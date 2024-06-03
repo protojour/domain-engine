@@ -104,6 +104,7 @@ fn test_graphql_field_order() {
             "b",
             "c",
             "d",
+            // collections are placed after regular fields:
             "connection",
             "obj_1",
             "obj_2"

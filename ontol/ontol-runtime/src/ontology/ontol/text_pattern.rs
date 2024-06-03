@@ -8,7 +8,6 @@ use tracing::{debug, error};
 use crate::{
     interface::serde::processor::ProcessorMode,
     ontology::Ontology,
-    property::PropertyId,
     value::{Attribute, FormatValueAsText, Value},
     DefId, RelationshipId,
 };
@@ -77,7 +76,7 @@ impl TextPattern {
                         let text_def_id = ontology.ontol_domain_meta().text;
 
                         attrs.insert(
-                            PropertyId::subject(crate::RelationshipId(text_def_id)),
+                            RelationshipId(text_def_id),
                             Attribute {
                                 rel: Value::unit(),
                                 val: Value::Text(text.into(), text_def_id),
@@ -110,7 +109,7 @@ impl TextPattern {
                                 ))
                             })?;
 
-                        attrs.insert(property.property_id, attribute);
+                        attrs.insert(property.rel_id, attribute);
                     }
                 }
             }
@@ -129,7 +128,7 @@ pub enum TextPatternConstantPart {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TextPatternProperty {
-    pub property_id: PropertyId,
+    pub rel_id: RelationshipId,
     pub type_def_id: DefId,
     pub capture_group: usize,
 }
@@ -145,10 +144,9 @@ impl<'d, 'o> Display for FormatPattern<'d, 'o> {
         for constant_part in &self.pattern.constant_parts {
             match (constant_part, self.value) {
                 (TextPatternConstantPart::AnyString { .. }, Value::Struct(attrs, _)) => {
-                    let property_id =
-                        PropertyId::subject(RelationshipId(self.ontology.ontol_domain_meta().text));
-                    let Some(attribute) = attrs.get(&property_id) else {
-                        error!("Attribute {property_id} missing when formatting capturing text pattern");
+                    let rel_id = RelationshipId(self.ontology.ontol_domain_meta().text);
+                    let Some(attribute) = attrs.get(&rel_id) else {
+                        error!("Attribute {rel_id} missing when formatting capturing text pattern");
                         return Err(std::fmt::Error);
                     };
                     match &attribute.val {
@@ -160,14 +158,14 @@ impl<'d, 'o> Display for FormatPattern<'d, 'o> {
                 }
                 (
                     TextPatternConstantPart::Property(TextPatternProperty {
-                        property_id,
+                        rel_id,
                         type_def_id,
                         ..
                     }),
                     Value::Struct(attrs, _),
                 ) => {
-                    let Some(attribute) = attrs.get(property_id) else {
-                        error!("Attribute {property_id} missing when formatting capturing text pattern");
+                    let Some(attribute) = attrs.get(rel_id) else {
+                        error!("Attribute {rel_id} missing when formatting capturing text pattern");
                         return Err(std::fmt::Error);
                     };
                     write!(

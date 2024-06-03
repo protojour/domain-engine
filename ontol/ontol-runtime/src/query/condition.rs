@@ -7,10 +7,9 @@ use thin_vec::ThinVec;
 use crate::{
     debug::OntolDebug,
     impl_ontol_debug,
-    property::PropertyId,
     value::{Value, ValueDebug},
     var::Var,
-    DefId,
+    DefId, RelationshipId,
 };
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -165,7 +164,7 @@ pub enum Clause<V, Term> {
     IsEntity(DefId),
     /// The left variable is connected via a property to the right variable.
     /// The right variable represents a set of values for the property.
-    MatchProp(PropertyId, SetOperator, V),
+    MatchProp(RelationshipId, SetOperator, V),
     /// An attribute (rel, val) is a member of the set
     Member(Term, Term),
 }

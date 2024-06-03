@@ -2,10 +2,9 @@ use ontol_hir::{
     import::arena_import, Binder, Binding, CaptureGroup, Kind, Node, Nodes, OverloadFunc,
 };
 use ontol_runtime::{
-    property::PropertyId,
     value::Attribute,
     var::{Var, VarSet},
-    DefId,
+    DefId, RelationshipId,
 };
 use thin_vec::ThinVec;
 use tracing::{debug, warn};
@@ -20,10 +19,10 @@ use super::{ssa_unifier::SsaUnifier, UnifierResult};
 
 #[derive(Clone)]
 pub enum Let<'m> {
-    Prop(Attribute<Binding<'m, TypedHir>>, (Var, PropertyId)),
+    Prop(Attribute<Binding<'m, TypedHir>>, (Var, RelationshipId)),
     PropDefault(
         Attribute<Binding<'m, TypedHir>>,
-        (Var, PropertyId),
+        (Var, RelationshipId),
         Attribute<Node>,
     ),
     Narrow(TypedHirData<'m, Var>),

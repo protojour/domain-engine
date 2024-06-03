@@ -1,8 +1,7 @@
 use ontol_hir::{visitor::HirVisitor, Node, PropFlags, PropVariant};
 use ontol_runtime::{
-    property::PropertyId,
     var::{Var, VarAllocator, VarSet},
-    MapFlags,
+    MapFlags, RelationshipId,
 };
 use thin_vec::ThinVec;
 
@@ -222,7 +221,7 @@ pub fn scan_immediate_free_vars<const N: usize>(
             &mut self,
             flags: PropFlags,
             struct_var: Var,
-            prop_id: PropertyId,
+            rel_id: RelationshipId,
             variant: &PropVariant,
             arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
         ) {
@@ -232,7 +231,7 @@ pub fn scan_immediate_free_vars<const N: usize>(
                 return;
             }
 
-            self.traverse_prop(struct_var, prop_id, variant, arena);
+            self.traverse_prop(struct_var, rel_id, variant, arena);
         }
 
         fn visit_var(&mut self, var: Var) {

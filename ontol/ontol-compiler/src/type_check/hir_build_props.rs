@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 use ontol_hir::{PropFlags, StructFlags};
 use ontol_runtime::{
-    property::{Cardinality, PropertyCardinality, PropertyId, Role, ValueCardinality},
+    property::{Cardinality, PropertyCardinality, Role, ValueCardinality},
     query::condition::SetOperator,
     value::Attribute,
     var::Var,
@@ -38,7 +38,7 @@ pub(super) struct UnpackerInfo<'m> {
 }
 
 struct MatchAttribute {
-    property_id: PropertyId,
+    rel_id: RelationshipId,
     cardinality: Cardinality,
     rel_params_def: Option<DefId>,
     value_def: DefId,
@@ -209,11 +209,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     /// the relations defined on the type. Compute `MatchAttributes`:
     fn collect_named_match_attributes(
         &self,
-        property_set: &IndexMap<PropertyId, Property>,
+        property_set: &IndexMap<RelationshipId, Property>,
         match_attributes: &mut IndexMap<MatchAttributeKey<'m>, MatchAttribute>,
     ) {
-        for (prop_id, _property) in property_set {
-            self.collect_match_attribute(*prop_id, match_attributes);
+        for (rel_id, _property) in property_set {
+            self.collect_match_attribute(*rel_id, match_attributes);
         }
     }
 
@@ -242,25 +242,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn collect_match_attribute(
         &self,
-        prop_id: PropertyId,
+        rel_id: RelationshipId,
         match_attributes: &mut IndexMap<MatchAttributeKey<'m>, MatchAttribute>,
     ) {
-        let meta = self.defs.relationship_meta(prop_id.relationship_id);
-        let match_key = match prop_id.role {
-            Role::Subject => match meta.relation_def_kind.value {
-                DefKind::TextLiteral(lit) => Some(MatchAttributeKey::Named(lit)),
-                _ => Some(MatchAttributeKey::Def(meta.relationship.relation_def_id)),
-            },
-            Role::Object => meta.relationship.object_prop.map(MatchAttributeKey::Named),
+        let meta = self.defs.relationship_meta(rel_id);
+        let match_key = match meta.relation_def_kind.value {
+            DefKind::TextLiteral(lit) => Some(MatchAttributeKey::Named(lit)),
+            _ => Some(MatchAttributeKey::Def(meta.relationship.relation_def_id)),
         };
-        let (_, owner_cardinality, _) = meta.relationship.by(prop_id.role);
-        let (value_def_id, _, _) = meta.relationship.by(prop_id.role.opposite());
+        let (_, owner_cardinality, _) = meta.relationship.by(Role::Subject);
+        let (value_def_id, _, _) = meta.relationship.by(Role::Object);
 
         if let Some(match_key) = match_key {
             match_attributes.insert(
                 match_key,
                 MatchAttribute {
-                    property_id: prop_id,
+                    rel_id,
                     cardinality: owner_cardinality,
                     rel_params_def: match &meta.relationship.rel_params {
                         RelParams::Type(def_id) => Some(*def_id),
@@ -292,9 +289,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 match_attributes.insert(
                     MatchAttributeKey::Def(self.primitives.relations.order),
                     MatchAttribute {
-                        property_id: PropertyId::subject(RelationshipId(
-                            self.primitives.relations.order,
-                        )),
+                        rel_id: RelationshipId(self.primitives.relations.order),
                         cardinality: (PropertyCardinality::Optional, ValueCardinality::IndexSet),
                         rel_params_def: None,
                         value_def: order_union_def_id,
@@ -306,9 +301,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             match_attributes.insert(
                 MatchAttributeKey::Def(self.primitives.relations.direction),
                 MatchAttribute {
-                    property_id: PropertyId::subject(RelationshipId(
-                        self.primitives.relations.direction,
-                    )),
+                    rel_id: RelationshipId(self.primitives.relations.direction),
                     cardinality: (PropertyCardinality::Optional, ValueCardinality::Unit),
                     rel_params_def: None,
                     value_def: self.primitives.direction_union,
@@ -463,9 +456,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     ));
                                 }
 
-                                if matches!(match_attribute.property_id.role, Role::Object) {
-                                    flags.insert(PropFlags::REL_UP_OPTIONAL);
-                                }
+                                // if todo!("matches!(match_attribute.property_id.role, Role::Object)")
+                                // {
+                                //     flags.insert(PropFlags::REL_UP_OPTIONAL);
+                                // }
 
                                 ontol_hir::PropVariant::Value(Attribute {
                                     rel: ctx.mk_node(ontol_hir::Kind::Unit, Meta::unit(NO_SPAN)),
@@ -516,7 +510,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 if self
                     .rel_ctx
                     .value_generators
-                    .contains_key(&match_attribute.property_id.relationship_id)
+                    .contains_key(&match_attribute.rel_id)
                 {
                     flags.insert(PropFlags::REL_DOWN_OPTIONAL);
                 }
@@ -549,7 +543,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ontol_hir::Kind::Prop(
                         flags,
                         struct_binder_var,
-                        match_attribute.property_id,
+                        match_attribute.rel_id,
                         prop_variant,
                     ),
                     Meta {
@@ -607,7 +601,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ontol_hir::Kind::Prop(
                         flags | PropFlags::REL_UP_OPTIONAL | PropFlags::REL_DOWN_OPTIONAL, // TODO
                         struct_binder_var,
-                        match_attribute.property_id,
+                        match_attribute.rel_id,
                         prop_variant,
                     ),
                     Meta {
@@ -702,14 +696,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             if match_attr.mentioned {
                 continue;
             }
-            if matches!(match_attr.property_id.role, Role::Object) {
-                continue;
-            }
             if matches!(match_attr.cardinality.0, PropertyCardinality::Optional) {
                 continue;
             }
 
-            let relationship_id = match_attr.property_id.relationship_id;
+            let relationship_id = match_attr.rel_id;
 
             if let Some(const_def_id) = self
                 .rel_ctx
@@ -733,7 +724,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         ontol_hir::Kind::Prop(
                             ontol_hir::PropFlags::empty(),
                             struct_binder_var,
-                            match_attr.property_id,
+                            match_attr.rel_id,
                             ontol_hir::PropVariant::Value(Attribute { rel, val }),
                         ),
                         Meta::unit(NO_SPAN),
@@ -751,8 +742,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             {
                 let meta = self.defs.relationship_meta(relationship_id);
-                let (target_def_id, cardinality, _span) =
-                    meta.relationship.by(match_attr.property_id.role.opposite());
+                let (target_def_id, cardinality, _span) = meta.relationship.by(Role::Object);
 
                 // Here we check that if the missing property refers to variably sized edges
                 // to foreign entities, that property does not need to be mentioned for the map

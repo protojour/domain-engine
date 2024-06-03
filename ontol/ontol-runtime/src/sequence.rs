@@ -276,7 +276,7 @@ impl IndexChain {
 mod tests {
     use tracing::debug;
 
-    use crate::{property::PropertyId, DefId, PackageId, RelationshipId};
+    use crate::{DefId, PackageId, RelationshipId};
 
     use super::*;
 
@@ -370,7 +370,7 @@ mod tests {
     fn struct_value(iter: impl IntoIterator<Item = (u16, Value)>) -> Value {
         let attrs = iter.into_iter().map(|(p, val)| {
             (
-                PropertyId::subject(RelationshipId(DefId(PackageId(42), p))),
+                RelationshipId(DefId(PackageId(42), p)),
                 Attribute::from(val),
             )
         });
@@ -388,7 +388,7 @@ mod tests {
                     let value = Value::I64(i as i64, def(42));
 
                     (
-                        PropertyId::subject(RelationshipId(DefId(PackageId(42), key))),
+                        RelationshipId(DefId(PackageId(42), key)),
                         Attribute::from(value),
                     )
                 })

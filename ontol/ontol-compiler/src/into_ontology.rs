@@ -15,9 +15,9 @@ use ontol_runtime::{
         ontol::{OntolDomainMeta, TextConstant, TextLikeType},
         Ontology,
     },
-    property::{PropertyCardinality, PropertyId, Role, ValueCardinality},
+    property::{PropertyCardinality, Role, ValueCardinality},
     rustdoc::RustDoc,
-    DefId, EdgeId, PackageId, MIRROR_PROP,
+    DefId, EdgeId, PackageId, RelationshipId, MIRROR_PROP,
 };
 use std::{
     collections::{BTreeSet, HashMap},
@@ -347,7 +347,7 @@ impl<'m> Compiler<'m> {
         union_member_cache: &UnionMemberCache,
         edges: &mut FnvHashMap<EdgeId, EdgeInfo>,
         strings: &mut StringCtx<'m>,
-    ) -> FnvHashMap<PropertyId, DataRelationshipInfo> {
+    ) -> FnvHashMap<RelationshipId, DataRelationshipInfo> {
         let mut relationships = FnvHashMap::default();
         self.collect_inherent_relationships_and_edges(
             type_def_id,
@@ -396,7 +396,7 @@ impl<'m> Compiler<'m> {
     fn collect_inherent_relationships_and_edges(
         &self,
         type_def_id: DefId,
-        relationships: &mut FnvHashMap<PropertyId, DataRelationshipInfo>,
+        relationships: &mut FnvHashMap<RelationshipId, DataRelationshipInfo>,
         edges: &mut FnvHashMap<EdgeId, EdgeInfo>,
         strings: &mut StringCtx<'m>,
     ) {
@@ -404,9 +404,9 @@ impl<'m> Compiler<'m> {
             return;
         };
         if let Some(table) = &properties.table {
-            for property_id in table.keys() {
+            for rel_id in table.keys() {
                 self.collect_prop_relationship_and_edge(
-                    *property_id,
+                    *rel_id,
                     DataRelationshipSource::Inherent,
                     relationships,
                     edges,
@@ -418,16 +418,16 @@ impl<'m> Compiler<'m> {
 
     fn collect_prop_relationship_and_edge(
         &self,
-        property_id: PropertyId,
+        rel_id: RelationshipId,
         source: DataRelationshipSource,
-        relationships: &mut FnvHashMap<PropertyId, DataRelationshipInfo>,
+        relationships: &mut FnvHashMap<RelationshipId, DataRelationshipInfo>,
         edges: &mut FnvHashMap<EdgeId, EdgeInfo>,
         strings: &mut StringCtx<'m>,
     ) {
-        let meta = self.defs.relationship_meta(property_id.relationship_id);
+        let meta = self.defs.relationship_meta(rel_id);
 
-        let (source_def_id, _, _) = meta.relationship.by(property_id.role);
-        let (target_def_id, _, _) = meta.relationship.by(property_id.role.opposite());
+        let (source_def_id, _, _) = meta.relationship.by(Role::Subject);
+        let (target_def_id, _, _) = meta.relationship.by(Role::Object);
 
         let Some(target_properties) = self.rel_ctx.properties_by_def_id(target_def_id) else {
             return;
@@ -435,19 +435,11 @@ impl<'m> Compiler<'m> {
         let Some(repr_kind) = self.repr_ctx.get_repr_kind(&target_def_id) else {
             return;
         };
-        let name = match property_id.role {
-            Role::Subject => match meta.relation_def_kind.value {
-                DefKind::TextLiteral(subject_name) => strings.intern_constant(subject_name),
-                // FIXME: This doesn't _really_ have a subject "name". It represents a flattened structure:
-                DefKind::Type(_) => strings.intern_constant(""),
-                _ => return,
-            },
-            Role::Object => {
-                let Some(prop) = meta.relationship.object_prop else {
-                    return;
-                };
-                strings.intern_constant(prop)
-            }
+        let name = match meta.relation_def_kind.value {
+            DefKind::TextLiteral(subject_name) => strings.intern_constant(subject_name),
+            // FIXME: This doesn't _really_ have a subject "name". It represents a flattened structure:
+            DefKind::Type(_) => strings.intern_constant(""),
+            _ => return,
         };
 
         let edge_params = match meta.relationship.rel_params {
@@ -456,7 +448,7 @@ impl<'m> Compiler<'m> {
         };
 
         let edge_id = if MIRROR_PROP {
-            EdgeId(property_id.relationship_id.0)
+            EdgeId(rel_id.0)
         } else {
             meta.relationship.edge_cardinal_id.id
         };
@@ -464,10 +456,7 @@ impl<'m> Compiler<'m> {
         let edge_cardinal_id = if MIRROR_PROP {
             EdgeCardinalId {
                 id: edge_id,
-                cardinal_idx: match property_id.role {
-                    Role::Subject => CardinalIdx(0),
-                    Role::Object => CardinalIdx(1),
-                },
+                cardinal_idx: CardinalIdx(0),
             }
         } else {
             meta.relationship.edge_cardinal_id
@@ -495,9 +484,7 @@ impl<'m> Compiler<'m> {
                 } else {
                     let source_properties = self.rel_ctx.properties_by_def_id(source_def_id);
                     let is_entity_id = source_properties
-                        .map(|properties| {
-                            properties.identified_by == Some(property_id.relationship_id)
-                        })
+                        .map(|properties| properties.identified_by == Some(rel_id))
                         .unwrap_or(false);
 
                     (
@@ -526,22 +513,11 @@ impl<'m> Compiler<'m> {
             });
 
             if MIRROR_PROP {
-                match property_id.role {
-                    Role::Subject => {
-                        edge_info.cardinals[0] = EdgeCardinal {
-                            target: target.clone(),
-                            cardinality: meta.relationship.subject_cardinality,
-                            is_entity: true,
-                        };
-                    }
-                    Role::Object => {
-                        edge_info.cardinals[1] = EdgeCardinal {
-                            target: target.clone(),
-                            cardinality: meta.relationship.object_cardinality,
-                            is_entity: true,
-                        };
-                    }
-                }
+                edge_info.cardinals[0] = EdgeCardinal {
+                    target: target.clone(),
+                    cardinality: meta.relationship.subject_cardinality,
+                    is_entity: true,
+                };
             } else {
                 edge_info.cardinals[edge_cardinal_id.cardinal_idx.0 as usize] = EdgeCardinal {
                     target: target.clone(),
@@ -561,14 +537,11 @@ impl<'m> Compiler<'m> {
 
         // collect relationship
         relationships.insert(
-            property_id,
+            rel_id,
             DataRelationshipInfo {
                 name,
                 kind: data_relationship_kind,
-                cardinality: match property_id.role {
-                    Role::Subject => meta.relationship.subject_cardinality,
-                    Role::Object => meta.relationship.object_cardinality,
-                },
+                cardinality: meta.relationship.subject_cardinality,
                 source,
                 target,
             },
@@ -580,7 +553,7 @@ impl<'m> Compiler<'m> {
         type_def_id: DefId,
         name: TextConstant,
         serde_generator: &mut SerdeGenerator,
-        data_relationships: &FnvHashMap<PropertyId, DataRelationshipInfo>,
+        data_relationships: &FnvHashMap<RelationshipId, DataRelationshipInfo>,
     ) -> Option<EntityInfo> {
         let properties = self.rel_ctx.properties_by_def_id(type_def_id)?;
         let id_relationship_id = properties.identified_by?;
@@ -639,7 +612,7 @@ impl<'m> Compiler<'m> {
             .get(&id_relationship_id)
             .cloned()?;
         let map = properties.table.as_ref()?;
-        let _property = map.get(&PropertyId::subject(inherent_id))?;
+        let _property = map.get(&inherent_id)?;
 
         Some(self.defs.relationship_meta(inherent_id))
     }

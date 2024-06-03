@@ -10,17 +10,17 @@ use tracing::{trace, Level};
 use crate::{
     cast::Cast,
     ontology::{ontol::TextConstant, Ontology},
-    property::{PropertyId, ValueCardinality},
+    property::ValueCardinality,
     query::condition::{Clause, ClausePair, CondTerm},
     sequence::Sequence,
     value::{Attribute, Value, ValueDebug},
     var::Var,
-    vm::proc::{BuiltinProc, Local, Procedure},
     vm::{
         abstract_vm::{AbstractVm, Processor, VmDebug},
+        proc::{BuiltinProc, Local, Procedure},
         VmError,
     },
-    DefId,
+    DefId, RelationshipId,
 };
 
 use super::{
@@ -147,7 +147,7 @@ impl<'o> Processor for OntolProcessor<'o> {
     fn get_attr(
         &mut self,
         source: Local,
-        key: PropertyId,
+        key: RelationshipId,
         flags: super::proc::GetAttrFlags,
     ) -> VmResult<()> {
         let _struct = self.struct_local_mut(source)?;
@@ -179,7 +179,7 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn put_attr1(&mut self, target: Local, key: PropertyId) -> VmResult<()> {
+    fn put_attr1(&mut self, target: Local, key: RelationshipId) -> VmResult<()> {
         let value = self.stack.pop().unwrap();
         if !matches!(value, Value::Unit(_) | Value::Void(_)) {
             match &mut self.stack[target.0 as usize] {
@@ -188,7 +188,7 @@ impl<'o> Processor for OntolProcessor<'o> {
                 }
                 Value::Filter(filter, _) => {
                     let meta = self.ontology.ontol_domain_meta();
-                    let relationship = key.relationship_id.0;
+                    let relationship = key.0;
 
                     if relationship == meta.order_relationship {
                         filter.set_order(value);
@@ -208,7 +208,7 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn put_attr2(&mut self, target: Local, key: PropertyId) -> VmResult<()> {
+    fn put_attr2(&mut self, target: Local, key: RelationshipId) -> VmResult<()> {
         let [rel, val]: [Value; 2] = self.pop_n();
         if !matches!(val, Value::Unit(_) | Value::Void(_)) {
             let map = self.struct_local_mut(target)?;
@@ -512,7 +512,7 @@ impl<'o> OntolProcessor<'o> {
     fn struct_local_mut(
         &mut self,
         local: Local,
-    ) -> VmResult<&mut FnvHashMap<PropertyId, Attribute>> {
+    ) -> VmResult<&mut FnvHashMap<RelationshipId, Attribute>> {
         match self.local_mut(local) {
             Value::Struct(attrs, _) | Value::StructUpdate(attrs, _) => Ok(attrs.as_mut()),
             _ => Err(VmError::InvalidType(local)),
@@ -620,10 +620,10 @@ mod tests {
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(42)),
-                OpCode::GetAttr(Local(0), "S:0:1".parse().unwrap(), GetAttrFlags::take2()),
-                OpCode::PutAttr1(Local(1), "S:0:3".parse().unwrap()),
-                OpCode::GetAttr(Local(0), "S:0:2".parse().unwrap(), GetAttrFlags::take2()),
-                OpCode::PutAttr1(Local(1), "S:0:4".parse().unwrap()),
+                OpCode::GetAttr(Local(0), "R:0:1".parse().unwrap(), GetAttrFlags::take2()),
+                OpCode::PutAttr1(Local(1), "R:0:3".parse().unwrap()),
+                OpCode::GetAttr(Local(0), "R:0:2".parse().unwrap(), GetAttrFlags::take2()),
+                OpCode::PutAttr1(Local(1), "R:0:4".parse().unwrap()),
                 OpCode::PopUntil(Local(1)),
                 OpCode::Return,
             ],
@@ -634,11 +634,11 @@ mod tests {
             .run([Value::new_struct(
                 [
                     (
-                        "S:0:1".parse().unwrap(),
+                        "R:0:1".parse().unwrap(),
                         Value::Text("foo".into(), def_id(0)).into(),
                     ),
                     (
-                        "S:0:2".parse().unwrap(),
+                        "R:0:2".parse().unwrap(),
                         Value::Text("bar".into(), def_id(0)).into(),
                     ),
                 ],
@@ -652,7 +652,7 @@ mod tests {
         };
         let properties = attrs.keys().cloned().collect::<FnvHashSet<_>>();
         assert_eq!(
-            FnvHashSet::from_iter(["S:0:3".parse().unwrap(), "S:0:4".parse().unwrap(),]),
+            FnvHashSet::from_iter(["R:0:3".parse().unwrap(), "R:0:4".parse().unwrap(),]),
             properties
         );
     }
@@ -681,17 +681,17 @@ mod tests {
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(0)),
                 // 2, 3:
-                OpCode::GetAttr(Local(0), "S:0:1".parse().unwrap(), GetAttrFlags::take2()),
+                OpCode::GetAttr(Local(0), "R:0:1".parse().unwrap(), GetAttrFlags::take2()),
                 OpCode::Call(double),
-                OpCode::PutAttr1(Local(1), "S:0:4".parse().unwrap()),
+                OpCode::PutAttr1(Local(1), "R:0:4".parse().unwrap()),
                 // 3, 4:
-                OpCode::GetAttr(Local(0), "S:0:2".parse().unwrap(), GetAttrFlags::take2()),
+                OpCode::GetAttr(Local(0), "R:0:2".parse().unwrap(), GetAttrFlags::take2()),
                 // 5, 6:
-                OpCode::GetAttr(Local(0), "S:0:3".parse().unwrap(), GetAttrFlags::take2()),
+                OpCode::GetAttr(Local(0), "R:0:3".parse().unwrap(), GetAttrFlags::take2()),
                 OpCode::Clone(Local(4)),
                 // pop(6, 7):
                 OpCode::Call(add_then_double),
-                OpCode::PutAttr1(Local(1), "S:0:5".parse().unwrap()),
+                OpCode::PutAttr1(Local(1), "R:0:5".parse().unwrap()),
                 OpCode::PopUntil(Local(1)),
                 OpCode::Return,
             ],
@@ -701,9 +701,9 @@ mod tests {
         let output = OntolVm::new(&ontology, mapping_proc)
             .run([Value::new_struct(
                 [
-                    ("S:0:1".parse().unwrap(), Value::I64(333, def_id(0)).into()),
-                    ("S:0:2".parse().unwrap(), Value::I64(10, def_id(0)).into()),
-                    ("S:0:3".parse().unwrap(), Value::I64(11, def_id(0)).into()),
+                    ("R:0:1".parse().unwrap(), Value::I64(333, def_id(0)).into()),
+                    ("R:0:2".parse().unwrap(), Value::I64(10, def_id(0)).into()),
+                    ("R:0:3".parse().unwrap(), Value::I64(11, def_id(0)).into()),
                 ],
                 def_id(0),
             )])
@@ -713,10 +713,10 @@ mod tests {
         let Value::Struct(mut attrs, _) = output else {
             panic!();
         };
-        let Value::I64(a, _) = attrs.remove(&"S:0:4".parse().unwrap()).unwrap().val else {
+        let Value::I64(a, _) = attrs.remove(&"R:0:4".parse().unwrap()).unwrap().val else {
             panic!();
         };
-        let Value::I64(b, _) = attrs.remove(&"S:0:5".parse().unwrap()).unwrap().val else {
+        let Value::I64(b, _) = attrs.remove(&"R:0:5".parse().unwrap()).unwrap().val else {
             panic!();
         };
         assert_eq!(666, a);
@@ -774,8 +774,8 @@ mod tests {
     fn flat_map_object() {
         let mut lib = Lib::default();
 
-        let prop_a: PropertyId = "S:0:0".parse().unwrap();
-        let prop_b: PropertyId = "S:0:1".parse().unwrap();
+        let prop_a: RelationshipId = "R:0:0".parse().unwrap();
+        let prop_b: RelationshipId = "R:0:1".parse().unwrap();
 
         let proc = lib.append_procedure(
             NParams(1),
@@ -825,7 +825,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            "[{S:0:1 -> 'b0', S:0:0 -> 'a'}, {S:0:1 -> 'b1', S:0:0 -> 'a'}]",
+            "[{R:0:1 -> 'b0', R:0:0 -> 'a'}, {R:0:1 -> 'b1', R:0:0 -> 'a'}]",
             format!("{}", ValueDebug(&output))
         );
     }
@@ -834,7 +834,7 @@ mod tests {
     fn discriminant_cond() {
         let mut lib = Lib::default();
 
-        let prop: PropertyId = "S:0:42".parse().unwrap();
+        let prop: RelationshipId = "R:0:42".parse().unwrap();
         let inner_def_id = def_id(100);
 
         let proc = lib.append_procedure(
@@ -888,7 +888,7 @@ mod tests {
         );
 
         assert_eq!(
-            "{S:0:42 -> int(666)}",
+            "{R:0:42 -> int(666)}",
             format!(
                 "{}",
                 ValueDebug(

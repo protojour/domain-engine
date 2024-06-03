@@ -30,7 +30,7 @@ fn test_map_match_scalar_key() {
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:2)
-                            (match-prop $a S:1:4 (element-in $b))
+                            (match-prop $a R:1:4 (element-in $b))
                             (member $b (_ 'input'))
                         "#
                         }))
@@ -123,8 +123,8 @@ fn test_map_match_query_mandatory_properties() {
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:2)
-                            (match-prop $a S:1:6 (element-in $b))
-                            (match-prop $a S:1:7 (element-in $c))
+                            (match-prop $a R:1:6 (element-in $b))
+                            (match-prop $a R:1:7 (element-in $c))
                             (member $b (_ 'A'))
                             (member $c (_ 'B'))
                         "#
@@ -176,7 +176,7 @@ fn test_map_match_query_optional_property() {
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:2)
-                            (match-prop $a S:1:6 (element-in $b))
+                            (match-prop $a R:1:6 (element-in $b))
                             (member $b (_ 'A'))
                         "#
                         }))
@@ -197,8 +197,8 @@ fn test_map_match_query_optional_property() {
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:2)
-                            (match-prop $a S:1:6 (element-in $b))
-                            (match-prop $a S:1:7 (element-in $c))
+                            (match-prop $a R:1:6 (element-in $b))
+                            (match-prop $a R:1:7 (element-in $c))
                             (member $b (_ 'A'))
                             (member $c (_ 'B'))
                         "#
@@ -246,7 +246,7 @@ fn test_map_match_anonymous_with_translation() {
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:2)
-                            (match-prop $a S:1:7 (element-in $b))
+                            (match-prop $a R:1:7 (element-in $b))
                             (member $b (_ 'X'))
                         "#
                         }))
@@ -291,7 +291,7 @@ fn test_map_match_sequence_filter_in_set() {
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:2)
-                            (match-prop $a S:1:7 (element-in $b))
+                            (match-prop $a R:1:7 (element-in $b))
                             (member $b (_ 'X'))
                             (member $b (_ 'Y'))
                         "#
@@ -354,7 +354,7 @@ mod match_contains_all {
                         eq!(&Literal(indoc! { r#"
                                 (root $a)
                                 (is-entity $a def@1:1)
-                                (match-prop $a S:1:7 (superset-of $b))
+                                (match-prop $a R:1:7 (superset-of $b))
                                 (member $b (_ 'x!'))
                                 (member $b (_ 'y!'))
                             "#
@@ -381,8 +381,8 @@ mod match_contains_all {
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:1)
-                            (match-prop $a S:1:8 (element-in $c))
-                            (match-prop $b S:1:9 (superset-of $d))
+                            (match-prop $a R:1:8 (element-in $c))
+                            (match-prop $b R:1:9 (superset-of $d))
                             (member $c (_ $b))
                             (member $d (_ 'x!'))
                         "#
@@ -427,9 +427,9 @@ fn test_map_match_in_sub_multi_edge() {
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:1)
-                            (match-prop $a S:1:7 (element-in $c))
+                            (match-prop $a R:1:7 (element-in $c))
                             (is-entity $b def@1:2)
-                            (match-prop $b S:1:12 (superset-of $d))
+                            (match-prop $b R:1:12 (superset-of $d))
                             (member $c (_ $b))
                             (member $d (_ 'x'))
                             (member $d (_ 'y'))

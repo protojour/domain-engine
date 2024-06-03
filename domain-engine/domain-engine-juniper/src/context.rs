@@ -14,7 +14,6 @@ use ontol_runtime::{
         serde::processor::ProcessorProfileFlags,
     },
     ontology::{ontol::TextConstant, Ontology},
-    property::PropertyId,
     value::Value,
     DefId,
 };
@@ -152,7 +151,7 @@ impl SchemaCtx {
                 .iter()
                 .all(|(pred_relationship, pred_type)| {
                     attrs
-                        .get(&PropertyId::subject(*pred_relationship))
+                        .get(pred_relationship)
                         .map(|attr| attr.val.type_def_id() == *pred_type)
                         .unwrap_or(false)
                 })

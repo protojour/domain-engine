@@ -12,10 +12,10 @@ use ontol_runtime::{
         },
         ontol::ValueGenerator,
     },
-    property::{PropertyId, ValueCardinality},
+    property::ValueCardinality,
     query::{filter::Filter, select::Select},
     value::{Attribute, Serial, Value, ValueDebug},
-    DefId,
+    DefId, RelationshipId,
 };
 use tracing::{debug, warn};
 
@@ -70,20 +70,20 @@ impl InMemoryStore {
             return Err(DomainError::EntityNotFound);
         }
 
-        let mut raw_props_update: BTreeMap<PropertyId, Attribute> = Default::default();
+        let mut raw_props_update: BTreeMap<RelationshipId, Attribute> = Default::default();
 
         let Value::StructUpdate(data_struct, _) = value else {
             return Err(DomainError::BadInput(anyhow!("Expected a struct update")));
         };
-        for (property_id, attribute) in *data_struct {
-            let data_relationship = find_data_relationship(type_info, &property_id)?;
+        for (rel_id, attribute) in *data_struct {
+            let data_relationship = find_data_relationship(type_info, &rel_id)?;
 
             match data_relationship.kind {
                 DataRelationshipKind::Id => {
                     warn!("ID should not be updated");
                 }
                 DataRelationshipKind::Tree => {
-                    raw_props_update.insert(property_id, attribute);
+                    raw_props_update.insert(rel_id, attribute);
                 }
                 DataRelationshipKind::Edge(edge_cardinal) => {
                     match data_relationship.cardinality.1 {
@@ -223,23 +223,20 @@ impl InMemoryStore {
         };
 
         if id_generated {
-            struct_map.insert(
-                PropertyId::subject(entity_info.id_relationship_id),
-                id.clone().into(),
-            );
+            struct_map.insert(entity_info.id_relationship_id, id.clone().into());
         }
 
-        let mut raw_props: FnvHashMap<PropertyId, Attribute> = Default::default();
+        let mut raw_props: FnvHashMap<RelationshipId, Attribute> = Default::default();
 
         let entity_key = Self::extract_dynamic_key(&id)?;
 
-        for (property_id, attribute) in *struct_map {
-            let data_relationship = find_data_relationship(type_info, &property_id)?;
+        for (rel_id, attribute) in *struct_map {
+            let data_relationship = find_data_relationship(type_info, &rel_id)?;
 
             match data_relationship.kind {
                 DataRelationshipKind::Id => {}
                 DataRelationshipKind::Tree => {
-                    raw_props.insert(property_id, attribute);
+                    raw_props.insert(rel_id, attribute);
                 }
                 DataRelationshipKind::Edge(edge_cardinal) => {
                     match data_relationship.cardinality.1 {
@@ -538,7 +535,7 @@ impl InMemoryStore {
             // Synthesize the entity, write it and move on..
 
             let entity_data = FnvHashMap::from_iter([(
-                PropertyId::subject(entity_info.id_relationship_id),
+                entity_info.id_relationship_id,
                 Attribute::from(id_value),
             )]);
             self.write_new_entity_inner(

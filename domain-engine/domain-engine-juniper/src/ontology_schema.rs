@@ -13,8 +13,8 @@ use ontol_runtime::{
         ontol::TextConstant,
         Ontology,
     },
-    property::{self, PropertyId},
-    DefId, EdgeId, MapKey, PackageId,
+    property::{self},
+    DefId, EdgeId, MapKey, PackageId, RelationshipId,
 };
 
 struct Domain {
@@ -37,7 +37,7 @@ struct MapEdge {
 struct DataRelationshipInfo {
     def_id: DefId,
     kind: RelationshipKindEnum,
-    property_id: PropertyId,
+    rel_id: RelationshipId,
     edge_cardinal_id: Option<EdgeCardinalId>,
 }
 
@@ -59,8 +59,8 @@ struct Entity {
 }
 
 struct PropertyFlow {
-    source: PropertyId,
-    target: PropertyId,
+    source: RelationshipId,
+    target: RelationshipId,
     kind: PropertyFlowKind,
 }
 
@@ -150,12 +150,12 @@ impl PropertyFlow {
 #[graphql_object]
 #[graphql(context = Context)]
 impl DataRelationshipInfo {
-    fn property_id(&self) -> String {
-        self.property_id.to_string()
+    fn relationship_id(&self) -> String {
+        self.rel_id.to_string()
     }
     fn source(&self, context: &Context) -> DataRelationshipSource {
         let type_info = context.get_type_info(self.def_id);
-        let data_relationship = type_info.data_relationships.get(&self.property_id).unwrap();
+        let data_relationship = type_info.data_relationships.get(&self.rel_id).unwrap();
         match data_relationship.source {
             ontol_runtime::ontology::domain::DataRelationshipSource::Inherent => {
                 DataRelationshipSource::Inherent
@@ -167,7 +167,7 @@ impl DataRelationshipInfo {
     }
     fn target(&self, context: &Context) -> TypeInfo {
         let type_info = context.get_type_info(self.def_id);
-        let data_relationship = type_info.data_relationships.get(&self.property_id).unwrap();
+        let data_relationship = type_info.data_relationships.get(&self.rel_id).unwrap();
         let target_def_id = match data_relationship.target {
             ontol_runtime::ontology::domain::DataRelationshipTarget::Unambiguous(def_id) => def_id,
             ontol_runtime::ontology::domain::DataRelationshipTarget::Union(def_id) => def_id,
@@ -176,12 +176,12 @@ impl DataRelationshipInfo {
     }
     fn name(&self, context: &Context) -> String {
         let type_info = context.get_type_info(self.def_id);
-        let data_relationship = type_info.data_relationships.get(&self.property_id).unwrap();
+        let data_relationship = type_info.data_relationships.get(&self.rel_id).unwrap();
         context[data_relationship.name].into()
     }
     fn cardinality(&self, context: &Context) -> Cardinality {
         let type_info = context.get_type_info(self.def_id);
-        let data_relationship = type_info.data_relationships.get(&self.property_id).unwrap();
+        let data_relationship = type_info.data_relationships.get(&self.rel_id).unwrap();
         Cardinality::from(data_relationship.cardinality)
     }
     fn kind(&self) -> RelationshipKindEnum {
@@ -363,7 +363,7 @@ impl TypeInfo {
         type_info
             .data_relationships
             .iter()
-            .map(|(property_id, dri)| {
+            .map(|(rel_id, dri)| {
                 let (kind, edge_cardinal_id) = match dri.kind {
                     ontol_runtime::ontology::domain::DataRelationshipKind::Id => {
                         (RelationshipKindEnum::Id, None)
@@ -378,7 +378,7 @@ impl TypeInfo {
                 DataRelationshipInfo {
                     kind,
                     def_id: self.id,
-                    property_id: *property_id,
+                    rel_id: *rel_id,
                     edge_cardinal_id,
                 }
             })

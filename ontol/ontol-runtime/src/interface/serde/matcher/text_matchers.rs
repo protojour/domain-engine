@@ -11,7 +11,6 @@ use crate::{
         },
         Ontology,
     },
-    property::{PropertyId, Role},
     value::{Attribute, Value},
     DefId, RelationshipId,
 };
@@ -121,17 +120,14 @@ impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
                                 .deserialize(StrDeserializer::<serde_json::Error>::new(str))
                                 .map_err(|_| ())?;
 
-                            attrs.insert(property.property_id, attribute);
+                            attrs.insert(property.rel_id, attribute);
                         }
                         TextPatternConstantPart::AnyString { .. } => {
                             let text_def_id = self.ontology.ontol_domain_meta().text;
-                            let property_id = PropertyId {
-                                role: Role::Subject,
-                                relationship_id: RelationshipId(text_def_id),
-                            };
+                            let rel_id = RelationshipId(text_def_id);
 
                             attrs.insert(
-                                property_id,
+                                rel_id,
                                 Attribute {
                                     rel: Value::unit(),
                                     val: Value::Text(str.into(), text_def_id),

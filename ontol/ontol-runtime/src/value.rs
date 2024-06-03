@@ -11,8 +11,8 @@ use smartstring::alias::String;
 use thin_vec::ThinVec;
 
 use crate::{
-    cast::Cast, ontology::Ontology, property::PropertyId, query::filter::Filter,
-    sequence::Sequence, DefId,
+    cast::Cast, ontology::Ontology, query::filter::Filter, sequence::Sequence, DefId,
+    RelationshipId,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -32,11 +32,11 @@ pub enum Value {
     ChronoTime(chrono::NaiveTime, DefId),
 
     /// A collection of attributes keyed by property.
-    Struct(Box<FnvHashMap<PropertyId, Attribute<Self>>>, DefId),
+    Struct(Box<FnvHashMap<RelationshipId, Attribute<Self>>>, DefId),
 
     /// A collection of attributes keyed by property, but contains
     /// only partial information, and must contain the ID of the struct (entity) to update.
-    StructUpdate(Box<FnvHashMap<PropertyId, Attribute<Self>>>, DefId),
+    StructUpdate(Box<FnvHashMap<RelationshipId, Attribute<Self>>>, DefId),
 
     /// A collection of arbitrary values keyed by strings.
     Dict(Box<BTreeMap<String, Value>>, DefId),
@@ -67,7 +67,7 @@ pub enum Value {
 
 impl Value {
     pub fn new_struct(
-        props: impl IntoIterator<Item = (PropertyId, Attribute<Self>)>,
+        props: impl IntoIterator<Item = (RelationshipId, Attribute<Self>)>,
         type_id: DefId,
     ) -> Self {
         Self::Struct(Box::new(FnvHashMap::from_iter(props)), type_id)
@@ -159,15 +159,15 @@ impl Value {
         }
     }
 
-    pub fn get_attribute(&self, property_id: PropertyId) -> Option<&Attribute<Self>> {
+    pub fn get_attribute(&self, rel_id: RelationshipId) -> Option<&Attribute<Self>> {
         match self {
-            Self::Struct(map, _) => map.get(&property_id),
+            Self::Struct(map, _) => map.get(&rel_id),
             _ => None,
         }
     }
 
-    pub fn get_attribute_value(&self, property_id: PropertyId) -> Option<&Value> {
-        self.get_attribute(property_id).map(|attr| &attr.val)
+    pub fn get_attribute_value(&self, rel_id: RelationshipId) -> Option<&Value> {
+        self.get_attribute(rel_id).map(|attr| &attr.val)
     }
 
     #[inline]

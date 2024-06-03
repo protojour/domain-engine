@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use fake::{Fake, Faker};
 use ontol_runtime::{
@@ -9,12 +9,13 @@ use ontol_runtime::{
         processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
     },
     ontology::{
+        domain::DataRelationshipKind,
         ontol::{text_pattern::TextPattern, TextLikeType},
         Ontology,
     },
     sequence::Sequence,
     value::{Attribute, Serial, Value},
-    DefId,
+    DefId, EdgeId,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use regex_generate::Generator;
@@ -50,6 +51,7 @@ pub fn new_constant_fake(
         ontology,
         rng: &mut rng,
         processor_mode,
+        edge_saturation: Default::default(),
     }
     .fake_value(def_id)
 }
@@ -58,6 +60,9 @@ struct FakeGenerator<'a, R: Rng> {
     ontology: &'a Ontology,
     rng: &'a mut R,
     processor_mode: ProcessorMode,
+
+    // A guard that prevents the generator from generating data for the same edge recursively
+    edge_saturation: HashSet<EdgeId>,
 }
 
 impl<'a, R: Rng> FakeGenerator<'a, R> {
@@ -204,9 +209,25 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
             }
             SerdeOperator::Struct(struct_op) => {
                 let mut attrs = HashMap::default();
+                let type_info = processor.ontology().get_type_info(struct_op.def.def_id);
+
                 for (_, property) in struct_op.properties.iter() {
+                    if let Some(data_relationship) =
+                        type_info.data_relationships.get(&property.rel_id)
+                    {
+                        if let DataRelationshipKind::Edge(edge_cardinal_id) = data_relationship.kind
+                        {
+                            // FIXME: Probably can't skip when the relationship is required
+                            if self.edge_saturation.contains(&edge_cardinal_id.id) {
+                                continue;
+                            }
+
+                            self.edge_saturation.insert(edge_cardinal_id.id);
+                        }
+                    }
+
                     let attr = self.fake_attribute(processor.new_child(property.value_addr)?)?;
-                    attrs.insert(property.property_id, attr);
+                    attrs.insert(property.rel_id, attr);
                 }
 
                 Value::Struct(Box::new(attrs), struct_op.def.def_id)

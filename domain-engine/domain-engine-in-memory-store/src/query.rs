@@ -2,14 +2,14 @@ use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::domain::{DataRelationshipKind, DataRelationshipTarget, EdgeCardinalId, TypeInfo},
-    property::{PropertyId, ValueCardinality},
+    property::ValueCardinality,
     query::{
         filter::Filter,
         select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     },
     sequence::{Sequence, SubSequence},
     value::{Attribute, Value},
-    DefId,
+    DefId, RelationshipId,
 };
 use tracing::{debug, error};
 
@@ -154,17 +154,17 @@ impl InMemoryStore {
         &self,
         type_info: &TypeInfo,
         entity_key: &DynamicKey,
-        mut properties: FnvHashMap<PropertyId, Attribute>,
+        mut properties: FnvHashMap<RelationshipId, Attribute>,
         struct_def_id: DefId,
-        select_properties: &FnvHashMap<PropertyId, Select>,
+        select_properties: &FnvHashMap<RelationshipId, Select>,
         ctx: &DbContext,
     ) -> DomainResult<Value> {
-        for (property_id, subselect) in select_properties {
-            if properties.contains_key(property_id) {
+        for (rel_id, subselect) in select_properties {
+            if properties.contains_key(rel_id) {
                 continue;
             }
 
-            let data_relationship = find_data_relationship(type_info, property_id)?;
+            let data_relationship = find_data_relationship(type_info, rel_id)?;
 
             let DataRelationshipKind::Edge(edge_cardinal) = data_relationship.kind else {
                 continue;
@@ -175,12 +175,12 @@ impl InMemoryStore {
             match data_relationship.cardinality.1 {
                 ValueCardinality::Unit => {
                     if let Some(attribute) = attrs.into_iter().next() {
-                        properties.insert(*property_id, attribute);
+                        properties.insert(*rel_id, attribute);
                     }
                 }
                 ValueCardinality::IndexSet | ValueCardinality::List => {
                     properties.insert(
-                        *property_id,
+                        *rel_id,
                         Value::Sequence(
                             Sequence::from_iter(attrs),
                             match data_relationship.target {
@@ -269,9 +269,7 @@ impl InMemoryStore {
         match select {
             Select::Leaf => {
                 // Entity leaf only includes the ID of that entity, not its other fields
-                let id_attribute = properties
-                    .get(&PropertyId::subject(entity_info.id_relationship_id))
-                    .unwrap();
+                let id_attribute = properties.get(&entity_info.id_relationship_id).unwrap();
                 Ok(id_attribute.val.clone())
             }
             Select::Struct(struct_select) => self.apply_struct_select(

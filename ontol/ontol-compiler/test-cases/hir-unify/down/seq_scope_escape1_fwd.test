@@ -1,30 +1,30 @@
 (struct ($c)
-    (prop! $c S:1:0 (#u #u))
-    (prop! $c S:1:1 (#u (set (.. @a #u $b))))
+    (prop! $c R:1:0 (#u #u))
+    (prop! $c R:1:1 (#u (set (.. @a #u $b))))
 )
 
 (struct ($d)
-    (prop! $d O:1:0
+    (prop! $d R:2:0
         (#u
             (struct ($e)
-                (prop! $e O:2:0 (#u #u))
-                (prop! $e O:2:1 (#u (set (.. @a #u $b))))
+                (prop! $e R:3:0 (#u #u))
+                (prop! $e R:3:1 (#u (set (.. @a #u $b))))
             )
         )
     )
 )
 
 |$c| (block
-    (let-prop $_ $_ ($c S:1:0))
-    (let-prop $_ $a ($c S:1:1))
+    (let-prop $_ $_ ($c R:1:0))
+    (let-prop $_ $a ($c R:1:1))
     (struct ($d)
-        (prop! $d O:1:0
+        (prop! $d R:2:0
             (#u
                 (struct ($e)
-                    (prop! $e O:2:0
+                    (prop! $e R:3:0
                         (#u #u)
                     )
-                    (prop! $e O:2:1
+                    (prop! $e R:3:1
                         (#u
                             (make-seq ($f)
                                 (for-each $a ($_ $b)

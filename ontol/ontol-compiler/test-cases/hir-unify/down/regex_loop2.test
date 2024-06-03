@@ -1,20 +1,20 @@
 (struct ($d)
-    (prop! $d S:1:0
+    (prop! $d R:1:0
         (#u (regex-seq (@c) def@0:0 ((1 $a) (2 $b))))
     )
 )
 
 (struct ($e)
-    (prop! $e S:1:0
+    (prop! $e R:2:0
         (#u
             (set
                 (.. @c
                     #u
                     (struct ($f)
-                        (prop! $f S:2:0
+                        (prop! $f R:2:1
                             (#u $a)
                         )
-                        (prop! $f S:2:1
+                        (prop! $f R:2:2
                             (#u $b)
                         )
                     )
@@ -25,10 +25,10 @@
 )
 
 |$d| (block
-    (let-prop $_ $g ($d S:1:0))
+    (let-prop $_ $g ($d R:1:0))
     (let-regex-iter $c ((1 $a) (2 $b)) def@0:0 $g)
     (struct ($e)
-        (prop! $e S:1:0
+        (prop! $e R:2:0
             (#u
                 (make-seq ($h)
                     (for-each $c ($_ $i)
@@ -36,10 +36,10 @@
                             (let-tup? @j ($a $b) $i)
                             (insert $h #u
                                 (struct ($f)
-                                    (prop! $f S:2:0
+                                    (prop! $f R:2:1
                                         (#u $a)
                                     )
-                                    (prop! $f S:2:1
+                                    (prop! $f R:2:2
                                         (#u $b)
                                     )
                                 )

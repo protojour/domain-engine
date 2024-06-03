@@ -653,7 +653,7 @@ impl<'e> Serialize for MapProperties<'e> {
             let docs = self
                 .ctx
                 .ontology
-                .get_docs(property.property_id.relationship_id.0)
+                .get_docs(property.rel_id.0)
                 .map(|constant| &self.ctx.ontology[constant]);
 
             match &property.kind {

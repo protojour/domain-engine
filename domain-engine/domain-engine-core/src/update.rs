@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    property::PropertyId,
     value::{Attribute, Value},
+    RelationshipId,
 };
 
 /// Sanitize something that is known to be a data store update
@@ -18,7 +18,7 @@ pub fn sanitize_update(update: &mut Value) {
     *update = value;
 }
 
-fn remove_none_attrs(attrs: &mut FnvHashMap<PropertyId, Attribute>) {
+fn remove_none_attrs(attrs: &mut FnvHashMap<RelationshipId, Attribute>) {
     attrs.retain(|_, attr| exists(&attr.rel) && exists(&attr.val))
 }
 

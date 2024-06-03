@@ -319,7 +319,7 @@ fn autogenerate_fmt_segment_property<'m>(
     arena: &mut TypedArena<'m>,
 ) -> Option<ontol_hir::Node> {
     if let TextPatternSegment::Property {
-        property_id,
+        rel_id,
         type_def_id,
         segment: _,
     } = segment
@@ -350,7 +350,7 @@ fn autogenerate_fmt_segment_property<'m>(
             ontol_hir::Kind::Prop(
                 ontol_hir::PropFlags::empty(),
                 binder_var,
-                *property_id,
+                *rel_id,
                 ontol_hir::PropVariant::Value(Attribute { rel, val: var_node }),
             ),
             Meta::new(object_ty, NO_SPAN),

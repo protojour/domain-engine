@@ -1,17 +1,17 @@
 (match-struct ($d)
-    (prop! $d S:1:2
+    (prop! $d R:1:2
         (#u (regex-seq (@c) def@0:43 ((1 $a)) ((2 $b))))
     )
 )
 
 (struct ($e)
-    (prop! $e S:1:6
+    (prop! $e R:1:6
         (#u
             (set
                 (.. @c
                     #u
                     (struct ($f)
-                        (prop! $f S:1:4
+                        (prop! $f R:1:4
                             (#u $a)
                         )
                     )
@@ -19,13 +19,13 @@
             )
         )
     )
-    (prop! $e S:1:7
+    (prop! $e R:1:7
         (#u
             (set
                 (.. @c
                     #u
                     (struct ($g)
-                        (prop! $g S:1:4
+                        (prop! $g R:1:4
                             (#u $b)
                         )
                     )
@@ -36,10 +36,10 @@
 )
 
 |$d| (block
-    (let-prop $_ $h ($d S:1:2))
+    (let-prop $_ $h ($d R:1:2))
     (let-regex-iter $c ((1 $a)) ((2 $b)) def@0:43 $h)
     (struct ($e)
-        (prop! $e S:1:6
+        (prop! $e R:1:6
             (#u
                 (make-seq ($i)
                     (for-each $c ($_ $j)
@@ -47,7 +47,7 @@
                             (let-tup? @k ($a $_) $j)
                             (insert $i #u
                                 (struct ($f)
-                                    (prop! $f S:1:4
+                                    (prop! $f R:1:4
                                         (#u $a)
                                     )
                                 )
@@ -57,7 +57,7 @@
                 )
             )
         )
-        (prop! $e S:1:7
+        (prop! $e R:1:7
             (#u
                 (make-seq ($l)
                     (for-each $c ($_ $m)
@@ -65,7 +65,7 @@
                             (let-tup? @n ($_ $b) $m)
                             (insert $l #u
                                 (struct ($g)
-                                    (prop! $g S:1:4
+                                    (prop! $g R:1:4
                                         (#u $b)
                                     )
                                 )

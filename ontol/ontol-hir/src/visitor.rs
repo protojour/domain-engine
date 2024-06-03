@@ -1,4 +1,4 @@
-use ontol_runtime::property::PropertyId;
+use ontol_runtime::RelationshipId;
 
 use crate::{
     arena::{Arena, NodeRef},
@@ -16,11 +16,11 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
         &mut self,
         flags: PropFlags,
         struct_var: Var,
-        prop_id: PropertyId,
+        rel_id: RelationshipId,
         variant: &PropVariant,
         arena: &'h Arena<'a, L>,
     ) {
-        self.traverse_prop(struct_var, prop_id, variant, arena);
+        self.traverse_prop(struct_var, rel_id, variant, arena);
     }
 
     #[allow(unused_variables)]
@@ -39,7 +39,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
     }
 
     #[allow(unused_variables)]
-    fn visit_property_id(&mut self, prop_id: PropertyId) {}
+    fn visit_property_id(&mut self, rel_id: RelationshipId) {}
 
     #[allow(unused_variables)]
     fn visit_binder(&mut self, var: Var) {}
@@ -157,8 +157,8 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                     self.visit_node(index, child);
                 }
             }
-            Kind::Prop(optional, struct_var, prop_id, variant) => {
-                self.visit_prop(*optional, *struct_var, *prop_id, variant, arena);
+            Kind::Prop(optional, struct_var, rel_id, variant) => {
+                self.visit_prop(*optional, *struct_var, *rel_id, variant, arena);
             }
             Kind::MoveRestAttrs(target, source) => {
                 self.visit_var(*target);
@@ -216,12 +216,12 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
     fn traverse_prop(
         &mut self,
         struct_var: Var,
-        prop_id: PropertyId,
+        rel_id: RelationshipId,
         variant: &PropVariant,
         arena: &'h Arena<'a, L>,
     ) {
         self.visit_var(struct_var);
-        self.visit_property_id(prop_id);
+        self.visit_property_id(rel_id);
         self.visit_prop_variant(variant, arena);
     }
 

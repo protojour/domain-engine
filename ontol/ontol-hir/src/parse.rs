@@ -135,10 +135,10 @@ impl<'a, L: Lang> Parser<'a, L> {
                 let (val, next) = self.parse_pattern_binding(next)?;
                 let (_, next) = parse_lparen(next)?;
                 let (var, next) = parse_dollar_var(next)?;
-                let (prop_id, next) = parse_prop_id(next)?;
+                let (rel_id, next) = parse_rel_id(next)?;
                 let (_, next) = parse_rparen(next)?;
                 Ok((
-                    self.make_node(Kind::LetProp(Attribute { rel, val }, (var, prop_id))),
+                    self.make_node(Kind::LetProp(Attribute { rel, val }, (var, rel_id))),
                     next,
                 ))
             }
@@ -151,7 +151,7 @@ impl<'a, L: Lang> Parser<'a, L> {
                 };
                 let (_, next) = parse_lparen(next)?;
                 let (var, next) = parse_dollar_var(next)?;
-                let (prop_id, next) = parse_prop_id(next)?;
+                let (rel_id, next) = parse_rel_id(next)?;
                 let (_, next) = parse_rparen(next)?;
                 let (attr, next) = {
                     let (rel, next) = self.parse(next)?;
@@ -160,7 +160,7 @@ impl<'a, L: Lang> Parser<'a, L> {
                     (Attribute { rel, val }, next)
                 };
                 Ok((
-                    self.make_node(Kind::LetPropDefault(binding, (var, prop_id), attr)),
+                    self.make_node(Kind::LetPropDefault(binding, (var, rel_id), attr)),
                     next,
                 ))
             }
@@ -407,12 +407,12 @@ impl<'a, L: Lang> Parser<'a, L> {
     }
 }
 
-fn parse_prop_id(next: &str) -> ParseResult<PropertyId> {
+fn parse_rel_id(next: &str) -> ParseResult<RelationshipId> {
     let (sym, next) = parse_symbol(next)?;
-    let prop_id: PropertyId = sym
+    let rel_id: RelationshipId = sym
         .parse()
         .map_err(|_| Error::Expected(Class::Property, Found(Token::Symbol(sym))))?;
-    Ok((prop_id, next))
+    Ok((rel_id, next))
 }
 
 fn parse_symbol(next: &str) -> ParseResult<&str> {

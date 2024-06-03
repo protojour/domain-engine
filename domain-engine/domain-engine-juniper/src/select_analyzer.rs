@@ -10,7 +10,6 @@ use ontol_runtime::{
             TypeData, TypeKind, TypeModifier,
         },
     },
-    property::PropertyId,
     query::{
         filter::Filter,
         select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
@@ -27,7 +26,7 @@ use crate::{
 };
 
 pub(crate) struct KeyedPropertySelection {
-    pub key: PropertyId,
+    pub key: RelationshipId,
     pub select: Select,
 }
 
@@ -84,7 +83,7 @@ impl<'a> SelectAnalyzer<'a> {
         look_ahead: juniper::executor::LookAheadSelection<GqlScalar>,
         map_key: MapKey,
         input_arg: &MapInputArg,
-        map_queries: &FnvHashMap<PropertyId, Var>,
+        map_queries: &FnvHashMap<RelationshipId, Var>,
         field_data: &FieldData,
     ) -> Result<AnalyzedQuery, juniper::FieldError<GqlScalar>> {
         let input = ArgsWrapper::new(look_ahead)
@@ -118,10 +117,10 @@ impl<'a> SelectAnalyzer<'a> {
         &self,
         look_ahead: juniper::executor::LookAheadSelection<GqlScalar>,
         field_data: &FieldData,
-        parent_property: PropertyId,
-        input_queries: &FnvHashMap<PropertyId, Var>,
+        parent_property: RelationshipId,
+        input_queries: &FnvHashMap<RelationshipId, Var>,
         output_selects: &mut FnvHashMap<Var, EntitySelect>,
-        recursion_guard: &mut FnvHashSet<PropertyId>,
+        recursion_guard: &mut FnvHashSet<RelationshipId>,
     ) -> Result<(), FieldError<GqlScalar>> {
         if !recursion_guard.insert(parent_property) {
             return Ok(());
@@ -273,7 +272,7 @@ impl<'a> SelectAnalyzer<'a> {
                     ..
                 }),
             ) => Ok(Some(KeyedPropertySelection {
-                key: field.property_id,
+                key: field.rel_id,
                 select: self.analyze_connection(
                     look_ahead,
                     &field.first_arg,
@@ -326,7 +325,7 @@ impl<'a> SelectAnalyzer<'a> {
                 },
                 Ok(type_data),
             ) => Ok(Some(KeyedPropertySelection {
-                key: PropertyId::subject(*relationship_id),
+                key: *relationship_id,
                 select: self.analyze_data(look_ahead.children(), &type_data.kind)?,
             })),
             (
@@ -345,12 +344,12 @@ impl<'a> SelectAnalyzer<'a> {
                 },
                 Err(_scalar_ref),
             ) => Ok(Some(KeyedPropertySelection {
-                key: PropertyId::subject(*relationship_id),
+                key: *relationship_id,
                 select: Select::Leaf,
             })),
             (FieldKind::Id(id_property_data), Err(_scalar_ref)) => {
                 Ok(Some(KeyedPropertySelection {
-                    key: PropertyId::subject(id_property_data.relationship_id),
+                    key: id_property_data.relationship_id,
                     select: Select::Leaf,
                 }))
             }
@@ -418,7 +417,7 @@ impl<'a> SelectAnalyzer<'a> {
                 self.analyze_object_data(look_ahead_children, object_data)
             }
             TypeKind::Union(union_data) => {
-                let mut union_map: FnvHashMap<DefId, FnvHashMap<PropertyId, Select>> =
+                let mut union_map: FnvHashMap<DefId, FnvHashMap<RelationshipId, Select>> =
                     FnvHashMap::default();
 
                 for field_look_ahead in look_ahead_children {
@@ -479,7 +478,7 @@ impl<'a> SelectAnalyzer<'a> {
     ) -> Result<Select, FieldError<GqlScalar>> {
         match &object_data.kind {
             ObjectKind::Node(node_data) => {
-                let mut properties: FnvHashMap<PropertyId, Select> = FnvHashMap::default();
+                let mut properties: FnvHashMap<RelationshipId, Select> = FnvHashMap::default();
 
                 for field_look_ahead in look_ahead_children {
                     let field_name = field_look_ahead.field_original_name();
@@ -510,16 +509,15 @@ impl<'a> SelectAnalyzer<'a> {
 
                                 let type_info =
                                     self.schema_ctx.ontology.get_type_info(node_data.def_id);
-                                let Some(flattened_relationship) = type_info
-                                    .data_relationships
-                                    .get(&PropertyId::subject(*proxy))
+                                let Some(flattened_relationship) =
+                                    type_info.data_relationships.get(proxy)
                                 else {
                                     error!("Flattened relationship not found");
                                     continue;
                                 };
 
                                 let Select::Struct(inner_struct_select) = properties
-                                    .entry(PropertyId::subject(*proxy))
+                                    .entry(*proxy)
                                     // Make the proxied structure:
                                     .or_insert(Select::Struct(StructSelect {
                                         def_id: flattened_relationship.target.def_id(),
@@ -625,8 +623,8 @@ impl<'a> SelectAnalyzer<'a> {
     }
 }
 
-const fn unit_property() -> PropertyId {
-    PropertyId::subject(RelationshipId(DefId::unit()))
+const fn unit_property() -> RelationshipId {
+    RelationshipId(DefId::unit())
 }
 
 fn merge_selects(existing: &mut Select, new: Select) {

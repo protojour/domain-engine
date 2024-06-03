@@ -1,7 +1,6 @@
 use ontol_hir::{Kind, Node, PropVariant};
 use ontol_runtime::{
     interface::discriminator::{Discriminant, LeafDiscriminant},
-    property::PropertyId,
     query::condition::{Clause, CondTerm, Condition, SetOperator},
     value::Value,
     var::Var,
@@ -112,7 +111,7 @@ impl<'c, 'm> ConditionBuilder<'c, 'm> {
                         self.output.add_clause(
                             narrow_var,
                             Clause::MatchProp(
-                                PropertyId::subject(*relationship_id),
+                                *relationship_id,
                                 SetOperator::ElementIn,
                                 variant_var,
                             ),

@@ -288,9 +288,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     .table
                     .as_ref()?;
 
-                let (property_id, _) = table.iter().find(|(_, property)| property.is_entity_id)?;
+                let (rel_id, _) = table.iter().find(|(_, property)| property.is_entity_id)?;
 
-                let meta = self.defs.relationship_meta(property_id.relationship_id);
+                let meta = self.defs.relationship_meta(*rel_id);
 
                 let DefKind::TextLiteral(property_name) = *meta.relation_def_kind.value else {
                     return None;

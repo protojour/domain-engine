@@ -1,11 +1,11 @@
 (struct ($e)
-    (prop! $e S:1:0 (#u $a))
-    (prop! $e S:1:1 (#u (set (.. @d #u $b))))
-    (prop! $e S:1:2 (#u $c))
+    (prop! $e R:1:0 (#u $a))
+    (prop! $e R:1:1 (#u (set (.. @d #u $b))))
+    (prop! $e R:1:2 (#u $c))
 )
 
 (struct ($f)
-    (prop! $f S:2:1
+    (prop! $f R:2:1
         (#u
             (set
                 (#u $a)
@@ -17,11 +17,11 @@
 )
 
 |$e| (block
-    (let-prop $_ $a ($e S:1:0))
-    (let-prop $_ $d ($e S:1:1))
-    (let-prop $_ $c ($e S:1:2))
+    (let-prop $_ $a ($e R:1:0))
+    (let-prop $_ $d ($e R:1:1))
+    (let-prop $_ $c ($e R:1:2))
     (struct ($f)
-        (prop! $f S:2:1
+        (prop! $f R:2:1
             (#u
                 (make-seq ($g)
                     (insert $g #u $a)

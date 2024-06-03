@@ -2,7 +2,7 @@ use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
 
 use super::filter::Filter;
-use crate::{property::PropertyId, DefId};
+use crate::{DefId, RelationshipId};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Select {
@@ -44,7 +44,7 @@ impl StructOrUnionSelect {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StructSelect {
     pub def_id: DefId,
-    pub properties: FnvHashMap<PropertyId, Select>,
+    pub properties: FnvHashMap<RelationshipId, Select>,
 }
 
 impl StructSelect {

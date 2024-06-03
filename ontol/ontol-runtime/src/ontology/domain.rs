@@ -10,12 +10,8 @@ use ontol_macros::OntolDebug;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    format_utils::AsAlpha,
-    impl_ontol_debug,
-    interface::serde::operator::SerdeOperatorAddr,
-    property::{Cardinality, PropertyId},
-    query::order::Direction,
-    DefId, EdgeId, RelationshipId,
+    format_utils::AsAlpha, impl_ontol_debug, interface::serde::operator::SerdeOperatorAddr,
+    property::Cardinality, query::order::Direction, DefId, EdgeId, RelationshipId,
 };
 
 use super::ontol::{TextConstant, ValueGenerator};
@@ -122,7 +118,7 @@ pub struct TypeInfo {
     /// FIXME: This should really be connected to a DomainInterface.
     pub operator_addr: Option<SerdeOperatorAddr>,
     pub store_key: Option<TextConstant>,
-    pub data_relationships: FnvHashMap<PropertyId, DataRelationshipInfo>,
+    pub data_relationships: FnvHashMap<RelationshipId, DataRelationshipInfo>,
 }
 
 impl TypeInfo {
@@ -146,11 +142,11 @@ impl TypeInfo {
 
     pub fn edge_relationships(
         &self,
-    ) -> impl Iterator<Item = (&PropertyId, &DataRelationshipInfo, EdgeCardinalId)> {
+    ) -> impl Iterator<Item = (&RelationshipId, &DataRelationshipInfo, EdgeCardinalId)> {
         self.data_relationships
             .iter()
-            .filter_map(|(prop_id, info)| match info.kind {
-                DataRelationshipKind::Edge(edge_cardinal) => Some((prop_id, info, edge_cardinal)),
+            .filter_map(|(rel_id, info)| match info.kind {
+                DataRelationshipKind::Edge(edge_cardinal) => Some((rel_id, info, edge_cardinal)),
                 _ => None,
             })
     }
@@ -243,7 +239,7 @@ pub struct EntityOrder {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct FieldPath(pub Box<[PropertyId]>);
+pub struct FieldPath(pub Box<[RelationshipId]>);
 
 #[derive(Serialize, Deserialize)]
 pub struct EdgeInfo {

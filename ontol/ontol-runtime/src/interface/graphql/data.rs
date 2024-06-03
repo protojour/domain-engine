@@ -6,7 +6,6 @@ use crate::{
     interface::serde::operator::SerdeOperatorAddr,
     ontology::{ontol::TextConstant, Ontology, OntologyInit},
     phf::PhfIndexMap,
-    property::PropertyId,
     var::Var,
     DefId, MapKey, RelationshipId,
 };
@@ -265,14 +264,14 @@ impl FieldData {
 pub enum FieldKind {
     /// A normal property of a node
     Property {
-        id: PropertyId,
+        id: RelationshipId,
         addr: SerdeOperatorAddr,
     },
     /// A flattened union property discriminator accessed through a proxy.
     /// This property is part of interfaces, since it's always present regardless of union variant.
     FlattenedPropertyDiscriminator {
         proxy: RelationshipId,
-        resolvers: Box<FnvHashMap<DefId, PropertyId>>,
+        resolvers: Box<FnvHashMap<DefId, RelationshipId>>,
     },
     /// A flattened property accessed through a "proxy"
     FlattenedProperty {
@@ -282,7 +281,7 @@ pub enum FieldKind {
     },
     /// The (incoming/"rel params") edge property of a node
     EdgeProperty {
-        id: PropertyId,
+        id: RelationshipId,
         addr: SerdeOperatorAddr,
     },
     /// The _id field of a node
@@ -313,7 +312,7 @@ pub enum FieldKind {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ConnectionPropertyField {
-    pub property_id: PropertyId,
+    pub rel_id: RelationshipId,
     pub first_arg: argument::FirstArg,
     pub after_arg: argument::AfterArg,
 }
@@ -321,7 +320,7 @@ pub struct ConnectionPropertyField {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct MapConnectionField {
     pub map_key: MapKey,
-    pub queries: FnvHashMap<PropertyId, Var>,
+    pub queries: FnvHashMap<RelationshipId, Var>,
     pub input_arg: argument::MapInputArg,
     pub first_arg: argument::FirstArg,
     pub after_arg: argument::AfterArg,
@@ -330,7 +329,7 @@ pub struct MapConnectionField {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct MapFindField {
     pub map_key: MapKey,
-    pub queries: FnvHashMap<PropertyId, Var>,
+    pub queries: FnvHashMap<RelationshipId, Var>,
     pub input_arg: argument::MapInputArg,
 }
 

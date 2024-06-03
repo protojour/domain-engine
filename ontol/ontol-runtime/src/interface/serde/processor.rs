@@ -5,8 +5,7 @@ use ontol_macros::OntolDebug;
 use crate::{
     format_utils::{Backticks, CommaSeparated, DoubleQuote},
     ontology::Ontology,
-    property::PropertyId,
-    DefId,
+    DefId, RelationshipId,
 };
 
 use super::operator::{AppliedVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags};
@@ -31,6 +30,10 @@ pub struct SerdeProcessor<'on, 'p> {
 }
 
 impl<'on, 'p> SerdeProcessor<'on, 'p> {
+    pub fn ontology(&self) -> &Ontology {
+        self.ontology
+    }
+
     /// Get the current processor level
     pub fn level(&self) -> ProcessorLevel {
         self.level
@@ -119,11 +122,11 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         }
     }
 
-    pub fn find_property(&self, prop: &str) -> Option<PropertyId> {
+    pub fn find_property(&self, prop: &str) -> Option<RelationshipId> {
         self.search_property(prop, self.value_operator)
     }
 
-    fn search_property(&self, prop: &str, operator: &'on SerdeOperator) -> Option<PropertyId> {
+    fn search_property(&self, prop: &str, operator: &'on SerdeOperator) -> Option<RelationshipId> {
         match operator {
             SerdeOperator::Union(union_op) => {
                 match union_op.applied_variants(self.mode, self.level) {
@@ -143,7 +146,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             SerdeOperator::Struct(struct_op) => struct_op
                 .properties
                 .get(prop)
-                .map(|serde_property| serde_property.property_id),
+                .map(|serde_property| serde_property.rel_id),
             _ => None,
         }
     }
@@ -333,7 +336,7 @@ impl RecursionLimitError {
 #[derive(Clone, Copy, Default, OntolDebug)]
 pub struct SubProcessorContext {
     pub is_update: bool,
-    pub parent_property_id: Option<PropertyId>,
+    pub parent_property_id: Option<RelationshipId>,
     pub parent_property_flags: SerdePropertyFlags,
 
     /// The edge properties used for (de)serializing the _edge data_

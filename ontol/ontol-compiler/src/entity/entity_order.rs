@@ -1,6 +1,5 @@
 use ontol_runtime::{
     ontology::domain::{EntityOrder, FieldPath},
-    property::PropertyId,
     query::order::Direction,
     DefId, RelationshipId,
 };
@@ -157,19 +156,18 @@ impl<'m> Compiler<'m> {
         field_span: SourceSpan,
         mut def_id: DefId,
     ) -> Result<FieldPath, CompileErrors> {
-        let mut output: Vec<PropertyId> = vec![];
+        let mut output: Vec<RelationshipId> = vec![];
         let mut errors = CompileErrors::default();
 
         for field_segment in field.split('.') {
-            let Ok((property_id, next_def_id)) = self.lookup_order_field(def_id, field_segment)
-            else {
+            let Ok((rel_id, next_def_id)) = self.lookup_order_field(def_id, field_segment) else {
                 CompileError::TODO(format!("no such field: `{field_segment}`"))
                     .span(field_span)
                     .report(&mut errors);
                 break;
             };
 
-            output.push(property_id);
+            output.push(rel_id);
             def_id = next_def_id;
         }
 
@@ -184,7 +182,7 @@ impl<'m> Compiler<'m> {
         &self,
         parent_def_id: DefId,
         field_name: &str,
-    ) -> Result<(PropertyId, DefId), ()> {
+    ) -> Result<(RelationshipId, DefId), ()> {
         let Some(literal_def_id) = self.defs.text_literals.get(field_name) else {
             debug!("order field: no text literal for {field_name}");
             return Err(());
@@ -195,11 +193,11 @@ impl<'m> Compiler<'m> {
             return Err(());
         };
 
-        for (property_id, _) in table {
-            let meta = self.defs.relationship_meta(property_id.relationship_id);
+        for (rel_id, _) in table {
+            let meta = self.defs.relationship_meta(*rel_id);
 
             if meta.relationship.relation_def_id == *literal_def_id {
-                return Ok((*property_id, meta.relationship.object.0));
+                return Ok((*rel_id, meta.relationship.object.0));
             }
         }
 

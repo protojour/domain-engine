@@ -23,7 +23,6 @@ use ontol_runtime::{
         ontol::TextConstant,
         Ontology,
     },
-    property::PropertyId,
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolverGraph},
     var::Var,
     DefId, MapDefFlags, MapKey, PackageId, RelationshipId,
@@ -85,21 +84,15 @@ pub(super) enum PropertyFieldProducer {
 }
 
 impl PropertyFieldProducer {
-    pub fn make_property(&self, property_id: PropertyId, addr: SerdeOperatorAddr) -> FieldKind {
+    pub fn make_property(&self, rel_id: RelationshipId, addr: SerdeOperatorAddr) -> FieldKind {
         match self {
-            Self::Property => FieldKind::Property {
-                id: property_id,
-                addr,
-            },
+            Self::Property => FieldKind::Property { id: rel_id, addr },
             Self::FlattenedProperty(proxy_id) => FieldKind::FlattenedProperty {
                 proxy: *proxy_id,
-                id: property_id.relationship_id,
+                id: rel_id,
                 addr,
             },
-            Self::EdgeProperty => FieldKind::EdgeProperty {
-                id: property_id,
-                addr,
-            },
+            Self::EdgeProperty => FieldKind::EdgeProperty { id: rel_id, addr },
         }
     }
 }
@@ -355,7 +348,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         let input_operator_addr = self.serde_gen.gen_addr_greedy(input_serde_key).unwrap();
 
-        let queries: FnvHashMap<PropertyId, Var> = prop_flow
+        let queries: FnvHashMap<RelationshipId, Var> = prop_flow
             .iter()
             .filter_map(|prop_flow| {
                 if let PropertyFlowData::Match(var) = &prop_flow.data {

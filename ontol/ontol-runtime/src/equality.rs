@@ -5,8 +5,8 @@ use fnv::FnvHashMap;
 use ordered_float::NotNan;
 
 use crate::{
-    property::PropertyId,
     value::{Attribute, Value},
+    RelationshipId,
 };
 
 /// Determine ONTOL equality.
@@ -161,14 +161,14 @@ impl OntolHash for Value {
     }
 }
 
-type PropertyMap = FnvHashMap<PropertyId, Attribute<Value>>;
+type PropertyMap = FnvHashMap<RelationshipId, Attribute<Value>>;
 
 fn property_map_equals(a: &PropertyMap, b: &PropertyMap) -> bool {
     if a.len() != b.len() {
         return false;
     }
 
-    fn sort_properties(iter: impl Iterator<Item = PropertyId>) -> Vec<PropertyId> {
+    fn sort_properties(iter: impl Iterator<Item = RelationshipId>) -> Vec<RelationshipId> {
         let mut properties: Vec<_> = iter.collect();
         properties.sort_unstable();
         properties
@@ -181,11 +181,11 @@ fn property_map_equals(a: &PropertyMap, b: &PropertyMap) -> bool {
         return false;
     }
 
-    for property_id in props_a {
+    for rel_id in props_a {
         if !a
-            .get(&property_id)
+            .get(&rel_id)
             .unwrap()
-            .ontol_equals(b.get(&property_id).unwrap())
+            .ontol_equals(b.get(&rel_id).unwrap())
         {
             return false;
         }

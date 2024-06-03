@@ -1,5 +1,6 @@
 use ontol_runtime::{
     ontology::{map::Extern, ontol::TextConstant},
+    property::Role,
     DefId,
 };
 use tracing::warn;
@@ -35,9 +36,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let mut extern_builder = ExternBuilder { url: None };
 
-        for property_id in table.keys() {
-            let meta = self.defs.relationship_meta(property_id.relationship_id);
-            let (value_type_def_id, ..) = meta.relationship.by(property_id.role.opposite());
+        for rel_id in table.keys() {
+            let meta = self.defs.relationship_meta(*rel_id);
+            let (value_type_def_id, ..) = meta.relationship.by(Role::Object);
 
             match meta.relation_def_kind.value {
                 DefKind::TextLiteral(prop_name) => match *prop_name {

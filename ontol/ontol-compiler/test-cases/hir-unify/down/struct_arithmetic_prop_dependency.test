@@ -1,27 +1,27 @@
 (struct ($c)
-    (prop! $c S:1:0 (#u (- $a 10)))
-    (prop! $c S:1:1 (#u (- $b 10)))
+    (prop! $c R:1:0 (#u (- $a 10)))
+    (prop! $c R:1:1 (#u (- $b 10)))
 )
 
 (struct ($d)
-    (prop! $d O:1:0 (#u (+ $a $b)))
-    (prop! $d O:1:1 (#u (+ $a 20)))
-    (prop! $d O:1:2 (#u (+ $b 20)))
+    (prop! $d R:2:0 (#u (+ $a $b)))
+    (prop! $d R:2:1 (#u (+ $a 20)))
+    (prop! $d R:2:2 (#u (+ $b 20)))
 )
 
 |$c| (block
-    (let-prop $_ $e ($c S:1:0))
-    (let-prop $_ $f ($c S:1:1))
+    (let-prop $_ $e ($c R:1:0))
+    (let-prop $_ $f ($c R:1:1))
     (let $a (+ $e 10))
     (let $b (+ $f 10))
     (struct ($d)
-        (prop! $d O:1:0
+        (prop! $d R:2:0
             (#u (+ $a $b))
         )
-        (prop! $d O:1:1
+        (prop! $d R:2:1
             (#u (+ $a 20))
         )
-        (prop! $d O:1:2
+        (prop! $d R:2:2
             (#u (+ $b 20))
         )
         (move-rest-attrs $d $c)

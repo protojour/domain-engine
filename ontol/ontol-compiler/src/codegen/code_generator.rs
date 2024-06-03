@@ -5,14 +5,14 @@ use fnv::FnvHashMap;
 use ontol_hir::{EvalCondTerm, OverloadFunc, PropVariant, StructFlags};
 use ontol_runtime::{
     ontology::map::MapLossiness,
-    property::{PropertyId, ValueCardinality},
+    property::ValueCardinality,
     query::condition::{Clause, ClausePair},
     value::Attribute,
     var::{Var, VarSet},
     vm::proc::{
         BuiltinProc, GetAttrFlags, Local, NParams, OpCode, OpCodeCondTerm, Predicate, Procedure,
     },
-    DefId, MapDirection, MapFlags, MapKey,
+    DefId, MapDirection, MapFlags, MapKey, RelationshipId,
 };
 use thin_vec::ThinVec;
 use tracing::debug;
@@ -293,7 +293,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     self.builder,
                 );
             }
-            ontol_hir::Kind::LetProp(Attribute { rel, val }, (struct_var, prop_id)) => {
+            ontol_hir::Kind::LetProp(Attribute { rel, val }, (struct_var, rel_id)) => {
                 let Ok(struct_local) = self.var_local(*struct_var, &span) else {
                     return;
                 };
@@ -315,14 +315,14 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 if delta > 0 {
                     block.op(
-                        OpCode::GetAttr(struct_local, *prop_id, attr_flags),
+                        OpCode::GetAttr(struct_local, *rel_id, attr_flags),
                         Delta(delta as i32),
                         span,
                         self.builder,
                     );
                 }
             }
-            ontol_hir::Kind::LetPropDefault(binding, (struct_var, prop_id), default) => {
+            ontol_hir::Kind::LetPropDefault(binding, (struct_var, rel_id), default) => {
                 let Ok(struct_local) = self.var_local(*struct_var, &span) else {
                     return;
                 };
@@ -352,7 +352,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 }
 
                 block.op(
-                    OpCode::GetAttr(struct_local, *prop_id, attr_flags),
+                    OpCode::GetAttr(struct_local, *rel_id, attr_flags),
                     Delta(delta as i32),
                     span,
                     self.builder,
@@ -713,9 +713,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     self.scope.remove(&binder.hir().var);
                 }
             }
-            ontol_hir::Kind::Prop(_, struct_var, prop_id, variant) => match variant {
+            ontol_hir::Kind::Prop(_, struct_var, rel_id, variant) => match variant {
                 PropVariant::Value(attr) => {
-                    self.gen_attribute(*struct_var, *prop_id, *attr, arena, span, block)
+                    self.gen_attribute(*struct_var, *rel_id, *attr, arena, span, block)
                 }
                 PropVariant::Predicate(..) => todo!(),
             },
@@ -867,11 +867,11 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     let vm_clause_op = match clause_op {
                         Clause::Root => Clause::Root,
                         Clause::IsEntity(def_id) => Clause::IsEntity(*def_id),
-                        Clause::MatchProp(prop_id, set_operator, set_var) => {
+                        Clause::MatchProp(rel_id, set_operator, set_var) => {
                             let Ok(set_local) = self.var_local(*set_var, &span) else {
                                 return;
                             };
-                            Clause::MatchProp(*prop_id, *set_operator, set_local)
+                            Clause::MatchProp(*rel_id, *set_operator, set_local)
                         }
                         Clause::Member(rel, val) => {
                             let rel = self.gen_eval_cond_term(rel, arena, span, block);
@@ -946,7 +946,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
     fn gen_attribute(
         &mut self,
         struct_var: Var,
-        prop_id: PropertyId,
+        rel_id: RelationshipId,
         Attribute { rel, val }: Attribute<ontol_hir::Node>,
         arena: &TypedArena<'m>,
         span: SourceSpan,
@@ -960,7 +960,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             ontol_hir::Kind::Unit => {
                 self.gen_node(arena.node_ref(val), block);
                 block.op(
-                    OpCode::PutAttr1(struct_local, prop_id),
+                    OpCode::PutAttr1(struct_local, rel_id),
                     Delta(-1),
                     span,
                     self.builder,
@@ -973,7 +973,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 block.op(OpCode::Clone(rel_local), Delta(1), span, self.builder);
                 block.op(
-                    OpCode::PutAttr2(struct_local, prop_id),
+                    OpCode::PutAttr2(struct_local, rel_id),
                     Delta(-2),
                     span,
                     self.builder,

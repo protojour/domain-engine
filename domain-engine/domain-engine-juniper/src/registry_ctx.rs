@@ -3,20 +3,19 @@ use std::sync::Arc;
 use juniper::{GraphQLValue, ID};
 use ontol_runtime::{
     debug::NoFmt,
-    interface::graphql::{
-        argument::{ArgKind, DomainFieldArg, FieldArg},
-        data::{
-            FieldKind, NativeScalarKind, Optionality, TypeAddr, TypeKind, TypeModifier, TypeRef,
-            UnitTypeRef,
-        },
-        schema::{QueryLevel, TypingPurpose},
-    },
     interface::{
         discriminator::{
             leaf_discriminant_scalar_union_for_has_attribute, LeafDiscriminantScalarUnion,
             VariantPurpose,
         },
-        graphql::argument::DefaultArg,
+        graphql::{
+            argument::{ArgKind, DefaultArg, DomainFieldArg, FieldArg},
+            data::{
+                FieldKind, NativeScalarKind, Optionality, TypeAddr, TypeKind, TypeModifier,
+                TypeRef, UnitTypeRef,
+            },
+            schema::{QueryLevel, TypingPurpose},
+        },
         serde::{
             operator::{
                 AppliedVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags,
@@ -25,7 +24,7 @@ use ontol_runtime::{
             processor::ProcessorProfileFlags,
         },
     },
-    property::{PropertyId, Role},
+    RelationshipId,
 };
 use tracing::{debug, trace, trace_span};
 
@@ -100,12 +99,10 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 let field = juniper::meta::Field {
                     name: name.string.as_str().into(),
                     description: match &field_data.kind {
-                        FieldKind::Property {
-                            id: property_id, ..
-                        } => self
+                        FieldKind::Property { id: rel_id, .. } => self
                             .schema_ctx
                             .ontology
-                            .get_docs(property_id.relationship_id.0)
+                            .get_docs(rel_id.0)
                             .map(|docs_constant| self.schema_ctx.ontology[docs_constant].into()),
                         _ => None,
                     },
@@ -151,7 +148,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         continue;
                     }
 
-                    if !filter.filter_property(key.arc_str(), Some(property.property_id), output) {
+                    if !filter.filter_property(key.arc_str(), Some(property.rel_id), output) {
                         continue;
                     }
 
@@ -211,10 +208,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         }
                     };
 
-                    if let Some(docs_constant) = self
-                        .schema_ctx
-                        .ontology
-                        .get_docs(property.property_id.relationship_id.0)
+                    if let Some(docs_constant) =
+                        self.schema_ctx.ontology.get_docs(property.rel_id.0)
                     {
                         argument = argument.description(&self.schema_ctx.ontology[docs_constant]);
                     }
@@ -704,18 +699,9 @@ impl ArgumentFilter {
     fn filter_property(
         &self,
         name: &str,
-        property_id: Option<PropertyId>,
+        _rel_id: Option<RelationshipId>,
         output: &Vec<juniper::meta::Argument<GqlScalar>>,
     ) -> bool {
-        if let Some(property_id) = property_id {
-            if self.skip_subject && matches!(property_id.role, Role::Subject) {
-                return false;
-            }
-            if self.skip_object && matches!(property_id.role, Role::Object) {
-                return false;
-            }
-        }
-
         if self.deduplicate {
             for arg in output {
                 if arg.name == name {

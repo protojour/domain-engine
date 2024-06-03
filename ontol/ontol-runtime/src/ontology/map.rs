@@ -6,10 +6,7 @@ use ontol_macros::OntolDebug;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    property::{Cardinality, PropertyId},
-    var::Var,
-    vm::proc::Procedure,
-    DefId, MapDirection,
+    property::Cardinality, var::Var, vm::proc::Procedure, DefId, MapDirection, RelationshipId,
 };
 
 use super::ontol::TextConstant;
@@ -30,7 +27,7 @@ pub enum MapLossiness {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]
 pub struct PropertyFlow {
-    pub id: PropertyId,
+    pub id: RelationshipId,
     pub data: PropertyFlowData,
 }
 
@@ -39,8 +36,8 @@ pub enum PropertyFlowData {
     Type(DefId),
     Match(Var),
     Cardinality(Cardinality),
-    ChildOf(PropertyId),
-    DependentOn(PropertyId),
+    ChildOf(RelationshipId),
+    DependentOn(RelationshipId),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -4,11 +4,10 @@ use std::fmt::{Debug, Display};
 
 use arena::{Arena, NodeRef};
 use ontol_runtime::{
-    property::PropertyId,
     query::condition::{ClausePair, SetOperator},
     value::Attribute,
     var::Var,
-    DefId,
+    DefId, RelationshipId,
 };
 use smallvec::SmallVec;
 use thin_vec::ThinVec;
@@ -139,15 +138,15 @@ pub enum Kind<'a, L: Lang> {
     /// Tries to bind expression to a variable. Exits labelled try block if #void.
     TryLet(Label, L::Data<'a, Binder>, Node),
     /// Defines two variables from a struct property
-    LetProp(Attribute<Binding<'a, L>>, (Var, PropertyId)),
+    LetProp(Attribute<Binding<'a, L>>, (Var, RelationshipId)),
     /// Defines two variables from a struct property, or a default attribute if not present
     LetPropDefault(
         Attribute<Binding<'a, L>>,
-        (Var, PropertyId),
+        (Var, RelationshipId),
         Attribute<Node>,
     ),
     /// Tries to define two variables from a struct propery, and exits to the try label if unsuccessful.
-    TryLetProp(Label, Attribute<Binding<'a, L>>, (Var, PropertyId)),
+    TryLetProp(Label, Attribute<Binding<'a, L>>, (Var, RelationshipId)),
     /// Unpack a tuple-like sequence to bind each element to a variable
     TryLetTup(Label, ThinVec<Binding<'a, L>>, Node),
     /// Narrowing with exit point
@@ -186,7 +185,7 @@ pub enum Kind<'a, L: Lang> {
     /// A struct with associated binder. The value is the struct.
     Struct(L::Data<'a, Binder>, StructFlags, Nodes),
     /// A property definition associated with a struct var in scope
-    Prop(PropFlags, Var, PropertyId, PropVariant),
+    Prop(PropFlags, Var, RelationshipId, PropVariant),
     /// Move rest of attributes into the first var, from the second var
     MoveRestAttrs(Var, Var),
     /// A sequence with associated binder. The value is the sequence.

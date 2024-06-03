@@ -57,8 +57,7 @@ fn test_relations_are_distinct_for_different_domains() {
                         .map(|(_key, property)| property)
                         .find(|property| !property.is_rel_params())
                         .unwrap()
-                        .property_id
-                        .relationship_id
+                        .rel_id
                 }
                 _ => panic!(),
             }

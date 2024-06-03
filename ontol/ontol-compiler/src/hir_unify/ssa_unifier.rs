@@ -4,11 +4,10 @@ use ontol_hir::{
     Label, Node, Nodes, PropFlags, PropVariant, SetEntry, StructFlags,
 };
 use ontol_runtime::{
-    property::PropertyId,
     query::condition::{Clause, ClausePair, SetOperator},
     value::Attribute,
     var::{Var, VarAllocator, VarSet},
-    MapDirection, MapFlags,
+    MapDirection, MapFlags, RelationshipId,
 };
 use smallvec::{smallvec, SmallVec};
 use thin_vec::thin_vec;
@@ -312,8 +311,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     }
                 }
             }
-            Kind::Prop(flags, var, prop_id, variant) => {
-                self.write_prop_expr((*flags, *var, *prop_id), variant, node_ref.meta(), mode)
+            Kind::Prop(flags, var, rel_id, variant) => {
+                self.write_prop_expr((*flags, *var, *rel_id), variant, node_ref.meta(), mode)
             }
             Kind::Regex(_seq_label, regex_def_id, capture_group_alternation) => {
                 let regex_meta = self
@@ -386,12 +385,11 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
     fn write_prop_expr(
         &mut self,
-        (flags, struct_var, prop_id): (PropFlags, Var, PropertyId),
+        (flags, struct_var, rel_id): (PropFlags, Var, RelationshipId),
         variant: &PropVariant,
         meta: &Meta<'m>,
         mode: ExprMode,
     ) -> UnifierResult<ontol_hir::Nodes> {
-        let relationship_id = prop_id.relationship_id;
         let builtin_rels = &self.primitives.relations;
 
         let (applied_mode, struct_var) = match mode {
@@ -400,9 +398,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 match_level,
                 ..
             } => {
-                if relationship_id.0 == builtin_rels.order
-                    || relationship_id.0 == builtin_rels.direction
-                {
+                if rel_id.0 == builtin_rels.order || rel_id.0 == builtin_rels.direction {
                     if match_level != 0 {
                         CompileError::TODO("order/direction at incorrect location")
                             .span(meta.span)
@@ -436,7 +432,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                         Kind::Prop(
                             flags,
                             struct_var,
-                            prop_id,
+                            rel_id,
                             PropVariant::Value(Attribute { rel, val }),
                         ),
                         *meta,
@@ -477,7 +473,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                         ClausePair(
                                             struct_var,
                                             Clause::MatchProp(
-                                                prop_id,
+                                                rel_id,
                                                 SetOperator::ElementIn,
                                                 set_var,
                                             )
@@ -503,7 +499,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                 thin_vec![
                                     ClausePair(
                                         struct_var,
-                                        Clause::MatchProp(prop_id, SetOperator::ElementIn, set_var,)
+                                        Clause::MatchProp(rel_id, SetOperator::ElementIn, set_var,)
                                     ),
                                     ClausePair(set_var, Clause::Member(rel_term, val_term))
                                 ],
@@ -530,7 +526,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             match_var,
                             thin_vec![ClausePair(
                                 struct_var,
-                                Clause::MatchProp(prop_id, *operator, set_cond_var)
+                                Clause::MatchProp(rel_id, *operator, set_cond_var)
                             )],
                         ),
                         Meta::new(&UNIT_TYPE, meta.span),

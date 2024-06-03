@@ -7,11 +7,11 @@ use super::{
 };
 use crate::{
     ontology::{ontol::TextConstant, Ontology},
-    property::{PropertyId, ValueCardinality},
+    property::ValueCardinality,
     query::condition::ClausePair,
     var::Var,
     vm::proc::{BuiltinProc, Local, OpCode, Predicate, Procedure},
-    DefId,
+    DefId, RelationshipId,
 };
 
 /// Abstract virtual machine for executing ONTOL procedures.
@@ -55,9 +55,10 @@ pub trait Processor {
 
     fn call_builtin(&mut self, proc: BuiltinProc, result_type: DefId) -> VmResult<()>;
     fn iter_next(&mut self, seq: Local, index: Local) -> VmResult<bool>;
-    fn get_attr(&mut self, source: Local, key: PropertyId, flags: GetAttrFlags) -> VmResult<()>;
-    fn put_attr1(&mut self, target: Local, key: PropertyId) -> VmResult<()>;
-    fn put_attr2(&mut self, target: Local, key: PropertyId) -> VmResult<()>;
+    fn get_attr(&mut self, source: Local, key: RelationshipId, flags: GetAttrFlags)
+        -> VmResult<()>;
+    fn put_attr1(&mut self, target: Local, key: RelationshipId) -> VmResult<()>;
+    fn put_attr2(&mut self, target: Local, key: RelationshipId) -> VmResult<()>;
     fn move_rest_attrs(&mut self, target: Local, source: Local) -> VmResult<()>;
     fn push_i64(&mut self, k: i64, result_type: DefId);
     fn push_f64(&mut self, k: f64, result_type: DefId);

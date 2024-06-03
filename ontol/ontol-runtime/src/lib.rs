@@ -150,11 +150,35 @@ pub struct RelationshipId(pub DefId);
 /// This forces single-line output even when pretty-printed
 impl ::std::fmt::Debug for RelationshipId {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "RelationshipId({:?})", self.0)
+        write!(f, "R:{}:{}", self.0 .0 .0, self.0 .1)
+    }
+}
+
+impl ::std::fmt::Display for RelationshipId {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "R:{}:{}", self.0 .0 .0, self.0 .1)
     }
 }
 
 impl_ontol_debug!(RelationshipId);
+
+impl FromStr for RelationshipId {
+    type Err = ();
+
+    fn from_str(mut s: &str) -> Result<Self, Self::Err> {
+        s = s.strip_prefix("R:").ok_or(())?;
+
+        let mut iterator = s.split(':');
+        let package_id = PackageId(iterator.next().ok_or(())?.parse().map_err(|_| ())?);
+        let def_idx: u16 = iterator.next().ok_or(())?.parse().map_err(|_| ())?;
+
+        if iterator.next().is_some() {
+            return Err(());
+        }
+
+        Ok(RelationshipId(DefId(package_id, def_idx)))
+    }
+}
 
 /// The ID of some relationship between ONTOL types.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]

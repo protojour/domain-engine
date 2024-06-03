@@ -11,7 +11,6 @@ use ontol_runtime::{
         serde::{SerdeDef, SerdeModifier},
     },
     ontology::ontol::TextConstant,
-    property::PropertyId,
     DefId, RelationshipId,
 };
 use patricia_tree::PatriciaMap;
@@ -319,7 +318,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &self,
         discriminator_builder: &mut DiscriminatorBuilder,
         variant_def: DefId,
-        property_set: &IndexMap<PropertyId, Property>,
+        property_set: &IndexMap<RelationshipId, Property>,
         span: &SourceSpan,
         error_set: &mut ErrorSet,
         strings: &mut StringCtx<'m>,
@@ -329,8 +328,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             property_candidates: vec![],
         };
 
-        for (property_id, _cardinality) in property_set {
-            let meta = self.defs.relationship_meta(property_id.relationship_id);
+        for (rel_id, _cardinality) in property_set {
+            let meta = self.defs.relationship_meta(*rel_id);
 
             let (object_def_id, _) = meta.relationship.object;
             let object_ty = self.def_ty_ctx.table.get(&object_def_id).unwrap();
@@ -360,7 +359,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         PropertyDiscriminatorCandidate {
                             relation_def_id: meta.relationship.relation_def_id,
                             discriminant: Discriminant::HasAttribute(
-                                property_id.relationship_id,
+                                *rel_id,
                                 strings.intern_constant(property_name),
                                 LeafDiscriminant::IsTextLiteral(
                                     strings.intern_constant(string_literal),
@@ -646,7 +645,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 }
 
 enum DomainTypeMatchData<'a> {
-    Struct(&'a IndexMap<PropertyId, Property>),
+    Struct(&'a IndexMap<RelationshipId, Property>),
     #[allow(dead_code)]
     Sequence(&'a Sequence),
     ConstructorStringPattern(&'a TextPatternSegment),

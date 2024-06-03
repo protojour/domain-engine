@@ -9,10 +9,9 @@ use crate::{
     interface::serde::deserialize_raw::RawVisitor,
     ontology::{domain::TypeKind, ontol::ValueGenerator},
     phf::PhfIndexMap,
-    property::PropertyId,
     value::{Attribute, Value},
     vm::proc::{NParams, Procedure},
-    DefId,
+    DefId, RelationshipId,
 };
 
 use super::{
@@ -31,13 +30,13 @@ use super::{
 /// The output of the struct deserializer.
 /// Requires some post-processing before it can become an Attribute.
 pub struct Struct {
-    pub attributes: FnvHashMap<PropertyId, Attribute>,
+    pub attributes: FnvHashMap<RelationshipId, Attribute>,
     pub id: Option<Value>,
     pub rel_params: Value,
     observed_required_count: usize,
 
     /// Pre-discriminated flattened unions
-    flattened_union_ops: FnvHashMap<PropertyId, SerdeOperatorAddr>,
+    flattened_union_ops: FnvHashMap<RelationshipId, SerdeOperatorAddr>,
 
     /// serde properties that may later be deserialized by the flattened unions above
     flattened_union_tmp_data: HashMap<Box<str>, serde_value::Value>,
@@ -254,7 +253,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                     serde_property.value_addr,
                     SubProcessorContext {
                         is_update: false,
-                        parent_property_id: Some(serde_property.property_id),
+                        parent_property_id: Some(serde_property.rel_id),
                         parent_property_flags: serde_property.flags,
                         rel_params_addr: None,
                     },
@@ -267,7 +266,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             if let Some(serde_value) = all_attrs.remove(key.arc_str().as_str()) {
                 let attr = property_processor
                     .deserialize(serde_value::ValueDeserializer::<E>::new(serde_value))?;
-                output.attributes.insert(serde_property.property_id, attr);
+                output.attributes.insert(serde_property.rel_id, attr);
 
                 if !is_optional {
                     output.observed_required_count += 1;
@@ -328,9 +327,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                             .map_err(RecursionLimitError::to_de_error)?,
                     )?;
 
-                    output
-                        .attributes
-                        .insert(PropertyId::subject(relationship_id), attr);
+                    output.attributes.insert(relationship_id, attr);
 
                     if !self.flags.contains(SerdeStructFlags::ENTITY_ID_OPTIONAL) {
                         output.observed_required_count += 1;
@@ -343,7 +340,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                             serde_property.value_addr,
                             SubProcessorContext {
                                 is_update: false,
-                                parent_property_id: Some(serde_property.property_id),
+                                parent_property_id: Some(serde_property.rel_id),
                                 parent_property_flags: serde_property.flags,
                                 rel_params_addr: rel_params_addr.0,
                             },
@@ -356,11 +353,11 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                         if let Some(attr) =
                             map.next_value_seed(property_processor.to_option_processor())?
                         {
-                            output.attributes.insert(serde_property.property_id, attr);
+                            output.attributes.insert(serde_property.rel_id, attr);
                         }
                     } else {
                         output.attributes.insert(
-                            serde_property.property_id,
+                            serde_property.rel_id,
                             map.next_value_seed(property_processor)?,
                         );
 
@@ -408,7 +405,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
 
                     output
                         .flattened_union_ops
-                        .insert(serde_property.property_id, addr);
+                        .insert(serde_property.rel_id, addr);
                     output.flattened_union_tmp_data.insert(key, value);
 
                     if !serde_property
@@ -444,7 +441,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         &self,
         output: &mut Struct,
     ) -> Result<(), E> {
-        for (property_id, addr) in std::mem::take(&mut output.flattened_union_ops) {
+        for (rel_id, addr) in std::mem::take(&mut output.flattened_union_ops) {
             let SerdeOperator::Struct(struct_op) = &self.processor.ontology[addr] else {
                 return Err(E::custom("BUG: flattened union must use a struct operator"));
             };
@@ -464,7 +461,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             let ontol_value = struct_deserializer
                 .deserialize_inner_flattened_struct(&mut output.flattened_union_tmp_data)?;
 
-            output.attributes.insert(property_id, ontol_value.into());
+            output.attributes.insert(rel_id, ontol_value.into());
         }
 
         if self.flags.contains(SerdeStructFlags::OPEN_DATA)
@@ -501,13 +498,13 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             return Err(output);
         }
 
-        let (prop_id, _) = output.attributes.iter().next().unwrap();
+        let (rel_id, _) = output.attributes.iter().next().unwrap();
         let type_info = self.processor.ontology.get_type_info(entity_def_id);
 
         let TypeKind::Entity(entity_info) = &type_info.kind else {
             return Err(output);
         };
-        if prop_id.relationship_id != entity_info.id_relationship_id {
+        if *rel_id != entity_info.id_relationship_id {
             return Err(output);
         }
 
@@ -527,7 +524,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                 // Only _default values_ are handled in the deserializer:
                 if let Some(ValueGenerator::DefaultProc(address)) = property.value_generator {
                     if !property.is_optional_for(self.processor.mode, &self.processor.profile.flags)
-                        && !output.attributes.contains_key(&property.property_id)
+                        && !output.attributes.contains_key(&property.rel_id)
                     {
                         let procedure = Procedure {
                             address,
@@ -542,7 +539,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                             .unwrap();
 
                         // BUG: No support for rel_params:
-                        output.attributes.insert(property.property_id, value.into());
+                        output.attributes.insert(property.rel_id, value.into());
                         output.observed_required_count += 1;
                     }
                 }
@@ -575,7 +572,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             for prop in properties.iter() {
                 debug!(
                     "    prop {:?}('{}') {:?} visible={} optional={}",
-                    prop.1.property_id,
+                    prop.1.rel_id,
                     prop.0.arc_str(),
                     prop.1.flags,
                     prop.1
@@ -602,7 +599,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                         )
                         .is_some()
                         && !property.is_optional()
-                        && !output.attributes.contains_key(&property.property_id)
+                        && !output.attributes.contains_key(&property.rel_id)
                 })
                 .map(|(key, _)| DoubleQuote(key.arc_str().as_str().into()))
                 .collect(),
@@ -637,7 +634,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                 self.processor
                     .ontology
                     .ontol_domain_meta()
-                    .open_data_property_id(),
+                    .open_data_rel_id(),
                 Value::Dict(Box::new(open_dict), DefId::unit()).into(),
             );
         }

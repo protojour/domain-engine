@@ -6,7 +6,7 @@ use fnv::{FnvHashMap, FnvHashSet};
 use ontol_hir::{PropVariant, StructFlags};
 use ontol_runtime::{
     ontology::map::{PropertyFlow, PropertyFlowData},
-    property::{PropertyId, Role},
+    property::Role,
     value::Attribute,
     var::{Var, VarSet},
     DefId, RelationshipId,
@@ -20,11 +20,11 @@ use crate::{
 
 pub struct DataFlowAnalyzer<'c, R> {
     defs: &'c R,
-    prop_origins: FnvHashMap<PropertyId, Var>,
+    prop_origins: FnvHashMap<RelationshipId, Var>,
     /// A table of which variable produce which properties
-    prop_origins_inverted: FnvHashMap<Var, FnvHashSet<PropertyId>>,
+    prop_origins_inverted: FnvHashMap<Var, FnvHashSet<RelationshipId>>,
     /// A mapping from a variable to its origin property
-    var_origins: FnvHashMap<Var, PropertyId>,
+    var_origins: FnvHashMap<Var, RelationshipId>,
     /// A mapping from variable to its dependencies
     var_dependencies: FnvHashMap<Var, VarSet>,
     property_flow: BTreeSet<PropertyFlow>,
@@ -59,34 +59,31 @@ where
     pub fn analyze(&mut self, arg: Var, body: TypedNodeRef<'_, 'm>) -> Option<Vec<PropertyFlow>> {
         self.var_dependencies.insert(arg, VarSet::default());
 
-        let unit_prop_id = PropertyId {
-            role: Role::Subject,
-            relationship_id: RelationshipId(DefId::unit()),
-        };
+        let unit_rel_id = RelationshipId(DefId::unit());
 
         match body.kind() {
             ontol_hir::Kind::Struct(binder, flags, nodes) => {
                 for node_ref in body.arena().node_refs(nodes) {
-                    self.analyze_node(node_ref, unit_prop_id);
+                    self.analyze_node(node_ref, unit_rel_id);
                 }
 
                 if flags.contains(StructFlags::MATCH) {
                     self.property_flow.insert(PropertyFlow {
-                        id: unit_prop_id,
+                        id: unit_rel_id,
                         data: PropertyFlowData::Match(binder.0.var),
                     });
                 }
             }
             _ => {
-                let deps = self.analyze_node(body, unit_prop_id);
-                self.reg_output_prop(arg, unit_prop_id, deps);
+                let deps = self.analyze_node(body, unit_rel_id);
+                self.reg_output_prop(arg, unit_rel_id, deps);
             }
         }
 
-        for (property_id, var) in &self.prop_origins {
+        for (rel_id, var) in &self.prop_origins {
             if let Some(parent) = self.var_origins.get(var) {
                 self.property_flow.insert(PropertyFlow {
-                    id: *property_id,
+                    id: *rel_id,
                     data: PropertyFlowData::ChildOf(*parent),
                 });
             }
@@ -99,7 +96,11 @@ where
         )
     }
 
-    fn analyze_node(&mut self, node_ref: TypedNodeRef<'_, 'm>, parent_prop: PropertyId) -> VarSet {
+    fn analyze_node(
+        &mut self,
+        node_ref: TypedNodeRef<'_, 'm>,
+        parent_prop: RelationshipId,
+    ) -> VarSet {
         // debug!("{node_ref}");
 
         let arena = node_ref.arena();
@@ -116,23 +117,23 @@ where
                 var_set
             }
             ontol_hir::Kind::Try(..) => VarSet::default(),
-            ontol_hir::Kind::LetProp(Attribute { rel, val }, (struct_var, prop_id))
-            | ontol_hir::Kind::LetPropDefault(Attribute { rel, val }, (struct_var, prop_id), _)
-            | ontol_hir::Kind::TryLetProp(_, Attribute { rel, val }, (struct_var, prop_id)) => {
-                self.prop_origins.insert(*prop_id, *struct_var);
+            ontol_hir::Kind::LetProp(Attribute { rel, val }, (struct_var, rel_id))
+            | ontol_hir::Kind::LetPropDefault(Attribute { rel, val }, (struct_var, rel_id), _)
+            | ontol_hir::Kind::TryLetProp(_, Attribute { rel, val }, (struct_var, rel_id)) => {
+                self.prop_origins.insert(*rel_id, *struct_var);
                 self.prop_origins_inverted
                     .entry(*struct_var)
                     .or_default()
-                    .insert(*prop_id);
+                    .insert(*rel_id);
 
                 let mut value_ty = &UNIT_TYPE;
 
                 if let ontol_hir::Binding::Binder(binder) = rel {
-                    self.var_origins.insert(binder.hir().var, *prop_id);
+                    self.var_origins.insert(binder.hir().var, *rel_id);
                     self.add_dep(binder.hir().var, *struct_var);
                 }
                 if let ontol_hir::Binding::Binder(binder) = val {
-                    self.var_origins.insert(binder.hir().var, *prop_id);
+                    self.var_origins.insert(binder.hir().var, *rel_id);
                     self.add_dep(binder.hir().var, *struct_var);
                     value_ty = binder.ty();
                 }
@@ -142,7 +143,7 @@ where
                     other => other.get_single_def_id(),
                 };
 
-                self.reg_scope_prop(*struct_var, *prop_id, value_def_id.unwrap_or(DefId::unit()));
+                self.reg_scope_prop(*struct_var, *rel_id, value_def_id.unwrap_or(DefId::unit()));
 
                 VarSet::default()
             }
@@ -301,7 +302,7 @@ where
     fn reg_output_prop(
         &mut self,
         _struct_var: Var,
-        property_id: PropertyId,
+        rel_id: RelationshipId,
         mut var_dependencies: VarSet,
     ) {
         while !var_dependencies.0.is_empty() {
@@ -311,7 +312,7 @@ where
                 if true {
                     if let Some(source_prop) = self.var_origins.get(&var) {
                         self.property_flow.insert(PropertyFlow {
-                            id: property_id,
+                            id: rel_id,
                             data: PropertyFlowData::DependentOn(*source_prop),
                         });
                     } else if let Some(parent_vars) = self.var_dependencies.get(&var) {
@@ -321,7 +322,7 @@ where
                     for dep_prop_id in deps {
                         // debug!("      insert {dep_prop_id}");
                         self.property_flow.insert(PropertyFlow {
-                            id: property_id,
+                            id: rel_id,
                             data: PropertyFlowData::DependentOn(*dep_prop_id),
                         });
                     }
@@ -339,22 +340,22 @@ where
     /// The purpose of the value_def_id is for the query engine
     /// to understand which entity must be looked up.
     /// rel_params is ignored here.
-    fn reg_scope_prop(&mut self, struct_var: Var, property_id: PropertyId, value_def_id: DefId) {
-        let meta = self.defs.relationship_meta(property_id.relationship_id);
-        let (_, cardinality, _) = meta.relationship.by(property_id.role);
+    fn reg_scope_prop(&mut self, struct_var: Var, rel_id: RelationshipId, value_def_id: DefId) {
+        let meta = self.defs.relationship_meta(rel_id);
+        let (_, cardinality, _) = meta.relationship.by(Role::Subject);
 
         self.property_flow.insert(PropertyFlow {
-            id: property_id,
+            id: rel_id,
             data: PropertyFlowData::Type(value_def_id),
         });
         self.property_flow.insert(PropertyFlow {
-            id: property_id,
+            id: rel_id,
             data: PropertyFlowData::Cardinality(cardinality),
         });
 
         register_children_recursive(
             struct_var,
-            property_id,
+            rel_id,
             &self.var_dependencies,
             &self.var_origins,
             &mut self.property_flow,
@@ -364,24 +365,24 @@ where
 
 fn register_children_recursive(
     var: Var,
-    property_id: PropertyId,
+    rel_id: RelationshipId,
     var_dependencies: &FnvHashMap<Var, VarSet>,
     // var_to_prop: &FnvHashMap<Var, FnvHashSet<PropertyId>>,
-    var_origins: &FnvHashMap<Var, PropertyId>,
+    var_origins: &FnvHashMap<Var, RelationshipId>,
     output: &mut BTreeSet<PropertyFlow>,
 ) {
     if let Some(dependencies) = var_dependencies.get(&var) {
         for var_dependency in dependencies {
-            if let Some(prop_id) = var_origins.get(&var_dependency) {
+            if let Some(parent_rel_id) = var_origins.get(&var_dependency) {
                 // recursion stops here, as there is a property associated with the variable:
                 output.insert(PropertyFlow {
-                    id: property_id,
-                    data: PropertyFlowData::ChildOf(*prop_id),
+                    id: rel_id,
+                    data: PropertyFlowData::ChildOf(*parent_rel_id),
                 });
             } else {
                 register_children_recursive(
                     var_dependency,
-                    property_id,
+                    rel_id,
                     var_dependencies,
                     var_origins,
                     output,

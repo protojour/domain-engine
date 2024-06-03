@@ -17,7 +17,7 @@ use ontol_runtime::{
     },
     ontology::ontol::{TextConstant, ValueGenerator},
     phf::PhfKey,
-    property::{PropertyId, Role},
+    property::Role,
     DefId, RelationshipId, MIRROR_PROP,
 };
 use tracing::{debug, debug_span, warn};
@@ -69,8 +69,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     continue;
                 };
 
-                for (property_id, property) in table {
-                    let meta = self.defs.relationship_meta(property_id.relationship_id);
+                for (rel_id, property) in table {
+                    let meta = self.defs.relationship_meta(*rel_id);
 
                     let match_side = if MIRROR_PROP {
                         meta.relationship.object
@@ -80,7 +80,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                     if match_side.0 == *union_def_id {
                         self.add_struct_op_property(
-                            *property_id,
+                            *rel_id,
                             property,
                             def.modifier,
                             &mut struct_flags,
@@ -103,7 +103,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             (
                 self.str_ctx.make_phf_key(EDGE_PROPERTY),
                 SerdeProperty {
-                    property_id: PropertyId::subject(RelationshipId(DefId::unit())),
+                    rel_id: RelationshipId(DefId::unit()),
                     flags: SerdePropertyFlags::REL_PARAMS | SerdePropertyFlags::OPTIONAL,
                     value_addr: SerdeOperatorAddr(0),
                     value_generator: None,
@@ -123,15 +123,15 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
     fn add_struct_op_property(
         &mut self,
-        property_id: PropertyId,
+        rel_id: RelationshipId,
         property: &Property,
         modifier: SerdeModifier,
         struct_flags: &mut SerdeStructFlags,
         output: &mut IndexMap<String, (PhfKey, SerdeProperty)>,
         must_flatten_unions: &mut bool,
     ) {
-        let meta = self.defs.relationship_meta(property_id.relationship_id);
-        let (value_type_def_id, ..) = meta.relationship.by(property_id.role.opposite());
+        let meta = self.defs.relationship_meta(rel_id);
+        let (value_type_def_id, ..) = meta.relationship.by(Role::Object);
 
         let (property_cardinality, value_addr) = self.get_property_operator(
             value_type_def_id,
@@ -147,27 +147,20 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             _ => todo!(),
         };
 
-        let prop_key: Cow<str> = match property_id.role {
-            Role::Subject => match meta.relation_def_kind.value {
-                DefKind::TextLiteral(prop_key) => Cow::Borrowed(prop_key),
-                DefKind::Type(_) => {
-                    return self.add_flattened_union_properties(
-                        property_id,
-                        modifier,
-                        meta,
-                        output,
-                        must_flatten_unions,
-                    );
-                }
-                _ => {
-                    panic!("Unsupported property");
-                }
-            },
-            Role::Object => Cow::Borrowed(
-                meta.relationship
-                    .object_prop
-                    .expect("Object property has no name"),
-            ),
+        let prop_key: Cow<str> = match meta.relation_def_kind.value {
+            DefKind::TextLiteral(prop_key) => Cow::Borrowed(prop_key),
+            DefKind::Type(_) => {
+                return self.add_flattened_union_properties(
+                    rel_id,
+                    modifier,
+                    meta,
+                    output,
+                    must_flatten_unions,
+                );
+            }
+            _ => {
+                panic!("Unsupported property");
+            }
         };
 
         let mut value_generator: Option<ValueGenerator> = None;
@@ -187,11 +180,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             value_generator = Some(ValueGenerator::DefaultProc(proc.address));
         }
 
-        if let Some(explicit_value_generator) = self
-            .rel_ctx
-            .value_generators
-            .get(&property_id.relationship_id)
-        {
+        if let Some(explicit_value_generator) = self.rel_ctx.value_generators.get(&rel_id) {
             flags |= SerdePropertyFlags::READ_ONLY;
             if value_generator.is_some() {
                 panic!("BUG: Cannot have both a default value and a generator. Solve this in type check.");
@@ -221,7 +210,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             output,
             prop_key.as_ref(),
             SerdeProperty {
-                property_id,
+                rel_id,
                 value_addr,
                 flags,
                 value_generator,
@@ -234,7 +223,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
     fn add_flattened_union_properties(
         &mut self,
-        property_id: PropertyId,
+        rel_id: RelationshipId,
         modifier: SerdeModifier,
         meta: RelationshipMeta,
         output: &mut IndexMap<String, (PhfKey, SerdeProperty)>,
@@ -310,7 +299,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             output,
             &entrypoint_prop_name.clone(),
             SerdeProperty {
-                property_id,
+                rel_id,
                 value_addr: union_addr,
                 flags: SerdePropertyFlags::empty(),
                 value_generator: None,
@@ -337,7 +326,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     (
                         self.str_ctx.make_phf_key(&key),
                         SerdeProperty {
-                            property_id: PropertyId::subject(RelationshipId(DefId::unit())),
+                            rel_id: RelationshipId(DefId::unit()),
                             value_addr,
                             flags: SerdePropertyFlags::OPTIONAL,
                             value_generator: None,
@@ -384,10 +373,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         // avoid duplicated properties, since some properties may already be "imported" from unions in which
         // the types are members,
-        let mut dedup: FnvHashSet<PropertyId> = Default::default();
+        let mut dedup: FnvHashSet<RelationshipId> = Default::default();
 
         for (_, serde_property) in new_operator.properties.iter() {
-            dedup.insert(serde_property.property_id);
+            dedup.insert(serde_property.rel_id);
         }
 
         let mut properties: IndexMap<String, (PhfKey, SerdeProperty)> = Default::default();
@@ -412,7 +401,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 find_unambiguous_struct_operator(*next_addr, &self.operators_by_addr)
             {
                 for (key, serde_property) in next_map_type.properties.iter() {
-                    if dedup.insert(serde_property.property_id) {
+                    if dedup.insert(serde_property.rel_id) {
                         insert_property(
                             &mut properties,
                             key.arc_str().as_str(),

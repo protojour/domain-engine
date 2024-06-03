@@ -24,7 +24,7 @@ use ontol_runtime::{
     },
     ontology::ontol::TextConstant,
     phf::PhfIndexMap,
-    property::{PropertyCardinality, PropertyId, Role, ValueCardinality},
+    property::{PropertyCardinality, Role, ValueCardinality},
     DefId, RelationshipId, MIRROR_PROP,
 };
 use thin_vec::thin_vec;
@@ -422,18 +422,16 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         // See if it should be an interface of flattened unions
         if let Some(table) = self.relations.properties_table_by_def_id(def_id) {
-            for property_id in table.keys() {
-                let meta = self.defs.relationship_meta(property_id.relationship_id);
+            for rel_id in table.keys().copied() {
+                let meta = self.defs.relationship_meta(rel_id);
                 let object = meta.relationship.object;
 
-                if let (Role::Subject, DefKind::Type(_)) =
-                    (property_id.role, meta.relation_def_kind.value)
-                {
+                if let DefKind::Type(_) = meta.relation_def_kind.value {
                     let union_discriminator =
                         self.relations.union_discriminators.get(&object.0).unwrap();
 
                     interface_variants.push((
-                        property_id.relationship_id,
+                        rel_id,
                         RelationId(meta.relationship.relation_def_id),
                         &union_discriminator.variants,
                     ));
@@ -613,9 +611,9 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         if let Some(properties) = self.relations.properties_by_def_id(def_id) {
             if let Some(table) = &properties.table {
-                for (property_id, property) in table {
+                for (rel_id, property) in table {
                     self.harvest_struct_field(
-                        *property_id,
+                        *rel_id,
                         property,
                         property_field_producer,
                         &mut field_namespace,
@@ -633,9 +631,9 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 };
 
                 if let Some(table) = &properties.table {
-                    for (property_id, property) in table {
+                    for (rel_id, property) in table {
                         self.harvest_struct_field(
-                            *property_id,
+                            *rel_id,
                             property,
                             property_field_producer,
                             &mut field_namespace,
@@ -658,8 +656,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     continue;
                 };
 
-                for (property_id, property) in table {
-                    let meta = self.defs.relationship_meta(property_id.relationship_id);
+                for (rel_id, property) in table {
+                    let meta = self.defs.relationship_meta(*rel_id);
 
                     let match_side = if MIRROR_PROP {
                         meta.relationship.object
@@ -669,7 +667,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
                     if match_side.0 == *union_def_id {
                         self.harvest_struct_field(
-                            *property_id,
+                            *rel_id,
                             property,
                             property_field_producer,
                             &mut field_namespace,
@@ -698,27 +696,6 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             return;
         }
 
-        // Get the general category of each field, for deciding the overall order.
-        fn field_order_category(field_kind: &FieldKind) -> u8 {
-            match field_kind {
-                FieldKind::Property {
-                    id: property_id, ..
-                }
-                | FieldKind::EdgeProperty {
-                    id: property_id, ..
-                } => match property_id.role {
-                    Role::Subject => 0,
-                    Role::Object => 1,
-                },
-                // Connections are placed after "plain" fields
-                FieldKind::ConnectionProperty(field) => match field.property_id.role {
-                    Role::Subject => 2,
-                    Role::Object => 3,
-                },
-                _ => 4,
-            }
-        }
-
         let mut fields_vec: Vec<_> = fields
             .into_iter()
             .map(|(key, value)| (self.serde_gen.str_ctx.make_phf_key(&key), value))
@@ -726,7 +703,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         // note: The sort is stable.
         fields_vec.sort_by(|(_, a), (_, b)| {
-            field_order_category(&a.kind).cmp(&field_order_category(&b.kind))
+            self.field_order_category(&a.kind)
+                .cmp(&self.field_order_category(&b.kind))
         });
 
         match &mut self.schema.types[type_addr.0 as usize].kind {
@@ -746,36 +724,52 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         }
     }
 
+    // Get the general category of each field, for deciding the overall order.
+    fn field_order_category(&self, field_kind: &FieldKind) -> u8 {
+        match field_kind {
+            FieldKind::Property { .. } => 0,
+            FieldKind::EdgeProperty { id: rel_id, .. } => {
+                self.defs
+                    .relationship_meta(*rel_id)
+                    .relationship
+                    .edge_cardinal_id
+                    .cardinal_idx
+                    .0
+            }
+            // Connections are placed after "plain" fields
+            FieldKind::ConnectionProperty(field) => {
+                100 + self
+                    .defs
+                    .relationship_meta(field.rel_id)
+                    .relationship
+                    .edge_cardinal_id
+                    .cardinal_idx
+                    .0
+            }
+            _ => 255,
+        }
+    }
+
     fn harvest_struct_field(
         &mut self,
-        property_id: PropertyId,
+        rel_id: RelationshipId,
         property: &Property,
         property_field_producer: PropertyFieldProducer,
         field_namespace: &mut GraphqlNamespace,
         harvest_variant: &HarvestVariant,
         output: &mut IndexMap<String, FieldData>,
     ) {
-        let meta = self.defs.relationship_meta(property_id.relationship_id);
-        match (
-            property_id.role,
-            meta.relation_def_kind.value,
-            harvest_variant,
-        ) {
-            (Role::Subject, DefKind::TextLiteral(prop_key), _) => self.harvest_data_struct_field(
-                (property_id, prop_key, property),
+        let meta = self.defs.relationship_meta(rel_id);
+        match (meta.relation_def_kind.value, harvest_variant) {
+            (DefKind::TextLiteral(prop_key), _) => self.harvest_data_struct_field(
+                (rel_id, prop_key, property),
                 meta,
                 property_field_producer,
                 field_namespace,
                 output,
             ),
-            (
-                Role::Subject,
-                DefKind::Type(_),
-                HarvestVariant::FlattenedUnionInterface(discriminator_table),
-            ) => {
-                let discriminators = discriminator_table
-                    .get(&property_id.relationship_id)
-                    .unwrap();
+            (DefKind::Type(_), HarvestVariant::FlattenedUnionInterface(discriminator_table)) => {
+                let discriminators = discriminator_table.get(&rel_id).unwrap();
 
                 let mut prop_keys: FnvHashSet<TextConstant> = Default::default();
                 for discriminator in discriminators.iter() {
@@ -805,13 +799,12 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
                     let prop_key = &self.serde_gen.str_ctx[prop_keys.into_iter().next().unwrap()];
 
-                    let resolvers: FnvHashMap<DefId, PropertyId> = discriminators
+                    let resolvers: FnvHashMap<DefId, RelationshipId> = discriminators
                         .iter()
                         .filter_map(|discriminator| match &discriminator.discriminant {
-                            Discriminant::HasAttribute(relationship_id, ..) => Some((
-                                discriminator.def_id(),
-                                PropertyId::subject(*relationship_id),
-                            )),
+                            Discriminant::HasAttribute(relationship_id, ..) => {
+                                Some((discriminator.def_id(), *relationship_id))
+                            }
                             _ => None,
                         })
                         .collect();
@@ -820,7 +813,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         field_namespace.unique_literal(prop_key),
                         FieldData {
                             kind: FieldKind::FlattenedPropertyDiscriminator {
-                                proxy: property_id.relationship_id,
+                                proxy: rel_id,
                                 resolvers: Box::new(resolvers),
                             },
                             field_type: TypeRef::mandatory(unit_type_ref),
@@ -830,16 +823,10 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     warn!("No uniform discriminator property");
                 }
             }
-            (
-                Role::Subject,
-                DefKind::Type(_),
-                HarvestVariant::FlattenedUnionPermutation(discriminator_table),
-            ) => {
+            (DefKind::Type(_), HarvestVariant::FlattenedUnionPermutation(discriminator_table)) => {
                 // concrete type for a specific permutation of flattened union variants
 
-                let union_discriminator = discriminator_table
-                    .get(&property_id.relationship_id)
-                    .unwrap();
+                let union_discriminator = discriminator_table.get(&rel_id).unwrap();
 
                 let Some(table) = self
                     .relations
@@ -854,27 +841,12 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     self.harvest_struct_field(
                         *inner_property_id,
                         property,
-                        PropertyFieldProducer::FlattenedProperty(property_id.relationship_id),
+                        PropertyFieldProducer::FlattenedProperty(rel_id),
                         field_namespace,
                         harvest_variant,
                         output,
                     );
                 }
-            }
-            (Role::Object, ..) => {
-                self.harvest_data_struct_field(
-                    (
-                        property_id,
-                        meta.relationship
-                            .object_prop
-                            .expect("Object property has no name"),
-                        property,
-                    ),
-                    meta,
-                    property_field_producer,
-                    field_namespace,
-                    output,
-                );
             }
             _ => {
                 panic!("Invalid property")
@@ -884,15 +856,15 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
     fn harvest_data_struct_field(
         &mut self,
-        (property_id, prop_key, property): (PropertyId, &str, &Property),
+        (rel_id, prop_key, property): (RelationshipId, &str, &Property),
         meta: RelationshipMeta,
         property_field_producer: PropertyFieldProducer,
         field_namespace: &mut GraphqlNamespace,
         output: &mut IndexMap<String, FieldData>,
     ) {
-        let (_, (prop_cardinality, value_cardinality), _) = meta.relationship.by(property_id.role);
-        let (value_def_id, ..) = meta.relationship.by(property_id.role.opposite());
-        trace!("    harvest data struct field `{prop_key}`: {property_id} ({value_def_id:?}) ({prop_cardinality:?}, {value_cardinality:?})");
+        let (_, (prop_cardinality, value_cardinality), _) = meta.relationship.by(Role::Subject);
+        let (value_def_id, ..) = meta.relationship.by(Role::Object);
+        trace!("    harvest data struct field `{prop_key}`: {rel_id} ({value_def_id:?}) ({prop_cardinality:?}, {value_cardinality:?})");
 
         let value_properties = self.relations.properties_by_def_id(value_def_id);
 
@@ -955,7 +927,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             };
 
             FieldData {
-                kind: property_field_producer.make_property(property_id, value_operator_addr),
+                kind: property_field_producer.make_property(rel_id, value_operator_addr),
                 field_type,
             }
         } else if is_entity_value {
@@ -976,7 +948,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
             FieldData::mandatory(
                 FieldKind::ConnectionProperty(Box::new(ConnectionPropertyField {
-                    property_id,
+                    rel_id,
                     first_arg: argument::FirstArg,
                     after_arg: argument::AfterArg,
                 })),
@@ -1008,7 +980,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             }
 
             FieldData {
-                kind: property_field_producer.make_property(property_id, value_operator_addr),
+                kind: property_field_producer.make_property(rel_id, value_operator_addr),
                 field_type: TypeRef::mandatory(unit).to_array(Optionality::from_optional(
                     matches!(prop_cardinality, PropertyCardinality::Optional),
                 )),

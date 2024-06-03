@@ -1,19 +1,19 @@
 (struct ($a)
-    (prop? $a S:0:0
+    (prop? $a R:0:0
         (#u (set (.. @b #u $c)))
     )
 )
 
 (set (.. @d #u
     (match-struct ($e)
-        (prop? $e O:1:0
+        (prop? $e R:1:0
             (element-in (set (.. @b #u $c)))
         )
     )
 ))
 
 |$a| (block
-    (let-prop $_ $b ($a S:0:0))
+    (let-prop $_ $b ($a R:0:0))
     (match-struct ($f)
         (let-cond-var $e $f)
         (push-cond-clauses $f
@@ -23,7 +23,7 @@
             (try? @h $b)
             (let-cond-var $g $f)
             (push-cond-clauses $f
-                (match-prop '$e O:1:0 element-in '$g)
+                (match-prop '$e R:1:0 element-in '$g)
             )
             (for-each $b ($_ $c)
                 (push-cond-clauses $f

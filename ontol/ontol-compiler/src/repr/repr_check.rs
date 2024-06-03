@@ -9,7 +9,7 @@ use std::collections::{hash_map::Entry, HashMap};
 
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
-use ontol_runtime::{property::PropertyId, DefId};
+use ontol_runtime::{property::Role, DefId, RelationshipId};
 use tracing::{debug_span, trace};
 
 use crate::{
@@ -176,15 +176,15 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         // traverse members (i.e. properties)
         if let Some(properties) = properties {
             if let Some(table) = &properties.table {
-                for (property_id, _property) in table {
-                    self.traverse_property(*property_id);
+                for (rel_id, _property) in table {
+                    self.traverse_property(*rel_id);
                 }
             }
 
             if let Constructor::Sequence(seq) = &properties.constructor {
                 for (_, relationship_id) in seq.elements() {
                     if let Some(relationship_id) = relationship_id {
-                        self.traverse_property(PropertyId::subject(relationship_id));
+                        self.traverse_property(relationship_id);
                     }
                 }
             }
@@ -208,10 +208,10 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         }
     }
 
-    fn traverse_property(&mut self, property_id: PropertyId) {
-        let meta = self.defs.relationship_meta(property_id.relationship_id);
+    fn traverse_property(&mut self, rel_id: RelationshipId) {
+        let meta = self.defs.relationship_meta(rel_id);
 
-        let (value_def_id, ..) = meta.relationship.by(property_id.role.opposite());
+        let (value_def_id, ..) = meta.relationship.by(Role::Object);
         let value_def = self.defs.table.get(&value_def_id).unwrap();
 
         if let Some(Type::Error) = self.def_types.table.get(&value_def_id) {

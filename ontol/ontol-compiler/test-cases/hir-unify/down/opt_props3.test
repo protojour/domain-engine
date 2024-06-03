@@ -1,17 +1,17 @@
 (struct ($c)
-    (prop? $c S:1:0
+    (prop? $c R:1:0
         (#u
             (struct ($d)
-                (prop? $d S:2:0
+                (prop? $d R:1:1
                     (#u $a)
                 )
             )
         )
     )
-    (prop? $c S:1:1
+    (prop? $c R:1:2
         (#u
             (struct ($e)
-                (prop? $e S:2:1
+                (prop? $e R:1:3
                     (#u $b)
                 )
             )
@@ -22,13 +22,13 @@
 // We should get "O:1:0" if either of "S:1:0" or "S:1:1" are defined(?)
 // Then its optional child props should be defined respectively based on free vars
 (struct ($f)
-    (prop? $f O:1:0
+    (prop? $f R:2:0
         (#u
             (struct ($g)
-                (prop? $g O:2:0
+                (prop? $g R:2:1
                     (#u $a)
                 )
-                (prop? $g O:2:1
+                (prop? $g R:2:2
                     (#u $b)
                 )
             )
@@ -37,23 +37,23 @@
 )
 
 |$c| (block
-    (let-prop $_ $d ($c S:1:0))
-    (let-prop $_ $e ($c S:1:1))
+    (let-prop $_ $d ($c R:1:0))
+    (let-prop $_ $e ($c R:1:2))
     (struct ($f)
-        (prop?- $f O:1:0
+        (prop?- $f R:2:0
             (#u
                 (struct ($g)
                     (catch (@h)
                         (try? @h $d)
-                        (let-prop? @h $_ $a ($d S:2:0))
-                        (prop?- $g O:2:0
+                        (let-prop? @h $_ $a ($d R:1:1))
+                        (prop?- $g R:2:1
                             (#u $a)
                         )
                     )
                     (catch (@i)
                         (try? @i $e)
-                        (let-prop? @i $_ $b ($e S:2:1))
-                        (prop?- $g O:2:1
+                        (let-prop? @i $_ $b ($e R:1:3))
+                        (prop?- $g R:2:2
                             (#u $b)
                         )
                     )

@@ -3,22 +3,23 @@ use std::sync::Arc;
 use fnv::FnvHashMap;
 use juniper::{graphql_value, FieldError};
 use ontol_runtime::{
-    interface::graphql::{
-        data::{
-            FieldKind, ObjectData, ObjectInterface, ObjectKind, TypeAddr, TypeData, TypeKind,
-            TypeModifier, TypeRef, UnitTypeRef,
+    interface::{
+        graphql::{
+            data::{
+                FieldKind, ObjectData, ObjectInterface, ObjectKind, TypeAddr, TypeData, TypeKind,
+                TypeModifier, TypeRef, UnitTypeRef,
+            },
+            schema::TypingPurpose,
         },
-        schema::TypingPurpose,
+        serde::{
+            operator::SerdeOperator,
+            processor::{ProcessorLevel, ProcessorMode, ProcessorProfileFlags},
+            serialize_raw,
+        },
     },
-    interface::serde::{
-        operator::SerdeOperator,
-        processor::{ProcessorLevel, ProcessorMode, ProcessorProfileFlags},
-        serialize_raw,
-    },
-    property::PropertyId,
     sequence::{Sequence, SubSequence},
     value::{Attribute, Value},
-    DefId,
+    DefId, RelationshipId,
 };
 use serde::Serialize;
 use tracing::{trace_span, warn};
@@ -295,7 +296,7 @@ impl<'v> AttributeType<'v> {
                 Value::Struct(attrs, _),
                 FieldKind::FlattenedPropertyDiscriminator { proxy, resolvers },
             ) => {
-                let attribute = match attrs.get(&PropertyId::subject(*proxy)) {
+                let attribute = match attrs.get(proxy) {
                     Some(attribute) => attribute,
                     None => {
                         warn!("proxy attribute not found");
@@ -313,7 +314,7 @@ impl<'v> AttributeType<'v> {
                 resolve_property(attrs, *property_id, field_type, schema_ctx, executor)
             }
             (Value::Struct(attrs, _), FieldKind::FlattenedProperty { proxy, id, .. }) => {
-                let attribute = match attrs.get(&PropertyId::subject(*proxy)) {
+                let attribute = match attrs.get(proxy) {
                     Some(attribute) => attribute,
                     None => {
                         warn!("proxy attribute not found");
@@ -325,20 +326,14 @@ impl<'v> AttributeType<'v> {
                     return Ok(graphql_value!(None));
                 };
 
-                resolve_property(
-                    attrs,
-                    PropertyId::subject(*id),
-                    field_type,
-                    schema_ctx,
-                    executor,
-                )
+                resolve_property(attrs, *id, field_type, schema_ctx, executor)
             }
             (Value::Struct(attrs, _), FieldKind::ConnectionProperty(field)) => {
                 let type_info = schema_ctx
                     .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap();
 
-                match attrs.get(&field.property_id) {
+                match attrs.get(&field.rel_id) {
                     Some(attribute) => resolve_schema_type_field(
                         AttributeType { attr: attribute },
                         type_info,
@@ -360,7 +355,7 @@ impl<'v> AttributeType<'v> {
             }
             (Value::Struct(attrs, _), FieldKind::Id(id_property_data)) => resolve_property(
                 attrs,
-                PropertyId::subject(id_property_data.relationship_id),
+                id_property_data.relationship_id,
                 field_type,
                 schema_ctx,
                 executor,
@@ -377,12 +372,7 @@ impl<'v> AttributeType<'v> {
                     ));
                 }
 
-                match attrs.get(
-                    &schema_ctx
-                        .ontology
-                        .ontol_domain_meta()
-                        .open_data_property_id(),
-                ) {
+                match attrs.get(&schema_ctx.ontology.ontol_domain_meta().open_data_rel_id()) {
                     Some(open_data_attr) => Ok(serialize_raw(
                         &open_data_attr.val,
                         &schema_ctx.ontology,
@@ -443,13 +433,13 @@ impl<'v> AttributeType<'v> {
 }
 
 fn resolve_property(
-    map: &FnvHashMap<PropertyId, Attribute>,
-    property_id: PropertyId,
+    map: &FnvHashMap<RelationshipId, Attribute>,
+    rel_id: RelationshipId,
     type_ref: TypeRef,
     schema_ctx: &Arc<SchemaCtx>,
     executor: &juniper::Executor<ServiceCtx, crate::gql_scalar::GqlScalar>,
 ) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
-    let attribute = match map.get(&property_id) {
+    let attribute = match map.get(&rel_id) {
         Some(attribute) => attribute,
         None => {
             return Ok(graphql_value!(None));

@@ -1,12 +1,11 @@
 use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    ontology::domain::{CardinalIdx, DataRelationshipKind},
-    property::{PropertyId, Role},
+    ontology::domain::DataRelationshipKind,
     query::condition::{Clause, CondTerm, Condition, SetOperator},
     value::{Attribute, Value},
     var::Var,
-    DefId, MIRROR_PROP,
+    DefId, RelationshipId,
 };
 
 use domain_engine_core::{
@@ -26,7 +25,7 @@ pub(super) enum FilterVal<'d> {
     Struct {
         type_def_id: DefId,
         dynamic_key: Option<&'d DynamicKey>,
-        prop_tree: &'d FnvHashMap<PropertyId, Attribute>,
+        prop_tree: &'d FnvHashMap<RelationshipId, Attribute>,
     },
     Sequence(&'d [Attribute]),
     Scalar(&'d Value),
@@ -35,7 +34,7 @@ pub(super) enum FilterVal<'d> {
 impl<'d> FilterVal<'d> {
     fn from_entity(
         entity_key: &'d EntityKey,
-        prop_tree: &'d FnvHashMap<PropertyId, Attribute>,
+        prop_tree: &'d FnvHashMap<RelationshipId, Attribute>,
     ) -> Self {
         Self::Struct {
             type_def_id: entity_key.type_def_id,
@@ -165,16 +164,7 @@ impl InMemoryStore {
                                 .get(&edge_cardinal.id)
                                 .ok_or(ProofError::Disproven)?;
 
-                            let cardinal_idx = if MIRROR_PROP {
-                                match prop_id.role {
-                                    Role::Subject => CardinalIdx(0),
-                                    Role::Object => CardinalIdx(1),
-                                }
-                            } else {
-                                edge_cardinal.cardinal_idx
-                            };
-
-                            let (target_key, rel_params) = match cardinal_idx.0 {
+                            let (target_key, rel_params) = match edge_cardinal.cardinal_idx.0 {
                                 0 => edge_collection.edges.iter().find_map(|edge| {
                                     if edge.from.dynamic_key == *key {
                                         Some((&edge.to, &edge.params))

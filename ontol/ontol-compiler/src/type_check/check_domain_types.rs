@@ -1,7 +1,7 @@
 use fnv::FnvHashSet;
 use ontol_runtime::{
     ontology::ontol::{TextLikeType, ValueGenerator},
-    property::{PropertyCardinality, PropertyId, Role, ValueCardinality},
+    property::{PropertyCardinality, ValueCardinality},
     DefId, RelationshipId,
 };
 use tracing::{debug, instrument, trace};
@@ -13,7 +13,6 @@ use crate::{
     relation::{Constructor, Property},
     repr::repr_model::ReprKind,
     text_patterns::TextPatternSegment,
-    thesaurus::TypeRelation,
     types::{FormatType, Type},
     SourceSpan,
 };
@@ -24,10 +23,10 @@ use super::TypeCheck;
 enum Action {
     ReportNonEntityInObjectRelationship(DefId, RelationshipId),
     /// Many(*) value cardinality between two entities are always considered optional
-    AdjustEntityPropertyCardinality(DefId, PropertyId),
+    AdjustEntityPropertyCardinality(DefId, RelationshipId),
     RedefineAsPrimaryId {
         def_id: DefId,
-        inherent_property_id: PropertyId,
+        inherent_property_id: RelationshipId,
         identifies_relationship_id: RelationshipId,
     },
     CheckValueGenerator {
@@ -46,37 +45,32 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let mut actions = vec![];
 
-        for (prop_id, property) in table {
-            trace!("check pre-repr {def_id:?} {prop_id:?} {property:?}");
+        for (rel_id, property) in table {
+            trace!("check pre-repr {def_id:?} {rel_id:?} {property:?}");
 
-            match prop_id.role {
-                Role::Subject => {
-                    let meta = self.defs.relationship_meta(prop_id.relationship_id);
+            let meta = self.defs.relationship_meta(*rel_id);
 
-                    let object_properties = self
-                        .rel_ctx
-                        .properties_by_def_id(meta.relationship.object.0)
-                        .unwrap();
+            let object_properties = self
+                .rel_ctx
+                .properties_by_def_id(meta.relationship.object.0)
+                .unwrap();
 
-                    // Check if the property is the primary id
-                    if let Some(id_relationship_id) = object_properties.identifies {
-                        let id_meta = self.defs.relationship_meta(id_relationship_id);
+            // Check if the property is the primary id
+            if let Some(id_relationship_id) = object_properties.identifies {
+                let id_meta = self.defs.relationship_meta(id_relationship_id);
 
-                        if id_meta.relationship.object.0 == def_id {
-                            debug!(
-                                "redefine as primary id: {id_relationship_id:?} <-> inherent {:?}",
-                                prop_id.relationship_id
-                            );
+                if id_meta.relationship.object.0 == def_id {
+                    debug!(
+                        "redefine as primary id: {id_relationship_id:?} <-> inherent {:?}",
+                        rel_id
+                    );
 
-                            actions.push(Action::RedefineAsPrimaryId {
-                                def_id,
-                                inherent_property_id: *prop_id,
-                                identifies_relationship_id: id_relationship_id,
-                            });
-                        }
-                    }
+                    actions.push(Action::RedefineAsPrimaryId {
+                        def_id,
+                        inherent_property_id: *rel_id,
+                        identifies_relationship_id: id_relationship_id,
+                    });
                 }
-                Role::Object => {}
             }
         }
 
@@ -95,120 +89,64 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let mut actions = vec![];
         let mut subject_relation_set: FnvHashSet<DefId> = Default::default();
 
-        for (prop_id, property) in table {
-            trace!("check post-repr {def_id:?} {prop_id:?} {property:?}");
+        for (rel_id, property) in table {
+            trace!("check post-repr {def_id:?} {rel_id:?} {property:?}");
 
-            match prop_id.role {
-                Role::Subject => {
-                    let meta = self.defs.relationship_meta(prop_id.relationship_id);
+            let meta = self.defs.relationship_meta(*rel_id);
 
-                    // Check that the same relation_def_id is not reused for subject properties
-                    if !subject_relation_set.insert(meta.relationship.relation_def_id) {
-                        CompileError::UnionInNamedRelationshipNotSupported
-                            .span(self.defs.def_span(meta.relationship_id.0))
-                            .report(&mut self.errors);
-                    }
+            // Check that the same relation_def_id is not reused for subject properties
+            if !subject_relation_set.insert(meta.relationship.relation_def_id) {
+                CompileError::UnionInNamedRelationshipNotSupported
+                    .span(self.defs.def_span(meta.relationship_id.0))
+                    .report(&mut self.errors);
+            }
 
-                    let object_properties = self
-                        .rel_ctx
-                        .properties_by_def_id(meta.relationship.object.0)
-                        .unwrap();
+            let object_properties = self
+                .rel_ctx
+                .properties_by_def_id(meta.relationship.object.0)
+                .unwrap();
 
-                    if properties.identified_by.is_some()
-                        && object_properties.identified_by.is_some()
-                    {
-                        if matches!(property.cardinality.1, ValueCardinality::List) {
-                            let span = self.defs.def_span(meta.relationship_id.0);
-                            CompileError::EntityRelationshipCannotBeAList
-                                .span(span)
-                                .report(&mut self.errors);
-                        }
-
-                        actions.push(Action::AdjustEntityPropertyCardinality(def_id, *prop_id));
-                    }
-
-                    if let Some((generator_def_id, gen_span)) = self
-                        .rel_ctx
-                        .value_generators_unchecked
-                        .remove(&prop_id.relationship_id)
-                    {
-                        actions.push(Action::CheckValueGenerator {
-                            relationship_id: prop_id.relationship_id,
-                            generator_def_id,
-                            object_def_id: meta.relationship.object.0,
-                            span: gen_span,
-                        });
-                    }
-
-                    if let DefKind::Type(_) = self.defs.def_kind(meta.relationship.relation_def_id)
-                    {
-                        let relation_repr_kind = self
-                            .repr_ctx
-                            .get_repr_kind(&meta.relationship.relation_def_id)
-                            .unwrap();
-
-                        if !matches!(relation_repr_kind, ReprKind::Unit) {
-                            CompileError::InvalidRelationType
-                                .span(meta.relationship.relation_span)
-                                .report(&mut self.errors);
-                        } else {
-                            let object = meta.relationship.object;
-
-                            let object_repr_kind = self.repr_ctx.get_repr_kind(&object.0).unwrap();
-
-                            if !matches!(object_repr_kind, ReprKind::StructUnion(_)) {
-                                CompileError::FlattenedRelationshipObjectMustBeStructUnion
-                                    .span(object.1)
-                                    .report(&mut self.errors);
-                            }
-                        }
-                    }
+            if properties.identified_by.is_some() && object_properties.identified_by.is_some() {
+                if matches!(property.cardinality.1, ValueCardinality::List) {
+                    let span = self.defs.def_span(meta.relationship_id.0);
+                    CompileError::EntityRelationshipCannotBeAList
+                        .span(span)
+                        .report(&mut self.errors);
                 }
-                Role::Object => {
-                    if properties.identified_by.is_none() {
-                        if thesaurus_entries.is_empty() {
-                            // it is illegal to specify an object property to something that is not an entity (has no id)
-                            actions.push(Action::ReportNonEntityInObjectRelationship(
-                                def_id,
-                                prop_id.relationship_id,
-                            ));
-                        }
 
-                        if thesaurus_entries.iter().any(|(is, _)| {
-                            matches!(is.rel, TypeRelation::SubVariant | TypeRelation::Subset)
-                        }) {
-                            let Some(table) = &properties.table else {
-                                panic!("No table in value union");
-                            };
+                actions.push(Action::AdjustEntityPropertyCardinality(def_id, *rel_id));
+            }
 
-                            assert!(table.get(prop_id).is_some());
+            if let Some((generator_def_id, gen_span)) =
+                self.rel_ctx.value_generators_unchecked.remove(&rel_id)
+            {
+                actions.push(Action::CheckValueGenerator {
+                    relationship_id: *rel_id,
+                    generator_def_id,
+                    object_def_id: meta.relationship.object.0,
+                    span: gen_span,
+                });
+            }
 
-                            let all_entities = thesaurus_entries
-                                .iter()
-                                .filter(|(is, _)| is.is_sub())
-                                .any(|(is, _)| {
-                                    let subject_properties =
-                                        self.rel_ctx.properties_by_def_id(is.def_id).unwrap();
+            if let DefKind::Type(_) = self.defs.def_kind(meta.relationship.relation_def_id) {
+                let relation_repr_kind = self
+                    .repr_ctx
+                    .get_repr_kind(&meta.relationship.relation_def_id)
+                    .unwrap();
 
-                                    subject_properties.identified_by.is_some()
-                                });
+                if !matches!(relation_repr_kind, ReprKind::Unit) {
+                    CompileError::InvalidRelationType
+                        .span(meta.relationship.relation_span)
+                        .report(&mut self.errors);
+                } else {
+                    let object = meta.relationship.object;
 
-                            if all_entities {
-                                actions.push(Action::AdjustEntityPropertyCardinality(
-                                    def_id, *prop_id,
-                                ));
-                            }
-                        }
-                    } else {
-                        let meta = self.defs.relationship_meta(prop_id.relationship_id);
-                        let subject_properties = self
-                            .rel_ctx
-                            .properties_by_def_id(meta.relationship.subject.0)
-                            .unwrap();
+                    let object_repr_kind = self.repr_ctx.get_repr_kind(&object.0).unwrap();
 
-                        if subject_properties.identified_by.is_some() {
-                            actions.push(Action::AdjustEntityPropertyCardinality(def_id, *prop_id));
-                        }
+                    if !matches!(object_repr_kind, ReprKind::StructUnion(_)) {
+                        CompileError::FlattenedRelationshipObjectMustBeStructUnion
+                            .span(object.1)
+                            .report(&mut self.errors);
                     }
                 }
             }
@@ -240,10 +178,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     inherent_property_id,
                     identifies_relationship_id,
                 } => {
-                    self.rel_ctx.inherent_id_map.insert(
-                        identifies_relationship_id,
-                        inherent_property_id.relationship_id,
-                    );
+                    self.rel_ctx
+                        .inherent_id_map
+                        .insert(identifies_relationship_id, inherent_property_id);
                     let properties = self.rel_ctx.properties_by_def_id_mut(def_id);
 
                     if let Some(table) = &mut properties.table {

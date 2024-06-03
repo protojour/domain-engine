@@ -1,7 +1,4 @@
-use ontol_runtime::{
-    property::{PropertyCardinality, PropertyId},
-    DefId, RelationshipId,
-};
+use ontol_runtime::{property::PropertyCardinality, DefId, RelationshipId};
 use tracing::debug;
 
 use crate::{
@@ -72,7 +69,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             None => {
                 properties.table = Some(
                     [(
-                        PropertyId::subject(relationship_id),
+                        relationship_id,
                         Property {
                             cardinality: relationship.subject_cardinality,
                             is_entity_id: false,
@@ -83,7 +80,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             Some(map) => {
                 map.insert(
-                    PropertyId::subject(relationship_id),
+                    relationship_id,
                     Property {
                         cardinality: relationship.subject_cardinality,
                         is_entity_id: false,
@@ -104,7 +101,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .properties_by_def_id_mut(object.0)
                     .table_mut()
                     .insert(
-                        PropertyId::object(relationship_id),
+                        relationship_id,
                         Property {
                             cardinality: relationship.object_cardinality,
                             is_entity_id: false,
@@ -535,7 +532,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .clone(),
             ),
             DefKind::Primitive(PrimitiveKind::Serial, _) => TextPatternSegment::Property {
-                property_id: PropertyId::subject(relationship.0),
+                rel_id: relationship.0,
                 type_def_id: relation_def_id,
                 segment: Box::new(TextPatternSegment::Serial { radix: 10 }),
             },
@@ -547,7 +544,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 match constructor {
                     Some(Constructor::TextFmt(rel_segment)) => TextPatternSegment::Property {
-                        property_id: PropertyId::subject(relationship.0),
+                        rel_id: relationship.0,
                         type_def_id: relation_def_id,
                         segment: Box::new(rel_segment.clone()),
                     },

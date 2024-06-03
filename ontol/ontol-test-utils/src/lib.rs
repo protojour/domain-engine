@@ -22,8 +22,7 @@ use ontol_runtime::{
         config::{DataStoreConfig, PackageConfig},
         Ontology,
     },
-    property::PropertyId,
-    PackageId,
+    PackageId, RelationshipId,
 };
 use tracing::info;
 use type_binding::TypeBinding;
@@ -133,14 +132,17 @@ impl OntolTest {
         type_names.map(|type_name| TypeBinding::new(self, type_name))
     }
 
-    pub fn prop_ids<const N: usize>(&self, props: [(&TypeBinding, &str); N]) -> [PropertyId; N] {
+    pub fn prop_ids<const N: usize>(
+        &self,
+        props: [(&TypeBinding, &str); N],
+    ) -> [RelationshipId; N] {
         props.map(|(binding, prop_name)| {
-            let prop_id = binding.find_property(prop_name).unwrap();
+            let rel_id = binding.find_property(prop_name).unwrap();
 
             // Having this debug line will help debugging tests,
             // as the property name won't be used in lower-level ONTOL representations.
-            info!("property {prop_id:?} => `{prop_name}`");
-            prop_id
+            info!("property {rel_id:?} => `{prop_name}`");
+            rel_id
         })
     }
 

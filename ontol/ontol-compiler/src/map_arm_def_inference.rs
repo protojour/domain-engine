@@ -2,9 +2,9 @@ use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
     ontology::domain::{CardinalIdx, EdgeCardinalId},
-    property::{PropertyCardinality, PropertyId, ValueCardinality},
+    property::{PropertyCardinality, Role, ValueCardinality},
     var::Var,
-    DefId, EdgeId,
+    DefId, EdgeId, RelationshipId,
 };
 use tracing::{debug, info};
 
@@ -345,7 +345,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
         pattern: &Pattern,
         attr_relation_id: DefId,
         flags: VarFlags,
-        (parent_def_id, parent_table): (DefId, &IndexMap<PropertyId, Property>),
+        (parent_def_id, parent_table): (DefId, &IndexMap<RelationshipId, Property>),
         output: &mut FnvHashMap<Var, Vec<VarRelationship>>,
     ) {
         if attr_relation_id == self.primitives.relations.order {
@@ -395,19 +395,18 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                     self.scan_source_variables(pattern, flags, output);
                 }
                 PatternKind::Variable(pat_var) => {
-                    let found = parent_table.iter().find_map(|(prop_id, _property)| {
-                        let meta = self.defs.relationship_meta(prop_id.relationship_id);
+                    let found = parent_table.iter().find_map(|(rel_id, _property)| {
+                        let meta = self.defs.relationship_meta(*rel_id);
                         if meta.relationship.relation_def_id == attr_relation_id {
-                            Some((*prop_id, meta))
+                            Some((*rel_id, meta))
                         } else {
                             None
                         }
                     });
 
-                    if let Some((prop_id, found_relationship_meta)) = found {
-                        let (val_def_id, _cardinality, _) = found_relationship_meta
-                            .relationship
-                            .by(prop_id.role.opposite());
+                    if let Some((_rel_id, found_relationship_meta)) = found {
+                        let (val_def_id, _cardinality, _) =
+                            found_relationship_meta.relationship.by(Role::Object);
 
                         output
                             .entry(*pat_var)

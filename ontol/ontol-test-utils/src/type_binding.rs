@@ -2,18 +2,19 @@ use fnv::FnvHashMap;
 use jsonschema::JSONSchema;
 use ontol_faker::new_constant_fake;
 use ontol_runtime::{
-    interface::json_schema::build_standalone_schema,
-    interface::serde::operator::SerdeOperatorAddr,
-    interface::serde::{
-        deserialize_raw,
-        processor::{ProcessorLevel, ProcessorMode},
+    interface::{
+        json_schema::build_standalone_schema,
+        serde::{
+            deserialize_raw,
+            operator::SerdeOperatorAddr,
+            processor::{ProcessorLevel, ProcessorMode},
+        },
     },
     ontology::{domain::TypeInfo, Ontology},
-    property::PropertyId,
     query::select::{Select, StructSelect},
     sequence::Sequence,
     value::{Attribute, Value},
-    DefId, PackageId,
+    DefId, PackageId, RelationshipId,
 };
 use serde::de::DeserializeSeed;
 use tracing::{debug, trace, warn};
@@ -148,7 +149,7 @@ impl<'on> TypeBinding<'on> {
             .expect("No serde operator addr")
     }
 
-    pub fn find_property(&self, prop: &str) -> Option<PropertyId> {
+    pub fn find_property(&self, prop: &str) -> Option<RelationshipId> {
         self.ontology
             .new_serde_processor(self.serde_operator_addr(), ProcessorMode::Create)
             .find_property(prop)
@@ -206,8 +207,8 @@ impl<'t, 'on> From<ValueBuilder<'t, 'on>> for Attribute {
 
 impl<'t, 'on> ValueBuilder<'t, 'on> {
     pub fn relationship(self, name: &str, attribute: Attribute) -> Self {
-        let property_id = self.binding.find_property(name).expect("unknown property");
-        self.merge_attribute(property_id, attribute)
+        let rel_id = self.binding.find_property(name).expect("unknown property");
+        self.merge_attribute(rel_id, attribute)
     }
 
     pub fn to_unit_attr(self) -> Attribute {
@@ -248,7 +249,7 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
             ))
             .unwrap();
 
-        self.merge_attribute(PropertyId::subject(entity_info.id_relationship_id), id)
+        self.merge_attribute(entity_info.id_relationship_id, id)
     }
 
     pub fn with_open_data(self, json: serde_json::Value) -> Self {
@@ -258,21 +259,17 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
             &mut serde_json::Deserializer::from_str(&serde_json::to_string(&json).unwrap()),
         )
         .unwrap();
-        let property_id = self
-            .binding
-            .ontology
-            .ontol_domain_meta()
-            .open_data_property_id();
-        self.merge_attribute(property_id, value.into())
+        let rel_id = self.binding.ontology.ontol_domain_meta().open_data_rel_id();
+        self.merge_attribute(rel_id, value.into())
     }
 
-    fn merge_attribute(mut self, property_id: PropertyId, attribute: Attribute) -> Self {
+    fn merge_attribute(mut self, rel_id: RelationshipId, attribute: Attribute) -> Self {
         match &mut self.value {
             Value::Struct(attrs, _) => {
-                attrs.insert(property_id, attribute);
+                attrs.insert(rel_id, attribute);
             }
             Value::Unit(def_id) => {
-                self.value = Value::new_struct([(property_id, attribute)], *def_id);
+                self.value = Value::new_struct([(rel_id, attribute)], *def_id);
             }
             other => {
                 panic!("Value data was not a map/unit, but {other:?}.")

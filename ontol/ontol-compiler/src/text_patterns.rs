@@ -3,8 +3,7 @@ use ontol_runtime::{
     ontology::ontol::text_pattern::{
         Regex, TextPattern, TextPatternConstantPart, TextPatternProperty,
     },
-    property::PropertyId,
-    DefId,
+    DefId, RelationshipId,
 };
 use regex_syntax::hir::{Capture, Hir, Look};
 use std::fmt::Write;
@@ -34,7 +33,7 @@ pub enum TextPatternSegment {
     },
     Regex(Hir),
     Property {
-        property_id: PropertyId,
+        rel_id: RelationshipId,
         type_def_id: DefId,
         segment: Box<TextPatternSegment>,
     },
@@ -179,13 +178,13 @@ impl TextPatternSegment {
                 }
             }
             Self::Property {
-                property_id,
+                rel_id,
                 type_def_id,
                 ..
             } => {
                 let index = capture_cursor.increment();
                 parts.push(TextPatternConstantPart::Property(TextPatternProperty {
-                    property_id: *property_id,
+                    rel_id: *rel_id,
                     type_def_id: *type_def_id,
                     capture_group: index as usize,
                 }));

@@ -3,11 +3,10 @@ use std::collections::BTreeSet;
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
-    interface::discriminator::UnionDiscriminator,
-    ontology::ontol::ValueGenerator,
-    property::{Cardinality, PropertyId},
-    DefId, PackageId, RelationshipId,
+    interface::discriminator::UnionDiscriminator, ontology::ontol::ValueGenerator,
+    property::Cardinality, DefId, PackageId, RelationshipId,
 };
+use tracing::warn;
 
 use crate::{sequence::Sequence, text_patterns::TextPatternSegment, SourceSpan};
 
@@ -46,7 +45,7 @@ impl RelCtx {
     pub fn properties_table_by_def_id(
         &self,
         domain_type_id: DefId,
-    ) -> Option<&IndexMap<PropertyId, Property>> {
+    ) -> Option<&IndexMap<RelationshipId, Property>> {
         self.properties_by_def_id
             .get(&domain_type_id)
             .and_then(|properties| properties.table.as_ref())
@@ -64,12 +63,12 @@ impl RelCtx {
     /// Stable-sort property tables such that all Subject property roles appear before Object roles.
     pub fn sort_property_tables(&mut self) {
         for properties in &mut self.properties_by_def_id.values_mut() {
-            if let Some(table) = &mut properties.table {
-                let mut table_vec: Vec<_> = std::mem::take(table).into_iter().collect();
+            if let Some(_table) = &mut properties.table {
+                warn!("TODO: sort by cardinal idx");
 
-                table_vec.sort_by(|(id_a, _), (id_b, _)| id_a.role.cmp(&id_b.role));
-
-                *table = table_vec.into_iter().collect();
+                // let mut table_vec: Vec<_> = std::mem::take(table).into_iter().collect();
+                // table_vec.sort_by(|(id_a, _), (id_b, _)| id_a.role.cmp(&id_b.role));
+                // *table = table_vec.into_iter().collect();
             }
         }
     }
@@ -78,7 +77,7 @@ impl RelCtx {
 #[derive(Default, Debug)]
 pub struct Properties {
     pub constructor: Constructor,
-    pub table: Option<IndexMap<PropertyId, Property>>,
+    pub table: Option<IndexMap<RelationshipId, Property>>,
     pub identifies: Option<RelationshipId>,
     pub identified_by: Option<RelationshipId>,
 }
@@ -89,7 +88,7 @@ impl Properties {
     }
 
     /// Get the property table, create it if None
-    pub fn table_mut(&mut self) -> &mut IndexMap<PropertyId, Property> {
+    pub fn table_mut(&mut self) -> &mut IndexMap<RelationshipId, Property> {
         self.table.get_or_insert_with(Default::default)
     }
 }

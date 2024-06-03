@@ -1,6 +1,6 @@
 // Contains a looping regex with two variations
 (struct ($c)
-    (prop! $c S:1:0
+    (prop! $c R:1:0
         (#u
             (regex-seq (@e) def@0:0 ((1 $a)) ((2 $b)))
         )
@@ -8,15 +8,15 @@
 )
 
 (struct ($d)
-    (prop! $d O:1:0 (#u (set (.. @e #u $a))))
-    (prop! $d O:1:1 (#u (set (.. @e #u $b))))
+    (prop! $d R:2:0 (#u (set (.. @e #u $a))))
+    (prop! $d R:2:1 (#u (set (.. @e #u $b))))
 )
 
 |$c| (block
-    (let-prop $_ $f ($c S:1:0))
+    (let-prop $_ $f ($c R:1:0))
     (let-regex-iter $e ((1 $a)) ((2 $b)) def@0:0 $f)
     (struct ($d)
-        (prop! $d O:1:0
+        (prop! $d R:2:0
             (#u
                 (make-seq ($g)
                     (for-each $e ($_ $h)
@@ -28,7 +28,7 @@
                 )
             )
         )
-        (prop! $d O:1:1
+        (prop! $d R:2:1
             (#u
                 (make-seq ($j)
                     (for-each $e ($_ $k)

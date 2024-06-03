@@ -8,9 +8,8 @@ use ontol_runtime::{
         domain::{DataRelationshipInfo, TypeInfo},
         Ontology,
     },
-    property::PropertyId,
     value::{Attribute, Serial, Value},
-    DefId, EdgeId,
+    DefId, EdgeId, RelationshipId,
 };
 use smallvec::SmallVec;
 use tracing::warn;
@@ -35,7 +34,7 @@ pub(super) enum DynamicKey {
     Serial(u64),
 }
 
-pub type EntityTable<K> = IndexMap<K, FnvHashMap<PropertyId, Attribute>>;
+pub type EntityTable<K> = IndexMap<K, FnvHashMap<RelationshipId, Attribute>>;
 
 #[derive(Debug)]
 pub(super) struct EdgeCollection {
@@ -120,7 +119,7 @@ impl InMemoryStore {
         &self,
         def_id: DefId,
         dynamic_key: &DynamicKey,
-    ) -> Option<&FnvHashMap<PropertyId, Attribute>> {
+    ) -> Option<&FnvHashMap<RelationshipId, Attribute>> {
         let collection = self.collections.get(&def_id)?;
         collection.get(dynamic_key)
     }
@@ -128,20 +127,17 @@ impl InMemoryStore {
 
 pub(crate) fn find_data_relationship<'a>(
     type_info: &'a TypeInfo,
-    property_id: &PropertyId,
+    rel_id: &RelationshipId,
 ) -> DomainResult<&'a DataRelationshipInfo> {
-    type_info
-        .data_relationships
-        .get(property_id)
-        .ok_or_else(|| {
-            warn!(
-                "data relationship {property_id:?} not found in {keys:?}",
-                keys = type_info.data_relationships.keys()
-            );
+    type_info.data_relationships.get(rel_id).ok_or_else(|| {
+        warn!(
+            "data relationship {rel_id:?} not found in {keys:?}",
+            keys = type_info.data_relationships.keys()
+        );
 
-            DomainError::DataStoreBadRequest(anyhow!(
-                "data relationship {def_id:?} -> {property_id} does not exist",
-                def_id = type_info.def_id
-            ))
-        })
+        DomainError::DataStoreBadRequest(anyhow!(
+            "data relationship {def_id:?} -> {rel_id} does not exist",
+            def_id = type_info.def_id
+        ))
+    })
 }

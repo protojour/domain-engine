@@ -1,14 +1,14 @@
 (struct ($f)
-    (prop! $f S:1:9
+    (prop! $f R:1:9
         (#u $a)
     )
-    (prop! $f S:1:10
+    (prop! $f R:1:10
         (#u $b)
     )
-    (prop! $f S:1:11
+    (prop! $f R:1:11
         (#u
             (struct ($g)
-                (prop! $g S:1:12
+                (prop! $g R:1:12
                     (#u $c)
                 )
             )
@@ -17,16 +17,16 @@
 )
 
 (struct ($d)
-    (prop! $d O:1:2
+    (prop! $d R:1:2
         (#u $a)
     )
-    (prop! $d O:1:6
+    (prop! $d R:1:6
         (#u
             (struct ($e)
-                (prop! $e O:1:4
+                (prop! $e R:1:4
                     (#u $b)
                 )
-                (prop! $e O:1:5
+                (prop! $e R:1:5
                     (#u $c)
                 )
             )
@@ -35,21 +35,21 @@
 )
 
 |$f| (block
-    (let-prop $_ $a ($f S:1:9))
-    (let-prop $_ $b ($f S:1:10))
-    (let-prop $_ $g ($f S:1:11))
-    (let-prop $_ $c ($g S:1:12))
+    (let-prop $_ $a ($f R:1:9))
+    (let-prop $_ $b ($f R:1:10))
+    (let-prop $_ $g ($f R:1:11))
+    (let-prop $_ $c ($g R:1:12))
     (struct ($d)
-        (prop! $d O:1:2
+        (prop! $d R:1:2
             (#u $a)
         )
-        (prop! $d O:1:6
+        (prop! $d R:1:6
             (#u
                 (struct ($e)
-                    (prop! $e O:1:4
+                    (prop! $e R:1:4
                         (#u $b)
                     )
-                    (prop! $e O:1:5
+                    (prop! $e R:1:5
                         (#u $c)
                     )
                 )

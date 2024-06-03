@@ -4,9 +4,8 @@ use ontol_runtime::{
         ProcessorLevel, ProcessorMode, ProcessorProfile, ProcessorProfileApi,
         ProcessorProfileFlags, SpecialProperty,
     },
-    property::PropertyId,
     value::{Attribute, Value},
-    DefId,
+    DefId, RelationshipId,
 };
 use serde::de::DeserializeSeed;
 use tracing::error;
@@ -80,7 +79,7 @@ impl<'b, 'on, 'p> SerdeHelper<'b, 'on, 'p> {
     pub fn to_value_map(
         &self,
         json: serde_json::Value,
-    ) -> Result<FnvHashMap<PropertyId, Attribute>, serde_json::Error> {
+    ) -> Result<FnvHashMap<RelationshipId, Attribute>, serde_json::Error> {
         let value = self.to_value_nocheck(json)?;
         assert_eq!(value.type_def_id(), self.binding.type_info.def_id);
         match value {

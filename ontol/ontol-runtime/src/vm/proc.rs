@@ -8,11 +8,11 @@ use crate::{
     debug::NoFmt,
     impl_ontol_debug,
     ontology::ontol::TextConstant,
-    property::{PropertyId, ValueCardinality},
+    property::ValueCardinality,
     query::{condition::ClausePair, filter::Filter},
     value::Value,
     var::Var,
-    DefId,
+    DefId, RelationshipId,
 };
 
 /// A complete ONTOL code library consisting of procedures.
@@ -85,11 +85,11 @@ pub enum OpCode {
     Iter(Local, Local, AddressOffset),
     /// Get an attribute from a struct.
     /// See GetAttrFlags for different semantic variations.
-    GetAttr(Local, PropertyId, GetAttrFlags),
+    GetAttr(Local, RelationshipId, GetAttrFlags),
     /// Pop 1 value from stack, and move it into the specified local struct. Sets the attribute parameter to unit.
-    PutAttr1(Local, PropertyId),
+    PutAttr1(Local, RelationshipId),
     /// Pop 2 stack values, rel_params (top) then value, and move it into the specified local struct.
-    PutAttr2(Local, PropertyId),
+    PutAttr2(Local, RelationshipId),
     /// Move rest attrs from the second local into the first local.
     MoveRestAttrs(Local, Local),
     /// Pop 2 stack values, rel_params (top) then value, and append resulting attribute to sequence
