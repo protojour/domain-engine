@@ -21,7 +21,6 @@ use super::TypeCheck;
 
 #[derive(Debug)]
 enum Action {
-    ReportNonEntityInObjectRelationship(DefId, RelationshipId),
     /// Many(*) value cardinality between two entities are always considered optional
     AdjustEntityPropertyCardinality(DefId, RelationshipId),
     RedefineAsPrimaryId {
@@ -84,7 +83,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let Some(table) = properties.table.as_ref() else {
             return;
         };
-        let thesaurus_entries = self.thesaurus.entries(def_id, self.defs);
 
         let mut actions = vec![];
         let mut subject_relation_set: FnvHashSet<DefId> = Default::default();
@@ -159,13 +157,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         for action in actions {
             trace!("perform action {action:?}");
             match action {
-                Action::ReportNonEntityInObjectRelationship(_def_id, relationship_id) => {
-                    let meta = self.defs.relationship_meta(relationship_id);
-
-                    CompileError::NonEntityInReverseRelationship
-                        .span(*meta.relationship.span)
-                        .report(self);
-                }
                 Action::AdjustEntityPropertyCardinality(def_id, property_id) => {
                     let properties = self.rel_ctx.properties_by_def_id_mut(def_id);
                     if let Some(table) = &mut properties.table {

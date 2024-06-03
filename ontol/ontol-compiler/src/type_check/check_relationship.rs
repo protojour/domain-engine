@@ -5,6 +5,7 @@ use crate::{
     def::{BuiltinRelationKind, DefKind, FmtFinalState, Relationship, TypeDef},
     error::CompileError,
     mem::Intern,
+    package::ONTOL_PKG,
     primitive::PrimitiveKind,
     relation::{Constructor, Properties, Property, TypeParam},
     sequence::Sequence,
@@ -59,6 +60,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let subject_ty = self.check_def(subject.0);
         let object_ty = self.check_def(object.0);
+
+        if subject.0.package_id() == ONTOL_PKG {
+            CompileError::SubjectMustBeDomainType
+                .span(subject.1)
+                .report(self);
+            return object_ty;
+        }
 
         self.check_subject_data_type(subject_ty, &subject.1);
         self.check_object_data_type(object_ty, &object.1);

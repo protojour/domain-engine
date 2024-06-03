@@ -1,2 +1,2 @@
-rel integer // ERROR definition is sealed and cannot be modified
+rel integer // ERROR subject must be a domain type
     'likes': integer

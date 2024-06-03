@@ -1,4 +1,4 @@
 def foo ()
 def bar ()
-rel {foo} 'a'[]::'aa' bar // ERROR only entities may have named reverse relationship
-rel {foo} 'b'::'bb' text // ERROR only entities may have named reverse relationship
+rel {foo} 'a'[]::'aa' bar
+rel {foo} 'b'::'bb' text // ERROR subject must be a domain type
