@@ -4,7 +4,7 @@ use fnv::FnvHashMap;
 use ontol_macros::RustDoc;
 use ontol_runtime::{
     ontology::{
-        domain::{BasicTypeInfo, EdgeCardinalId, TypeKind},
+        domain::{BasicTypeInfo, EdgeCardinalProjection, TypeKind},
         ontol::TextLikeType,
     },
     property::Cardinality,
@@ -189,7 +189,7 @@ pub enum BuiltinRelationKind {
 #[derive(Debug)]
 pub struct Relationship {
     pub relation_def_id: DefId,
-    pub edge_cardinal_id: EdgeCardinalId,
+    pub projection: EdgeCardinalProjection,
     pub relation_span: SourceSpan,
 
     pub subject: (DefId, SourceSpan),

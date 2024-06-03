@@ -335,7 +335,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         if let Some(rel_id) = rel_id {
             if let Some(data_relationship) = subject_info.data_relationships.get(&rel_id) {
                 if let DataRelationshipKind::Edge(cardinal_id) = &data_relationship.kind {
-                    match cardinal_id.cardinal_idx.cmp(&filter.edge_cardinal_idx) {
+                    match cardinal_id.subject.cmp(&filter.edge_cardinal_idx) {
                         Ordering::Less => {
                             return false;
                         }

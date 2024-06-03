@@ -1,7 +1,9 @@
 use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    ontology::domain::{DataRelationshipKind, DataRelationshipTarget, EdgeCardinalId, TypeInfo},
+    ontology::domain::{
+        DataRelationshipKind, DataRelationshipTarget, EdgeCardinalProjection, TypeInfo,
+    },
     property::ValueCardinality,
     query::{
         filter::Filter,
@@ -166,11 +168,11 @@ impl InMemoryStore {
 
             let data_relationship = find_data_relationship(type_info, rel_id)?;
 
-            let DataRelationshipKind::Edge(edge_cardinal) = data_relationship.kind else {
+            let DataRelationshipKind::Edge(projection) = data_relationship.kind else {
                 continue;
             };
 
-            let attrs = self.sub_query_attributes(edge_cardinal, subselect, entity_key, ctx)?;
+            let attrs = self.sub_query_attributes(projection, subselect, entity_key, ctx)?;
 
             match data_relationship.cardinality.1 {
                 ValueCardinality::Unit => {
@@ -199,20 +201,20 @@ impl InMemoryStore {
 
     fn sub_query_attributes(
         &self,
-        edge_cardinal: EdgeCardinalId,
+        projection: EdgeCardinalProjection,
         select: &Select,
         parent_key: &DynamicKey,
         ctx: &DbContext,
     ) -> DomainResult<Vec<Attribute>> {
         let edge_collection = self
             .edge_collections
-            .get(&edge_cardinal.id)
+            .get(&projection.id)
             .expect("No edge collection");
 
         let mut out = vec![];
 
         for edge in &edge_collection.edges {
-            let entity = match edge_cardinal.cardinal_idx.0 {
+            let entity = match projection.subject.0 {
                 0 => {
                     if &edge.from.dynamic_key != parent_key {
                         continue;

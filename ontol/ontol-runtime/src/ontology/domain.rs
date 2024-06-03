@@ -142,11 +142,17 @@ impl TypeInfo {
 
     pub fn edge_relationships(
         &self,
-    ) -> impl Iterator<Item = (&RelationshipId, &DataRelationshipInfo, EdgeCardinalId)> {
+    ) -> impl Iterator<
+        Item = (
+            &RelationshipId,
+            &DataRelationshipInfo,
+            EdgeCardinalProjection,
+        ),
+    > {
         self.data_relationships
             .iter()
             .filter_map(|(rel_id, info)| match info.kind {
-                DataRelationshipKind::Edge(edge_cardinal) => Some((rel_id, info, edge_cardinal)),
+                DataRelationshipKind::Edge(projection) => Some((rel_id, info, projection)),
                 _ => None,
             })
     }
@@ -198,7 +204,7 @@ pub enum DataRelationshipKind {
     Tree,
     /// Graph data relationships can be circular and involves entities.
     /// The Graph relationship kind must go from one entity to another entity.
-    Edge(EdgeCardinalId),
+    Edge(EdgeCardinalProjection),
 }
 
 #[derive(Clone, Serialize, Deserialize, OntolDebug)]
@@ -279,23 +285,36 @@ impl Display for CardinalIdx {
     }
 }
 
+/// An edge cardinal projection.
+///
+/// It is used to model the the projection of hyper-edges as properties.
 #[derive(Clone, Copy, Serialize, Deserialize)]
-pub struct EdgeCardinalId {
+pub struct EdgeCardinalProjection {
     /// The edge id that is the source of this data point
     pub id: EdgeId,
 
-    /// The cardinal index of this data point within the edge
-    pub cardinal_idx: CardinalIdx,
+    /// The object cardinal of the projection, the attribute value.
+    pub object: CardinalIdx,
+
+    /// The subject cardinal of the projection.
+    /// This is the origin: The value that owns the property.
+    pub subject: CardinalIdx,
 }
 
-impl Debug for EdgeCardinalId {
+impl EdgeCardinalProjection {
+    pub fn proj(&self) -> (u8, u8) {
+        (self.subject.0, self.object.0)
+    }
+}
+
+impl Debug for EdgeCardinalProjection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}:{}:{}",
-            self.id.0 .0 .0, self.id.0 .1, self.cardinal_idx,
+            "{}:{}:{}->{}",
+            self.id.0 .0 .0, self.id.0 .1, self.object, self.subject,
         )
     }
 }
 
-impl_ontol_debug!(EdgeCardinalId);
+impl_ontol_debug!(EdgeCardinalProjection);

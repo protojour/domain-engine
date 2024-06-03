@@ -215,14 +215,13 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     if let Some(data_relationship) =
                         type_info.data_relationships.get(&property.rel_id)
                     {
-                        if let DataRelationshipKind::Edge(edge_cardinal_id) = data_relationship.kind
-                        {
+                        if let DataRelationshipKind::Edge(projection) = data_relationship.kind {
                             // FIXME: Probably can't skip when the relationship is required
-                            if self.edge_saturation.contains(&edge_cardinal_id.id) {
+                            if self.edge_saturation.contains(&projection.id) {
                                 continue;
                             }
 
-                            self.edge_saturation.insert(edge_cardinal_id.id);
+                            self.edge_saturation.insert(projection.id);
                         }
                     }
 

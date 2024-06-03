@@ -3,7 +3,7 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::{
-        domain::{CardinalIdx, EdgeCardinalId},
+        domain::{CardinalIdx, EdgeCardinalProjection},
         ontol::TextConstant,
     },
     DefId, EdgeId, RelationshipId,
@@ -18,7 +18,7 @@ pub struct EdgeCtx {
 
     pub edges: FnvHashMap<EdgeId, MaterializedEdge>,
 
-    pub rel_to_edge: FnvHashMap<RelationshipId, EdgeCardinalId>,
+    pub rel_to_edge: FnvHashMap<RelationshipId, EdgeCardinalProjection>,
 
     pub store_keys: FnvHashMap<DefId, TextConstant>,
 }

@@ -8,7 +8,7 @@ use crate::juniper::{
 use ::juniper::{GraphQLEnum, GraphQLObject};
 use ontol_runtime::{
     ontology::{
-        domain::{self, EdgeCardinalId, TypeKind},
+        domain::{self, EdgeCardinalProjection, TypeKind},
         map::MapMeta,
         ontol::TextConstant,
         Ontology,
@@ -38,11 +38,11 @@ struct DataRelationshipInfo {
     def_id: DefId,
     kind: RelationshipKindEnum,
     rel_id: RelationshipId,
-    edge_cardinal_id: Option<EdgeCardinalId>,
+    edge_projection: Option<EdgeCardinalProjection>,
 }
 
-struct DataRelationshipEdge {
-    id: EdgeCardinalId,
+struct DataRelationshipEdgeProjection {
+    projection: EdgeCardinalProjection,
 }
 
 struct Edge {
@@ -187,23 +187,27 @@ impl DataRelationshipInfo {
     fn kind(&self) -> RelationshipKindEnum {
         self.kind
     }
-    fn edge(&self) -> Option<DataRelationshipEdge> {
-        self.edge_cardinal_id
-            .map(|edge_cardinal_id| DataRelationshipEdge {
-                id: edge_cardinal_id,
-            })
+    fn edge_projection(&self) -> Option<DataRelationshipEdgeProjection> {
+        self.edge_projection
+            .map(|projection| DataRelationshipEdgeProjection { projection })
     }
 }
 
 #[graphql_object]
 #[graphql(context = Context)]
-impl DataRelationshipEdge {
-    fn cardinal_idx(&self) -> i32 {
-        self.id.cardinal_idx.0.into()
+impl DataRelationshipEdgeProjection {
+    fn subject(&self) -> i32 {
+        self.projection.subject.0.into()
+    }
+
+    fn object(&self) -> i32 {
+        self.projection.object.0.into()
     }
 
     fn edge(&self) -> Edge {
-        Edge { id: self.id.id }
+        Edge {
+            id: self.projection.id,
+        }
     }
 }
 
@@ -364,7 +368,7 @@ impl TypeInfo {
             .data_relationships
             .iter()
             .map(|(rel_id, dri)| {
-                let (kind, edge_cardinal_id) = match dri.kind {
+                let (kind, edge_projection) = match dri.kind {
                     ontol_runtime::ontology::domain::DataRelationshipKind::Id => {
                         (RelationshipKindEnum::Id, None)
                     }
@@ -379,7 +383,7 @@ impl TypeInfo {
                     kind,
                     def_id: self.id,
                     rel_id: *rel_id,
-                    edge_cardinal_id,
+                    edge_projection,
                 }
             })
             .collect()

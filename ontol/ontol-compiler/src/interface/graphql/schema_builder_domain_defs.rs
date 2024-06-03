@@ -726,8 +726,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 self.defs
                     .relationship_meta(*rel_id)
                     .relationship
-                    .edge_cardinal_id
-                    .cardinal_idx
+                    .projection
+                    .subject
                     .0
             }
             // Connections are placed after "plain" fields
@@ -736,8 +736,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     .defs
                     .relationship_meta(field.rel_id)
                     .relationship
-                    .edge_cardinal_id
-                    .cardinal_idx
+                    .projection
+                    .subject
                     .0
             }
             _ => 255,

@@ -6,7 +6,7 @@ use ontol_parser::{
     U32Span,
 };
 use ontol_runtime::{
-    ontology::domain::{CardinalIdx, EdgeCardinalId},
+    ontology::domain::{CardinalIdx, EdgeCardinalProjection},
     property::{PropertyCardinality, ValueCardinality},
     DefId, EdgeId,
 };
@@ -109,9 +109,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         Some(self.ctx.define_anonymous(
             DefKind::Relationship(Relationship {
                 relation_def_id,
-                edge_cardinal_id: EdgeCardinalId {
+                projection: EdgeCardinalProjection {
                     id: EdgeId(relation_def_id),
-                    cardinal_idx: CardinalIdx(0),
+                    subject: CardinalIdx(0),
+                    object: CardinalIdx(1),
                 },
                 relation_span: self.ctx.source_span(from.1),
                 subject: (from.0, self.ctx.source_span(from.1)),

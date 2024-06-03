@@ -5,7 +5,7 @@ use ontol_parser::cst::{
     view::NodeView,
 };
 use ontol_runtime::{
-    ontology::domain::{CardinalIdx, EdgeCardinalId},
+    ontology::domain::{CardinalIdx, EdgeCardinalProjection},
     property::{PropertyCardinality, ValueCardinality},
     DefId, EdgeId, RelationshipId,
 };
@@ -189,9 +189,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
             self.ctx.compiler.edge_ctx.rel_to_edge.insert(
                 RelationshipId(relationship_id),
-                EdgeCardinalId {
-                    cardinal_idx: CardinalIdx(0),
+                EdgeCardinalProjection {
                     id: edge_id,
+                    object: CardinalIdx(1),
+                    subject: CardinalIdx(0),
                 },
             );
         };
@@ -234,9 +235,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
             Relationship {
                 relation_def_id,
-                edge_cardinal_id: EdgeCardinalId {
-                    cardinal_idx: CardinalIdx(0),
+                projection: EdgeCardinalProjection {
                     id: edge_id,
+                    subject: CardinalIdx(0),
+                    object: CardinalIdx(1),
                 },
                 relation_span: self.ctx.source_span(ident_span),
                 subject: (subject_def, self.ctx.source_span(rel_subject.0.span())),
@@ -253,9 +255,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
             let relationship1 = Relationship {
                 relation_def_id: relation1_def_id,
-                edge_cardinal_id: EdgeCardinalId {
-                    cardinal_idx: CardinalIdx(1),
+                projection: EdgeCardinalProjection {
                     id: edge_id,
+                    subject: CardinalIdx(1),
+                    object: CardinalIdx(0),
                 },
                 relation_span: self.ctx.source_span(name.view().span()),
                 subject: relationship0.object,
@@ -277,9 +280,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         if relation_def_id == self.ctx.compiler.primitives.relations.id {
             relationship0 = Relationship {
                 relation_def_id: self.ctx.compiler.primitives.relations.identifies,
-                edge_cardinal_id: EdgeCardinalId {
-                    cardinal_idx: CardinalIdx(0),
+                projection: EdgeCardinalProjection {
                     id: edge_id,
+                    object: CardinalIdx(0),
+                    subject: CardinalIdx(1),
                 },
                 relation_span: relationship0.relation_span,
                 subject: relationship0.object,

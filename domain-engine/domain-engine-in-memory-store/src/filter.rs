@@ -152,7 +152,7 @@ impl InMemoryStore {
                                 ctx,
                             )?);
                         }
-                        DataRelationshipKind::Edge(edge_cardinal) => {
+                        DataRelationshipKind::Edge(projection) => {
                             let Some(key) = dynamic_key else {
                                 return Err(ProofError::Domain(DomainError::DataStore(anyhow!(
                                     "cannot filter edge without dynamic key"
@@ -161,18 +161,18 @@ impl InMemoryStore {
 
                             let edge_collection = self
                                 .edge_collections
-                                .get(&edge_cardinal.id)
+                                .get(&projection.id)
                                 .ok_or(ProofError::Disproven)?;
 
-                            let (target_key, rel_params) = match edge_cardinal.cardinal_idx.0 {
-                                0 => edge_collection.edges.iter().find_map(|edge| {
+                            let (target_key, rel_params) = match projection.proj() {
+                                (0, 1) => edge_collection.edges.iter().find_map(|edge| {
                                     if edge.from.dynamic_key == *key {
                                         Some((&edge.to, &edge.params))
                                     } else {
                                         None
                                     }
                                 }),
-                                1 => edge_collection.edges.iter().find_map(|edge| {
+                                (1, 0) => edge_collection.edges.iter().find_map(|edge| {
                                     if edge.to.dynamic_key == *key {
                                         Some((&edge.from, &edge.params))
                                     } else {

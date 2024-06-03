@@ -446,8 +446,8 @@ impl<'m> Compiler<'m> {
             RelParams::Unit | RelParams::IndexRange(_) => None,
         };
 
-        let edge_id = meta.relationship.edge_cardinal_id.id;
-        let edge_cardinal_id = meta.relationship.edge_cardinal_id;
+        let edge_id = meta.relationship.projection.id;
+        let edge_projection = meta.relationship.projection;
 
         let (data_relationship_kind, target) = match repr_kind {
             ReprKind::StructUnion(members) => {
@@ -459,7 +459,7 @@ impl<'m> Compiler<'m> {
                         .map(|properties| properties.identified_by.is_some())
                         .unwrap_or(false)
                 }) {
-                    (DataRelationshipKind::Edge(edge_cardinal_id), target)
+                    (DataRelationshipKind::Edge(edge_projection), target)
                 } else {
                     (DataRelationshipKind::Tree, target)
                 }
@@ -467,7 +467,7 @@ impl<'m> Compiler<'m> {
             _ => {
                 let target = DataRelationshipTarget::Unambiguous(target_def_id);
                 if target_properties.identified_by.is_some() {
-                    (DataRelationshipKind::Edge(edge_cardinal_id), target)
+                    (DataRelationshipKind::Edge(edge_projection), target)
                 } else {
                     let source_properties = self.rel_ctx.properties_by_def_id(source_def_id);
                     let is_entity_id = source_properties
@@ -499,7 +499,7 @@ impl<'m> Compiler<'m> {
                 is_entity: false,
             });
 
-            edge_info.cardinals[edge_cardinal_id.cardinal_idx.0 as usize] = EdgeCardinal {
+            edge_info.cardinals[edge_projection.subject.0 as usize] = EdgeCardinal {
                 target: target.clone(),
                 cardinality: meta.relationship.subject_cardinality,
                 is_entity: true,

@@ -1,7 +1,7 @@
 use ontol_macros::test;
 use ontol_runtime::{
     ontology::{
-        domain::{CardinalIdx, EdgeCardinalId},
+        domain::{CardinalIdx, EdgeCardinalProjection},
         map::{PropertyFlow, PropertyFlowData},
     },
     property::{PropertyCardinality, ValueCardinality},
@@ -20,9 +20,10 @@ use crate::{
 
 const MOCK_RELATIONSHIP: Relationship = Relationship {
     relation_def_id: DefId::unit(),
-    edge_cardinal_id: EdgeCardinalId {
-        cardinal_idx: CardinalIdx(0),
+    projection: EdgeCardinalProjection {
         id: EdgeId(DefId::unit()),
+        object: CardinalIdx(1),
+        subject: CardinalIdx(0),
     },
     relation_span: NO_SPAN,
     subject: (DefId::unit(), NO_SPAN),

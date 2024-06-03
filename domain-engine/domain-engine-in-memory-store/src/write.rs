@@ -7,8 +7,8 @@ use ontol_runtime::{
     interface::serde::{operator::SerdeOperatorAddr, processor::ProcessorMode},
     ontology::{
         domain::{
-            DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget, EdgeCardinalId,
-            EntityInfo,
+            DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget,
+            EdgeCardinalProjection, EntityInfo,
         },
         ontol::ValueGenerator,
     },
@@ -85,57 +85,53 @@ impl InMemoryStore {
                 DataRelationshipKind::Tree => {
                     raw_props_update.insert(rel_id, attribute);
                 }
-                DataRelationshipKind::Edge(edge_cardinal) => {
-                    match data_relationship.cardinality.1 {
-                        ValueCardinality::Unit => {
-                            self.insert_entity_relationship(
-                                type_info.def_id,
-                                &dynamic_key,
-                                (edge_cardinal, Some(EdgeWriteMode::Overwrite)),
-                                attribute,
-                                data_relationship,
-                                ctx,
-                            )?;
+                DataRelationshipKind::Edge(projection) => match data_relationship.cardinality.1 {
+                    ValueCardinality::Unit => {
+                        self.insert_entity_relationship(
+                            type_info.def_id,
+                            &dynamic_key,
+                            (projection, Some(EdgeWriteMode::Overwrite)),
+                            attribute,
+                            data_relationship,
+                            ctx,
+                        )?;
+                    }
+                    ValueCardinality::IndexSet | ValueCardinality::List => match attribute.val {
+                        Value::Sequence(_sequence, _) => {
+                            return Err(DomainError::DataStore(anyhow!(
+                                "Multi-relation overwrite not yet implemented"
+                            )));
                         }
-                        ValueCardinality::IndexSet | ValueCardinality::List => {
-                            match attribute.val {
-                                Value::Sequence(_sequence, _) => {
-                                    return Err(DomainError::DataStore(anyhow!(
-                                        "Multi-relation overwrite not yet implemented"
-                                    )));
-                                }
-                                Value::Patch(patch_attributes, _) => {
-                                    for attribute in patch_attributes {
-                                        if matches!(attribute.rel, Value::DeleteRelationship(_)) {
-                                            self.delete_entity_relationship(
-                                                type_info.def_id,
-                                                &dynamic_key,
-                                                edge_cardinal,
-                                                attribute.val,
-                                                data_relationship,
-                                                ctx,
-                                            )?;
-                                        } else {
-                                            self.insert_entity_relationship(
-                                                type_info.def_id,
-                                                &dynamic_key,
-                                                (edge_cardinal, None),
-                                                attribute,
-                                                data_relationship,
-                                                ctx,
-                                            )?;
-                                        }
-                                    }
-                                }
-                                _ => {
-                                    return Err(DomainError::DataStoreBadRequest(anyhow!(
-                                        "Invalid input for multi-relation write"
-                                    )));
+                        Value::Patch(patch_attributes, _) => {
+                            for attribute in patch_attributes {
+                                if matches!(attribute.rel, Value::DeleteRelationship(_)) {
+                                    self.delete_entity_relationship(
+                                        type_info.def_id,
+                                        &dynamic_key,
+                                        projection,
+                                        attribute.val,
+                                        data_relationship,
+                                        ctx,
+                                    )?;
+                                } else {
+                                    self.insert_entity_relationship(
+                                        type_info.def_id,
+                                        &dynamic_key,
+                                        (projection, None),
+                                        attribute,
+                                        data_relationship,
+                                        ctx,
+                                    )?;
                                 }
                             }
                         }
-                    }
-                }
+                        _ => {
+                            return Err(DomainError::DataStoreBadRequest(anyhow!(
+                                "Invalid input for multi-relation write"
+                            )));
+                        }
+                    },
+                },
             }
         }
 
@@ -238,38 +234,36 @@ impl InMemoryStore {
                 DataRelationshipKind::Tree => {
                     raw_props.insert(rel_id, attribute);
                 }
-                DataRelationshipKind::Edge(edge_cardinal) => {
-                    match data_relationship.cardinality.1 {
-                        ValueCardinality::Unit => {
+                DataRelationshipKind::Edge(projection) => match data_relationship.cardinality.1 {
+                    ValueCardinality::Unit => {
+                        self.insert_entity_relationship(
+                            type_info.def_id,
+                            &entity_key,
+                            (projection, Some(EdgeWriteMode::Insert)),
+                            attribute,
+                            data_relationship,
+                            ctx,
+                        )?;
+                    }
+                    ValueCardinality::IndexSet | ValueCardinality::List => {
+                        let Value::Sequence(seq, _) = attribute.val else {
+                            return Err(DomainError::DataStoreBadRequest(anyhow!(
+                                "Expected sequence for ValueCardinality::Many"
+                            )));
+                        };
+
+                        for attribute in seq.into_attrs() {
                             self.insert_entity_relationship(
                                 type_info.def_id,
                                 &entity_key,
-                                (edge_cardinal, Some(EdgeWriteMode::Insert)),
+                                (projection, Some(EdgeWriteMode::Insert)),
                                 attribute,
                                 data_relationship,
                                 ctx,
                             )?;
                         }
-                        ValueCardinality::IndexSet | ValueCardinality::List => {
-                            let Value::Sequence(seq, _) = attribute.val else {
-                                return Err(DomainError::DataStoreBadRequest(anyhow!(
-                                    "Expected sequence for ValueCardinality::Many"
-                                )));
-                            };
-
-                            for attribute in seq.into_attrs() {
-                                self.insert_entity_relationship(
-                                    type_info.def_id,
-                                    &entity_key,
-                                    (edge_cardinal, Some(EdgeWriteMode::Insert)),
-                                    attribute,
-                                    data_relationship,
-                                    ctx,
-                                )?;
-                            }
-                        }
                     }
-                }
+                },
             }
         }
 
@@ -288,7 +282,7 @@ impl InMemoryStore {
         &mut self,
         entity_def_id: DefId,
         entity_key: &DynamicKey,
-        (edge_cardinal, write_mode): (EdgeCardinalId, Option<EdgeWriteMode>),
+        (projection, write_mode): (EdgeCardinalProjection, Option<EdgeWriteMode>),
         Attribute { rel, val }: Attribute,
         data_relationship: &DataRelationshipInfo,
         ctx: &DbContext,
@@ -379,7 +373,7 @@ impl InMemoryStore {
 
         let edge_collection = self
             .edge_collections
-            .get_mut(&edge_cardinal.id)
+            .get_mut(&projection.id)
             .expect("No edge collection");
 
         let local_key = EntityKey {
@@ -387,8 +381,8 @@ impl InMemoryStore {
             dynamic_key: entity_key.clone(),
         };
 
-        match (edge_cardinal.cardinal_idx.0, write_mode) {
-            (0, EdgeWriteMode::Insert) => {
+        match (projection.proj(), write_mode) {
+            ((0, 1), EdgeWriteMode::Insert) => {
                 enforce_cardinality_pre_insert(edge_collection, &local_key, &foreign_key);
                 edge_collection.edges.push(Edge {
                     from: local_key,
@@ -396,7 +390,7 @@ impl InMemoryStore {
                     params: rel,
                 });
             }
-            (0, EdgeWriteMode::Overwrite) => {
+            ((0, 1), EdgeWriteMode::Overwrite) => {
                 edge_collection.edges.retain(|edge| edge.from != local_key);
                 enforce_cardinality_pre_insert(edge_collection, &local_key, &foreign_key);
                 edge_collection.edges.push(Edge {
@@ -405,7 +399,7 @@ impl InMemoryStore {
                     params: rel,
                 });
             }
-            (0, EdgeWriteMode::UpdateExisting) => {
+            ((0, 1), EdgeWriteMode::UpdateExisting) => {
                 let edge = edge_collection
                     .edges
                     .iter_mut()
@@ -414,7 +408,7 @@ impl InMemoryStore {
 
                 edge.params = rel;
             }
-            (1, EdgeWriteMode::Insert) => {
+            ((1, 0), EdgeWriteMode::Insert) => {
                 enforce_cardinality_pre_insert(edge_collection, &foreign_key, &local_key);
                 edge_collection.edges.push(Edge {
                     from: foreign_key,
@@ -422,7 +416,7 @@ impl InMemoryStore {
                     params: rel,
                 });
             }
-            (1, EdgeWriteMode::Overwrite) => {
+            ((1, 0), EdgeWriteMode::Overwrite) => {
                 edge_collection.edges.retain(|edge| edge.to != local_key);
                 enforce_cardinality_pre_insert(edge_collection, &foreign_key, &local_key);
                 edge_collection.edges.push(Edge {
@@ -431,7 +425,7 @@ impl InMemoryStore {
                     params: rel,
                 });
             }
-            (1, EdgeWriteMode::UpdateExisting) => {
+            ((1, 0), EdgeWriteMode::UpdateExisting) => {
                 let edge = edge_collection
                     .edges
                     .iter_mut()
@@ -440,7 +434,7 @@ impl InMemoryStore {
 
                 edge.params = rel;
             }
-            _ => panic!("unsupported edge cardinal idx"),
+            _ => panic!("unsupported edge projection"),
         }
 
         Ok(())
@@ -450,7 +444,7 @@ impl InMemoryStore {
         &mut self,
         entity_def_id: DefId,
         entity_key: &DynamicKey,
-        edge_cardinal: EdgeCardinalId,
+        projection: EdgeCardinalProjection,
         foreign_id: Value,
         data_relationship: &DataRelationshipInfo,
         ctx: &DbContext,
@@ -491,7 +485,7 @@ impl InMemoryStore {
 
         let edge_collection = self
             .edge_collections
-            .get_mut(&edge_cardinal.id)
+            .get_mut(&projection.id)
             .expect("No edge collection");
         let edges = &mut edge_collection.edges;
 
@@ -500,7 +494,7 @@ impl InMemoryStore {
             dynamic_key: entity_key.clone(),
         };
 
-        let edge_index = match edge_cardinal.cardinal_idx.0 {
+        let edge_index = match projection.subject.0 {
             0 => edges
                 .iter()
                 .find_position(|edge| edge.from == local_key && edge.to == foreign_key),

@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    ontology::domain::{CardinalIdx, EdgeCardinalId},
+    ontology::domain::{CardinalIdx, EdgeCardinalProjection},
     property::{PropertyCardinality, ValueCardinality},
     var::Var,
     DefId, EdgeId, RelationshipId,
@@ -157,9 +157,10 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
 
                     let relationship = Relationship {
                         relation_def_id,
-                        edge_cardinal_id: EdgeCardinalId {
+                        projection: EdgeCardinalProjection {
                             id: EdgeId(relationship_id),
-                            cardinal_idx: CardinalIdx(0),
+                            object: CardinalIdx(0),
+                            subject: CardinalIdx(0),
                         },
                         relation_span: pattern.span,
                         subject: (parent_def_id, pattern.span),
