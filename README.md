@@ -57,8 +57,8 @@ graph TD
 
    domain-engine-core-->ontol-runtime
 
-   domain-engine-juniper-->ontol-runtime
-   domain-engine-juniper-->domain-engine-core
+   domain-engine-graphql-->ontol-runtime
+   domain-engine-graphql-->domain-engine-core
 
    domain-engine-in-memory-store-->ontol-runtime
    domain-engine-in-memory-store-->domain-engine-core
@@ -68,7 +68,7 @@ graph TD
    ontool-->ontol-parser
    ontool-->ontol-lsp
    ontool-->domain-engine-core
-   ontool-->domain-engine-juniper
+   ontool-->domain-engine-graphql
    ontool-->domain-engine-in-memory-store
 ```
 
