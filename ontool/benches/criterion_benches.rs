@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use domain_engine_core::{DomainEngine, Session};
+use domain_engine_graphql::context::ServiceCtx;
 use domain_engine_in_memory_store::InMemoryDataStoreFactory;
-use domain_engine_juniper::context::ServiceCtx;
 use domain_engine_test_utils::graphql_test_utils::Exec;
 use indoc::indoc;
 use ontol_compiler::{
@@ -154,7 +154,7 @@ pub fn compile_benchmark(c: &mut Criterion) {
             })
             .unwrap();
         b.iter(|| {
-            domain_engine_juniper::create_graphql_schema(
+            domain_engine_graphql::create_graphql_schema(
                 black_box(test.ontology_owned()),
                 black_box(*package_id),
             )
@@ -184,7 +184,7 @@ pub fn compile_benchmark(c: &mut Criterion) {
             })
             .unwrap();
         let schema =
-            domain_engine_juniper::create_graphql_schema(test.ontology_owned(), *package_id)
+            domain_engine_graphql::create_graphql_schema(test.ontology_owned(), *package_id)
                 .unwrap();
         let service_context: ServiceCtx = engine.into();
         b.iter(|| {

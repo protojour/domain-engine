@@ -1,5 +1,5 @@
 [package]
-name = "domain-engine-juniper"
+name = "domain-engine-graphql"
 version = "0.1.0"
 edition = "2021"
 

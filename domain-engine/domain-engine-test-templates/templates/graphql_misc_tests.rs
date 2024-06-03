@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use domain_engine_core::{DomainEngine, Session};
-use domain_engine_juniper::{
+use domain_engine_graphql::{
     context::ServiceCtx,
     juniper::{graphql_value, InputValue},
 };

@@ -11,9 +11,12 @@ use crate::graphql::{domain_graphql_handler, graphiql_handler, GraphqlService};
 use ::juniper::{EmptyMutation, EmptySubscription};
 use axum::{routing::post, Extension};
 use domain_engine_core::{DomainEngine, DomainError, DomainResult, Session};
+use domain_engine_graphql::{
+    juniper,
+    ontology_schema::{Context, Query, Schema},
+    CreateSchemaError,
+};
 use domain_engine_in_memory_store::InMemoryDataStoreFactory;
-use domain_engine_juniper::ontology_schema::{Context, Query, Schema};
-use domain_engine_juniper::{juniper, CreateSchemaError};
 use juniper_axum::extract::JuniperRequest;
 use ontol_runtime::{ontology::Ontology, PackageId};
 use reqwest::header::HeaderName;
@@ -161,7 +164,7 @@ fn domain_router(
 ) -> anyhow::Result<axum::Router> {
     let mut router: axum::Router = axum::Router::new();
 
-    match domain_engine_juniper::create_graphql_schema(engine.ontology_owned(), package_id) {
+    match domain_engine_graphql::create_graphql_schema(engine.ontology_owned(), package_id) {
         Err(CreateSchemaError::GraphqlInterfaceNotFound) => {
             // Don't create the graphql endpoints
         }

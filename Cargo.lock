@@ -842,6 +842,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "domain-engine-graphql"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "domain-engine-core",
+ "domain-engine-in-memory-store",
+ "domain-engine-test-templates",
+ "domain-engine-test-utils",
+ "fnv",
+ "graphql-parser",
+ "juniper",
+ "ontol-macros",
+ "ontol-runtime",
+ "ontol-test-utils",
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "smartstring",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "unimock",
+]
+
+[[package]]
 name = "domain-engine-grpc"
 version = "0.1.0"
 dependencies = [
@@ -884,33 +911,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "domain-engine-juniper"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "base64 0.22.1",
- "domain-engine-core",
- "domain-engine-in-memory-store",
- "domain-engine-test-templates",
- "domain-engine-test-utils",
- "fnv",
- "graphql-parser",
- "juniper",
- "ontol-macros",
- "ontol-runtime",
- "ontol-test-utils",
- "pretty_assertions",
- "serde",
- "serde_json",
- "smartstring",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "unimock",
-]
-
-[[package]]
 name = "domain-engine-test-templates"
 version = "0.1.0"
 
@@ -921,8 +921,8 @@ dependencies = [
  "async-trait",
  "chrono",
  "domain-engine-core",
+ "domain-engine-graphql",
  "domain-engine-in-memory-store",
- "domain-engine-juniper",
  "fnv",
  "graphql-parser",
  "juniper",
@@ -2221,7 +2221,6 @@ dependencies = [
  "clap",
  "clap-stdin",
  "domain-engine-core",
- "domain-engine-juniper",
  "ontol-runtime",
  "serde",
  "serde_json",
@@ -2423,8 +2422,8 @@ dependencies = [
  "criterion",
  "crossterm",
  "domain-engine-core",
+ "domain-engine-graphql",
  "domain-engine-in-memory-store",
- "domain-engine-juniper",
  "domain-engine-test-utils",
  "futures",
  "http-body 1.0.0",

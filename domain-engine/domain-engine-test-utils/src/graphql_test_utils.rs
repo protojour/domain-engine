@@ -8,10 +8,10 @@ use domain_engine_core::{
     data_store::{DataStore, DataStoreAPIMock, Request, Response},
     DomainEngine, Session,
 };
-use domain_engine_in_memory_store::InMemoryDataStoreFactory;
-use domain_engine_juniper::{
+use domain_engine_graphql::{
     context::ServiceCtx, create_graphql_schema, gql_scalar::GqlScalar, Schema,
 };
+use domain_engine_in_memory_store::InMemoryDataStoreFactory;
 use juniper::ScalarValue;
 use ontol_runtime::sequence::Sequence;
 use ontol_test_utils::{OntolTest, SrcName, TestCompile, TestPackages};

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use domain_engine_core::{system::SystemApiMock, DomainEngine, Session};
-use domain_engine_juniper::{
+use domain_engine_graphql::{
     context::ServiceCtx,
     gql_scalar::GqlScalar,
     juniper::{graphql_value, InputValue, ScalarValue, Value},

@@ -1,5 +1,5 @@
 use domain_engine_core::data_store::{DataStoreAPIMock, Request, Response};
-use domain_engine_juniper::{
+use domain_engine_graphql::{
     context::ServiceCtx,
     gql_scalar::GqlScalar,
     juniper::{self, graphql_value},
