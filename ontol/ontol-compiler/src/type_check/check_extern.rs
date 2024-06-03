@@ -1,6 +1,5 @@
 use ontol_runtime::{
     ontology::{map::Extern, ontol::TextConstant},
-    property::Role,
     DefId,
 };
 use tracing::warn;
@@ -38,7 +37,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         for rel_id in table.keys() {
             let meta = self.defs.relationship_meta(*rel_id);
-            let (value_type_def_id, ..) = meta.relationship.by(Role::Object);
+            let (value_type_def_id, ..) = meta.relationship.object();
 
             match meta.relation_def_kind.value {
                 DefKind::TextLiteral(prop_name) => match *prop_name {

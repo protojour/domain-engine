@@ -333,14 +333,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             let (object_def_id, _) = meta.relationship.object;
             let object_ty = self.def_ty_ctx.table.get(&object_def_id).unwrap();
-            let Some(property_name) =
-                meta.relationship
-                    .object_prop
-                    .or(match meta.relation_def_kind.value {
-                        DefKind::TextLiteral(lit) => Some(lit),
-                        _ => None,
-                    })
-            else {
+            let Some(property_name) = (match meta.relation_def_kind.value {
+                DefKind::TextLiteral(lit) => Some(lit),
+                _ => None,
+            }) else {
                 continue;
             };
 

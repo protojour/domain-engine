@@ -239,7 +239,6 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                             ValueCardinality::Unit,
                         ),
                         object: (ident_literal, span),
-                        object_prop: None,
                         object_cardinality: (
                             PropertyCardinality::Mandatory,
                             ValueCardinality::Unit,

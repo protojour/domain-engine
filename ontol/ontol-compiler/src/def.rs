@@ -7,7 +7,7 @@ use ontol_runtime::{
         domain::{BasicTypeInfo, EdgeCardinalId, TypeKind},
         ontol::TextLikeType,
     },
-    property::{Cardinality, Role},
+    property::Cardinality,
     var::VarAllocator,
     DefId, PackageId, RelationshipId,
 };
@@ -40,7 +40,7 @@ pub enum DefKind<'m> {
     Type(TypeDef<'m>),
     BuiltinRelType(BuiltinRelationKind, Option<&'static str>),
     Edge,
-    Relationship(Relationship<'m>),
+    Relationship(Relationship),
     FmtTransition(DefId, FmtFinalState),
     // FIXME: This should not be builtin proc directly.
     // we may find the _actual_ builtin proc to call during type check,
@@ -187,7 +187,7 @@ pub enum BuiltinRelationKind {
 
 /// This definition expresses that a relation is a relationship between a subject and an object
 #[derive(Debug)]
-pub struct Relationship<'m> {
+pub struct Relationship {
     pub relation_def_id: DefId,
     pub edge_cardinal_id: EdgeCardinalId,
     pub relation_span: SourceSpan,
@@ -200,18 +200,16 @@ pub struct Relationship<'m> {
     /// How many subjects are related to the object
     pub object_cardinality: Cardinality,
 
-    pub object_prop: Option<&'m str>,
-
     pub rel_params: RelParams,
 }
 
-impl<'m> Relationship<'m> {
-    /// Get relationship data by a specific role: subject or object
-    pub fn by(&self, role: Role) -> (DefId, Cardinality, SourceSpan) {
-        match role {
-            Role::Subject => (self.subject.0, self.subject_cardinality, self.subject.1),
-            Role::Object => (self.object.0, self.object_cardinality, self.object.1),
-        }
+impl Relationship {
+    pub fn subject(&self) -> (DefId, Cardinality, SourceSpan) {
+        (self.subject.0, self.subject_cardinality, self.subject.1)
+    }
+
+    pub fn object(&self) -> (DefId, Cardinality, SourceSpan) {
+        (self.object.0, self.object_cardinality, self.object.1)
     }
 }
 
@@ -225,7 +223,7 @@ pub enum RelParams {
 #[derive(Clone)]
 pub struct RelationshipMeta<'d, 'm> {
     pub relationship_id: RelationshipId,
-    pub relationship: SpannedBorrow<'d, Relationship<'m>>,
+    pub relationship: SpannedBorrow<'d, Relationship>,
     pub relation_def_kind: SpannedBorrow<'d, DefKind<'m>>,
 }
 

@@ -2,7 +2,7 @@ use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
     ontology::domain::{CardinalIdx, EdgeCardinalId},
-    property::{PropertyCardinality, Role, ValueCardinality},
+    property::{PropertyCardinality, ValueCardinality},
     var::Var,
     DefId, EdgeId, RelationshipId,
 };
@@ -173,7 +173,6 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                             PropertyCardinality::Mandatory,
                             ValueCardinality::Unit,
                         ),
-                        object_prop: None,
                         rel_params: RelParams::Unit,
                     };
 
@@ -406,7 +405,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
 
                     if let Some((_rel_id, found_relationship_meta)) = found {
                         let (val_def_id, _cardinality, _) =
-                            found_relationship_meta.relationship.by(Role::Object);
+                            found_relationship_meta.relationship.object();
 
                         output
                             .entry(*pat_var)

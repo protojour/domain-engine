@@ -118,7 +118,6 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::IndexSet),
                 object: (to.0, self.ctx.source_span(to.1)),
                 object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::IndexSet),
-                object_prop: None,
                 rel_params: RelParams::Unit,
             }),
             to.1,

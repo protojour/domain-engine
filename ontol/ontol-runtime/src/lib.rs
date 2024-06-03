@@ -24,10 +24,6 @@ mod equality;
 
 extern crate self as ontol_runtime;
 
-/// Property mirroring is the old ONTOL property model,
-/// trying to remove this by using edge cardinals instead
-pub const MIRROR_PROP: bool = false;
-
 /// Identifies one "package" of ONTOL code.
 /// One package represents a domain,
 /// but one package can consist of internal subdomains (probably).

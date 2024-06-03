@@ -24,8 +24,8 @@ use ontol_runtime::{
     },
     ontology::ontol::TextConstant,
     phf::PhfIndexMap,
-    property::{PropertyCardinality, Role, ValueCardinality},
-    DefId, RelationshipId, MIRROR_PROP,
+    property::{PropertyCardinality, ValueCardinality},
+    DefId, RelationshipId,
 };
 use thin_vec::thin_vec;
 use tracing::{trace, trace_span, warn};
@@ -659,13 +659,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 for (rel_id, property) in table {
                     let meta = self.defs.relationship_meta(*rel_id);
 
-                    let match_side = if MIRROR_PROP {
-                        meta.relationship.object
-                    } else {
-                        meta.relationship.subject
-                    };
-
-                    if match_side.0 == *union_def_id {
+                    if meta.relationship.subject.0 == *union_def_id {
                         self.harvest_struct_field(
                             *rel_id,
                             property,
@@ -862,8 +856,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         field_namespace: &mut GraphqlNamespace,
         output: &mut IndexMap<String, FieldData>,
     ) {
-        let (_, (prop_cardinality, value_cardinality), _) = meta.relationship.by(Role::Subject);
-        let (value_def_id, ..) = meta.relationship.by(Role::Object);
+        let (_, (prop_cardinality, value_cardinality), _) = meta.relationship.subject();
+        let (value_def_id, ..) = meta.relationship.object();
         trace!("    harvest data struct field `{prop_key}`: {rel_id} ({value_def_id:?}) ({prop_cardinality:?}, {value_cardinality:?})");
 
         let value_properties = self.relations.properties_by_def_id(value_def_id);

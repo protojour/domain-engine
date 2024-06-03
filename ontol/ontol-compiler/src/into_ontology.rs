@@ -7,17 +7,16 @@ use ontol_runtime::{
     },
     ontology::{
         domain::{
-            BasicTypeInfo, CardinalIdx, DataRelationshipInfo, DataRelationshipKind,
-            DataRelationshipSource, DataRelationshipTarget, Domain, EdgeCardinal, EdgeCardinalId,
-            EdgeInfo, EntityInfo, TypeInfo, TypeKind,
+            BasicTypeInfo, DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource,
+            DataRelationshipTarget, Domain, EdgeCardinal, EdgeInfo, EntityInfo, TypeInfo, TypeKind,
         },
         map::MapMeta,
         ontol::{OntolDomainMeta, TextConstant, TextLikeType},
         Ontology,
     },
-    property::{PropertyCardinality, Role, ValueCardinality},
+    property::{PropertyCardinality, ValueCardinality},
     rustdoc::RustDoc,
-    DefId, EdgeId, PackageId, RelationshipId, MIRROR_PROP,
+    DefId, EdgeId, PackageId, RelationshipId,
 };
 use std::{
     collections::{BTreeSet, HashMap},
@@ -426,8 +425,8 @@ impl<'m> Compiler<'m> {
     ) {
         let meta = self.defs.relationship_meta(rel_id);
 
-        let (source_def_id, _, _) = meta.relationship.by(Role::Subject);
-        let (target_def_id, _, _) = meta.relationship.by(Role::Object);
+        let (source_def_id, _, _) = meta.relationship.subject();
+        let (target_def_id, _, _) = meta.relationship.object();
 
         let Some(target_properties) = self.rel_ctx.properties_by_def_id(target_def_id) else {
             return;
@@ -447,20 +446,8 @@ impl<'m> Compiler<'m> {
             RelParams::Unit | RelParams::IndexRange(_) => None,
         };
 
-        let edge_id = if MIRROR_PROP {
-            EdgeId(rel_id.0)
-        } else {
-            meta.relationship.edge_cardinal_id.id
-        };
-
-        let edge_cardinal_id = if MIRROR_PROP {
-            EdgeCardinalId {
-                id: edge_id,
-                cardinal_idx: CardinalIdx(0),
-            }
-        } else {
-            meta.relationship.edge_cardinal_id
-        };
+        let edge_id = meta.relationship.edge_cardinal_id.id;
+        let edge_cardinal_id = meta.relationship.edge_cardinal_id;
 
         let (data_relationship_kind, target) = match repr_kind {
             ReprKind::StructUnion(members) => {
@@ -500,7 +487,7 @@ impl<'m> Compiler<'m> {
         };
 
         // collect edge
-        if let DataRelationshipKind::Edge { .. } = &data_relationship_kind {
+        if let DataRelationshipKind::Edge(_) = &data_relationship_kind {
             let edge_info = edges.entry(edge_id).or_insert_with(|| EdgeInfo {
                 cardinals: vec![],
                 store_key: self.edge_ctx.store_keys.get(&edge_id.0).copied(),
@@ -512,19 +499,11 @@ impl<'m> Compiler<'m> {
                 is_entity: false,
             });
 
-            if MIRROR_PROP {
-                edge_info.cardinals[0] = EdgeCardinal {
-                    target: target.clone(),
-                    cardinality: meta.relationship.subject_cardinality,
-                    is_entity: true,
-                };
-            } else {
-                edge_info.cardinals[edge_cardinal_id.cardinal_idx.0 as usize] = EdgeCardinal {
-                    target: target.clone(),
-                    cardinality: meta.relationship.subject_cardinality,
-                    is_entity: true,
-                }
-            }
+            edge_info.cardinals[edge_cardinal_id.cardinal_idx.0 as usize] = EdgeCardinal {
+                target: target.clone(),
+                cardinality: meta.relationship.subject_cardinality,
+                is_entity: true,
+            };
 
             if let Some(edge_params) = edge_params {
                 edge_info.cardinals.resize_with(3, || EdgeCardinal {

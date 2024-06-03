@@ -28,7 +28,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         match relation_def_kind {
             DefKind::TextLiteral(_) | DefKind::Type(_) => {
-                self.check_named_relation(relationship_id, relationship, span);
+                self.check_named_relation(relationship_id, relationship);
             }
             DefKind::BuiltinRelType(kind, _) => {
                 self.check_builtin_relation(relationship_id, relationship, kind, span);
@@ -53,7 +53,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         relationship_id: RelationshipId,
         relationship: &Relationship,
-        span: &SourceSpan,
     ) -> TypeRef<'m> {
         let subject = &relationship.subject;
         let object = &relationship.object;
@@ -91,37 +90,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         // Ensure properties in object
         self.rel_ctx.properties_by_def_id_mut(object.0);
-
-        match (&relationship.object_prop, object_ty) {
-            (Some(_), Type::Domain(_)) => {
-                self.check_not_sealed(object_ty, &object.1);
-
-                if self
-                    .rel_ctx
-                    .properties_by_def_id_mut(object.0)
-                    .table_mut()
-                    .insert(
-                        relationship_id,
-                        Property {
-                            cardinality: relationship.object_cardinality,
-                            is_entity_id: false,
-                        },
-                    )
-                    .is_some()
-                {
-                    return CompileError::UnionInNamedRelationshipNotSupported
-                        .span(*span)
-                        .report_ty(self);
-                }
-            }
-            (Some(_), _) => {
-                // non-domain type in object
-                return CompileError::NonEntityInReverseRelationship
-                    .span(*span)
-                    .report_ty(self);
-            }
-            (None, _) => {}
-        }
 
         object_ty
     }

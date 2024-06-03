@@ -9,7 +9,7 @@ use std::collections::{hash_map::Entry, HashMap};
 
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
-use ontol_runtime::{property::Role, DefId, RelationshipId};
+use ontol_runtime::{DefId, RelationshipId};
 use tracing::{debug_span, trace};
 
 use crate::{
@@ -211,7 +211,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
     fn traverse_property(&mut self, rel_id: RelationshipId) {
         let meta = self.defs.relationship_meta(rel_id);
 
-        let (value_def_id, ..) = meta.relationship.by(Role::Object);
+        let (value_def_id, ..) = meta.relationship.object();
         let value_def = self.defs.table.get(&value_def_id).unwrap();
 
         if let Some(Type::Error) = self.def_types.table.get(&value_def_id) {

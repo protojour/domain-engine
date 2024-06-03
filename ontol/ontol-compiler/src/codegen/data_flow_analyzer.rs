@@ -6,7 +6,6 @@ use fnv::{FnvHashMap, FnvHashSet};
 use ontol_hir::{PropVariant, StructFlags};
 use ontol_runtime::{
     ontology::map::{PropertyFlow, PropertyFlowData},
-    property::Role,
     value::Attribute,
     var::{Var, VarSet},
     DefId, RelationshipId,
@@ -342,7 +341,7 @@ where
     /// rel_params is ignored here.
     fn reg_scope_prop(&mut self, struct_var: Var, rel_id: RelationshipId, value_def_id: DefId) {
         let meta = self.defs.relationship_meta(rel_id);
-        let (_, cardinality, _) = meta.relationship.by(Role::Subject);
+        let (_, cardinality, _) = meta.relationship.subject();
 
         self.property_flow.insert(PropertyFlow {
             id: rel_id,

@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 use ontol_hir::{PropFlags, StructFlags};
 use ontol_runtime::{
-    property::{Cardinality, PropertyCardinality, Role, ValueCardinality},
+    property::{Cardinality, PropertyCardinality, ValueCardinality},
     query::condition::SetOperator,
     value::Attribute,
     var::Var,
@@ -250,8 +250,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             DefKind::TextLiteral(lit) => Some(MatchAttributeKey::Named(lit)),
             _ => Some(MatchAttributeKey::Def(meta.relationship.relation_def_id)),
         };
-        let (_, owner_cardinality, _) = meta.relationship.by(Role::Subject);
-        let (value_def_id, _, _) = meta.relationship.by(Role::Object);
+        let (_, owner_cardinality, _) = meta.relationship.subject();
+        let (value_def_id, _, _) = meta.relationship.object();
 
         if let Some(match_key) = match_key {
             match_attributes.insert(
@@ -742,7 +742,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             {
                 let meta = self.defs.relationship_meta(relationship_id);
-                let (target_def_id, cardinality, _span) = meta.relationship.by(Role::Object);
+                let (target_def_id, cardinality, _span) = meta.relationship.object();
 
                 // Here we check that if the missing property refers to variably sized edges
                 // to foreign entities, that property does not need to be mentioned for the map

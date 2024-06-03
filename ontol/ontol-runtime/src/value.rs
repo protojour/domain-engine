@@ -44,7 +44,7 @@ pub enum Value {
     /// A sequence of attributes.
     ///
     /// The difference between a Sequence and a Map is that
-    /// sequences use numeric keys instead of PropertyId.
+    /// sequences use numeric keys instead of RelationshipId.
     ///
     /// Some sequences will be uniform (all elements have the same type).
     /// Other sequences will behave more like tuples.

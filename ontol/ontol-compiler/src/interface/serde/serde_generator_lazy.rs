@@ -17,8 +17,7 @@ use ontol_runtime::{
     },
     ontology::ontol::{TextConstant, ValueGenerator},
     phf::PhfKey,
-    property::Role,
-    DefId, RelationshipId, MIRROR_PROP,
+    DefId, RelationshipId,
 };
 use tracing::{debug, debug_span, warn};
 
@@ -72,13 +71,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 for (rel_id, property) in table {
                     let meta = self.defs.relationship_meta(*rel_id);
 
-                    let match_side = if MIRROR_PROP {
-                        meta.relationship.object
-                    } else {
-                        meta.relationship.subject
-                    };
-
-                    if match_side.0 == *union_def_id {
+                    if meta.relationship.subject.0 == *union_def_id {
                         self.add_struct_op_property(
                             *rel_id,
                             property,
@@ -131,7 +124,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         must_flatten_unions: &mut bool,
     ) {
         let meta = self.defs.relationship_meta(rel_id);
-        let (value_type_def_id, ..) = meta.relationship.by(Role::Object);
+        let (value_type_def_id, ..) = meta.relationship.object();
 
         let (property_cardinality, value_addr) = self.get_property_operator(
             value_type_def_id,
