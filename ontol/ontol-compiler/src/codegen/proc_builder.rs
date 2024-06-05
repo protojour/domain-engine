@@ -202,7 +202,7 @@ fn debug_output(n_params: NParams, output: &SpannedOpCodes) {
 pub struct Block {
     label: BlockLabel,
     stack_start: u32,
-    ir: SmallVec<[(Ir, SourceSpan); 32]>,
+    ir: SmallVec<(Ir, SourceSpan), 32>,
     terminator: Option<Terminator>,
     terminator_span: SourceSpan,
 }
@@ -270,7 +270,7 @@ impl Block {
         BlockOffset(self.ir.len() as u32)
     }
 
-    pub fn ir_mut(&mut self) -> &mut SmallVec<[(Ir, SourceSpan); 32]> {
+    pub fn ir_mut(&mut self) -> &mut SmallVec<(Ir, SourceSpan), 32> {
         &mut self.ir
     }
 
@@ -283,4 +283,4 @@ impl Block {
     }
 }
 
-pub type SpannedOpCodes = SmallVec<[(OpCode, SourceSpan); 32]>;
+pub type SpannedOpCodes = SmallVec<(OpCode, SourceSpan), 32>;

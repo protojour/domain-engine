@@ -903,7 +903,7 @@ dependencies = [
  "pretty_assertions",
  "serde",
  "serde_json",
- "smallvec",
+ "smallvec 2.0.0-alpha.6",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -1486,7 +1486,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "smallvec",
+ "smallvec 1.13.2",
  "tokio",
  "want",
 ]
@@ -2260,7 +2260,7 @@ dependencies = [
  "serde",
  "serde-value",
  "serde_json",
- "smallvec",
+ "smallvec 2.0.0-alpha.6",
  "thin-vec",
  "thiserror",
  "tracing",
@@ -2303,7 +2303,7 @@ dependencies = [
  "indoc",
  "ontol-runtime",
  "pretty_assertions",
- "smallvec",
+ "smallvec 2.0.0-alpha.6",
  "thin-vec",
  "tracing-subscriber",
 ]
@@ -2515,7 +2515,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "redox_syscall 0.5.1",
- "smallvec",
+ "smallvec 1.13.2",
  "windows-targets 0.52.5",
 ]
 
@@ -3284,6 +3284,12 @@ name = "smallvec"
 version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
+
+[[package]]
+name = "smallvec"
+version = "2.0.0-alpha.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66778689f64ae4f4e9365890e55048783afc0bb07a8e214b0bcfe7b88e6bb2bf"
 
 [[package]]
 name = "smartstring"

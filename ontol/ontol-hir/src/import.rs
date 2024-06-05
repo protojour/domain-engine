@@ -108,7 +108,7 @@ impl<'i, 'o, 'a, L: Lang> Importer<'i, 'o, 'a, L> {
         Attribute { rel, val }
     }
 
-    fn import_entries(&mut self, entries: &[SetEntry<'a, L>]) -> SmallVec<[SetEntry<'a, L>; 1]> {
+    fn import_entries(&mut self, entries: &[SetEntry<'a, L>]) -> SmallVec<SetEntry<'a, L>, 1> {
         entries
             .iter()
             .map(|SetEntry(iter, attr)| SetEntry(iter.clone(), self.import_attr(*attr)))

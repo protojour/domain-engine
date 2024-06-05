@@ -109,7 +109,7 @@ impl From<Var> for Binder {
     }
 }
 
-pub type Nodes = SmallVec<[Node; 2]>;
+pub type Nodes = SmallVec<Node, 2>;
 
 /// The syntax kind of a node.
 #[derive(Clone)]
@@ -181,7 +181,7 @@ pub enum Kind<'a, L: Lang> {
     /// The expression (node) represents something which is evaluated on the narrowed value.
     Narrow(Node),
     /// A set-builder of set entries
-    Set(SmallVec<[SetEntry<'a, L>; 1]>),
+    Set(SmallVec<SetEntry<'a, L>, 1>),
     /// A struct with associated binder. The value is the struct.
     Struct(L::Data<'a, Binder>, StructFlags, Nodes),
     /// A property definition associated with a struct var in scope

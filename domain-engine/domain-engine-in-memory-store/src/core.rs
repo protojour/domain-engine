@@ -34,7 +34,7 @@ pub(super) struct DbContext {
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub(super) enum DynamicKey {
     Text(String),
-    Octets(SmallVec<[u8; 16]>),
+    Octets(SmallVec<u8, 16>),
     Serial(u64),
 }
 

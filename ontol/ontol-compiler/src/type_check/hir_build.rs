@@ -672,7 +672,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         parent_struct_flags: StructFlags,
         ctx: &mut HirBuildCtx<'m>,
     ) -> ontol_hir::Node {
-        let mut set_entries: SmallVec<[ontol_hir::SetEntry<'m, TypedHir>; 1]> =
+        let mut set_entries: SmallVec<ontol_hir::SetEntry<'m, TypedHir>, 1> =
             SmallVec::with_capacity(elements.len());
 
         for element in elements {

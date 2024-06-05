@@ -28,7 +28,7 @@ pub enum ReprKind {
     /// Just a plain old struct, no `is` business
     Struct,
     /// Struct merged with other Structs
-    StructIntersection(SmallVec<[(DefId, SourceSpan); 1]>),
+    StructIntersection(SmallVec<(DefId, SourceSpan), 1>),
     // Intersection of non-structs
     Intersection(Vec<(DefId, SourceSpan)>),
     StructUnion(Vec<(DefId, SourceSpan)>),
