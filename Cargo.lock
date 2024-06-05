@@ -2123,6 +2123,7 @@ dependencies = [
  "serde",
  "serde-value",
  "serde_json",
+ "smallvec 2.0.0-alpha.6",
  "smartstring",
  "thin-vec",
  "thiserror",
@@ -2985,6 +2986,9 @@ name = "smallvec"
 version = "2.0.0-alpha.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "66778689f64ae4f4e9365890e55048783afc0bb07a8e214b0bcfe7b88e6bb2bf"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "smartstring"

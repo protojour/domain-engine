@@ -16,6 +16,7 @@ pub mod query;
 pub mod resolve_path;
 pub mod rustdoc;
 pub mod sequence;
+pub mod tuple;
 pub mod value;
 pub mod var;
 pub mod vm;
