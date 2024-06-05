@@ -18,7 +18,7 @@ use domain_engine_core::{
 };
 use tracing::debug;
 
-use crate::core::{DynamicKey, EntityTable, HyperEdgeStore, InMemoryStore};
+use crate::core::{DynamicKey, HyperEdgeTable, InMemoryStore, VertexTable};
 
 mod core;
 // mod filter;
@@ -47,8 +47,8 @@ impl InMemoryDb {
     fn new(package_id: PackageId, ontology: Arc<Ontology>, system: ArcSystemApi) -> Self {
         let domain = ontology.find_domain(package_id).unwrap();
 
-        let mut collections: FnvHashMap<DefId, EntityTable<DynamicKey>> = Default::default();
-        let mut hyper_edges: FnvHashMap<EdgeId, HyperEdgeStore> = Default::default();
+        let mut collections: FnvHashMap<DefId, VertexTable<DynamicKey>> = Default::default();
+        let mut hyper_edges: FnvHashMap<EdgeId, HyperEdgeTable> = Default::default();
 
         for type_info in domain.type_infos() {
             if let Some(entity_info) = type_info.entity_info() {
@@ -81,12 +81,12 @@ impl InMemoryDb {
 
             hyper_edges
                 .entry(*edge_id)
-                .or_insert_with(|| HyperEdgeStore { columns });
+                .or_insert_with(|| HyperEdgeTable { columns });
         }
 
         Self {
             store: RwLock::new(InMemoryStore {
-                collections,
+                vertices: collections,
                 edges: hyper_edges,
                 serial_counter: 0,
             }),

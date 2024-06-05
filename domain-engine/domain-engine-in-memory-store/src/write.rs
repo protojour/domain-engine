@@ -24,11 +24,11 @@ use domain_engine_core::{
 };
 
 use crate::{
-    core::{find_data_relationship, DbContext, EdgeData, EdgeVectorData, EntityKey},
+    core::{find_data_relationship, DbContext, EdgeData, EdgeVectorData, VertexKey},
     query::{Cursor, IncludeTotalLen, Limit},
 };
 
-use super::core::{DynamicKey, InMemoryStore};
+use super::core::InMemoryStore;
 
 enum EdgeWriteMode {
     Insert,
@@ -43,7 +43,7 @@ impl InMemoryStore {
         select: &Select,
         ctx: &DbContext,
     ) -> DomainResult<Value> {
-        let entity_id = self.write_new_entity_inner(entity, ctx)?;
+        let entity_id = self.write_new_vertex_inner(entity, ctx)?;
         self.post_write_select(entity_id, select, ctx)
     }
 
@@ -58,13 +58,16 @@ impl InMemoryStore {
         let entity_id = find_inherent_entity_id(&value, &ctx.ontology)?
             .ok_or_else(|| DomainError::EntityNotFound)?;
         let type_info = ctx.ontology.get_type_info(value.type_def_id());
-        let dynamic_key = Self::extract_dynamic_key(&entity_id)?;
+        let vertex_key = VertexKey {
+            type_def_id: type_info.def_id,
+            dynamic_key: Self::extract_dynamic_key(&entity_id)?,
+        };
 
         if !self
-            .collections
+            .vertices
             .get(&type_info.def_id)
             .unwrap()
-            .contains_key(&dynamic_key)
+            .contains_key(&vertex_key.dynamic_key)
         {
             return Err(DomainError::EntityNotFound);
         }
@@ -87,8 +90,7 @@ impl InMemoryStore {
                 DataRelationshipKind::Edge(projection) => match data_relationship.cardinality.1 {
                     ValueCardinality::Unit => {
                         self.insert_entity_relationship(
-                            type_info.def_id,
-                            &dynamic_key,
+                            vertex_key.clone(),
                             (projection, Some(EdgeWriteMode::Overwrite)),
                             attribute,
                             data_relationship,
@@ -105,8 +107,7 @@ impl InMemoryStore {
                             for attribute in patch_attributes {
                                 if matches!(attribute.rel, Value::DeleteRelationship(_)) {
                                     self.delete_entity_relationship(
-                                        type_info.def_id,
-                                        &dynamic_key,
+                                        vertex_key.clone(),
                                         projection,
                                         attribute.val,
                                         data_relationship,
@@ -114,8 +115,7 @@ impl InMemoryStore {
                                     )?;
                                 } else {
                                     self.insert_entity_relationship(
-                                        type_info.def_id,
-                                        &dynamic_key,
+                                        vertex_key.clone(),
                                         (projection, None),
                                         attribute,
                                         data_relationship,
@@ -134,8 +134,8 @@ impl InMemoryStore {
             }
         }
 
-        let collection = self.collections.get_mut(&type_info.def_id).unwrap();
-        let raw_props = collection.get_mut(&dynamic_key).unwrap();
+        let collection = self.vertices.get_mut(&type_info.def_id).unwrap();
+        let raw_props = collection.get_mut(&vertex_key.dynamic_key).unwrap();
 
         for (property_id, attr) in raw_props_update {
             raw_props.insert(property_id, attr);
@@ -154,7 +154,7 @@ impl InMemoryStore {
             Select::EntityId => Ok(entity_id),
             Select::Struct(struct_select) => {
                 let target_dynamic_key = Self::extract_dynamic_key(&entity_id)?;
-                let entity_seq = self.query_single_entity_collection(
+                let entity_seq = self.query_single_vertex_collection(
                     struct_select,
                     &Filter::default(),
                     Limit(usize::MAX),
@@ -185,19 +185,19 @@ impl InMemoryStore {
     }
 
     /// Returns the entity ID
-    fn write_new_entity_inner(&mut self, entity: Value, ctx: &DbContext) -> DomainResult<Value> {
+    fn write_new_vertex_inner(&mut self, vertex: Value, ctx: &DbContext) -> DomainResult<Value> {
         debug!(
-            "write new entity {:?}: {}",
-            entity.type_def_id(),
-            ValueDebug(&entity)
+            "write new vertex {:?}: {}",
+            vertex.type_def_id(),
+            ValueDebug(&vertex)
         );
 
-        let type_info = ctx.ontology.get_type_info(entity.type_def_id());
+        let type_info = ctx.ontology.get_type_info(vertex.type_def_id());
         let entity_info = type_info
             .entity_info()
-            .ok_or(DomainError::NotAnEntity(entity.type_def_id()))?;
+            .ok_or(DomainError::NotAnEntity(vertex.type_def_id()))?;
 
-        let (id, id_generated) = match find_inherent_entity_id(&entity, &ctx.ontology)? {
+        let (id, id_generated) = match find_inherent_entity_id(&vertex, &ctx.ontology)? {
             Some(id) => (id, false),
             None => {
                 let value_generator = entity_info.id_value_generator.ok_or_else(|| {
@@ -211,9 +211,9 @@ impl InMemoryStore {
             }
         };
 
-        debug!("write entity_id={}", ValueDebug(&id));
+        debug!("write vertex_id={}", ValueDebug(&id));
 
-        let Value::Struct(mut struct_map, type_def_id) = entity else {
+        let Value::Struct(mut struct_map, type_def_id) = vertex else {
             return Err(DomainError::EntityMustBeStruct);
         };
 
@@ -223,7 +223,10 @@ impl InMemoryStore {
 
         let mut raw_props: FnvHashMap<RelationshipId, Attribute> = Default::default();
 
-        let entity_key = Self::extract_dynamic_key(&id)?;
+        let vertex_key = VertexKey {
+            type_def_id: type_info.def_id,
+            dynamic_key: Self::extract_dynamic_key(&id)?,
+        };
 
         for (rel_id, attribute) in *struct_map {
             let data_relationship = find_data_relationship(type_info, &rel_id)?;
@@ -236,8 +239,7 @@ impl InMemoryStore {
                 DataRelationshipKind::Edge(projection) => match data_relationship.cardinality.1 {
                     ValueCardinality::Unit => {
                         self.insert_entity_relationship(
-                            type_info.def_id,
-                            &entity_key,
+                            vertex_key.clone(),
                             (projection, Some(EdgeWriteMode::Insert)),
                             attribute,
                             data_relationship,
@@ -253,8 +255,7 @@ impl InMemoryStore {
 
                         for attribute in seq.into_attrs() {
                             self.insert_entity_relationship(
-                                type_info.def_id,
-                                &entity_key,
+                                vertex_key.clone(),
                                 (projection, Some(EdgeWriteMode::Insert)),
                                 attribute,
                                 data_relationship,
@@ -266,21 +267,20 @@ impl InMemoryStore {
             }
         }
 
-        let collection = self.collections.get_mut(&type_def_id).unwrap();
+        let collection = self.vertices.get_mut(&type_def_id).unwrap();
 
-        if collection.contains_key(&entity_key) {
+        if collection.contains_key(&vertex_key.dynamic_key) {
             return Err(DomainError::EntityAlreadyExists);
         }
 
-        collection.insert(entity_key, raw_props);
+        collection.insert(vertex_key.dynamic_key, raw_props);
 
         Ok(id)
     }
 
     fn insert_entity_relationship(
         &mut self,
-        entity_def_id: DefId,
-        entity_key: &DynamicKey,
+        subject_key: VertexKey,
         (projection, write_mode): (EdgeCardinalProjection, Option<EdgeWriteMode>),
         Attribute { rel, val }: Attribute,
         data_relationship: &DataRelationshipInfo,
@@ -303,16 +303,13 @@ impl InMemoryStore {
             DataRelationshipTarget::Unambiguous(entity_def_id) => {
                 if &val.type_def_id() == entity_def_id {
                     let write_mode = write_mode.unwrap_or(write_mode_from_value(&val));
-                    let foreign_id = self.write_new_entity_inner(val, ctx)?;
-                    let dynamic_key = Self::extract_dynamic_key(&foreign_id)?;
+                    let foreign_id = self.write_new_vertex_inner(val, ctx)?;
+                    let foreign_key = VertexKey {
+                        type_def_id: *entity_def_id,
+                        dynamic_key: Self::extract_dynamic_key(&foreign_id)?,
+                    };
 
-                    (
-                        write_mode,
-                        EntityKey {
-                            type_def_id: *entity_def_id,
-                            dynamic_key,
-                        },
-                    )
+                    (write_mode, foreign_key)
                 } else {
                     (
                         write_mode.unwrap_or(write_mode_from_value(&rel)),
@@ -335,15 +332,13 @@ impl InMemoryStore {
 
                     let write_mode = write_mode.unwrap_or(write_mode_from_value(&val));
                     let entity_def_id = val.type_def_id();
-                    let foreign_id = self.write_new_entity_inner(val, ctx)?;
-                    let dynamic_key = Self::extract_dynamic_key(&foreign_id)?;
-
-                    let key = EntityKey {
+                    let foreign_id = self.write_new_vertex_inner(val, ctx)?;
+                    let foreign_key = VertexKey {
                         type_def_id: entity_def_id,
-                        dynamic_key,
+                        dynamic_key: Self::extract_dynamic_key(&foreign_id)?,
                     };
 
-                    (write_mode, key)
+                    (write_mode, foreign_key)
                 } else {
                     let (variant_def_id, entity_info) = variants
                         .iter()
@@ -375,18 +370,13 @@ impl InMemoryStore {
             .get_mut(&projection.id)
             .expect("No edge collection");
 
-        let local_key = EntityKey {
-            type_def_id: entity_def_id,
-            dynamic_key: entity_key.clone(),
-        };
-
-        let mut edge_tuple: Vec<EdgeData<EntityKey>> = edge_store
+        let mut edge_tuple: Vec<EdgeData<VertexKey>> = edge_store
             .columns
             .iter()
             .enumerate()
             .map(|(idx, column)| match &column.data {
                 EdgeVectorData::Keys(_) => EdgeData::Key(if idx == projection.subject.0 as usize {
-                    local_key.clone()
+                    subject_key.clone()
                 } else if idx == projection.object.0 as usize {
                     foreign_key.clone()
                 } else {
@@ -407,6 +397,7 @@ impl InMemoryStore {
             EdgeWriteMode::Overwrite => {
                 let mut to_delete = BTreeSet::default();
                 edge_store.collect_unique_violations(&edge_tuple, &mut to_delete);
+                // Delete the edge(s) that match in the subject column:
                 edge_store.collect_column_eq(
                     projection.subject,
                     &edge_tuple[projection.subject.0 as usize],
@@ -457,8 +448,7 @@ impl InMemoryStore {
 
     fn delete_entity_relationship(
         &mut self,
-        entity_def_id: DefId,
-        entity_key: &DynamicKey,
+        subject_key: VertexKey,
         projection: EdgeCardinalProjection,
         foreign_id: Value,
         data_relationship: &DataRelationshipInfo,
@@ -503,14 +493,9 @@ impl InMemoryStore {
             .get_mut(&projection.id)
             .expect("No edge collection");
 
-        let local_key = EntityKey {
-            type_def_id: entity_def_id,
-            dynamic_key: entity_key.clone(),
-        };
-
         let (subject_data, object_data) = match projection.proj() {
-            (0, 1) => (EdgeData::Key(local_key), EdgeData::Key(foreign_key)),
-            (1, 0) => (EdgeData::Key(foreign_key), EdgeData::Key(local_key)),
+            (0, 1) => (EdgeData::Key(subject_key), EdgeData::Key(foreign_key)),
+            (1, 0) => (EdgeData::Key(foreign_key), EdgeData::Key(subject_key)),
             _ => todo!(),
         };
 
@@ -541,9 +526,9 @@ impl InMemoryStore {
         entity_info: &EntityInfo,
         id_value: Value,
         ctx: &DbContext,
-    ) -> DomainResult<EntityKey> {
+    ) -> DomainResult<VertexKey> {
         let foreign_key = Self::extract_dynamic_key(&id_value)?;
-        let entity_data = self.look_up_entity(foreign_entity_def_id, &foreign_key);
+        let entity_data = self.look_up_vertex(foreign_entity_def_id, &foreign_key);
 
         if entity_data.is_none() && entity_info.is_self_identifying {
             // This type has UPSERT semantics.
@@ -553,7 +538,7 @@ impl InMemoryStore {
                 entity_info.id_relationship_id,
                 Attribute::from(id_value),
             )]);
-            self.write_new_entity_inner(
+            self.write_new_vertex_inner(
                 Value::Struct(Box::new(entity_data), foreign_entity_def_id),
                 ctx,
             )?;
@@ -578,7 +563,7 @@ impl InMemoryStore {
             return Err(DomainError::UnresolvedForeignKey(repr));
         }
 
-        Ok(EntityKey {
+        Ok(VertexKey {
             type_def_id: foreign_entity_def_id,
             dynamic_key: foreign_key,
         })

@@ -16,9 +16,9 @@ use domain_engine_core::{
 };
 use tracing::{error, warn};
 
-use crate::core::{DbContext, EdgeVectorData, HyperEdgeStore};
+use crate::core::{DbContext, EdgeVectorData, HyperEdgeTable};
 
-use super::core::{DynamicKey, EntityKey, InMemoryStore};
+use super::core::{DynamicKey, InMemoryStore, VertexKey};
 
 #[derive(Clone, Copy, Debug)]
 pub(super) enum FilterVal<'d> {
@@ -33,7 +33,7 @@ pub(super) enum FilterVal<'d> {
 
 impl<'d> FilterVal<'d> {
     fn from_entity(
-        entity_key: &'d EntityKey,
+        entity_key: &'d VertexKey,
         prop_tree: &'d FnvHashMap<RelationshipId, Attribute>,
     ) -> Self {
         Self::Struct {
@@ -160,10 +160,10 @@ impl InMemoryStore {
                             };
 
                             fn edge_lookup<'e>(
-                                edge_store: &'e HyperEdgeStore,
+                                edge_store: &'e HyperEdgeTable,
                                 projection: &EdgeCardinalProjection,
                                 key: &DynamicKey,
-                            ) -> Option<(&'e EntityKey, &'e Value)> {
+                            ) -> Option<(&'e VertexKey, &'e Value)> {
                                 let EdgeVectorData::Keys(source_keys) =
                                     &edge_store.columns[projection.subject.0 as usize].data
                                 else {
@@ -207,7 +207,7 @@ impl InMemoryStore {
                             .ok_or(ProofError::Disproven)?;
 
                             let entity = self
-                                .look_up_entity(target_key.type_def_id, &target_key.dynamic_key)
+                                .look_up_vertex(target_key.type_def_id, &target_key.dynamic_key)
                                 .map(|prop_tree| FilterVal::from_entity(target_key, prop_tree))
                                 .ok_or(ProofError::Disproven)?;
 

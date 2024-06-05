@@ -21,8 +21,8 @@ use tracing::{debug, warn};
 use domain_engine_core::{system::ArcSystemApi, DomainError, DomainResult};
 
 pub(super) struct InMemoryStore {
-    pub collections: FnvHashMap<DefId, EntityTable<DynamicKey>>,
-    pub edges: FnvHashMap<EdgeId, HyperEdgeStore>,
+    pub vertices: FnvHashMap<DefId, VertexTable<DynamicKey>>,
+    pub edges: FnvHashMap<EdgeId, HyperEdgeTable>,
     pub serial_counter: u64,
 }
 
@@ -38,16 +38,16 @@ pub(super) enum DynamicKey {
     Serial(u64),
 }
 
-impl AsRef<DynamicKey> for &DynamicKey {
+impl AsRef<DynamicKey> for DynamicKey {
     fn as_ref(&self) -> &DynamicKey {
         self
     }
 }
 
-pub type EntityTable<K> = IndexMap<K, FnvHashMap<RelationshipId, Attribute>>;
+pub type VertexTable<K> = IndexMap<K, FnvHashMap<RelationshipId, Attribute>>;
 
 #[derive(Debug)]
-pub(super) struct HyperEdgeStore {
+pub(super) struct HyperEdgeTable {
     pub columns: Vec<EdgeColumn>,
 }
 
@@ -65,29 +65,29 @@ pub(super) enum EdgeData<K> {
 
 #[derive(Debug)]
 pub(super) enum EdgeVectorData {
-    Keys(Vec<EntityKey>),
+    Keys(Vec<VertexKey<DynamicKey>>),
     Values(Vec<Value>),
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub(super) struct EntityKey {
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub(super) struct VertexKey<K: AsRef<DynamicKey> = DynamicKey> {
     pub type_def_id: DefId,
-    pub dynamic_key: DynamicKey,
+    pub dynamic_key: K,
 }
 
-impl AsRef<DynamicKey> for EntityKey {
+impl<K: AsRef<DynamicKey>> AsRef<DynamicKey> for VertexKey<K> {
     fn as_ref(&self) -> &DynamicKey {
-        &self.dynamic_key
+        self.dynamic_key.as_ref()
     }
 }
 
 impl InMemoryStore {
     pub fn delete_entities(&mut self, ids: Vec<Value>, def_id: DefId) -> DomainResult<Vec<bool>> {
         let mut result_vec = Vec::with_capacity(ids.len());
-        let mut deleted_set: HashSet<EntityKey> = HashSet::with_capacity(ids.len());
+        let mut deleted_set: HashSet<VertexKey> = HashSet::with_capacity(ids.len());
 
         let collection = self
-            .collections
+            .vertices
             .get_mut(&def_id)
             .ok_or_else(|| DomainError::DataStore(anyhow!("Collection not found")))?;
 
@@ -95,7 +95,7 @@ impl InMemoryStore {
             let dynamic_key = Self::extract_dynamic_key(&id)?;
 
             let status = if collection.swap_remove(&dynamic_key).is_some() {
-                deleted_set.insert(EntityKey {
+                deleted_set.insert(VertexKey {
                     type_def_id: def_id,
                     dynamic_key,
                 });
@@ -107,7 +107,7 @@ impl InMemoryStore {
             result_vec.push(status);
         }
 
-        // filter deleted entity from edge collections
+        // cascade delete all edges
         for (_, edge_store) in self.edges.iter_mut() {
             let mut edge_delete_set: BTreeSet<usize> = Default::default();
 
@@ -150,13 +150,12 @@ impl InMemoryStore {
         }
     }
 
-    pub fn look_up_entity(
+    pub fn look_up_vertex(
         &self,
         def_id: DefId,
         dynamic_key: &DynamicKey,
     ) -> Option<&FnvHashMap<RelationshipId, Attribute>> {
-        let collection = self.collections.get(&def_id)?;
-        collection.get(dynamic_key)
+        self.vertices.get(&def_id)?.get(dynamic_key)
     }
 }
 
@@ -177,11 +176,11 @@ pub(crate) fn find_data_relationship<'a>(
     })
 }
 
-impl HyperEdgeStore {
+impl HyperEdgeTable {
     pub(super) fn collect_column_eq<K: AsRef<DynamicKey>>(
         &self,
         cardinal_idx: CardinalIdx,
-        data: &EdgeData<K>,
+        data: &EdgeData<VertexKey<K>>,
         output: &mut BTreeSet<usize>,
     ) {
         let column = &self.columns[cardinal_idx.0 as usize];
@@ -191,7 +190,7 @@ impl HyperEdgeStore {
 
     pub(super) fn collect_unique_violations<K: AsRef<DynamicKey>>(
         &self,
-        tuple: &[EdgeData<K>],
+        tuple: &[EdgeData<VertexKey<K>>],
         output: &mut BTreeSet<usize>,
     ) {
         for (cardinal_idx, column) in self.columns.iter().enumerate() {
@@ -205,15 +204,15 @@ impl HyperEdgeStore {
 
     fn collect_matching<K: AsRef<DynamicKey>>(
         vec_data: &EdgeVectorData,
-        data: &EdgeData<K>,
+        data: &EdgeData<VertexKey<K>>,
         output: &mut BTreeSet<usize>,
     ) {
         match (vec_data, data) {
             (EdgeVectorData::Keys(keys), EdgeData::Key(key)) => {
-                output.extend(
-                    keys.iter()
-                        .positions(|elem| &elem.dynamic_key == key.as_ref()),
-                );
+                output.extend(keys.iter().positions(|elem| {
+                    elem.type_def_id == key.type_def_id
+                        && &elem.dynamic_key == key.dynamic_key.as_ref()
+                }));
             }
             (EdgeVectorData::Values(values), EdgeData::Value(value)) => {
                 output.extend(values.iter().positions(|elem| elem == value));
@@ -222,7 +221,7 @@ impl HyperEdgeStore {
         }
     }
 
-    pub(super) fn push_tuple(&mut self, mut tuple: Vec<EdgeData<EntityKey>>) {
+    pub(super) fn push_tuple(&mut self, mut tuple: Vec<EdgeData<VertexKey>>) {
         for column in self.columns.iter_mut().rev() {
             let data = tuple.pop().unwrap();
 

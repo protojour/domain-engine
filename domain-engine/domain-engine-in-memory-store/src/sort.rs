@@ -16,7 +16,7 @@ use crate::core::{DbContext, DynamicKey};
 type Attrs = FnvHashMap<RelationshipId, Attribute>;
 
 pub(super) fn sort_props_vec(
-    raw_props_slice: &mut [(DynamicKey, FnvHashMap<RelationshipId, Attribute>)],
+    raw_props_slice: &mut [(&DynamicKey, FnvHashMap<RelationshipId, Attribute>)],
     def_id: DefId,
     filter: &Filter,
     ctx: &DbContext,

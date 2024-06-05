@@ -20,12 +20,12 @@ use tracing::{debug, error};
 use domain_engine_core::{DomainError, DomainResult};
 
 use crate::{
-    core::{find_data_relationship, DbContext, EdgeData, EdgeVectorData},
+    core::{find_data_relationship, DbContext, DynamicKey, EdgeData, EdgeVectorData},
     filter::FilterVal,
     sort::sort_props_vec,
 };
 
-use super::core::{DynamicKey, EntityKey, InMemoryStore};
+use super::core::{InMemoryStore, VertexKey};
 
 #[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct Cursor {
@@ -39,7 +39,7 @@ pub struct IncludeTotalLen(pub bool);
 impl InMemoryStore {
     pub fn query_entities(&self, select: &EntitySelect, ctx: &DbContext) -> DomainResult<Sequence> {
         match &select.source {
-            StructOrUnionSelect::Struct(struct_select) => self.query_single_entity_collection(
+            StructOrUnionSelect::Struct(struct_select) => self.query_single_vertex_collection(
                 struct_select,
                 &select.filter,
                 Limit(select.limit),
@@ -58,7 +58,7 @@ impl InMemoryStore {
         }
     }
 
-    pub fn query_single_entity_collection(
+    pub fn query_single_vertex_collection(
         &self,
         struct_select: &StructSelect,
         filter: &Filter,
@@ -67,9 +67,9 @@ impl InMemoryStore {
         IncludeTotalLen(include_total_len): IncludeTotalLen,
         ctx: &DbContext,
     ) -> DomainResult<Sequence> {
-        debug!("query single entity collection: {struct_select:?}");
+        debug!("query single vertex collection: {struct_select:?}");
         let collection = self
-            .collections
+            .vertices
             .get(&struct_select.def_id)
             .ok_or(DomainError::InvalidEntityDefId)?;
 
@@ -91,7 +91,7 @@ impl InMemoryStore {
                     prop_tree: props,
                 };
                 if self.eval_condition(filter_val, filter.condition(), ctx)? {
-                    vec.push((key.clone(), props.clone()));
+                    vec.push((key, props.clone()));
                 }
             }
             vec
@@ -138,10 +138,13 @@ impl InMemoryStore {
                 },
             });
 
-        for (entity_key, properties) in raw_props_vec {
+        for (dynamic_key, properties) in raw_props_vec {
             let value = self.apply_struct_select(
                 type_info,
-                &entity_key,
+                VertexKey {
+                    type_def_id: struct_select.def_id,
+                    dynamic_key,
+                },
                 properties,
                 struct_select.def_id,
                 &struct_select.properties,
@@ -157,7 +160,7 @@ impl InMemoryStore {
     fn apply_struct_select(
         &self,
         type_info: &TypeInfo,
-        entity_key: &DynamicKey,
+        vertex_key: VertexKey<&DynamicKey>,
         mut properties: FnvHashMap<RelationshipId, Attribute>,
         struct_def_id: DefId,
         select_properties: &FnvHashMap<RelationshipId, Select>,
@@ -174,7 +177,7 @@ impl InMemoryStore {
                 continue;
             };
 
-            let attrs = self.sub_query_attributes(projection, subselect, entity_key, ctx)?;
+            let attrs = self.sub_query_attributes(projection, subselect, vertex_key, ctx)?;
 
             match data_relationship.cardinality.1 {
                 ValueCardinality::Unit => {
@@ -205,7 +208,7 @@ impl InMemoryStore {
         &self,
         projection: EdgeCardinalProjection,
         select: &Select,
-        parent_key: &DynamicKey,
+        parent_key: VertexKey<&DynamicKey>,
         ctx: &DbContext,
     ) -> DomainResult<Vec<Attribute>> {
         let edge_store = self.edges.get(&projection.id).expect("No edge collection");
@@ -232,7 +235,16 @@ impl InMemoryStore {
             &edge_store.columns[projection.object.0 as usize].data
         {
             for edge_idx in edge_set {
-                let entity = self.sub_query_entity(&object_keys[edge_idx], select, ctx)?;
+                let key = &object_keys[edge_idx];
+
+                let entity = self.sub_query_entity(
+                    VertexKey {
+                        type_def_id: key.type_def_id,
+                        dynamic_key: &key.dynamic_key,
+                    },
+                    select,
+                    ctx,
+                )?;
 
                 out.push(Attribute {
                     rel: value_vector
@@ -248,13 +260,13 @@ impl InMemoryStore {
 
     fn sub_query_entity(
         &self,
-        entity_key: &EntityKey,
+        vertex_key: VertexKey<&DynamicKey>,
         select: &Select,
         ctx: &DbContext,
     ) -> DomainResult<Value> {
         if let Select::Struct(struct_select) = select {
             // sanity check
-            if !self.collections.contains_key(&struct_select.def_id) {
+            if !self.vertices.contains_key(&struct_select.def_id) {
                 error!(
                     "Store does not contain a collection for {:?}",
                     struct_select.def_id
@@ -264,16 +276,16 @@ impl InMemoryStore {
         }
 
         let properties = self
-            .collections
-            .get(&entity_key.type_def_id)
+            .vertices
+            .get(&vertex_key.type_def_id)
             .ok_or(DomainError::InherentIdNotFound)?
-            .get(&entity_key.dynamic_key)
+            .get(vertex_key.dynamic_key)
             .ok_or(DomainError::InherentIdNotFound)?;
 
-        let type_info = ctx.ontology.get_type_info(entity_key.type_def_id);
+        let type_info = ctx.ontology.get_type_info(vertex_key.type_def_id);
         let entity_info = type_info
             .entity_info()
-            .ok_or(DomainError::NotAnEntity(entity_key.type_def_id))?;
+            .ok_or(DomainError::NotAnEntity(vertex_key.type_def_id))?;
 
         match select {
             Select::Leaf => {
@@ -283,9 +295,9 @@ impl InMemoryStore {
             }
             Select::Struct(struct_select) => self.apply_struct_select(
                 type_info,
-                &entity_key.dynamic_key,
+                vertex_key,
                 properties.clone(),
-                entity_key.type_def_id,
+                vertex_key.type_def_id,
                 &struct_select.properties,
                 ctx,
             ),
@@ -294,9 +306,9 @@ impl InMemoryStore {
                     if variant_select.def_id == type_info.def_id {
                         return self.apply_struct_select(
                             type_info,
-                            &entity_key.dynamic_key,
+                            vertex_key,
                             properties.clone(),
-                            entity_key.type_def_id,
+                            vertex_key.type_def_id,
                             &variant_select.properties,
                             ctx,
                         );
@@ -312,7 +324,7 @@ impl InMemoryStore {
             Select::Entity(entity_select) => match &entity_select.source {
                 StructOrUnionSelect::Struct(struct_select) => self.apply_struct_select(
                     type_info,
-                    &entity_key.dynamic_key,
+                    vertex_key,
                     properties.clone(),
                     struct_select.def_id,
                     &struct_select.properties,
@@ -321,12 +333,12 @@ impl InMemoryStore {
                 StructOrUnionSelect::Union(_, candidates) => {
                     let struct_select = candidates
                         .iter()
-                        .find(|struct_select| struct_select.def_id == entity_key.type_def_id)
+                        .find(|struct_select| struct_select.def_id == vertex_key.type_def_id)
                         .expect("Union variant not found");
 
                     self.apply_struct_select(
                         type_info,
-                        &entity_key.dynamic_key,
+                        vertex_key,
                         properties.clone(),
                         struct_select.def_id,
                         &struct_select.properties,
