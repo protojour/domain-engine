@@ -58,7 +58,7 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
                         return Err(<A::Error as serde::de::Error>::custom("Not a sequence"));
                     };
 
-                    patches.extend(seq.attrs);
+                    patches.extend(seq.elements);
                 }
                 Operation::Remove => {
                     let mut sub_processor = self.entity_sequence_processor.with_level(
@@ -76,10 +76,10 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
                         return Err(<A::Error as serde::de::Error>::custom("Not a sequence"));
                     };
 
-                    for attr in seq.attrs.iter_mut() {
+                    for attr in seq.elements.iter_mut() {
                         attr.rel = Value::DeleteRelationship(DefId::unit());
                     }
-                    patches.extend(seq.attrs);
+                    patches.extend(seq.elements);
                 }
             }
         }

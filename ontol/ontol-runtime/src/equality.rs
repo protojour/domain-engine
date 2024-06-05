@@ -80,11 +80,11 @@ impl OntolEquals for Value {
             }
             (Value::Sequence(a, def_a), Value::Sequence(b, def_b)) => {
                 def_a == def_b
-                    && a.attrs().len() == b.attrs().len()
+                    && a.elements().len() == b.elements().len()
                     && a.sub() == b.sub()
-                    && a.attrs()
+                    && a.elements()
                         .iter()
-                        .zip(b.attrs().iter())
+                        .zip(b.elements().iter())
                         .all(|(a, b)| a.ontol_equals(b))
             }
             (Value::Patch(a, def_a), Value::Patch(b, def_b)) => {
@@ -139,10 +139,10 @@ impl OntolHash for Value {
             }
             Value::Sequence(v, def) => {
                 def.hash(h);
-                v.attrs().len().hash(h);
+                v.elements().len().hash(h);
                 v.sub().hash(h);
 
-                for attr in v.attrs() {
+                for attr in v.elements() {
                     attr.ontol_hash(h, builder);
                 }
             }

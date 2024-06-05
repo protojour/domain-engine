@@ -11,54 +11,63 @@ use thin_vec::ThinVec;
 
 use crate::{
     equality::{OntolEquals, OntolHash},
-    value::{Attribute, Value},
+    value::Attribute,
 };
 
 /// This type represents all ONTOL sequences.
 ///
 /// Both insertion-ordered sets and lists are sequences.
-#[derive(Clone, Default, Serialize, Deserialize, Debug)]
-pub struct Sequence {
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct Sequence<T = Attribute> {
     /// The attributes of this sequence
-    pub(crate) attrs: ThinVec<Attribute>,
+    pub(crate) elements: ThinVec<T>,
     /// The subsequence information, if any.
     /// If this is None, the sequence is considered complete.
     pub(crate) sub_seq: Option<Box<SubSequence>>,
 }
 
-impl Sequence {
+impl<T> Default for Sequence<T> {
+    fn default() -> Self {
+        Self {
+            elements: Default::default(),
+            sub_seq: None,
+        }
+    }
+}
+
+impl<T> Sequence<T> {
     pub fn with_capacity(cap: usize) -> Self {
         Self {
-            attrs: ThinVec::with_capacity(cap),
+            elements: ThinVec::with_capacity(cap),
             sub_seq: None,
         }
     }
 
     pub fn with_sub(self, sub: SubSequence) -> Self {
         Self {
-            attrs: self.attrs,
+            elements: self.elements,
             sub_seq: Some(Box::new(sub)),
         }
     }
 
-    pub fn push(&mut self, attr: Attribute) {
-        self.attrs.push(attr);
+    pub fn push(&mut self, element: T) {
+        self.elements.push(element);
     }
 
-    pub fn extend(&mut self, iter: impl IntoIterator<Item = Attribute>) {
-        self.attrs.extend(iter);
+    pub fn extend(&mut self, iter: impl IntoIterator<Item = T>) {
+        self.elements.extend(iter);
     }
 
-    pub fn attrs(&self) -> &[Attribute] {
-        &self.attrs
+    pub fn elements(&self) -> &[T] {
+        &self.elements
     }
 
-    pub fn attrs_mut(&mut self) -> &mut [Attribute] {
-        &mut self.attrs
+    pub fn elements_mut(&mut self) -> &mut [T] {
+        &mut self.elements
     }
 
-    pub fn into_attrs(self) -> ThinVec<Attribute> {
-        self.attrs
+    pub fn into_elements(self) -> ThinVec<T> {
+        self.elements
     }
 
     pub fn sub(&self) -> Option<&SubSequence> {
@@ -71,19 +80,19 @@ impl Sequence {
 }
 
 /// Create a new sequence that is not a subsequence.
-impl FromIterator<Attribute> for Sequence {
-    fn from_iter<T: IntoIterator<Item = Attribute>>(iter: T) -> Self {
+impl<T> FromIterator<T> for Sequence<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         Self {
-            attrs: iter.into_iter().collect(),
+            elements: iter.into_iter().collect(),
             sub_seq: None,
         }
     }
 }
 
-impl From<ThinVec<Attribute>> for Sequence {
-    fn from(value: ThinVec<Attribute>) -> Self {
+impl<T> From<ThinVec<T>> for Sequence<T> {
+    fn from(value: ThinVec<T>) -> Self {
         Self {
-            attrs: value,
+            elements: value,
             sub_seq: None,
         }
     }
@@ -105,53 +114,52 @@ impl SubSequence {
     }
 }
 
-pub trait SequenceBuilder: Index<usize, Output = Attribute> {
-    fn try_push(&mut self, attr: Attribute<Value>) -> Result<(), DuplicateError>;
+pub trait SequenceBuilder<T>: Index<usize, Output = T> {
+    fn try_push(&mut self, item: T) -> Result<(), DuplicateError<T>>;
 
-    fn build(self) -> Sequence;
+    fn build(self) -> Sequence<T>;
 }
 
-pub struct ListBuilder {
-    attrs: ThinVec<Attribute>,
+pub struct ListBuilder<T = Attribute> {
+    elements: ThinVec<T>,
 }
 
-impl ListBuilder {
+impl<T> ListBuilder<T> {
     pub fn with_capacity(cap: usize) -> Self {
         Self {
-            attrs: ThinVec::with_capacity(cap),
+            elements: ThinVec::with_capacity(cap),
         }
     }
 }
 
-impl SequenceBuilder for ListBuilder {
-    fn try_push(&mut self, attr: Attribute<Value>) -> Result<(), DuplicateError> {
-        self.attrs.push(attr);
+impl<T> SequenceBuilder<T> for ListBuilder<T> {
+    fn try_push(&mut self, element: T) -> Result<(), DuplicateError<T>> {
+        self.elements.push(element);
         Ok(())
     }
 
-    fn build(self) -> Sequence {
+    fn build(self) -> Sequence<T> {
         Sequence {
-            attrs: self.attrs,
+            elements: self.elements,
             sub_seq: None,
         }
     }
 }
 
-impl Index<usize> for ListBuilder {
-    type Output = Attribute;
+impl<T> Index<usize> for ListBuilder<T> {
+    type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.attrs[index]
+        &self.elements[index]
     }
 }
 
 /// Builder for insertion-ordered sets of attributes
 ///
 /// Duplicates will not be appended.
-#[derive(Default)]
-pub struct IndexSetBuilder {
+pub struct IndexSetBuilder<T> {
     /// Length cached outside the ThinVec
-    attrs: ThinVec<Attribute>,
+    elements: ThinVec<T>,
     /// Length cached outside the ThinVec
     len: usize,
     /// Hash buckets, the values are IndexChain which stores indexes into the `attrs` vector.
@@ -162,10 +170,21 @@ pub struct IndexSetBuilder {
     hash_builder: ahash::RandomState,
 }
 
-impl IndexSetBuilder {
+impl<T> Default for IndexSetBuilder<T> {
+    fn default() -> Self {
+        Self {
+            elements: Default::default(),
+            len: 0,
+            hash_buckets: Default::default(),
+            hash_builder: Default::default(),
+        }
+    }
+}
+
+impl<T> IndexSetBuilder<T> {
     pub fn with_capacity(cap: usize) -> Self {
         Self {
-            attrs: ThinVec::with_capacity(cap),
+            elements: ThinVec::with_capacity(cap),
             len: 0,
             hash_buckets: FnvHashMap::with_capacity(cap),
             hash_builder: Default::default(),
@@ -173,11 +192,14 @@ impl IndexSetBuilder {
     }
 }
 
-impl SequenceBuilder for IndexSetBuilder {
-    fn try_push(&mut self, attr: Attribute<Value>) -> Result<(), DuplicateError> {
+impl<T> SequenceBuilder<T> for IndexSetBuilder<T>
+where
+    T: OntolEquals + OntolHash,
+{
+    fn try_push(&mut self, element: T) -> Result<(), DuplicateError<T>> {
         let hash = {
             let mut hasher = self.hash_builder.build_hasher();
-            attr.ontol_hash(&mut hasher, &self.hash_builder);
+            element.ontol_hash(&mut hasher, &self.hash_builder);
             hasher.finish()
         };
 
@@ -195,11 +217,11 @@ impl SequenceBuilder for IndexSetBuilder {
 
                     // Check all the indexes in the same hash bucket
                     loop {
-                        let other_attr = self.attrs.get(next_chain.index).unwrap();
+                        let other_element = self.elements.get(next_chain.index).unwrap();
 
-                        if attr.ontol_equals(other_attr) {
+                        if element.ontol_equals(other_element) {
                             return Err(DuplicateError {
-                                attr,
+                                element,
                                 index: self.len,
                                 equals_index: next_chain.index,
                             });
@@ -218,30 +240,30 @@ impl SequenceBuilder for IndexSetBuilder {
             }
         }
 
-        self.attrs.push(attr);
+        self.elements.push(element);
         self.len += 1;
         Ok(())
     }
 
-    fn build(self) -> Sequence {
+    fn build(self) -> Sequence<T> {
         Sequence {
-            attrs: self.attrs,
+            elements: self.elements,
             sub_seq: None,
         }
     }
 }
 
-impl Index<usize> for IndexSetBuilder {
-    type Output = Attribute;
+impl<T> Index<usize> for IndexSetBuilder<T> {
+    type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.attrs[index]
+        &self.elements[index]
     }
 }
 
 /// Error saying that a duplicate has been found in the [IndexSetBuilder]
-pub struct DuplicateError {
-    pub attr: Attribute<Value>,
+pub struct DuplicateError<T> {
+    pub element: T,
     pub index: usize,
     pub equals_index: usize,
 }
@@ -276,13 +298,13 @@ impl IndexChain {
 mod tests {
     use tracing::debug;
 
-    use crate::{DefId, PackageId, RelationshipId};
+    use crate::{value::Value, DefId, PackageId, RelationshipId};
 
     use super::*;
 
     #[test]
     fn dedup_typed_unit() {
-        let mut builder = IndexSetBuilder::default();
+        let mut builder: IndexSetBuilder<Attribute> = Default::default();
 
         assert!(builder.try_push(Value::unit().into()).is_ok());
         assert!(builder.try_push(Value::unit().into()).is_err());
@@ -293,7 +315,7 @@ mod tests {
 
     #[test]
     fn dedup_text() {
-        let mut builder = IndexSetBuilder::default();
+        let mut builder: IndexSetBuilder<Attribute> = Default::default();
 
         assert!(builder.try_push(text("a").into()).is_ok());
         assert!(builder.try_push(text("a").into()).is_err());
@@ -303,7 +325,7 @@ mod tests {
 
     #[test]
     fn dedup_i64() {
-        let mut builder = IndexSetBuilder::default();
+        let mut builder: IndexSetBuilder<Attribute> = Default::default();
 
         assert!(builder.try_push(Value::I64(42, def(2)).into()).is_ok());
         assert!(builder.try_push(Value::I64(42, def(2)).into()).is_err());
@@ -312,7 +334,7 @@ mod tests {
 
     #[test]
     fn dedup_f64_zero() {
-        let mut builder = IndexSetBuilder::default();
+        let mut builder: IndexSetBuilder<Attribute> = Default::default();
 
         assert!(builder.try_push(Value::F64(0.0, def(4)).into()).is_ok());
         assert!(builder.try_push(Value::F64(-0.0, def(4)).into()).is_err());
@@ -322,7 +344,7 @@ mod tests {
     // OntolEquals or not
     #[test]
     fn dedup_f64_nan_can_duplicate() {
-        let mut builder = IndexSetBuilder::default();
+        let mut builder: IndexSetBuilder<Attribute> = Default::default();
 
         let nan = Value::F64(f64::NAN, def(3));
 
@@ -333,7 +355,7 @@ mod tests {
 
     #[test]
     fn dedup_struct_empty() {
-        let mut builder = IndexSetBuilder::default();
+        let mut builder: IndexSetBuilder<Attribute> = Default::default();
 
         assert!(builder.try_push(struct_value([]).into()).is_ok());
         assert!(builder.try_push(struct_value([]).into()).is_err());
@@ -341,7 +363,7 @@ mod tests {
 
     #[test]
     fn dedup_big_structs_different_iteration_order() {
-        let mut builder = IndexSetBuilder::default();
+        let mut builder: IndexSetBuilder<Attribute> = Default::default();
 
         // structs with different insertion order
         assert!(builder

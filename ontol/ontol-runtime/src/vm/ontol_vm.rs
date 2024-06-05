@@ -114,11 +114,11 @@ impl<'o> Processor for OntolProcessor<'o> {
 
         match self.local_mut(seq) {
             Value::Sequence(seq, _) => {
-                if seq.attrs.len() <= i {
+                if seq.elements.len() <= i {
                     Ok(false)
                 } else {
                     // TODO(optimize): Figure out when clone is needed!
-                    let attr = seq.attrs[i].clone();
+                    let attr = seq.elements[i].clone();
 
                     self.stack.push(attr.rel);
                     self.stack.push(attr.val);
@@ -245,7 +245,7 @@ impl<'o> Processor for OntolProcessor<'o> {
     fn append_attr2(&mut self, seq: Local) -> VmResult<()> {
         let [rel, val]: [Value; 2] = self.pop_n();
         let seq = self.sequence_local_mut(seq)?;
-        seq.attrs.push(Attribute { rel, val });
+        seq.elements.push(Attribute { rel, val });
         Ok(())
     }
 
@@ -274,7 +274,7 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     fn move_seq_vals_to_stack(&mut self, source: Local) -> VmResult<()> {
-        let sequence = std::mem::take(&mut self.sequence_local_mut(source)?.attrs);
+        let sequence = std::mem::take(&mut self.sequence_local_mut(source)?.elements);
         *self.local_mut(source) = Value::unit();
         self.stack.extend(sequence.into_iter().map(|attr| attr.val));
         Ok(())
@@ -762,7 +762,7 @@ mod tests {
             panic!();
         };
         let output = seq
-            .attrs
+            .elements
             .into_iter()
             .map(|attr| attr.val.cast_into())
             .collect::<Vec<i64>>();

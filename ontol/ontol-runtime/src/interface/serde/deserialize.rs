@@ -354,12 +354,12 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
             SequenceKind::IndexSet => self.deserialize_sequence(
                 seq,
                 &mut sequence_matcher,
-                IndexSetBuilder::with_capacity(cap),
+                IndexSetBuilder::<Attribute>::with_capacity(cap),
             )?,
             SequenceKind::List => self.deserialize_sequence(
                 seq,
                 &mut sequence_matcher,
-                ListBuilder::with_capacity(cap),
+                ListBuilder::<Attribute>::with_capacity(cap),
             )?,
         };
 
@@ -460,7 +460,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> MatcherVisitor<'on, 'p, M> {
         &self,
         mut seq: A,
         sequence_matcher: &mut SequenceRangesMatcher<'on>,
-        mut sequence_builder: impl SequenceBuilder,
+        mut sequence_builder: impl SequenceBuilder<Attribute>,
     ) -> Result<Value, A::Error> {
         loop {
             let processor = match sequence_matcher.match_next_seq_element() {
@@ -496,7 +496,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> MatcherVisitor<'on, 'p, M> {
                         ))
                     } else {
                         Err(Error::invalid_length(
-                            sequence_builder.build().attrs.len(),
+                            sequence_builder.build().elements.len(),
                             self,
                         ))
                     };

@@ -104,7 +104,9 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 self.serialize_pattern_as_raw_text(value, *pattern_def_id, serializer)
             }
             (SerdeOperator::DynamicSequence, _) => match value {
-                Value::Sequence(seq, _) => self.serialize_dynamic_sequence(&seq.attrs, serializer),
+                Value::Sequence(seq, _) => {
+                    self.serialize_dynamic_sequence(&seq.elements, serializer)
+                }
                 _ => panic!("Not a sequence"),
             },
             (SerdeOperator::RelationList(seq_op) | SerdeOperator::RelationIndexSet(seq_op), _) => {

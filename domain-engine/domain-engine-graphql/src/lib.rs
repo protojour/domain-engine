@@ -208,7 +208,7 @@ async fn mutation(
             for entity_mutation in entity_mutations {
                 let values = entity_mutation
                     .inputs
-                    .into_attrs()
+                    .into_elements()
                     .into_iter()
                     .map(|attr| attr.val)
                     .collect();

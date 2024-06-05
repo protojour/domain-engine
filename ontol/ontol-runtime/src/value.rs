@@ -11,8 +11,8 @@ use smartstring::alias::String;
 use thin_vec::ThinVec;
 
 use crate::{
-    cast::Cast, ontology::Ontology, query::filter::Filter, sequence::Sequence, DefId,
-    RelationshipId,
+    cast::Cast, ontology::Ontology, query::filter::Filter, sequence::Sequence, tuple::EndoTuple,
+    DefId, RelationshipId,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -82,7 +82,7 @@ impl Value {
             })
             .collect();
         let type_def_id = sequence
-            .attrs()
+            .elements()
             .first()
             .map(|attr| attr.val.type_def_id())
             .unwrap_or(DefId::unit());
@@ -302,6 +302,18 @@ pub struct Attribute<T = Value> {
     pub val: T,
 }
 
+pub enum ValueOrTuple {
+    Value(Value),
+    Tuple(Box<EndoTuple<Value>>),
+}
+
+pub enum Attribute2 {
+    //Value(Value),
+    //Tuple(Box<EndoTuple<Value>>),
+    Value(ValueOrTuple),
+    Sequence(Sequence),
+}
+
 impl From<Value> for Attribute<Value> {
     fn from(value: Value) -> Self {
         Self {
@@ -373,7 +385,7 @@ impl<'v> Display for ValueDebug<'v> {
             }
             Value::Sequence(seq, _) => {
                 write!(f, "[")?;
-                let mut iter = seq.attrs().iter().peekable();
+                let mut iter = seq.elements().iter().peekable();
                 while let Some(attr) = iter.next() {
                     write!(f, "{}", AttrDebug(attr),)?;
 

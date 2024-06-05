@@ -199,7 +199,7 @@ async fn test_conduit_db_store_entity_tree() {
         .await
         .unwrap();
 
-    let new_user_id = users.attrs()[1]
+    let new_user_id = users.elements()[1]
         .val
         .get_attribute(user_type.find_property("user_id").unwrap())
         .unwrap()
@@ -218,7 +218,7 @@ async fn test_conduit_db_store_entity_tree() {
                 )
                 .await
                 .unwrap()
-                .attrs()[1]
+                .elements()[1]
                 .val
         ),
         expected = json!({
@@ -238,7 +238,7 @@ async fn test_conduit_db_store_entity_tree() {
         .await
         .unwrap();
 
-    let comment_id = comments.attrs()[0]
+    let comment_id = comments.elements()[0]
         .val
         .get_attribute(comment_type.find_property("id").unwrap())
         .unwrap()
@@ -272,7 +272,7 @@ async fn test_conduit_db_store_entity_tree() {
                     )
                     .await
                     .unwrap()
-                    .attrs()[1]
+                    .elements()[1]
                     .val
             ),
         expected = json!({

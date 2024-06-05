@@ -29,7 +29,7 @@ fn exists(value: &Value) -> bool {
             .iter()
             .all(|(_, attr)| exists(&attr.rel) && exists(&attr.val)),
         Value::Sequence(seq, _) => seq
-            .attrs()
+            .elements()
             .iter()
             .all(|attr| exists(&attr.rel) && exists(&attr.val)),
         _other => true,

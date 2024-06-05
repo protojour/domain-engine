@@ -39,7 +39,7 @@ impl Filter {
 
     pub fn set_order(&mut self, order: Value) {
         self.order = match order {
-            Value::Sequence(seq, _) => seq.attrs.into_iter().map(|attr| attr.val).collect(),
+            Value::Sequence(seq, _) => seq.elements.into_iter().map(|attr| attr.val).collect(),
             other => vec![other],
         };
     }

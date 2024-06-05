@@ -50,7 +50,7 @@ impl<'d> FilterVal<'d> {
                 dynamic_key: None,
                 prop_tree: map,
             },
-            Value::Sequence(seq, _) => Self::Sequence(seq.attrs()),
+            Value::Sequence(seq, _) => Self::Sequence(seq.elements()),
             _ => Self::Scalar(value),
         }
     }

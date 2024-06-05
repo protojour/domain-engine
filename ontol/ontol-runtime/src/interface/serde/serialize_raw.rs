@@ -50,11 +50,11 @@ pub fn serialize_raw<S: Serializer>(
             map_access.end()
         }
         Value::Sequence(seq, _) => {
-            let mut seq_access = serializer.serialize_seq(Some(seq.attrs.len()))?;
+            let mut seq_access = serializer.serialize_seq(Some(seq.elements.len()))?;
 
-            for attr in &seq.attrs {
+            for element in &seq.elements {
                 seq_access.serialize_element(
-                    &RawProxy::new_as_child(&attr.val, ontology, level)
+                    &RawProxy::new_as_child(&element.val, ontology, level)
                         .map_err(RecursionLimitError::to_ser_error)?,
                 )?;
             }

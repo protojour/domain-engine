@@ -99,7 +99,7 @@ impl<'o, 'de> Visitor<'de> for RawVisitor<'o> {
         while let Some(value) =
             seq_access.next_element_seed(self.child().map_err(RecursionLimitError::to_de_error)?)?
         {
-            sequence.attrs.push(Attribute::from(value));
+            sequence.push(Attribute::from(value));
         }
 
         Ok(Value::Sequence(sequence, DefId::unit()))
