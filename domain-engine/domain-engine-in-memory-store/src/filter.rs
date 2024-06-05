@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    ontology::domain::DataRelationshipKind,
+    ontology::domain::{DataRelationshipKind, EdgeCardinalProjection},
     query::condition::{Clause, CondTerm, Condition, SetOperator},
     value::{Attribute, Value},
     var::Var,
@@ -16,7 +16,7 @@ use domain_engine_core::{
 };
 use tracing::{error, warn};
 
-use crate::core::DbContext;
+use crate::core::{DbContext, EdgeVectorData, HyperEdgeStore};
 
 use super::core::{DynamicKey, EntityKey, InMemoryStore};
 
@@ -159,28 +159,51 @@ impl InMemoryStore {
                                 ))));
                             };
 
-                            let edge_collection = self
-                                .edge_collections
-                                .get(&projection.id)
-                                .ok_or(ProofError::Disproven)?;
+                            fn edge_lookup<'e>(
+                                edge_store: &'e HyperEdgeStore,
+                                projection: &EdgeCardinalProjection,
+                                key: &DynamicKey,
+                            ) -> Option<(&'e EntityKey, &'e Value)> {
+                                let EdgeVectorData::Keys(source_keys) =
+                                    &edge_store.columns[projection.subject.0 as usize].data
+                                else {
+                                    return None;
+                                };
 
-                            let (target_key, rel_params) = match projection.proj() {
-                                (0, 1) => edge_collection.edges.iter().find_map(|edge| {
-                                    if edge.from.dynamic_key == *key {
-                                        Some((&edge.to, &edge.params))
-                                    } else {
-                                        None
-                                    }
-                                }),
-                                (1, 0) => edge_collection.edges.iter().find_map(|edge| {
-                                    if edge.to.dynamic_key == *key {
-                                        Some((&edge.from, &edge.params))
-                                    } else {
-                                        None
-                                    }
-                                }),
-                                _ => None,
+                                let idx = source_keys
+                                    .iter()
+                                    .position(|elem| &elem.dynamic_key == key)?;
+
+                                let EdgeVectorData::Keys(target_keys) =
+                                    &edge_store.columns[projection.object.0 as usize].data
+                                else {
+                                    return None;
+                                };
+
+                                let target_key = &target_keys[idx];
+
+                                static UNIT_VALUE: Value = Value::unit();
+
+                                let target_rel = edge_store
+                                    .columns
+                                    .iter()
+                                    .find_map(|column| match &column.data {
+                                        EdgeVectorData::Values(values) => Some(values),
+                                        EdgeVectorData::Keys(_) => None,
+                                    })
+                                    .map(|values| &values[idx])
+                                    .unwrap_or(&UNIT_VALUE);
+
+                                Some((target_key, target_rel))
                             }
+
+                            let (target_key, rel_params) = edge_lookup(
+                                self.edges
+                                    .get(&projection.id)
+                                    .ok_or(ProofError::Disproven)?,
+                                projection,
+                                key,
+                            )
                             .ok_or(ProofError::Disproven)?;
 
                             let entity = self

@@ -1,4 +1,4 @@
-use core::DbContext;
+use core::{DbContext, EdgeColumn, EdgeVectorData};
 use std::sync::Arc;
 
 use domain_engine_core::data_store::{DataStoreFactory, DataStoreFactorySync};
@@ -18,7 +18,7 @@ use domain_engine_core::{
 };
 use tracing::debug;
 
-use crate::core::{DynamicKey, EdgeCollection, EntityTable, InMemoryStore};
+use crate::core::{DynamicKey, EntityTable, HyperEdgeStore, InMemoryStore};
 
 mod core;
 // mod filter;
@@ -48,7 +48,7 @@ impl InMemoryDb {
         let domain = ontology.find_domain(package_id).unwrap();
 
         let mut collections: FnvHashMap<DefId, EntityTable<DynamicKey>> = Default::default();
-        let mut edge_collections: FnvHashMap<EdgeId, EdgeCollection> = Default::default();
+        let mut hyper_edges: FnvHashMap<EdgeId, HyperEdgeStore> = Default::default();
 
         for type_info in domain.type_infos() {
             if let Some(entity_info) = type_info.entity_info() {
@@ -62,25 +62,32 @@ impl InMemoryDb {
         }
 
         for (edge_id, edge_info) in domain.edges() {
-            edge_collections
+            let columns = edge_info
+                .cardinals
+                .iter()
+                .map(|cardinal| {
+                    let vector = if cardinal.is_entity {
+                        EdgeVectorData::Keys(vec![])
+                    } else {
+                        EdgeVectorData::Values(vec![])
+                    };
+
+                    EdgeColumn {
+                        data: vector,
+                        unique: matches!(cardinal.cardinality.1, ValueCardinality::Unit),
+                    }
+                })
+                .collect();
+
+            hyper_edges
                 .entry(*edge_id)
-                .or_insert_with(|| EdgeCollection {
-                    edges: vec![],
-                    subject_unique: matches!(
-                        edge_info.cardinals[0].cardinality.1,
-                        ValueCardinality::Unit
-                    ),
-                    object_unique: matches!(
-                        edge_info.cardinals[1].cardinality.1,
-                        ValueCardinality::Unit
-                    ),
-                });
+                .or_insert_with(|| HyperEdgeStore { columns });
         }
 
         Self {
             store: RwLock::new(InMemoryStore {
                 collections,
-                edge_collections,
+                edges: hyper_edges,
                 serial_counter: 0,
             }),
             context: DbContext { ontology, system },

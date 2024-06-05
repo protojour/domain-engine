@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
@@ -18,7 +20,7 @@ use tracing::{debug, error};
 use domain_engine_core::{DomainError, DomainResult};
 
 use crate::{
-    core::{find_data_relationship, DbContext},
+    core::{find_data_relationship, DbContext, EdgeData, EdgeVectorData},
     filter::FilterVal,
     sort::sort_props_vec,
 };
@@ -206,34 +208,39 @@ impl InMemoryStore {
         parent_key: &DynamicKey,
         ctx: &DbContext,
     ) -> DomainResult<Vec<Attribute>> {
-        let edge_collection = self
-            .edge_collections
-            .get(&projection.id)
-            .expect("No edge collection");
+        let edge_store = self.edges.get(&projection.id).expect("No edge collection");
 
         let mut out = vec![];
 
-        for edge in &edge_collection.edges {
-            let entity = match projection.subject.0 {
-                0 => {
-                    if &edge.from.dynamic_key != parent_key {
-                        continue;
-                    }
-                    self.sub_query_entity(&edge.to, select, ctx)?
-                }
-                1 => {
-                    if &edge.to.dynamic_key != parent_key {
-                        continue;
-                    }
-                    self.sub_query_entity(&edge.from, select, ctx)?
-                }
-                _ => panic!("unsupported edge cardinal idx"),
-            };
+        let mut edge_set = BTreeSet::default();
 
-            out.push(Attribute {
-                rel: edge.params.clone(),
-                val: entity,
+        edge_store.collect_column_eq(
+            projection.subject,
+            &EdgeData::Key(parent_key),
+            &mut edge_set,
+        );
+
+        let value_vector = edge_store
+            .columns
+            .iter()
+            .find_map(|column| match &column.data {
+                EdgeVectorData::Values(values) => Some(values),
+                _ => None,
             });
+
+        if let EdgeVectorData::Keys(object_keys) =
+            &edge_store.columns[projection.object.0 as usize].data
+        {
+            for edge_idx in edge_set {
+                let entity = self.sub_query_entity(&object_keys[edge_idx], select, ctx)?;
+
+                out.push(Attribute {
+                    rel: value_vector
+                        .map(|vector| vector[edge_idx].clone())
+                        .unwrap_or(Value::unit()),
+                    val: entity,
+                });
+            }
         }
 
         Ok(out)

@@ -1,8 +1,7 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::anyhow;
 use fnv::FnvHashMap;
-use itertools::Itertools;
 use ontol_runtime::{
     interface::serde::{operator::SerdeOperatorAddr, processor::ProcessorMode},
     ontology::{
@@ -25,7 +24,7 @@ use domain_engine_core::{
 };
 
 use crate::{
-    core::{find_data_relationship, DbContext, Edge, EdgeCollection, EntityKey},
+    core::{find_data_relationship, DbContext, EdgeData, EdgeVectorData, EntityKey},
     query::{Cursor, IncludeTotalLen, Limit},
 };
 
@@ -371,8 +370,8 @@ impl InMemoryStore {
             }
         };
 
-        let edge_collection = self
-            .edge_collections
+        let edge_store = self
+            .edges
             .get_mut(&projection.id)
             .expect("No edge collection");
 
@@ -381,60 +380,76 @@ impl InMemoryStore {
             dynamic_key: entity_key.clone(),
         };
 
-        match (projection.proj(), write_mode) {
-            ((0, 1), EdgeWriteMode::Insert) => {
-                enforce_cardinality_pre_insert(edge_collection, &local_key, &foreign_key);
-                edge_collection.edges.push(Edge {
-                    from: local_key,
-                    to: foreign_key,
-                    params: rel,
-                });
-            }
-            ((0, 1), EdgeWriteMode::Overwrite) => {
-                edge_collection.edges.retain(|edge| edge.from != local_key);
-                enforce_cardinality_pre_insert(edge_collection, &local_key, &foreign_key);
-                edge_collection.edges.push(Edge {
-                    from: local_key,
-                    to: foreign_key,
-                    params: rel,
-                });
-            }
-            ((0, 1), EdgeWriteMode::UpdateExisting) => {
-                let edge = edge_collection
-                    .edges
-                    .iter_mut()
-                    .find(|edge| edge.from == local_key && edge.to == foreign_key)
-                    .ok_or(DomainError::EntityNotFound)?;
+        let mut edge_tuple: Vec<EdgeData<EntityKey>> = edge_store
+            .columns
+            .iter()
+            .enumerate()
+            .map(|(idx, column)| match &column.data {
+                EdgeVectorData::Keys(_) => EdgeData::Key(if idx == projection.subject.0 as usize {
+                    local_key.clone()
+                } else if idx == projection.object.0 as usize {
+                    foreign_key.clone()
+                } else {
+                    panic!()
+                }),
+                EdgeVectorData::Values(_) => EdgeData::Value(rel.clone()),
+            })
+            .collect();
 
-                edge.params = rel;
-            }
-            ((1, 0), EdgeWriteMode::Insert) => {
-                enforce_cardinality_pre_insert(edge_collection, &foreign_key, &local_key);
-                edge_collection.edges.push(Edge {
-                    from: foreign_key,
-                    to: local_key,
-                    params: rel,
-                });
-            }
-            ((1, 0), EdgeWriteMode::Overwrite) => {
-                edge_collection.edges.retain(|edge| edge.to != local_key);
-                enforce_cardinality_pre_insert(edge_collection, &foreign_key, &local_key);
-                edge_collection.edges.push(Edge {
-                    from: foreign_key,
-                    to: local_key,
-                    params: rel,
-                });
-            }
-            ((1, 0), EdgeWriteMode::UpdateExisting) => {
-                let edge = edge_collection
-                    .edges
-                    .iter_mut()
-                    .find(|edge| edge.from == foreign_key && edge.to == local_key)
-                    .ok_or(DomainError::EntityNotFound)?;
+        match write_mode {
+            EdgeWriteMode::Insert => {
+                let mut to_delete = BTreeSet::default();
+                edge_store.collect_unique_violations(&edge_tuple, &mut to_delete);
+                edge_store.delete_edges(to_delete);
 
-                edge.params = rel;
+                edge_store.push_tuple(edge_tuple);
             }
-            _ => panic!("unsupported edge projection"),
+            EdgeWriteMode::Overwrite => {
+                let mut to_delete = BTreeSet::default();
+                edge_store.collect_unique_violations(&edge_tuple, &mut to_delete);
+                edge_store.collect_column_eq(
+                    projection.subject,
+                    &edge_tuple[projection.subject.0 as usize],
+                    &mut to_delete,
+                );
+                edge_store.delete_edges(to_delete);
+
+                edge_store.push_tuple(edge_tuple);
+            }
+            EdgeWriteMode::UpdateExisting => {
+                let mut subject_matching = BTreeSet::default();
+                let mut object_matching = BTreeSet::default();
+
+                edge_store.collect_column_eq(
+                    projection.subject,
+                    &edge_tuple[projection.subject.0 as usize],
+                    &mut subject_matching,
+                );
+                edge_store.collect_column_eq(
+                    projection.object,
+                    &edge_tuple[projection.object.0 as usize],
+                    &mut object_matching,
+                );
+
+                for column in edge_store.columns.iter_mut().rev() {
+                    let data = edge_tuple.pop().unwrap();
+
+                    if let (EdgeVectorData::Values(values), EdgeData::Value(value)) =
+                        (&mut column.data, data)
+                    {
+                        let mut written = 0;
+
+                        for edge_index in subject_matching.intersection(&object_matching) {
+                            values[*edge_index] = value.clone();
+                            written += 1;
+                        }
+
+                        if written == 0 {
+                            return Err(DomainError::EntityNotFound);
+                        }
+                    }
+                }
+            }
         }
 
         Ok(())
@@ -483,33 +498,39 @@ impl InMemoryStore {
             }
         };
 
-        let edge_collection = self
-            .edge_collections
+        let edge_store = self
+            .edges
             .get_mut(&projection.id)
             .expect("No edge collection");
-        let edges = &mut edge_collection.edges;
 
         let local_key = EntityKey {
             type_def_id: entity_def_id,
             dynamic_key: entity_key.clone(),
         };
 
-        let edge_index = match projection.subject.0 {
-            0 => edges
-                .iter()
-                .find_position(|edge| edge.from == local_key && edge.to == foreign_key),
-            1 => edges
-                .iter()
-                .find_position(|edge| edge.from == foreign_key && edge.to == local_key),
-            _ => panic!("unsupported edge cardinal idx"),
+        let (subject_data, object_data) = match projection.proj() {
+            (0, 1) => (EdgeData::Key(local_key), EdgeData::Key(foreign_key)),
+            (1, 0) => (EdgeData::Key(foreign_key), EdgeData::Key(local_key)),
+            _ => todo!(),
         };
 
-        match edge_index {
-            Some((index, _)) => {
-                edges.remove(index);
-                Ok(())
-            }
-            None => Err(DomainError::EntityNotFound),
+        let mut subjects_matching = BTreeSet::new();
+        let mut objects_matching = BTreeSet::new();
+
+        edge_store.collect_column_eq(projection.subject, &subject_data, &mut subjects_matching);
+        edge_store.collect_column_eq(projection.object, &object_data, &mut objects_matching);
+
+        let did_delete = edge_store.delete_edges(
+            subjects_matching
+                .intersection(&objects_matching)
+                .copied()
+                .collect(),
+        );
+
+        if did_delete {
+            Ok(())
+        } else {
+            Err(DomainError::EntityNotFound)
         }
     }
 
@@ -584,21 +605,5 @@ impl InMemoryStore {
                 Value::Serial(Serial(serial_value), def_id)
             }
         }))
-    }
-}
-
-/// Ensure none of the keys are in the edge collection given there's some
-/// singleton cardinality that should be enforced.
-fn enforce_cardinality_pre_insert(
-    edge_collection: &mut EdgeCollection,
-    from_key: &EntityKey,
-    to_key: &EntityKey,
-) {
-    if edge_collection.subject_unique {
-        edge_collection.edges.retain(|edge| &edge.from != from_key);
-    }
-
-    if edge_collection.object_unique {
-        edge_collection.edges.retain(|edge| &edge.to != to_key);
     }
 }
