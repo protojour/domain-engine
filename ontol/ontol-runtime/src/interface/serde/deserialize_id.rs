@@ -1,8 +1,6 @@
 use serde::de::Visitor;
 
-use crate::{
-    interface::serde::processor::RecursionLimitError, ontology::Ontology, value::Attribute,
-};
+use crate::{interface::serde::processor::RecursionLimitError, ontology::Ontology, value::Attr};
 
 use super::{operator::SerdeOperatorAddr, processor::SerdeProcessor};
 
@@ -14,7 +12,7 @@ pub struct IdSingletonStructVisitor<'on, 'p> {
 }
 
 impl<'on, 'p, 'de> Visitor<'de> for IdSingletonStructVisitor<'on, 'p> {
-    type Value = Attribute;
+    type Value = Attr;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "id singleton map")

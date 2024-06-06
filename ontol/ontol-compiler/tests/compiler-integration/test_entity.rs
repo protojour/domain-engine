@@ -1,5 +1,8 @@
 use ontol_macros::test;
-use ontol_runtime::{value::Value, PackageId};
+use ontol_runtime::{
+    value::{AttrRef, Value},
+    PackageId,
+};
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches,
     examples::{ARTIST_AND_INSTRUMENT, GUITAR_SYNTH_UNION},
@@ -52,7 +55,7 @@ fn inherent_id_no_autogen() {
 
         let entity: Value = foo.entity_builder(json!("id"), json!({ "key": "id" })).into();
         expect_eq!(
-            actual = serde_read(&foo).as_json(&entity),
+            actual = serde_read(&foo).as_json(AttrRef::Unit(&entity)),
             expected = json!({ "key": "id" }),
         );
     });
@@ -73,7 +76,7 @@ fn inherent_id_autogen() {
 
         let entity: Value = foo.entity_builder(json!("generated_id"), json!({})).into();
         expect_eq!(
-            actual = serde_read(&foo).as_json(&entity),
+            actual = serde_read(&foo).as_json(AttrRef::Unit(&entity)),
             expected = json!({ "key": "generated_id" }),
         );
     });
@@ -191,26 +194,25 @@ fn artist_and_instrument_id_as_relation_object() {
 
     let john = serde_create(&artist)
         .to_value_nocheck(json!({
-                "name": "John McLaughlin",
-                "plays": [
-                    {
-                        "ID": example_id,
-                        "_edge": {
-                            "how_much": "much."
-                        }
+            "name": "John McLaughlin",
+            "plays": [
+                {
+                    "ID": example_id,
+                    "_edge": {
+                        "how_much": "much."
                     }
-                ]
+                }
+            ]
         }))
         .unwrap();
 
-    let plays_attributes = john
-        .get_attribute_value(plays)
-        .unwrap()
-        .cast_ref::<Vec<_>>();
+    let plays_attributes = john.get_attribute(plays).unwrap().as_matrix().unwrap();
+    // .cast_ref::<Vec<_>>();
 
     // The value of the `plays` attribute is an `artist-id`
     expect_eq!(
-        actual = serde_create(&instrument_id).as_json(&plays_attributes[0].val),
+        actual = serde_create(&instrument_id)
+            .as_json(plays_attributes.get_attr_cloned(0).unwrap().as_ref()),
         expected = json!(example_id)
     );
 
@@ -398,16 +400,23 @@ fn entity_union_in_relation_with_ids() {
         .unwrap();
 
     let plays_attributes = artist_value
-        .get_attribute_value(plays)
+        .get_attribute(plays)
         .unwrap()
-        .cast_ref::<Vec<_>>();
+        .as_matrix()
+        .unwrap();
 
-    let guitar_id_attr = &plays_attributes[0];
-    let synth_id_attr = &plays_attributes[1];
+    let guitar_id_attr = plays_attributes.get_attr_cloned(0).unwrap();
+    let synth_id_attr = plays_attributes.get_attr_cloned(1).unwrap();
 
     assert_ne!(guitar_id.type_info.def_id, synth_id.type_info.def_id);
-    assert_eq!(guitar_id_attr.val.type_def_id(), guitar_id.type_info.def_id);
-    assert_eq!(synth_id_attr.val.type_def_id(), synth_id.type_info.def_id);
+    assert_eq!(
+        guitar_id_attr.as_unit().unwrap().type_def_id(),
+        guitar_id.type_info.def_id
+    );
+    assert_eq!(
+        synth_id_attr.as_unit().unwrap().type_def_id(),
+        synth_id.type_info.def_id
+    );
 }
 
 #[test]

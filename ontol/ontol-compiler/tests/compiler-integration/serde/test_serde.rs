@@ -561,9 +561,9 @@ fn test_serde_with_raw_id_overridde_profile() {
     .compile_then(|test| {
         let [foo, bar] = test.bind(["foo", "bar"]);
 
-        let foo_value = serde_create(&foo)
+        let foo_attr = serde_create(&foo)
             .with_profile(processor_profile.clone())
-            .to_value_nocheck(json!({
+            .to_attr_nocheck(json!({
                 "IGNORE1": 1,
                 "__ID": "a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
                 "IGNORE2": 2
@@ -573,29 +573,29 @@ fn test_serde_with_raw_id_overridde_profile() {
         expect_eq!(
             actual = serde_create(&foo)
                 .with_profile(processor_profile.clone())
-                .as_json(&foo_value),
+                .as_json(foo_attr.as_ref()),
             expected = json!({ "__ID": "a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" })
         );
 
         expect_eq!(
-            actual = serde_create(&foo).as_json(&foo_value),
+            actual = serde_create(&foo).as_json(foo_attr.as_ref()),
             expected = json!({ "prefix_id": "prefix/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" }),
         );
 
-        let bar_value = serde_create(&bar)
+        let bar_attr = serde_create(&bar)
             .with_profile(processor_profile.clone())
-            .to_value_nocheck(json!({ "__ID": "1337" }))
+            .to_attr_nocheck(json!({ "__ID": "1337" }))
             .unwrap();
 
         expect_eq!(
             actual = ontol_test_utils::serde_helper::serde_create(&bar)
                 .with_profile(processor_profile.clone())
-                .as_json(&bar_value),
+                .as_json(bar_attr.as_ref()),
             expected = json!({ "__ID": "1337" })
         );
 
         expect_eq!(
-            actual = serde_create(&bar).as_json(&bar_value),
+            actual = serde_create(&bar).as_json(bar_attr.as_ref()),
             expected = json!({ "int_id": 1337 }),
         );
     });
@@ -625,20 +625,20 @@ fn test_serde_with_raw_prefix_text_id_overridde_profile() {
 
         assert_json_io_matches!(serde_create(&baz), { "prefix_id": "prefix/mytext" });
 
-        let baz_value = serde_create(&baz)
+        let baz_attr = serde_create(&baz)
             .with_profile(processor_profile.clone())
-            .to_value_nocheck(json!({ "__ID": "mytext" }))
+            .to_attr_nocheck(json!({ "__ID": "mytext" }))
             .unwrap();
 
         expect_eq!(
             actual = ontol_test_utils::serde_helper::serde_create(&baz)
                 .with_profile(processor_profile.clone())
-                .as_json(&baz_value),
+                .as_json(baz_attr.as_ref()),
             expected = json!({ "__ID": "mytext" })
         );
 
         expect_eq!(
-            actual = serde_create(&baz).as_json(&baz_value),
+            actual = serde_create(&baz).as_json(baz_attr.as_ref()),
             expected = json!({ "prefix_id": "prefix/mytext" }),
         );
     });
@@ -672,20 +672,20 @@ fn test_serde_with_raw_prefix_int_id_overridde_profile() {
             r#"invalid type: string "prefix/deadbeef", expected string matching /(?:\A(?:prefix/)(([0-9]+?))\z)/ at line 1 column 30"#
         );
 
-        let baz_value = serde_create(&baz)
+        let baz_attr = serde_create(&baz)
             .with_profile(processor_profile.clone())
-            .to_value_nocheck(json!({ "__ID": "1337" }))
+            .to_attr_nocheck(json!({ "__ID": "1337" }))
             .unwrap();
 
         expect_eq!(
             actual = ontol_test_utils::serde_helper::serde_create(&baz)
                 .with_profile(processor_profile.clone())
-                .as_json(&baz_value),
+                .as_json(baz_attr.as_ref()),
             expected = json!({ "__ID": "1337" })
         );
 
         expect_eq!(
-            actual = serde_create(&baz).as_json(&baz_value),
+            actual = serde_create(&baz).as_json(baz_attr.as_ref()),
             expected = json!({ "prefix_id": "prefix/1337" }),
         );
     });
@@ -694,6 +694,7 @@ fn test_serde_with_raw_prefix_int_id_overridde_profile() {
 mod serde_raw_dynamic_entity_in_union {
     use super::*;
     use ontol_macros::test;
+    use ontol_runtime::value::AttrRef;
     use ontol_test_utils::OntolTest;
 
     /// This tests an entity union without data-based discriminators (only id-based)
@@ -764,13 +765,14 @@ mod serde_raw_dynamic_entity_in_union {
         );
 
         expect_eq!(
-            actual = ontol_test_utils::serde_helper::serde_create(&foo_id).as_json(&id),
+            actual =
+                ontol_test_utils::serde_helper::serde_create(&foo_id).as_json(AttrRef::Unit(&id)),
             expected = json!("foo/42")
         );
 
         serde_raw(&foobar)
             .with_profile(processor_profile.clone())
-            .to_value_nocheck(r#"{ "__id": "42", "__type": "foo" }"#)
+            .to_attr_nocheck(r#"{ "__id": "42", "__type": "foo" }"#)
             .unwrap();
     }
 
@@ -790,11 +792,11 @@ mod serde_raw_dynamic_entity_in_union {
             .with_profile(processor_profile.clone())
             // Will read the `id` property first, note that it's _raw text_ according to the profile,
             // thus its prefix should not be considered
-            .to_value_nocheck(r#"{ "id": "bar/42", "__type": "foo", "data": "yo" }"#)
+            .to_attr_nocheck(r#"{ "id": "bar/42", "__type": "foo", "data": "yo" }"#)
             .unwrap();
 
         expect_eq!(
-            actual = ontol_test_utils::serde_helper::serde_create(&foo).as_json(&data),
+            actual = ontol_test_utils::serde_helper::serde_create(&foo).as_json(data.as_ref()),
             expected = json!({
                 "id": "foo/bar/42",
                 "data": "yo",
@@ -914,7 +916,7 @@ fn test_serialize_raw_tree_only() {
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         let entity = serde_raw(&foo)
-            .to_value_nocheck(json!({
+            .to_attr_nocheck(json!({
                 "key": "a",
                 "foo_field": "1",
                 "bar": {
@@ -924,7 +926,7 @@ fn test_serialize_raw_tree_only() {
             }))
             .unwrap();
         assert_eq!(
-            serde_raw_tree_only(&foo).as_json(&entity),
+            serde_raw_tree_only(&foo).as_json(entity.as_ref()),
             json!({
                 "key": "a",
                 "foo_field": "1"
@@ -938,7 +940,7 @@ fn test_serialize_raw_tree_only_artist_and_instrument() {
     ARTIST_AND_INSTRUMENT.1.compile_then(|test| {
         let [artist] = test.bind(["artist"]);
         let entity = serde_raw(&artist)
-            .to_value_nocheck(json!({
+            .to_attr_nocheck(json!({
                 "ID": "artist/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
                 "name": "Jimi",
                 "plays": [
@@ -953,7 +955,7 @@ fn test_serialize_raw_tree_only_artist_and_instrument() {
             }))
             .unwrap();
         assert_eq!(
-            serde_raw_tree_only(&artist).as_json(&entity),
+            serde_raw_tree_only(&artist).as_json(entity.as_ref()),
             json!({
                 "ID": "artist/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
                 "name": "Jimi",

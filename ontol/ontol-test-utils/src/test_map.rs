@@ -3,7 +3,7 @@ use ontol_runtime::{
     ontology::map::Extern,
     property::ValueCardinality,
     query::filter::Filter,
-    value::Value,
+    value::{AttrRef, Value},
     vm::{
         proc::{Procedure, Yield},
         VmResult, VmState,
@@ -145,10 +145,11 @@ impl<'on, 'p> TestMapper<'on, 'p> {
             .unwrap();
         let [output_binding] = self.test.bind([to.typename()]);
         let output_json = match &to {
-            Key::Unit(_) => (*self.serde_helper_factory)(&output_binding).as_json(&value),
-            Key::Seq(_) => {
-                (*self.serde_helper_factory)(&output_binding).dynamic_seq_as_json(&value)
+            Key::Unit(_) => {
+                (*self.serde_helper_factory)(&output_binding).as_json(AttrRef::Unit(&value))
             }
+            Key::Seq(_) => (*self.serde_helper_factory)(&output_binding)
+                .dynamic_seq_as_json(AttrRef::Unit(&value)),
         };
 
         expect_eq!(actual = output_json, expected = expected);
@@ -188,17 +189,19 @@ impl<'on, 'p> TestMapper<'on, 'p> {
             None => panic!("named map not found"),
         };
         let param = (*self.serde_helper_factory)(&input_binding)
-            .to_value_nocheck(input)
-            .unwrap();
+            .to_attr_nocheck(input)
+            .unwrap()
+            .into_unit()
+            .expect("input not a unit attr");
         let value = self.run_vm(procedure, param).unwrap();
 
         // The resulting value must have the runtime def_id of the requested to_key.
         expect_eq!(actual = value.type_def_id(), expected = key.output.def_id);
 
         let output_json = if key.output.flags.contains(MapDefFlags::SEQUENCE) {
-            (*self.serde_helper_factory)(&output_binding).dynamic_seq_as_json(&value)
+            (*self.serde_helper_factory)(&output_binding).dynamic_seq_as_json(AttrRef::Unit(&value))
         } else {
-            (*self.serde_helper_factory)(&output_binding).as_json(&value)
+            (*self.serde_helper_factory)(&output_binding).as_json(AttrRef::Unit(&value))
         };
 
         expect_eq!(actual = output_json, expected = expected);
@@ -217,8 +220,10 @@ impl<'on, 'p> TestMapper<'on, 'p> {
 
         let [input_binding, output_binding] = self.test.bind([from.typename(), to.typename()]);
         let param = (*self.serde_helper_factory)(&input_binding)
-            .to_value_nocheck(input)
-            .unwrap();
+            .to_attr_nocheck(input)
+            .unwrap()
+            .into_unit()
+            .expect("input not a unit attr");
 
         let procedure = match self.get_mapper_proc((from, to)) {
             Some(procedure) => procedure,
@@ -290,9 +295,8 @@ impl<'on, 'p> TestMapper<'on, 'p> {
                                 input_type_info.operator_addr.unwrap(),
                                 ProcessorMode::Read,
                             )
-                            .serialize_value(
-                                &extern_param,
-                                None,
+                            .serialize_attr(
+                                AttrRef::Unit(&extern_param),
                                 &mut serde_json::Serializer::new(&mut buf),
                             )
                             .unwrap();
@@ -305,15 +309,16 @@ impl<'on, 'p> TestMapper<'on, 'p> {
                                 .yielder
                                 .yield_call_extern_http_json(&self.test.ontology[*url], param_json);
 
-                            let attr = ontology
+                            let val = ontology
                                 .new_serde_processor(
                                     output_type_info.operator_addr.unwrap(),
                                     ProcessorMode::Read,
                                 )
                                 .deserialize(output_json)
-                                .unwrap();
+                                .unwrap()
+                                .unwrap_unit();
 
-                            param = attr.val;
+                            param = val;
                         }
                         _ => panic!("unhandled"),
                     }

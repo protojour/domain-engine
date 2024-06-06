@@ -14,11 +14,13 @@ use ontol_runtime::{
         Ontology,
     },
     sequence::Sequence,
-    value::{Attribute, Serial, Value},
+    tuple::{CardinalIdx, EndoTuple},
+    value::{Attr, AttrMatrix, Serial, Value},
     DefId, EdgeId,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use regex_generate::Generator;
+use smallvec::smallvec;
 use tracing::debug;
 
 const MAX_REPEAT: u32 = 128;
@@ -76,10 +78,11 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     .new_serde_processor(addr, self.processor_mode)
                     .with_level(ProcessorLevel::new_root_with_recursion_limit(32)),
             )?
-            .val)
+            .into_unit()
+            .unwrap())
     }
 
-    fn fake_attribute(&mut self, processor: SerdeProcessor) -> Result<Attribute, Error> {
+    fn fake_attribute(&mut self, processor: SerdeProcessor) -> Result<Attr, Error> {
         debug!("fake attribute {processor:?}");
         let val = match processor.value_operator {
             SerdeOperator::AnyPlaceholder | SerdeOperator::Unit => Value::unit(),
@@ -167,12 +170,19 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
             }
             SerdeOperator::RelationList(seq_op) | SerdeOperator::RelationIndexSet(seq_op) => {
                 return if processor.level().current_global_level() > SENSIBLE_RECURSION_LEVEL {
-                    Ok(Value::Sequence(Sequence::default(), seq_op.def.def_id).into())
+                    Ok(Attr::Matrix(AttrMatrix {
+                        origin: CardinalIdx(0),
+                        elements: smallvec![Default::default()],
+                    }))
                 } else {
                     let attr = self.fake_attribute(processor.narrow(seq_op.range.addr))?;
 
-                    Ok(Value::Sequence(Sequence::from_iter([attr]), seq_op.def.def_id).into())
-                }
+                    // FIXME: Need info about the cardinality of this matrix
+                    Ok(Attr::Matrix(AttrMatrix {
+                        origin: CardinalIdx(0),
+                        elements: smallvec![Sequence::from_iter([attr.into_unit().unwrap()])],
+                    }))
+                };
             }
             SerdeOperator::ConstructorSequence(seq_op) => {
                 let mut attrs = vec![];
@@ -180,10 +190,18 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 for range in &seq_op.ranges {
                     if let Some(rep) = range.finite_repetition {
                         for _ in 0..(rep as usize) {
-                            attrs.push(self.fake_attribute(processor.new_child(range.addr)?)?);
+                            attrs.push(
+                                self.fake_attribute(processor.new_child(range.addr)?)?
+                                    .into_unit()
+                                    .unwrap(),
+                            );
                         }
                     } else {
-                        attrs.push(self.fake_attribute(processor.new_child(range.addr)?)?);
+                        attrs.push(
+                            self.fake_attribute(processor.new_child(range.addr)?)?
+                                .into_unit()
+                                .unwrap(),
+                        );
                     }
                 }
 
@@ -236,14 +254,21 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
             }
         };
 
-        let rel = if let Some(rel_params_addr) = processor.ctx.rel_params_addr {
-            self.fake_attribute(processor.new_child(rel_params_addr)?)?
-                .val
+        let attr = if let Some(rel_params_addr) = processor.ctx.rel_params_addr {
+            let rel = self
+                .fake_attribute(processor.new_child(rel_params_addr)?)?
+                .into_unit()
+                .unwrap();
+
+            Attr::Tuple(Box::new(EndoTuple {
+                origin: CardinalIdx(0),
+                elements: [val, rel].into_iter().collect(),
+            }))
         } else {
-            Value::unit()
+            Attr::Unit(val)
         };
 
-        Ok(Attribute { rel, val })
+        Ok(attr)
     }
 }
 

@@ -5,8 +5,9 @@ use ontol_parser::cst::{
     view::NodeView,
 };
 use ontol_runtime::{
-    ontology::domain::{CardinalIdx, EdgeCardinalProjection},
+    ontology::domain::EdgeCardinalProjection,
     property::{PropertyCardinality, ValueCardinality},
+    tuple::CardinalIdx,
     DefId, EdgeId, RelationshipId,
 };
 

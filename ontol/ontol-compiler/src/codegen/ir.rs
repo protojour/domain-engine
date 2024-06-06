@@ -23,7 +23,7 @@ pub enum Ir {
     /// Take attribute and push two values on the stack: value(top), rel_params
     Cond(Predicate, BlockLabel),
     /// Iterate sequence using param(1) as counter. Call block for each iteration.
-    Iter(Local, Local, BlockLabel),
+    Iter(Local, u8, Local, BlockLabel),
 }
 
 #[derive(Clone, Copy, OntolDebug)]

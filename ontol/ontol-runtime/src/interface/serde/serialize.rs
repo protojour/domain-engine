@@ -13,7 +13,9 @@ use crate::{
         processor::{RecursionLimitError, ScalarFormat},
     },
     ontology::ontol::text_pattern::{FormatPattern, TextPatternConstantPart},
-    value::{Attribute, FormatValueAsText, Value},
+    sequence::Sequence,
+    tuple::CardinalIdx,
+    value::{Attr, AttrRef, FormatValueAsText, Value},
     DefId, RelationshipId,
 };
 
@@ -26,43 +28,41 @@ use super::{
 
 type Res<S> = Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Error>;
 
-const UNIT_ATTR: Attribute = Attribute {
-    rel: Value::unit(),
-    val: Value::unit(),
-};
+const UNIT_ATTR: Attr = Attr::Unit(Value::unit());
 
 impl<'on, 'p> SerdeProcessor<'on, 'p> {
     /// Serialize a value using this processor.
-    pub fn serialize_value<S: Serializer>(
-        &self,
-        value: &Value,
-        rel_params: Option<&Value>,
-        serializer: S,
-    ) -> Res<S> {
+    pub fn serialize_attr<S: Serializer>(&self, attr: AttrRef, serializer: S) -> Res<S> {
         trace!(
             "serializing op={:?}",
             self.ontology.debug(self.value_operator)
         );
 
-        match (self.value_operator, self.scalar_format()) {
-            (SerdeOperator::AnyPlaceholder, _) => {
+        let attr = attr.coerce_to_unit();
+
+        match (self.value_operator, self.scalar_format(), attr) {
+            (SerdeOperator::AnyPlaceholder, ..) => {
                 warn!("serializatoin of AnyPlaceholder");
                 Err(Error::custom("unknown type"))
             }
-            (SerdeOperator::Unit, _) => {
-                cast_ref::<()>(value);
+            (SerdeOperator::Unit, _, AttrRef::Unit(v)) => {
+                cast_ref::<()>(v);
                 serializer.serialize_unit()
             }
-            (SerdeOperator::False(_), _) => serializer.serialize_bool(false),
-            (SerdeOperator::True(_), _) => serializer.serialize_bool(true),
-            (SerdeOperator::Boolean(_), _) => serializer.serialize_bool(*cast_ref::<bool>(value)),
-            (SerdeOperator::I64(..), ScalarFormat::DomainTransparent) => match value {
-                Value::I64(int, _) => serializer.serialize_i64(*int),
-                Value::F64(f, _) => serializer.serialize_i64((*f).round() as i64),
-                other => panic!("BUG: Serialize expected number, got {other:?}"),
-            },
-            (SerdeOperator::I32(..), ScalarFormat::DomainTransparent) => {
-                let int_i64: i64 = match value {
+            (SerdeOperator::False(_), ..) => serializer.serialize_bool(false),
+            (SerdeOperator::True(_), ..) => serializer.serialize_bool(true),
+            (SerdeOperator::Boolean(_), _, AttrRef::Unit(v)) => {
+                serializer.serialize_bool(*cast_ref::<bool>(v))
+            }
+            (SerdeOperator::I64(..), ScalarFormat::DomainTransparent, AttrRef::Unit(v)) => {
+                match v {
+                    Value::I64(int, _) => serializer.serialize_i64(*int),
+                    Value::F64(f, _) => serializer.serialize_i64((*f).round() as i64),
+                    other => panic!("BUG: Serialize expected number, got {other:?}"),
+                }
+            }
+            (SerdeOperator::I32(..), ScalarFormat::DomainTransparent, AttrRef::Unit(v)) => {
+                let int_i64: i64 = match v {
                     Value::I64(int, _) => *int,
                     Value::F64(f, _) => (*f).round() as i64,
                     other => panic!("BUG: Serialize expected number, got {other:?}"),
@@ -72,13 +72,15 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     S::Error::custom(format!("overflow when converting to i32: {err:?}"))
                 })?)
             }
-            (SerdeOperator::F64(..), ScalarFormat::DomainTransparent) => match value {
-                Value::I64(num, _) => serializer.serialize_f64(*num as f64),
-                Value::F64(f, _) => serializer.serialize_f64(*f),
-                other => panic!("BUG: Serialize expected number, got {other:?}"),
-            },
-            (SerdeOperator::Serial(def_id), ScalarFormat::DomainTransparent) => {
-                self.serialize_as_text_formatted(value, *def_id, serializer)
+            (SerdeOperator::F64(..), ScalarFormat::DomainTransparent, AttrRef::Unit(v)) => {
+                match v {
+                    Value::I64(num, _) => serializer.serialize_f64(*num as f64),
+                    Value::F64(f, _) => serializer.serialize_f64(*f),
+                    other => panic!("BUG: Serialize expected number, got {other:?}"),
+                }
+            }
+            (SerdeOperator::Serial(def_id), ScalarFormat::DomainTransparent, AttrRef::Unit(v)) => {
+                self.serialize_as_text_formatted(v, *def_id, serializer)
             }
             (
                 SerdeOperator::I32(def_id, ..)
@@ -86,51 +88,68 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 | SerdeOperator::F64(def_id, ..)
                 | SerdeOperator::Serial(def_id, ..),
                 ScalarFormat::RawText,
-            ) => self.serialize_as_text_formatted(value, *def_id, serializer),
+                AttrRef::Unit(v),
+            ) => self.serialize_as_text_formatted(v, *def_id, serializer),
             (
                 SerdeOperator::String(def_id)
                 | SerdeOperator::StringConstant(_, def_id)
                 | SerdeOperator::TextPattern(def_id),
                 _,
-            ) => match value {
+                AttrRef::Unit(v),
+            ) => match v {
                 Value::Text(s, _) => serializer.serialize_str(s),
-                _ => self.serialize_as_text_formatted(value, *def_id, serializer),
+                _ => self.serialize_as_text_formatted(v, *def_id, serializer),
             },
             (
                 SerdeOperator::CapturingTextPattern(pattern_def_id),
                 ScalarFormat::DomainTransparent,
-            ) => self.serialize_as_pattern_formatted(value, *pattern_def_id, serializer),
-            (SerdeOperator::CapturingTextPattern(pattern_def_id), ScalarFormat::RawText) => {
-                self.serialize_pattern_as_raw_text(value, *pattern_def_id, serializer)
-            }
-            (SerdeOperator::DynamicSequence, _) => match value {
+                AttrRef::Unit(v),
+            ) => self.serialize_as_pattern_formatted(v, *pattern_def_id, serializer),
+            (
+                SerdeOperator::CapturingTextPattern(pattern_def_id),
+                ScalarFormat::RawText,
+                AttrRef::Unit(v),
+            ) => self.serialize_pattern_as_raw_text(v, *pattern_def_id, serializer),
+            (SerdeOperator::DynamicSequence, _, AttrRef::Unit(v)) => match v {
                 Value::Sequence(seq, _) => {
                     self.serialize_dynamic_sequence(&seq.elements, serializer)
                 }
                 _ => panic!("Not a sequence"),
             },
-            (SerdeOperator::RelationList(seq_op) | SerdeOperator::RelationIndexSet(seq_op), _) => {
-                self.serialize_sequence(
-                    cast_ref::<Vec<_>>(value),
-                    slice::from_ref(&seq_op.range),
-                    serializer,
-                )
-            }
-            (SerdeOperator::ConstructorSequence(seq_op), _) => {
-                self.serialize_sequence(cast_ref::<Vec<_>>(value), &seq_op.ranges, serializer)
-            }
-            (SerdeOperator::Alias(value_op), _) => self
+            (
+                SerdeOperator::RelationList(seq_op) | SerdeOperator::RelationIndexSet(seq_op),
+                _,
+                AttrRef::Matrix(cardinal_idx, tuple),
+            ) => self.serialize_matrix(
+                cardinal_idx,
+                tuple,
+                slice::from_ref(&seq_op.range),
+                serializer,
+            ),
+            (
+                SerdeOperator::ConstructorSequence(seq_op),
+                _,
+                AttrRef::Unit(Value::Sequence(seq, _)),
+            ) => self.serialize_sequence(
+                seq.elements.iter().map(|value| AttrRef::Unit(value)),
+                seq.elements.len(),
+                &seq_op.ranges,
+                serializer,
+            ),
+            (SerdeOperator::Alias(value_op), _, _) => self
                 .narrow(value_op.inner_addr)
-                .serialize_value(value, rel_params, serializer),
-            (SerdeOperator::Union(union_op), _) => {
+                .serialize_attr(attr, serializer),
+            (SerdeOperator::Union(union_op), _, _) => {
+                let val = attr.first_unit().expect("matrix union");
+
                 match union_op.applied_variants(self.mode, self.level) {
-                    AppliedVariants::Unambiguous(addr) => self
-                        .narrow(addr)
-                        .serialize_value(value, rel_params, serializer),
+                    AppliedVariants::Unambiguous(addr) => {
+                        self.narrow(addr).serialize_attr(attr, serializer)
+                    }
                     AppliedVariants::OneOf(possible_variants) => {
                         let variant = possible_variants
                             .into_iter()
-                            .find(|variant| value.type_def_id() == variant.serde_def.def_id);
+                            .find(|variant| val.type_def_id() == variant.serde_def.def_id);
 
                         if let Some(variant) = variant {
                             let processor = self.narrow(variant.addr);
@@ -139,24 +158,45 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                                 variant.addr
                             );
 
-                            processor.serialize_value(value, rel_params, serializer)
+                            processor.serialize_attr(attr, serializer)
                         } else {
                             panic!(
                                 "Discriminator not found while serializing union type {:?}: {:#?}",
-                                value.type_def_id(),
+                                val.type_def_id(),
                                 possible_variants.into_iter().collect::<Vec<_>>()
                             );
                         }
                     }
                 }
             }
-            (SerdeOperator::IdSingletonStruct(_, name_constant, inner_addr), _) => {
-                let mut map = serializer.serialize_map(Some(1 + option_len(&rel_params)))?;
+            (
+                SerdeOperator::IdSingletonStruct(_, name_constant, inner_addr),
+                _,
+                AttrRef::Unit(_),
+            ) => {
+                let mut map = serializer.serialize_map(Some(1))?;
                 map.serialize_entry(
                     &self.ontology[*name_constant],
                     &Proxy {
-                        value,
-                        rel_params: None,
+                        attr,
+                        processor: self
+                            .new_child(*inner_addr)
+                            .map_err(RecursionLimitError::to_ser_error)?,
+                    },
+                )?;
+
+                map.end()
+            }
+            (
+                SerdeOperator::IdSingletonStruct(_, name_constant, inner_addr),
+                _,
+                AttrRef::Tuple(_, t),
+            ) => {
+                let mut map = serializer.serialize_map(Some(1))?;
+                map.serialize_entry(
+                    &self.ontology[*name_constant],
+                    &Proxy {
+                        attr: AttrRef::Unit(&t[0]),
                         processor: self
                             .new_child(*inner_addr)
                             .map_err(RecursionLimitError::to_ser_error)?,
@@ -164,15 +204,16 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 )?;
                 self.serialize_rel_params::<S>(
                     &self.ontology.ontol_domain_meta().edge_property,
-                    rel_params,
+                    t.get(1),
                     &mut map,
                 )?;
 
                 map.end()
             }
-            (SerdeOperator::Struct(struct_op), _) => {
-                self.serialize_struct(struct_op, rel_params, value, serializer)
+            (SerdeOperator::Struct(struct_op), _, _) => {
+                self.serialize_struct(struct_op, attr, serializer)
             }
+            (_, _, attr) => panic!("unknown serializer combination: {self:?} attr: {attr:?}"),
         }
     }
 
@@ -259,9 +300,10 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                         let attr = attrs.get(&pattern_property.rel_id).ok_or_else(|| {
                             S::Error::custom("property not present in pattern struct")
                         })?;
+                        let Attr::Unit(value) = attr else { panic!() };
 
                         self.serialize_as_text_formatted(
-                            &attr.val,
+                            value,
                             pattern_property.type_def_id,
                             serializer,
                         )
@@ -273,32 +315,89 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         }
     }
 
-    fn serialize_sequence<S: Serializer>(
+    fn serialize_sequence<'v, S: Serializer>(
         &self,
-        elements: &[Attribute],
+        mut elements: impl Iterator<Item = AttrRef<'v>>,
+        len: usize,
         ranges: &[SequenceRange],
         serializer: S,
     ) -> Res<S> {
-        let mut seq = serializer.serialize_seq(Some(elements.len()))?;
-
-        let mut element_iter = elements.iter();
+        let mut seq = serializer.serialize_seq(Some(len))?;
 
         for range in ranges {
             if let Some(finite_repetition) = range.finite_repetition {
                 for _ in 0..finite_repetition {
-                    let attribute = element_iter.next().unwrap();
+                    let attr = elements.next().unwrap();
 
                     seq.serialize_element(&Proxy {
-                        value: &attribute.val,
-                        rel_params: attribute.rel.filter_non_unit(),
+                        attr,
                         processor: self.narrow(range.addr),
                     })?;
                 }
             } else {
-                for attribute in element_iter.by_ref() {
+                while let Some(attr) = elements.next() {
                     seq.serialize_element(&Proxy {
-                        value: &attribute.val,
-                        rel_params: attribute.rel.filter_non_unit(),
+                        attr,
+                        processor: self.narrow(range.addr),
+                    })?;
+                }
+            }
+        }
+
+        seq.end()
+    }
+
+    fn serialize_matrix<'v, S: Serializer>(
+        &self,
+        origin: CardinalIdx,
+        tuple: &[Sequence<Value>],
+        ranges: &[SequenceRange],
+        serializer: S,
+    ) -> Res<S> {
+        let mut seq =
+            serializer.serialize_seq(tuple.iter().next().map(|seq| seq.elements.len()))?;
+
+        let mut work_tuple: Vec<&Value> = Vec::with_capacity(tuple.len());
+        let mut index = 0;
+
+        #[inline]
+        fn next_item<'v>(
+            tuple: &'v [Sequence<Value>],
+            output: &mut Vec<&'v Value>,
+            index: &mut usize,
+        ) -> Option<()> {
+            output.clear();
+
+            for e in tuple {
+                if e.elements.len() <= *index {
+                    return None;
+                }
+
+                output.push(&e.elements[*index]);
+            }
+
+            *index += 1;
+
+            Some(())
+        }
+
+        for range in ranges {
+            if let Some(finite_repetition) = range.finite_repetition {
+                for _ in 0..finite_repetition {
+                    next_item(tuple, &mut work_tuple, &mut index).unwrap();
+                    let attr = AttrRef::RowTuple(origin, &work_tuple).coerce_to_unit();
+
+                    seq.serialize_element(&Proxy {
+                        attr,
+                        processor: self.narrow(range.addr),
+                    })?;
+                }
+            } else {
+                while let Some(()) = next_item(tuple, &mut work_tuple, &mut index) {
+                    let attr = AttrRef::RowTuple(origin, &work_tuple).coerce_to_unit();
+
+                    seq.serialize_element(&Proxy {
+                        attr,
                         processor: self.narrow(range.addr),
                     })?;
                 }
@@ -310,17 +409,16 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
     fn serialize_dynamic_sequence<S: Serializer>(
         &self,
-        elements: &[Attribute],
+        elements: &[Value],
         serializer: S,
     ) -> Res<S> {
         let mut seq = serializer.serialize_seq(Some(elements.len()))?;
 
-        for attr in elements {
-            let def_id = attr.val.type_def_id();
+        for value in elements {
+            let def_id = value.type_def_id();
             match self.ontology.get_type_info(def_id).operator_addr {
                 Some(addr) => seq.serialize_element(&Proxy {
-                    value: &attr.val,
-                    rel_params: None,
+                    attr: AttrRef::Unit(value),
                     processor: self.narrow(addr),
                 })?,
                 None => {
@@ -335,10 +433,18 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
     fn serialize_struct<S: Serializer>(
         &self,
         struct_op: &StructOperator,
-        rel_params: Option<&Value>,
-        value: &Value,
+        attr: AttrRef,
         serializer: S,
     ) -> Res<S> {
+        let (value, rel_params) = match attr {
+            AttrRef::Unit(value) => (value, None),
+            AttrRef::Tuple(_, elements) => (&elements[0], elements.get(1)),
+            AttrRef::RowTuple(_, elements) => (elements[0], elements.get(1).map(|v| *v)),
+            AttrRef::Matrix(..) => {
+                panic!("attr matrix")
+            }
+        };
+
         let attributes = match value {
             Value::Struct(attributes, _) => attributes,
             Value::StructUpdate(attributes, _) => attributes,
@@ -372,7 +478,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             if let Some(open_data_attr) =
                 attributes.get(&self.ontology.ontol_domain_meta().open_data_rel_id())
             {
-                let Value::Dict(dict, _) = &open_data_attr.val else {
+                let Some(Value::Dict(dict, _)) = &open_data_attr.as_unit() else {
                     panic!("Open data must be a dict");
                 };
 
@@ -398,7 +504,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         &self,
         struct_op: &StructOperator,
         value: &Value,
-        attributes: &FnvHashMap<RelationshipId, Attribute<Value>>,
+        attrs: &FnvHashMap<RelationshipId, Attr>,
         rel_params: Option<&Value>,
         overridden_id_property_key: Option<&str>,
         map: &mut S::SerializeMap,
@@ -410,8 +516,8 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 self.serialize_rel_params::<S>(phf_key.arc_str(), rel_params, map)?;
             } else {
                 let unit_attr = UNIT_ATTR;
-                let attribute = match attributes.get(&serde_prop.rel_id) {
-                    Some(value) => value,
+                let attr = match attrs.get(&serde_prop.rel_id) {
+                    Some(attr) => attr,
                     None => {
                         if serde_prop.is_optional_for(self.mode, &self.profile.flags) {
                             continue;
@@ -450,8 +556,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                         map.serialize_entry(
                             name,
                             &Proxy {
-                                value: &attribute.val,
-                                rel_params: attribute.rel.filter_non_unit(),
+                                attr: attr.as_ref(),
                                 processor: self
                                     .new_child_with_context(
                                         serde_prop.value_addr,
@@ -470,7 +575,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                         let SerdeOperator::Union(union_op) = &self.ontology[*union_addr] else {
                             panic!("expected union operator");
                         };
-                        let value = &attribute.val;
+                        let value = attr.as_unit().unwrap();
                         let addr = match union_op.applied_variants(self.mode, self.level) {
                             AppliedVariants::Unambiguous(addr) => addr,
                             AppliedVariants::OneOf(possible_variants) => {
@@ -531,8 +636,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 map.serialize_entry(
                     property_name,
                     &Proxy {
-                        value: rel_params,
-                        rel_params: None,
+                        attr: AttrRef::Unit(rel_params),
                         processor: self
                             .new_child(addr)
                             .map_err(RecursionLimitError::to_ser_error)?,
@@ -559,8 +663,7 @@ fn option_len<T>(opt: &Option<T>) -> usize {
 }
 
 struct Proxy<'v, 'on, 'p> {
-    value: &'v Value,
-    rel_params: Option<&'v Value>,
+    attr: AttrRef<'v>,
     processor: SerdeProcessor<'on, 'p>,
 }
 
@@ -569,8 +672,7 @@ impl<'v, 'on, 'p> serde::Serialize for Proxy<'v, 'on, 'p> {
     where
         S: serde::Serializer,
     {
-        self.processor
-            .serialize_value(self.value, self.rel_params, serializer)
+        self.processor.serialize_attr(self.attr, serializer)
     }
 }
 

@@ -7,11 +7,18 @@ use std::{
 
 use ::serde::{Deserialize, Serialize};
 use fnv::FnvHashMap;
+use itertools::{Itertools, Position};
+use smallvec::{smallvec, SmallVec};
 use smartstring::alias::String;
 use thin_vec::ThinVec;
+use tracing::debug;
 
 use crate::{
-    cast::Cast, ontology::Ontology, query::filter::Filter, sequence::Sequence, tuple::EndoTuple,
+    cast::Cast,
+    ontology::Ontology,
+    query::filter::Filter,
+    sequence::Sequence,
+    tuple::{CardinalIdx, EndoTuple, EndoTupleElements},
     DefId, RelationshipId,
 };
 
@@ -32,11 +39,11 @@ pub enum Value {
     ChronoTime(chrono::NaiveTime, DefId),
 
     /// A collection of attributes keyed by property.
-    Struct(Box<FnvHashMap<RelationshipId, Attribute<Self>>>, DefId),
+    Struct(Box<FnvHashMap<RelationshipId, Attr>>, DefId),
 
     /// A collection of attributes keyed by property, but contains
     /// only partial information, and must contain the ID of the struct (entity) to update.
-    StructUpdate(Box<FnvHashMap<RelationshipId, Attribute<Self>>>, DefId),
+    StructUpdate(Box<FnvHashMap<RelationshipId, Attr>>, DefId),
 
     /// A collection of arbitrary values keyed by strings.
     Dict(Box<BTreeMap<String, Value>>, DefId),
@@ -48,16 +55,18 @@ pub enum Value {
     ///
     /// Some sequences will be uniform (all elements have the same type).
     /// Other sequences will behave more like tuples.
-    Sequence(Sequence, DefId),
+    ///
+    /// FIXME: Refactor this to be a pure Array of Values
+    Sequence(Sequence<Value>, DefId),
 
     /// A patching of some graph property of entities.
     ///
     /// The type of each attribute carry the patch semantics:
     ///
-    /// * `(value: Struct, rel_params)`: Write a new entity
-    /// * `(value: StructUpdate, rel_params)`: Update the given entity with new rel_params
-    /// * `(value: ID, rel_params: Value::Delete)`: Delete the given ID
-    Patch(Vec<Attribute<Self>>, DefId),
+    /// * `Attr::Tuple(Struct, rel_params)`: Write a new entity
+    /// * `Attr::Tuple(StructUpdate, rel_params)`: Update the given entity with new rel_params
+    /// * `Attr::Tuple(ID, Value::Delete)`: Delete the given ID
+    Patch(Vec<Attr>, DefId),
 
     /// Special rel_params used for edge deletion
     DeleteRelationship(DefId),
@@ -67,24 +76,18 @@ pub enum Value {
 
 impl Value {
     pub fn new_struct(
-        props: impl IntoIterator<Item = (RelationshipId, Attribute<Self>)>,
+        props: impl IntoIterator<Item = (RelationshipId, Attr)>,
         type_id: DefId,
     ) -> Self {
         Self::Struct(Box::new(FnvHashMap::from_iter(props)), type_id)
     }
 
     pub fn sequence_of(values: impl IntoIterator<Item = Value>) -> Self {
-        let sequence: Sequence = values
-            .into_iter()
-            .map(|val| Attribute {
-                rel: Self::unit(),
-                val,
-            })
-            .collect();
+        let sequence: Sequence<Value> = values.into_iter().collect();
         let type_def_id = sequence
             .elements()
             .first()
-            .map(|attr| attr.val.type_def_id())
+            .map(|value| value.type_def_id())
             .unwrap_or(DefId::unit());
         Self::Sequence(sequence, type_def_id)
     }
@@ -159,7 +162,7 @@ impl Value {
         }
     }
 
-    pub fn get_attribute(&self, rel_id: RelationshipId) -> Option<&Attribute<Self>> {
+    pub fn get_attribute(&self, rel_id: RelationshipId) -> Option<&Attr> {
         match self {
             Self::Struct(map, _) => map.get(&rel_id),
             _ => None,
@@ -167,7 +170,10 @@ impl Value {
     }
 
     pub fn get_attribute_value(&self, rel_id: RelationshipId) -> Option<&Value> {
-        self.get_attribute(rel_id).map(|attr| &attr.val)
+        match self.get_attribute(rel_id)? {
+            Attr::Unit(value) => Some(value),
+            _ => None,
+        }
     }
 
     #[inline]
@@ -264,12 +270,14 @@ impl<'d, 'o> Display for FormatValueAsText<'d, 'o> {
                 Value::Struct(props, type_def_id) => {
                     // concatenate every prop (not sure this is a good idea, since the order is not defined)
                     for attr in props.values() {
-                        FormatValueAsText {
-                            value: &attr.val,
-                            type_def_id: *type_def_id,
-                            ontology: self.ontology,
+                        if let Attr::Unit(value) = attr {
+                            FormatValueAsText {
+                                value,
+                                type_def_id: *type_def_id,
+                                ontology: self.ontology,
+                            }
+                            .fmt(f)?;
                         }
-                        .fmt(f)?;
                     }
 
                     Ok(())
@@ -302,16 +310,172 @@ pub struct Attribute<T = Value> {
     pub val: T,
 }
 
-pub enum ValueOrTuple {
-    Value(Value),
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum Attr {
+    /// The attribute has one value
+    Unit(Value),
+    /// The attribute is horizontally multivalued,
+    /// the size is known at (ontol-)compile time.
+    ///
+    /// The tuple represents siblings in the hyper-edge this attribute is derived from.
     Tuple(Box<EndoTuple<Value>>),
+    /// Column-oriented matrix, i.e. tuples first, then sequences within those tuples
+    Matrix(AttrMatrix),
 }
 
-pub enum Attribute2 {
-    //Value(Value),
-    //Tuple(Box<EndoTuple<Value>>),
-    Value(ValueOrTuple),
-    Sequence(Sequence),
+impl Attr {
+    pub fn as_ref(&self) -> AttrRef {
+        match self {
+            Attr::Unit(v) => AttrRef::Unit(v),
+            Attr::Tuple(t) => AttrRef::Tuple(t.origin, &t.elements),
+            Attr::Matrix(m) => AttrRef::Matrix(m.origin, &m.elements),
+        }
+    }
+
+    pub fn as_unit(&self) -> Option<&Value> {
+        match self {
+            Self::Unit(v) => Some(v),
+            Self::Tuple(t) => {
+                if t.elements.len() == 1 {
+                    t.elements.get(0)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
+    pub fn as_matrix(&self) -> Option<&AttrMatrix> {
+        match self {
+            Self::Matrix(m) => Some(m),
+            _ => None,
+        }
+    }
+
+    pub fn into_unit(self) -> Option<Value> {
+        match self {
+            Self::Unit(v) => Some(v),
+            Self::Tuple(t) => {
+                if t.elements.len() == 1 {
+                    t.elements.into_iter().next()
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
+    pub fn into_tuple(self) -> Option<(CardinalIdx, EndoTupleElements<Value>)> {
+        match self {
+            Self::Unit(v) => Some((CardinalIdx(0), smallvec![v])),
+            Self::Tuple(t) => Some((t.origin, t.elements)),
+            Self::Matrix(_) => None,
+        }
+    }
+
+    pub fn unwrap_unit(self) -> Value {
+        match self {
+            Self::Unit(value) => value,
+            Self::Tuple(tuple) => {
+                if tuple.elements.len() != 1 {
+                    panic!("not a singleton tuple")
+                }
+                tuple.elements.into_iter().next().unwrap()
+            }
+            Self::Matrix(_) => {
+                panic!("matrix is not a unit")
+            }
+        }
+    }
+
+    // Hack for now
+    pub fn unit_or_tuple(origin: CardinalIdx, value: Value, rel_params: Value) -> Self {
+        if rel_params.is_unit() {
+            Self::Unit(value)
+        } else {
+            debug!("making a tuple for rel_params: {}", ValueDebug(&rel_params));
+            Self::Tuple(Box::new(EndoTuple {
+                origin,
+                elements: smallvec![value, rel_params],
+            }))
+        }
+    }
+}
+
+/// A column-first matrix of attributes.
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct AttrMatrix {
+    pub origin: CardinalIdx,
+    pub elements: EndoTupleElements<Sequence<Value>>,
+}
+
+impl AttrMatrix {
+    pub fn get_attr_cloned(&self, index: usize) -> Option<Attr> {
+        let mut elements: SmallVec<Value, 1> = smallvec![];
+
+        for e in &self.elements {
+            elements.push(e.elements.get(index)?.clone());
+        }
+
+        Some(Attr::Tuple(Box::new(EndoTuple {
+            origin: self.origin,
+            elements,
+        })))
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum AttrRef<'v> {
+    /// One value
+    Unit(&'v Value),
+    /// Tuple not in a matrix
+    Tuple(CardinalIdx, &'v [Value]),
+    /// Tuple borrowed from a Matrix
+    RowTuple(CardinalIdx, &'v [&'v Value]),
+    /// A whole matrix
+    Matrix(CardinalIdx, &'v [Sequence<Value>]),
+}
+
+impl<'v> AttrRef<'v> {
+    #[inline]
+    pub fn coerce_to_unit(self) -> Self {
+        match self {
+            Self::Unit(v) => Self::Unit(v),
+            Self::Tuple(_, t) => {
+                if t.len() == 1 {
+                    Self::Unit(&t[0])
+                } else {
+                    self
+                }
+            }
+            Self::RowTuple(_, t) => {
+                if t.len() == 1 {
+                    Self::Unit(t[0])
+                } else {
+                    self
+                }
+            }
+            Self::Matrix(i, m) => Self::Matrix(i, m),
+        }
+    }
+
+    pub fn first_unit(self) -> Option<&'v Value> {
+        match self {
+            Self::Unit(v) => Some(v),
+            Self::Tuple(_, t) => t.get(0),
+            Self::RowTuple(_, t) => t.get(0).map(|val| *val),
+            Self::Matrix(..) => None,
+        }
+    }
+
+    pub fn as_unit(&self) -> Option<&Value> {
+        match self {
+            Self::Unit(v) => Some(v),
+            _ => None,
+        }
+    }
 }
 
 impl From<Value> for Attribute<Value> {
@@ -320,6 +484,18 @@ impl From<Value> for Attribute<Value> {
             rel: Value::unit(),
             val: value,
         }
+    }
+}
+
+impl From<Value> for Attr {
+    fn from(value: Value) -> Self {
+        Self::Unit(value)
+    }
+}
+
+impl From<EndoTuple<Value>> for Attr {
+    fn from(value: EndoTuple<Value>) -> Self {
+        Self::Tuple(Box::new(value))
     }
 }
 
@@ -347,9 +523,9 @@ impl<T> Index<usize> for Attribute<T> {
     }
 }
 
-pub struct ValueDebug<'v>(pub &'v Value);
+pub struct ValueDebug<'v, V>(pub &'v V);
 
-impl<'v> Display for ValueDebug<'v> {
+impl<'v> Display for ValueDebug<'v, Value> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value = &self.0;
         match &value {
@@ -372,7 +548,7 @@ impl<'v> Display for ValueDebug<'v> {
                 write!(f, "{{")?;
                 let mut iter = m.iter().peekable();
                 while let Some((prop, attr)) = iter.next() {
-                    write!(f, "{prop} -> {}", AttrDebug(attr),)?;
+                    write!(f, "{prop} -> {}", ValueDebug(attr),)?;
 
                     if iter.peek().is_some() {
                         write!(f, ", ")?;
@@ -384,24 +560,13 @@ impl<'v> Display for ValueDebug<'v> {
                 write!(f, "dict")
             }
             Value::Sequence(seq, _) => {
-                write!(f, "[")?;
-                let mut iter = seq.elements().iter().peekable();
-                while let Some(attr) = iter.next() {
-                    write!(f, "{}", AttrDebug(attr),)?;
-
-                    if iter.peek().is_some() {
-                        write!(f, ", ")?;
-                    }
-                }
-                write!(f, "]")
+                write!(f, "{}", ValueDebug(seq))
             }
             Value::Patch(patch, _) => {
                 write!(f, "patch{{")?;
-                let mut iter = patch.iter().peekable();
-                while let Some(attr) = iter.next() {
-                    write!(f, "{}", AttrDebug(attr),)?;
-
-                    if iter.peek().is_some() {
+                for (pos, attr) in patch.iter().with_position() {
+                    write!(f, "{}", ValueDebug(attr),)?;
+                    if matches!(pos, Position::First | Position::Middle) {
                         write!(f, ", ")?;
                     }
                 }
@@ -415,9 +580,7 @@ impl<'v> Display for ValueDebug<'v> {
     }
 }
 
-struct AttrDebug<'a>(&'a Attribute);
-
-impl<'a> Display for AttrDebug<'a> {
+impl<'a> Display for ValueDebug<'a, Attribute> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let attr = &self.0;
         write!(f, "{}", ValueDebug(&attr.val))?;
@@ -427,6 +590,64 @@ impl<'a> Display for AttrDebug<'a> {
         }
 
         Ok(())
+    }
+}
+
+impl<'a> Display for ValueDebug<'a, Attr> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let attr = &self.0;
+
+        match attr {
+            Attr::Unit(value) => {
+                write!(f, "{}", ValueDebug(value))?;
+            }
+            Attr::Tuple(tuple) => {
+                write!(f, "{}", ValueDebug(&tuple.elements))?;
+            }
+            Attr::Matrix(mat) => {
+                write!(f, "{}", ValueDebug(mat))?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl<'a, T> Display for ValueDebug<'a, EndoTupleElements<T>>
+where
+    ValueDebug<'a, T>: Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "(")?;
+        for (pos, element) in self.0.iter().with_position() {
+            write!(f, "{}", ValueDebug(element))?;
+            if matches!(pos, Position::First | Position::Middle) {
+                write!(f, ", ")?;
+            }
+        }
+        write!(f, ")")
+    }
+}
+
+impl<'a, T> Display for ValueDebug<'a, Sequence<T>>
+where
+    ValueDebug<'a, T>: Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[")?;
+        for (pos, element) in self.0.elements.iter().with_position() {
+            write!(f, "{}", ValueDebug(element))?;
+            if matches!(pos, Position::First | Position::Middle) {
+                write!(f, ", ")?;
+            }
+        }
+        write!(f, "]")
+    }
+}
+
+impl<'a> Display for ValueDebug<'a, AttrMatrix> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "mat{}", ValueDebug(&self.0.elements))
     }
 }
 

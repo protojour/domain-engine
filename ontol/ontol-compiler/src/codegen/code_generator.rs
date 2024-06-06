@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use bit_set::BitSet;
 use fnv::FnvHashMap;
-use ontol_hir::{EvalCondTerm, OverloadFunc, PropVariant, StructFlags};
+use ontol_hir::{Binding, EvalCondTerm, OverloadFunc, PropVariant, StructFlags};
 use ontol_runtime::{
     ontology::map::MapLossiness,
     property::ValueCardinality,
@@ -298,13 +298,13 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     return;
                 };
 
-                let mut attr_flags = GetAttrFlags::TAKE;
                 let mut delta = 0;
+                let mut len: u8 = 0;
 
-                for (binding, flags) in [(rel, GetAttrFlags::REL), (val, GetAttrFlags::VAL)] {
+                for binding in [val, rel] {
                     if let ontol_hir::Binding::Binder(binder) = binding {
                         delta += 1;
-                        attr_flags.insert(flags);
+                        len += 1;
                         self.scope_insert(
                             binder.hir().var,
                             self.builder.top_plus(delta),
@@ -315,7 +315,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 if delta > 0 {
                     block.op(
-                        OpCode::GetAttr(struct_local, *rel_id, attr_flags),
+                        OpCode::GetAttr(struct_local, *rel_id, len, GetAttrFlags::TAKE),
                         Delta(delta as i32),
                         span,
                         self.builder,
@@ -327,18 +327,16 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     return;
                 };
 
-                let mut attr_flags = GetAttrFlags::empty();
                 let mut delta = 0;
 
                 let before = self.builder.top();
 
-                for (binding, flags) in [
-                    (binding.rel, GetAttrFlags::REL),
-                    (binding.val, GetAttrFlags::VAL),
-                ] {
+                let mut len: u8 = 0;
+
+                for binding in [binding.val, binding.rel] {
                     if let ontol_hir::Binding::Binder(binder) = binding {
                         delta += 1;
-                        attr_flags.insert(flags);
+                        len += 1;
                         self.scope_insert(
                             binder.hir().var,
                             self.builder.top_plus(delta),
@@ -352,7 +350,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 }
 
                 block.op(
-                    OpCode::GetAttr(struct_local, *rel_id, attr_flags),
+                    OpCode::GetAttr(struct_local, *rel_id, len, GetAttrFlags::empty()),
                     Delta(delta as i32),
                     span,
                     self.builder,
@@ -778,23 +776,26 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 };
                 let counter = block.op(OpCode::I64(0, DefId::unit()), Delta(1), span, self.builder);
 
-                let elem_rel_local = self.builder.top_plus(1);
-                let elem_val_local = self.builder.top_plus(2);
+                let mut tuple_elements: Vec<(Local, Binding<TypedHir>)> = vec![];
+                let mut plus = 1;
+
+                if matches!(*val_binding, Binding::Binder(_)) {
+                    tuple_elements.push((self.builder.top_plus(plus), *val_binding));
+                    plus += 1;
+                }
+                if matches!(*rel_binding, Binding::Binder(_)) {
+                    tuple_elements.push((self.builder.top_plus(plus), *rel_binding));
+                    // plus += 1;
+                }
 
                 let loop_label = {
-                    let mut loop_block = self.builder.new_block(Delta(2), span);
+                    let mut loop_block = self
+                        .builder
+                        .new_block(Delta(tuple_elements.len() as i32), span);
                     let loop_label = loop_block.label();
                     let old_scope = self.scope.clone();
 
-                    self.gen_in_scope(
-                        &[
-                            (elem_rel_local, *rel_binding),
-                            (elem_val_local, *val_binding),
-                        ],
-                        nodes,
-                        arena,
-                        &mut loop_block,
-                    );
+                    self.gen_in_scope(&tuple_elements, nodes, arena, &mut loop_block);
 
                     self.scope = old_scope;
 
@@ -807,7 +808,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 };
 
                 block.ir(
-                    Ir::Iter(seq_local, counter, loop_label),
+                    Ir::Iter(seq_local, tuple_elements.len() as u8, counter, loop_label),
                     Delta(0),
                     span,
                     self.builder,
@@ -819,19 +820,35 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 let Ok(seq_local) = self.var_local(*seq_var, &meta.span) else {
                     return;
                 };
-                self.gen_node(arena.node_ref(attr.rel), block);
-                let rel_local = self.builder.top();
 
-                self.gen_node(arena.node_ref(attr.val), block);
+                match arena.kind_of(attr.rel) {
+                    ontol_hir::Kind::Unit => {
+                        self.gen_node(arena.node_ref(attr.val), block);
 
-                block.op(OpCode::Clone(rel_local), Delta(1), span, self.builder);
-                block.op(
-                    OpCode::AppendAttr2(seq_local),
-                    Delta(-2),
-                    span,
-                    self.builder,
-                );
-                block.pop_until(before, span, self.builder);
+                        block.op(
+                            OpCode::AppendAttr(seq_local, 1),
+                            Delta(-1),
+                            span,
+                            self.builder,
+                        );
+                        block.pop_until(before, span, self.builder);
+                    }
+                    _ => {
+                        self.gen_node(arena.node_ref(attr.rel), block);
+                        let rel_local = self.builder.top();
+
+                        self.gen_node(arena.node_ref(attr.val), block);
+
+                        block.op(OpCode::Clone(rel_local), Delta(1), span, self.builder);
+                        block.op(
+                            OpCode::AppendAttr(seq_local, 2),
+                            Delta(-2),
+                            span,
+                            self.builder,
+                        );
+                        block.pop_until(before, span, self.builder);
+                    }
+                }
             }
             ontol_hir::Kind::StringPush(to_var, node) => {
                 let before = self.builder.top();

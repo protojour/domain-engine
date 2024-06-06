@@ -1,5 +1,6 @@
 use std::{
     collections::hash_map::Entry,
+    fmt::Display,
     hash::{BuildHasher, Hasher},
     ops::Index,
 };
@@ -114,8 +115,13 @@ impl SubSequence {
     }
 }
 
+pub trait WithCapacity {
+    fn with_capacity(cap: usize) -> Self;
+}
+
 pub trait SequenceBuilder<T>: Index<usize, Output = T> {
     fn try_push(&mut self, item: T) -> Result<(), DuplicateError<T>>;
+    fn cur_len(&self) -> usize;
 
     fn build(self) -> Sequence<T>;
 }
@@ -124,8 +130,8 @@ pub struct ListBuilder<T = Attribute> {
     elements: ThinVec<T>,
 }
 
-impl<T> ListBuilder<T> {
-    pub fn with_capacity(cap: usize) -> Self {
+impl<T> WithCapacity for ListBuilder<T> {
+    fn with_capacity(cap: usize) -> Self {
         Self {
             elements: ThinVec::with_capacity(cap),
         }
@@ -136,6 +142,10 @@ impl<T> SequenceBuilder<T> for ListBuilder<T> {
     fn try_push(&mut self, element: T) -> Result<(), DuplicateError<T>> {
         self.elements.push(element);
         Ok(())
+    }
+
+    fn cur_len(&self) -> usize {
+        self.elements.len()
     }
 
     fn build(self) -> Sequence<T> {
@@ -170,23 +180,23 @@ pub struct IndexSetBuilder<T> {
     hash_builder: ahash::RandomState,
 }
 
+impl<T> WithCapacity for IndexSetBuilder<T> {
+    fn with_capacity(cap: usize) -> Self {
+        Self {
+            elements: ThinVec::with_capacity(cap),
+            len: 0,
+            hash_buckets: FnvHashMap::with_capacity(cap),
+            hash_builder: Default::default(),
+        }
+    }
+}
+
 impl<T> Default for IndexSetBuilder<T> {
     fn default() -> Self {
         Self {
             elements: Default::default(),
             len: 0,
             hash_buckets: Default::default(),
-            hash_builder: Default::default(),
-        }
-    }
-}
-
-impl<T> IndexSetBuilder<T> {
-    pub fn with_capacity(cap: usize) -> Self {
-        Self {
-            elements: ThinVec::with_capacity(cap),
-            len: 0,
-            hash_buckets: FnvHashMap::with_capacity(cap),
             hash_builder: Default::default(),
         }
     }
@@ -245,6 +255,10 @@ where
         Ok(())
     }
 
+    fn cur_len(&self) -> usize {
+        self.elements.len()
+    }
+
     fn build(self) -> Sequence<T> {
         Sequence {
             elements: self.elements,
@@ -266,6 +280,16 @@ pub struct DuplicateError<T> {
     pub element: T,
     pub index: usize,
     pub equals_index: usize,
+}
+
+impl<T> Display for DuplicateError<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "invalid index-set: attribute[{}] equals attribute[{}]",
+            self.index, self.equals_index
+        )
+    }
 }
 
 /// A linked list of indexes
@@ -298,7 +322,10 @@ impl IndexChain {
 mod tests {
     use tracing::debug;
 
-    use crate::{value::Value, DefId, PackageId, RelationshipId};
+    use crate::{
+        value::{Attr, Value},
+        DefId, PackageId, RelationshipId,
+    };
 
     use super::*;
 
@@ -390,12 +417,9 @@ mod tests {
     }
 
     fn struct_value(iter: impl IntoIterator<Item = (u16, Value)>) -> Value {
-        let attrs = iter.into_iter().map(|(p, val)| {
-            (
-                RelationshipId(DefId(PackageId(42), p)),
-                Attribute::from(val),
-            )
-        });
+        let attrs = iter
+            .into_iter()
+            .map(|(p, val)| (RelationshipId(DefId(PackageId(42), p)), Attr::Unit(val)));
 
         Value::Struct(Box::new(FnvHashMap::from_iter(attrs)), def(2))
     }
@@ -409,10 +433,7 @@ mod tests {
                     let key = i as u16;
                     let value = Value::I64(i as i64, def(42));
 
-                    (
-                        RelationshipId(DefId(PackageId(42), key)),
-                        Attribute::from(value),
-                    )
+                    (RelationshipId(DefId(PackageId(42), key)), Attr::Unit(value))
                 })
                 .collect();
 

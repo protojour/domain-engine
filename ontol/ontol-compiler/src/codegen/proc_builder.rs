@@ -132,8 +132,9 @@ impl ProcBuilder {
         for block in self.blocks {
             for (ir, span) in block.ir {
                 let opcode = match ir {
-                    Ir::Iter(seq, counter, block_label) => OpCode::Iter(
+                    Ir::Iter(seq, n, counter, block_label) => OpCode::Iter(
                         seq,
+                        n,
                         counter,
                         AddressOffset(*block_addresses.get(&block_label).unwrap()),
                     ),

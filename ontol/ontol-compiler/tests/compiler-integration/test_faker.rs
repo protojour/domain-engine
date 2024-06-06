@@ -1,5 +1,5 @@
 use ontol_macros::test;
-use ontol_runtime::interface::serde::processor::ProcessorMode;
+use ontol_runtime::{interface::serde::processor::ProcessorMode, value::AttrRef};
 use ontol_test_utils::{
     examples::{GEOJSON, GUITAR_SYNTH_UNION, WGS},
     expect_eq,
@@ -19,7 +19,7 @@ fn test_fake_primitives() {
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         expect_eq!(
-            actual = serde_read(&foo).as_json(&foo.new_fake(ProcessorMode::Raw)),
+            actual = serde_read(&foo).as_json(AttrRef::Unit(&foo.new_fake(ProcessorMode::Raw))),
             expected = json!({
                 "s": "mollitia sit porro tenetur",
                 "i": 2117826670,
@@ -39,7 +39,7 @@ fn test_fake_text_like_types() {
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         expect_eq!(
-            actual = serde_read(&foo).as_json(&foo.new_fake(ProcessorMode::Raw)),
+            actual = serde_read(&foo).as_json(AttrRef::Unit(&foo.new_fake(ProcessorMode::Raw))),
             expected = json!({
                 "id": "be63cfde-00db-4e4f-04e9-5224a7b8351a",
                 "created_at": "2249-06-21T19:23:34.131225284+00:00",
@@ -53,7 +53,8 @@ fn test_fake_geojson() {
     let test = TestPackages::with_static_sources([GEOJSON, WGS]).compile();
     let [geometry] = test.bind(["Geometry"]);
     expect_eq!(
-        actual = serde_read(&geometry).as_json(&geometry.new_fake(ProcessorMode::Raw)),
+        actual =
+            serde_read(&geometry).as_json(AttrRef::Unit(&geometry.new_fake(ProcessorMode::Raw))),
         expected = json!({
             "type": "Polygon",
             "coordinates": [
@@ -72,7 +73,7 @@ fn test_fake_guitar_synth() {
     let test = GUITAR_SYNTH_UNION.1.compile();
     let [artist] = test.bind(["artist"]);
     expect_eq!(
-        actual = serde_read(&artist).as_json(&artist.new_fake(ProcessorMode::Raw)),
+        actual = serde_read(&artist).as_json(AttrRef::Unit(&artist.new_fake(ProcessorMode::Raw))),
         expected = json!({
             "artist-id": "mollitia sit porro tenetur",
             "name": "delectus molestias aspernatur voluptatem reprehenderit",

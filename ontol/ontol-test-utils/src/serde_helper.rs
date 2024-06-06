@@ -4,7 +4,7 @@ use ontol_runtime::{
         ProcessorLevel, ProcessorMode, ProcessorProfile, ProcessorProfileApi,
         ProcessorProfileFlags, SpecialProperty,
     },
-    value::{Attribute, Value},
+    value::{Attr, AttrRef, Value},
     DefId, RelationshipId,
 };
 use serde::de::DeserializeSeed;
@@ -70,7 +70,10 @@ impl<'b, 'on, 'p> SerdeHelper<'b, 'on, 'p> {
 
     #[track_caller]
     pub fn to_value(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
-        let value = self.to_value_nocheck(json)?;
+        let value = self
+            .to_attr_nocheck(json)?
+            .into_unit()
+            .expect("not a unit attr");
         assert_eq!(value.type_def_id(), self.binding.type_info.def_id);
         Ok(value)
     }
@@ -79,8 +82,10 @@ impl<'b, 'on, 'p> SerdeHelper<'b, 'on, 'p> {
     pub fn to_value_map(
         &self,
         json: serde_json::Value,
-    ) -> Result<FnvHashMap<RelationshipId, Attribute>, serde_json::Error> {
-        let value = self.to_value_nocheck(json)?;
+    ) -> Result<FnvHashMap<RelationshipId, Attr>, serde_json::Error> {
+        let Attr::Unit(value) = self.to_attr_nocheck(json)? else {
+            panic!("not a unit attr");
+        };
         assert_eq!(value.type_def_id(), self.binding.type_info.def_id);
         match value {
             Value::Struct(attrs, _) => Ok(*attrs),
@@ -93,13 +98,25 @@ impl<'b, 'on, 'p> SerdeHelper<'b, 'on, 'p> {
     /// (i.e. it should deserialize to a _variant_ of the type)
     #[track_caller]
     pub fn to_value_variant(&self, json: impl JsonConvert) -> Result<Value, serde_json::Error> {
-        let value = self.to_value_nocheck(json)?;
+        let value = self
+            .to_attr_nocheck(json)?
+            .into_unit()
+            .expect("not a unit attr");
         assert_ne!(value.type_def_id(), self.binding.type_info.def_id);
         Ok(value)
     }
 
-    /// Deserialize to value, do not run type_def_id assert checks
+    /// Deserialize to unit value, do not run type_def_id assert checks
     pub fn to_value_nocheck(&self, json: impl JsonConvert) -> Result<Value, serde_json::Error> {
+        match self.to_attr_nocheck(json)? {
+            Attr::Unit(value) => Ok(value),
+            Attr::Tuple(t) => panic!("was: {t:?}"),
+            Attr::Matrix(m) => panic!("was: {m:?}"),
+        }
+    }
+
+    /// Deserialize to attr, do not run type_def_id assert checks
+    pub fn to_attr_nocheck(&self, json: impl JsonConvert) -> Result<Attr, serde_json::Error> {
         let json_string = json.to_json_string();
 
         let attribute_result = self
@@ -122,11 +139,7 @@ impl<'b, 'on, 'p> SerdeHelper<'b, 'on, 'p> {
                         });
 
                 match (attribute_result, json_schema_result) {
-                    (Ok(Attribute { rel, val }), Ok(())) => {
-                        assert_eq!(rel.type_def_id(), DefId::unit());
-
-                        Ok(val)
-                    }
+                    (Ok(attr), Ok(())) => Ok(attr),
                     (Err(json_error), Err(_)) => Err(json_error),
                     (Ok(_), Err(_schema_error)) => {
                         panic!("BUG: JSON schema did not accept input {json_string}");
@@ -138,23 +151,19 @@ impl<'b, 'on, 'p> SerdeHelper<'b, 'on, 'p> {
                     }
                 }
             }
-            _ => attribute_result.map(|Attribute { rel, val }| {
-                assert_eq!(rel.type_def_id(), DefId::unit());
-
-                val
-            }),
+            _ => attribute_result,
         }
     }
 
-    pub fn as_json(&self, value: &Value) -> serde_json::Value {
-        self.serialize_json(value, false)
+    pub fn as_json(&self, attr: AttrRef) -> serde_json::Value {
+        self.serialize_json(attr, false)
     }
 
-    pub fn dynamic_seq_as_json(&self, value: &Value) -> serde_json::Value {
-        self.serialize_json(value, true)
+    pub fn dynamic_seq_as_json(&self, attr: AttrRef) -> serde_json::Value {
+        self.serialize_json(attr, true)
     }
 
-    fn serialize_json(&self, value: &Value, dynamic_seq: bool) -> serde_json::Value {
+    fn serialize_json(&self, attr: AttrRef, dynamic_seq: bool) -> serde_json::Value {
         let mut buf: Vec<u8> = vec![];
         self.binding
             .ontology()
@@ -168,7 +177,7 @@ impl<'b, 'on, 'p> SerdeHelper<'b, 'on, 'p> {
             )
             .with_level(self.level)
             .with_profile(&self.profile)
-            .serialize_value(value, None, &mut serde_json::Serializer::new(&mut buf))
+            .serialize_attr(attr, &mut serde_json::Serializer::new(&mut buf))
             .expect("serialization failed");
         serde_json::from_slice(&buf).unwrap()
     }

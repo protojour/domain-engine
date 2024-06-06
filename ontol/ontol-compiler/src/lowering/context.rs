@@ -8,8 +8,9 @@ use ontol_parser::{
     ParserError, U32Span,
 };
 use ontol_runtime::{
-    ontology::domain::{CardinalIdx, EdgeCardinalProjection},
+    ontology::domain::EdgeCardinalProjection,
     property::{PropertyCardinality, ValueCardinality},
+    tuple::CardinalIdx,
     var::{Var, VarAllocator},
     DefId, PackageId,
 };

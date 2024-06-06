@@ -54,16 +54,21 @@ pub trait Processor {
     fn pop_until(&mut self, local: Local);
 
     fn call_builtin(&mut self, proc: BuiltinProc, result_type: DefId) -> VmResult<()>;
-    fn iter_next(&mut self, seq: Local, index: Local) -> VmResult<bool>;
-    fn get_attr(&mut self, source: Local, key: RelationshipId, flags: GetAttrFlags)
-        -> VmResult<()>;
+    fn iter_next(&mut self, seq: Local, n: u8, index: Local) -> VmResult<bool>;
+    fn get_attr(
+        &mut self,
+        source: Local,
+        key: RelationshipId,
+        len: u8,
+        flags: GetAttrFlags,
+    ) -> VmResult<()>;
     fn put_attr1(&mut self, target: Local, key: RelationshipId) -> VmResult<()>;
     fn put_attr2(&mut self, target: Local, key: RelationshipId) -> VmResult<()>;
     fn move_rest_attrs(&mut self, target: Local, source: Local) -> VmResult<()>;
     fn push_i64(&mut self, k: i64, result_type: DefId);
     fn push_f64(&mut self, k: f64, result_type: DefId);
     fn push_string(&mut self, k: TextConstant, result_type: DefId);
-    fn append_attr2(&mut self, seq: Local) -> VmResult<()>;
+    fn append_attr2(&mut self, seq: Local, len: u8) -> VmResult<()>;
     fn append_string(&mut self, to: Local) -> VmResult<()>;
     fn cond_predicate(&mut self, predicate: &Predicate) -> VmResult<bool>;
     fn move_seq_vals_to_stack(&mut self, source: Local) -> VmResult<()>;
@@ -191,8 +196,8 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                         processor.yield_call_extern(*extern_def_id, *output_def_id)?,
                     ));
                 }
-                OpCode::GetAttr(local, property_id, flags) => {
-                    processor.get_attr(*local, *property_id, *flags)?;
+                OpCode::GetAttr(local, property_id, len, flags) => {
+                    processor.get_attr(*local, *property_id, *len, *flags)?;
                     self.program_counter += 1;
                 }
                 OpCode::PutAttr1(target, property_id) => {
@@ -219,15 +224,15 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                     processor.push_string(*constant, *result_type);
                     self.program_counter += 1;
                 }
-                OpCode::Iter(seq, index, offset) => {
-                    if processor.iter_next(*seq, *index)? {
+                OpCode::Iter(seq, n, index, offset) => {
+                    if processor.iter_next(*seq, *n, *index)? {
                         self.program_counter = self.proc_address + offset.0 as usize;
                     } else {
                         self.program_counter += 1;
                     }
                 }
-                OpCode::AppendAttr2(seq) => {
-                    processor.append_attr2(*seq)?;
+                OpCode::AppendAttr(seq, n) => {
+                    processor.append_attr2(*seq, *n)?;
                     self.program_counter += 1;
                 }
                 OpCode::AppendString(to) => {

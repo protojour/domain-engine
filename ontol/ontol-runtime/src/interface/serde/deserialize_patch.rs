@@ -1,7 +1,9 @@
 use serde::de::Visitor;
+use smallvec::smallvec;
 
 use crate::{
-    value::{Attribute, Value},
+    tuple::{CardinalIdx, EndoTuple},
+    value::{Attr, Value},
     DefId,
 };
 
@@ -26,7 +28,7 @@ enum Operation {
 }
 
 impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
-    type Value = Attribute;
+    type Value = Attr;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "patch structure")
@@ -36,7 +38,7 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
     where
         A: serde::de::MapAccess<'de>,
     {
-        let mut patches = vec![];
+        let mut patches: Vec<Attr> = vec![];
 
         while let Some(operation) = map.next_key::<Operation>()? {
             match operation {
@@ -53,12 +55,13 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
                         sub_processor.ctx.is_update = true;
                     }
 
-                    let Value::Sequence(seq, _def_id) = map.next_value_seed(sub_processor)?.val
+                    let Attr::Unit(Value::Sequence(seq, _def_id)) =
+                        map.next_value_seed(sub_processor)?
                     else {
                         return Err(<A::Error as serde::de::Error>::custom("Not a sequence"));
                     };
 
-                    patches.extend(seq.elements);
+                    patches.extend(seq.elements.into_iter().map(Attr::Unit));
                 }
                 Operation::Remove => {
                     let mut sub_processor = self.entity_sequence_processor.with_level(
@@ -71,22 +74,22 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
                     // Go to id-only mode
                     sub_processor.mode = ProcessorMode::Delete;
 
-                    let Value::Sequence(mut seq, _def_id) = map.next_value_seed(sub_processor)?.val
+                    let Attr::Unit(Value::Sequence(seq, _def_id)) =
+                        map.next_value_seed(sub_processor)?
                     else {
                         return Err(<A::Error as serde::de::Error>::custom("Not a sequence"));
                     };
 
-                    for attr in seq.elements.iter_mut() {
-                        attr.rel = Value::DeleteRelationship(DefId::unit());
-                    }
-                    patches.extend(seq.elements);
+                    patches.extend(seq.elements.into_iter().map(|value| {
+                        Attr::Tuple(Box::new(EndoTuple {
+                            origin: CardinalIdx(0),
+                            elements: smallvec![value, Value::DeleteRelationship(DefId::unit())],
+                        }))
+                    }));
                 }
             }
         }
 
-        Ok(Attribute {
-            rel: Value::unit(),
-            val: Value::Patch(patches, self.type_def_id),
-        })
+        Ok(Attr::Unit(Value::Patch(patches, self.type_def_id)))
     }
 }

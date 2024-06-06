@@ -3,7 +3,7 @@ use serde::{
     Deserializer,
 };
 
-use crate::value::Attribute;
+use crate::value::Attr;
 
 use super::processor::SerdeProcessor;
 
@@ -18,7 +18,7 @@ pub struct OptionProcessor<'on, 'p> {
 }
 
 impl<'on, 'p, 'de> DeserializeSeed<'de> for OptionProcessor<'on, 'p> {
-    type Value = Option<Attribute>;
+    type Value = Option<Attr>;
 
     fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
         deserializer.deserialize_option(self)
@@ -26,7 +26,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for OptionProcessor<'on, 'p> {
 }
 
 impl<'on, 'p, 'de> Visitor<'de> for OptionProcessor<'on, 'p> {
-    type Value = Option<Attribute>;
+    type Value = Option<Attr>;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "option")

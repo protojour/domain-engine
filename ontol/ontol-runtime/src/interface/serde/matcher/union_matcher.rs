@@ -129,7 +129,7 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
                     SerdeOperator::RelationList(seq_op) => {
                         return Ok(SequenceRangesMatcher::new(
                             slice::from_ref(&seq_op.range),
-                            SequenceKind::List,
+                            SequenceKind::AttrMatrixList,
                             seq_op.def.def_id,
                             self.ctx,
                         ))
@@ -137,7 +137,7 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
                     SerdeOperator::ConstructorSequence(seq_op) => {
                         return Ok(SequenceRangesMatcher::new(
                             &seq_op.ranges,
-                            SequenceKind::List,
+                            SequenceKind::ValueList,
                             seq_op.def.def_id,
                             self.ctx,
                         ))

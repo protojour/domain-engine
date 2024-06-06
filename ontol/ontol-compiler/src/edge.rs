@@ -2,10 +2,8 @@
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    ontology::{
-        domain::{CardinalIdx, EdgeCardinalProjection},
-        ontol::TextConstant,
-    },
+    ontology::{domain::EdgeCardinalProjection, ontol::TextConstant},
+    tuple::CardinalIdx,
     DefId, EdgeId, RelationshipId,
 };
 

@@ -12,8 +12,7 @@ use ontol_runtime::{
     },
     ontology::{domain::TypeInfo, Ontology},
     query::select::{Select, StructSelect},
-    sequence::Sequence,
-    value::{Attribute, Value},
+    value::{Attr, Attribute, Value},
     DefId, PackageId, RelationshipId,
 };
 use serde::de::DeserializeSeed;
@@ -206,9 +205,9 @@ impl<'t, 'on> From<ValueBuilder<'t, 'on>> for Attribute {
 }
 
 impl<'t, 'on> ValueBuilder<'t, 'on> {
-    pub fn relationship(self, name: &str, attribute: Attribute) -> Self {
+    pub fn relationship(self, name: &str, attr: Attr) -> Self {
         let rel_id = self.binding.find_property(name).expect("unknown property");
-        self.merge_attribute(rel_id, attribute)
+        self.merge_attribute(rel_id, attr)
     }
 
     pub fn to_unit_attr(self) -> Attribute {
@@ -220,7 +219,11 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
     }
 
     fn with_json_data(mut self, json: serde_json::Value) -> Self {
-        let value = serde_create(self.binding).to_value_nocheck(json).unwrap();
+        let value = serde_create(self.binding)
+            .to_attr_nocheck(json)
+            .unwrap()
+            .into_unit()
+            .unwrap();
         *self.value.type_def_id_mut() = value.type_def_id();
         match (&mut self.value, value) {
             (Value::Unit(_), value) => {
@@ -263,13 +266,13 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
         self.merge_attribute(rel_id, value.into())
     }
 
-    fn merge_attribute(mut self, rel_id: RelationshipId, attribute: Attribute) -> Self {
+    fn merge_attribute(mut self, rel_id: RelationshipId, attr: Attr) -> Self {
         match &mut self.value {
             Value::Struct(attrs, _) => {
-                attrs.insert(rel_id, attribute);
+                attrs.insert(rel_id, attr);
             }
             Value::Unit(def_id) => {
-                self.value = Value::new_struct([(rel_id, attribute)], *def_id);
+                self.value = Value::new_struct([(rel_id, attr)], *def_id);
             }
             other => {
                 panic!("Value data was not a map/unit, but {other:?}.")
@@ -279,12 +282,14 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
     }
 }
 
+/*
 pub trait ToSequence {
     fn to_sequence_attribute(self, ty: &TypeBinding) -> Attribute;
 }
 
-impl ToSequence for Vec<Attribute> {
+impl ToSequence for Vec<Attr> {
     fn to_sequence_attribute(self, ty: &TypeBinding) -> Attribute {
         Value::Sequence(Sequence::from_iter(self), ty.type_info.def_id).to_attr(Value::unit())
     }
 }
+*/

@@ -2042,6 +2042,7 @@ dependencies = [
  "ontol-runtime",
  "rand",
  "regex_generate",
+ "smallvec 2.0.0-alpha.6",
  "tracing",
  "uuid",
 ]
@@ -2114,6 +2115,7 @@ dependencies = [
  "bitflags 2.5.0",
  "chrono",
  "fnv",
+ "itertools 0.12.1",
  "num",
  "ontol-macros",
  "ordered-float 4.2.0",

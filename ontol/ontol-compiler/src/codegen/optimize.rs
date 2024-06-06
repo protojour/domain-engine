@@ -68,7 +68,7 @@ impl CloneToBumpOptimizer {
                         self.count_local_use(local.0 as usize);
                     }
                 }
-                Ir::Iter(_, _, block_index) => {
+                Ir::Iter(.., block_index) => {
                     sub_blocks.push((*block_index, BlockKind::Looping));
                 }
                 _ => {}

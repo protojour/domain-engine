@@ -1,8 +1,9 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    ontology::domain::{CardinalIdx, EdgeCardinalProjection},
+    ontology::domain::EdgeCardinalProjection,
     property::{PropertyCardinality, ValueCardinality},
+    tuple::CardinalIdx,
     var::Var,
     DefId, EdgeId, RelationshipId,
 };

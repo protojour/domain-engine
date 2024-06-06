@@ -9,7 +9,8 @@ use crate::{
     interface::serde::deserialize_raw::RawVisitor,
     ontology::{domain::TypeKind, ontol::ValueGenerator},
     phf::PhfIndexMap,
-    value::{Attribute, Value},
+    tuple::CardinalIdx,
+    value::{Attr, Value},
     vm::proc::{NParams, Procedure},
     DefId, RelationshipId,
 };
@@ -30,7 +31,7 @@ use super::{
 /// The output of the struct deserializer.
 /// Requires some post-processing before it can become an Attribute.
 pub struct Struct {
-    pub attributes: FnvHashMap<RelationshipId, Attribute>,
+    pub attributes: FnvHashMap<RelationshipId, Attr>,
     pub id: Option<Value>,
     pub rel_params: Value,
     observed_required_count: usize,
@@ -98,7 +99,7 @@ impl Default for Struct {
 }
 
 impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
-    type Value = Attribute;
+    type Value = Attr;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
@@ -128,10 +129,11 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
             let output = struct_deserializer.deserialize_struct(self.buffered_attrs, map)?;
 
             if output.id.is_some() {
-                return Ok(Attribute {
-                    rel: output.rel_params,
-                    val: output.id.unwrap(),
-                });
+                return Ok(Attr::unit_or_tuple(
+                    CardinalIdx(0),
+                    output.id.unwrap(),
+                    output.rel_params,
+                ));
             } else {
                 output
             }
@@ -140,14 +142,16 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
         };
 
         let boxed_attrs = Box::new(output.attributes);
-        Ok(Attribute {
-            rel: output.rel_params,
-            val: if self.ctx.is_update {
+
+        Ok(Attr::unit_or_tuple(
+            CardinalIdx(0),
+            if self.ctx.is_update {
                 Value::StructUpdate(boxed_attrs, type_def_id)
             } else {
                 Value::Struct(boxed_attrs, type_def_id)
             },
-        })
+            output.rel_params,
+        ))
     }
 }
 
@@ -303,22 +307,28 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         while let Some(prop_kind) = map.next_key_seed(property_visitor)? {
             match prop_kind {
                 PropKind::RelParams(addr) => {
-                    let Attribute { val, .. } = map.next_value_seed(
+                    let Attr::Unit(rel_params) = map.next_value_seed(
                         self.processor
                             .new_rel_params_child(addr)
                             .map_err(RecursionLimitError::to_de_error)?,
-                    )?;
+                    )?
+                    else {
+                        return Err(serde::de::Error::custom("invalid relation parameters"));
+                    };
 
-                    output.rel_params = val;
+                    output.rel_params = rel_params;
                 }
                 PropKind::SingletonId(addr) => {
-                    let Attribute { val, .. } = map.next_value_seed(
+                    let Attr::Unit(id) = map.next_value_seed(
                         self.processor
                             .new_child_with_context(addr, SubProcessorContext::entity_id())
                             .map_err(RecursionLimitError::to_de_error)?,
-                    )?;
+                    )?
+                    else {
+                        panic!("expected singleton attribute");
+                    };
 
-                    output.id = Some(val);
+                    output.id = Some(id);
                 }
                 PropKind::OverriddenId(relationship_id, addr) => {
                     let attr = map.next_value_seed(
@@ -509,7 +519,10 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         }
 
         let attributes = std::mem::take(&mut output.attributes);
-        output.id = Some(attributes.into_iter().next().unwrap().1.val);
+        output.id = match attributes.into_iter().next().unwrap().1 {
+            Attr::Unit(id) => Some(id),
+            _ => None,
+        };
         Ok(output)
     }
 

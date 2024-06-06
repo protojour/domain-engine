@@ -11,7 +11,7 @@ use crate::{
         },
         Ontology,
     },
-    value::{Attribute, Value},
+    value::{Attr, Value},
     DefId, RelationshipId,
 };
 
@@ -126,13 +126,7 @@ impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
                             let text_def_id = self.ontology.ontol_domain_meta().text;
                             let rel_id = RelationshipId(text_def_id);
 
-                            attrs.insert(
-                                rel_id,
-                                Attribute {
-                                    rel: Value::unit(),
-                                    val: Value::Text(str.into(), text_def_id),
-                                },
-                            );
+                            attrs.insert(rel_id, Attr::Unit(Value::Text(str.into(), text_def_id)));
                         }
                         TextPatternConstantPart::Literal(_) => {}
                     }

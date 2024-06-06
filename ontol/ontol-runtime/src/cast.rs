@@ -1,7 +1,7 @@
 use smartstring::alias::String;
 use uuid::Uuid;
 
-use crate::value::{Attribute, Serial, Value};
+use crate::value::{Serial, Value};
 
 /// Cast, or panic at runtime
 pub trait Cast<T> {
@@ -139,10 +139,10 @@ impl Cast<Serial> for Value {
     }
 }
 
-impl Cast<Vec<Attribute>> for Value {
-    type Ref = [Attribute];
+impl Cast<Vec<Value>> for Value {
+    type Ref = [Value];
 
-    fn cast_into(self) -> Vec<Attribute> {
+    fn cast_into(self) -> Vec<Value> {
         match self {
             Value::Sequence(seq, _) => seq.into_elements().into_iter().collect(),
             _ => panic!("not an vector"),

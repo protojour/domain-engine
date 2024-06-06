@@ -1,10 +1,11 @@
 use ontol_macros::test;
 use ontol_runtime::{
     ontology::{
-        domain::{CardinalIdx, EdgeCardinalProjection},
+        domain::EdgeCardinalProjection,
         map::{PropertyFlow, PropertyFlowData},
     },
     property::{PropertyCardinality, ValueCardinality},
+    tuple::CardinalIdx,
     DefId, EdgeId, RelationshipId,
 };
 use ontol_test_utils::expect_eq;

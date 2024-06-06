@@ -27,6 +27,8 @@ pub enum VmError {
     InvalidType(Local),
     #[error("attribute not present")]
     AttributeNotPresent,
+    #[error("invalid attribute cardinality at {0:?}")]
+    InvalidAttributeCardinality(Local),
     #[error("assert failed")]
     AssertionFailed,
     #[error("overflow")]

@@ -8,7 +8,7 @@ use tracing::{debug, error};
 use crate::{
     interface::serde::processor::ProcessorMode,
     ontology::Ontology,
-    value::{Attribute, FormatValueAsText, Value},
+    value::{Attr, FormatValueAsText, Value},
     DefId, RelationshipId,
 };
 
@@ -77,10 +77,7 @@ impl TextPattern {
 
                         attrs.insert(
                             RelationshipId(text_def_id),
-                            Attribute {
-                                rel: Value::unit(),
-                                val: Value::Text(text.into(), text_def_id),
-                            },
+                            Attr::Unit(Value::Text(text.into(), text_def_id)),
                         );
                     }
                     TextPatternConstantPart::Literal(_) => {}
@@ -149,8 +146,8 @@ impl<'d, 'o> Display for FormatPattern<'d, 'o> {
                         error!("Attribute {rel_id} missing when formatting capturing text pattern");
                         return Err(std::fmt::Error);
                     };
-                    match &attribute.val {
-                        Value::Text(text, _) => {
+                    match attribute {
+                        Attr::Unit(Value::Text(text, _)) => {
                             write!(f, "{text}")?;
                         }
                         _ => panic!(),
@@ -168,11 +165,15 @@ impl<'d, 'o> Display for FormatPattern<'d, 'o> {
                         error!("Attribute {rel_id} missing when formatting capturing text pattern");
                         return Err(std::fmt::Error);
                     };
+                    let Attr::Unit(value) = attribute else {
+                        error!("Not a unit");
+                        return Err(std::fmt::Error);
+                    };
                     write!(
                         f,
                         "{}",
                         FormatValueAsText {
-                            value: &attribute.val,
+                            value,
                             type_def_id: *type_def_id,
                             ontology: self.ontology
                         }

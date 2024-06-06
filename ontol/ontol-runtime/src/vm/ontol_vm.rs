@@ -3,9 +3,10 @@ use std::array;
 use bit_vec::BitVec;
 use fnv::FnvHashMap;
 use regex_automata::{util::captures::Captures, Input};
+use smallvec::smallvec;
 use smartstring::alias::String;
 use thin_vec::ThinVec;
-use tracing::{trace, Level};
+use tracing::{error, trace, Level};
 
 use crate::{
     cast::Cast,
@@ -13,7 +14,8 @@ use crate::{
     property::ValueCardinality,
     query::condition::{Clause, ClausePair, CondTerm},
     sequence::Sequence,
-    value::{Attribute, Value, ValueDebug},
+    tuple::{CardinalIdx, EndoTuple},
+    value::{Attr, Value, ValueDebug},
     var::Var,
     vm::{
         abstract_vm::{AbstractVm, Processor, VmDebug},
@@ -109,38 +111,40 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn iter_next(&mut self, seq: Local, index: Local) -> VmResult<bool> {
+    fn iter_next(&mut self, start_column: Local, n: u8, index: Local) -> VmResult<bool> {
         let i = *self.int_local_mut(index)? as usize;
 
-        match self.local_mut(seq) {
-            Value::Sequence(seq, _) => {
-                if seq.elements.len() <= i {
-                    Ok(false)
-                } else {
-                    // TODO(optimize): Figure out when clone is needed!
-                    let attr = seq.elements[i].clone();
+        let mut result = true;
 
-                    self.stack.push(attr.rel);
-                    self.stack.push(attr.val);
+        for n in 0..(n as u16) {
+            let column_local = Local(start_column.0 + n);
 
-                    *self.int_local_mut(index)? += 1;
+            match self.local_mut(column_local) {
+                Value::Sequence(seq, _) => {
+                    if seq.elements.len() <= i {
+                        result = false;
+                    } else {
+                        // TODO(optimize): Figure out when clone is needed!
+                        let value = seq.elements[i].clone();
 
-                    Ok(true)
+                        self.stack.push(value);
+                    }
                 }
-            }
-            Value::Void(_) => {
-                // Yields one #void item, then stops
-                if i == 0 {
-                    self.push_void();
-                    self.push_void();
-                    *self.int_local_mut(index)? += 1;
-                    Ok(true)
-                } else {
-                    Ok(false)
+                Value::Void(_) => {
+                    // Yields one #void tuple, then stops
+                    if i == 0 {
+                        self.push_void();
+                    } else {
+                        result = false;
+                    }
                 }
+                _ => return Err(VmError::InvalidType(column_local)),
             }
-            _ => Err(VmError::InvalidType(seq)),
         }
+
+        *self.int_local_mut(index)? += 1;
+
+        Ok(result)
     }
 
     #[inline(always)]
@@ -148,6 +152,7 @@ impl<'o> Processor for OntolProcessor<'o> {
         &mut self,
         source: Local,
         key: RelationshipId,
+        len: u8,
         flags: super::proc::GetAttrFlags,
     ) -> VmResult<()> {
         let _struct = self.struct_local_mut(source)?;
@@ -158,19 +163,30 @@ impl<'o> Processor for OntolProcessor<'o> {
         };
         match attr {
             Some(attr) => {
-                if flags.contains(GetAttrFlags::REL) {
-                    self.stack.push(attr.rel);
+                match attr {
+                    Attr::Unit(value) if len == 1 => {
+                        self.stack.push(value);
+                    }
+                    Attr::Tuple(tuple) if tuple.elements.len() == len as usize => {
+                        for elem in tuple.elements.into_iter() {
+                            self.stack.push(elem);
+                        }
+                    }
+                    Attr::Matrix(mat) if mat.elements.len() == len as usize => {
+                        for elem in mat.elements.into_iter() {
+                            self.stack.push(Value::Sequence(elem, DefId::unit()));
+                        }
+                    }
+                    attr => {
+                        error!("attr was: {}, flags was {flags:?}", ValueDebug(&attr));
+                        return Err(VmError::InvalidType(source));
+                    }
                 }
-                if flags.contains(GetAttrFlags::VAL) {
-                    self.stack.push(attr.val);
-                }
+
                 Ok(())
             }
             None => {
-                if flags.contains(GetAttrFlags::REL) {
-                    self.push_void();
-                }
-                if flags.contains(GetAttrFlags::VAL) {
+                for _ in 0..len {
                     self.push_void();
                 }
                 Ok(())
@@ -184,7 +200,7 @@ impl<'o> Processor for OntolProcessor<'o> {
         if !matches!(value, Value::Unit(_) | Value::Void(_)) {
             match &mut self.stack[target.0 as usize] {
                 Value::Struct(attrs, _) | Value::StructUpdate(attrs, _) => {
-                    attrs.insert(key, value.to_unit_attr());
+                    attrs.insert(key, Attr::Unit(value));
                 }
                 Value::Filter(filter, _) => {
                     let meta = self.ontology.ontol_domain_meta();
@@ -212,7 +228,13 @@ impl<'o> Processor for OntolProcessor<'o> {
         let [rel, val]: [Value; 2] = self.pop_n();
         if !matches!(val, Value::Unit(_) | Value::Void(_)) {
             let map = self.struct_local_mut(target)?;
-            map.insert(key, Attribute { rel, val });
+            map.insert(
+                key,
+                Attr::Tuple(Box::new(EndoTuple {
+                    origin: CardinalIdx(0),
+                    elements: smallvec![val, rel],
+                })),
+            );
         }
         Ok(())
     }
@@ -242,10 +264,16 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn append_attr2(&mut self, seq: Local) -> VmResult<()> {
-        let [rel, val]: [Value; 2] = self.pop_n();
-        let seq = self.sequence_local_mut(seq)?;
-        seq.elements.push(Attribute { rel, val });
+    fn append_attr2(&mut self, seq: Local, len: u8) -> VmResult<()> {
+        for i in (0..len as u16).rev() {
+            let value = self.pop_one();
+
+            let seq_local = Local(seq.0 + i);
+            let seq = self.sequence_local_mut(seq_local)?;
+
+            seq.elements.push(value);
+        }
+
         Ok(())
     }
 
@@ -276,7 +304,10 @@ impl<'o> Processor for OntolProcessor<'o> {
     fn move_seq_vals_to_stack(&mut self, source: Local) -> VmResult<()> {
         let sequence = std::mem::take(&mut self.sequence_local_mut(source)?.elements);
         *self.local_mut(source) = Value::unit();
-        self.stack.extend(sequence.into_iter().map(|attr| attr.val));
+        for value in sequence.into_iter() {
+            self.stack.push(value);
+        }
+
         Ok(())
     }
 
@@ -339,7 +370,7 @@ impl<'o> Processor for OntolProcessor<'o> {
 
         let text_pattern = self.ontology.get_text_pattern(pattern_id).unwrap();
 
-        let mut attrs: ThinVec<Attribute> = ThinVec::new();
+        let mut values: ThinVec<Value> = ThinVec::new();
         let text_def_id = self.ontology.ontol_domain_meta().text;
 
         for captures in text_pattern
@@ -349,13 +380,10 @@ impl<'o> Processor for OntolProcessor<'o> {
         {
             let value_attributes =
                 extract_regex_captures(haystack, &captures, group_filter, text_def_id);
-            attrs.push(Attribute::from(Value::Sequence(
-                value_attributes.into(),
-                text_def_id,
-            )));
+            values.push(Value::Sequence(value_attributes.into(), text_def_id));
         }
 
-        self.stack.push(Value::Sequence(attrs.into(), text_def_id));
+        self.stack.push(Value::Sequence(values.into(), text_def_id));
         Ok(())
     }
 
@@ -512,7 +540,7 @@ impl<'o> OntolProcessor<'o> {
     fn struct_local_mut(
         &mut self,
         local: Local,
-    ) -> VmResult<&mut FnvHashMap<RelationshipId, Attribute>> {
+    ) -> VmResult<&mut FnvHashMap<RelationshipId, Attr>> {
         match self.local_mut(local) {
             Value::Struct(attrs, _) | Value::StructUpdate(attrs, _) => Ok(attrs.as_mut()),
             _ => Err(VmError::InvalidType(local)),
@@ -520,7 +548,7 @@ impl<'o> OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn sequence_local_mut(&mut self, local: Local) -> VmResult<&mut Sequence> {
+    fn sequence_local_mut(&mut self, local: Local) -> VmResult<&mut Sequence<Value>> {
         match self.local_mut(local) {
             Value::Sequence(seq, _) => Ok(seq),
             _ => Err(VmError::InvalidType(local)),
@@ -580,7 +608,7 @@ fn extract_regex_captures(
     captures: &Captures,
     group_filter: &BitVec,
     text_def_id: DefId,
-) -> ThinVec<Attribute> {
+) -> ThinVec<Value> {
     group_filter
         .iter()
         .enumerate()
@@ -590,7 +618,7 @@ fn extract_regex_captures(
                 Some(span) => Value::Text(haystack[span.start..span.end].into(), text_def_id),
                 None => Value::Void(DefId::unit()),
             };
-            Attribute::from(value)
+            value
         })
         .collect()
 }
@@ -620,9 +648,9 @@ mod tests {
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(42)),
-                OpCode::GetAttr(Local(0), "R:0:1".parse().unwrap(), GetAttrFlags::take2()),
+                OpCode::GetAttr(Local(0), "R:0:1".parse().unwrap(), 1, GetAttrFlags::TAKE),
                 OpCode::PutAttr1(Local(1), "R:0:3".parse().unwrap()),
-                OpCode::GetAttr(Local(0), "R:0:2".parse().unwrap(), GetAttrFlags::take2()),
+                OpCode::GetAttr(Local(0), "R:0:2".parse().unwrap(), 1, GetAttrFlags::TAKE),
                 OpCode::PutAttr1(Local(1), "R:0:4".parse().unwrap()),
                 OpCode::PopUntil(Local(1)),
                 OpCode::Return,
@@ -681,14 +709,14 @@ mod tests {
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(0)),
                 // 2, 3:
-                OpCode::GetAttr(Local(0), "R:0:1".parse().unwrap(), GetAttrFlags::take2()),
+                OpCode::GetAttr(Local(0), "R:0:1".parse().unwrap(), 1, GetAttrFlags::TAKE),
                 OpCode::Call(double),
                 OpCode::PutAttr1(Local(1), "R:0:4".parse().unwrap()),
                 // 3, 4:
-                OpCode::GetAttr(Local(0), "R:0:2".parse().unwrap(), GetAttrFlags::take2()),
+                OpCode::GetAttr(Local(0), "R:0:2".parse().unwrap(), 1, GetAttrFlags::TAKE),
                 // 5, 6:
-                OpCode::GetAttr(Local(0), "R:0:3".parse().unwrap(), GetAttrFlags::take2()),
-                OpCode::Clone(Local(4)),
+                OpCode::GetAttr(Local(0), "R:0:3".parse().unwrap(), 1, GetAttrFlags::TAKE),
+                OpCode::Clone(Local(2)),
                 // pop(6, 7):
                 OpCode::Call(add_then_double),
                 OpCode::PutAttr1(Local(1), "R:0:5".parse().unwrap()),
@@ -713,10 +741,18 @@ mod tests {
         let Value::Struct(mut attrs, _) = output else {
             panic!();
         };
-        let Value::I64(a, _) = attrs.remove(&"R:0:4".parse().unwrap()).unwrap().val else {
+        let Value::I64(a, _) = attrs
+            .remove(&"R:0:4".parse().unwrap())
+            .unwrap()
+            .unwrap_unit()
+        else {
             panic!();
         };
-        let Value::I64(b, _) = attrs.remove(&"R:0:5".parse().unwrap()).unwrap().val else {
+        let Value::I64(b, _) = attrs
+            .remove(&"R:0:5".parse().unwrap())
+            .unwrap()
+            .unwrap_unit()
+        else {
             panic!();
         };
         assert_eq!(666, a);
@@ -735,16 +771,14 @@ mod tests {
                 // index counter
                 OpCode::I64(0, def_id(0)),
                 // Offset(2): for each in Local(0)
-                OpCode::Iter(Local(0), Local(2), AddressOffset(5)),
+                OpCode::Iter(Local(0), 1, Local(2), AddressOffset(5)),
                 OpCode::PopUntil(Local(1)),
                 OpCode::Return,
                 // Offset(4): map item
                 OpCode::I64(2, def_id(0)),
                 OpCode::CallBuiltin(BuiltinProc::MulI64, def_id(0)),
-                // add rel params
-                OpCode::CallBuiltin(BuiltinProc::NewUnit, def_id(0)),
-                // pop (rel_params, value), append to sequence
-                OpCode::AppendAttr2(Local(1)),
+                // append value to matrix
+                OpCode::AppendAttr(Local(1), 1),
                 OpCode::Goto(AddressOffset(2)),
             ],
         );
@@ -764,7 +798,7 @@ mod tests {
         let output = seq
             .elements
             .into_iter()
-            .map(|attr| attr.val.cast_into())
+            .map(|value| value.cast_into())
             .collect::<Vec<i64>>();
 
         assert_eq!(vec![2, 4], output);
@@ -780,27 +814,27 @@ mod tests {
         let proc = lib.append_procedure(
             NParams(1),
             [
-                // a -> Local(2):
-                OpCode::GetAttr(Local(0), prop_a, GetAttrFlags::take2()),
-                // [b] -> Local(4):
-                OpCode::GetAttr(Local(0), prop_b, GetAttrFlags::take2()),
-                // counter -> Local(5):
+                // a -> Local(1):
+                OpCode::GetAttr(Local(0), prop_a, 1, GetAttrFlags::TAKE),
+                // [b] -> Local(2):
+                OpCode::GetAttr(Local(0), prop_b, 1, GetAttrFlags::TAKE),
+                // counter -> Local(3):
                 OpCode::I64(0, def_id(0)),
-                // output -> Local(6):
+                // output -> Local(4):
                 OpCode::CallBuiltin(BuiltinProc::NewSeq, def_id(0)),
-                OpCode::Iter(Local(4), Local(5), AddressOffset(7)),
-                OpCode::PopUntil(Local(6)),
+                OpCode::Iter(Local(2), 1, Local(3), AddressOffset(7)),
+                OpCode::PopUntil(Local(4)),
                 OpCode::Return,
                 // Loop
-                // New object -> Local(9)
+                // New object -> Local(6)
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(0)),
-                OpCode::Clone(Local(2)),
-                OpCode::PutAttr1(Local(9), prop_a),
-                OpCode::Bump(Local(8)),
-                OpCode::PutAttr1(Local(9), prop_b),
-                OpCode::Bump(Local(7)),
-                OpCode::AppendAttr2(Local(6)),
-                OpCode::PopUntil(Local(6)),
+                OpCode::Clone(Local(1)),
+                OpCode::PutAttr1(Local(6), prop_a),
+                OpCode::Bump(Local(5)),
+                OpCode::PutAttr1(Local(6), prop_b),
+                OpCode::Bump(Local(6)),
+                OpCode::AppendAttr(Local(4), 1),
+                OpCode::PopUntil(Local(4)),
                 OpCode::Goto(AddressOffset(4)),
             ],
         );
@@ -841,14 +875,14 @@ mod tests {
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(7)),
-                OpCode::GetAttr(Local(0), prop, GetAttrFlags::take2()),
+                OpCode::GetAttr(Local(0), prop, 1, GetAttrFlags::TAKE),
                 OpCode::Cond(Predicate::IsNotVoid(Local(2)), AddressOffset(5)),
                 // AddressOffset(3):
                 OpCode::PopUntil(Local(1)),
                 OpCode::Return,
                 // AddressOffset(4):
                 OpCode::Cond(
-                    Predicate::MatchesDiscriminant(Local(3), inner_def_id),
+                    Predicate::MatchesDiscriminant(Local(2), inner_def_id),
                     AddressOffset(7),
                 ),
                 OpCode::Goto(AddressOffset(3)),

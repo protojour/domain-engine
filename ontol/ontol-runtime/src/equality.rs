@@ -5,7 +5,9 @@ use fnv::FnvHashMap;
 use ordered_float::NotNan;
 
 use crate::{
-    value::{Attribute, Value},
+    sequence::Sequence,
+    tuple::EndoTupleElements,
+    value::{Attr, Attribute, Value},
     RelationshipId,
 };
 
@@ -42,6 +44,74 @@ impl OntolHash for Attribute {
     fn ontol_hash(&self, h: &mut ahash::AHasher, builder: &ahash::RandomState) {
         self.rel.ontol_hash(h, builder);
         self.val.ontol_hash(h, builder);
+    }
+}
+
+impl OntolEquals for Attr {
+    fn ontol_equals(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Attr::Unit(a), Attr::Unit(b)) => a.ontol_equals(b),
+            (Attr::Tuple(a), Attr::Tuple(b)) => a.elements.ontol_equals(&b.elements),
+            (Attr::Matrix(a), Attr::Matrix(b)) => a.elements.ontol_equals(&b.elements),
+            _ => false,
+        }
+    }
+}
+
+impl OntolHash for Attr {
+    fn ontol_hash(&self, h: &mut ahash::AHasher, builder: &ahash::RandomState) {
+        core::mem::discriminant(self).hash(h);
+
+        match self {
+            Attr::Unit(b) => b.ontol_hash(h, builder),
+            Attr::Tuple(t) => t.elements.ontol_hash(h, builder),
+            Attr::Matrix(m) => m.elements.ontol_hash(h, builder),
+        }
+    }
+}
+
+impl<T: OntolEquals> OntolEquals for EndoTupleElements<T> {
+    fn ontol_equals(&self, other: &Self) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+
+        self.iter()
+            .zip(other.iter())
+            .all(|(a, b)| a.ontol_equals(b))
+    }
+}
+
+impl<T: OntolHash> OntolHash for EndoTupleElements<T> {
+    fn ontol_hash(&self, h: &mut ahash::AHasher, builder: &ahash::RandomState) {
+        self.len().hash(h);
+
+        for element in self {
+            element.ontol_hash(h, builder);
+        }
+    }
+}
+
+impl<T: OntolEquals> OntolEquals for Sequence<T> {
+    fn ontol_equals(&self, other: &Self) -> bool {
+        self.elements().len() == other.elements().len()
+            && self.sub() == other.sub()
+            && self
+                .elements()
+                .iter()
+                .zip(other.elements().iter())
+                .all(|(a, b)| a.ontol_equals(b))
+    }
+}
+
+impl<T: OntolHash> OntolHash for Sequence<T> {
+    fn ontol_hash(&self, h: &mut ahash::AHasher, builder: &ahash::RandomState) {
+        self.elements().len().hash(h);
+        self.sub().hash(h);
+
+        for attr in self.elements() {
+            attr.ontol_hash(h, builder);
+        }
     }
 }
 
@@ -139,12 +209,7 @@ impl OntolHash for Value {
             }
             Value::Sequence(v, def) => {
                 def.hash(h);
-                v.elements().len().hash(h);
-                v.sub().hash(h);
-
-                for attr in v.elements() {
-                    attr.ontol_hash(h, builder);
-                }
+                v.ontol_hash(h, builder);
             }
             Value::Patch(v, def) => {
                 def.hash(h);
@@ -161,7 +226,7 @@ impl OntolHash for Value {
     }
 }
 
-type PropertyMap = FnvHashMap<RelationshipId, Attribute<Value>>;
+type PropertyMap = FnvHashMap<RelationshipId, Attr>;
 
 fn property_map_equals(a: &PropertyMap, b: &PropertyMap) -> bool {
     if a.len() != b.len() {

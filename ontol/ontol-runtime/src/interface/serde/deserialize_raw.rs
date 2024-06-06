@@ -5,12 +5,7 @@ use serde::{
     Deserializer,
 };
 
-use crate::{
-    ontology::Ontology,
-    sequence::Sequence,
-    value::{Attribute, Value},
-    DefId,
-};
+use crate::{ontology::Ontology, sequence::Sequence, value::Value, DefId};
 
 use super::processor::{ProcessorLevel, RecursionLimitError};
 
@@ -99,7 +94,7 @@ impl<'o, 'de> Visitor<'de> for RawVisitor<'o> {
         while let Some(value) =
             seq_access.next_element_seed(self.child().map_err(RecursionLimitError::to_de_error)?)?
         {
-            sequence.push(Attribute::from(value));
+            sequence.push(value);
         }
 
         Ok(Value::Sequence(sequence, DefId::unit()))

@@ -26,8 +26,9 @@ pub struct SequenceRangesMatcher<'on> {
 
 #[derive(Clone, Copy)]
 pub enum SequenceKind {
-    IndexSet,
-    List,
+    AttrMatrixIndexSet,
+    AttrMatrixList,
+    ValueList,
 }
 
 impl<'on> ValueMatcher for SequenceRangesMatcher<'on> {

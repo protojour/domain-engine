@@ -82,18 +82,19 @@ pub enum OpCode {
     CallExtern(DefId, DefId),
     /// Iterate all items in #0, #1 is the counter.
     /// Pushes two items on the stack
-    Iter(Local, Local, AddressOffset),
+    Iter(Local, u8, Local, AddressOffset),
     /// Get an attribute from a struct.
     /// See GetAttrFlags for different semantic variations.
-    GetAttr(Local, RelationshipId, GetAttrFlags),
+    GetAttr(Local, RelationshipId, u8, GetAttrFlags),
     /// Pop 1 value from stack, and move it into the specified local struct. Sets the attribute parameter to unit.
     PutAttr1(Local, RelationshipId),
     /// Pop 2 stack values, rel_params (top) then value, and move it into the specified local struct.
     PutAttr2(Local, RelationshipId),
     /// Move rest attrs from the second local into the first local.
     MoveRestAttrs(Local, Local),
-    /// Pop 2 stack values, rel_params (top) then value, and append resulting attribute to sequence
-    AppendAttr2(Local),
+    /// Pop N stack values, rel_params (top) then value, and append resulting attribute to matrix.
+    /// Last stack value will be last in the tuple
+    AppendAttr(Local, u8),
     /// Pop 1 stack value, which must be Data::String, and append to local which must also be a string
     AppendString(Local),
     /// Push a constant i64 to the stack.
@@ -181,20 +182,10 @@ bitflags::bitflags! {
     pub struct GetAttrFlags: u8 {
         /// If flag is set, take the attribute instead of cloning it
         const TAKE  = 0b00000001;
-        /// Push attr rel param on top of stack, if present
-        const REL   = 0b00000010;
-        /// Push attr val on top of stack, if present
-        const VAL   = 0b00000100;
     }
 }
 
 impl_ontol_debug!(GetAttrFlags);
-
-impl GetAttrFlags {
-    pub fn take2() -> Self {
-        Self::TAKE | Self::REL | Self::VAL
-    }
-}
 
 pub enum Yield {
     Match(Var, ValueCardinality, Filter),

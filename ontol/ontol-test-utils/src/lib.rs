@@ -70,12 +70,15 @@ macro_rules! assert_json_io_matches {
     };
     ($serde_helper:expr, $input:tt == $expected_output:tt) => {
         let input = serde_json::json!($input);
-        let value = match $serde_helper.to_value_nocheck(input.clone()) {
-            Ok(value) => value,
+        let attr = match $serde_helper.to_attr_nocheck(input.clone()) {
+            Ok(attr) => attr,
             Err(err) => panic!("deserialize failed: {err}"),
         };
-        tracing::debug!("deserialized value: {value:#?}");
-        let output = $serde_helper.as_json(&value);
+        tracing::debug!(
+            "deserialized value: {}",
+            ontol_runtime::value::ValueDebug(&attr)
+        );
+        let output = $serde_helper.as_json(attr.as_ref());
 
         pretty_assertions::assert_eq!(serde_json::json!($expected_output), output);
     };

@@ -4,6 +4,7 @@ use serde::{
     de::{DeserializeSeed, Error, MapAccess, SeqAccess, Unexpected, Visitor},
     Deserializer,
 };
+use smallvec::{smallvec, SmallVec};
 use tracing::{trace, warn};
 
 use crate::{
@@ -12,8 +13,10 @@ use crate::{
         deserialize_struct::{PossibleProps, StructDeserializer, StructVisitor},
         matcher::map_matchers::MapMatchMode,
     },
-    sequence::{IndexSetBuilder, ListBuilder, SequenceBuilder},
-    value::{Attribute, Serial, Value},
+    sequence::{IndexSetBuilder, ListBuilder, SequenceBuilder, WithCapacity},
+    tuple::CardinalIdx,
+    value::{Attr, AttrMatrix, Serial, Value},
+    DefId,
 };
 
 use super::{
@@ -75,7 +78,7 @@ impl<'on, 'p, M: ValueMatcher + Sized> IntoVisitor<'on, 'p> for M {}
 /// This is also the reason that only map types may be related through parameterized relationships.
 /// Other types only support unparameterized relationships.
 impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
-    type Value = Attribute;
+    type Value = Attr;
 
     fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
         match (self.value_operator, self.scalar_format()) {
@@ -196,7 +199,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 _ => deserializer.deserialize_seq(
                     SequenceRangesMatcher::new(
                         slice::from_ref(&seq_op.range),
-                        SequenceKind::List,
+                        SequenceKind::AttrMatrixList,
                         seq_op.def.def_id,
                         self.ctx,
                     )
@@ -217,7 +220,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 _ => deserializer.deserialize_seq(
                     SequenceRangesMatcher::new(
                         slice::from_ref(&seq_op.range),
-                        SequenceKind::IndexSet,
+                        SequenceKind::AttrMatrixIndexSet,
                         seq_op.def.def_id,
                         self.ctx,
                     )
@@ -227,7 +230,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
             (SerdeOperator::ConstructorSequence(seq_op), _) => deserializer.deserialize_seq(
                 SequenceRangesMatcher::new(
                     &seq_op.ranges,
-                    SequenceKind::List,
+                    SequenceKind::ValueList,
                     seq_op.def.def_id,
                     self.ctx,
                 )
@@ -237,7 +240,12 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 let mut typed_attribute =
                     self.narrow(value_op.inner_addr).deserialize(deserializer)?;
 
-                *typed_attribute.val.type_def_id_mut() = value_op.def.def_id;
+                match &mut typed_attribute {
+                    Attr::Unit(value) => {
+                        *value.type_def_id_mut() = value_op.def.def_id;
+                    }
+                    _ => panic!("can't change type"),
+                }
 
                 Ok(typed_attribute)
             }
@@ -279,7 +287,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
 }
 
 impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> {
-    type Value = Attribute;
+    type Value = Attr;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         self.matcher.expecting(f)
@@ -350,20 +358,31 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
             .map_err(|_| Error::invalid_type(Unexpected::Seq, &self))?;
 
         let cap = seq.size_hint().unwrap_or(0);
-        let sequence = match sequence_matcher.kind {
-            SequenceKind::IndexSet => self.deserialize_sequence(
+        let attr = match sequence_matcher.kind {
+            SequenceKind::AttrMatrixIndexSet => self.deserialize_sequence(
                 seq,
                 &mut sequence_matcher,
-                IndexSetBuilder::<Attribute>::with_capacity(cap),
+                MakeMatrix::<IndexSetBuilder<Value>>::new(CardinalIdx(0), cap),
             )?,
-            SequenceKind::List => self.deserialize_sequence(
+            SequenceKind::AttrMatrixList => self.deserialize_sequence(
                 seq,
                 &mut sequence_matcher,
-                ListBuilder::<Attribute>::with_capacity(cap),
+                MakeMatrix::<ListBuilder<Value>>::new(CardinalIdx(0), cap),
             )?,
+            SequenceKind::ValueList => {
+                let type_def_id = sequence_matcher.type_def_id;
+                self.deserialize_sequence(
+                    seq,
+                    &mut sequence_matcher,
+                    MakeValueList {
+                        builder: ListBuilder::with_capacity(cap),
+                        def_id: type_def_id,
+                    },
+                )?
+            }
         };
 
-        Ok(sequence.into())
+        Ok(attr)
     }
 
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
@@ -446,22 +465,19 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                     .id
                     .ok_or_else(|| Error::custom("missing identifier attribute".to_string()))?;
 
-                Ok(Attribute {
-                    rel: output.rel_params,
-                    val: id,
-                })
+                Ok(Attr::unit_or_tuple(CardinalIdx(0), id, output.rel_params))
             }
         }
     }
 }
 
 impl<'on, 'p, 'de, M: ValueMatcher> MatcherVisitor<'on, 'p, M> {
-    fn deserialize_sequence<A: SeqAccess<'de>>(
+    fn deserialize_sequence<A: SeqAccess<'de>, MK: MakeVectorAttr>(
         &self,
         mut seq: A,
         sequence_matcher: &mut SequenceRangesMatcher<'on>,
-        mut sequence_builder: impl SequenceBuilder<Attribute>,
-    ) -> Result<Value, A::Error> {
+        mut make_attr: MK,
+    ) -> Result<Attr, A::Error> {
         loop {
             let processor = match sequence_matcher.match_next_seq_element() {
                 Some(element_match) => self
@@ -470,38 +486,110 @@ impl<'on, 'p, 'de, M: ValueMatcher> MatcherVisitor<'on, 'p, M> {
                 None => {
                     // note: if there are more elements to deserialize,
                     // serde will automatically generate a 'trailing characters' error after returning:
-                    return Ok(Value::Sequence(
-                        sequence_builder.build(),
-                        sequence_matcher.type_def_id,
-                    ));
+                    return Ok(make_attr.into_attr());
                 }
             };
 
             match seq.next_element_seed(processor)? {
                 Some(attribute) => {
-                    sequence_builder
+                    make_attr
                         .try_push(attribute)
-                        .map_err(|duplicate_error| {
-                            Error::custom(format!(
-                                "invalid index-set: attribute[{}] equals attribute[{}]",
-                                duplicate_error.index, duplicate_error.equals_index
-                            ))
-                        })?
+                        .map_err(|msg| serde::de::Error::custom(msg))?;
                 }
                 None => {
                     return if sequence_matcher.match_seq_end().is_ok() {
-                        Ok(Value::Sequence(
-                            sequence_builder.build(),
-                            sequence_matcher.type_def_id,
-                        ))
+                        Ok(make_attr.into_attr())
                     } else {
-                        Err(Error::invalid_length(
-                            sequence_builder.build().elements.len(),
-                            self,
-                        ))
+                        Err(Error::invalid_length(make_attr.len(), self))
                     };
                 }
             }
         }
+    }
+}
+
+trait MakeVectorAttr {
+    fn try_push(&mut self, attr: Attr) -> Result<(), String>;
+    fn len(&self) -> usize;
+    fn into_attr(self) -> Attr;
+}
+
+struct MakeMatrix<B> {
+    origin: CardinalIdx,
+    capacity: usize,
+    builder_tuple: SmallVec<B, 1>,
+}
+
+impl<B: WithCapacity> MakeMatrix<B> {
+    fn new(origin: CardinalIdx, cap: usize) -> Self {
+        Self {
+            origin,
+            capacity: cap,
+            builder_tuple: smallvec![B::with_capacity(cap)],
+        }
+    }
+}
+
+impl<B> MakeVectorAttr for MakeMatrix<B>
+where
+    B: SequenceBuilder<Value> + WithCapacity,
+{
+    fn try_push(&mut self, attr: Attr) -> Result<(), String> {
+        let tuple = attr.into_tuple().expect("matrix in matrix");
+
+        self.builder_tuple.resize_with(tuple.1.len(), || {
+            <B as WithCapacity>::with_capacity(self.capacity)
+        });
+
+        for (builder, element) in self.builder_tuple.iter_mut().zip(tuple.1.into_iter()) {
+            builder
+                .try_push(element)
+                .map_err(|dupl| format!("{dupl}"))?;
+        }
+
+        Ok(())
+    }
+
+    fn len(&self) -> usize {
+        if self.builder_tuple.is_empty() {
+            0
+        } else {
+            self.builder_tuple[0].cur_len()
+        }
+    }
+
+    fn into_attr(self) -> Attr {
+        Attr::Matrix(AttrMatrix {
+            origin: self.origin,
+            elements: self.builder_tuple.into_iter().map(|t| t.build()).collect(),
+        })
+    }
+}
+
+struct MakeValueList<B> {
+    builder: B,
+    def_id: DefId,
+}
+
+impl<B> MakeVectorAttr for MakeValueList<B>
+where
+    B: SequenceBuilder<Value>,
+{
+    fn try_push(&mut self, attr: Attr) -> Result<(), String> {
+        let value = attr
+            .into_unit()
+            .ok_or_else(|| "expected unit value".to_string())?;
+        self.builder
+            .try_push(value)
+            .map_err(|dupl| format!("{dupl}"))?;
+        Ok(())
+    }
+
+    fn len(&self) -> usize {
+        self.builder.cur_len()
+    }
+
+    fn into_attr(self) -> Attr {
+        Attr::Unit(Value::Sequence(self.builder.build(), self.def_id))
     }
 }
