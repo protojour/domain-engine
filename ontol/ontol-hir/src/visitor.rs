@@ -227,7 +227,10 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
 
     fn traverse_prop_variant(&mut self, variant: &PropVariant, arena: &'h Arena<'a, L>) {
         match variant {
-            PropVariant::Value(attr) => {
+            PropVariant::Unit(node) => {
+                self.visit_node(0, arena.node_ref(*node));
+            }
+            PropVariant::Tuple(attr) => {
                 self.visit_node(0, arena.node_ref(attr.rel));
                 self.visit_node(1, arena.node_ref(attr.val));
             }

@@ -305,19 +305,24 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
 impl<'h, 'a, L: Lang> Print<PropVariant> for Printer<'h, 'a, L> {
     fn print(self, f: &mut std::fmt::Formatter, _sep: Sep, variant: &PropVariant) -> PrintResult {
         let indent = self.indent;
-        write!(f, "{indent}(")?;
 
-        let multi = match variant {
-            PropVariant::Value(attr) => {
-                self.print_all(f, Sep::None, self.kinds(&[attr.rel, attr.val]))?
+        match variant {
+            PropVariant::Unit(node) => {
+                self.print(f, Sep::None, self.kind(*node))?;
+            }
+            PropVariant::Tuple(attr) => {
+                write!(f, "{indent}(")?;
+                let multi = self.print_all(f, Sep::None, self.kinds(&[attr.rel, attr.val]))?;
+                self.print_rparen(f, multi)?;
             }
             PropVariant::Predicate(operator, param) => {
+                write!(f, "{indent}(")?;
                 write!(f, "{operator}")?;
-                self.print(f, Sep::Space, self.kind(*param))?
+                let multi = self.print(f, Sep::Space, self.kind(*param))?;
+                self.print_rparen(f, multi)?;
             }
         };
 
-        self.print_rparen(f, multi)?;
         Ok(Multiline(true))
     }
 }

@@ -92,9 +92,9 @@ pub enum OpCode {
     PutAttr2(Local, RelationshipId),
     /// Move rest attrs from the second local into the first local.
     MoveRestAttrs(Local, Local),
-    /// Pop N stack values, rel_params (top) then value, and append resulting attribute to matrix.
-    /// Last stack value will be last in the tuple
-    AppendAttr(Local, u8),
+    /// Pop N stack values, push each of those consecutively into N different contiguous sequences
+    /// starting at the given local position.
+    SeqAppendN(Local, u8),
     /// Pop 1 stack value, which must be Data::String, and append to local which must also be a string
     AppendString(Local),
     /// Push a constant i64 to the stack.

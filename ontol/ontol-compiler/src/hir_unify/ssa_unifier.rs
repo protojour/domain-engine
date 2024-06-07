@@ -422,7 +422,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         };
 
         match (applied_mode, variant) {
-            (ExprMode::Expr { .. }, PropVariant::Value(Attribute { rel, val })) => {
+            (ExprMode::Expr { .. }, PropVariant::Tuple(Attribute { rel, val })) => {
                 let free_vars = scan_immediate_free_vars(self.expr_arena, [*rel, *val]);
                 self.maybe_apply_catch_block(free_vars, meta.span, &|zelf| {
                     let rel = zelf.write_one_expr(*rel, applied_mode)?;
@@ -433,7 +433,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             flags,
                             struct_var,
                             rel_id,
-                            PropVariant::Value(Attribute { rel, val }),
+                            PropVariant::Tuple(Attribute { rel, val }),
                         ),
                         *meta,
                     )])
@@ -444,7 +444,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             ),
             (
                 ExprMode::MatchStruct { match_var, .. },
-                PropVariant::Value(Attribute { rel, val }),
+                PropVariant::Tuple(Attribute { rel, val }),
             ) => {
                 let unit_meta = Meta::new(&UNIT_TYPE, meta.span);
                 let mut body = Nodes::default();

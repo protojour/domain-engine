@@ -68,7 +68,7 @@ pub trait Processor {
     fn push_i64(&mut self, k: i64, result_type: DefId);
     fn push_f64(&mut self, k: f64, result_type: DefId);
     fn push_string(&mut self, k: TextConstant, result_type: DefId);
-    fn append_attr2(&mut self, seq: Local, len: u8) -> VmResult<()>;
+    fn seq_append_n(&mut self, seq: Local, len: u8) -> VmResult<()>;
     fn append_string(&mut self, to: Local) -> VmResult<()>;
     fn cond_predicate(&mut self, predicate: &Predicate) -> VmResult<bool>;
     fn move_seq_vals_to_stack(&mut self, source: Local) -> VmResult<()>;
@@ -231,8 +231,8 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                         self.program_counter += 1;
                     }
                 }
-                OpCode::AppendAttr(seq, n) => {
-                    processor.append_attr2(*seq, *n)?;
+                OpCode::SeqAppendN(seq, n) => {
+                    processor.seq_append_n(*seq, *n)?;
                     self.program_counter += 1;
                 }
                 OpCode::AppendString(to) => {

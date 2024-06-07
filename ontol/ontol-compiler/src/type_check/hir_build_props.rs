@@ -409,7 +409,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             },
                             ctx,
                         );
-                        ontol_hir::PropVariant::Value(Attribute {
+                        ontol_hir::PropVariant::Tuple(Attribute {
                             rel: rel_node,
                             val: val_node,
                         })
@@ -461,7 +461,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 //     flags.insert(PropFlags::REL_UP_OPTIONAL);
                                 // }
 
-                                ontol_hir::PropVariant::Value(Attribute {
+                                ontol_hir::PropVariant::Tuple(Attribute {
                                     rel: ctx.mk_node(ontol_hir::Kind::Unit, Meta::unit(NO_SPAN)),
                                     val: ctx.mk_node(
                                         ontol_hir::Kind::Set(hir_set_elements),
@@ -489,7 +489,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         },
                                         ctx,
                                     );
-                                    ontol_hir::PropVariant::Value(Attribute {
+                                    ontol_hir::PropVariant::Tuple(Attribute {
                                         rel: rel_node,
                                         val: val_node,
                                     })
@@ -725,7 +725,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ontol_hir::PropFlags::empty(),
                             struct_binder_var,
                             match_attr.rel_id,
-                            ontol_hir::PropVariant::Value(Attribute { rel, val }),
+                            ontol_hir::PropVariant::Tuple(Attribute { rel, val }),
                         ),
                         Meta::unit(NO_SPAN),
                     )

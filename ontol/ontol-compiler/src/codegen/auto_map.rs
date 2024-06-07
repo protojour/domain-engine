@@ -351,7 +351,7 @@ fn autogenerate_fmt_segment_property<'m>(
                 ontol_hir::PropFlags::empty(),
                 binder_var,
                 *rel_id,
-                ontol_hir::PropVariant::Value(Attribute { rel, val: var_node }),
+                ontol_hir::PropVariant::Tuple(Attribute { rel, val: var_node }),
             ),
             Meta::new(object_ty, NO_SPAN),
         )))

@@ -229,26 +229,29 @@ where
 
                 var_set
             }
-            ontol_hir::Kind::Prop(_, struct_var, prop_id, variant) => {
-                self.prop_origins.insert(*prop_id, *struct_var);
+            ontol_hir::Kind::Prop(_, struct_var, rel_id, variant) => {
+                self.prop_origins.insert(*rel_id, *struct_var);
                 self.prop_origins_inverted
                     .entry(*struct_var)
                     .or_default()
-                    .insert(*prop_id);
+                    .insert(*rel_id);
 
                 let mut var_set = VarSet::default();
 
                 match variant {
-                    PropVariant::Value(Attribute { rel, val }) => {
-                        var_set.union_with(&self.analyze_node(arena.node_ref(*rel), *prop_id));
-                        var_set.union_with(&self.analyze_node(arena.node_ref(*val), *prop_id));
+                    PropVariant::Unit(node) => {
+                        var_set.union_with(&self.analyze_node(arena.node_ref(*node), *rel_id));
+                    }
+                    PropVariant::Tuple(Attribute { rel, val }) => {
+                        var_set.union_with(&self.analyze_node(arena.node_ref(*rel), *rel_id));
+                        var_set.union_with(&self.analyze_node(arena.node_ref(*val), *rel_id));
                     }
                     PropVariant::Predicate(..) => {
                         todo!()
                     }
                 }
 
-                self.reg_output_prop(*struct_var, *prop_id, var_set);
+                self.reg_output_prop(*struct_var, *rel_id, var_set);
 
                 Default::default()
             }

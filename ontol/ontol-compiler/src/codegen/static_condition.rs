@@ -59,7 +59,27 @@ impl<'c, 'm> ConditionBuilder<'c, 'm> {
             }
             Kind::Prop(_, _, prop_id, variant) => match variant {
                 PropVariant::Predicate(..) => CondTerm::Wildcard,
-                PropVariant::Value(attr) => {
+                PropVariant::Unit(node) => {
+                    let Some(parent_var) = parent_var else {
+                        return CondTerm::Wildcard;
+                    };
+                    let prop_var = self.output.mk_cond_var();
+
+                    let term = self.term(*node, Some(prop_var));
+
+                    if !matches!(term, CondTerm::Wildcard) {
+                        self.output.add_clause(
+                            parent_var,
+                            Clause::MatchProp(*prop_id, SetOperator::ElementIn, prop_var),
+                        );
+
+                        self.output
+                            .add_clause(prop_var, Clause::Member(CondTerm::Wildcard, term));
+                    }
+
+                    CondTerm::Wildcard
+                }
+                PropVariant::Tuple(attr) => {
                     let Some(parent_var) = parent_var else {
                         return CondTerm::Wildcard;
                     };

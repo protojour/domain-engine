@@ -212,7 +212,8 @@ pub enum Kind<'a, L: Lang> {
 
 #[derive(Clone)]
 pub enum PropVariant {
-    Value(Attribute<Node>),
+    Unit(Node),
+    Tuple(Attribute<Node>),
     Predicate(SetOperator, Node),
 }
 

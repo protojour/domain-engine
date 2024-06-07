@@ -345,22 +345,58 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             Kind::Prop(flags, var, prop_id, variant) => {
                 let mut sub_lets = vec![];
 
+                let prop_scoped = scoped.prop(self.map_flags);
+
+                let (rel_optional, needs_default) = match self.direction {
+                    MapDirection::Down => {
+                        if flags.rel_down_optional() && !flags.rel_up_optional() {
+                            (true, false)
+                        } else {
+                            (flags.rel_up_optional(), !flags.pat_optional())
+                        }
+                    }
+                    MapDirection::Up => (flags.rel_up_optional(), !flags.pat_optional()),
+                    MapDirection::Mixed => (true, true),
+                };
+
                 match variant {
-                    PropVariant::Value(Attribute { rel, val }) => {
-                        let prop_scoped = scoped.prop(self.map_flags);
+                    PropVariant::Unit(node) => {
+                        match (rel_optional, needs_default) {
+                            (true, true) => {
+                                // This passed type check, so there must be a way to construct a value default
+                                let default = self
+                                    .write_default_node(*self.scope_arena.node_ref(*node).meta());
 
-                        let (rel_optional, needs_default) = match self.direction {
-                            MapDirection::Down => {
-                                if flags.rel_down_optional() && !flags.rel_up_optional() {
-                                    (true, false)
-                                } else {
-                                    (flags.rel_up_optional(), !flags.pat_optional())
-                                }
+                                let val = self.traverse(*node, prop_scoped, &mut sub_lets)?;
+                                let default = Attribute {
+                                    rel: self.mk_node(
+                                        Kind::Unit,
+                                        Meta {
+                                            ty: &UNIT_TYPE,
+                                            span: NO_SPAN,
+                                        },
+                                    ),
+                                    val: default,
+                                };
+
+                                self.push_let(
+                                    Let::PropDefault(
+                                        Attribute {
+                                            rel: Binding::Wildcard,
+                                            val,
+                                        },
+                                        (*var, *prop_id),
+                                        default,
+                                    ),
+                                    node_ref.span(),
+                                    scoped,
+                                    lets,
+                                );
                             }
-                            MapDirection::Up => (flags.rel_up_optional(), !flags.pat_optional()),
-                            MapDirection::Mixed => (true, true),
-                        };
-
+                            _ => {}
+                        }
+                    }
+                    PropVariant::Tuple(Attribute { rel, val }) => {
                         match (rel_optional, needs_default) {
                             (true, true) => {
                                 // This passed type check, so there must be a way to construct a value default

@@ -264,7 +264,7 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn append_attr2(&mut self, seq: Local, len: u8) -> VmResult<()> {
+    fn seq_append_n(&mut self, seq: Local, len: u8) -> VmResult<()> {
         for i in (0..len as u16).rev() {
             let value = self.pop_one();
 
@@ -778,7 +778,7 @@ mod tests {
                 OpCode::I64(2, def_id(0)),
                 OpCode::CallBuiltin(BuiltinProc::MulI64, def_id(0)),
                 // append value to matrix
-                OpCode::AppendAttr(Local(1), 1),
+                OpCode::SeqAppendN(Local(1), 1),
                 OpCode::Goto(AddressOffset(2)),
             ],
         );
@@ -833,7 +833,7 @@ mod tests {
                 OpCode::Bump(Local(5)),
                 OpCode::PutAttr1(Local(6), prop_b),
                 OpCode::Bump(Local(6)),
-                OpCode::AppendAttr(Local(4), 1),
+                OpCode::SeqAppendN(Local(4), 1),
                 OpCode::PopUntil(Local(4)),
                 OpCode::Goto(AddressOffset(4)),
             ],

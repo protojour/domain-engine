@@ -74,7 +74,8 @@ impl<'i, 'o, 'a, L: Lang> Importer<'i, 'o, 'a, L> {
                 *struct_var,
                 *prop_id,
                 match variant {
-                    PropVariant::Value(attr) => PropVariant::Value(self.import_attr(*attr)),
+                    PropVariant::Unit(node) => PropVariant::Unit(self.import(*node)),
+                    PropVariant::Tuple(attr) => PropVariant::Tuple(self.import_attr(*attr)),
                     PropVariant::Predicate(operator, param) => {
                         PropVariant::Predicate(*operator, self.import(*param))
                     }

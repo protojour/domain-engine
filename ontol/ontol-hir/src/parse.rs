@@ -323,7 +323,7 @@ impl<'a, L: Lang> Parser<'a, L> {
                 let (rel, next) = self.parse(next)?;
                 let (val, next) = self.parse(next)?;
 
-                Ok((PropVariant::Value(Attribute { rel, val }), next))
+                Ok((PropVariant::Tuple(Attribute { rel, val }), next))
             }
         })
     }

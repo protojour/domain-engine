@@ -712,7 +712,20 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 }
             }
             ontol_hir::Kind::Prop(_, struct_var, rel_id, variant) => match variant {
-                PropVariant::Value(attr) => {
+                PropVariant::Unit(node) => {
+                    let Ok(struct_local) = self.var_local(*struct_var, &span) else {
+                        return;
+                    };
+
+                    self.gen_node(arena.node_ref(*node), block);
+                    block.op(
+                        OpCode::PutAttr1(struct_local, *rel_id),
+                        Delta(-1),
+                        span,
+                        self.builder,
+                    );
+                }
+                PropVariant::Tuple(attr) => {
                     self.gen_attribute(*struct_var, *rel_id, *attr, arena, span, block)
                 }
                 PropVariant::Predicate(..) => todo!(),
@@ -826,7 +839,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                         self.gen_node(arena.node_ref(attr.val), block);
 
                         block.op(
-                            OpCode::AppendAttr(seq_local, 1),
+                            OpCode::SeqAppendN(seq_local, 1),
                             Delta(-1),
                             span,
                             self.builder,
@@ -841,7 +854,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                         block.op(OpCode::Clone(rel_local), Delta(1), span, self.builder);
                         block.op(
-                            OpCode::AppendAttr(seq_local, 2),
+                            OpCode::SeqAppendN(seq_local, 2),
                             Delta(-2),
                             span,
                             self.builder,
