@@ -42,4 +42,4 @@ unimock.workspace = true
 assert_matches = "1"
 pretty_assertions = "1"
 serde-value = "0.7"
-rstest = { version = "0.19", default-features = false }
+rstest.workspace = true

@@ -48,7 +48,7 @@ regex-automata = "0.4"
 arcstr = { version = "1", features = ["serde"] }
 ordered-float = { version = "4", features = ["serde"] }
 unimock = "0.6"
-
+rstest = { version = "0.21", default_features = false }
 
 [profile.release]
 strip = true

@@ -17,4 +17,4 @@ thin-vec.workspace = true
 assert_matches = "1"
 indoc = "2"
 pretty_assertions = "1"
-rstest = { version = "0.19", default-features = false }
+rstest.workspace = true
