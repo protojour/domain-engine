@@ -1,15 +1,13 @@
 (struct ($e)
     (prop! $e R:1:0
-        (#u
-            (struct ($f)
-                (prop! $f R:2:0
-                    (#u (set (.. @a #u $b)))
-                )
+        (struct ($f)
+            (prop! $f R:2:0
+                (set (.. @a #u $b))
             )
         )
     )
     (prop! $e R:1:1
-        (#u (set (.. @c #u $d)))
+        (set (.. @c #u $d))
     )
 )
 
@@ -17,55 +15,43 @@
 // So it's constant in this sense, but each _child_ need to _clone_ the original scope.
 (struct ($g)
     (prop! $g R:3:0
-        (#u
-            (struct ($h)
-                (prop! $h R:4:0
-                    (#u
-                        (struct ($i)
-                            (prop! $i R:5:0
-                                (#u (set (.. @a #u $b)))
-                            )
-                        )
+        (struct ($h)
+            (prop! $h R:4:0
+                (struct ($i)
+                    (prop! $i R:5:0
+                        (set (.. @a #u $b))
                     )
                 )
-                (prop! $h R:4:1
-                    (#u (set (.. @c #u $d)))
-                )
+            )
+            (prop! $h R:4:1
+                (set (.. @c #u $d))
             )
         )
     )
 )
 
 |$e| (block
-    (let-prop $_ $f ($e R:1:0))
-    (let-prop $_ $a ($f R:2:0))
-    (let-prop $_ $c ($e R:1:1))
+    (let-prop $f ($e R:1:0))
+    (let-prop $a ($f R:2:0))
+    (let-prop $c ($e R:1:1))
     (struct ($g)
         (prop! $g R:3:0
-            (#u
-                (struct ($h)
-                    (prop! $h R:4:0
-                        (#u
-                            (struct ($i)
-                                (prop! $i R:5:0
-                                    (#u
-                                        (make-seq ($j)
-                                            (for-each $a ($_ $b)
-                                                (insert $j #u $b)
-                                            )
-                                        )
-                                    )
+            (struct ($h)
+                (prop! $h R:4:0
+                    (struct ($i)
+                        (prop! $i R:5:0
+                            (make-seq ($j)
+                                (for-each $a ($_ $b)
+                                    (insert $j #u $b)
                                 )
                             )
                         )
                     )
-                    (prop! $h R:4:1
-                        (#u
-                            (make-seq ($k)
-                                (for-each $c ($_ $d)
-                                    (insert $k #u $d)
-                                )
-                            )
+                )
+                (prop! $h R:4:1
+                    (make-seq ($k)
+                        (for-each $c ($_ $d)
+                            (insert $k #u $d)
                         )
                     )
                 )

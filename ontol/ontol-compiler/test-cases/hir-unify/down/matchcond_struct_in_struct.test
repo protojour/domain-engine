@@ -1,24 +1,22 @@
 (struct ($c)
-    (prop! $c R:1:0 (#u $a))
-    (prop! $c R:1:1 (#u $b))
+    (prop! $c R:1:0 $a)
+    (prop! $c R:1:1 $b)
 )
 
 (set (.. @f
     #u
     (match-struct ($d)
         (prop! $d R:2:0
-            (#u
-                (struct ($e)
-                    (prop! $e R:3:0 ($a $b))
-                )
+            (struct ($e)
+                (prop! $e R:3:0 [$a $b])
             )
         )
     )
 ))
 
 |$c| (block
-    (let-prop $_ $a ($c R:1:0))
-    (let-prop $_ $b ($c R:1:1))
+    (let-prop $a ($c R:1:0))
+    (let-prop $b ($c R:1:1))
     (match-struct ($g)
         (let-cond-var $d $g)
         (push-cond-clauses $g
@@ -33,7 +31,7 @@
         (let-cond-var $h $g)
         (push-cond-clauses $g
             (match-prop '$e R:3:0 element-in '$h)
-            (member '$h ($a $b))
+            (member '$h ($b $a))
         )
     )
 )

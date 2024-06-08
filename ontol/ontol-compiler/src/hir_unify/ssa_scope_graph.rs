@@ -1,8 +1,7 @@
 use ontol_hir::{
-    import::arena_import, Binder, Binding, CaptureGroup, Kind, Node, Nodes, OverloadFunc,
+    import::arena_import, Binder, Binding, CaptureGroup, Kind, Node, Nodes, OverloadFunc, Pack,
 };
 use ontol_runtime::{
-    value::Attribute,
     var::{Var, VarSet},
     DefId, RelationshipId,
 };
@@ -19,11 +18,11 @@ use super::{ssa_unifier::SsaUnifier, UnifierResult};
 
 #[derive(Clone)]
 pub enum Let<'m> {
-    Prop(Attribute<Binding<'m, TypedHir>>, (Var, RelationshipId)),
+    Prop(Pack<Binding<'m, TypedHir>>, (Var, RelationshipId)),
     PropDefault(
-        Attribute<Binding<'m, TypedHir>>,
+        Pack<Binding<'m, TypedHir>>,
         (Var, RelationshipId),
-        Attribute<Node>,
+        ThinVec<Node>,
     ),
     Narrow(TypedHirData<'m, Var>),
     Regex(ThinVec<ThinVec<CaptureGroup<'m, TypedHir>>>, DefId, Var),
@@ -48,9 +47,16 @@ pub struct ComplexExpr<'m> {
 impl<'m> Let<'m> {
     pub fn defines(&self) -> VarSet {
         match self {
-            Self::Prop(attr, _) | Self::PropDefault(attr, ..) => {
-                Self::binding_defines(&attr.rel).union(&Self::binding_defines(&attr.val))
-            }
+            Self::Prop(bind_pack, ..) | Self::PropDefault(bind_pack, ..) => match bind_pack {
+                Pack::Unit(u) => Self::binding_defines(u),
+                Pack::Tuple(t) => {
+                    let mut set = VarSet::default();
+                    for b in t {
+                        set = set.union(&Self::binding_defines(b));
+                    }
+                    set
+                }
+            },
             Self::Regex(groups_list, ..) => {
                 let mut var_set = VarSet::default();
                 for groups in groups_list {

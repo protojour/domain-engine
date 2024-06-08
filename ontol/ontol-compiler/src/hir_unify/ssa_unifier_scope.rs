@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use ontol_hir::{Binder, Binding, Kind, Label, Node, Nodes, PropVariant, SetEntry};
+use ontol_hir::{Binder, Binding, Kind, Label, Node, Nodes, Pack, PropVariant, SetEntry};
 use ontol_runtime::{
     value::Attribute,
     var::{Var, VarSet},
@@ -342,7 +342,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 }
                 Ok(Binding::Binder(*binder))
             }
-            Kind::Prop(flags, var, prop_id, variant) => {
+            Kind::Prop(flags, var, rel_id, variant) => {
                 let mut sub_lets = vec![];
 
                 let prop_scoped = scoped.prop(self.map_flags);
@@ -367,55 +367,57 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                 let default = self
                                     .write_default_node(*self.scope_arena.node_ref(*node).meta());
 
-                                let val = self.traverse(*node, prop_scoped, &mut sub_lets)?;
-                                let default = Attribute {
-                                    rel: self.mk_node(
-                                        Kind::Unit,
-                                        Meta {
-                                            ty: &UNIT_TYPE,
-                                            span: NO_SPAN,
-                                        },
-                                    ),
-                                    val: default,
-                                };
+                                let binding = self.traverse(*node, prop_scoped, &mut sub_lets)?;
 
                                 self.push_let(
                                     Let::PropDefault(
-                                        Attribute {
-                                            rel: Binding::Wildcard,
-                                            val,
-                                        },
-                                        (*var, *prop_id),
-                                        default,
+                                        Pack::Unit(binding),
+                                        (*var, *rel_id),
+                                        thin_vec![default],
                                     ),
                                     node_ref.span(),
                                     scoped,
                                     lets,
                                 );
                             }
-                            _ => {}
+                            (rel_optional, _) => {
+                                let next_scoped = if rel_optional {
+                                    Scoped::MaybeVoid
+                                } else {
+                                    prop_scoped
+                                };
+
+                                let binding = self.traverse(*node, next_scoped, &mut sub_lets)?;
+
+                                self.push_let(
+                                    Let::Prop(Pack::Unit(binding), (*var, *rel_id)),
+                                    node_ref.span(),
+                                    scoped,
+                                    lets,
+                                );
+                            }
                         }
                     }
                     PropVariant::Tuple(Attribute { rel, val }) => {
                         match (rel_optional, needs_default) {
                             (true, true) => {
                                 // This passed type check, so there must be a way to construct a value default
-                                let default = Attribute {
-                                    rel: self.write_default_node(
-                                        *self.scope_arena.node_ref(*rel).meta(),
-                                    ),
-                                    val: self.write_default_node(
+                                let default = thin_vec![
+                                    self.write_default_node(
                                         *self.scope_arena.node_ref(*val).meta(),
                                     ),
-                                };
+                                    self.write_default_node(
+                                        *self.scope_arena.node_ref(*rel).meta(),
+                                    ),
+                                ];
 
                                 let rel = self.traverse(*rel, prop_scoped, &mut sub_lets)?;
                                 let val = self.traverse(*val, prop_scoped, &mut sub_lets)?;
 
                                 self.push_let(
                                     Let::PropDefault(
-                                        Attribute { rel, val },
-                                        (*var, *prop_id),
+                                        Pack::Tuple(thin_vec![val, rel]),
+                                        (*var, *rel_id),
                                         default,
                                     ),
                                     node_ref.span(),
@@ -434,7 +436,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                 let val = self.traverse(*val, next_scoped, &mut sub_lets)?;
 
                                 self.push_let(
-                                    Let::Prop(Attribute { rel, val }, (*var, *prop_id)),
+                                    Let::Prop(Pack::Tuple(thin_vec![val, rel]), (*var, *rel_id)),
                                     node_ref.span(),
                                     scoped,
                                     lets,
@@ -596,7 +598,9 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 }
 
                 let kind = match let_node {
-                    Let::Prop(attr, var_prop) => Kind::TryLetProp(catch_label, *attr, *var_prop),
+                    Let::Prop(bind_pack, var_prop) => {
+                        Kind::TryLetProp(catch_label, bind_pack.clone(), *var_prop)
+                    }
                     _ => {
                         return Err(UnifierError::Unimplemented(
                             "unhandled try let variant".to_string(),

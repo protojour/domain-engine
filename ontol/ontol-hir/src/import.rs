@@ -45,10 +45,7 @@ impl<'i, 'o, 'a, L: Lang> Importer<'i, 'o, 'a, L> {
             LetPropDefault(binding, (var, prop_id), default) => LetPropDefault(
                 binding.clone(),
                 (*var, *prop_id),
-                Attribute {
-                    rel: self.import(default.rel),
-                    val: self.import(default.val),
-                },
+                default.iter().map(|node| self.import(*node)).collect(),
             ),
             TryLetProp(catch, attr, (var, prop_id)) => {
                 TryLetProp(*catch, attr.clone(), (*var, *prop_id))

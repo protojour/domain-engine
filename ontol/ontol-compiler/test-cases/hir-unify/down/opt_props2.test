@@ -1,40 +1,28 @@
 (struct ($b)
     (prop? $b R:1:0
-        (#u
-            (struct ($c)
-                (prop? $c R:1:1
-                    (#u $a)
-                )
-            )
+        (struct ($c)
+            (prop? $c R:1:1 $a)
         )
     )
 )
 
 (struct ($d)
     (prop? $d R:2:0
-        (#u
-            (struct ($e)
-                (prop? $e R:2:1
-                    (#u $a)
-                )
-            )
+        (struct ($e)
+            (prop? $e R:2:1 $a)
         )
     )
 )
 
 |$b| (block
-    (let-prop $_ $c ($b R:1:0))
+    (let-prop $c ($b R:1:0))
     (struct ($d)
         (prop?- $d R:2:0
-            (#u
-                (struct ($e)
-                    (catch (@f)
-                        (try? @f $c)
-                        (let-prop? @f $_ $a ($c R:1:1))
-                        (prop?- $e R:2:1
-                            (#u $a)
-                        )
-                    )
+            (struct ($e)
+                (catch (@f)
+                    (try? @f $c)
+                    (let-prop? @f $a ($c R:1:1))
+                    (prop?- $e R:2:1 $a)
                 )
             )
         )

@@ -206,9 +206,9 @@ pub struct TypeMapping<'m> {
     pub to: TypeRef<'m>,
 }
 
-pub fn scan_immediate_free_vars<const N: usize>(
+pub fn scan_immediate_free_vars(
     arena: &ontol_hir::arena::Arena<TypedHir>,
-    nodes: [ontol_hir::Node; N],
+    nodes: &[ontol_hir::Node],
 ) -> VarSet {
     #[derive(Default)]
     struct FreeVarsAnalyzer {
@@ -267,7 +267,7 @@ pub fn scan_immediate_free_vars<const N: usize>(
 
     let mut analyzer = FreeVarsAnalyzer::default();
     for (index, node) in nodes.into_iter().enumerate() {
-        analyzer.visit_node(index, arena.node_ref(node));
+        analyzer.visit_node(index, arena.node_ref(*node));
     }
     analyzer.free_vars
 }

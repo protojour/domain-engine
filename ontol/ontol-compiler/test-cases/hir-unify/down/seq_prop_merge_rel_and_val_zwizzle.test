@@ -1,16 +1,14 @@
 (struct ($e)
     (prop! $e R:1:0
-        (#u
-            (set
-                (.. @f
-                    (struct ($g)
-                        (prop! $g R:2:0 (#u $a))
-                        (prop! $g R:2:1 (#u $b))
-                    )
-                    (struct ($h)
-                        (prop! $h R:3:0 (#u $c))
-                        (prop! $h R:3:1 (#u $d))
-                    )
+        (set
+            (.. @f
+                (struct ($g)
+                    (prop! $g R:2:0 $a)
+                    (prop! $g R:2:1 $b)
+                )
+                (struct ($h)
+                    (prop! $h R:3:0 $c)
+                    (prop! $h R:3:1 $d)
                 )
             )
         )
@@ -19,17 +17,15 @@
 
 (struct ($i)
     (prop! $i R:4:0
-        (#u
-            (set
-                (.. @f
-                    (struct ($j)
-                        (prop! $j R:5:0 (#u $a))
-                        (prop! $j R:5:1 (#u $c))
-                    )
-                    (struct ($k)
-                        (prop! $k R:6:0 (#u $b))
-                        (prop! $k R:6:1 (#u $d))
-                    )
+        (set
+            (.. @f
+                (struct ($j)
+                    (prop! $j R:5:0 $a)
+                    (prop! $j R:5:1 $c)
+                )
+                (struct ($k)
+                    (prop! $k R:6:0 $b)
+                    (prop! $k R:6:1 $d)
                 )
             )
         )
@@ -37,33 +33,23 @@
 )
 
 |$e| (block
-    (let-prop $_ $f ($e R:1:0))
+    (let-prop $f ($e R:1:0))
     (struct ($i)
         (prop! $i R:4:0
-            (#u
-                (make-seq ($l)
-                    (for-each $f ($g $h)
-                        (let-prop $_ $a ($g R:2:0))
-                        (let-prop $_ $b ($g R:2:1))
-                        (let-prop $_ $c ($h R:3:0))
-                        (let-prop $_ $d ($h R:3:1))
-                        (insert $l
-                            (struct ($j)
-                                (prop! $j R:5:0
-                                    (#u $a)
-                                )
-                                (prop! $j R:5:1
-                                    (#u $c)
-                                )
-                            )
-                            (struct ($k)
-                                (prop! $k R:6:0
-                                    (#u $b)
-                                )
-                                (prop! $k R:6:1
-                                    (#u $d)
-                                )
-                            )
+            (make-seq ($l)
+                (for-each $f ($g $h)
+                    (let-prop $a ($g R:2:0))
+                    (let-prop $b ($g R:2:1))
+                    (let-prop $c ($h R:3:0))
+                    (let-prop $d ($h R:3:1))
+                    (insert $l
+                        (struct ($j)
+                            (prop! $j R:5:0 $a)
+                            (prop! $j R:5:1 $c)
+                        )
+                        (struct ($k)
+                            (prop! $k R:6:0 $b)
+                            (prop! $k R:6:1 $d)
                         )
                     )
                 )

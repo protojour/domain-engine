@@ -3,14 +3,13 @@ use std::fmt::{Debug, Display};
 use ontol_runtime::{
     format_utils::AsAlpha,
     query::condition::{Clause, ClausePair},
-    value::Attribute,
     var::Var,
 };
 use thin_vec::ThinVec;
 
 use crate::{
     arena::{Arena, NodeRef},
-    Binding, CaptureGroup, EvalCondTerm, Kind, Label, Lang, Node, OverloadFunc, PropVariant,
+    Binding, CaptureGroup, EvalCondTerm, Kind, Label, Lang, Node, OverloadFunc, Pack, PropVariant,
     RootNode, SetEntry, StructFlags,
 };
 
@@ -113,31 +112,24 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 self.print_rparen(f, multi)?;
                 Ok(multi)
             }
-            Kind::LetProp(Attribute { rel, val }, (var, prop_id)) => {
+            Kind::LetProp(bind_pack, (var, prop_id)) => {
                 write!(f, "{indent}(let-prop")?;
-                self.print(f, Sep::Space, rel)?;
-                self.print(f, Sep::Space, val)?;
+                self.print(f, Sep::Space, bind_pack)?;
                 write!(f, " ({var} {prop_id})")?;
                 self.print_rparen(f, Multiline(false))?;
                 Ok(Multiline(true))
             }
-            Kind::LetPropDefault(binding, (var, prop_id), default) => {
+            Kind::LetPropDefault(bind_pack, (var, prop_id), default) => {
                 write!(f, "{indent}(let-prop-default")?;
-                self.print(f, Sep::Space, &binding.rel)?;
-                self.print(f, Sep::Space, &binding.val)?;
+                self.print(f, Sep::Space, bind_pack)?;
                 write!(f, " ({var} {prop_id})")?;
-                self.print_all(
-                    f,
-                    Sep::Space,
-                    [self.kind(default.rel), self.kind(default.val)].into_iter(),
-                )?;
+                self.print_all(f, Sep::Space, self.kinds(default))?;
                 self.print_rparen(f, Multiline(false))?;
                 Ok(Multiline(true))
             }
-            Kind::TryLetProp(try_label, Attribute { rel, val }, (var, prop_id)) => {
+            Kind::TryLetProp(try_label, bind_pack, (var, prop_id)) => {
                 write!(f, "{indent}(let-prop? {try_label}")?;
-                self.print(f, Sep::Space, rel)?;
-                self.print(f, Sep::Space, val)?;
+                self.print(f, Sep::Space, bind_pack)?;
                 write!(f, " ({var} {prop_id})")?;
                 self.print_rparen(f, Multiline(false))?;
                 Ok(Multiline(true))
@@ -302,28 +294,53 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
     }
 }
 
+impl<'h, 'a, L: Lang> Print<Pack<Binding<'a, L>>> for Printer<'h, 'a, L> {
+    fn print(
+        self,
+        f: &mut std::fmt::Formatter,
+        sep: Sep,
+        pack: &Pack<Binding<'a, L>>,
+    ) -> PrintResult {
+        write!(f, "{sep}")?;
+
+        match pack {
+            Pack::Unit(u) => {
+                self.print(f, Sep::None, u)?;
+            }
+            Pack::Tuple(t) => {
+                write!(f, "[")?;
+                let multi = self.print_all(f, Sep::None, t.iter())?;
+                self.print_rbracket(f, multi)?;
+            }
+        };
+
+        Ok(Multiline(false))
+    }
+}
+
 impl<'h, 'a, L: Lang> Print<PropVariant> for Printer<'h, 'a, L> {
     fn print(self, f: &mut std::fmt::Formatter, _sep: Sep, variant: &PropVariant) -> PrintResult {
         let indent = self.indent;
 
         match variant {
             PropVariant::Unit(node) => {
-                self.print(f, Sep::None, self.kind(*node))?;
+                let multi = self.print(f, Sep::Space, self.kind(*node))?;
+                Ok(multi)
             }
             PropVariant::Tuple(attr) => {
-                write!(f, "{indent}(")?;
-                let multi = self.print_all(f, Sep::None, self.kinds(&[attr.rel, attr.val]))?;
-                self.print_rparen(f, multi)?;
+                write!(f, "{indent}[")?;
+                let multi = self.print_all(f, Sep::None, self.kinds(&[attr.val, attr.rel]))?;
+                self.print_rbracket(f, multi)?;
+                Ok(multi)
             }
             PropVariant::Predicate(operator, param) => {
                 write!(f, "{indent}(")?;
                 write!(f, "{operator}")?;
                 let multi = self.print(f, Sep::Space, self.kind(*param))?;
                 self.print_rparen(f, multi)?;
+                Ok(multi)
             }
-        };
-
-        Ok(Multiline(true))
+        }
     }
 }
 
@@ -456,6 +473,16 @@ impl<'h, 'a, L: Lang> Printer<'h, 'a, L> {
             write!(f, "{indent})")?;
         } else {
             write!(f, ")")?;
+        }
+        Ok(())
+    }
+
+    fn print_rbracket(self, f: &mut std::fmt::Formatter, multi: Multiline) -> std::fmt::Result {
+        if multi.0 {
+            let indent = self.indent.force_indent();
+            write!(f, "{indent}]")?;
+        } else {
+            write!(f, "]")?;
         }
         Ok(())
     }

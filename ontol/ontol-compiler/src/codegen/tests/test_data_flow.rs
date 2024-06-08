@@ -97,12 +97,12 @@ fn test_analyze_ssa1() {
         "$b",
         "
         (block
-            (let-prop $_ $c ($b R:1:0))
-            (let-prop $_ $d ($b R:1:1))
-            (let-prop $_ $e ($d R:1:2))
+            (let-prop $c ($b R:1:0))
+            (let-prop $d ($b R:1:1))
+            (let-prop $e ($d R:1:2))
             (struct ($a)
-                (prop $a R:2:0 (#u (map $c)))
-                (prop $a R:2:1 (#u $e))
+                (prop $a R:2:0 [(map $c) #u])
+                (prop $a R:2:1 [$e #u])
             )
         )
         ",
@@ -130,33 +130,34 @@ fn test_analyze_ssa2() {
         "$f",
         "
         (block
-            (let-prop $_ $a ($f R:2:26))
-            (let-prop $_ $b ($f R:2:33))
-            (let-prop $_ $g ($f R:2:55))
-            (let-prop $_ $c ($g R:2:15))
-            (let-prop-default $_ $e ($f R:2:57) #u (make-seq ($j)))
+            (let-prop $a ($f R:2:26))
+            (let-prop $b ($f R:2:33))
+            (let-prop $g ($f R:2:55))
+            (let-prop $c ($g R:2:15))
+            (let-prop-default $e ($f R:2:57) (make-seq ($j)))
             (struct ($i)
                 (catch (@k)
                     (try? @k $a)
                     (prop?! $i R:1:4
-                        (#u (map $a))
+                        [(map $a) #u]
                     )
                 )
                 (prop! $i R:1:6
-                    (#u $b)
+                    [$b #u]
                 )
                 (prop! $i R:1:7
-                    (#u $c)
+                    [$c #u]
                 )
                 (prop! $i R:1:8
-                    (#u
+                    [
                         (make-seq ($l)
                             (for-each $e ($_ $h)
-                                (let-prop $_ $d ($h R:2:53))
+                                (let-prop $d ($h R:2:53))
                                 (insert $l #u (map $d))
                             )
                         )
-                    )
+                        #u
+                    ]
                 )
             )
         )
@@ -194,15 +195,13 @@ fn test_analyze_seq1() {
         "$b",
         "
         (block
-            (let-prop-default $_ $c ($b R:1:0) #u (make-seq ($s)))
+            (let-prop-default $c ($b R:1:0) (make-seq ($s)))
             (struct ($a)
                 (prop $a R:2:0
-                    (#u
-                        (make-seq ($d)
-                            (for-each $c ($_ $e)
-                                (let-prop $_ $f ($e R:2:1))
-                                (insert $d #u $f)
-                            )
+                    (make-seq ($d)
+                        (for-each $c ($_ $e)
+                            (let-prop $f ($e R:2:1))
+                            (insert $d #u $f)
                         )
                     )
                 )
@@ -230,19 +229,19 @@ fn test_analyze_regex_match1() {
         "$b",
         "
         (block
-            (let-prop $_ $c ($b R:1:0))
+            (let-prop $c ($b R:1:0))
             (let-regex ((1 $d)) ((2 $e)) def@0:0 $c)
             (struct ($a)
                 (catch (@f)
                     (try? @f $d)
                     (prop $a R:2:0
-                        (#u $d)
+                        $d
                     )
                 )
                 (catch (@g)
                     (try? @g $e)
                     (prop $a R:2:1
-                        (#u $e)
+                        $e
                     )
                 )
             )

@@ -1,13 +1,11 @@
 (struct ($b)
     (prop! $b R:1:0
-        (#u
-            (set
-                (.. @f
-                    #u
-                    (struct ($c)
-                        (prop! $c R:1:1
-                            (#u (set (.. @g #u (map $a))))
-                        )
+        (set
+            (.. @f
+                #u
+                (struct ($c)
+                    (prop! $c R:1:1
+                        (set (.. @g #u (map $a)))
                     )
                 )
             )
@@ -17,14 +15,12 @@
 
 (struct ($d)
     (prop! $d R:2:0
-        (#u
-            (set
-                (.. @f
-                    #u
-                    (struct ($e)
-                        (prop! $e R:2:1
-                            (#u (set (.. @g #u (map $a))))
-                        )
+        (set
+            (.. @f
+                #u
+                (struct ($e)
+                    (prop! $e R:2:1
+                        (set (.. @g #u (map $a)))
                     )
                 )
             )
@@ -33,22 +29,18 @@
 )
 
 |$b| (block
-    (let-prop $_ $f ($b R:1:0))
+    (let-prop $f ($b R:1:0))
     (struct ($d)
         (prop! $d R:2:0
-            (#u
-                (make-seq ($h)
-                    (for-each $f ($_ $c)
-                        (let-prop $_ $g ($c R:1:1))
-                        (insert $h #u
-                            (struct ($e)
-                                (prop! $e R:2:1
-                                    (#u
-                                        (make-seq ($i)
-                                            (for-each $g ($_ $a)
-                                                (insert $i #u (map $a))
-                                            )
-                                        )
+            (make-seq ($h)
+                (for-each $f ($_ $c)
+                    (let-prop $g ($c R:1:1))
+                    (insert $h #u
+                        (struct ($e)
+                            (prop! $e R:2:1
+                                (make-seq ($i)
+                                    (for-each $g ($_ $a)
+                                        (insert $i #u (map $a))
                                     )
                                 )
                             )

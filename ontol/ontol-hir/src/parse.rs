@@ -32,10 +32,12 @@ pub enum Class {
     Colon,
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub enum Token<'s> {
     LParen,
     RParen,
+    LBracket,
+    RBracket,
     Symbol(&'s str),
     I64(i64),
     F64(f64),
@@ -71,7 +73,7 @@ impl<'a, L: Lang> Parser<'a, L> {
         match parse_token(next)? {
             (Token::LParen, next) => {
                 let (node, next) = self.parse_parenthesized(next)?;
-                let (_, next) = parse_rparen(next)?;
+                let (_, next) = parse_expect(next, Token::RParen, Class::RParen)?;
                 Ok((node, next))
             }
             (Token::Dollar, next) => match parse_token(next)? {
@@ -101,10 +103,10 @@ impl<'a, L: Lang> Parser<'a, L> {
             ("*", next) => self.parse_binary_call(OverloadFunc::Mul, next),
             ("/", next) => self.parse_binary_call(OverloadFunc::Div, next),
             ("with", next) => {
-                let (_, next) = parse_lparen(next)?;
+                let (_, next) = parse_expect(next, Token::LParen, Class::LParen)?;
                 let (bind_var, next) = parse_dollar_var(next)?;
                 let (def, next) = self.parse(next)?;
-                let (_, next) = parse_rparen(next)?;
+                let (_, next) = parse_expect(next, Token::RParen, Class::RParen)?;
                 let (body, next) = self.parse_many(next, Self::parse)?;
                 Ok((
                     self.make_node(Kind::With(self.make_binder(bind_var), def, body.into())),
@@ -131,36 +133,33 @@ impl<'a, L: Lang> Parser<'a, L> {
                 Ok((self.make_node(Kind::Let(self.make_binder(var), node)), next))
             }
             ("let-prop", next) => {
-                let (rel, next) = self.parse_pattern_binding(next)?;
-                let (val, next) = self.parse_pattern_binding(next)?;
-                let (_, next) = parse_lparen(next)?;
+                let (bind_pack, next) =
+                    self.parse_pack(next, |zelf, next| zelf.parse_pattern_binding(next))?;
+
+                let (_, next) = parse_expect(next, Token::LParen, Class::LParen)?;
                 let (var, next) = parse_dollar_var(next)?;
                 let (rel_id, next) = parse_rel_id(next)?;
-                let (_, next) = parse_rparen(next)?;
+                let (_, next) = parse_expect(next, Token::RParen, Class::RParen)?;
                 Ok((
-                    self.make_node(Kind::LetProp(Attribute { rel, val }, (var, rel_id))),
+                    self.make_node(Kind::LetProp(bind_pack, (var, rel_id))),
                     next,
                 ))
             }
             ("let-prop-default", next) => {
-                let (binding, next) = {
-                    let (rel, next) = self.parse_pattern_binding(next)?;
-                    let (val, next) = self.parse_pattern_binding(next)?;
+                let (bind_pack, next) =
+                    self.parse_pack(next, |zelf, next| zelf.parse_pattern_binding(next))?;
 
-                    (Attribute { rel, val }, next)
-                };
-                let (_, next) = parse_lparen(next)?;
+                let (_, next) = parse_expect(next, Token::LParen, Class::LParen)?;
                 let (var, next) = parse_dollar_var(next)?;
                 let (rel_id, next) = parse_rel_id(next)?;
-                let (_, next) = parse_rparen(next)?;
-                let (attr, next) = {
-                    let (rel, next) = self.parse(next)?;
-                    let (val, next) = self.parse(next)?;
-
-                    (Attribute { rel, val }, next)
-                };
+                let (_, next) = parse_expect(next, Token::RParen, Class::RParen)?;
+                let (default, next) = self.parse_many(next, Self::parse)?;
                 Ok((
-                    self.make_node(Kind::LetPropDefault(binding, (var, rel_id), attr)),
+                    self.make_node(Kind::LetPropDefault(
+                        bind_pack,
+                        (var, rel_id),
+                        default.into(),
+                    )),
                     next,
                 ))
             }
@@ -217,7 +216,7 @@ impl<'a, L: Lang> Parser<'a, L> {
             }
             ("let-regex", mut next) => {
                 let mut groups_list = thin_vec![];
-                while parse_lparen(next).is_ok() {
+                while parse_expect(next, Token::LParen, Class::LParen).is_ok() {
                     let (groups, next_next) = parse_paren_delimited(next, |next| {
                         self.parse_many(next, Self::parse_capture_group)
                             .map(|(vec, next)| (ThinVec::from(vec), next))
@@ -294,7 +293,28 @@ impl<'a, L: Lang> Parser<'a, L> {
                 Err(Error::Unexpected(Class::Eof | Class::RParen)) => {
                     return Ok((nodes, next));
                 }
-                Err(error) => return Err(error),
+                Err(error) => {
+                    return Err(error);
+                }
+            }
+        }
+    }
+
+    fn parse_pack<'s, T>(
+        &mut self,
+        next: &'s str,
+        mut item_fn: impl FnMut(&mut Self, &'s str) -> ParseResult<'s, T>,
+    ) -> ParseResult<'s, Pack<T>> {
+        match parse_raw_token(next)? {
+            (Token::LBracket, _) => {
+                let (items, next) = parse_bracket_delimited(next, |next| {
+                    self.parse_many(next, |zelf, next| item_fn(zelf, next))
+                })?;
+                Ok((Pack::Tuple(items.into_iter().collect()), next))
+            }
+            _ => {
+                let (unit, next) = item_fn(self, next)?;
+                Ok((Pack::Unit(unit), next))
             }
         }
     }
@@ -313,19 +333,25 @@ impl<'a, L: Lang> Parser<'a, L> {
     }
 
     fn parse_prop_variant<'s>(&mut self, next: &'s str) -> ParseResult<'s, PropVariant> {
-        parse_paren_delimited(next, |next| match parse_symbol(next) {
-            Ok(("element-in", next)) => {
-                let (node, next) = self.parse(next)?;
-                Ok((PropVariant::Predicate(SetOperator::ElementIn, node), next))
-            }
-            Ok((sym, _)) => return Err(Error::Expected(Class::Set, Found(Token::Symbol(sym)))),
-            Err(_) => {
-                let (rel, next) = self.parse(next)?;
+        match parse_raw_token(next)? {
+            (Token::LBracket, _) => parse_bracket_delimited(next, |next| {
                 let (val, next) = self.parse(next)?;
+                let (rel, next) = self.parse(next)?;
 
                 Ok((PropVariant::Tuple(Attribute { rel, val }), next))
-            }
-        })
+            }),
+            _ => match parse_symbol(next) {
+                Ok(("element-in", next)) => {
+                    let (node, next) = self.parse(next)?;
+                    Ok((PropVariant::Predicate(SetOperator::ElementIn, node), next))
+                }
+                _ => {
+                    let (unit, next) = self.parse(next)?;
+
+                    Ok((PropVariant::Unit(unit), next))
+                }
+            },
+        }
     }
 
     fn parse_set_entry<'s>(&mut self, next: &'s str) -> ParseResult<'s, SetEntry<'a, L>> {
@@ -442,9 +468,19 @@ fn parse_paren_delimited<'s, T>(
     next: &'s str,
     mut item_fn: impl FnMut(&'s str) -> ParseResult<'s, T>,
 ) -> ParseResult<'s, T> {
-    let (_, next) = parse_lparen(next)?;
+    let (_, next) = parse_expect(next, Token::LParen, Class::LParen)?;
     let (value, next) = item_fn(next)?;
-    let (_, next) = parse_rparen(next)?;
+    let (_, next) = parse_expect(next, Token::RParen, Class::RParen)?;
+    Ok((value, next))
+}
+
+fn parse_bracket_delimited<'s, T>(
+    next: &'s str,
+    mut item_fn: impl FnMut(&'s str) -> ParseResult<'s, T>,
+) -> ParseResult<'s, T> {
+    let (_, next) = parse_expect(next, Token::LBracket, Class::LParen)?;
+    let (value, next) = item_fn(next)?;
+    let (_, next) = parse_expect(next, Token::RBracket, Class::RParen)?;
     Ok((value, next))
 }
 
@@ -473,7 +509,7 @@ fn parse_def_id(next: &str) -> ParseResult<DefId> {
         (token, _) => return Err(Error::Expected(Class::At, Found(token))),
     };
     let (pkg, next) = parse_i64(next)?;
-    let (_, next) = parse_colon(next)?;
+    let (_, next) = parse_expect(next, Token::Colon, Class::Colon)?;
     let (idx, _) = parse_i64(next)?;
 
     Ok((DefId(PackageId(pkg as u16), idx as u16), next_outer))
@@ -486,30 +522,22 @@ fn parse_i64(next: &str) -> ParseResult<i64> {
     }
 }
 
-fn parse_colon(next: &str) -> ParseResult<()> {
-    match parse_token(next)? {
-        (Token::Colon, next) => Ok(((), next)),
-        (token, _) => Err(Error::Expected(Class::Colon, Found(token))),
-    }
-}
+fn parse_expect<'s>(next: &'s str, expected: Token, class: Class) -> ParseResult<'s, ()> {
+    let (token, next_next) = parse_raw_token(next)?;
 
-fn parse_lparen(next: &str) -> ParseResult<()> {
-    match parse_token(next)? {
-        (Token::LParen, next) => Ok(((), next)),
-        (token, _) => Err(Error::Expected(Class::LParen, Found(token))),
-    }
-}
-
-fn parse_rparen(next: &str) -> ParseResult<()> {
-    match parse_raw_token(next)? {
-        (Token::RParen, next) => Ok(((), next)),
-        (token, _) => Err(Error::Expected(Class::RParen, Found(token))),
+    if token == expected {
+        Ok(((), next_next))
+    } else {
+        match token {
+            Token::RParen | Token::RBracket => Err(Error::Unexpected(Class::RParen)),
+            _ => Err(Error::Expected(class, Found(token))),
+        }
     }
 }
 
 fn parse_token(next: &str) -> ParseResult<Token> {
     match parse_raw_token(next)? {
-        (Token::RParen, _) => Err(Error::Unexpected(Class::RParen)),
+        (Token::RParen | Token::RBracket, _) => Err(Error::Unexpected(Class::RParen)),
         (token, next) => Ok((token, next)),
     }
 }
@@ -518,10 +546,12 @@ fn parse_raw_token(next: &str) -> ParseResult<Token> {
     let next = next.trim_start();
     let mut chars = next.char_indices();
 
-    match chars.next() {
+    let token = match chars.next() {
         None => Err(Error::Unexpected(Class::Eof)),
         Some((_, '(')) => Ok((Token::LParen, chars.as_str())),
         Some((_, ')')) => Ok((Token::RParen, chars.as_str())),
+        Some((_, '[')) => Ok((Token::LBracket, chars.as_str())),
+        Some((_, ']')) => Ok((Token::RBracket, chars.as_str())),
         Some((_, '$')) => Ok((Token::Dollar, chars.as_str())),
         Some((_, '#')) => Ok((Token::Hash, chars.as_str())),
         Some((_, '@')) => Ok((Token::At, chars.as_str())),
@@ -538,7 +568,7 @@ fn parse_raw_token(next: &str) -> ParseResult<Token> {
         }
         Some((_, char)) if char.is_ascii() => {
             for (index, char) in chars.by_ref() {
-                if char.is_whitespace() || char == '(' || char == ')' {
+                if char.is_whitespace() || matches!(char, '(' | ')' | '[' | ']') {
                     return Ok((Token::Symbol(&next[0..index]), &next[index..]));
                 }
             }
@@ -546,7 +576,9 @@ fn parse_raw_token(next: &str) -> ParseResult<Token> {
             Ok((Token::Symbol(next), chars.as_str()))
         }
         Some((_, char)) => Err(Error::InvalidChar(char)),
-    }
+    };
+
+    token
 }
 
 fn interpret_number(num: &str) -> Result<Token, Error> {

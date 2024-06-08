@@ -1,20 +1,12 @@
 (struct ($c)
     (prop? $c R:1:0
-        (#u
-            (struct ($d)
-                (prop? $d R:1:1
-                    (#u $a)
-                )
-            )
+        (struct ($d)
+            (prop? $d R:1:1 $a)
         )
     )
     (prop? $c R:1:2
-        (#u
-            (struct ($e)
-                (prop? $e R:1:3
-                    (#u $b)
-                )
-            )
+        (struct ($e)
+            (prop? $e R:1:3 $b)
         )
     )
 )
@@ -23,40 +15,28 @@
 // Then its optional child props should be defined respectively based on free vars
 (struct ($f)
     (prop? $f R:2:0
-        (#u
-            (struct ($g)
-                (prop? $g R:2:1
-                    (#u $a)
-                )
-                (prop? $g R:2:2
-                    (#u $b)
-                )
-            )
+        (struct ($g)
+            (prop? $g R:2:1 $a)
+            (prop? $g R:2:2 $b)
         )
     )
 )
 
 |$c| (block
-    (let-prop $_ $d ($c R:1:0))
-    (let-prop $_ $e ($c R:1:2))
+    (let-prop $d ($c R:1:0))
+    (let-prop $e ($c R:1:2))
     (struct ($f)
         (prop?- $f R:2:0
-            (#u
-                (struct ($g)
-                    (catch (@h)
-                        (try? @h $d)
-                        (let-prop? @h $_ $a ($d R:1:1))
-                        (prop?- $g R:2:1
-                            (#u $a)
-                        )
-                    )
-                    (catch (@i)
-                        (try? @i $e)
-                        (let-prop? @i $_ $b ($e R:1:3))
-                        (prop?- $g R:2:2
-                            (#u $b)
-                        )
-                    )
+            (struct ($g)
+                (catch (@h)
+                    (try? @h $d)
+                    (let-prop? @h $a ($d R:1:1))
+                    (prop?- $g R:2:1 $a)
+                )
+                (catch (@i)
+                    (try? @i $e)
+                    (let-prop? @i $b ($e R:1:3))
+                    (prop?- $g R:2:2 $b)
                 )
             )
         )

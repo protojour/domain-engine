@@ -422,8 +422,19 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         };
 
         match (applied_mode, variant) {
+            (ExprMode::Expr { .. }, PropVariant::Unit(val)) => {
+                let free_vars = scan_immediate_free_vars(self.expr_arena, &[*val]);
+                self.maybe_apply_catch_block(free_vars, meta.span, &|zelf| {
+                    let val = zelf.write_one_expr(*val, applied_mode)?;
+
+                    Ok(smallvec![zelf.mk_node(
+                        Kind::Prop(flags, struct_var, rel_id, PropVariant::Unit(val),),
+                        *meta,
+                    )])
+                })
+            }
             (ExprMode::Expr { .. }, PropVariant::Tuple(Attribute { rel, val })) => {
-                let free_vars = scan_immediate_free_vars(self.expr_arena, [*rel, *val]);
+                let free_vars = scan_immediate_free_vars(self.expr_arena, &[*rel, *val]);
                 self.maybe_apply_catch_block(free_vars, meta.span, &|zelf| {
                     let rel = zelf.write_one_expr(*rel, applied_mode)?;
                     let val = zelf.write_one_expr(*val, applied_mode)?;
@@ -444,20 +455,44 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             ),
             (
                 ExprMode::MatchStruct { match_var, .. },
-                PropVariant::Tuple(Attribute { rel, val }),
+                PropVariant::Unit(_) | PropVariant::Tuple(_),
             ) => {
                 let unit_meta = Meta::new(&UNIT_TYPE, meta.span);
                 let mut body = Nodes::default();
-                let (rel_term, _rel_meta, rel_nodes) =
-                    self.write_cond_term(*rel, match_var, applied_mode, &mut body)?;
-                let (val_term, _val_meta, val_nodes) =
-                    self.write_cond_term(*val, match_var, applied_mode, &mut body)?;
+
+                let (in_nodes, clause, out_nodes) = match variant {
+                    PropVariant::Unit(node) => {
+                        let (term, _meta, nodes) =
+                            self.write_cond_term(*node, match_var, applied_mode, &mut body)?;
+
+                        (
+                            vec![*node],
+                            Clause::Member(EvalCondTerm::Wildcard, term),
+                            nodes,
+                        )
+                    }
+                    PropVariant::Tuple(Attribute { rel, val }) => {
+                        let (rel_term, _rel_meta, mut rel_nodes) =
+                            self.write_cond_term(*rel, match_var, applied_mode, &mut body)?;
+                        let (val_term, _val_meta, val_nodes) =
+                            self.write_cond_term(*val, match_var, applied_mode, &mut body)?;
+
+                        rel_nodes.extend(val_nodes);
+
+                        (
+                            vec![*rel, *val],
+                            Clause::Member(rel_term, val_term),
+                            rel_nodes,
+                        )
+                    }
+                    PropVariant::Predicate(..) => unreachable!(),
+                };
 
                 let set_var = self.alloc_var();
                 let let_cond_var = self.mk_let_cond_var(set_var, match_var, meta.span);
 
                 if flags.rel_up_optional() {
-                    let mut free_vars = scan_immediate_free_vars(self.expr_arena, [*rel, *val]);
+                    let mut free_vars = scan_immediate_free_vars(self.expr_arena, &in_nodes);
                     free_vars.insert(struct_var);
                     free_vars.insert(set_var);
 
@@ -478,15 +513,14 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                                 set_var,
                                             )
                                         ),
-                                        ClausePair(set_var, Clause::Member(rel_term, val_term))
+                                        ClausePair(set_var, clause.clone())
                                     ],
                                 ),
                                 unit_meta,
                             ),
                         ]);
 
-                        body.extend(rel_nodes.clone());
-                        body.extend(val_nodes.clone());
+                        body.extend(out_nodes.clone());
 
                         Ok(body)
                     })?);
@@ -501,15 +535,14 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                         struct_var,
                                         Clause::MatchProp(rel_id, SetOperator::ElementIn, set_var,)
                                     ),
-                                    ClausePair(set_var, Clause::Member(rel_term, val_term))
+                                    ClausePair(set_var, clause)
                                 ],
                             ),
                             unit_meta,
                         ),
                     ]);
 
-                    body.extend(rel_nodes);
-                    body.extend(val_nodes);
+                    body.extend(out_nodes);
                 }
 
                 Ok(body)
@@ -517,7 +550,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             (ExprMode::MatchStruct { match_var, .. }, PropVariant::Predicate(operator, node)) => {
                 let set_cond_var = self.alloc_var();
                 let let_cond_var = self.mk_let_cond_var(set_cond_var, match_var, meta.span);
-                let free_vars = scan_immediate_free_vars(self.expr_arena, [*node]);
+                let free_vars = scan_immediate_free_vars(self.expr_arena, &[*node]);
 
                 self.maybe_apply_catch_block(free_vars, meta.span, &|zelf| {
                     let mut body = smallvec![let_cond_var];
@@ -564,7 +597,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                         .report(self);
                     return Ok(smallvec![]);
                 };
-                let free_vars = scan_immediate_free_vars(self.expr_arena, [*rel, *val]);
+                let free_vars = scan_immediate_free_vars(self.expr_arena, &[*rel, *val]);
 
                 let for_each = self.prealloc_node();
                 let ((rel_binding, val_binding), for_each_body) =
@@ -633,7 +666,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     // panic!("set prop: no iteration source");
                     return Ok(smallvec![]);
                 };
-                let free_vars = scan_immediate_free_vars(self.expr_arena, [*rel, *val]);
+                let free_vars = scan_immediate_free_vars(self.expr_arena, &[*rel, *val]);
 
                 let for_each = self.prealloc_node();
                 let ((rel_binding, val_binding), for_each_body) =

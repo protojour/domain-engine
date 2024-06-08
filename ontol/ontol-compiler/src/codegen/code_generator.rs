@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use bit_set::BitSet;
 use fnv::FnvHashMap;
-use ontol_hir::{Binding, EvalCondTerm, OverloadFunc, PropVariant, StructFlags};
+use ontol_hir::{Binding, EvalCondTerm, OverloadFunc, Pack, PropVariant, StructFlags};
 use ontol_runtime::{
     ontology::map::MapLossiness,
     property::ValueCardinality,
@@ -293,7 +293,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     self.builder,
                 );
             }
-            ontol_hir::Kind::LetProp(Attribute { rel, val }, (struct_var, rel_id)) => {
+            ontol_hir::Kind::LetProp(bind_pack, (struct_var, rel_id)) => {
                 let Ok(struct_local) = self.var_local(*struct_var, &span) else {
                     return;
                 };
@@ -301,15 +301,30 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 let mut delta = 0;
                 let mut len: u8 = 0;
 
-                for binding in [val, rel] {
-                    if let ontol_hir::Binding::Binder(binder) = binding {
-                        delta += 1;
-                        len += 1;
-                        self.scope_insert(
-                            binder.hir().var,
-                            self.builder.top_plus(delta),
-                            &binder.meta().span,
-                        );
+                match bind_pack {
+                    Pack::Unit(binding) => {
+                        if let ontol_hir::Binding::Binder(binder) = binding {
+                            delta += 1;
+                            len += 1;
+                            self.scope_insert(
+                                binder.hir().var,
+                                self.builder.top_plus(delta),
+                                &binder.meta().span,
+                            );
+                        }
+                    }
+                    Pack::Tuple(t) => {
+                        for binding in t {
+                            if let ontol_hir::Binding::Binder(binder) = binding {
+                                delta += 1;
+                                len += 1;
+                                self.scope_insert(
+                                    binder.hir().var,
+                                    self.builder.top_plus(delta),
+                                    &binder.meta().span,
+                                );
+                            }
+                        }
                     }
                 }
 
@@ -322,7 +337,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     );
                 }
             }
-            ontol_hir::Kind::LetPropDefault(binding, (struct_var, rel_id), default) => {
+            ontol_hir::Kind::LetPropDefault(bind_pack, (struct_var, rel_id), default) => {
                 let Ok(struct_local) = self.var_local(*struct_var, &span) else {
                     return;
                 };
@@ -333,15 +348,30 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 let mut len: u8 = 0;
 
-                for binding in [binding.val, binding.rel] {
-                    if let ontol_hir::Binding::Binder(binder) = binding {
-                        delta += 1;
-                        len += 1;
-                        self.scope_insert(
-                            binder.hir().var,
-                            self.builder.top_plus(delta),
-                            &binder.meta().span,
-                        );
+                match bind_pack {
+                    Pack::Unit(binding) => {
+                        if let ontol_hir::Binding::Binder(binder) = binding {
+                            delta += 1;
+                            len += 1;
+                            self.scope_insert(
+                                binder.hir().var,
+                                self.builder.top_plus(delta),
+                                &binder.meta().span,
+                            );
+                        }
+                    }
+                    Pack::Tuple(t) => {
+                        for binding in t {
+                            if let ontol_hir::Binding::Binder(binder) = binding {
+                                delta += 1;
+                                len += 1;
+                                self.scope_insert(
+                                    binder.hir().var,
+                                    self.builder.top_plus(delta),
+                                    &binder.meta().span,
+                                );
+                            }
+                        }
                     }
                 }
 
@@ -364,11 +394,21 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                     default_block.pop_until(before, span, self.builder);
 
-                    if let ontol_hir::Binding::Binder(_) = binding.rel {
-                        self.gen_node(arena.node_ref(default.rel), &mut default_block);
-                    }
-                    if let ontol_hir::Binding::Binder(_) = binding.val {
-                        self.gen_node(arena.node_ref(default.val), &mut default_block);
+                    match bind_pack {
+                        Pack::Unit(binding) => {
+                            let default = default.iter().next().unwrap();
+
+                            if matches!(binding, Binding::Binder(_)) {
+                                self.gen_node(arena.node_ref(*default), &mut default_block);
+                            }
+                        }
+                        Pack::Tuple(bindings) => {
+                            for (binding, default) in bindings.iter().zip(default.iter()) {
+                                if matches!(binding, Binding::Binder(_)) {
+                                    self.gen_node(arena.node_ref(*default), &mut default_block);
+                                }
+                            }
+                        }
                     }
 
                     default_block.commit(

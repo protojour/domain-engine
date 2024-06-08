@@ -3,7 +3,7 @@
 use std::{collections::BTreeSet, fmt::Debug};
 
 use fnv::{FnvHashMap, FnvHashSet};
-use ontol_hir::{PropVariant, StructFlags};
+use ontol_hir::{Pack, PropVariant, StructFlags};
 use ontol_runtime::{
     ontology::map::{PropertyFlow, PropertyFlowData},
     value::Attribute,
@@ -11,11 +11,7 @@ use ontol_runtime::{
     DefId, RelationshipId,
 };
 
-use crate::{
-    def::LookupRelationshipMeta,
-    typed_hir::TypedNodeRef,
-    types::{Type, UNIT_TYPE},
-};
+use crate::{def::LookupRelationshipMeta, typed_hir::TypedNodeRef, types::Type};
 
 pub struct DataFlowAnalyzer<'c, R> {
     defs: &'c R,
@@ -116,33 +112,48 @@ where
                 var_set
             }
             ontol_hir::Kind::Try(..) => VarSet::default(),
-            ontol_hir::Kind::LetProp(Attribute { rel, val }, (struct_var, rel_id))
-            | ontol_hir::Kind::LetPropDefault(Attribute { rel, val }, (struct_var, rel_id), _)
-            | ontol_hir::Kind::TryLetProp(_, Attribute { rel, val }, (struct_var, rel_id)) => {
+            ontol_hir::Kind::LetProp(bind_pack, (struct_var, rel_id))
+            | ontol_hir::Kind::LetPropDefault(bind_pack, (struct_var, rel_id), _)
+            | ontol_hir::Kind::TryLetProp(_, bind_pack, (struct_var, rel_id)) => {
                 self.prop_origins.insert(*rel_id, *struct_var);
                 self.prop_origins_inverted
                     .entry(*struct_var)
                     .or_default()
                     .insert(*rel_id);
 
-                let mut value_ty = &UNIT_TYPE;
+                let mut types = vec![];
 
-                if let ontol_hir::Binding::Binder(binder) = rel {
-                    self.var_origins.insert(binder.hir().var, *rel_id);
-                    self.add_dep(binder.hir().var, *struct_var);
+                match bind_pack {
+                    Pack::Unit(binding) => {
+                        if let ontol_hir::Binding::Binder(binder) = binding {
+                            self.var_origins.insert(binder.hir().var, *rel_id);
+                            self.add_dep(binder.hir().var, *struct_var);
+                            types.push(binder.ty());
+                        }
+                    }
+                    Pack::Tuple(t) => {
+                        for binding in t {
+                            if let ontol_hir::Binding::Binder(binder) = binding {
+                                self.var_origins.insert(binder.hir().var, *rel_id);
+                                self.add_dep(binder.hir().var, *struct_var);
+                                types.push(binder.ty());
+                            }
+                        }
+                    }
                 }
-                if let ontol_hir::Binding::Binder(binder) = val {
-                    self.var_origins.insert(binder.hir().var, *rel_id);
-                    self.add_dep(binder.hir().var, *struct_var);
-                    value_ty = binder.ty();
+
+                for ty in types {
+                    let value_def_id = match ty {
+                        Type::Seq(_rel, val) => val.get_single_def_id(),
+                        other => other.get_single_def_id(),
+                    };
+
+                    self.reg_scope_prop(
+                        *struct_var,
+                        *rel_id,
+                        value_def_id.unwrap_or(DefId::unit()),
+                    );
                 }
-
-                let value_def_id = match value_ty {
-                    Type::Seq(_rel, val) => val.get_single_def_id(),
-                    other => other.get_single_def_id(),
-                };
-
-                self.reg_scope_prop(*struct_var, *rel_id, value_def_id.unwrap_or(DefId::unit()));
 
                 VarSet::default()
             }

@@ -1,34 +1,26 @@
 (match-struct ($d)
     (prop! $d R:1:2
-        (#u (regex-seq (@c) def@0:43 ((1 $a)) ((2 $b))))
+        (regex-seq (@c) def@0:43 ((1 $a)) ((2 $b)))
     )
 )
 
 (struct ($e)
     (prop! $e R:1:6
-        (#u
-            (set
-                (.. @c
-                    #u
-                    (struct ($f)
-                        (prop! $f R:1:4
-                            (#u $a)
-                        )
-                    )
+        (set
+            (.. @c
+                #u
+                (struct ($f)
+                    (prop! $f R:1:4 $a)
                 )
             )
         )
     )
     (prop! $e R:1:7
-        (#u
-            (set
-                (.. @c
-                    #u
-                    (struct ($g)
-                        (prop! $g R:1:4
-                            (#u $b)
-                        )
-                    )
+        (set
+            (.. @c
+                #u
+                (struct ($g)
+                    (prop! $g R:1:4 $b)
                 )
             )
         )
@@ -36,21 +28,17 @@
 )
 
 |$d| (block
-    (let-prop $_ $h ($d R:1:2))
+    (let-prop $h ($d R:1:2))
     (let-regex-iter $c ((1 $a)) ((2 $b)) def@0:43 $h)
     (struct ($e)
         (prop! $e R:1:6
-            (#u
-                (make-seq ($i)
-                    (for-each $c ($_ $j)
-                        (catch (@k)
-                            (let-tup? @k ($a $_) $j)
-                            (insert $i #u
-                                (struct ($f)
-                                    (prop! $f R:1:4
-                                        (#u $a)
-                                    )
-                                )
+            (make-seq ($i)
+                (for-each $c ($_ $j)
+                    (catch (@k)
+                        (let-tup? @k ($a $_) $j)
+                        (insert $i #u
+                            (struct ($f)
+                                (prop! $f R:1:4 $a)
                             )
                         )
                     )
@@ -58,17 +46,13 @@
             )
         )
         (prop! $e R:1:7
-            (#u
-                (make-seq ($l)
-                    (for-each $c ($_ $m)
-                        (catch (@n)
-                            (let-tup? @n ($_ $b) $m)
-                            (insert $l #u
-                                (struct ($g)
-                                    (prop! $g R:1:4
-                                        (#u $b)
-                                    )
-                                )
+            (make-seq ($l)
+                (for-each $c ($_ $m)
+                    (catch (@n)
+                        (let-tup? @n ($_ $b) $m)
+                        (insert $l #u
+                            (struct ($g)
+                                (prop! $g R:1:4 $b)
                             )
                         )
                     )

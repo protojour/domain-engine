@@ -2,7 +2,7 @@ use ontol_runtime::RelationshipId;
 
 use crate::{
     arena::{Arena, NodeRef},
-    Attribute, Binding, Kind, Label, Lang, PropFlags, PropVariant, SetEntry, Var,
+    Binding, Kind, Label, Lang, Node, Pack, PropFlags, PropVariant, SetEntry, Var,
 };
 
 pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
@@ -81,22 +81,20 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                 self.visit_binder(L::as_hir(binder).var);
                 self.visit_node(0, arena.node_ref(*node));
             }
-            Kind::LetProp(Attribute { rel, val }, (var, _prop_id)) => {
-                self.traverse_pattern_binding(rel);
-                self.traverse_pattern_binding(val);
+            Kind::LetProp(bind_pack, (var, _prop_id)) => {
+                self.traverse_pack_binding(bind_pack);
                 self.visit_var(*var);
             }
-            Kind::LetPropDefault(binding, (var, _prop_id), default) => {
-                self.traverse_pattern_binding(&binding.rel);
-                self.traverse_pattern_binding(&binding.val);
+            Kind::LetPropDefault(bind_pack, (var, _prop_id), default) => {
+                self.traverse_pack_binding(bind_pack);
                 self.visit_var(*var);
-                self.visit_node(0, arena.node_ref(default.rel));
-                self.visit_node(1, arena.node_ref(default.val));
+                for (i, node) in default.iter().enumerate() {
+                    self.visit_node(i, arena.node_ref(*node));
+                }
             }
-            Kind::TryLetProp(try_label, Attribute { rel, val }, (var, _prop_id)) => {
+            Kind::TryLetProp(try_label, bind_pack, (var, _prop_id)) => {
                 self.visit_label(*try_label);
-                self.traverse_pattern_binding(rel);
-                self.traverse_pattern_binding(val);
+                self.traverse_pack_binding(bind_pack);
                 self.visit_var(*var);
             }
             Kind::TryLetTup(try_label, bindings, node) => {
@@ -254,10 +252,36 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
         self.visit_node(1, arena.node_ref(entry.1.val));
     }
 
+    fn traverse_pack_binding(&mut self, pack: &Pack<Binding<'a, L>>) {
+        match pack {
+            Pack::Unit(u) => {
+                self.traverse_pattern_binding(u);
+            }
+            Pack::Tuple(t) => {
+                for el in t {
+                    self.traverse_pattern_binding(el);
+                }
+            }
+        }
+    }
+
     fn traverse_pattern_binding(&mut self, binding: &Binding<'a, L>) {
         match binding {
             Binding::Binder(binder) => self.visit_binder(L::as_hir(binder).var),
             Binding::Wildcard => {}
+        }
+    }
+
+    fn traverse_pack_node(&mut self, pack: &Pack<Node>, arena: &'h Arena<'a, L>) {
+        match pack {
+            Pack::Unit(u) => {
+                self.visit_node(0, arena.node_ref(*u));
+            }
+            Pack::Tuple(t) => {
+                for (i, node) in t.iter().enumerate() {
+                    self.visit_node(i, arena.node_ref(*node));
+                }
+            }
         }
     }
 }

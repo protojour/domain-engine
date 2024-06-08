@@ -1,35 +1,31 @@
 (struct ($e)
-    (prop! $e R:1:0 (#u $a))
-    (prop! $e R:1:1 (#u (set (.. @d #u $b))))
-    (prop! $e R:1:2 (#u $c))
+    (prop! $e R:1:0 $a)
+    (prop! $e R:1:1 (set (.. @d #u $b)))
+    (prop! $e R:1:2 $c)
 )
 
 (struct ($f)
     (prop! $f R:2:1
-        (#u
-            (set
-                (#u $a)
-                (.. @d #u $b)
-                (#u $c)
-            )
+        (set
+            (#u $a)
+            (.. @d #u $b)
+            (#u $c)
         )
     )
 )
 
 |$e| (block
-    (let-prop $_ $a ($e R:1:0))
-    (let-prop $_ $d ($e R:1:1))
-    (let-prop $_ $c ($e R:1:2))
+    (let-prop $a ($e R:1:0))
+    (let-prop $d ($e R:1:1))
+    (let-prop $c ($e R:1:2))
     (struct ($f)
         (prop! $f R:2:1
-            (#u
-                (make-seq ($g)
-                    (insert $g #u $a)
-                    (for-each $d ($_ $b)
-                        (insert $g #u $b)
-                    )
-                    (insert $g #u $c)
+            (make-seq ($g)
+                (insert $g #u $a)
+                (for-each $d ($_ $b)
+                    (insert $g #u $b)
                 )
+                (insert $g #u $c)
             )
         )
         (move-rest-attrs $f $e)

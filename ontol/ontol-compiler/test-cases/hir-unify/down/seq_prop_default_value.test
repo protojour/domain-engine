@@ -1,24 +1,22 @@
 (struct ($b)
     (prop $b R:1:0
-        (#u (set (.. @d #u $a)))
+        (set (.. @d #u $a))
     )
 )
 
 (struct ($c)
     (prop $c R:2:1
-        (#u (set (.. @d #u $a)))
+        (set (.. @d #u $a))
     )
 )
 
 |$b| (block
-    (let-prop-default $_ $d ($b R:1:0) #u #u)
+    (let-prop-default $d ($b R:1:0) #u)
     (struct ($c)
         (prop- $c R:2:1
-            (#u
-                (make-seq ($e)
-                    (for-each $d ($_ $a)
-                        (insert $e #u $a)
-                    )
+            (make-seq ($e)
+                (for-each $d ($_ $a)
+                    (insert $e #u $a)
                 )
             )
         )

@@ -138,15 +138,11 @@ pub enum Kind<'a, L: Lang> {
     /// Tries to bind expression to a variable. Exits labelled try block if #void.
     TryLet(Label, L::Data<'a, Binder>, Node),
     /// Defines two variables from a struct property
-    LetProp(Attribute<Binding<'a, L>>, (Var, RelationshipId)),
+    LetProp(Pack<Binding<'a, L>>, (Var, RelationshipId)),
     /// Defines two variables from a struct property, or a default attribute if not present
-    LetPropDefault(
-        Attribute<Binding<'a, L>>,
-        (Var, RelationshipId),
-        Attribute<Node>,
-    ),
+    LetPropDefault(Pack<Binding<'a, L>>, (Var, RelationshipId), ThinVec<Node>),
     /// Tries to define two variables from a struct propery, and exits to the try label if unsuccessful.
-    TryLetProp(Label, Attribute<Binding<'a, L>>, (Var, RelationshipId)),
+    TryLetProp(Label, Pack<Binding<'a, L>>, (Var, RelationshipId)),
     /// Unpack a tuple-like sequence to bind each element to a variable
     TryLetTup(Label, ThinVec<Binding<'a, L>>, Node),
     /// Narrowing with exit point
@@ -215,6 +211,12 @@ pub enum PropVariant {
     Unit(Node),
     Tuple(Attribute<Node>),
     Predicate(SetOperator, Node),
+}
+
+#[derive(Clone)]
+pub enum Pack<T> {
+    Unit(T),
+    Tuple(ThinVec<T>),
 }
 
 #[derive(Clone, Copy)]
