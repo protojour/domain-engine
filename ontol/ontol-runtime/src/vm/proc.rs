@@ -87,9 +87,9 @@ pub enum OpCode {
     /// See GetAttrFlags for different semantic variations.
     GetAttr(Local, RelationshipId, u8, GetAttrFlags),
     /// Pop 1 value from stack, and move it into the specified local struct. Sets the attribute parameter to unit.
-    PutAttr1(Local, RelationshipId),
-    /// Pop 2 stack values, rel_params (top) then value, and move it into the specified local struct.
-    PutAttr2(Local, RelationshipId),
+    PutAttrUnit(Local, RelationshipId),
+    /// Pop n stack values, insert them as a tuple attribute in reverse order
+    PutAttrTup(Local, u8, RelationshipId),
     /// Move rest attrs from the second local into the first local.
     MoveRestAttrs(Local, Local),
     /// Pop N stack values, push each of those consecutively into N different contiguous sequences

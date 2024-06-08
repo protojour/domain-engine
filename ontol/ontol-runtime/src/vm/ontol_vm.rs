@@ -3,7 +3,7 @@ use std::array;
 use bit_vec::BitVec;
 use fnv::FnvHashMap;
 use regex_automata::{util::captures::Captures, Input};
-use smallvec::smallvec;
+use smallvec::SmallVec;
 use smartstring::alias::String;
 use thin_vec::ThinVec;
 use tracing::{error, trace, Level};
@@ -122,6 +122,8 @@ impl<'o> Processor for OntolProcessor<'o> {
             match self.local_mut(column_local) {
                 Value::Sequence(seq, _) => {
                     if seq.elements.len() <= i {
+                        trace!("ending iteration on tuple {n}");
+
                         result = false;
                     } else {
                         // TODO(optimize): Figure out when clone is needed!
@@ -195,7 +197,7 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn put_attr1(&mut self, target: Local, key: RelationshipId) -> VmResult<()> {
+    fn put_attr_unit(&mut self, target: Local, key: RelationshipId) -> VmResult<()> {
         let value = self.stack.pop().unwrap();
         if !matches!(value, Value::Unit(_) | Value::Void(_)) {
             match &mut self.stack[target.0 as usize] {
@@ -224,17 +226,16 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn put_attr2(&mut self, target: Local, key: RelationshipId) -> VmResult<()> {
-        let [rel, val]: [Value; 2] = self.pop_n();
-        if !matches!(val, Value::Unit(_) | Value::Void(_)) {
-            let map = self.struct_local_mut(target)?;
-            map.insert(
-                key,
-                Attr::Tuple(Box::new(EndoTuple {
-                    elements: smallvec![val, rel],
-                })),
-            );
+    fn put_attr_tup(&mut self, target: Local, n: u8, key: RelationshipId) -> VmResult<()> {
+        let mut elements: SmallVec<Value, 1> = Default::default();
+
+        for _ in 0..n {
+            elements.push(self.pop_one());
         }
+
+        let map = self.struct_local_mut(target)?;
+        map.insert(key, Attr::Tuple(Box::new(EndoTuple { elements })));
+
         Ok(())
     }
 
@@ -648,9 +649,9 @@ mod tests {
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(42)),
                 OpCode::GetAttr(Local(0), "R:0:1".parse().unwrap(), 1, GetAttrFlags::TAKE),
-                OpCode::PutAttr1(Local(1), "R:0:3".parse().unwrap()),
+                OpCode::PutAttrUnit(Local(1), "R:0:3".parse().unwrap()),
                 OpCode::GetAttr(Local(0), "R:0:2".parse().unwrap(), 1, GetAttrFlags::TAKE),
-                OpCode::PutAttr1(Local(1), "R:0:4".parse().unwrap()),
+                OpCode::PutAttrUnit(Local(1), "R:0:4".parse().unwrap()),
                 OpCode::PopUntil(Local(1)),
                 OpCode::Return,
             ],
@@ -710,7 +711,7 @@ mod tests {
                 // 2, 3:
                 OpCode::GetAttr(Local(0), "R:0:1".parse().unwrap(), 1, GetAttrFlags::TAKE),
                 OpCode::Call(double),
-                OpCode::PutAttr1(Local(1), "R:0:4".parse().unwrap()),
+                OpCode::PutAttrUnit(Local(1), "R:0:4".parse().unwrap()),
                 // 3, 4:
                 OpCode::GetAttr(Local(0), "R:0:2".parse().unwrap(), 1, GetAttrFlags::TAKE),
                 // 5, 6:
@@ -718,7 +719,7 @@ mod tests {
                 OpCode::Clone(Local(2)),
                 // pop(6, 7):
                 OpCode::Call(add_then_double),
-                OpCode::PutAttr1(Local(1), "R:0:5".parse().unwrap()),
+                OpCode::PutAttrUnit(Local(1), "R:0:5".parse().unwrap()),
                 OpCode::PopUntil(Local(1)),
                 OpCode::Return,
             ],
@@ -828,9 +829,9 @@ mod tests {
                 // New object -> Local(6)
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(0)),
                 OpCode::Clone(Local(1)),
-                OpCode::PutAttr1(Local(6), prop_a),
+                OpCode::PutAttrUnit(Local(6), prop_a),
                 OpCode::Bump(Local(5)),
-                OpCode::PutAttr1(Local(6), prop_b),
+                OpCode::PutAttrUnit(Local(6), prop_b),
                 OpCode::Bump(Local(6)),
                 OpCode::SeqAppendN(Local(4), 1),
                 OpCode::PopUntil(Local(4)),
@@ -887,7 +888,7 @@ mod tests {
                 OpCode::Goto(AddressOffset(3)),
                 // AddressOffset(7):
                 OpCode::I64(666, def_id(200)),
-                OpCode::PutAttr1(Local(1), prop),
+                OpCode::PutAttrUnit(Local(1), prop),
                 OpCode::Goto(AddressOffset(3)),
             ],
         );

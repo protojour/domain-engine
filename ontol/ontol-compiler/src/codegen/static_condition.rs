@@ -79,14 +79,18 @@ impl<'c, 'm> ConditionBuilder<'c, 'm> {
 
                     CondTerm::Wildcard
                 }
-                PropVariant::Tuple(attr) => {
+                PropVariant::Tuple(tup) => {
                     let Some(parent_var) = parent_var else {
                         return CondTerm::Wildcard;
                     };
                     let prop_var = self.output.mk_cond_var();
 
-                    let rel = self.term(attr.rel, Some(prop_var));
-                    let val = self.term(attr.val, Some(prop_var));
+                    if tup.len() != 2 {
+                        panic!("only 2-tuples supported for now");
+                    }
+
+                    let val = self.term(tup[0], Some(prop_var));
+                    let rel = self.term(tup[1], Some(prop_var));
 
                     if !matches!(rel, CondTerm::Wildcard) || !matches!(val, CondTerm::Wildcard) {
                         self.output.add_clause(

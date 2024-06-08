@@ -7,7 +7,7 @@ use ontol_runtime::{
     MapDirection,
 };
 use smallvec::smallvec;
-use thin_vec::thin_vec;
+use thin_vec::{thin_vec, ThinVec};
 use tracing::{debug, trace};
 
 use crate::{
@@ -398,28 +398,29 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             }
                         }
                     }
-                    PropVariant::Tuple(Attribute { rel, val }) => {
+                    PropVariant::Tuple(tup) => {
                         match (rel_optional, needs_default) {
                             (true, true) => {
                                 // This passed type check, so there must be a way to construct a value default
-                                let default = thin_vec![
-                                    self.write_default_node(
-                                        *self.scope_arena.node_ref(*val).meta(),
-                                    ),
-                                    self.write_default_node(
-                                        *self.scope_arena.node_ref(*rel).meta(),
-                                    ),
-                                ];
+                                let default: ThinVec<_> = tup
+                                    .iter()
+                                    .map(|node| {
+                                        self.write_default_node(
+                                            *self.scope_arena.node_ref(*node).meta(),
+                                        )
+                                    })
+                                    .collect();
 
-                                let rel = self.traverse(*rel, prop_scoped, &mut sub_lets)?;
-                                let val = self.traverse(*val, prop_scoped, &mut sub_lets)?;
+                                let bind_pack = Pack::Tuple(
+                                    tup.iter()
+                                        .map(|node| {
+                                            self.traverse(*node, prop_scoped, &mut sub_lets)
+                                        })
+                                        .collect::<Result<_, _>>()?,
+                                );
 
                                 self.push_let(
-                                    Let::PropDefault(
-                                        Pack::Tuple(thin_vec![val, rel]),
-                                        (*var, *rel_id),
-                                        default,
-                                    ),
+                                    Let::PropDefault(bind_pack, (*var, *rel_id), default),
                                     node_ref.span(),
                                     scoped,
                                     lets,
@@ -432,11 +433,16 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                     prop_scoped
                                 };
 
-                                let rel = self.traverse(*rel, next_scoped, &mut sub_lets)?;
-                                let val = self.traverse(*val, next_scoped, &mut sub_lets)?;
+                                let bind_pack = Pack::Tuple(
+                                    tup.iter()
+                                        .map(|node| {
+                                            self.traverse(*node, next_scoped, &mut sub_lets)
+                                        })
+                                        .collect::<Result<_, _>>()?,
+                                );
 
                                 self.push_let(
-                                    Let::Prop(Pack::Tuple(thin_vec![val, rel]), (*var, *rel_id)),
+                                    Let::Prop(bind_pack, (*var, *rel_id)),
                                     node_ref.span(),
                                     scoped,
                                     lets,

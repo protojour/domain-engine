@@ -2,17 +2,16 @@ use std::collections::BTreeMap;
 
 use bit_set::BitSet;
 use fnv::FnvHashMap;
-use ontol_hir::{Binding, EvalCondTerm, OverloadFunc, Pack, PropVariant, StructFlags};
+use ontol_hir::{Binding, EvalCondTerm, Node, OverloadFunc, Pack, PropVariant, StructFlags};
 use ontol_runtime::{
     ontology::map::MapLossiness,
     property::ValueCardinality,
     query::condition::{Clause, ClausePair},
-    value::Attribute,
     var::{Var, VarSet},
     vm::proc::{
         BuiltinProc, GetAttrFlags, Local, NParams, OpCode, OpCodeCondTerm, Predicate, Procedure,
     },
-    DefId, MapDirection, MapFlags, MapKey, RelationshipId,
+    DefId, MapDirection, MapFlags, MapKey,
 };
 use thin_vec::ThinVec;
 use tracing::debug;
@@ -751,25 +750,45 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     self.scope.remove(&binder.hir().var);
                 }
             }
-            ontol_hir::Kind::Prop(_, struct_var, rel_id, variant) => match variant {
-                PropVariant::Unit(node) => {
-                    let Ok(struct_local) = self.var_local(*struct_var, &span) else {
-                        return;
-                    };
+            ontol_hir::Kind::Prop(_, struct_var, rel_id, variant) => {
+                let Ok(struct_local) = self.var_local(*struct_var, &span) else {
+                    return;
+                };
 
-                    self.gen_node(arena.node_ref(*node), block);
-                    block.op(
-                        OpCode::PutAttr1(struct_local, *rel_id),
-                        Delta(-1),
-                        span,
-                        self.builder,
-                    );
+                match variant {
+                    PropVariant::Unit(node) => {
+                        self.gen_node(arena.node_ref(*node), block);
+                        block.op(
+                            OpCode::PutAttrUnit(struct_local, *rel_id),
+                            Delta(-1),
+                            span,
+                            self.builder,
+                        );
+                    }
+                    PropVariant::Tuple(tup) => {
+                        let mut top: FnvHashMap<Node, Local> = Default::default();
+
+                        for node in tup.iter() {
+                            self.gen_node(arena.node_ref(*node), block);
+                            top.insert(*node, self.builder.top());
+                        }
+
+                        // PutAttrTup must see the values in reverse order
+                        for node in tup.iter().rev().skip(1) {
+                            let local = top.get(node).unwrap();
+                            block.op(OpCode::Clone(*local), Delta(1), span, self.builder);
+                        }
+
+                        block.op(
+                            OpCode::PutAttrTup(struct_local, tup.len() as u8, *rel_id),
+                            Delta(-(tup.len() as i32)),
+                            span,
+                            self.builder,
+                        );
+                    }
+                    PropVariant::Predicate(..) => todo!(),
                 }
-                PropVariant::Tuple(attr) => {
-                    self.gen_attribute(*struct_var, *rel_id, *attr, arena, span, block)
-                }
-                PropVariant::Predicate(..) => todo!(),
-            },
+            }
             ontol_hir::Kind::MoveRestAttrs(target, source) => {
                 let Ok(target_local) = self.var_local(*target, &span) else {
                     return;
@@ -1009,45 +1028,6 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 let top = self.builder.top();
 
                 OpCodeCondTerm::Value(top)
-            }
-        }
-    }
-
-    fn gen_attribute(
-        &mut self,
-        struct_var: Var,
-        rel_id: RelationshipId,
-        Attribute { rel, val }: Attribute<ontol_hir::Node>,
-        arena: &TypedArena<'m>,
-        span: SourceSpan,
-        block: &mut Block,
-    ) {
-        let Ok(struct_local) = self.var_local(struct_var, &span) else {
-            return;
-        };
-
-        match arena.kind_of(rel) {
-            ontol_hir::Kind::Unit => {
-                self.gen_node(arena.node_ref(val), block);
-                block.op(
-                    OpCode::PutAttr1(struct_local, rel_id),
-                    Delta(-1),
-                    span,
-                    self.builder,
-                );
-            }
-            _ => {
-                self.gen_node(arena.node_ref(rel), block);
-                let rel_local = self.builder.top();
-                self.gen_node(arena.node_ref(val), block);
-
-                block.op(OpCode::Clone(rel_local), Delta(1), span, self.builder);
-                block.op(
-                    OpCode::PutAttr2(struct_local, rel_id),
-                    Delta(-2),
-                    span,
-                    self.builder,
-                );
             }
         }
     }

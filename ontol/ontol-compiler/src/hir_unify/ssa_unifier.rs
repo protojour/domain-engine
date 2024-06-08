@@ -433,19 +433,17 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     )])
                 })
             }
-            (ExprMode::Expr { .. }, PropVariant::Tuple(Attribute { rel, val })) => {
-                let free_vars = scan_immediate_free_vars(self.expr_arena, &[*rel, *val]);
+            (ExprMode::Expr { .. }, PropVariant::Tuple(tup)) => {
+                let free_vars = scan_immediate_free_vars(self.expr_arena, tup);
                 self.maybe_apply_catch_block(free_vars, meta.span, &|zelf| {
-                    let rel = zelf.write_one_expr(*rel, applied_mode)?;
-                    let val = zelf.write_one_expr(*val, applied_mode)?;
+                    let variant = PropVariant::Tuple(
+                        tup.iter()
+                            .map(|node| zelf.write_one_expr(*node, applied_mode))
+                            .collect::<Result<_, _>>()?,
+                    );
 
                     Ok(smallvec![zelf.mk_node(
-                        Kind::Prop(
-                            flags,
-                            struct_var,
-                            rel_id,
-                            PropVariant::Tuple(Attribute { rel, val }),
-                        ),
+                        Kind::Prop(flags, struct_var, rel_id, variant,),
                         *meta,
                     )])
                 })
@@ -471,18 +469,22 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             nodes,
                         )
                     }
-                    PropVariant::Tuple(Attribute { rel, val }) => {
-                        let (rel_term, _rel_meta, mut rel_nodes) =
-                            self.write_cond_term(*rel, match_var, applied_mode, &mut body)?;
-                        let (val_term, _val_meta, val_nodes) =
-                            self.write_cond_term(*val, match_var, applied_mode, &mut body)?;
+                    PropVariant::Tuple(tup) => {
+                        if tup.len() != 2 {
+                            panic!("tuple length must be 2 for now")
+                        }
 
-                        rel_nodes.extend(val_nodes);
+                        let (val_term, _val_meta, mut val_nodes) =
+                            self.write_cond_term(tup[0], match_var, applied_mode, &mut body)?;
+                        let (rel_term, _rel_meta, rel_nodes) =
+                            self.write_cond_term(tup[1], match_var, applied_mode, &mut body)?;
+
+                        val_nodes.extend(rel_nodes);
 
                         (
-                            vec![*rel, *val],
+                            vec![tup[0], tup[1]],
                             Clause::Member(rel_term, val_term),
-                            rel_nodes,
+                            val_nodes,
                         )
                     }
                     PropVariant::Predicate(..) => unreachable!(),

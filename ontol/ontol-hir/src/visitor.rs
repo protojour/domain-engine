@@ -228,9 +228,10 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
             PropVariant::Unit(node) => {
                 self.visit_node(0, arena.node_ref(*node));
             }
-            PropVariant::Tuple(attr) => {
-                self.visit_node(0, arena.node_ref(attr.rel));
-                self.visit_node(1, arena.node_ref(attr.val));
+            PropVariant::Tuple(tup) => {
+                for (i, node) in tup.iter().enumerate() {
+                    self.visit_node(i, arena.node_ref(*node));
+                }
             }
             PropVariant::Predicate(_operator, node) => {
                 self.visit_node(0, arena.node_ref(*node));

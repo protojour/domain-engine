@@ -253,9 +253,10 @@ where
                     PropVariant::Unit(node) => {
                         var_set.union_with(&self.analyze_node(arena.node_ref(*node), *rel_id));
                     }
-                    PropVariant::Tuple(Attribute { rel, val }) => {
-                        var_set.union_with(&self.analyze_node(arena.node_ref(*rel), *rel_id));
-                        var_set.union_with(&self.analyze_node(arena.node_ref(*val), *rel_id));
+                    PropVariant::Tuple(tup) => {
+                        for node in tup {
+                            var_set.union_with(&self.analyze_node(arena.node_ref(*node), *rel_id));
+                        }
                     }
                     PropVariant::Predicate(..) => {
                         todo!()

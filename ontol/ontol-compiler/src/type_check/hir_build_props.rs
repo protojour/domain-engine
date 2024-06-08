@@ -410,10 +410,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ctx,
                         );
                         if let Some(rel_node) = rel_node {
-                            PropVariant::Tuple(Attribute {
-                                rel: rel_node,
-                                val: val_node,
-                            })
+                            PropVariant::Tuple(smallvec![val_node, rel_node])
                         } else {
                             PropVariant::Unit(val_node)
                         }
@@ -499,10 +496,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         ctx,
                                     );
                                     if let Some(rel_node) = rel_node {
-                                        PropVariant::Tuple(Attribute {
-                                            rel: rel_node,
-                                            val: val_node,
-                                        })
+                                        PropVariant::Tuple(smallvec![val_node, rel_node])
                                     } else {
                                         PropVariant::Unit(val_node)
                                     }

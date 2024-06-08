@@ -62,8 +62,8 @@ pub trait Processor {
         len: u8,
         flags: GetAttrFlags,
     ) -> VmResult<()>;
-    fn put_attr1(&mut self, target: Local, key: RelationshipId) -> VmResult<()>;
-    fn put_attr2(&mut self, target: Local, key: RelationshipId) -> VmResult<()>;
+    fn put_attr_unit(&mut self, target: Local, key: RelationshipId) -> VmResult<()>;
+    fn put_attr_tup(&mut self, target: Local, n: u8, key: RelationshipId) -> VmResult<()>;
     fn move_rest_attrs(&mut self, target: Local, source: Local) -> VmResult<()>;
     fn push_i64(&mut self, k: i64, result_type: DefId);
     fn push_f64(&mut self, k: f64, result_type: DefId);
@@ -200,12 +200,12 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                     processor.get_attr(*local, *property_id, *len, *flags)?;
                     self.program_counter += 1;
                 }
-                OpCode::PutAttr1(target, property_id) => {
-                    processor.put_attr1(*target, *property_id)?;
+                OpCode::PutAttrUnit(target, property_id) => {
+                    processor.put_attr_unit(*target, *property_id)?;
                     self.program_counter += 1;
                 }
-                OpCode::PutAttr2(target, property_id) => {
-                    processor.put_attr2(*target, *property_id)?;
+                OpCode::PutAttrTup(target, n, property_id) => {
+                    processor.put_attr_tup(*target, *n, *property_id)?;
                     self.program_counter += 1;
                 }
                 OpCode::MoveRestAttrs(target, source) => {

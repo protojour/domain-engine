@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use fnv::FnvHashSet;
 use ontol_runtime::{
-    value::Attribute,
     var::{Var, VarAllocator},
     DefId, PackageId,
 };
@@ -344,14 +343,12 @@ fn autogenerate_fmt_segment_property<'m>(
             }
         };
 
-        let rel = arena.add(TypedHirData(ontol_hir::Kind::Unit, Meta::unit(NO_SPAN)));
-
         Some(arena.add(TypedHirData(
             ontol_hir::Kind::Prop(
                 ontol_hir::PropFlags::empty(),
                 binder_var,
                 *rel_id,
-                ontol_hir::PropVariant::Tuple(Attribute { rel, val: var_node }),
+                ontol_hir::PropVariant::Unit(var_node),
             ),
             Meta::new(object_ty, NO_SPAN),
         )))

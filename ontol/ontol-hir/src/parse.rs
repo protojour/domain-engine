@@ -335,10 +335,9 @@ impl<'a, L: Lang> Parser<'a, L> {
     fn parse_prop_variant<'s>(&mut self, next: &'s str) -> ParseResult<'s, PropVariant> {
         match parse_raw_token(next)? {
             (Token::LBracket, _) => parse_bracket_delimited(next, |next| {
-                let (val, next) = self.parse(next)?;
-                let (rel, next) = self.parse(next)?;
+                let (nodes, next) = self.parse_many(next, |zelf, next| zelf.parse(next))?;
 
-                Ok((PropVariant::Tuple(Attribute { rel, val }), next))
+                Ok((PropVariant::Tuple(nodes.into_iter().collect()), next))
             }),
             _ => match parse_symbol(next) {
                 Ok(("element-in", next)) => {

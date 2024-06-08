@@ -72,7 +72,7 @@ impl<'i, 'o, 'a, L: Lang> Importer<'i, 'o, 'a, L> {
                 *prop_id,
                 match variant {
                     PropVariant::Unit(node) => PropVariant::Unit(self.import(*node)),
-                    PropVariant::Tuple(attr) => PropVariant::Tuple(self.import_attr(*attr)),
+                    PropVariant::Tuple(tup) => PropVariant::Tuple(self.import_nodes(tup)),
                     PropVariant::Predicate(operator, param) => {
                         PropVariant::Predicate(*operator, self.import(*param))
                     }

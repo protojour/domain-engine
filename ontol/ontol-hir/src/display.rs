@@ -327,9 +327,9 @@ impl<'h, 'a, L: Lang> Print<PropVariant> for Printer<'h, 'a, L> {
                 let multi = self.print(f, Sep::Space, self.kind(*node))?;
                 Ok(multi)
             }
-            PropVariant::Tuple(attr) => {
+            PropVariant::Tuple(tup) => {
                 write!(f, "{indent}[")?;
-                let multi = self.print_all(f, Sep::None, self.kinds(&[attr.val, attr.rel]))?;
+                let multi = self.print_all(f, Sep::None, self.kinds(tup))?;
                 self.print_rbracket(f, multi)?;
                 Ok(multi)
             }

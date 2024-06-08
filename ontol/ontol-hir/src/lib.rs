@@ -91,7 +91,7 @@ impl<'a, L: Lang> RootNode<'a, L> {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Node(u32);
 
 /// A binder is syntactic element that introduces a variable,
@@ -209,7 +209,7 @@ pub enum Kind<'a, L: Lang> {
 #[derive(Clone)]
 pub enum PropVariant {
     Unit(Node),
-    Tuple(Attribute<Node>),
+    Tuple(Nodes),
     Predicate(SetOperator, Node),
 }
 
