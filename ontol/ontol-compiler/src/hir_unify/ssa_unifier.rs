@@ -207,8 +207,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                         {
                             if flags.contains(StructFlags::MATCH) {
                                 let match_var = self.alloc_var();
-                                let inner_set_ty =
-                                    self.types.intern(Type::Seq(&UNIT_TYPE, binder.meta().ty));
+                                let inner_set_ty = self.types.intern(Type::Seq(binder.meta().ty));
 
                                 debug!("HERE: root set query");
                                 return self.write_match_struct_expr(
@@ -787,7 +786,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         };
 
         let def_ty = match type_mapping.from {
-            Type::Seq(_, val_ty) => val_ty,
+            Type::Seq(val_ty) => val_ty,
             other => other,
         };
 
@@ -887,10 +886,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
     ) -> UnifierResult<Nodes> {
         let span = self.out_arena.node_ref(input).span();
         match (type_mapping.from, type_mapping.to) {
-            (Type::Seq(rel0, val0), Type::Seq(rel1, val1)) if rel0 == rel1 && val0 == val1 => {
-                Ok(smallvec![input])
-            }
-            (Type::Seq(rel_from, val_from), Type::Seq(rel_to, val_to)) => {
+            (Type::Seq(val0), Type::Seq(val1)) if val0 == val1 => Ok(smallvec![input]),
+            (Type::Seq(val_from), Type::Seq(val_to)) => {
                 let inner_set_var = self.alloc_var();
                 let mut nodes = smallvec![self.mk_node(
                     Kind::Let(
@@ -901,18 +898,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 )];
 
                 let seq_map = {
-                    let rel_var = self.alloc_var();
                     let val_var = self.alloc_var();
-                    let mapped_rel = {
-                        let input = self.mk_node(Kind::Var(rel_var), Meta::new(rel_from, span));
-                        self.write_type_map_if_necessary(
-                            input,
-                            TypeMapping {
-                                from: rel_from,
-                                to: rel_to,
-                            },
-                        )?
-                    };
+                    let mapped_rel = self.mk_node(Kind::Unit, Meta::new(&UNIT_TYPE, span));
                     let mapped_val = {
                         let input = self.mk_node(Kind::Var(val_var), Meta::new(val_from, span));
                         self.write_type_map_if_necessary(
@@ -930,7 +917,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             Kind::Insert(
                                 target_seq_var,
                                 Attribute {
-                                    rel: *mapped_rel.last().unwrap(),
+                                    rel: mapped_rel,
                                     val: *mapped_val.last().unwrap(),
                                 },
                             ),
@@ -942,13 +929,10 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                         Kind::ForEach(
                             inner_set_var,
                             (
-                                Binding::Binder(TypedHirData(
-                                    rel_var.into(),
-                                    Meta::new(rel_from, span),
-                                )),
+                                Binding::Wildcard,
                                 Binding::Binder(TypedHirData(
                                     val_var.into(),
-                                    Meta::new(rel_from, span),
+                                    Meta::new(val_from, span),
                                 )),
                             ),
                             [insert].into_iter().collect(),

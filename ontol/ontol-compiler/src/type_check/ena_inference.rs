@@ -117,17 +117,35 @@ impl<'c, 'm> Infer<'c, 'm> {
                 }
                 InferValue::Unknown => Err(TypeError::NotEnoughInformation),
             },
-            Type::Seq(rel, val) => {
-                let rel = self.infer_recursive(rel)?;
-                let val = self.infer_recursive(val)?;
-
-                Ok(self.types.intern(Type::Seq(rel, val)))
+            Type::Seq(item) => {
+                let item = self.infer_recursive(item)?;
+                Ok(self.types.intern(Type::Seq(item)))
+            }
+            Type::Tuple(elements) => {
+                let elements = self.infer_elements(elements)?;
+                Ok(self.types.intern(Type::Tuple(elements)))
+            }
+            Type::Matrix(elements) => {
+                let elements = self.infer_elements(elements)?;
+                Ok(self.types.intern(Type::Matrix(elements)))
             }
             Type::Option(item) => self
                 .infer_recursive(item)
                 .map(|item| self.types.intern(Type::Option(item))),
             ty => Ok(ty),
         }
+    }
+
+    fn infer_elements(
+        &mut self,
+        elements: &[TypeRef<'m>],
+    ) -> Result<&'m [TypeRef<'m>], TypeError<'m>> {
+        let elements = elements
+            .iter()
+            .map(|el| self.infer_recursive(el))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(self.types.intern(elements))
     }
 }
 

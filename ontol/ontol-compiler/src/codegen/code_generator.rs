@@ -805,7 +805,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 );
             }
             ontol_hir::Kind::MakeSeq(binder, nodes) => {
-                let Type::Seq(_, val_ty) = ty else {
+                let Type::Seq(val_ty) = ty else {
                     panic!("Not a sequence: {ty:?}");
                 };
                 let seq_local = block.op(

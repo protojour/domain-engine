@@ -317,8 +317,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 },
                 expected_ty,
             ) => {
-                let (rel_ty, val_ty) = match expected_ty {
-                    Some((Type::Seq(rel_ty, val_ty), _)) => (*rel_ty, *val_ty),
+                let val_ty = match expected_ty {
+                    Some((Type::Seq(val_ty), _)) => *val_ty,
                     Some((other_ty, _strength)) => {
                         // Handle looping regular expressions
                         if let Type::Primitive(PrimitiveKind::Text, _) | Type::TextLike(..) =
@@ -367,7 +367,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         }
 
                         TypeError::MustBeSequence(other_ty).report(pattern.span, self);
-                        (&UNIT_TYPE, &ERROR_TYPE)
+                        &ERROR_TYPE
                     }
                     None => {
                         let val_ty = val_type_def
@@ -382,7 +382,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 val_ty
                             });
 
-                        (&UNIT_TYPE, val_ty)
+                        val_ty
                     }
                 };
 
@@ -407,7 +407,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let Some(label) = ctx.label_map.get(&first_element.id) else {
                     panic!("No label for pattern element");
                 };
-                let seq_ty = self.types.intern(Type::Seq(rel_ty, val_ty));
+                let seq_ty = self.types.intern(Type::Seq(val_ty));
 
                 ctx.mk_node(
                     ontol_hir::Kind::Set(
@@ -507,7 +507,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let type_var = ctx.inference.new_type_variable(arm_pat_id);
 
                 match expected_ty {
-                    Some((Type::Seq(_rel_ty, val_ty), _)) => self.type_error_node(
+                    Some((Type::Seq(val_ty), _)) => self.type_error_node(
                         TypeError::VariableMustBeSequenceEnclosed(val_ty),
                         pattern.span,
                         ctx,

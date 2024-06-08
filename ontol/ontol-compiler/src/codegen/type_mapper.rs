@@ -91,7 +91,7 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
                     }),
                 }
             }
-            Type::Seq(_, val_ty) => {
+            Type::Seq(val_ty) => {
                 let def_id = val_ty.get_single_def_id()?;
                 Some(MapInfo {
                     map_def: MapDef {

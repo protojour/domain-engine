@@ -1,6 +1,7 @@
 use std::{collections::HashSet, fmt::Display};
 
 use fnv::{FnvHashMap, FnvHashSet};
+use itertools::{Itertools, Position};
 use ontol_runtime::{
     ontology::{map::Extern, ontol::TextLikeType},
     DefId,
@@ -33,7 +34,10 @@ pub enum Type<'m> {
     TextConstant(DefId),
     Regex(DefId),
     TextLike(DefId, TextLikeType),
-    Seq(TypeRef<'m>, TypeRef<'m>),
+    Seq(TypeRef<'m>),
+    #[allow(unused)]
+    Tuple(&'m [TypeRef<'m>]),
+    Matrix(&'m [TypeRef<'m>]),
     #[allow(unused)]
     Option(TypeRef<'m>),
     Function(FunctionType),
@@ -150,7 +154,9 @@ impl<'m> Type<'m> {
             Self::TextConstant(def_id) => Some(*def_id),
             Self::Regex(def_id) => Some(*def_id),
             Self::TextLike(def_id, _) => Some(*def_id),
-            Self::Seq(_, _) => None,
+            Self::Seq(_) => None,
+            Self::Tuple(_) => None,
+            Self::Matrix(_) => None,
             Self::Option(ty) => ty.get_single_def_id(),
             Self::Function(_) => None,
             Self::Domain(def_id) => Some(*def_id),
@@ -162,6 +168,10 @@ impl<'m> Type<'m> {
             Self::Infer(_) => None,
             Self::Error => None,
         }
+    }
+
+    pub fn is_unit(&self) -> bool {
+        matches!(self, Self::Primitive(PrimitiveKind::Unit, _))
     }
 
     pub fn is_anonymous(&self) -> bool {
@@ -309,8 +319,24 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
             }
             Type::TextLike(_, TextLikeType::Uuid) => write!(f, "{tick}ontol.uuid{tick}"),
             Type::TextLike(_, TextLikeType::DateTime) => write!(f, "{tick}ontol.datetime{tick}"),
-            Type::Seq(rel, val) => {
-                write!(f, "{{{}: {}}}", self.child(rel), self.child(val),)
+            Type::Seq(item) => {
+                write!(f, "{{{}}}", self.child(item))
+            }
+            ty @ (Type::Tuple(elements) | Type::Matrix(elements)) => {
+                let prefix = if matches!(ty, Type::Tuple(_)) {
+                    "tup"
+                } else {
+                    "mat"
+                };
+
+                write!(f, "{prefix}(",)?;
+                for (pos, elem) in elements.iter().with_position() {
+                    write!(f, "{}", self.child(elem))?;
+                    if matches!(pos, Position::First | Position::Middle) {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, ")")
             }
             Type::Option(ty) => {
                 write!(f, "{tick}{}?{tick}", self.child(ty))

@@ -144,7 +144,7 @@ where
 
                 for ty in types {
                     let value_def_id = match ty {
-                        Type::Seq(_rel, val) => val.get_single_def_id(),
+                        Type::Seq(val) => val.get_single_def_id(),
                         other => other.get_single_def_id(),
                     };
 

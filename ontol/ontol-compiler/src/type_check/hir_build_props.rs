@@ -419,7 +419,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         match &val.kind {
                             PatternKind::Set { elements, .. } => {
                                 let mut hir_set_elements = smallvec![];
-                                let seq_ty = self.types.intern(Type::Seq(rel_params_ty, value_ty));
+                                let seq_ty = if rel_params_ty.is_unit() {
+                                    self.types.intern(Type::Seq(value_ty))
+                                } else {
+                                    let elements = self.types.intern(vec![value_ty, rel_params_ty]);
+                                    self.types.intern(Type::Matrix(elements))
+                                };
 
                                 for element in elements.iter() {
                                     let val_node = self.build_node(

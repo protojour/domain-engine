@@ -1995,6 +1995,7 @@ dependencies = [
  "heck",
  "indexmap",
  "indoc",
+ "itertools 0.12.1",
  "ontol-hir",
  "ontol-macros",
  "ontol-parser",

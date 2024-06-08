@@ -475,8 +475,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             Type::EmptySequence(_) => {
                 todo!("not sure if this should be handled here")
             }
-            Type::Seq(..) => {
-                panic!("Sequence not handled here")
+            Type::Seq(..) | Type::Tuple(_) | Type::Matrix(_) => {
+                panic!("collection-like types not handled here")
             }
             Type::Option(_) => {
                 panic!("Option not handled here")
