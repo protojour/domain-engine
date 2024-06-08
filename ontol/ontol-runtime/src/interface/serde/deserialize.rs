@@ -14,7 +14,6 @@ use crate::{
         matcher::map_matchers::MapMatchMode,
     },
     sequence::{IndexSetBuilder, ListBuilder, SequenceBuilder, WithCapacity},
-    tuple::CardinalIdx,
     value::{Attr, AttrMatrix, Serial, Value},
     DefId,
 };
@@ -362,12 +361,12 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
             SequenceKind::AttrMatrixIndexSet => self.deserialize_sequence(
                 seq,
                 &mut sequence_matcher,
-                MakeMatrix::<IndexSetBuilder<Value>>::new(CardinalIdx(0), cap),
+                MakeMatrix::<IndexSetBuilder<Value>>::new(cap),
             )?,
             SequenceKind::AttrMatrixList => self.deserialize_sequence(
                 seq,
                 &mut sequence_matcher,
-                MakeMatrix::<ListBuilder<Value>>::new(CardinalIdx(0), cap),
+                MakeMatrix::<ListBuilder<Value>>::new(cap),
             )?,
             SequenceKind::ValueList => {
                 let type_def_id = sequence_matcher.type_def_id;
@@ -465,7 +464,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                     .id
                     .ok_or_else(|| Error::custom("missing identifier attribute".to_string()))?;
 
-                Ok(Attr::unit_or_tuple(CardinalIdx(0), id, output.rel_params))
+                Ok(Attr::unit_or_tuple(id, output.rel_params))
             }
         }
     }
@@ -515,15 +514,13 @@ trait MakeVectorAttr {
 }
 
 struct MakeMatrix<B> {
-    origin: CardinalIdx,
     capacity: usize,
     builder_tuple: SmallVec<B, 1>,
 }
 
 impl<B: WithCapacity> MakeMatrix<B> {
-    fn new(origin: CardinalIdx, cap: usize) -> Self {
+    fn new(cap: usize) -> Self {
         Self {
-            origin,
             capacity: cap,
             builder_tuple: smallvec![B::with_capacity(cap)],
         }
@@ -537,11 +534,11 @@ where
     fn try_push(&mut self, attr: Attr) -> Result<(), String> {
         let tuple = attr.into_tuple().expect("matrix in matrix");
 
-        self.builder_tuple.resize_with(tuple.1.len(), || {
+        self.builder_tuple.resize_with(tuple.len(), || {
             <B as WithCapacity>::with_capacity(self.capacity)
         });
 
-        for (builder, element) in self.builder_tuple.iter_mut().zip(tuple.1.into_iter()) {
+        for (builder, element) in self.builder_tuple.iter_mut().zip(tuple.into_iter()) {
             builder
                 .try_push(element)
                 .map_err(|dupl| format!("{dupl}"))?;
@@ -560,7 +557,6 @@ where
 
     fn into_attr(self) -> Attr {
         Attr::Matrix(AttrMatrix {
-            origin: self.origin,
             elements: self.builder_tuple.into_iter().map(|t| t.build()).collect(),
         })
     }

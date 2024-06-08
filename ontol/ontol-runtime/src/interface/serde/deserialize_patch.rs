@@ -2,7 +2,7 @@ use serde::de::Visitor;
 use smallvec::smallvec;
 
 use crate::{
-    tuple::{CardinalIdx, EndoTuple},
+    tuple::EndoTuple,
     value::{Attr, Value},
     DefId,
 };
@@ -82,7 +82,6 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
 
                     patches.extend(seq.elements.into_iter().map(|value| {
                         Attr::Tuple(Box::new(EndoTuple {
-                            origin: CardinalIdx(0),
                             elements: smallvec![value, Value::DeleteRelationship(DefId::unit())],
                         }))
                     }));

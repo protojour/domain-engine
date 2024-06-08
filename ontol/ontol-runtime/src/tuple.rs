@@ -24,7 +24,6 @@ impl Display for CardinalIdx {
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Debug)]
 pub struct EndoTuple<T> {
-    pub origin: CardinalIdx,
     pub elements: EndoTupleElements<T>,
 }
 

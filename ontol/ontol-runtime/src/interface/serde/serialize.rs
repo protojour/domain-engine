@@ -14,7 +14,6 @@ use crate::{
     },
     ontology::ontol::text_pattern::{FormatPattern, TextPatternConstantPart},
     sequence::Sequence,
-    tuple::CardinalIdx,
     value::{Attr, AttrRef, FormatValueAsText, Value},
     DefId, RelationshipId,
 };
@@ -119,13 +118,8 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             (
                 SerdeOperator::RelationList(seq_op) | SerdeOperator::RelationIndexSet(seq_op),
                 _,
-                AttrRef::Matrix(cardinal_idx, tuple),
-            ) => self.serialize_matrix(
-                cardinal_idx,
-                tuple,
-                slice::from_ref(&seq_op.range),
-                serializer,
-            ),
+                AttrRef::Matrix(tuple),
+            ) => self.serialize_matrix(tuple, slice::from_ref(&seq_op.range), serializer),
             (
                 SerdeOperator::ConstructorSequence(seq_op),
                 _,
@@ -190,7 +184,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             (
                 SerdeOperator::IdSingletonStruct(_, name_constant, inner_addr),
                 _,
-                AttrRef::Tuple(_, t),
+                AttrRef::Tuple(t),
             ) => {
                 let mut map = serializer.serialize_map(Some(1))?;
                 map.serialize_entry(
@@ -349,7 +343,6 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
     fn serialize_matrix<'v, S: Serializer>(
         &self,
-        origin: CardinalIdx,
         tuple: &[Sequence<Value>],
         ranges: &[SequenceRange],
         serializer: S,
@@ -385,7 +378,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             if let Some(finite_repetition) = range.finite_repetition {
                 for _ in 0..finite_repetition {
                     next_item(tuple, &mut work_tuple, &mut index).unwrap();
-                    let attr = AttrRef::RowTuple(origin, &work_tuple).coerce_to_unit();
+                    let attr = AttrRef::RowTuple(&work_tuple).coerce_to_unit();
 
                     seq.serialize_element(&Proxy {
                         attr,
@@ -394,7 +387,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 }
             } else {
                 while let Some(()) = next_item(tuple, &mut work_tuple, &mut index) {
-                    let attr = AttrRef::RowTuple(origin, &work_tuple).coerce_to_unit();
+                    let attr = AttrRef::RowTuple(&work_tuple).coerce_to_unit();
 
                     seq.serialize_element(&Proxy {
                         attr,
@@ -438,8 +431,8 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
     ) -> Res<S> {
         let (value, rel_params) = match attr {
             AttrRef::Unit(value) => (value, None),
-            AttrRef::Tuple(_, elements) => (&elements[0], elements.get(1)),
-            AttrRef::RowTuple(_, elements) => (elements[0], elements.get(1).map(|v| *v)),
+            AttrRef::Tuple(elements) => (&elements[0], elements.get(1)),
+            AttrRef::RowTuple(elements) => (elements[0], elements.get(1).map(|v| *v)),
             AttrRef::Matrix(..) => {
                 panic!("attr matrix")
             }

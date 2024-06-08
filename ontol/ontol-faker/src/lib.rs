@@ -14,7 +14,7 @@ use ontol_runtime::{
         Ontology,
     },
     sequence::Sequence,
-    tuple::{CardinalIdx, EndoTuple},
+    tuple::EndoTuple,
     value::{Attr, AttrMatrix, Serial, Value},
     DefId, EdgeId,
 };
@@ -171,7 +171,6 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
             SerdeOperator::RelationList(seq_op) | SerdeOperator::RelationIndexSet(seq_op) => {
                 return if processor.level().current_global_level() > SENSIBLE_RECURSION_LEVEL {
                     Ok(Attr::Matrix(AttrMatrix {
-                        origin: CardinalIdx(0),
                         elements: smallvec![Default::default()],
                     }))
                 } else {
@@ -179,7 +178,6 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
 
                     // FIXME: Need info about the cardinality of this matrix
                     Ok(Attr::Matrix(AttrMatrix {
-                        origin: CardinalIdx(0),
                         elements: smallvec![Sequence::from_iter([attr.into_unit().unwrap()])],
                     }))
                 };
@@ -261,7 +259,6 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 .unwrap();
 
             Attr::Tuple(Box::new(EndoTuple {
-                origin: CardinalIdx(0),
                 elements: [val, rel].into_iter().collect(),
             }))
         } else {

@@ -18,7 +18,7 @@ use crate::{
     ontology::Ontology,
     query::filter::Filter,
     sequence::Sequence,
-    tuple::{CardinalIdx, EndoTuple, EndoTupleElements},
+    tuple::{EndoTuple, EndoTupleElements},
     DefId, RelationshipId,
 };
 
@@ -327,8 +327,8 @@ impl Attr {
     pub fn as_ref(&self) -> AttrRef {
         match self {
             Attr::Unit(v) => AttrRef::Unit(v),
-            Attr::Tuple(t) => AttrRef::Tuple(t.origin, &t.elements),
-            Attr::Matrix(m) => AttrRef::Matrix(m.origin, &m.elements),
+            Attr::Tuple(t) => AttrRef::Tuple(&t.elements),
+            Attr::Matrix(m) => AttrRef::Matrix(&m.elements),
         }
     }
 
@@ -367,10 +367,10 @@ impl Attr {
         }
     }
 
-    pub fn into_tuple(self) -> Option<(CardinalIdx, EndoTupleElements<Value>)> {
+    pub fn into_tuple(self) -> Option<EndoTupleElements<Value>> {
         match self {
-            Self::Unit(v) => Some((CardinalIdx(0), smallvec![v])),
-            Self::Tuple(t) => Some((t.origin, t.elements)),
+            Self::Unit(v) => Some(smallvec![v]),
+            Self::Tuple(t) => Some(t.elements),
             Self::Matrix(_) => None,
         }
     }
@@ -391,13 +391,12 @@ impl Attr {
     }
 
     // Hack for now
-    pub fn unit_or_tuple(origin: CardinalIdx, value: Value, rel_params: Value) -> Self {
+    pub fn unit_or_tuple(value: Value, rel_params: Value) -> Self {
         if rel_params.is_unit() {
             Self::Unit(value)
         } else {
             debug!("making a tuple for rel_params: {}", ValueDebug(&rel_params));
             Self::Tuple(Box::new(EndoTuple {
-                origin,
                 elements: smallvec![value, rel_params],
             }))
         }
@@ -407,7 +406,6 @@ impl Attr {
 /// A column-first matrix of attributes.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct AttrMatrix {
-    pub origin: CardinalIdx,
     pub elements: EndoTupleElements<Sequence<Value>>,
 }
 
@@ -419,10 +417,7 @@ impl AttrMatrix {
             elements.push(e.elements.get(index)?.clone());
         }
 
-        Some(Attr::Tuple(Box::new(EndoTuple {
-            origin: self.origin,
-            elements,
-        })))
+        Some(Attr::Tuple(Box::new(EndoTuple { elements })))
     }
 }
 
@@ -431,11 +426,11 @@ pub enum AttrRef<'v> {
     /// One value
     Unit(&'v Value),
     /// Tuple not in a matrix
-    Tuple(CardinalIdx, &'v [Value]),
+    Tuple(&'v [Value]),
     /// Tuple borrowed from a Matrix
-    RowTuple(CardinalIdx, &'v [&'v Value]),
+    RowTuple(&'v [&'v Value]),
     /// A whole matrix
-    Matrix(CardinalIdx, &'v [Sequence<Value>]),
+    Matrix(&'v [Sequence<Value>]),
 }
 
 impl<'v> AttrRef<'v> {
@@ -443,29 +438,29 @@ impl<'v> AttrRef<'v> {
     pub fn coerce_to_unit(self) -> Self {
         match self {
             Self::Unit(v) => Self::Unit(v),
-            Self::Tuple(_, t) => {
+            Self::Tuple(t) => {
                 if t.len() == 1 {
                     Self::Unit(&t[0])
                 } else {
                     self
                 }
             }
-            Self::RowTuple(_, t) => {
+            Self::RowTuple(t) => {
                 if t.len() == 1 {
                     Self::Unit(t[0])
                 } else {
                     self
                 }
             }
-            Self::Matrix(i, m) => Self::Matrix(i, m),
+            Self::Matrix(m) => Self::Matrix(m),
         }
     }
 
     pub fn first_unit(self) -> Option<&'v Value> {
         match self {
             Self::Unit(v) => Some(v),
-            Self::Tuple(_, t) => t.get(0),
-            Self::RowTuple(_, t) => t.get(0).map(|val| *val),
+            Self::Tuple(t) => t.get(0),
+            Self::RowTuple(t) => t.get(0).map(|val| *val),
             Self::Matrix(..) => None,
         }
     }
@@ -677,6 +672,8 @@ mod tests {
         assert_eq!(24, std::mem::size_of::<BTreeMap<RelationshipId, Value>>());
         assert_eq!(24, std::mem::size_of::<Vec<Value>>());
         assert_eq!(48, std::mem::size_of::<HashMap<RelationshipId, Value>>());
+
+        assert_eq!(32, std::mem::size_of::<Attr>());
     }
 
     #[test]

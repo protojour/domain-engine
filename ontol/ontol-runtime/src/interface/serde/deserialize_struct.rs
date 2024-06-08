@@ -9,7 +9,6 @@ use crate::{
     interface::serde::deserialize_raw::RawVisitor,
     ontology::{domain::TypeKind, ontol::ValueGenerator},
     phf::PhfIndexMap,
-    tuple::CardinalIdx,
     value::{Attr, Value},
     vm::proc::{NParams, Procedure},
     DefId, RelationshipId,
@@ -129,11 +128,7 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
             let output = struct_deserializer.deserialize_struct(self.buffered_attrs, map)?;
 
             if output.id.is_some() {
-                return Ok(Attr::unit_or_tuple(
-                    CardinalIdx(0),
-                    output.id.unwrap(),
-                    output.rel_params,
-                ));
+                return Ok(Attr::unit_or_tuple(output.id.unwrap(), output.rel_params));
             } else {
                 output
             }
@@ -144,7 +139,6 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
         let boxed_attrs = Box::new(output.attributes);
 
         Ok(Attr::unit_or_tuple(
-            CardinalIdx(0),
             if self.ctx.is_update {
                 Value::StructUpdate(boxed_attrs, type_def_id)
             } else {

@@ -14,7 +14,7 @@ use crate::{
     property::ValueCardinality,
     query::condition::{Clause, ClausePair, CondTerm},
     sequence::Sequence,
-    tuple::{CardinalIdx, EndoTuple},
+    tuple::EndoTuple,
     value::{Attr, Value, ValueDebug},
     var::Var,
     vm::{
@@ -231,7 +231,6 @@ impl<'o> Processor for OntolProcessor<'o> {
             map.insert(
                 key,
                 Attr::Tuple(Box::new(EndoTuple {
-                    origin: CardinalIdx(0),
                     elements: smallvec![val, rel],
                 })),
             );
