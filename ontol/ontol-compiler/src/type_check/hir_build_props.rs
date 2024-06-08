@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use ontol_hir::{PropFlags, StructFlags};
+use ontol_hir::{PropFlags, PropVariant, StructFlags};
 use ontol_runtime::{
     property::{Cardinality, PropertyCardinality, ValueCardinality},
     query::condition::SetOperator,
@@ -409,10 +409,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             },
                             ctx,
                         );
-                        ontol_hir::PropVariant::Tuple(Attribute {
-                            rel: rel_node,
-                            val: val_node,
-                        })
+                        if let Some(rel_node) = rel_node {
+                            PropVariant::Tuple(Attribute {
+                                rel: rel_node,
+                                val: val_node,
+                            })
+                        } else {
+                            PropVariant::Unit(val_node)
+                        }
                     }
                     ValueCardinality::IndexSet | ValueCardinality::List => {
                         match &val.kind {
@@ -450,7 +454,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                             None
                                         },
                                         Attribute {
-                                            rel: rel_node,
+                                            rel: rel_node.unwrap_or_else(|| {
+                                                ctx.mk_node(
+                                                    ontol_hir::Kind::Unit,
+                                                    Meta {
+                                                        ty: &UNIT_TYPE,
+                                                        span: prop_span,
+                                                    },
+                                                )
+                                            }),
                                             val: val_node,
                                         },
                                     ));
@@ -461,13 +473,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 //     flags.insert(PropFlags::REL_UP_OPTIONAL);
                                 // }
 
-                                ontol_hir::PropVariant::Tuple(Attribute {
-                                    rel: ctx.mk_node(ontol_hir::Kind::Unit, Meta::unit(NO_SPAN)),
-                                    val: ctx.mk_node(
-                                        ontol_hir::Kind::Set(hir_set_elements),
-                                        Meta::new(seq_ty, prop_span),
-                                    ),
-                                })
+                                ontol_hir::PropVariant::Unit(ctx.mk_node(
+                                    ontol_hir::Kind::Set(hir_set_elements),
+                                    Meta::new(seq_ty, prop_span),
+                                ))
                             }
                             _ => {
                                 let rel_node = self.build_rel_node_from_option(
@@ -489,10 +498,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         },
                                         ctx,
                                     );
-                                    ontol_hir::PropVariant::Tuple(Attribute {
-                                        rel: rel_node,
-                                        val: val_node,
-                                    })
+                                    if let Some(rel_node) = rel_node {
+                                        PropVariant::Tuple(Attribute {
+                                            rel: rel_node,
+                                            val: val_node,
+                                        })
+                                    } else {
+                                        PropVariant::Unit(val_node)
+                                    }
                                 } else {
                                     TypeError::VariableMustBeSequenceEnclosed(value_ty)
                                         .report(val.span, self);
@@ -633,54 +646,42 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         prop_span: SourceSpan,
         actual_struct_flags: StructFlags,
         ctx: &mut HirBuildCtx<'m>,
-    ) -> ontol_hir::Node {
+    ) -> Option<ontol_hir::Node> {
         match (rel_params_ty, rel) {
-            (Type::Primitive(PrimitiveKind::Unit, _), Some(rel)) => self.error_node(
+            (Type::Primitive(PrimitiveKind::Unit, _), Some(rel)) => Some(self.error_node(
                 CompileError::NoRelationParametersExpected.span(rel.span),
                 ctx,
-            ),
-            (ty @ Type::Primitive(PrimitiveKind::Unit, _), None) => ctx.mk_node(
-                ontol_hir::Kind::Unit,
-                Meta {
-                    ty,
-                    span: prop_span,
-                },
-            ),
-            (_, Some(rel)) => self.build_node(
+            )),
+            (Type::Primitive(PrimitiveKind::Unit, _), None) => None,
+            (_, Some(rel)) => Some(self.build_node(
                 rel,
                 NodeInfo {
                     expected_ty: Some((rel_params_ty, Strength::Strong)),
                     parent_struct_flags: actual_struct_flags,
                 },
                 ctx,
-            ),
+            )),
             (ty @ Type::Anonymous(def_id), None) => {
                 match self.rel_ctx.properties_by_def_id(*def_id) {
                     Some(_) => {
                         if actual_struct_flags.contains(StructFlags::MATCH) {
-                            ctx.mk_node(
+                            Some(ctx.mk_node(
                                 ontol_hir::Kind::Unit,
                                 Meta {
                                     ty,
                                     span: prop_span,
                                 },
-                            )
+                            ))
                         } else {
                             // need to produce something
-                            self.build_implicit_rel_node(ty, val, prop_span, ctx)
+                            Some(self.build_implicit_rel_node(ty, val, prop_span, ctx))
                         }
                     }
                     // An anonymous type without properties, i.e. just "meta relationships" about the relationship itself:
-                    None => ctx.mk_node(
-                        ontol_hir::Kind::Unit,
-                        Meta {
-                            ty,
-                            span: prop_span,
-                        },
-                    ),
+                    None => None,
                 }
             }
-            (ty, None) => self.build_implicit_rel_node(ty, val, prop_span, ctx),
+            (ty, None) => Some(self.build_implicit_rel_node(ty, val, prop_span, ctx)),
         }
     }
 
@@ -712,8 +713,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let value_ty = self.check_def(const_def_id);
 
                 let prop_node = {
-                    let rel = ctx.mk_unit_node_no_span();
-                    let val = ctx.mk_node(
+                    let value = ctx.mk_node(
                         ontol_hir::Kind::Const(const_def_id),
                         Meta {
                             ty: value_ty,
@@ -725,7 +725,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ontol_hir::PropFlags::empty(),
                             struct_binder_var,
                             match_attr.rel_id,
-                            ontol_hir::PropVariant::Tuple(Attribute { rel, val }),
+                            ontol_hir::PropVariant::Unit(value),
                         ),
                         Meta::unit(NO_SPAN),
                     )
