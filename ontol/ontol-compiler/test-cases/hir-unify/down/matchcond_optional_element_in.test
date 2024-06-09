@@ -1,33 +1,34 @@
 (struct ($a)
     (prop? $a R:0:0
-        (set (.. @b #u $c))
+        (matrix (.. @b #u $c))
     )
 )
 
-(set (.. @d #u
+(matrix (.. @d
     (match-struct ($e)
         (prop? $e R:1:0
-            element-in (set (.. @b #u $c))
+            element-in (matrix (.. @b #u $c))
         )
     )
 ))
 
 |$a| (block
-    (let-prop $b ($a R:0:0))
-    (match-struct ($f)
-        (let-cond-var $e $f)
-        (push-cond-clauses $f
+    (let-prop [$b $f] ($a R:0:0))
+    (match-struct ($g)
+        (let-cond-var $e $g)
+        (push-cond-clauses $g
             (root '$e)
         )
-        (catch (@h)
-            (try? @h $b)
-            (let-cond-var $g $f)
-            (push-cond-clauses $f
-                (match-prop '$e R:1:0 element-in '$g)
+        (catch (@i)
+            (try? @i $b)
+            (try? @i $f)
+            (let-cond-var $h $g)
+            (push-cond-clauses $g
+                (match-prop '$e R:1:0 element-in '$h)
             )
-            (for-each $b ($_ $c)
-                (push-cond-clauses $f
-                    (member '$g (_ $c))
+            (for-each $b $f ($_ $c)
+                (push-cond-clauses $g
+                    (member '$h ($c _))
                 )
             )
         )

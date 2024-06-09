@@ -3,9 +3,9 @@ use ontol_runtime::var::{Var, VarAllocator};
 
 use crate::{
     pattern::PatId,
-    typed_hir::{self, Meta, TypedHir, TypedHirData},
+    typed_hir::{self, TypedHir, TypedHirData},
     types::TypeRef,
-    SourceSpan, NO_SPAN,
+    SourceSpan,
 };
 
 use super::{ena_inference::Inference, hir_build_props::MatchAttributeKey};
@@ -78,11 +78,6 @@ impl<'m> HirBuildCtx<'m> {
         meta: typed_hir::Meta<'m>,
     ) -> ontol_hir::Node {
         self.hir_arena.add(TypedHirData(kind, meta))
-    }
-
-    pub fn mk_unit_node_no_span(&mut self) -> ontol_hir::Node {
-        self.hir_arena
-            .add(TypedHirData(ontol_hir::Kind::Unit, Meta::unit(NO_SPAN)))
     }
 }
 

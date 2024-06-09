@@ -5,7 +5,6 @@ use std::fmt::{Debug, Display};
 use arena::{Arena, NodeRef};
 use ontol_runtime::{
     query::condition::{ClausePair, SetOperator},
-    value::Attribute,
     var::Var,
     DefId, RelationshipId,
 };
@@ -176,8 +175,8 @@ pub enum Kind<'a, L: Lang> {
     /// The variable represents the not-yet-narrowed value.
     /// The expression (node) represents something which is evaluated on the narrowed value.
     Narrow(Node),
-    /// A set-builder of set entries
-    Set(SmallVec<SetEntry<'a, L>, 1>),
+    /// A matrix-builder of matrix entries
+    Matrix(SmallVec<MatrixRow<'a, L>, 1>),
     /// A struct with associated binder. The value is the struct.
     Struct(L::Data<'a, Binder>, StructFlags, Nodes),
     /// A property definition associated with a struct var in scope
@@ -185,14 +184,14 @@ pub enum Kind<'a, L: Lang> {
     /// Move rest of attributes into the first var, from the second var
     MoveRestAttrs(Var, Var),
     /// A sequence with associated binder. The value is the sequence.
-    /// TODO: This can be done with Let!
-    MakeSeq(L::Data<'a, Binder>, Nodes),
+    MakeSeq(Option<L::Data<'a, Binder>>, Nodes),
+    MakeMatrix(ThinVec<L::Data<'a, Binder>>, Nodes),
     /// Copy a SubSequence into the the first variable, copied from the second variable
     CopySubSeq(Var, Var),
-    /// Iterate attributes in sequence var,
-    ForEach(Var, (Binding<'a, L>, Binding<'a, L>), Nodes),
-    /// Push an attribute to the end of a sequence
-    Insert(Var, Attribute<Node>),
+    /// Iterate sequence or matrix (matrix iteration has more than 1 binding),
+    ForEach(ThinVec<(Var, Binding<'a, L>)>, Nodes),
+    /// Push a value to the end of a sequence
+    Insert(Var, Node),
     /// Push the second string at the end of the first string
     StringPush(Var, Node),
     /// Declarative regex w/captures.
@@ -259,7 +258,7 @@ pub enum OverloadFunc {
 }
 
 #[derive(Clone)]
-pub struct SetEntry<'a, L: Lang>(pub Option<L::Data<'a, Label>>, pub Attribute<Node>);
+pub struct MatrixRow<'a, L: Lang>(pub Option<L::Data<'a, Label>>, pub Nodes);
 
 bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]

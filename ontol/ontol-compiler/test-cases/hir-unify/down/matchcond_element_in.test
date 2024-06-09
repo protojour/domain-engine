@@ -1,24 +1,22 @@
 (struct ($c)
     (prop $c R:1:0
-        (set (.. @e #u $a))
+        (matrix (.. @e $a #u))
     )
     (prop $c R:1:1
-        (set (.. @f #u $b))
+        (matrix (.. @f $b #u))
     )
 )
 
-(set (.. @g #u
+(matrix (.. @g
     (match-struct ($d)
         (prop $d R:2:0 element-in
-            (set
+            (matrix
                 (.. @e
-                    #u
                     (struct ($q)
                         (prop $q R:3:0 $a)
                     )
                 )
                 (.. @f
-                    #u
                     (struct ($r)
                         (prop $r R:3:1 $b)
                     )
@@ -29,37 +27,37 @@
 ))
 
 |$c| (block
-    (let-prop-default $e ($c R:1:0) #u)
-    (let-prop-default $f ($c R:1:1) #u)
-    (match-struct ($s)
-        (let-cond-var $d $s)
-        (push-cond-clauses $s
+    (let-prop-default [$e $s] ($c R:1:0) (make-seq) (make-seq))
+    (let-prop-default [$f $t] ($c R:1:1) (make-seq) (make-seq))
+    (match-struct ($u)
+        (let-cond-var $d $u)
+        (push-cond-clauses $u
             (root '$d)
         )
-        (let-cond-var $t $s)
-        (push-cond-clauses $s
-            (match-prop '$d R:2:0 element-in '$t)
+        (let-cond-var $v $u)
+        (push-cond-clauses $u
+            (match-prop '$d R:2:0 element-in '$v)
         )
-        (for-each $e ($_ $a)
-            (let-cond-var $q $s)
-            (push-cond-clauses $s
-                (member '$t (_ '$q))
+        (for-each $e $s ($a $_)
+            (let-cond-var $q $u)
+            (push-cond-clauses $u
+                (member '$v (_ '$q))
             )
-            (let-cond-var $u $s)
-            (push-cond-clauses $s
-                (match-prop '$q R:3:0 element-in '$u)
-                (member '$u (_ $a))
+            (let-cond-var $w $u)
+            (push-cond-clauses $u
+                (match-prop '$q R:3:0 element-in '$w)
+                (member '$w (_ $a))
             )
         )
-        (for-each $f ($_ $b)
-            (let-cond-var $r $s)
-            (push-cond-clauses $s
-                (member '$t (_ '$r))
+        (for-each $f $t ($b $_)
+            (let-cond-var $r $u)
+            (push-cond-clauses $u
+                (member '$v (_ '$r))
             )
-            (let-cond-var $v $s)
-            (push-cond-clauses $s
-                (match-prop '$r R:3:1 element-in '$v)
-                (member '$v (_ $b))
+            (let-cond-var $x $u)
+            (push-cond-clauses $u
+                (match-prop '$r R:3:1 element-in '$x)
+                (member '$x (_ $b))
             )
         )
     )

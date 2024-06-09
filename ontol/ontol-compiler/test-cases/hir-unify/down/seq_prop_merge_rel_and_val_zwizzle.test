@@ -1,6 +1,6 @@
 (struct ($e)
     (prop! $e R:1:0
-        (set
+        (matrix
             (.. @f
                 (struct ($g)
                     (prop! $g R:2:0 $a)
@@ -17,7 +17,7 @@
 
 (struct ($i)
     (prop! $i R:4:0
-        (set
+        (matrix
             (.. @f
                 (struct ($j)
                     (prop! $j R:5:0 $a)
@@ -33,20 +33,22 @@
 )
 
 |$e| (block
-    (let-prop $f ($e R:1:0))
+    (let-prop [$f $l] ($e R:1:0))
     (struct ($i)
         (prop! $i R:4:0
-            (make-seq ($l)
-                (for-each $f ($g $h)
+            (make-matrix ($m $n)
+                (for-each $f $l ($g $h)
                     (let-prop $a ($g R:2:0))
                     (let-prop $b ($g R:2:1))
                     (let-prop $c ($h R:3:0))
                     (let-prop $d ($h R:3:1))
-                    (insert $l
+                    (insert $m
                         (struct ($j)
                             (prop! $j R:5:0 $a)
                             (prop! $j R:5:1 $c)
                         )
+                    )
+                    (insert $n
                         (struct ($k)
                             (prop! $k R:6:0 $b)
                             (prop! $k R:6:1 $d)

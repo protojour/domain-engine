@@ -27,6 +27,7 @@ pub enum UnifierError {
     NonEntityQuery,
     Unsolvable,
     Unimplemented(String),
+    MatrixWithoutRows,
     #[allow(clippy::upper_case_acronyms)]
     TODO(String),
 }
@@ -129,7 +130,7 @@ impl VariableTracker {
             fn visit_set_entry(
                 &mut self,
                 index: usize,
-                entry: &ontol_hir::SetEntry<'m, L>,
+                entry: &ontol_hir::MatrixRow<'m, L>,
                 arena: &'h ontol_hir::arena::Arena<'m, L>,
             ) {
                 if let Some(label) = &entry.0 {

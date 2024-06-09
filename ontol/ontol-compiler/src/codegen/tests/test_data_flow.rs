@@ -134,7 +134,7 @@ fn test_analyze_ssa2() {
             (let-prop $b ($f R:2:33))
             (let-prop $g ($f R:2:55))
             (let-prop $c ($g R:2:15))
-            (let-prop-default $e ($f R:2:57) (make-seq ($j)))
+            (let-prop-default $e ($f R:2:57) (make-seq))
             (struct ($i)
                 (catch (@k)
                     (try? @k $a)
@@ -149,15 +149,12 @@ fn test_analyze_ssa2() {
                     [$c #u]
                 )
                 (prop! $i R:1:8
-                    [
-                        (make-seq ($l)
-                            (for-each $e ($_ $h)
-                                (let-prop $d ($h R:2:53))
-                                (insert $l #u (map $d))
-                            )
+                    (make-seq ($l)
+                        (for-each $e ($h)
+                            (let-prop $d ($h R:2:53))
+                            (insert $l (map $d))
                         )
-                        #u
-                    ]
+                    )
                 )
             )
         )
@@ -199,9 +196,9 @@ fn test_analyze_seq1() {
             (struct ($a)
                 (prop $a R:2:0
                     (make-seq ($d)
-                        (for-each $c ($_ $e)
+                        (for-each $c ($e)
                             (let-prop $f ($e R:2:1))
-                            (insert $d #u $f)
+                            (insert $d $f)
                         )
                     )
                 )

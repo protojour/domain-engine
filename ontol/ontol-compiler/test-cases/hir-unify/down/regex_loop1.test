@@ -6,8 +6,8 @@
 )
 
 (struct ($d)
-    (prop! $d R:2:0 (set (.. @e #u $a)))
-    (prop! $d R:2:1 (set (.. @e #u $b)))
+    (prop! $d R:2:0 (matrix (.. @e $a)))
+    (prop! $d R:2:1 (matrix (.. @e $b)))
 )
 
 |$c| (block
@@ -15,21 +15,21 @@
     (let-regex-iter $e ((1 $a)) ((2 $b)) def@0:0 $f)
     (struct ($d)
         (prop! $d R:2:0
-            (make-seq ($g)
-                (for-each $e ($_ $h)
+            (make-matrix ($g)
+                (for-each $e ($h)
                     (catch (@i)
                         (let-tup? @i ($a $_) $h)
-                        (insert $g #u $a)
+                        (insert $g $a)
                     )
                 )
             )
         )
         (prop! $d R:2:1
-            (make-seq ($j)
-                (for-each $e ($_ $k)
+            (make-matrix ($j)
+                (for-each $e ($k)
                     (catch (@l)
                         (let-tup? @l ($_ $b) $k)
-                        (insert $j #u $b)
+                        (insert $j $b)
                     )
                 )
             )

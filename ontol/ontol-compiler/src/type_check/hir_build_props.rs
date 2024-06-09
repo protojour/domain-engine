@@ -3,7 +3,6 @@ use ontol_hir::{PropFlags, PropVariant, StructFlags};
 use ontol_runtime::{
     property::{Cardinality, PropertyCardinality, ValueCardinality},
     query::condition::SetOperator,
-    value::Attribute,
     var::Var,
     DefId, RelationshipId,
 };
@@ -418,7 +417,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ValueCardinality::IndexSet | ValueCardinality::List => {
                         match &val.kind {
                             PatternKind::Set { elements, .. } => {
-                                let mut hir_set_elements = smallvec![];
+                                let mut hir_matrix_rows = smallvec![];
                                 let seq_ty = if rel_params_ty.is_unit() {
                                     self.types.intern(Type::Seq(value_ty))
                                 } else {
@@ -443,7 +442,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         actual_struct_flags,
                                         ctx,
                                     );
-                                    hir_set_elements.push(ontol_hir::SetEntry(
+
+                                    let mut elements = smallvec![val_node];
+                                    if let Some(rel_node) = rel_node {
+                                        elements.push(rel_node);
+                                    }
+
+                                    hir_matrix_rows.push(ontol_hir::MatrixRow(
                                         if element.is_iter {
                                             let Some(label) = ctx.label_map.get(&element.id) else {
                                                 CompileError::TODO("unable to loop")
@@ -455,18 +460,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         } else {
                                             None
                                         },
-                                        Attribute {
-                                            rel: rel_node.unwrap_or_else(|| {
-                                                ctx.mk_node(
-                                                    ontol_hir::Kind::Unit,
-                                                    Meta {
-                                                        ty: &UNIT_TYPE,
-                                                        span: prop_span,
-                                                    },
-                                                )
-                                            }),
-                                            val: val_node,
-                                        },
+                                        elements,
                                     ));
                                 }
 
@@ -476,7 +470,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 // }
 
                                 ontol_hir::PropVariant::Unit(ctx.mk_node(
-                                    ontol_hir::Kind::Set(hir_set_elements),
+                                    ontol_hir::Kind::Matrix(hir_matrix_rows),
                                     Meta::new(seq_ty, prop_span),
                                 ))
                             }

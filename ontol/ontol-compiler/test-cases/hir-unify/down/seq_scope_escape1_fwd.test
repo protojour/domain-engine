@@ -1,28 +1,29 @@
 (struct ($c)
     (prop! $c R:1:0 #u)
-    (prop! $c R:1:1 (set (.. @a #u $b)))
+    (prop! $c R:1:1 (matrix (.. @a #u $b)))
 )
 
 (struct ($d)
     (prop! $d R:2:0
         (struct ($e)
             (prop! $e R:3:0 #u)
-            (prop! $e R:3:1 (set (.. @a #u $b)))
+            (prop! $e R:3:1 (matrix (.. @a #u $b)))
         )
     )
 )
 
 |$c| (block
     (let-prop $_ ($c R:1:0))
-    (let-prop $a ($c R:1:1))
+    (let-prop [$a $f] ($c R:1:1))
     (struct ($d)
         (prop! $d R:2:0
             (struct ($e)
                 (prop! $e R:3:0 #u)
                 (prop! $e R:3:1
-                    (make-seq ($f)
-                        (for-each $a ($_ $b)
-                            (insert $f #u $b)
+                    (make-matrix ($g $h)
+                        (for-each $a $f ($_ $b)
+                            (insert $g #u)
+                            (insert $h $b)
                         )
                     )
                 )

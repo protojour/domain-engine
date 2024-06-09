@@ -9,8 +9,8 @@ use thin_vec::ThinVec;
 
 use crate::{
     arena::{Arena, NodeRef},
-    Binding, CaptureGroup, EvalCondTerm, Kind, Label, Lang, Node, OverloadFunc, Pack, PropVariant,
-    RootNode, SetEntry, StructFlags,
+    Binding, CaptureGroup, EvalCondTerm, Kind, Label, Lang, MatrixRow, Node, OverloadFunc, Pack,
+    PropVariant, RootNode, StructFlags,
 };
 
 impl<'h, 'a, L: Lang> std::fmt::Display for NodeRef<'h, 'a, L> {
@@ -215,8 +215,8 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 self.print_rparen(f, multi)?;
                 Ok(multi.or(sep))
             }
-            Kind::Set(entries) => {
-                write!(f, "{indent}(set")?;
+            Kind::Matrix(entries) => {
+                write!(f, "{indent}(matrix")?;
                 let multi = self.print_all(f, Sep::Space, entries.iter())?;
                 self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
@@ -243,7 +243,27 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
             }
             Kind::MakeSeq(binder, children) => {
                 let indent = if children.is_empty() { sep } else { indent };
-                write!(f, "{indent}(make-seq ({})", L::as_hir(binder).var)?;
+                write!(f, "{indent}(make-seq")?;
+                if let Some(binder) = binder.as_ref() {
+                    write!(f, " ({})", L::as_hir(binder).var)?;
+                }
+                let multi = self.print_all(f, Sep::Space, self.kinds(children))?;
+                self.print_rparen(f, multi)?;
+                Ok(multi)
+            }
+            Kind::MakeMatrix(binders, children) => {
+                let indent = if children.is_empty() { sep } else { indent };
+                write!(f, "{indent}(make-matrix (")?;
+                {
+                    let mut iter = binders.iter().peekable();
+                    while let Some(binder) = iter.next() {
+                        write!(f, "{}", L::as_hir(binder).var)?;
+                        if iter.peek().is_some() {
+                            write!(f, " ")?;
+                        }
+                    }
+                }
+                write!(f, ")")?;
                 let multi = self.print_all(f, Sep::Space, self.kinds(children))?;
                 self.print_rparen(f, multi)?;
                 Ok(multi)
@@ -252,15 +272,30 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 write!(f, "{sep}(copy-sub-seq {} {})", target, source)?;
                 Ok(Multiline(false))
             }
-            Kind::ForEach(var, (rel, val), children) => {
-                write!(f, "{indent}(for-each {var} ({rel} {val})")?;
+            Kind::ForEach(elements, children) => {
+                write!(f, "{indent}(for-each ")?;
+                for (var, _) in elements {
+                    write!(f, "{var} ")?;
+                }
+
+                {
+                    write!(f, "(")?;
+                    let mut iter = elements.iter().peekable();
+                    while let Some((_, binding)) = iter.next() {
+                        write!(f, "{binding}")?;
+                        if iter.peek().is_some() {
+                            write!(f, " ")?;
+                        }
+                    }
+                    write!(f, ")")?;
+                }
                 let multi = self.print_all(f, Sep::Space, self.kinds(children))?;
                 self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
             }
-            Kind::Insert(seq_var, attr) => {
+            Kind::Insert(seq_var, node) => {
                 write!(f, "{indent}(insert {seq_var}",)?;
-                let multi = self.print_all(f, Sep::Space, self.kinds(&[attr.rel, attr.val]))?;
+                let multi = self.print_all(f, Sep::Space, self.kinds(&[*node]))?;
                 self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
             }
@@ -306,15 +341,15 @@ impl<'h, 'a, L: Lang> Print<Pack<Binding<'a, L>>> for Printer<'h, 'a, L> {
         match pack {
             Pack::Unit(u) => {
                 self.print(f, Sep::None, u)?;
+                Ok(Multiline(false))
             }
             Pack::Tuple(t) => {
                 write!(f, "[")?;
                 let multi = self.print_all(f, Sep::None, t.iter())?;
                 self.print_rbracket(f, multi)?;
+                Ok(Multiline(true))
             }
-        };
-
-        Ok(Multiline(false))
+        }
     }
 }
 
@@ -331,7 +366,7 @@ impl<'h, 'a, L: Lang> Print<PropVariant> for Printer<'h, 'a, L> {
                 write!(f, "{indent}[")?;
                 let multi = self.print_all(f, Sep::None, self.kinds(tup))?;
                 self.print_rbracket(f, multi)?;
-                Ok(multi)
+                Ok(Multiline(true))
             }
             PropVariant::Predicate(operator, param) => {
                 write!(f, "{indent}(")?;
@@ -424,19 +459,19 @@ impl<'h, 'a, L: Lang> Print<CaptureGroup<'a, L>> for Printer<'h, 'a, L> {
     }
 }
 
-impl<'h, 'a, L: Lang> Print<SetEntry<'a, L>> for Printer<'h, 'a, L> {
+impl<'h, 'a, L: Lang> Print<MatrixRow<'a, L>> for Printer<'h, 'a, L> {
     fn print(
         self,
         f: &mut std::fmt::Formatter,
         _sep: Sep,
-        SetEntry(iter_label, attr): &SetEntry<'a, L>,
+        MatrixRow(iter_label, elements): &MatrixRow<'a, L>,
     ) -> PrintResult {
         let indent = self.indent;
         write!(f, "{indent}(")?;
         if let Some(iter_label) = iter_label {
             write!(f, ".. {}", L::as_hir(iter_label))?;
         }
-        let multi = self.print_all(f, Sep::Space, self.kinds(&[attr.rel, attr.val]))?;
+        let multi = self.print_all(f, Sep::Space, self.kinds(elements))?;
         self.print_rparen(f, multi)?;
         Ok(Multiline(true))
     }

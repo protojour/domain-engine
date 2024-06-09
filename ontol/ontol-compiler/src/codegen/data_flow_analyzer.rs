@@ -6,7 +6,6 @@ use fnv::{FnvHashMap, FnvHashSet};
 use ontol_hir::{Pack, PropVariant, StructFlags};
 use ontol_runtime::{
     ontology::map::{PropertyFlow, PropertyFlowData},
-    value::Attribute,
     var::{Var, VarSet},
     DefId, RelationshipId,
 };
@@ -213,15 +212,13 @@ where
             | ontol_hir::Kind::Narrow(node) => {
                 self.analyze_node(arena.node_ref(*node), parent_prop)
             }
-            ontol_hir::Kind::Set(entries) => {
+            ontol_hir::Kind::Matrix(rows) => {
                 let mut var_set = VarSet::default();
-                for set_entry in entries {
-                    var_set.union_with(
-                        &self.analyze_node(arena.node_ref(set_entry.1.rel), parent_prop),
-                    );
-                    var_set.union_with(
-                        &self.analyze_node(arena.node_ref(set_entry.1.val), parent_prop),
-                    );
+                for row in rows {
+                    for element in &row.1 {
+                        var_set
+                            .union_with(&self.analyze_node(arena.node_ref(*element), parent_prop));
+                    }
                 }
                 var_set
             }
@@ -267,19 +264,18 @@ where
 
                 Default::default()
             }
-            ontol_hir::Kind::MakeSeq(_, body) => {
+            ontol_hir::Kind::MakeSeq(_, body) | ontol_hir::Kind::MakeMatrix(_, body) => {
                 let mut var_set = VarSet::default();
                 for child in arena.node_refs(body) {
                     var_set.union_with(&self.analyze_node(child, parent_prop));
                 }
                 var_set
             }
-            ontol_hir::Kind::ForEach(var, (rel_binding, val_binding), body) => {
-                if let ontol_hir::Binding::Binder(binder) = rel_binding {
-                    self.add_dep(binder.hir().var, *var);
-                }
-                if let ontol_hir::Binding::Binder(binder) = val_binding {
-                    self.add_dep(binder.hir().var, *var);
+            ontol_hir::Kind::ForEach(elements, body) => {
+                for (var, binding) in elements {
+                    if let ontol_hir::Binding::Binder(binder) = binding {
+                        self.add_dep(binder.hir().var, *var);
+                    }
                 }
                 let mut var_set = VarSet::default();
                 for child in arena.node_refs(body) {
@@ -287,12 +283,9 @@ where
                 }
                 var_set
             }
-            ontol_hir::Kind::Insert(var, Attribute { rel, val }) => {
-                let mut var_set = self.analyze_node(arena.node_ref(*rel), parent_prop);
-                var_set.union_with(&self.analyze_node(arena.node_ref(*val), parent_prop));
-
+            ontol_hir::Kind::Insert(var, node) => {
+                let var_set = self.analyze_node(arena.node_ref(*node), parent_prop);
                 self.var_dependencies.insert(*var, var_set.clone());
-
                 var_set
             }
             ontol_hir::Kind::StringPush(to_var, node) => {

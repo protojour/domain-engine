@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use ontol_hir::{Label, StructFlags};
-use ontol_runtime::{value::Attribute, DefId};
-use smallvec::SmallVec;
+use ontol_runtime::DefId;
+use smallvec::{smallvec, SmallVec};
 use thin_vec::{thin_vec, ThinVec};
 use tracing::debug;
 
@@ -395,7 +395,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 let first_element = elements.iter().next().unwrap();
 
-                let rel = ctx.mk_unit_node_no_span();
                 let val = self.build_node(
                     &first_element.val,
                     NodeInfo {
@@ -410,13 +409,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let seq_ty = self.types.intern(Type::Seq(val_ty));
 
                 ctx.mk_node(
-                    ontol_hir::Kind::Set(
-                        [ontol_hir::SetEntry(
+                    ontol_hir::Kind::Matrix(
+                        [ontol_hir::MatrixRow(
                             Some(TypedHirData(
                                 Label(label.0),
                                 Meta::new(seq_ty, pattern.span),
                             )),
-                            Attribute { rel, val },
+                            smallvec![val],
                         )]
                         .into(),
                     ),
@@ -672,20 +671,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         parent_struct_flags: StructFlags,
         ctx: &mut HirBuildCtx<'m>,
     ) -> ontol_hir::Node {
-        let mut set_entries: SmallVec<ontol_hir::SetEntry<'m, TypedHir>, 1> =
+        let mut set_entries: SmallVec<ontol_hir::MatrixRow<'m, TypedHir>, 1> =
             SmallVec::with_capacity(elements.len());
 
         for element in elements {
             let rel = match &element.rel {
-                Some(pattern) => self.build_node(
+                Some(pattern) => Some(self.build_node(
                     pattern,
                     NodeInfo {
                         expected_ty: Some((rel_ty, Strength::Strong)),
                         parent_struct_flags,
                     },
                     ctx,
-                ),
-                None => ctx.mk_node(ontol_hir::Kind::Unit, Meta { ty: rel_ty, span }),
+                )),
+                None => None,
             };
             let val = self.build_node(
                 &element.val,
@@ -711,11 +710,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 None
             };
 
-            set_entries.push(ontol_hir::SetEntry(label, Attribute { rel, val }));
+            let mut elements = smallvec![val];
+            if let Some(rel) = rel {
+                elements.push(rel);
+            }
+
+            set_entries.push(ontol_hir::MatrixRow(label, elements));
         }
 
         ctx.mk_node(
-            ontol_hir::Kind::Set(set_entries),
+            ontol_hir::Kind::Matrix(set_entries),
             Meta {
                 ty: &UNIT_TYPE,
                 span,

@@ -3,8 +3,7 @@
     (prop! $c R:1:1 $b)
 )
 
-(set (.. @f
-    #u
+(matrix (.. @f
     (match-struct ($d)
         (prop! $d R:2:0
             (struct ($e)

@@ -12,6 +12,7 @@ pub enum Error<'s> {
     InvalidSymbol(&'s str),
     InvalidNumber,
     InvalidVariableNumber,
+    ElementMismatch,
 }
 
 #[derive(Debug)]
@@ -183,36 +184,54 @@ impl<'a, L: Lang> Parser<'a, L> {
             ("prop?-!", next) => {
                 self.parse_prop(PropFlags::PAT_OPTIONAL | PropFlags::REL_DOWN_OPTIONAL, next)
             }
-            ("set", next) => {
+            ("matrix", next) => {
                 let (entries, next) = self.parse_many(next, Self::parse_set_entry)?;
-                Ok((self.make_node(Kind::Set(entries.into())), next))
+                Ok((self.make_node(Kind::Matrix(entries.into())), next))
             }
             ("make-seq", next) => {
-                let (binder, next) = self.parse_binder(next)?;
+                let (binder, next) = match parse_raw_token(next) {
+                    Ok((Token::LParen, _)) => {
+                        let (binder, next) = self.parse_binder(next)?;
+                        (Some(binder), next)
+                    }
+                    _ => (None, next),
+                };
                 let (children, next) = self.parse_many(next, Self::parse)?;
                 Ok((self.make_node(Kind::MakeSeq(binder, children.into())), next))
             }
-            ("for-each", next) => {
-                let (seq_var, next) = parse_dollar_var(next)?;
-                let ((rel, val), next) = parse_paren_delimited(next, |next| {
-                    let (rel, next) = self.parse_pattern_binding(next)?;
-                    let (val, next) = self.parse_pattern_binding(next)?;
-                    Ok(((rel, val), next))
+            ("for-each", mut next) => {
+                let mut elements: ThinVec<(Var, Binding<'a, L>)> = Default::default();
+
+                loop {
+                    let (seq_var, next_next) = parse_dollar_var(next)?;
+
+                    next = next_next;
+                    elements.push((seq_var, Binding::Wildcard));
+
+                    if matches!(parse_raw_token(next), Ok((Token::LParen, _))) {
+                        break;
+                    }
+                }
+
+                let (bindings, next) = parse_paren_delimited(next, |next| {
+                    self.parse_many(next, |zelf, next| zelf.parse_pattern_binding(next))
                 })?;
+
+                if bindings.len() != elements.len() {
+                    return Err(Error::ElementMismatch);
+                }
+
+                for (element, binding) in elements.iter_mut().zip(bindings.into_iter()) {
+                    element.1 = binding;
+                }
+
                 let (body, next) = self.parse_many(next, Self::parse)?;
-                Ok((
-                    self.make_node(Kind::ForEach(seq_var, (rel, val), body.into())),
-                    next,
-                ))
+                Ok((self.make_node(Kind::ForEach(elements, body.into())), next))
             }
             ("insert", next) => {
                 let (seq_var, next) = parse_dollar_var(next)?;
-                let (rel, next) = self.parse(next)?;
-                let (val, next) = self.parse(next)?;
-                Ok((
-                    self.make_node(Kind::Insert(seq_var, Attribute { rel, val })),
-                    next,
-                ))
+                let (node, next) = self.parse(next)?;
+                Ok((self.make_node(Kind::Insert(seq_var, node)), next))
             }
             ("let-regex", mut next) => {
                 let mut groups_list = thin_vec![];
@@ -353,24 +372,25 @@ impl<'a, L: Lang> Parser<'a, L> {
         }
     }
 
-    fn parse_set_entry<'s>(&mut self, next: &'s str) -> ParseResult<'s, SetEntry<'a, L>> {
-        parse_paren_delimited(next, |next| match parse_symbol(next) {
-            Ok(("..", next)) => {
-                let (label, next) = parse_at_label(next)?;
-                let (rel, next) = self.parse(next)?;
-                let (val, next) = self.parse(next)?;
+    fn parse_set_entry<'s>(&mut self, next: &'s str) -> ParseResult<'s, MatrixRow<'a, L>> {
+        parse_paren_delimited(next, |next| {
+            let (label, next) = match parse_symbol(next) {
+                Ok(("..", next)) => {
+                    let (label, next) = parse_at_label(next)?;
+                    (Some(label), next)
+                }
+                _ => (None, next),
+            };
 
-                Ok((
-                    SetEntry(Some(self.make_label(label)), Attribute { rel, val }),
-                    next,
-                ))
-            }
-            _ => {
-                let (rel, next) = self.parse(next)?;
-                let (val, next) = self.parse(next)?;
+            let (elements, next) = self.parse_many(next, |zelf, next| zelf.parse(next))?;
 
-                Ok((SetEntry(None, Attribute { rel, val }), next))
-            }
+            Ok((
+                MatrixRow(
+                    label.map(|label| self.make_label(label)),
+                    elements.into_iter().collect(),
+                ),
+                next,
+            ))
         })
     }
 

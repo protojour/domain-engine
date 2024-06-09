@@ -1,3 +1,4 @@
+use fnv::FnvHashMap;
 use ontol_hir::{visitor::HirVisitor, Node, PropFlags, PropVariant};
 use ontol_runtime::{
     var::{Var, VarAllocator, VarSet},
@@ -10,7 +11,7 @@ use crate::{
     types::TypeRef,
 };
 
-use super::ssa_scope_graph::SpannedLet;
+use super::{ssa_scope_graph::SpannedLet, ssa_unifier::SsaUnifier};
 
 #[derive(Clone, Default)]
 pub struct ScopeTracker<'m> {
@@ -184,7 +185,6 @@ impl Catcher {
 
 #[derive(Clone)]
 pub enum ExtendedScope<'m> {
-    Wildcard,
     Node(ontol_hir::Node),
     SeqUnpack(ThinVec<ontol_hir::Binding<'m, TypedHir>>, Meta<'m>),
 }
@@ -206,70 +206,83 @@ pub struct TypeMapping<'m> {
     pub to: TypeRef<'m>,
 }
 
-pub fn scan_immediate_free_vars(
-    arena: &ontol_hir::arena::Arena<TypedHir>,
-    nodes: &[ontol_hir::Node],
-) -> VarSet {
-    #[derive(Default)]
-    struct FreeVarsAnalyzer {
-        free_vars: VarSet,
-        binders: VarSet,
+impl<'c, 'm> SsaUnifier<'c, 'm> {
+    pub fn scan_immediate_free_vars<'s>(
+        &'s self,
+        arena: &ontol_hir::arena::Arena<TypedHir>,
+        nodes: &[ontol_hir::Node],
+    ) -> VarSet {
+        struct FreeVarsAnalyzer<'s> {
+            free_vars: VarSet,
+            binders: VarSet,
+            iter_tuple_vars: &'s FnvHashMap<Var, FnvHashMap<u8, Var>>,
+        }
+
+        impl<'h, 'm: 'h, 's> ontol_hir::visitor::HirVisitor<'h, 'm, TypedHir> for FreeVarsAnalyzer<'s> {
+            fn visit_prop(
+                &mut self,
+                flags: PropFlags,
+                struct_var: Var,
+                rel_id: RelationshipId,
+                variant: &PropVariant,
+                arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
+            ) {
+                // If the property is optional, don't consider its inner variables as required.
+                // This should result in catch blocks being generated at the correct levels.
+                if flags.pat_optional() {
+                    return;
+                }
+
+                self.traverse_prop(struct_var, rel_id, variant, arena);
+            }
+
+            fn visit_var(&mut self, var: Var) {
+                if !self.binders.contains(var) {
+                    self.free_vars.insert(var);
+                }
+            }
+
+            fn visit_label(&mut self, label: ontol_hir::Label) {
+                let var: Var = label.into();
+                if !self.binders.contains(var) {
+                    self.free_vars.insert(var);
+                }
+
+                if let Some(expand_tuple) = self.iter_tuple_vars.get(&var) {
+                    for (_, var) in expand_tuple {
+                        self.visit_var(*var);
+                    }
+                }
+            }
+
+            fn visit_binder(&mut self, var: Var) {
+                self.binders.insert(var);
+            }
+
+            fn visit_set_entry(
+                &mut self,
+                index: usize,
+                entry: &ontol_hir::MatrixRow<'m, TypedHir>,
+                arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
+            ) {
+                if let Some(label) = entry.0 {
+                    self.visit_label(*label.hir());
+                } else {
+                    self.traverse_set_entry(index, entry, arena);
+                }
+            }
+        }
+
+        let mut analyzer = FreeVarsAnalyzer {
+            free_vars: Default::default(),
+            binders: Default::default(),
+            iter_tuple_vars: &self.iter_tuple_vars,
+        };
+        for (index, node) in nodes.into_iter().enumerate() {
+            analyzer.visit_node(index, arena.node_ref(*node));
+        }
+        analyzer.free_vars
     }
-
-    impl<'h, 'm: 'h> ontol_hir::visitor::HirVisitor<'h, 'm, TypedHir> for FreeVarsAnalyzer {
-        fn visit_prop(
-            &mut self,
-            flags: PropFlags,
-            struct_var: Var,
-            rel_id: RelationshipId,
-            variant: &PropVariant,
-            arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
-        ) {
-            // If the property is optional, don't consider its inner variables as required.
-            // This should result in catch blocks being generated at the correct levels.
-            if flags.pat_optional() {
-                return;
-            }
-
-            self.traverse_prop(struct_var, rel_id, variant, arena);
-        }
-
-        fn visit_var(&mut self, var: Var) {
-            if !self.binders.contains(var) {
-                self.free_vars.insert(var);
-            }
-        }
-
-        fn visit_label(&mut self, label: ontol_hir::Label) {
-            let var: Var = label.into();
-            if !self.binders.contains(var) {
-                self.free_vars.insert(var);
-            }
-        }
-
-        fn visit_binder(&mut self, var: Var) {
-            self.binders.insert(var);
-        }
-
-        fn visit_set_entry(
-            &mut self,
-            index: usize,
-            entry: &ontol_hir::SetEntry<'m, TypedHir>,
-            arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
-        ) {
-            if let Some(label) = entry.0 {
-                self.visit_label(*label.hir());
-            } else {
-                self.traverse_set_entry(index, entry, arena);
-            }
-        }
-    }
-
-    let mut analyzer = FreeVarsAnalyzer::default();
-    for (index, node) in nodes.into_iter().enumerate() {
-        analyzer.visit_node(index, arena.node_ref(*node));
-    }
-    analyzer.free_vars
 }
 
 pub fn scan_all_vars_and_labels(

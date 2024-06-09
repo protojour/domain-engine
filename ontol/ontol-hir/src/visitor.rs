@@ -2,7 +2,7 @@ use ontol_runtime::RelationshipId;
 
 use crate::{
     arena::{Arena, NodeRef},
-    Binding, Kind, Label, Lang, Node, Pack, PropFlags, PropVariant, SetEntry, Var,
+    Binding, Kind, Label, Lang, MatrixRow, Node, Pack, PropFlags, PropVariant, Var,
 };
 
 pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
@@ -29,7 +29,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
     }
 
     #[allow(unused_variables)]
-    fn visit_set_entry(&mut self, index: usize, entry: &SetEntry<'a, L>, arena: &'h Arena<'a, L>) {
+    fn visit_set_entry(&mut self, index: usize, entry: &MatrixRow<'a, L>, arena: &'h Arena<'a, L>) {
         self.traverse_set_entry(index, entry, arena);
     }
 
@@ -144,7 +144,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                     self.visit_node(index + 1, node_ref);
                 }
             }
-            Kind::Set(entries) => {
+            Kind::Matrix(entries) => {
                 for (index, entry) in entries.iter().enumerate() {
                     self.visit_set_entry(index, entry, arena);
                 }
@@ -163,7 +163,17 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                 self.visit_var(*source);
             }
             Kind::MakeSeq(binder, children) => {
-                self.visit_binder(L::as_hir(binder).var);
+                if let Some(binder) = binder.as_ref() {
+                    self.visit_binder(L::as_hir(binder).var);
+                }
+                for (index, child) in arena.node_refs(children).enumerate() {
+                    self.visit_node(index, child);
+                }
+            }
+            Kind::MakeMatrix(binders, children) => {
+                for binder in binders {
+                    self.visit_binder(L::as_hir(binder).var);
+                }
                 for (index, child) in arena.node_refs(children).enumerate() {
                     self.visit_node(index, child);
                 }
@@ -172,18 +182,18 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                 self.visit_var(*target);
                 self.visit_var(*source);
             }
-            Kind::ForEach(seq_var, (rel, val), body) => {
-                self.visit_var(*seq_var);
-                self.traverse_pattern_binding(rel);
-                self.traverse_pattern_binding(val);
+            Kind::ForEach(elements, body) => {
+                for (seq_var, binding) in elements {
+                    self.visit_var(*seq_var);
+                    self.traverse_pattern_binding(binding);
+                }
                 for (index, node_ref) in arena.node_refs(body).enumerate() {
                     self.visit_node(index, node_ref);
                 }
             }
-            Kind::Insert(seq_var, attr) => {
+            Kind::Insert(seq_var, node) => {
                 self.visit_var(*seq_var);
-                self.visit_node(0, arena.node_ref(attr.rel));
-                self.visit_node(1, arena.node_ref(attr.val));
+                self.visit_node(0, arena.node_ref(*node));
             }
             Kind::StringPush(to_var, node) => {
                 self.visit_var(*to_var);
@@ -243,14 +253,16 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
     fn traverse_set_entry(
         &mut self,
         index: usize,
-        entry: &SetEntry<'a, L>,
+        MatrixRow(iter_label, elements): &MatrixRow<'a, L>,
         arena: &'h Arena<'a, L>,
     ) {
-        if let Some(label_data) = &entry.0 {
+        if let Some(label_data) = iter_label {
             self.visit_label(*L::as_hir(label_data));
         }
-        self.visit_node(0, arena.node_ref(entry.1.rel));
-        self.visit_node(1, arena.node_ref(entry.1.val));
+
+        for (index, element) in elements.iter().enumerate() {
+            self.visit_node(index, arena.node_ref(*element));
+        }
     }
 
     fn traverse_pack_binding(&mut self, pack: &Pack<Binding<'a, L>>) {

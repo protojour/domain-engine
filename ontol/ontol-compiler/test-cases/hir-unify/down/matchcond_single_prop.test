@@ -2,8 +2,7 @@
     (prop! $b R:1:0 $a)
 )
 
-(set (.. @d
-    #u
+(matrix (.. @d
     (match-struct ($c)
         (prop! $c R:2:0 $a)
     )

@@ -1,9 +1,8 @@
-use ontol_runtime::value::Attribute;
 use smallvec::SmallVec;
 
 use crate::{
     arena::{Arena, NodeRef},
-    Lang, Node, Nodes, PropVariant, SetEntry,
+    Lang, MatrixRow, Node, Nodes, PropVariant,
 };
 
 /// Import from one arena into another
@@ -64,7 +63,7 @@ impl<'i, 'o, 'a, L: Lang> Importer<'i, 'o, 'a, L> {
             Map(arg) => Map(self.import(*arg)),
             Pun(arg) => Pun(self.import(*arg)),
             Narrow(arg) => Narrow(self.import(*arg)),
-            Set(entries) => Set(self.import_entries(entries)),
+            Matrix(entries) => Matrix(self.import_entries(entries)),
             Struct(binder, flags, body) => Struct(binder.clone(), *flags, self.import_nodes(body)),
             Prop(optional, struct_var, prop_id, variant) => Prop(
                 *optional,
@@ -79,10 +78,9 @@ impl<'i, 'o, 'a, L: Lang> Importer<'i, 'o, 'a, L> {
                 },
             ),
             MakeSeq(binder, body) => MakeSeq(binder.clone(), self.import_nodes(body)),
-            ForEach(var, (rel, val), body) => {
-                ForEach(*var, (rel.clone(), val.clone()), self.import_nodes(body))
-            }
-            Insert(var, attr) => Insert(*var, self.import_attr(*attr)),
+            MakeMatrix(binders, body) => MakeMatrix(binders.clone(), self.import_nodes(body)),
+            ForEach(elements, body) => ForEach(elements.clone(), self.import_nodes(body)),
+            Insert(var, node) => Insert(*var, self.import(*node)),
             StringPush(var, node) => StringPush(*var, self.import(*node)),
             Regex(label, def_id, groups_list) => Regex(label.clone(), *def_id, groups_list.clone()),
             LetCondVar(bind_var, cond) => LetCondVar(*bind_var, *cond),
@@ -100,16 +98,10 @@ impl<'i, 'o, 'a, L: Lang> Importer<'i, 'o, 'a, L> {
         imported_nodes
     }
 
-    fn import_attr(&mut self, attr: Attribute<Node>) -> Attribute<Node> {
-        let rel = self.import(attr.rel);
-        let val = self.import(attr.val);
-        Attribute { rel, val }
-    }
-
-    fn import_entries(&mut self, entries: &[SetEntry<'a, L>]) -> SmallVec<SetEntry<'a, L>, 1> {
+    fn import_entries(&mut self, entries: &[MatrixRow<'a, L>]) -> SmallVec<MatrixRow<'a, L>, 1> {
         entries
             .iter()
-            .map(|SetEntry(iter, attr)| SetEntry(iter.clone(), self.import_attr(*attr)))
+            .map(|MatrixRow(iter, elements)| MatrixRow(iter.clone(), self.import_nodes(elements)))
             .collect()
     }
 }

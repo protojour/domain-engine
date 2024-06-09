@@ -1,10 +1,11 @@
 use std::collections::BTreeMap;
 
-use ontol_hir::{Binder, Binding, Kind, Label, Node, Nodes, Pack, PropVariant, SetEntry};
+use ontol_hir::{
+    Binder, Binding, Kind, Label, MatrixRow, Node, Nodes, Pack, PropFlags, PropVariant,
+};
 use ontol_runtime::{
-    value::Attribute,
     var::{Var, VarSet},
-    MapDirection,
+    MapDirection, RelationshipId,
 };
 use smallvec::smallvec;
 use thin_vec::{thin_vec, ThinVec};
@@ -36,7 +37,6 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         catcher: &mut Catcher,
     ) -> UnifierResult<Binding<'m, TypedHir>> {
         match scope_node {
-            ExtendedScope::Wildcard => Ok(Binding::Wildcard),
             ExtendedScope::Node(node) => self.define_scope(node, scoped, body),
             ExtendedScope::SeqUnpack(bindings, source_meta) => {
                 let var = self.var_allocator.alloc();
@@ -88,9 +88,9 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
         for (let_node, span) in scoped_lets {
             let (kind, ty) = match let_node {
-                Let::Prop(attr, var_prop) => (Kind::LetProp(attr, var_prop), &UNIT_TYPE),
-                Let::PropDefault(attr, var_prop, default) => {
-                    (Kind::LetPropDefault(attr, var_prop, default), &UNIT_TYPE)
+                Let::Prop(pack, var_prop) => (Kind::LetProp(pack, var_prop), &UNIT_TYPE),
+                Let::PropDefault(pack, var_prop, default) => {
+                    (Kind::LetPropDefault(pack, var_prop, default), &UNIT_TYPE)
                 }
                 Let::Narrow(typed_var) => (
                     Kind::TryNarrow(self.mk_root_try_label(), *typed_var.hir()),
@@ -296,19 +296,18 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 lets.extend(sub_lets);
                 binding
             }
-            Kind::Set(entries) => {
-                if entries.len() == 1 {
-                    let SetEntry(iter, Attribute { rel, val }) = entries.first().unwrap();
-                    if let Some(iter_label) = iter {
+            Kind::Matrix(rows) => {
+                if rows.len() == 1 {
+                    if let Some((iter_label, elements)) = find_matrix_iter_row(rows) {
                         let iter_var: Var = (*iter_label.hir()).into();
                         if self
                             .iter_extended_scope_table
                             .insert(
                                 *iter_label.hir(),
-                                Attribute {
-                                    rel: ExtendedScope::Node(*rel),
-                                    val: ExtendedScope::Node(*val),
-                                },
+                                elements
+                                    .iter()
+                                    .map(|node| ExtendedScope::Node(*node))
+                                    .collect(),
                             )
                             .is_some()
                         {
@@ -342,121 +341,13 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 }
                 Ok(Binding::Binder(*binder))
             }
-            Kind::Prop(flags, var, rel_id, variant) => {
-                let mut sub_lets = vec![];
-
-                let prop_scoped = scoped.prop(self.map_flags);
-
-                let (rel_optional, needs_default) = match self.direction {
-                    MapDirection::Down => {
-                        if flags.rel_down_optional() && !flags.rel_up_optional() {
-                            (true, false)
-                        } else {
-                            (flags.rel_up_optional(), !flags.pat_optional())
-                        }
-                    }
-                    MapDirection::Up => (flags.rel_up_optional(), !flags.pat_optional()),
-                    MapDirection::Mixed => (true, true),
-                };
-
-                match variant {
-                    PropVariant::Unit(node) => {
-                        match (rel_optional, needs_default) {
-                            (true, true) => {
-                                // This passed type check, so there must be a way to construct a value default
-                                let default = self
-                                    .write_default_node(*self.scope_arena.node_ref(*node).meta());
-
-                                let binding = self.traverse(*node, prop_scoped, &mut sub_lets)?;
-
-                                self.push_let(
-                                    Let::PropDefault(
-                                        Pack::Unit(binding),
-                                        (*var, *rel_id),
-                                        thin_vec![default],
-                                    ),
-                                    node_ref.span(),
-                                    scoped,
-                                    lets,
-                                );
-                            }
-                            (rel_optional, _) => {
-                                let next_scoped = if rel_optional {
-                                    Scoped::MaybeVoid
-                                } else {
-                                    prop_scoped
-                                };
-
-                                let binding = self.traverse(*node, next_scoped, &mut sub_lets)?;
-
-                                self.push_let(
-                                    Let::Prop(Pack::Unit(binding), (*var, *rel_id)),
-                                    node_ref.span(),
-                                    scoped,
-                                    lets,
-                                );
-                            }
-                        }
-                    }
-                    PropVariant::Tuple(tup) => {
-                        match (rel_optional, needs_default) {
-                            (true, true) => {
-                                // This passed type check, so there must be a way to construct a value default
-                                let default: ThinVec<_> = tup
-                                    .iter()
-                                    .map(|node| {
-                                        self.write_default_node(
-                                            *self.scope_arena.node_ref(*node).meta(),
-                                        )
-                                    })
-                                    .collect();
-
-                                let bind_pack = Pack::Tuple(
-                                    tup.iter()
-                                        .map(|node| {
-                                            self.traverse(*node, prop_scoped, &mut sub_lets)
-                                        })
-                                        .collect::<Result<_, _>>()?,
-                                );
-
-                                self.push_let(
-                                    Let::PropDefault(bind_pack, (*var, *rel_id), default),
-                                    node_ref.span(),
-                                    scoped,
-                                    lets,
-                                );
-                            }
-                            (rel_optional, _) => {
-                                let next_scoped = if rel_optional {
-                                    Scoped::MaybeVoid
-                                } else {
-                                    prop_scoped
-                                };
-
-                                let bind_pack = Pack::Tuple(
-                                    tup.iter()
-                                        .map(|node| {
-                                            self.traverse(*node, next_scoped, &mut sub_lets)
-                                        })
-                                        .collect::<Result<_, _>>()?,
-                                );
-
-                                self.push_let(
-                                    Let::Prop(bind_pack, (*var, *rel_id)),
-                                    node_ref.span(),
-                                    scoped,
-                                    lets,
-                                );
-                            }
-                        };
-                    }
-                    PropVariant::Predicate(..) => {
-                        return Err(UnifierError::TODO("predicate prop scope".to_string()));
-                    }
-                }
-                lets.extend(sub_lets);
-                Ok(Binding::Wildcard)
-            }
+            Kind::Prop(flags, var, rel_id, variant) => self.traverse_prop(
+                (*flags, *var, *rel_id),
+                variant,
+                node_ref.span(),
+                scoped,
+                lets,
+            ),
             Kind::Regex(iter_label, regex_def_id, groups_list) => {
                 let haystack_var = self.var_allocator.alloc();
                 match iter_label {
@@ -502,10 +393,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
                             self.iter_extended_scope_table.insert(
                                 *iter_label.hir(),
-                                Attribute {
-                                    rel: ExtendedScope::Wildcard,
-                                    val: ExtendedScope::SeqUnpack(unpack, *node_ref.meta()),
-                                },
+                                vec![ExtendedScope::SeqUnpack(unpack, *node_ref.meta())],
                             );
                         }
 
@@ -543,8 +431,9 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             Kind::With(..)
             | Kind::MoveRestAttrs(_, _)
             | Kind::MakeSeq(_, _)
+            | Kind::MakeMatrix(_, _)
             | Kind::CopySubSeq(_, _)
-            | Kind::ForEach(_, _, _)
+            | Kind::ForEach(_, _)
             | Kind::Insert(_, _)
             | Kind::StringPush(_, _)
             | Kind::PushCondClauses(_, _)
@@ -562,6 +451,189 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 Err(UnifierError::TODO(format!("Not a scope node: {node_ref}")))
             }
         }
+    }
+
+    fn traverse_prop(
+        &mut self,
+        (flags, var, rel_id): (PropFlags, Var, RelationshipId),
+        variant: &ontol_hir::PropVariant,
+        span: SourceSpan,
+        scoped: Scoped,
+        lets: &mut Vec<SpannedLet<'m>>,
+    ) -> UnifierResult<ontol_hir::Binding<'m, TypedHir>> {
+        let mut sub_lets = vec![];
+
+        let prop_scoped = scoped.prop(self.map_flags);
+
+        let (rel_optional, needs_default) = match self.direction {
+            MapDirection::Down => {
+                if flags.rel_down_optional() && !flags.rel_up_optional() {
+                    (true, false)
+                } else {
+                    (flags.rel_up_optional(), !flags.pat_optional())
+                }
+            }
+            MapDirection::Up => (flags.rel_up_optional(), !flags.pat_optional()),
+            MapDirection::Mixed => (true, true),
+        };
+
+        match variant {
+            PropVariant::Unit(node) => {
+                let unit_node_ref = self.scope_arena.node_ref(*node);
+
+                match (unit_node_ref.hir(), rel_optional, needs_default) {
+                    (ontol_hir::Kind::Matrix(rows), ..) => {
+                        if let Some((iter_label, elements)) = find_matrix_iter_row(rows) {
+                            if self
+                                .iter_extended_scope_table
+                                .insert(
+                                    *iter_label.hir(),
+                                    elements
+                                        .iter()
+                                        .map(|node| ExtendedScope::Node(*node))
+                                        .collect(),
+                                )
+                                .is_some()
+                            {
+                                return Err(UnifierError::TODO(
+                                    "fix duplicate iter scope".to_string(),
+                                ));
+                            }
+
+                            let iter_label_var: Var = (*iter_label.hir()).into();
+
+                            let next_scoped = if rel_optional {
+                                Scoped::MaybeVoid
+                            } else {
+                                prop_scoped
+                            };
+                            let let_prop_default = rel_optional && needs_default;
+
+                            let pack = Pack::Tuple(
+                                elements
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(idx, _)| {
+                                        let tuple_var =
+                                            self.get_or_alloc_iter_tuple_var(iter_label_var, idx);
+
+                                        if matches!(next_scoped, Scoped::Yes) || let_prop_default {
+                                            self.scope_tracker.in_scope.insert(tuple_var);
+                                        }
+
+                                        Binding::Binder(TypedHirData(
+                                            Binder { var: tuple_var },
+                                            *iter_label.meta(),
+                                        ))
+                                    })
+                                    .collect(),
+                            );
+
+                            if let_prop_default {
+                                let defaults: ThinVec<_> = elements
+                                    .iter()
+                                    .map(|_| self.write_empty_sequence(*unit_node_ref.meta()))
+                                    .collect();
+
+                                self.push_let(
+                                    Let::PropDefault(pack, (var, rel_id), defaults),
+                                    span,
+                                    scoped,
+                                    lets,
+                                );
+                            } else {
+                                self.push_let(Let::Prop(pack, (var, rel_id)), span, scoped, lets);
+                            }
+                        } else {
+                            CompileError::PatternRequiresIteratedVariable
+                                .span(span)
+                                .report(self);
+                        };
+                    }
+                    (_, true, true) => {
+                        // This passed type check, so there must be a way to construct a value default
+                        let default =
+                            self.write_default_node(*self.scope_arena.node_ref(*node).meta());
+
+                        let binding = self.traverse(*node, prop_scoped, &mut sub_lets)?;
+
+                        self.push_let(
+                            Let::PropDefault(
+                                Pack::Unit(binding),
+                                (var, rel_id),
+                                thin_vec![default],
+                            ),
+                            span,
+                            scoped,
+                            lets,
+                        );
+                    }
+                    (..) => {
+                        let next_scoped = if rel_optional {
+                            Scoped::MaybeVoid
+                        } else {
+                            prop_scoped
+                        };
+
+                        let binding = self.traverse(*node, next_scoped, &mut sub_lets)?;
+
+                        self.push_let(
+                            Let::Prop(Pack::Unit(binding), (var, rel_id)),
+                            span,
+                            scoped,
+                            lets,
+                        );
+                    }
+                }
+            }
+            PropVariant::Tuple(tup) => {
+                match (rel_optional, needs_default) {
+                    (true, true) => {
+                        // This passed type check, so there must be a way to construct a value default
+                        let default: ThinVec<_> = tup
+                            .iter()
+                            .map(|node| {
+                                self.write_default_node(*self.scope_arena.node_ref(*node).meta())
+                            })
+                            .collect();
+
+                        let bind_pack = Pack::Tuple(
+                            tup.iter()
+                                .map(|node| self.traverse(*node, prop_scoped, &mut sub_lets))
+                                .collect::<Result<_, _>>()?,
+                        );
+
+                        self.push_let(
+                            Let::PropDefault(bind_pack, (var, rel_id), default),
+                            span,
+                            scoped,
+                            lets,
+                        );
+                    }
+                    (rel_optional, _) => {
+                        let next_scoped = if rel_optional {
+                            Scoped::MaybeVoid
+                        } else {
+                            prop_scoped
+                        };
+
+                        let bind_pack = Pack::Tuple(
+                            tup.iter()
+                                .map(|node| self.traverse(*node, next_scoped, &mut sub_lets))
+                                .collect::<Result<_, _>>()?,
+                        );
+
+                        self.push_let(Let::Prop(bind_pack, (var, rel_id)), span, scoped, lets);
+                    }
+                };
+            }
+            PropVariant::Predicate(..) => {
+                return Err(UnifierError::TODO("predicate prop scope".to_string()));
+            }
+        }
+
+        lets.extend(sub_lets);
+        Ok(Binding::Wildcard)
     }
 
     fn push_let(
@@ -626,4 +698,16 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
         Ok(())
     }
+}
+
+fn find_matrix_iter_row<'a, 'm>(
+    rows: &'a [MatrixRow<'m, TypedHir>],
+) -> Option<(TypedHirData<'m, Label>, &'a Nodes)> {
+    rows.iter().find_map(|MatrixRow(iter_label, elements)| {
+        if let Some(iter_label) = iter_label {
+            Some((*iter_label, elements))
+        } else {
+            None
+        }
+    })
 }

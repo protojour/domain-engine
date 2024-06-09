@@ -64,9 +64,7 @@ fn test_fn_call() {
 fn test_struct() {
     let src = indoc! {"
         (struct ($a)
-            (prop- $a R:0:0
-                #u
-            )
+            (prop- $a R:0:0 #u)
             (prop- $a R:0:0
                 [#u
                     (struct ($b))
@@ -94,31 +92,23 @@ fn test_mixed() {
 }
 
 #[test]
-fn test_set() {
+fn test_matrix() {
     let src = indoc! {"
-        (struct ($a)
-            (prop- $a R:0:0
-                [#u
-                    (set
-                        (.. @c #u $b)
-                    )
-                ]
-            )
+        (matrix
+            (.. @c #u $b)
         )"
     };
     assert_eq!(src, parse_print(src));
 }
 
 #[test]
-fn test_set_in_prop() {
+fn test_matrix_in_prop() {
     let src = indoc! {"
         (struct ($a)
             (prop- $a R:0:0
-                [#u
-                    (set
-                        (.. @c #u $b)
-                    )
-                ]
+                (matrix
+                    (.. @c #u $b)
+                )
             )
         )"
     };
@@ -135,7 +125,7 @@ fn test_map_seq() {
                 (prop- $a R:0:0
                     [#u
                         (make-seq ($d)
-                            (for-each $c ($e $f) $d)
+                            (for-each $c ($e) $d)
                         )
                     ]
                 )

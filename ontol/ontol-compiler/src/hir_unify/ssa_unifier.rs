@@ -1,11 +1,11 @@
 use fnv::FnvHashMap;
+use itertools::Itertools;
 use ontol_hir::{
     arena::NodeRef, find_value_node, import::arena_import, Binder, Binding, EvalCondTerm, Kind,
-    Label, Node, Nodes, PropFlags, PropVariant, SetEntry, StructFlags,
+    Label, MatrixRow, Node, Nodes, PropFlags, PropVariant, StructFlags,
 };
 use ontol_runtime::{
     query::condition::{Clause, ClausePair, SetOperator},
-    value::Attribute,
     var::{Var, VarAllocator, VarSet},
     MapDirection, MapFlags, RelationshipId,
 };
@@ -15,10 +15,7 @@ use tracing::{debug, info};
 
 use crate::{
     def::{DefKind, Defs},
-    hir_unify::{
-        regex_interpolation::RegexStringInterpolator,
-        ssa_util::{scan_immediate_free_vars, NodesExt},
-    },
+    hir_unify::{regex_interpolation::RegexStringInterpolator, ssa_util::NodesExt},
     mem::Intern,
     primitive::Primitives,
     relation::RelCtx,
@@ -58,8 +55,8 @@ pub struct SsaUnifier<'c, 'm> {
     pub(super) root_try_label: Option<Label>,
 
     pub(super) all_scope_vars_and_labels: VarSet,
-    pub(super) iter_extended_scope_table:
-        FnvHashMap<ontol_hir::Label, Attribute<ExtendedScope<'m>>>,
+    pub(super) iter_extended_scope_table: FnvHashMap<ontol_hir::Label, Vec<ExtendedScope<'m>>>,
+    pub(super) iter_tuple_vars: FnvHashMap<Var, FnvHashMap<u8, Var>>,
     pub(super) scope_tracker: ScopeTracker<'m>,
 }
 
@@ -88,6 +85,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             root_try_label: None,
             all_scope_vars_and_labels: Default::default(),
             iter_extended_scope_table: Default::default(),
+            iter_tuple_vars: Default::default(),
             scope_tracker: Default::default(),
         }
     }
@@ -191,17 +189,18 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     *node_ref.meta()
                 )])
             }
-            Kind::Set(entries) => {
-                if entries.len() == 1 {
-                    let ontol_hir::SetEntry(_, Attribute { rel, val }) = entries.first().unwrap();
+            Kind::Matrix(rows) => {
+                if rows.is_empty() {
+                    return Err(UnifierError::MatrixWithoutRows);
+                }
 
-                    let rel_kind = self.expr_arena.kind_of(*rel);
-                    let val_kind = self.expr_arena.kind_of(*val);
+                if rows.len() == 1 && rows.first().unwrap().1.len() == 1 {
+                    let element = rows.first().unwrap().1.first().unwrap();
+
+                    let kind = self.expr_arena.kind_of(*element);
 
                     // Handle {..struct match()} at the top level, which is a special case:
-                    if let (Kind::Unit, Kind::Struct(binder, flags, struct_body)) =
-                        (rel_kind, val_kind)
-                    {
+                    if let Kind::Struct(binder, flags, struct_body) = kind {
                         if let ExprMode::MatchStruct { match_level: 0, .. } =
                             mode.match_struct(Var(0))
                         {
@@ -213,7 +212,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                 return self.write_match_struct_expr(
                                     *binder,
                                     struct_body,
-                                    self.expr_arena.node_ref(*val),
+                                    self.expr_arena.node_ref(*element),
                                     TypeMapping {
                                         to: node_ref.ty(),
                                         from: inner_set_ty,
@@ -225,16 +224,23 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     }
                 }
 
+                let arity = rows.iter().map(|row| row.1.len()).max().unwrap();
+
                 Ok(match mode {
                     ExprMode::Expr { .. } => {
                         let make_seq = self.prealloc_node();
-                        let out_seq_var = self.alloc_var();
+                        let out_columns: Vec<Var> =
+                            (0..arity).map(|_| self.alloc_var()).collect_vec();
                         let seq_body =
-                            self.write_seq_body(entries, *node_ref.meta(), out_seq_var, mode)?;
+                            self.write_matrix_body(rows, *node_ref.meta(), &out_columns, mode)?;
                         smallvec![self.write_node(
                             make_seq,
-                            Kind::MakeSeq(
-                                TypedHirData(out_seq_var.into(), *node_ref.meta()),
+                            Kind::MakeMatrix(
+                                out_columns
+                                    .into_iter()
+                                    // FIXME: node_ref.meta is probably wrong here:
+                                    .map(|var| TypedHirData(var.into(), *node_ref.meta()))
+                                    .collect(),
                                 seq_body
                             ),
                             *node_ref.meta(),
@@ -249,8 +255,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                         match_level: _,
                         match_var,
                         set_cond_var,
-                    } => self.write_match_seq_body(
-                        entries,
+                    } => self.write_match_matrix_body(
+                        rows,
                         *node_ref.meta(),
                         match_var,
                         set_cond_var,
@@ -422,7 +428,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
         match (applied_mode, variant) {
             (ExprMode::Expr { .. }, PropVariant::Unit(val)) => {
-                let free_vars = scan_immediate_free_vars(self.expr_arena, &[*val]);
+                let free_vars = self.scan_immediate_free_vars(self.expr_arena, &[*val]);
                 self.maybe_apply_catch_block(free_vars, meta.span, &|zelf| {
                     let val = zelf.write_one_expr(*val, applied_mode)?;
 
@@ -433,7 +439,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 })
             }
             (ExprMode::Expr { .. }, PropVariant::Tuple(tup)) => {
-                let free_vars = scan_immediate_free_vars(self.expr_arena, tup);
+                let free_vars = self.scan_immediate_free_vars(self.expr_arena, tup);
                 self.maybe_apply_catch_block(free_vars, meta.span, &|zelf| {
                     let variant = PropVariant::Tuple(
                         tup.iter()
@@ -493,7 +499,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 let let_cond_var = self.mk_let_cond_var(set_var, match_var, meta.span);
 
                 if flags.rel_up_optional() {
-                    let mut free_vars = scan_immediate_free_vars(self.expr_arena, &in_nodes);
+                    let mut free_vars = self.scan_immediate_free_vars(self.expr_arena, &in_nodes);
                     free_vars.insert(struct_var);
                     free_vars.insert(set_var);
 
@@ -551,7 +557,9 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             (ExprMode::MatchStruct { match_var, .. }, PropVariant::Predicate(operator, node)) => {
                 let set_cond_var = self.alloc_var();
                 let let_cond_var = self.mk_let_cond_var(set_cond_var, match_var, meta.span);
-                let free_vars = scan_immediate_free_vars(self.expr_arena, &[*node]);
+                let free_vars = self.scan_immediate_free_vars(self.expr_arena, &[*node]);
+
+                debug!("prop predicate free vars: {free_vars:?}");
 
                 self.maybe_apply_catch_block(free_vars, meta.span, &|zelf| {
                     let mut body = smallvec![let_cond_var];
@@ -578,79 +586,108 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         }
     }
 
-    fn write_seq_body(
+    fn write_matrix_body(
         &mut self,
-        entries: &[SetEntry<'m, TypedHir>],
+        rows: &[MatrixRow<'m, TypedHir>],
         seq_meta: Meta<'m>,
-        out_seq_var: Var,
+        out_columns: &[Var],
         mode: ExprMode,
     ) -> UnifierResult<Nodes> {
-        let mut seq_body: Nodes = smallvec![];
+        let mut matrix_body: Nodes = smallvec![];
 
-        for SetEntry(label, Attribute { rel, val }) in entries {
-            debug!("in_scope: {:?}", self.scope_tracker.in_scope);
+        for MatrixRow(label, elements) in rows {
+            debug!(
+                "matrix arity={}, in_scope: {:?}",
+                elements.len(),
+                self.scope_tracker.in_scope,
+            );
 
             if let Some(label) = label {
                 let label = *label.hir();
-                let Some(scope_attr) = self.iter_extended_scope_table.get(&label).cloned() else {
+                let Some(scope_elements) = self.iter_extended_scope_table.get(&label).cloned()
+                else {
                     CompileError::TODO("no iteration source")
                         .span(seq_meta.span)
                         .report(self);
                     return Ok(smallvec![]);
                 };
-                let free_vars = scan_immediate_free_vars(self.expr_arena, &[*rel, *val]);
+                let free_vars = self.scan_immediate_free_vars(self.expr_arena, elements);
+
+                debug!("matrix free vars: {free_vars:?}");
 
                 let for_each = self.prealloc_node();
-                let ((rel_binding, val_binding), for_each_body) =
+                let (bindings, for_each_body) =
                     self.new_loop_scope(seq_meta.span, move |zelf, scope_body, catcher| {
-                        let rel_binding = zelf.define_scope_extended(
-                            scope_attr.rel,
-                            Scoped::Yes,
-                            &free_vars,
-                            scope_body,
-                            catcher,
-                        )?;
-                        let val_binding = zelf.define_scope_extended(
-                            scope_attr.val,
-                            Scoped::Yes,
-                            &free_vars,
-                            scope_body,
-                            catcher,
-                        )?;
+                        let mut bindings = vec![];
+
+                        for scope_element in scope_elements {
+                            let binding = zelf.define_scope_extended(
+                                scope_element,
+                                Scoped::Yes,
+                                &free_vars,
+                                scope_body,
+                                catcher,
+                            )?;
+
+                            bindings.push(binding);
+                        }
 
                         debug!("in scope in loop: {:?}", zelf.scope_tracker.in_scope);
 
-                        let rel = zelf.write_one_expr(*rel, mode)?;
-                        let val = zelf.write_one_expr(*val, mode)?;
+                        let insertions: Vec<_> = elements
+                            .iter()
+                            .map(|element| zelf.write_one_expr(*element, mode))
+                            .collect::<Result<_, _>>()?;
 
-                        let body = smallvec![zelf.mk_node(
-                            Kind::Insert(out_seq_var, Attribute { rel, val }),
-                            Meta::new(&UNIT_TYPE, seq_meta.span),
-                        )];
+                        let body: Nodes = insertions
+                            .into_iter()
+                            .zip(out_columns)
+                            .map(|(insertion, out_column)| {
+                                zelf.mk_node(
+                                    Kind::Insert(*out_column, insertion),
+                                    Meta::new(&UNIT_TYPE, seq_meta.span),
+                                )
+                            })
+                            .collect();
 
-                        Ok(((rel_binding, val_binding), body))
+                        Ok((bindings, body))
                     })?;
-                seq_body.push_node(self.write_node(
+
+                let for_each_bindings = bindings
+                    .into_iter()
+                    .enumerate()
+                    .map(|(idx, binding)| {
+                        (self.get_or_alloc_iter_tuple_var(Var(label.0), idx), binding)
+                    })
+                    .collect();
+
+                matrix_body.push_node(self.write_node(
                     for_each,
-                    Kind::ForEach(label.into(), (rel_binding, val_binding), for_each_body),
+                    Kind::ForEach(for_each_bindings, for_each_body),
                     Meta::new(&UNIT_TYPE, seq_meta.span),
                 ));
             } else {
-                let rel = self.write_one_expr(*rel, mode)?;
-                let val = self.write_one_expr(*val, mode)?;
-                seq_body.push_node(self.mk_node(
-                    Kind::Insert(out_seq_var, Attribute { rel, val }),
-                    Meta::new(&UNIT_TYPE, seq_meta.span),
-                ));
+                let insert_params: Vec<_> = elements
+                    .iter()
+                    .map(|element| self.write_one_expr(*element, mode))
+                    .collect::<Result<_, _>>()?;
+
+                for (insert_param, out_column) in insert_params.iter().zip(out_columns) {
+                    matrix_body.push_node(self.mk_node(
+                        // FIXME: Cannot push to the same out_seq_var
+                        Kind::Insert(*out_column, *insert_param),
+                        Meta::new(&UNIT_TYPE, seq_meta.span),
+                    ));
+                }
             }
         }
 
-        Ok(seq_body)
+        Ok(matrix_body)
     }
 
-    fn write_match_seq_body(
+    fn write_match_matrix_body(
         &mut self,
-        entries: &[SetEntry<'m, TypedHir>],
+        rows: &[MatrixRow<'m, TypedHir>],
         seq_meta: Meta<'m>,
         match_var: Var,
         set_cond_var: Var,
@@ -658,81 +695,97 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
     ) -> UnifierResult<Nodes> {
         let mut seq_body: Nodes = smallvec![];
 
-        for SetEntry(label, Attribute { rel, val }) in entries {
+        for MatrixRow(label, elements) in rows {
             debug!("in_scope: {:?}", self.scope_tracker.in_scope);
 
             if let Some(label) = label {
                 let label = *label.hir();
-                let Some(scope_attr) = self.iter_extended_scope_table.get(&label).cloned() else {
+                let Some(scope_elements) = self.iter_extended_scope_table.get(&label).cloned()
+                else {
                     // panic!("set prop: no iteration source");
                     return Ok(smallvec![]);
                 };
-                let free_vars = scan_immediate_free_vars(self.expr_arena, &[*rel, *val]);
+                let free_vars = self.scan_immediate_free_vars(self.expr_arena, elements);
+
+                debug!("matrix(match) free vars: {free_vars:?}");
 
                 let for_each = self.prealloc_node();
-                let ((rel_binding, val_binding), for_each_body) =
+                let (bindings, for_each_body) =
                     self.new_loop_scope(seq_meta.span, move |zelf, scope_body, catcher| {
-                        let rel_binding = zelf.define_scope_extended(
-                            scope_attr.rel,
-                            Scoped::Yes,
-                            &free_vars,
-                            scope_body,
-                            catcher,
-                        )?;
-                        let val_binding = zelf.define_scope_extended(
-                            scope_attr.val,
-                            Scoped::Yes,
-                            &free_vars,
-                            scope_body,
-                            catcher,
-                        )?;
+                        let mut bindings = vec![];
 
+                        for scope_element in scope_elements {
+                            let binding = zelf.define_scope_extended(
+                                scope_element,
+                                Scoped::Yes,
+                                &free_vars,
+                                scope_body,
+                                catcher,
+                            )?;
+
+                            bindings.push(binding);
+                        }
+
+                        let mut term_tuple = vec![];
+                        let mut clause_nodes = vec![];
                         let mut body = smallvec![];
 
-                        let (rel_term, _rel_meta, rel_nodes) =
-                            zelf.write_cond_term(*rel, match_var, mode, &mut body)?;
-                        let (val_term, _val_meta, val_nodes) =
-                            zelf.write_cond_term(*val, match_var, mode, &mut body)?;
+                        for element in elements {
+                            let (term, _meta, nodes) =
+                                zelf.write_cond_term(*element, match_var, mode, &mut body)?;
+                            term_tuple.push(term);
+                            clause_nodes.extend(nodes);
+                        }
 
                         debug!("in match scope in loop: {:?}", zelf.scope_tracker.in_scope);
 
                         body.push(zelf.mk_node(
                             Kind::PushCondClauses(
                                 match_var,
-                                thin_vec![ClausePair(
-                                    set_cond_var,
-                                    Clause::Member(rel_term, val_term)
-                                ),],
+                                thin_vec![ClausePair(set_cond_var, mk_member_clause(term_tuple))],
                             ),
                             Meta::new(&UNIT_TYPE, seq_meta.span),
                         ));
 
-                        body.extend(rel_nodes);
-                        body.extend(val_nodes);
+                        body.extend(clause_nodes);
 
-                        Ok(((rel_binding, val_binding), body))
+                        Ok((bindings, body))
                     })?;
+
+                let for_each_bindings = bindings
+                    .into_iter()
+                    .enumerate()
+                    .map(|(idx, binding)| {
+                        (self.get_or_alloc_iter_tuple_var(Var(label.0), idx), binding)
+                    })
+                    .collect();
+
                 seq_body.push_node(self.write_node(
                     for_each,
-                    Kind::ForEach(label.into(), (rel_binding, val_binding), for_each_body),
+                    Kind::ForEach(for_each_bindings, for_each_body),
                     Meta::new(&UNIT_TYPE, seq_meta.span),
                 ));
             } else {
-                let (rel_term, _rel_meta, rel_nodes) =
-                    self.write_cond_term(*rel, match_var, mode, &mut seq_body)?;
-                let (val_term, _val_meta, val_nodes) =
-                    self.write_cond_term(*val, match_var, mode, &mut seq_body)?;
+                let mut term_tuple = vec![];
+                let mut clause_nodes = vec![];
+
+                for element in elements {
+                    let (term, _rel_meta, nodes) =
+                        self.write_cond_term(*element, match_var, mode, &mut seq_body)?;
+
+                    term_tuple.push(term);
+                    clause_nodes.extend(nodes);
+                }
 
                 seq_body.push(self.mk_node(
                     Kind::PushCondClauses(
                         match_var,
-                        thin_vec![ClausePair(set_cond_var, Clause::Member(rel_term, val_term)),],
+                        thin_vec![ClausePair(set_cond_var, mk_member_clause(term_tuple))],
                     ),
                     Meta::new(&UNIT_TYPE, seq_meta.span),
                 ));
 
-                seq_body.extend(rel_nodes);
-                seq_body.extend(val_nodes);
+                seq_body.extend(clause_nodes);
             }
         }
 
@@ -899,7 +952,6 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
                 let seq_map = {
                     let val_var = self.alloc_var();
-                    let mapped_rel = self.mk_node(Kind::Unit, Meta::new(&UNIT_TYPE, span));
                     let mapped_val = {
                         let input = self.mk_node(Kind::Var(val_var), Meta::new(val_from, span));
                         self.write_type_map_if_necessary(
@@ -914,27 +966,20 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     let target_seq_var = self.alloc_var();
                     let insert = {
                         self.mk_node(
-                            Kind::Insert(
-                                target_seq_var,
-                                Attribute {
-                                    rel: mapped_rel,
-                                    val: *mapped_val.last().unwrap(),
-                                },
-                            ),
+                            Kind::Insert(target_seq_var, *mapped_val.last().unwrap()),
                             Meta::new(&UNIT_TYPE, span),
                         )
                     };
 
                     let for_each = self.mk_node(
                         Kind::ForEach(
-                            inner_set_var,
-                            (
-                                Binding::Wildcard,
+                            thin_vec![(
+                                inner_set_var,
                                 Binding::Binder(TypedHirData(
                                     val_var.into(),
                                     Meta::new(val_from, span),
                                 )),
-                            ),
+                            )],
                             [insert].into_iter().collect(),
                         ),
                         Meta::new(&UNIT_TYPE, span),
@@ -946,7 +991,10 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
                     self.mk_node(
                         Kind::MakeSeq(
-                            TypedHirData(target_seq_var.into(), Meta::new(type_mapping.from, span)),
+                            Some(TypedHirData(
+                                target_seq_var.into(),
+                                Meta::new(type_mapping.from, span),
+                            )),
                             smallvec![for_each, copy_sub_seq],
                         ),
                         Meta::new(type_mapping.to, span),
@@ -973,13 +1021,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
     pub(super) fn write_default_node(&mut self, meta: Meta<'m>) -> Node {
         let Some(def_id) = meta.ty.get_single_def_id() else {
             return match meta.ty {
-                Type::Seq(..) => {
-                    let var = self.alloc_var();
-                    self.mk_node(
-                        Kind::MakeSeq(TypedHirData(Binder { var }, meta), smallvec![]),
-                        meta,
-                    )
-                }
+                Type::Seq(..) => self.write_empty_sequence(meta),
                 _ => self.mk_node(Kind::Unit, Meta::unit(meta.span)),
             };
         };
@@ -1024,8 +1066,34 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         }
     }
 
+    pub(super) fn write_empty_sequence(&mut self, meta: Meta<'m>) -> Node {
+        self.mk_node(Kind::MakeSeq(None, smallvec![]), meta)
+    }
+
     pub(super) fn alloc_var(&mut self) -> Var {
         self.var_allocator.alloc()
+    }
+
+    pub(super) fn get_or_alloc_iter_tuple_var(
+        &mut self,
+        iter_label: Var,
+        element_idx: usize,
+    ) -> Var {
+        if element_idx == 0 {
+            return iter_label;
+        }
+
+        let element_idx: u8 = element_idx.try_into().unwrap();
+
+        let entry = self.iter_tuple_vars.entry(iter_label).or_default();
+
+        let var = entry.entry(element_idx).or_insert_with(|| {
+            let var = self.var_allocator.alloc();
+            self.all_scope_vars_and_labels.insert(var);
+            var
+        });
+
+        *var
     }
 
     pub(super) fn mk_root_try_label(&mut self) -> Label {
@@ -1077,5 +1145,13 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 impl<'c, 'm> AsMut<CompileErrors> for SsaUnifier<'c, 'm> {
     fn as_mut(&mut self) -> &mut CompileErrors {
         self.errors
+    }
+}
+
+fn mk_member_clause(term_tuple: Vec<EvalCondTerm>) -> Clause<Var, EvalCondTerm> {
+    match term_tuple.len() {
+        0 => Clause::Member(EvalCondTerm::Wildcard, EvalCondTerm::Wildcard),
+        1 => Clause::Member(EvalCondTerm::Wildcard, term_tuple[0].clone()),
+        _ => Clause::Member(term_tuple[1].clone(), term_tuple[0].clone()),
     }
 }

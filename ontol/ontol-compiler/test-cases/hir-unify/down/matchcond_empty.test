@@ -1,7 +1,6 @@
 (struct ($b))
 
-(set (.. @a
-    #u
+(matrix (.. @a
     (match-struct ($c))
 ))
 

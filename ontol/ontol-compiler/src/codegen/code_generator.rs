@@ -819,12 +819,41 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     span,
                     self.builder,
                 );
-                self.gen_in_scope(
-                    &[(seq_local, ontol_hir::Binding::Binder(*binder))],
-                    nodes,
-                    arena,
-                    block,
+                let mut scope = vec![];
+                if let Some(binder) = binder {
+                    scope.push((seq_local, ontol_hir::Binding::Binder(*binder)));
+                }
+
+                self.gen_in_scope(&scope, nodes, arena, block);
+                block.pop_until(seq_local, span, self.builder);
+            }
+            ontol_hir::Kind::MakeMatrix(binders, nodes) => {
+                // Matrix of arity=1 is supported outside properties
+                let Type::Seq(val_ty) = ty else {
+                    panic!("Not a sequence: {ty:?}");
+                };
+                if binders.len() != 1 {
+                    CompileError::TODO("standalone matrix must have arity=1")
+                        .span(span)
+                        .report(self.errors);
+                    return;
+                }
+
+                let seq_local = block.op(
+                    OpCode::CallBuiltin(
+                        BuiltinProc::NewSeq,
+                        val_ty
+                            .get_single_def_id()
+                            .unwrap_or_else(|| panic!("val_ty: {val_ty:?}")),
+                    ),
+                    Delta(1),
+                    span,
+                    self.builder,
                 );
+                let mut scope = vec![];
+                scope.push((seq_local, ontol_hir::Binding::Binder(binders[0])));
+
+                self.gen_in_scope(&scope, nodes, arena, block);
                 block.pop_until(seq_local, span, self.builder);
             }
             ontol_hir::Kind::CopySubSeq(target, source) => {
@@ -842,8 +871,11 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     self.builder,
                 );
             }
-            ontol_hir::Kind::ForEach(seq_var, (rel_binding, val_binding), nodes) => {
-                let Ok(seq_local) = self.var_local(*seq_var, &meta.span) else {
+            ontol_hir::Kind::ForEach(elements, nodes) => {
+                let Some((first_seq_var, _)) = elements.iter().next() else {
+                    return;
+                };
+                let Ok(seq_local) = self.var_local(*first_seq_var, &meta.span) else {
                     return;
                 };
                 let counter = block.op(OpCode::I64(0, DefId::unit()), Delta(1), span, self.builder);
@@ -851,13 +883,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 let mut tuple_elements: Vec<(Local, Binding<TypedHir>)> = vec![];
                 let mut plus = 1;
 
-                if matches!(*val_binding, Binding::Binder(_)) {
-                    tuple_elements.push((self.builder.top_plus(plus), *val_binding));
+                for (_, binding) in elements {
+                    tuple_elements.push((self.builder.top_plus(plus), *binding));
                     plus += 1;
-                }
-                if matches!(*rel_binding, Binding::Binder(_)) {
-                    tuple_elements.push((self.builder.top_plus(plus), *rel_binding));
-                    // plus += 1;
                 }
 
                 let loop_label = {
@@ -887,40 +915,21 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 );
                 block.pop_until(counter, span, self.builder);
             }
-            ontol_hir::Kind::Insert(seq_var, attr) => {
+            ontol_hir::Kind::Insert(seq_var, node) => {
                 let before = self.builder.top();
                 let Ok(seq_local) = self.var_local(*seq_var, &meta.span) else {
                     return;
                 };
 
-                match arena.kind_of(attr.rel) {
-                    ontol_hir::Kind::Unit => {
-                        self.gen_node(arena.node_ref(attr.val), block);
+                self.gen_node(arena.node_ref(*node), block);
 
-                        block.op(
-                            OpCode::SeqAppendN(seq_local, 1),
-                            Delta(-1),
-                            span,
-                            self.builder,
-                        );
-                        block.pop_until(before, span, self.builder);
-                    }
-                    _ => {
-                        self.gen_node(arena.node_ref(attr.rel), block);
-                        let rel_local = self.builder.top();
-
-                        self.gen_node(arena.node_ref(attr.val), block);
-
-                        block.op(OpCode::Clone(rel_local), Delta(1), span, self.builder);
-                        block.op(
-                            OpCode::SeqAppendN(seq_local, 2),
-                            Delta(-2),
-                            span,
-                            self.builder,
-                        );
-                        block.pop_until(before, span, self.builder);
-                    }
-                }
+                block.op(
+                    OpCode::SeqAppendN(seq_local, 1),
+                    Delta(-1),
+                    span,
+                    self.builder,
+                );
+                block.pop_until(before, span, self.builder);
             }
             ontol_hir::Kind::StringPush(to_var, node) => {
                 let before = self.builder.top();
@@ -983,7 +992,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 block.pop_until(before, span, self.builder);
             }
-            ontol_hir::Kind::Set(..) | ontol_hir::Kind::Regex(..) => {
+            ontol_hir::Kind::Matrix(..) | ontol_hir::Kind::Regex(..) => {
                 unreachable!(
                     "{} is only declarative, not used in code generation",
                     node_ref

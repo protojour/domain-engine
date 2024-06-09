@@ -1,22 +1,22 @@
 (struct ($b)
     (prop $b R:1:0
-        (set (.. @d #u $a))
+        (matrix (.. @d $a))
     )
 )
 
 (struct ($c)
     (prop $c R:2:1
-        (set (.. @d #u $a))
+        (matrix (.. @d $a))
     )
 )
 
 |$b| (block
-    (let-prop-default $d ($b R:1:0) #u)
+    (let-prop-default [$d] ($b R:1:0) (make-seq))
     (struct ($c)
         (prop- $c R:2:1
-            (make-seq ($e)
-                (for-each $d ($_ $a)
-                    (insert $e #u $a)
+            (make-matrix ($e)
+                (for-each $d ($a)
+                    (insert $e $a)
                 )
             )
         )
