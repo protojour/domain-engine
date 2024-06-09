@@ -35,6 +35,8 @@ pub enum VmError {
     Overflow,
     #[error("invalid direction")]
     InvalidDirection,
+    #[error("invalid matrix column")]
+    InvalidMatrixColumn,
 }
 
 pub type VmResult<T> = Result<T, VmError>;

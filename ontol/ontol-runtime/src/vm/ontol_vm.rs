@@ -14,8 +14,8 @@ use crate::{
     property::ValueCardinality,
     query::condition::{Clause, ClausePair, CondTerm},
     sequence::Sequence,
-    tuple::EndoTuple,
-    value::{Attr, Value, ValueDebug},
+    tuple::{EndoTuple, EndoTupleElements},
+    value::{Attr, AttrMatrix, Value, ValueDebug},
     var::Var,
     vm::{
         abstract_vm::{AbstractVm, Processor, VmDebug},
@@ -227,7 +227,7 @@ impl<'o> Processor for OntolProcessor<'o> {
 
     #[inline(always)]
     fn put_attr_tup(&mut self, target: Local, n: u8, key: RelationshipId) -> VmResult<()> {
-        let mut elements: SmallVec<Value, 1> = Default::default();
+        let mut elements: SmallVec<Value, 1> = SmallVec::with_capacity(n as usize);
 
         for _ in 0..n {
             elements.push(self.pop_one());
@@ -235,6 +235,25 @@ impl<'o> Processor for OntolProcessor<'o> {
 
         let map = self.struct_local_mut(target)?;
         map.insert(key, Attr::Tuple(Box::new(EndoTuple { elements })));
+
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn put_attr_mat(&mut self, target: Local, n: u8, key: RelationshipId) -> VmResult<()> {
+        let mut columns: EndoTupleElements<Sequence<Value>> =
+            EndoTupleElements::with_capacity(n as usize);
+
+        for _ in 0..n {
+            let Value::Sequence(sequence, _) = self.pop_one() else {
+                return Err(VmError::InvalidMatrixColumn);
+            };
+
+            columns.push(sequence);
+        }
+
+        let map = self.struct_local_mut(target)?;
+        map.insert(key, Attr::Matrix(AttrMatrix { elements: columns }));
 
         Ok(())
     }

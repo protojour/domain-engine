@@ -756,15 +756,54 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 };
 
                 match variant {
-                    PropVariant::Unit(node) => {
-                        self.gen_node(arena.node_ref(*node), block);
-                        block.op(
-                            OpCode::PutAttrUnit(struct_local, *rel_id),
-                            Delta(-1),
-                            span,
-                            self.builder,
-                        );
-                    }
+                    PropVariant::Unit(node) => match arena.node_ref(*node).kind() {
+                        ontol_hir::Kind::MakeMatrix(columns, body) => {
+                            let mut scope = vec![];
+
+                            for binder in columns.iter() {
+                                let Type::Seq(item_ty) = binder.meta().ty else {
+                                    panic!("matrix column must be sequence-typed");
+                                };
+
+                                let seq_local = block.op(
+                                    OpCode::CallBuiltin(
+                                        BuiltinProc::NewSeq,
+                                        item_ty
+                                            .get_single_def_id()
+                                            .unwrap_or_else(|| panic!("item_ty: {item_ty:?}")),
+                                    ),
+                                    Delta(1),
+                                    span,
+                                    self.builder,
+                                );
+
+                                scope.push((seq_local, ontol_hir::Binding::Binder(*binder)));
+                            }
+
+                            self.gen_in_scope(&scope, body, arena, block);
+
+                            // PutAttrMat must see the values in reverse order
+                            for (local, _) in scope.iter().rev() {
+                                block.op(OpCode::Clone(*local), Delta(1), span, self.builder);
+                            }
+
+                            block.op(
+                                OpCode::PutAttrMat(struct_local, columns.len() as u8, *rel_id),
+                                Delta(-(columns.len() as i32)),
+                                span,
+                                self.builder,
+                            );
+                        }
+                        _ => {
+                            self.gen_node(arena.node_ref(*node), block);
+                            block.op(
+                                OpCode::PutAttrUnit(struct_local, *rel_id),
+                                Delta(-1),
+                                span,
+                                self.builder,
+                            );
+                        }
+                    },
                     PropVariant::Tuple(tup) => {
                         let mut top: FnvHashMap<Node, Local> = Default::default();
 

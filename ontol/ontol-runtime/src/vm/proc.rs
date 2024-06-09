@@ -90,6 +90,8 @@ pub enum OpCode {
     PutAttrUnit(Local, RelationshipId),
     /// Pop n stack values, insert them as a tuple attribute in reverse order
     PutAttrTup(Local, u8, RelationshipId),
+    /// Pop n stack values which must be sequence-typed, insert them as columns in a matrix-valued attribute in reverse order
+    PutAttrMat(Local, u8, RelationshipId),
     /// Move rest attrs from the second local into the first local.
     MoveRestAttrs(Local, Local),
     /// Pop N stack values, push each of those consecutively into N different contiguous sequences
