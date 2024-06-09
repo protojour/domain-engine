@@ -58,7 +58,7 @@ pub enum MapArmsKind {
 pub struct TypeCheck<'c, 'm> {
     /// This map stores the expected type of constants
     pub expected_constant_types: FnvHashMap<DefId, TypeRef<'m>>,
-    pub types: &'c mut TypeCtx<'m>,
+    pub type_ctx: &'c mut TypeCtx<'m>,
     pub def_ty_ctx: &'c mut DefTypeCtx<'m>,
     pub rel_ctx: &'c mut RelCtx,
     pub edge_ctx: &'c mut EdgeCtx,
@@ -168,7 +168,7 @@ impl<'m> Compiler<'m> {
     pub fn type_check(&mut self) -> TypeCheck<'_, 'm> {
         TypeCheck {
             expected_constant_types: Default::default(),
-            types: &mut self.ty_ctx,
+            type_ctx: &mut self.ty_ctx,
             errors: &mut self.errors,
             def_ty_ctx: &mut self.def_ty_ctx,
             rel_ctx: &mut self.rel_ctx,

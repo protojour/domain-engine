@@ -108,7 +108,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             self.report_missing_prop_errors(&mut ctx);
         }
 
-        Ok(self.types.intern(Type::Tautology))
+        Ok(self.type_ctx.intern(Type::Tautology))
     }
 
     fn build_typed_ontol_hir_arms(
@@ -154,7 +154,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         ctx: &mut HirBuildCtx<'m>,
     ) {
         let mut inference = HirArmTypeInference {
-            types: self.types,
+            types: self.type_ctx,
             eq_relations: &mut ctx.inference.eq_relations,
             errors: self.errors,
         };

@@ -708,7 +708,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     // warn!("Skipping match-struct for now");
 
                     let value_cardinality = match ty {
-                        Type::Seq(..) => ValueCardinality::IndexSet,
+                        Type::Seq(..) | Type::Matrix(..) => ValueCardinality::IndexSet,
                         _ => ValueCardinality::Unit,
                     };
 
@@ -750,84 +750,102 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     self.scope.remove(&binder.hir().var);
                 }
             }
-            ontol_hir::Kind::Prop(_, struct_var, rel_id, variant) => {
+            ontol_hir::Kind::Prop(_, struct_var, rel_id, PropVariant::Unit(unit_node)) => {
                 let Ok(struct_local) = self.var_local(*struct_var, &span) else {
                     return;
                 };
 
-                match variant {
-                    PropVariant::Unit(node) => match arena.node_ref(*node).kind() {
-                        ontol_hir::Kind::MakeMatrix(columns, body) => {
-                            let mut scope = vec![];
+                let unit_ref = arena.node_ref(*unit_node);
 
-                            for binder in columns.iter() {
-                                let Type::Seq(item_ty) = binder.meta().ty else {
-                                    panic!("matrix column must be sequence-typed");
-                                };
+                if let Type::Matrix(elements) = unit_ref.meta().ty {
+                    // The property is matrix-typed
 
-                                let seq_local = block.op(
-                                    OpCode::CallBuiltin(
-                                        BuiltinProc::NewSeq,
-                                        item_ty
-                                            .get_single_def_id()
-                                            .unwrap_or_else(|| panic!("item_ty: {item_ty:?}")),
-                                    ),
-                                    Delta(1),
-                                    span,
-                                    self.builder,
+                    if let ontol_hir::Kind::MakeMatrix(columns, body) = unit_ref.kind() {
+                        let mut scope = vec![];
+
+                        for binder in columns.iter() {
+                            let Type::Seq(item_ty) = binder.meta().ty else {
+                                panic!(
+                                    "matrix column must be sequence-typed: {:?}",
+                                    binder.meta().ty
                                 );
+                            };
 
-                                scope.push((seq_local, ontol_hir::Binding::Binder(*binder)));
-                            }
-
-                            self.gen_in_scope(&scope, body, arena, block);
-
-                            // PutAttrMat must see the values in reverse order
-                            for (local, _) in scope.iter().rev() {
-                                block.op(OpCode::Clone(*local), Delta(1), span, self.builder);
-                            }
-
-                            block.op(
-                                OpCode::PutAttrMat(struct_local, columns.len() as u8, *rel_id),
-                                Delta(-(columns.len() as i32)),
+                            let seq_local = block.op(
+                                OpCode::CallBuiltin(
+                                    BuiltinProc::NewSeq,
+                                    item_ty
+                                        .get_single_def_id()
+                                        .unwrap_or_else(|| panic!("item_ty: {item_ty:?}")),
+                                ),
+                                Delta(1),
                                 span,
                                 self.builder,
                             );
-                        }
-                        _ => {
-                            self.gen_node(arena.node_ref(*node), block);
-                            block.op(
-                                OpCode::PutAttrUnit(struct_local, *rel_id),
-                                Delta(-1),
-                                span,
-                                self.builder,
-                            );
-                        }
-                    },
-                    PropVariant::Tuple(tup) => {
-                        let mut top: FnvHashMap<Node, Local> = Default::default();
 
-                        for node in tup.iter() {
-                            self.gen_node(arena.node_ref(*node), block);
-                            top.insert(*node, self.builder.top());
+                            scope.push((seq_local, ontol_hir::Binding::Binder(*binder)));
                         }
 
-                        // PutAttrTup must see the values in reverse order
-                        for node in tup.iter().rev().skip(1) {
-                            let local = top.get(node).unwrap();
+                        self.gen_in_scope(&scope, body, arena, block);
+
+                        // PutAttrMat must see the values in reverse order
+                        for (local, _) in scope.iter().rev() {
                             block.op(OpCode::Clone(*local), Delta(1), span, self.builder);
                         }
 
                         block.op(
-                            OpCode::PutAttrTup(struct_local, tup.len() as u8, *rel_id),
-                            Delta(-(tup.len() as i32)),
+                            OpCode::PutAttrMat(struct_local, columns.len() as u8, *rel_id),
+                            Delta(-(columns.len() as i32)),
                             span,
                             self.builder,
                         );
+                    } else if elements.len() == 1 {
+                        self.gen_node(unit_ref, block);
+                        block.op(
+                            OpCode::PutAttrMat(struct_local, 1, *rel_id),
+                            Delta(-1),
+                            span,
+                            self.builder,
+                        );
+                    } else {
+                        panic!("multi-column matrix of this type not handled");
                     }
-                    PropVariant::Predicate(..) => todo!(),
+                } else {
+                    self.gen_node(unit_ref, block);
+                    block.op(
+                        OpCode::PutAttrUnit(struct_local, *rel_id),
+                        Delta(-1),
+                        span,
+                        self.builder,
+                    );
                 }
             }
+            ontol_hir::Kind::Prop(_, struct_var, rel_id, PropVariant::Tuple(tup)) => {
+                let Ok(struct_local) = self.var_local(*struct_var, &span) else {
+                    return;
+                };
+
+                let mut top: FnvHashMap<Node, Local> = Default::default();
+
+                for node in tup.iter() {
+                    self.gen_node(arena.node_ref(*node), block);
+                    top.insert(*node, self.builder.top());
+                }
+
+                // PutAttrTup must see the values in reverse order
+                for node in tup.iter().rev().skip(1) {
+                    let local = top.get(node).unwrap();
+                    block.op(OpCode::Clone(*local), Delta(1), span, self.builder);
+                }
+
+                block.op(
+                    OpCode::PutAttrTup(struct_local, tup.len() as u8, *rel_id),
+                    Delta(-(tup.len() as i32)),
+                    span,
+                    self.builder,
+                );
+            }
+            ontol_hir::Kind::Prop(.., PropVariant::Predicate(..)) => todo!(),
             ontol_hir::Kind::MoveRestAttrs(target, source) => {
                 let Ok(target_local) = self.var_local(*target, &span) else {
                     return;
@@ -844,15 +862,22 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 );
             }
             ontol_hir::Kind::MakeSeq(binder, nodes) => {
-                let Type::Seq(val_ty) = ty else {
-                    panic!("Not a sequence: {ty:?}");
+                let item_ty = match ty {
+                    Type::Seq(item_ty) => item_ty,
+                    Type::Matrix(columns) if columns.len() == 1 => columns[0],
+                    _ => {
+                        CompileError::TODO(format!("unable to coerce to sequence: {ty:?}"))
+                            .span(span)
+                            .report(self.errors);
+                        return;
+                    }
                 };
                 let seq_local = block.op(
                     OpCode::CallBuiltin(
                         BuiltinProc::NewSeq,
-                        val_ty
+                        item_ty
                             .get_single_def_id()
-                            .unwrap_or_else(|| panic!("val_ty: {val_ty:?}")),
+                            .unwrap_or_else(|| panic!("val_ty: {item_ty:?}")),
                     ),
                     Delta(1),
                     span,
@@ -868,8 +893,8 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             }
             ontol_hir::Kind::MakeMatrix(binders, nodes) => {
                 // Matrix of arity=1 is supported outside properties
-                let Type::Seq(val_ty) = ty else {
-                    panic!("Not a sequence: {ty:?}");
+                let Type::Matrix(column_types) = ty else {
+                    panic!("not a matrix: {ty:?}");
                 };
                 if binders.len() != 1 {
                     CompileError::TODO("standalone matrix must have arity=1")
@@ -877,6 +902,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                         .report(self.errors);
                     return;
                 }
+                let val_ty = column_types[0];
 
                 let seq_local = block.op(
                     OpCode::CallBuiltin(

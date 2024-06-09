@@ -532,7 +532,18 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             if let_prop_default {
                                 let defaults: ThinVec<_> = elements
                                     .iter()
-                                    .map(|_| self.write_empty_sequence(*unit_node_ref.meta()))
+                                    .enumerate()
+                                    .map(|(idx, node)| {
+                                        let meta = Meta {
+                                            ty: unit_node_ref
+                                                .meta()
+                                                .ty
+                                                .matrix_column_type(idx, self.types),
+                                            span: self.scope_arena.node_ref(*node).meta().span,
+                                        };
+
+                                        self.write_empty_sequence(meta)
+                                    })
                                     .collect();
 
                                 self.push_let(

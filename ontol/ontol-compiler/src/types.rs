@@ -53,94 +53,6 @@ pub enum Type<'m> {
     Error,
 }
 
-#[derive(PartialEq, Eq, Hash, Debug)]
-pub enum FunctionType {
-    BinaryArithmetic,
-    BinaryText,
-}
-
-impl FunctionType {
-    pub fn signature<'m>(
-        &self,
-        param_types: &[Option<TypeRef<'m>>],
-        out_type: Option<TypeRef<'m>>,
-        primitives: &Primitives,
-        def_types: &DefTypeCtx<'m>,
-        repr_ctx: &ReprCtx,
-        types: &mut TypeCtx<'m>,
-    ) -> FunctionSig<'m> {
-        match self {
-            Self::BinaryArithmetic => {
-                if param_types.iter().any(|arg| arg.is_some()) {
-                    let known_arg = Self::concrete_numeric_ty(
-                        param_types
-                            .iter()
-                            .filter_map(|ty| ty.as_ref())
-                            .next()
-                            .unwrap(),
-                        primitives,
-                        repr_ctx,
-                        types,
-                    );
-
-                    FunctionSig {
-                        args: types.intern([known_arg, known_arg]),
-                        output: known_arg,
-                    }
-                } else if out_type.is_some() {
-                    let output =
-                        Self::concrete_numeric_ty(out_type.unwrap(), primitives, repr_ctx, types);
-
-                    FunctionSig {
-                        args: types.intern([output, output]),
-                        output,
-                    }
-                } else {
-                    FunctionSig {
-                        args: &[],
-                        output: &ERROR_TYPE,
-                    }
-                }
-            }
-            Self::BinaryText => {
-                let text = *def_types.table.get(&primitives.text).unwrap();
-                let text_text = types.intern([text, text]);
-
-                FunctionSig {
-                    args: text_text,
-                    output: text,
-                }
-            }
-        }
-    }
-
-    fn concrete_numeric_ty<'m>(
-        ty: TypeRef<'m>,
-        primitives: &Primitives,
-        repr_ctx: &ReprCtx,
-        types: &mut TypeCtx<'m>,
-    ) -> TypeRef<'m> {
-        let Some(def_id) = ty.get_single_def_id() else {
-            return &ERROR_TYPE;
-        };
-        match repr_ctx.get_repr_kind(&def_id) {
-            Some(ReprKind::Scalar(_, ReprScalarKind::I64(_), _)) => {
-                types.intern(Type::Primitive(PrimitiveKind::I64, primitives.i64))
-            }
-            Some(ReprKind::Scalar(_, ReprScalarKind::F64(_), _)) => {
-                types.intern(Type::Primitive(PrimitiveKind::F64, primitives.f64))
-            }
-            _ => &ERROR_TYPE,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct FunctionSig<'m> {
-    pub args: &'m [TypeRef<'m>],
-    pub output: TypeRef<'m>,
-}
-
 pub static UNIT_TYPE: Type = Type::Primitive(PrimitiveKind::Unit, DefId::unit());
 pub static ERROR_TYPE: Type = Type::Error;
 
@@ -181,6 +93,110 @@ impl<'m> Type<'m> {
     pub fn is_domain_specific(&self) -> bool {
         matches!(self, Self::Domain(_) | Self::Anonymous(_))
     }
+
+    pub fn matrix_column_type(&self, column_idx: usize, type_ctx: &mut TypeCtx<'m>) -> TypeRef<'m> {
+        match self {
+            Type::Matrix(column_item_type) => {
+                type_ctx.intern(Type::Seq(column_item_type[column_idx]))
+            }
+            Type::Error => type_ctx.intern(Type::Seq(&ERROR_TYPE)),
+            _ => {
+                panic!("matrix must be matrix type. was: {:?}", self);
+            }
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Hash, Debug)]
+pub enum FunctionType {
+    BinaryArithmetic,
+    BinaryText,
+}
+
+impl FunctionType {
+    pub fn signature<'m>(
+        &self,
+        param_types: &[Option<TypeRef<'m>>],
+        out_type: Option<TypeRef<'m>>,
+        primitives: &Primitives,
+        def_types: &DefTypeCtx<'m>,
+        repr_ctx: &ReprCtx,
+        type_ctx: &mut TypeCtx<'m>,
+    ) -> FunctionSig<'m> {
+        match self {
+            Self::BinaryArithmetic => {
+                if param_types.iter().any(|arg| arg.is_some()) {
+                    let known_arg = Self::concrete_numeric_ty(
+                        param_types
+                            .iter()
+                            .filter_map(|ty| ty.as_ref())
+                            .next()
+                            .unwrap(),
+                        primitives,
+                        repr_ctx,
+                        type_ctx,
+                    );
+
+                    FunctionSig {
+                        args: type_ctx.intern([known_arg, known_arg]),
+                        output: known_arg,
+                    }
+                } else if out_type.is_some() {
+                    let output = Self::concrete_numeric_ty(
+                        out_type.unwrap(),
+                        primitives,
+                        repr_ctx,
+                        type_ctx,
+                    );
+
+                    FunctionSig {
+                        args: type_ctx.intern([output, output]),
+                        output,
+                    }
+                } else {
+                    FunctionSig {
+                        args: &[],
+                        output: &ERROR_TYPE,
+                    }
+                }
+            }
+            Self::BinaryText => {
+                let text = *def_types.table.get(&primitives.text).unwrap();
+                let text_text = type_ctx.intern([text, text]);
+
+                FunctionSig {
+                    args: text_text,
+                    output: text,
+                }
+            }
+        }
+    }
+
+    fn concrete_numeric_ty<'m>(
+        ty: TypeRef<'m>,
+        primitives: &Primitives,
+        repr_ctx: &ReprCtx,
+        types: &mut TypeCtx<'m>,
+    ) -> TypeRef<'m> {
+        let Some(def_id) = ty.get_single_def_id() else {
+            return &ERROR_TYPE;
+        };
+        match repr_ctx.get_repr_kind(&def_id) {
+            Some(ReprKind::Scalar(_, ReprScalarKind::I64(_), _)) => {
+                types.intern(Type::Primitive(PrimitiveKind::I64, primitives.i64))
+            }
+            Some(ReprKind::Scalar(_, ReprScalarKind::F64(_), _)) => {
+                types.intern(Type::Primitive(PrimitiveKind::F64, primitives.f64))
+            }
+            _ => &ERROR_TYPE,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct FunctionSig<'m> {
+    pub args: &'m [TypeRef<'m>],
+    pub output: TypeRef<'m>,
 }
 
 /// Cache for types. Every ontol value/variable has a type during compile time.

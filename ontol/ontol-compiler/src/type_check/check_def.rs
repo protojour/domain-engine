@@ -36,22 +36,24 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             DefKind::Type(TypeDef {
                 ident: Some(_ident),
                 ..
-            }) => self.types.intern(Type::Domain(def_id)),
+            }) => self.type_ctx.intern(Type::Domain(def_id)),
             DefKind::Type(TypeDef { ident: None, .. }) => {
-                self.types.intern(Type::Anonymous(def_id))
+                self.type_ctx.intern(Type::Anonymous(def_id))
             }
-            DefKind::TextLiteral(_) => self.types.intern(Type::TextConstant(def_id)),
-            DefKind::Regex(_) => self.types.intern(Type::Regex(def_id)),
+            DefKind::TextLiteral(_) => self.type_ctx.intern(Type::TextConstant(def_id)),
+            DefKind::Regex(_) => self.type_ctx.intern(Type::Regex(def_id)),
             DefKind::Relationship(relationship) => {
                 self.check_relationship(def_id, relationship, &def.span)
             }
-            DefKind::Edge => self.types.intern(Type::Tautology),
-            DefKind::Primitive(kind, _ident) => self.types.intern(Type::Primitive(*kind, def_id)),
-            DefKind::Mapping { .. } => self.types.intern(Type::Tautology),
+            DefKind::Edge => self.type_ctx.intern(Type::Tautology),
+            DefKind::Primitive(kind, _ident) => {
+                self.type_ctx.intern(Type::Primitive(*kind, def_id))
+            }
+            DefKind::Mapping { .. } => self.type_ctx.intern(Type::Tautology),
             DefKind::Constant(pat_id) => {
                 let pattern = self.patterns.table.remove(pat_id).unwrap();
                 let ty = match self.expected_constant_types.remove(&def_id) {
-                    None => self.types.intern(Type::Error),
+                    None => self.type_ctx.intern(Type::Error),
                     Some(ty) => ty,
                 };
 
@@ -75,18 +77,18 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             DefKind::NumberLiteral(lit) => {
                 if lit.contains('.') {
                     match NotNan::<f64>::from_str(lit) {
-                        Ok(num) => self.types.intern(Type::FloatConstant(num)),
-                        Err(_) => self.types.intern(Type::Error),
+                        Ok(num) => self.type_ctx.intern(Type::FloatConstant(num)),
+                        Err(_) => self.type_ctx.intern(Type::Error),
                     }
                 } else {
                     match i64::from_str(lit) {
-                        Ok(num) => self.types.intern(Type::IntConstant(num)),
-                        Err(_) => self.types.intern(Type::Error),
+                        Ok(num) => self.type_ctx.intern(Type::IntConstant(num)),
+                        Err(_) => self.type_ctx.intern(Type::Error),
                     }
                 }
             }
-            DefKind::Extern(_) => self.types.intern(Type::Extern(def_id)),
-            DefKind::BuiltinRelType(..) => self.types.intern(Type::Tautology),
+            DefKind::Extern(_) => self.type_ctx.intern(Type::Extern(def_id)),
+            DefKind::BuiltinRelType(..) => self.type_ctx.intern(Type::Tautology),
             other => {
                 panic!("failed def typecheck: {other:?}");
             }

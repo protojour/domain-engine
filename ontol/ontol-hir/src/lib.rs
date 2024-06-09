@@ -169,7 +169,7 @@ pub enum Kind<'a, L: Lang> {
     Call(OverloadFunc, Nodes),
     /// A map call
     Map(Node),
-    /// A pun call, just rewrites the type inline
+    /// A pun call, just rewrites the type_def_id.
     Pun(Node),
     /// Narrowing of the type of an expression, e.g. selecting a specific union variant.
     /// The variable represents the not-yet-narrowed value.

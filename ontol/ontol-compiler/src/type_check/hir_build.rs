@@ -118,7 +118,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             self.primitives,
                             self.def_ty_ctx,
                             self.repr_ctx,
-                            self.types,
+                            self.type_ctx,
                         );
 
                         debug!("sig: {sig:?}");
@@ -294,7 +294,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                     Some((Type::Option(Type::Domain(_)), _)) => {
                         *ctx.hir_arena[node].meta_mut() = Meta {
-                            ty: self.types.intern(Type::Option(meta.ty)),
+                            ty: self.type_ctx.intern(Type::Option(meta.ty)),
                             span: meta.span,
                         };
                         node
@@ -374,7 +374,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .map(|def_id| self.check_def(def_id))
                             .unwrap_or_else(|| {
                                 let val_pat_id = self.patterns.alloc_pat_id();
-                                let val_ty = self.types.intern(Type::Infer(
+                                let val_ty = self.type_ctx.intern(Type::Infer(
                                     ctx.inference.new_type_variable(val_pat_id),
                                 ));
 
@@ -406,7 +406,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let Some(label) = ctx.label_map.get(&first_element.id) else {
                     panic!("No label for pattern element");
                 };
-                let seq_ty = self.types.intern(Type::Seq(val_ty));
+                let per_column_types = self.type_ctx.intern([val_ty]);
+                let seq_ty = self.type_ctx.intern(Type::Matrix(per_column_types));
 
                 ctx.mk_node(
                     ontol_hir::Kind::Matrix(

@@ -43,7 +43,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
         }
 
-        self.types.intern(Type::Tautology)
+        self.type_ctx.intern(Type::Tautology)
     }
 
     /// This defines a property on a compound type.

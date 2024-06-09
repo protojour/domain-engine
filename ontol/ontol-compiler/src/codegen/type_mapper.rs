@@ -1,5 +1,5 @@
 use ontol_runtime::{MapDef, MapDefFlags};
-use tracing::warn;
+use tracing::{debug, warn};
 
 use crate::{
     def::Defs,
@@ -93,6 +93,24 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
             }
             Type::Seq(val_ty) => {
                 let def_id = val_ty.get_single_def_id()?;
+                Some(MapInfo {
+                    map_def: MapDef {
+                        def_id,
+                        flags: MapDefFlags::SEQUENCE,
+                    },
+                    punned: None,
+                    anonymous,
+                })
+            }
+            Type::Matrix(column_types) => {
+                if column_types.len() != 1 {
+                    warn!("unsure how to map a multi-column matrix: {ty:?}");
+                    return None;
+                }
+
+                debug!("matrix first column type: {:?}", column_types[0]);
+
+                let def_id = column_types[0].get_single_def_id()?;
                 Some(MapInfo {
                     map_def: MapDef {
                         def_id,

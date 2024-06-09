@@ -419,10 +419,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             PatternKind::Set { elements, .. } => {
                                 let mut hir_matrix_rows = smallvec![];
                                 let seq_ty = if rel_params_ty.is_unit() {
-                                    self.types.intern(Type::Seq(value_ty))
+                                    let elements = self.type_ctx.intern(vec![value_ty]);
+                                    self.type_ctx.intern(Type::Matrix(elements))
                                 } else {
-                                    let elements = self.types.intern(vec![value_ty, rel_params_ty]);
-                                    self.types.intern(Type::Matrix(elements))
+                                    let elements =
+                                        self.type_ctx.intern(vec![value_ty, rel_params_ty]);
+                                    self.type_ctx.intern(Type::Matrix(elements))
                                 };
 
                                 for element in elements.iter() {

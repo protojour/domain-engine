@@ -26,8 +26,11 @@ pub struct SequenceRangesMatcher<'on> {
 
 #[derive(Clone, Copy)]
 pub enum SequenceKind {
+    /// attribute matrix with index-set semantics
     AttrMatrixIndexSet,
+    /// attribute matrix with list semantics
     AttrMatrixList,
+    /// unit attribute that will contain one sequence, i.e. no tuple-like properties.
     ValueList,
 }
 

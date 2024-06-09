@@ -11,7 +11,7 @@ use ontol_runtime::{
 };
 use smallvec::{smallvec, SmallVec};
 use thin_vec::thin_vec;
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 
 use crate::{
     def::{DefKind, Defs},
@@ -24,7 +24,7 @@ use crate::{
         repr_model::{ReprKind, ReprScalarKind},
     },
     typed_hir::{Meta, TypedHir, TypedHirData, TypedNodeRef},
-    types::{Type, TypeCtx, UNIT_TYPE},
+    types::{Type, TypeCtx, TypeRef, UNIT_TYPE},
     CompileError, CompileErrors, Compiler, SourceSpan, NO_SPAN,
 };
 
@@ -162,7 +162,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         } else {
             let last_meta = *self
                 .out_arena
-                .node_ref(*nodes.iter().last().unwrap())
+                .node_ref(nodes.last().copied().unwrap())
                 .meta();
             Ok(self.mk_node(Kind::Block(nodes), last_meta))
         }
@@ -206,7 +206,11 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                         {
                             if flags.contains(StructFlags::MATCH) {
                                 let match_var = self.alloc_var();
-                                let inner_set_ty = self.types.intern(Type::Seq(binder.meta().ty));
+
+                                let inner_matrix_ty = {
+                                    let column_types = self.types.intern([binder.meta().ty]);
+                                    self.types.intern(Type::Matrix(column_types))
+                                };
 
                                 debug!("HERE: root set query");
                                 return self.write_match_struct_expr(
@@ -215,7 +219,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                     self.expr_arena.node_ref(*element),
                                     TypeMapping {
                                         to: node_ref.ty(),
-                                        from: inner_set_ty,
+                                        from: inner_matrix_ty,
                                     },
                                     mode.match_struct(match_var),
                                 );
@@ -233,13 +237,29 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             (0..arity).map(|_| self.alloc_var()).collect_vec();
                         let seq_body =
                             self.write_matrix_body(rows, *node_ref.meta(), &out_columns, mode)?;
+
+                        let column_seq_types = (0..arity)
+                            .into_iter()
+                            .map(|idx| node_ref.meta().ty.matrix_column_type(idx, self.types))
+                            .collect_vec();
+
                         smallvec![self.write_node(
                             make_seq,
                             Kind::MakeMatrix(
                                 out_columns
                                     .into_iter()
-                                    // FIXME: node_ref.meta is probably wrong here:
-                                    .map(|var| TypedHirData(var.into(), *node_ref.meta()))
+                                    .enumerate()
+                                    .map(|(column_idx, var)| {
+                                        let column_type = column_seq_types[column_idx];
+
+                                        TypedHirData(
+                                            var.into(),
+                                            Meta {
+                                                ty: column_type,
+                                                span: node_ref.meta().span,
+                                            },
+                                        )
+                                    })
                                     .collect(),
                                 seq_body
                             ),
@@ -674,7 +694,6 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
                 for (insert_param, out_column) in insert_params.iter().zip(out_columns) {
                     matrix_body.push_node(self.mk_node(
-                        // FIXME: Cannot push to the same out_seq_var
                         Kind::Insert(*out_column, *insert_param),
                         Meta::new(&UNIT_TYPE, seq_meta.span),
                     ));
@@ -840,6 +859,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
         let def_ty = match type_mapping.from {
             Type::Seq(val_ty) => val_ty,
+            Type::Matrix(tuple) => tuple[0],
             other => other,
         };
 
@@ -940,82 +960,117 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         let span = self.out_arena.node_ref(input).span();
         match (type_mapping.from, type_mapping.to) {
             (Type::Seq(val0), Type::Seq(val1)) if val0 == val1 => Ok(smallvec![input]),
-            (Type::Seq(val_from), Type::Seq(val_to)) => {
-                let inner_set_var = self.alloc_var();
-                let mut nodes = smallvec![self.mk_node(
-                    Kind::Let(
-                        TypedHirData(inner_set_var.into(), *self.out_arena.node_ref(input).meta()),
-                        input
-                    ),
-                    Meta::unit(span),
-                )];
-
-                let seq_map = {
-                    let val_var = self.alloc_var();
-                    let mapped_val = {
-                        let input = self.mk_node(Kind::Var(val_var), Meta::new(val_from, span));
-                        self.write_type_map_if_necessary(
-                            input,
-                            TypeMapping {
-                                from: val_from,
-                                to: val_to,
-                            },
-                        )?
-                    };
-
-                    let target_seq_var = self.alloc_var();
-                    let insert = {
-                        self.mk_node(
-                            Kind::Insert(target_seq_var, *mapped_val.last().unwrap()),
-                            Meta::new(&UNIT_TYPE, span),
-                        )
-                    };
-
-                    let for_each = self.mk_node(
-                        Kind::ForEach(
-                            thin_vec![(
-                                inner_set_var,
-                                Binding::Binder(TypedHirData(
-                                    val_var.into(),
-                                    Meta::new(val_from, span),
-                                )),
-                            )],
-                            [insert].into_iter().collect(),
-                        ),
-                        Meta::new(&UNIT_TYPE, span),
-                    );
-                    let copy_sub_seq = self.mk_node(
-                        Kind::CopySubSeq(target_seq_var, inner_set_var),
-                        Meta::new(&UNIT_TYPE, span),
-                    );
-
-                    self.mk_node(
-                        Kind::MakeSeq(
-                            Some(TypedHirData(
-                                target_seq_var.into(),
-                                Meta::new(type_mapping.from, span),
-                            )),
-                            smallvec![for_each, copy_sub_seq],
-                        ),
-                        Meta::new(type_mapping.to, span),
-                    )
-                };
-
-                nodes.push(seq_map);
-
-                Ok(nodes)
+            (Type::Seq(item_from), Type::Seq(item_to)) => self.type_map_sequence(
+                input,
+                [type_mapping.from, type_mapping.to],
+                [item_from, item_to],
+                span,
+            ),
+            (Type::Seq(item_ty), Type::Matrix(columns))
+                if columns.len() == 1 && &columns[0] == item_ty =>
+            {
+                Ok(smallvec![input])
+            }
+            (Type::Matrix(col_from), Type::Matrix(col_to)) if col_from.iter().eq(col_to.iter()) => {
+                Ok(smallvec![input])
+            }
+            (Type::Matrix(col_from), Type::Matrix(col_to))
+                if col_from.len() == 1 && col_to.len() == 1 =>
+            {
+                self.type_map_sequence(
+                    input,
+                    [type_mapping.from, type_mapping.to],
+                    [col_from[0], col_to[0]],
+                    span,
+                )
+            }
+            (Type::Matrix(_), Type::Matrix(_)) => {
+                CompileError::TODO("map between matrices of different arity")
+                    .span(span)
+                    .report(self.errors);
+                Err(UnifierError::Reported)
             }
             (inner, outer)
                 if inner != outer
                     && !matches!(inner, Type::Error)
                     && !matches!(outer, Type::Error) =>
             {
+                trace!("request mapping from {inner:?} to {outer:?}");
                 Ok(smallvec![
                     self.mk_node(Kind::Map(input), Meta::new(outer, span))
                 ])
             }
             _ => Ok(smallvec![input]),
         }
+    }
+
+    fn type_map_sequence(
+        &mut self,
+        input: Node,
+        [seq_from, seq_to]: [TypeRef<'m>; 2],
+        [item_from, item_to]: [TypeRef<'m>; 2],
+        span: SourceSpan,
+    ) -> UnifierResult<Nodes> {
+        let inner_set_var = self.alloc_var();
+        let mut nodes = smallvec![self.mk_node(
+            Kind::Let(
+                TypedHirData(inner_set_var.into(), *self.out_arena.node_ref(input).meta()),
+                input
+            ),
+            Meta::unit(span),
+        )];
+
+        let seq_map = {
+            let val_var = self.alloc_var();
+            let mapped_val = {
+                let input = self.mk_node(Kind::Var(val_var), Meta::new(item_from, span));
+                self.write_type_map_if_necessary(
+                    input,
+                    TypeMapping {
+                        from: item_from,
+                        to: item_to,
+                    },
+                )?
+            };
+
+            let target_seq_var = self.alloc_var();
+            let insert = {
+                self.mk_node(
+                    Kind::Insert(target_seq_var, *mapped_val.last().unwrap()),
+                    Meta::new(&UNIT_TYPE, span),
+                )
+            };
+
+            let for_each = self.mk_node(
+                Kind::ForEach(
+                    thin_vec![(
+                        inner_set_var,
+                        Binding::Binder(TypedHirData(val_var.into(), Meta::new(item_from, span),)),
+                    )],
+                    [insert].into_iter().collect(),
+                ),
+                Meta::new(&UNIT_TYPE, span),
+            );
+            let copy_sub_seq = self.mk_node(
+                Kind::CopySubSeq(target_seq_var, inner_set_var),
+                Meta::new(&UNIT_TYPE, span),
+            );
+
+            self.mk_node(
+                Kind::MakeSeq(
+                    Some(TypedHirData(
+                        target_seq_var.into(),
+                        Meta::new(seq_from, span),
+                    )),
+                    smallvec![for_each, copy_sub_seq],
+                ),
+                Meta::new(seq_to, span),
+            )
+        };
+
+        nodes.push(seq_map);
+
+        Ok(nodes)
     }
 
     pub(super) fn write_default_node(&mut self, meta: Meta<'m>) -> Node {

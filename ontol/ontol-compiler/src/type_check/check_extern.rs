@@ -123,7 +123,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 .add_map_task(key_pair, request, self.defs, self.errors);
         }
 
-        self.types.intern(Type::Tautology)
+        self.type_ctx.intern(Type::Tautology)
     }
 
     fn check_arm(&mut self, pat_id: PatId) -> TypeRef<'m> {
