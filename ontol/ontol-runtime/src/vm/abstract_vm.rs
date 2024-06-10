@@ -59,12 +59,12 @@ pub trait Processor {
         &mut self,
         source: Local,
         key: RelationshipId,
-        len: u8,
+        arity: u8,
         flags: GetAttrFlags,
     ) -> VmResult<()>;
     fn put_attr_unit(&mut self, target: Local, key: RelationshipId) -> VmResult<()>;
-    fn put_attr_tup(&mut self, target: Local, n: u8, key: RelationshipId) -> VmResult<()>;
-    fn put_attr_mat(&mut self, target: Local, n: u8, key: RelationshipId) -> VmResult<()>;
+    fn put_attr_tuple(&mut self, target: Local, arity: u8, key: RelationshipId) -> VmResult<()>;
+    fn put_attr_matrix(&mut self, target: Local, arity: u8, key: RelationshipId) -> VmResult<()>;
     fn move_rest_attrs(&mut self, target: Local, source: Local) -> VmResult<()>;
     fn push_i64(&mut self, k: i64, result_type: DefId);
     fn push_f64(&mut self, k: f64, result_type: DefId);
@@ -197,20 +197,20 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                         processor.yield_call_extern(*extern_def_id, *output_def_id)?,
                     ));
                 }
-                OpCode::GetAttr(local, rel_id, len, flags) => {
-                    processor.get_attr(*local, *rel_id, *len, *flags)?;
+                OpCode::GetAttr(local, rel_id, arity, flags) => {
+                    processor.get_attr(*local, *rel_id, *arity, *flags)?;
                     self.program_counter += 1;
                 }
                 OpCode::PutAttrUnit(target, rel_id) => {
                     processor.put_attr_unit(*target, *rel_id)?;
                     self.program_counter += 1;
                 }
-                OpCode::PutAttrTup(target, n, rel_id) => {
-                    processor.put_attr_tup(*target, *n, *rel_id)?;
+                OpCode::PutAttrTup(target, arity, rel_id) => {
+                    processor.put_attr_tuple(*target, *arity, *rel_id)?;
                     self.program_counter += 1;
                 }
-                OpCode::PutAttrMat(target, n, rel_id) => {
-                    processor.put_attr_mat(*target, *n, *rel_id)?;
+                OpCode::PutAttrMat(target, arity, rel_id) => {
+                    processor.put_attr_matrix(*target, *arity, *rel_id)?;
                     self.program_counter += 1;
                 }
                 OpCode::MoveRestAttrs(target, source) => {

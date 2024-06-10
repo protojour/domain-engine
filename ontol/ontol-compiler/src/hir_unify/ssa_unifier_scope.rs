@@ -555,11 +555,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             } else {
                                 self.push_let(Let::Prop(pack, (var, rel_id)), span, scoped, lets);
                             }
-                        } else {
-                            CompileError::PatternRequiresIteratedVariable
-                                .span(span)
-                                .report(self);
-                        };
+                        }
                     }
                     (_, true, true) => {
                         // This passed type check, so there must be a way to construct a value default

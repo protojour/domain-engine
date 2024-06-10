@@ -163,34 +163,19 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     }
                 }
             }
-            (
-                SerdeOperator::IdSingletonStruct(_, name_constant, inner_addr),
-                _,
-                AttrRef::Unit(_),
-            ) => {
-                let mut map = serializer.serialize_map(Some(1))?;
-                map.serialize_entry(
-                    &self.ontology[*name_constant],
-                    &Proxy {
-                        attr,
-                        processor: self
-                            .new_child(*inner_addr)
-                            .map_err(RecursionLimitError::to_ser_error)?,
-                    },
-                )?;
+            (SerdeOperator::IdSingletonStruct(_, name_constant, inner_addr), ..) => {
+                let (val, rel_params) = match attr {
+                    AttrRef::Unit(unit) => (unit, None),
+                    AttrRef::Tuple(tup) => (&tup[0], tup.get(1)),
+                    AttrRef::RowTuple(tup) => (tup[0], tup.get(1).map(|v| *v)),
+                    AttrRef::Matrix(_) => panic!("id singleton struct matrix"),
+                };
 
-                map.end()
-            }
-            (
-                SerdeOperator::IdSingletonStruct(_, name_constant, inner_addr),
-                _,
-                AttrRef::Tuple(t),
-            ) => {
                 let mut map = serializer.serialize_map(Some(1))?;
                 map.serialize_entry(
                     &self.ontology[*name_constant],
                     &Proxy {
-                        attr: AttrRef::Unit(&t[0]),
+                        attr: AttrRef::Unit(val),
                         processor: self
                             .new_child(*inner_addr)
                             .map_err(RecursionLimitError::to_ser_error)?,
@@ -198,7 +183,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 )?;
                 self.serialize_rel_params::<S>(
                     &self.ontology.ontol_domain_meta().edge_property,
-                    t.get(1),
+                    rel_params,
                     &mut map,
                 )?;
 

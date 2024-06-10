@@ -211,8 +211,7 @@ fn artist_and_instrument_id_as_relation_object() {
 
     // The value of the `plays` attribute is an `artist-id`
     expect_eq!(
-        actual = serde_create(&instrument_id)
-            .as_json(plays_attributes.get_attr_cloned(0).unwrap().as_ref()),
+        actual = serde_create(&instrument_id).as_json(plays_attributes.get_ref(0, 0).unwrap()),
         expected = json!(example_id)
     );
 
@@ -405,8 +404,8 @@ fn entity_union_in_relation_with_ids() {
         .as_matrix()
         .unwrap();
 
-    let guitar_id_attr = plays_attributes.get_attr_cloned(0).unwrap();
-    let synth_id_attr = plays_attributes.get_attr_cloned(1).unwrap();
+    let guitar_id_attr = plays_attributes.get_row_cloned(0).unwrap();
+    let synth_id_attr = plays_attributes.get_row_cloned(1).unwrap();
 
     assert_ne!(guitar_id.type_info.def_id, synth_id.type_info.def_id);
     assert_eq!(

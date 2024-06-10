@@ -171,14 +171,14 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
             SerdeOperator::RelationList(seq_op) | SerdeOperator::RelationIndexSet(seq_op) => {
                 return if processor.level().current_global_level() > SENSIBLE_RECURSION_LEVEL {
                     Ok(Attr::Matrix(AttrMatrix {
-                        elements: smallvec![Default::default()],
+                        columns: smallvec![Default::default()],
                     }))
                 } else {
                     let attr = self.fake_attribute(processor.narrow(seq_op.range.addr))?;
 
                     // FIXME: Need info about the cardinality of this matrix
                     Ok(Attr::Matrix(AttrMatrix {
-                        elements: smallvec![Sequence::from_iter([attr.into_unit().unwrap()])],
+                        columns: smallvec![Sequence::from_iter([attr.into_unit().unwrap()])],
                     }))
                 };
             }

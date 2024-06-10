@@ -154,7 +154,7 @@ impl<'o> Processor for OntolProcessor<'o> {
         &mut self,
         source: Local,
         key: RelationshipId,
-        len: u8,
+        arity: u8,
         flags: super::proc::GetAttrFlags,
     ) -> VmResult<()> {
         let _struct = self.struct_local_mut(source)?;
@@ -166,16 +166,16 @@ impl<'o> Processor for OntolProcessor<'o> {
         match attr {
             Some(attr) => {
                 match attr {
-                    Attr::Unit(value) if len == 1 => {
+                    Attr::Unit(value) if arity == 1 => {
                         self.stack.push(value);
                     }
-                    Attr::Tuple(tuple) if tuple.elements.len() == len as usize => {
+                    Attr::Tuple(tuple) if tuple.elements.len() == arity as usize => {
                         for elem in tuple.elements.into_iter() {
                             self.stack.push(elem);
                         }
                     }
-                    Attr::Matrix(mat) if mat.elements.len() == len as usize => {
-                        for elem in mat.elements.into_iter() {
+                    Attr::Matrix(mat) if mat.columns.len() == arity as usize => {
+                        for elem in mat.columns.into_iter() {
                             self.stack.push(Value::Sequence(elem, DefId::unit()));
                         }
                     }
@@ -188,7 +188,7 @@ impl<'o> Processor for OntolProcessor<'o> {
                 Ok(())
             }
             None => {
-                for _ in 0..len {
+                for _ in 0..arity {
                     self.push_void();
                 }
                 Ok(())
@@ -226,10 +226,10 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn put_attr_tup(&mut self, target: Local, n: u8, key: RelationshipId) -> VmResult<()> {
-        let mut elements: SmallVec<Value, 1> = SmallVec::with_capacity(n as usize);
+    fn put_attr_tuple(&mut self, target: Local, arity: u8, key: RelationshipId) -> VmResult<()> {
+        let mut elements: SmallVec<Value, 1> = SmallVec::with_capacity(arity as usize);
 
-        for _ in 0..n {
+        for _ in 0..arity {
             elements.push(self.pop_one());
         }
 
@@ -240,11 +240,11 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn put_attr_mat(&mut self, target: Local, n: u8, key: RelationshipId) -> VmResult<()> {
+    fn put_attr_matrix(&mut self, target: Local, arity: u8, key: RelationshipId) -> VmResult<()> {
         let mut columns: EndoTupleElements<Sequence<Value>> =
-            EndoTupleElements::with_capacity(n as usize);
+            EndoTupleElements::with_capacity(arity as usize);
 
-        for _ in 0..n {
+        for _ in 0..arity {
             let Value::Sequence(sequence, _) = self.pop_one() else {
                 return Err(VmError::InvalidMatrixColumn);
             };
@@ -252,8 +252,25 @@ impl<'o> Processor for OntolProcessor<'o> {
             columns.push(sequence);
         }
 
-        let map = self.struct_local_mut(target)?;
-        map.insert(key, Attr::Matrix(AttrMatrix { elements: columns }));
+        match &mut self.stack[target.0 as usize] {
+            Value::Struct(attrs, _) | Value::StructUpdate(attrs, _) => {
+                attrs.insert(key, Attr::Matrix(AttrMatrix { columns }));
+            }
+            Value::Filter(filter, _) => {
+                let meta = self.ontology.ontol_domain_meta();
+                let relationship = key.0;
+
+                if relationship == meta.order_relationship && arity == 1 {
+                    filter.set_order(Value::Sequence(
+                        columns.into_iter().next().unwrap(),
+                        DefId::unit(),
+                    ));
+                } else {
+                    return Err(VmError::InvalidType(target));
+                }
+            }
+            _ => return Err(VmError::InvalidType(target)),
+        }
 
         Ok(())
     }

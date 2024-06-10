@@ -557,7 +557,7 @@ where
 
     fn into_attr(self) -> Attr {
         Attr::Matrix(AttrMatrix {
-            elements: self.builder_tuple.into_iter().map(|t| t.build()).collect(),
+            columns: self.builder_tuple.into_iter().map(|t| t.build()).collect(),
         })
     }
 }

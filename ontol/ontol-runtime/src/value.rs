@@ -328,7 +328,7 @@ impl Attr {
         match self {
             Attr::Unit(v) => AttrRef::Unit(v),
             Attr::Tuple(t) => AttrRef::Tuple(&t.elements),
-            Attr::Matrix(m) => AttrRef::Matrix(&m.elements),
+            Attr::Matrix(m) => AttrRef::Matrix(&m.columns),
         }
     }
 
@@ -406,15 +406,25 @@ impl Attr {
 /// A column-first matrix of attributes.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct AttrMatrix {
-    pub elements: EndoTupleElements<Sequence<Value>>,
+    pub columns: EndoTupleElements<Sequence<Value>>,
 }
 
 impl AttrMatrix {
-    pub fn get_attr_cloned(&self, index: usize) -> Option<Attr> {
+    /// Get an AttrRef at specific coordinate in the matrix
+    pub fn get_ref(&self, row_index: usize, column_index: usize) -> Option<AttrRef> {
+        let column = self.columns.get(column_index)?;
+
+        let value = column.elements().get(row_index)?;
+
+        Some(AttrRef::Unit(value))
+    }
+
+    /// Get a full row as a tuple attribute
+    pub fn get_row_cloned(&self, row_index: usize) -> Option<Attr> {
         let mut elements: SmallVec<Value, 1> = smallvec![];
 
-        for e in &self.elements {
-            elements.push(e.elements.get(index)?.clone());
+        for e in &self.columns {
+            elements.push(e.elements.get(row_index)?.clone());
         }
 
         Some(Attr::Tuple(Box::new(EndoTuple { elements })))
@@ -575,19 +585,6 @@ impl<'v> Display for ValueDebug<'v, Value> {
     }
 }
 
-impl<'a> Display for ValueDebug<'a, Attribute> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let attr = &self.0;
-        write!(f, "{}", ValueDebug(&attr.val))?;
-
-        if !attr.rel.is_unit() {
-            write!(f, "::{}", ValueDebug(&attr.rel))?;
-        }
-
-        Ok(())
-    }
-}
-
 impl<'a> Display for ValueDebug<'a, Attr> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let attr = &self.0;
@@ -642,7 +639,7 @@ where
 
 impl<'a> Display for ValueDebug<'a, AttrMatrix> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "mat{}", ValueDebug(&self.0.elements))
+        write!(f, "mat{}", ValueDebug(&self.0.columns))
     }
 }
 

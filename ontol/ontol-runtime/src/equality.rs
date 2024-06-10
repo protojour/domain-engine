@@ -52,7 +52,7 @@ impl OntolEquals for Attr {
         match (self, other) {
             (Attr::Unit(a), Attr::Unit(b)) => a.ontol_equals(b),
             (Attr::Tuple(a), Attr::Tuple(b)) => a.elements.ontol_equals(&b.elements),
-            (Attr::Matrix(a), Attr::Matrix(b)) => a.elements.ontol_equals(&b.elements),
+            (Attr::Matrix(a), Attr::Matrix(b)) => a.columns.ontol_equals(&b.columns),
             _ => false,
         }
     }
@@ -65,7 +65,7 @@ impl OntolHash for Attr {
         match self {
             Attr::Unit(b) => b.ontol_hash(h, builder),
             Attr::Tuple(t) => t.elements.ontol_hash(h, builder),
-            Attr::Matrix(m) => m.elements.ontol_hash(h, builder),
+            Attr::Matrix(m) => m.columns.ontol_hash(h, builder),
         }
     }
 }
