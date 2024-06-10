@@ -2,7 +2,6 @@ use std::{
     cmp::Ordering,
     collections::BTreeMap,
     fmt::{Debug, Display},
-    ops::Index,
 };
 
 use ::serde::{Deserialize, Serialize};
@@ -176,22 +175,6 @@ impl Value {
         }
     }
 
-    #[inline]
-    pub const fn to_attr(self, rel_params: Value) -> Attribute<Self> {
-        Attribute {
-            rel: rel_params,
-            val: self,
-        }
-    }
-
-    #[inline]
-    pub const fn to_unit_attr(self) -> Attribute<Self> {
-        Attribute {
-            rel: Value::unit(),
-            val: self,
-        }
-    }
-
     pub fn cast_ref<T>(&self) -> &<Self as Cast<T>>::Ref
     where
         Self: Cast<T>,
@@ -288,28 +271,11 @@ impl<'d, 'o> Display for FormatValueAsText<'d, 'o> {
     }
 }
 
-/// An Attribute is a Value that is part of another value.
+/// ONTOL attributes
 ///
-/// An attribute may be parameterized (rel_params).
-/// The attribute parameter should be non-unit when the relationship between
-/// the container (subject) and the map (object) is parameterized.
+/// Attributes are part of other values. Attributes can be single or multi-valued.
 ///
-/// The parameter _value_ is itself a `Value`.
-///
-/// The attribute value is also just a Value.
-///
-/// FIXME: There is probably a flaw in the modelling of one-to-many attributes.
-/// One-to-many has many rel_params too (currently represented using Data::Seq for the value).
-/// So should Attribute be an enum instead of a struct?
-/// An attribute existing of (relation parameter, value)
-#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Debug)]
-pub struct Attribute<T = Value> {
-    /// The relation parameter(s)
-    pub rel: T,
-    /// The attribute value
-    pub val: T,
-}
-
+/// The variants of this enum describe how attributes may be quantified.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum Attr {
     /// The attribute has one value
@@ -483,15 +449,6 @@ impl<'v> AttrRef<'v> {
     }
 }
 
-impl From<Value> for Attribute<Value> {
-    fn from(value: Value) -> Self {
-        Self {
-            rel: Value::unit(),
-            val: value,
-        }
-    }
-}
-
 impl From<Value> for Attr {
     fn from(value: Value) -> Self {
         Self::Unit(value)
@@ -501,30 +458,6 @@ impl From<Value> for Attr {
 impl From<EndoTuple<Value>> for Attr {
     fn from(value: EndoTuple<Value>) -> Self {
         Self::Tuple(Box::new(value))
-    }
-}
-
-impl<R, V, T> From<(R, V)> for Attribute<T>
-where
-    T: From<R> + From<V>,
-{
-    fn from((rel, val): (R, V)) -> Self {
-        Self {
-            rel: rel.into(),
-            val: val.into(),
-        }
-    }
-}
-
-impl<T> Index<usize> for Attribute<T> {
-    type Output = T;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        match index {
-            0 => &self.rel,
-            1 => &self.val,
-            _ => panic!("Out of bounds for Attribute"),
-        }
     }
 }
 
@@ -647,7 +580,7 @@ impl<'a> Display for ValueDebug<'a, AttrMatrix> {
 mod tests {
     use std::collections::{BTreeMap, HashMap};
 
-    use crate::{PackageId, RelationshipId};
+    use crate::RelationshipId;
 
     use super::*;
     use num::rational::BigRational;
@@ -671,14 +604,5 @@ mod tests {
         assert_eq!(48, std::mem::size_of::<HashMap<RelationshipId, Value>>());
 
         assert_eq!(32, std::mem::size_of::<Attr>());
-    }
-
-    #[test]
-    fn attributes() {
-        let mut map = BTreeMap::new();
-        map.insert(
-            RelationshipId(DefId(PackageId(0), 666)),
-            Value::I64(42, DefId(PackageId(0), 42)).to_unit_attr(),
-        );
     }
 }

@@ -12,7 +12,8 @@ use ontol_runtime::{
     },
     ontology::{domain::TypeInfo, Ontology},
     query::select::{Select, StructSelect},
-    value::{Attr, Attribute, Value},
+    tuple::EndoTuple,
+    value::{Attr, Value},
     DefId, PackageId, RelationshipId,
 };
 use serde::de::DeserializeSeed;
@@ -198,8 +199,8 @@ impl<'t, 'on> From<ValueBuilder<'t, 'on>> for Value {
     }
 }
 
-impl<'t, 'on> From<ValueBuilder<'t, 'on>> for Attribute {
-    fn from(b: ValueBuilder<'t, 'on>) -> Attribute {
+impl<'t, 'on> From<ValueBuilder<'t, 'on>> for Attr {
+    fn from(b: ValueBuilder<'t, 'on>) -> Attr {
         b.to_unit_attr()
     }
 }
@@ -210,12 +211,14 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
         self.merge_attribute(rel_id, attr)
     }
 
-    pub fn to_unit_attr(self) -> Attribute {
-        self.value.to_unit_attr()
+    pub fn to_unit_attr(self) -> Attr {
+        Attr::Unit(self.value)
     }
 
-    pub fn to_attr(self, rel_params: impl Into<Value>) -> Attribute {
-        self.value.to_attr(rel_params.into())
+    pub fn to_attr(self, rel_params: impl Into<Value>) -> Attr {
+        Attr::Tuple(Box::new(EndoTuple {
+            elements: [self.value, rel_params.into()].into_iter().collect(),
+        }))
     }
 
     fn with_json_data(mut self, json: serde_json::Value) -> Self {

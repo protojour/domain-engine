@@ -10,16 +10,13 @@ use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
 use thin_vec::ThinVec;
 
-use crate::{
-    equality::{OntolEquals, OntolHash},
-    value::Attribute,
-};
+use crate::equality::{OntolEquals, OntolHash};
 
 /// This type represents all ONTOL sequences.
 ///
 /// Both insertion-ordered sets and lists are sequences.
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct Sequence<T = Attribute> {
+pub struct Sequence<T> {
     /// The attributes of this sequence
     pub(crate) elements: ThinVec<T>,
     /// The subsequence information, if any.
@@ -126,7 +123,7 @@ pub trait SequenceBuilder<T>: Index<usize, Output = T> {
     fn build(self) -> Sequence<T>;
 }
 
-pub struct ListBuilder<T = Attribute> {
+pub struct ListBuilder<T> {
     elements: ThinVec<T>,
 }
 
@@ -331,7 +328,7 @@ mod tests {
 
     #[test]
     fn dedup_typed_unit() {
-        let mut builder: IndexSetBuilder<Attribute> = Default::default();
+        let mut builder: IndexSetBuilder<Attr> = Default::default();
 
         assert!(builder.try_push(Value::unit().into()).is_ok());
         assert!(builder.try_push(Value::unit().into()).is_err());
@@ -342,7 +339,7 @@ mod tests {
 
     #[test]
     fn dedup_text() {
-        let mut builder: IndexSetBuilder<Attribute> = Default::default();
+        let mut builder: IndexSetBuilder<Attr> = Default::default();
 
         assert!(builder.try_push(text("a").into()).is_ok());
         assert!(builder.try_push(text("a").into()).is_err());
@@ -352,7 +349,7 @@ mod tests {
 
     #[test]
     fn dedup_i64() {
-        let mut builder: IndexSetBuilder<Attribute> = Default::default();
+        let mut builder: IndexSetBuilder<Attr> = Default::default();
 
         assert!(builder.try_push(Value::I64(42, def(2)).into()).is_ok());
         assert!(builder.try_push(Value::I64(42, def(2)).into()).is_err());
@@ -361,7 +358,7 @@ mod tests {
 
     #[test]
     fn dedup_f64_zero() {
-        let mut builder: IndexSetBuilder<Attribute> = Default::default();
+        let mut builder: IndexSetBuilder<Attr> = Default::default();
 
         assert!(builder.try_push(Value::F64(0.0, def(4)).into()).is_ok());
         assert!(builder.try_push(Value::F64(-0.0, def(4)).into()).is_err());
@@ -371,7 +368,7 @@ mod tests {
     // OntolEquals or not
     #[test]
     fn dedup_f64_nan_can_duplicate() {
-        let mut builder: IndexSetBuilder<Attribute> = Default::default();
+        let mut builder: IndexSetBuilder<Attr> = Default::default();
 
         let nan = Value::F64(f64::NAN, def(3));
 
@@ -382,7 +379,7 @@ mod tests {
 
     #[test]
     fn dedup_struct_empty() {
-        let mut builder: IndexSetBuilder<Attribute> = Default::default();
+        let mut builder: IndexSetBuilder<Attr> = Default::default();
 
         assert!(builder.try_push(struct_value([]).into()).is_ok());
         assert!(builder.try_push(struct_value([]).into()).is_err());
@@ -390,7 +387,7 @@ mod tests {
 
     #[test]
     fn dedup_big_structs_different_iteration_order() {
-        let mut builder: IndexSetBuilder<Attribute> = Default::default();
+        let mut builder: IndexSetBuilder<Attr> = Default::default();
 
         // structs with different insertion order
         assert!(builder

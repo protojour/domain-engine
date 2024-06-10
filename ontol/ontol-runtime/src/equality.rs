@@ -7,7 +7,7 @@ use ordered_float::NotNan;
 use crate::{
     sequence::Sequence,
     tuple::EndoTupleElements,
-    value::{Attr, Attribute, Value},
+    value::{Attr, Value},
     RelationshipId,
 };
 
@@ -32,19 +32,6 @@ pub trait OntolEquals {
 /// so hashing is intended to be more performant than comparison.
 pub trait OntolHash {
     fn ontol_hash(&self, h: &mut ahash::AHasher, builder: &ahash::RandomState);
-}
-
-impl OntolEquals for Attribute {
-    fn ontol_equals(&self, other: &Self) -> bool {
-        self.rel.ontol_equals(&other.rel) && self.val.ontol_equals(&other.val)
-    }
-}
-
-impl OntolHash for Attribute {
-    fn ontol_hash(&self, h: &mut ahash::AHasher, builder: &ahash::RandomState) {
-        self.rel.ontol_hash(h, builder);
-        self.val.ontol_hash(h, builder);
-    }
 }
 
 impl OntolEquals for Attr {
