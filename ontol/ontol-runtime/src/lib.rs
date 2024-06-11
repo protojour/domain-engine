@@ -6,6 +6,7 @@ use ::serde::{Deserialize, Serialize};
 use ontol_macros::OntolDebug;
 use value::{TagPkg, ValueTagError};
 
+pub mod attr;
 pub mod cast;
 pub mod debug;
 pub mod format_utils;

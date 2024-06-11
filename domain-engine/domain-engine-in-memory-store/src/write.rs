@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    attr::{Attr, AttrRef},
     interface::serde::{operator::SerdeOperatorAddr, processor::ProcessorMode},
     ontology::{
         domain::{
@@ -14,7 +15,7 @@ use ontol_runtime::{
     property::ValueCardinality,
     query::{filter::Filter, select::Select},
     tuple::EndoTuple,
-    value::{Attr, AttrRef, Serial, Value, ValueDebug},
+    value::{Serial, Value, ValueDebug},
     DefId, RelationshipId,
 };
 use smallvec::smallvec;

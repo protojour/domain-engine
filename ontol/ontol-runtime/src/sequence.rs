@@ -320,7 +320,8 @@ mod tests {
     use tracing::debug;
 
     use crate::{
-        value::{Attr, Value, ValueTag},
+        attr::Attr,
+        value::{Value, ValueTag},
         DefId, PackageId, RelationshipId,
     };
 

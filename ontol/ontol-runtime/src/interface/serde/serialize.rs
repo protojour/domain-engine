@@ -7,6 +7,7 @@ use std::{fmt::Write, slice};
 use tracing::{trace, warn};
 
 use crate::{
+    attr::{Attr, AttrRef, AttrTupleRef},
     cast::Cast,
     interface::serde::{
         operator::AppliedVariants,
@@ -14,7 +15,7 @@ use crate::{
     },
     ontology::ontol::text_pattern::{FormatPattern, TextPatternConstantPart},
     sequence::Sequence,
-    value::{Attr, AttrRef, FormatValueAsText, Value},
+    value::{FormatValueAsText, Value},
     DefId, RelationshipId,
 };
 
@@ -166,8 +167,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             (SerdeOperator::IdSingletonStruct(_, name_constant, inner_addr), ..) => {
                 let (val, rel_params) = match attr {
                     AttrRef::Unit(unit) => (unit, None),
-                    AttrRef::Tuple(tup) => (&tup[0], tup.get(1)),
-                    AttrRef::RowTuple(tup) => (tup[0], tup.get(1).map(|v| *v)),
+                    AttrRef::Tuple(tup) => (tup.get(0).unwrap(), tup.get(1)),
                     AttrRef::Matrix(_) => panic!("id singleton struct matrix"),
                 };
 
@@ -363,7 +363,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             if let Some(finite_repetition) = range.finite_repetition {
                 for _ in 0..finite_repetition {
                     next_item(tuple, &mut work_tuple, &mut index).unwrap();
-                    let attr = AttrRef::RowTuple(&work_tuple).coerce_to_unit();
+                    let attr = AttrRef::Tuple(AttrTupleRef::Row(&work_tuple)).coerce_to_unit();
 
                     seq.serialize_element(&Proxy {
                         attr,
@@ -372,7 +372,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 }
             } else {
                 while let Some(()) = next_item(tuple, &mut work_tuple, &mut index) {
-                    let attr = AttrRef::RowTuple(&work_tuple).coerce_to_unit();
+                    let attr = AttrRef::Tuple(AttrTupleRef::Row(&work_tuple)).coerce_to_unit();
 
                     seq.serialize_element(&Proxy {
                         attr,
@@ -416,8 +416,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
     ) -> Res<S> {
         let (value, rel_params) = match attr {
             AttrRef::Unit(value) => (value, None),
-            AttrRef::Tuple(elements) => (&elements[0], elements.get(1)),
-            AttrRef::RowTuple(elements) => (elements[0], elements.get(1).map(|v| *v)),
+            AttrRef::Tuple(tup) => (tup.get(0).unwrap(), tup.get(1)),
             AttrRef::Matrix(..) => {
                 panic!("attr matrix")
             }

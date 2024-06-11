@@ -5,10 +5,8 @@ use domain_engine_core::{DomainError, DomainResult};
 use fnv::FnvHashMap;
 use itertools::Itertools;
 use ontol_runtime::{
-    ontology::domain::EntityOrder,
-    query::filter::Filter,
-    value::{Attr, Value},
-    DefId, RelationshipId,
+    attr::Attr, ontology::domain::EntityOrder, query::filter::Filter, value::Value, DefId,
+    RelationshipId,
 };
 
 use crate::core::{DbContext, DynamicKey};

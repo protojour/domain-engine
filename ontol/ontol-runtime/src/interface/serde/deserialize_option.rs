@@ -3,7 +3,7 @@ use serde::{
     Deserializer,
 };
 
-use crate::value::Attr;
+use crate::attr::Attr;
 
 use super::processor::SerdeProcessor;
 

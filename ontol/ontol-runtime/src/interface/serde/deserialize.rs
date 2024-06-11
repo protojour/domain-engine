@@ -8,13 +8,14 @@ use smallvec::{smallvec, SmallVec};
 use tracing::{trace, warn};
 
 use crate::{
+    attr::{Attr, AttrMatrix},
     interface::serde::{
         deserialize_id::IdSingletonStructVisitor,
         deserialize_struct::{PossibleProps, StructDeserializer, StructVisitor},
         matcher::map_matchers::MapMatchMode,
     },
     sequence::{IndexSetBuilder, ListBuilder, SequenceBuilder, WithCapacity},
-    value::{Attr, AttrMatrix, Serial, Value, ValueTag},
+    value::{Serial, Value, ValueTag},
 };
 
 use super::{

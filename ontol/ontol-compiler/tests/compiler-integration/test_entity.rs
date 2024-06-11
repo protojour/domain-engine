@@ -1,8 +1,5 @@
 use ontol_macros::test;
-use ontol_runtime::{
-    value::{AttrRef, Value},
-    PackageId,
-};
+use ontol_runtime::{attr::AttrRef, value::Value, PackageId};
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches,
     examples::{ARTIST_AND_INSTRUMENT, GUITAR_SYNTH_UNION},

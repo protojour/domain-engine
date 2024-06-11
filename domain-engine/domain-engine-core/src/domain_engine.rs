@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
 use ontol_runtime::{
+    attr::AttrRef,
     interface::serde::processor::ProcessorMode,
     ontology::{config::data_store_backed_domains, map::Extern, Ontology},
     property::ValueCardinality,
@@ -11,7 +12,7 @@ use ontol_runtime::{
     },
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolvePath, ResolverGraph},
     sequence::Sequence,
-    value::{AttrRef, Value, ValueTag},
+    value::{Value, ValueTag},
     vm::{ontol_vm::OntolVm, proc::Yield, VmState},
     MapKey, PackageId,
 };

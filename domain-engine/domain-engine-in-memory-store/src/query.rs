@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    attr::{Attr, AttrMatrix},
     ontology::domain::{DataRelationshipKind, EdgeCardinalProjection, TypeInfo},
     property::ValueCardinality,
     query::{
@@ -10,7 +11,7 @@ use ontol_runtime::{
         select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     },
     sequence::{Sequence, SubSequence},
-    value::{Attr, AttrMatrix, Value},
+    value::Value,
     DefId, RelationshipId,
 };
 use tracing::{debug, error};

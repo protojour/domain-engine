@@ -694,7 +694,7 @@ fn test_serde_with_raw_prefix_int_id_overridde_profile() {
 mod serde_raw_dynamic_entity_in_union {
     use super::*;
     use ontol_macros::test;
-    use ontol_runtime::value::AttrRef;
+    use ontol_runtime::attr::AttrRef;
     use ontol_test_utils::OntolTest;
 
     /// This tests an entity union without data-based discriminators (only id-based)

@@ -1,9 +1,10 @@
 use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    attr::{Attr, AttrMatrix},
     ontology::domain::{DataRelationshipKind, EdgeCardinalProjection},
     query::condition::{Clause, CondTerm, Condition, SetOperator},
-    value::{Attr, AttrMatrix, Value},
+    value::Value,
     var::Var,
     DefId, RelationshipId,
 };

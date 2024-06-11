@@ -1,5 +1,5 @@
 use ontol_macros::test;
-use ontol_runtime::{interface::serde::processor::ProcessorMode, value::AttrRef};
+use ontol_runtime::{attr::AttrRef, interface::serde::processor::ProcessorMode};
 use ontol_test_utils::{
     examples::{GEOJSON, GUITAR_SYNTH_UNION, WGS},
     expect_eq,

@@ -3,6 +3,7 @@ use serde::de::{value::StrDeserializer, DeserializeSeed};
 use tracing::error;
 
 use crate::{
+    attr::Attr,
     interface::serde::processor::{ProcessorMode, ScalarFormat},
     ontology::{
         ontol::{
@@ -11,7 +12,7 @@ use crate::{
         },
         Ontology,
     },
-    value::{Attr, Value, ValueTag},
+    value::{Value, ValueTag},
     DefId, RelationshipId,
 };
 

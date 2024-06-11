@@ -8,12 +8,13 @@ use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use ontol_runtime::{
+    attr::Attr,
     ontology::{
         domain::{DataRelationshipInfo, TypeInfo},
         Ontology,
     },
     tuple::CardinalIdx,
-    value::{Attr, Serial, Value},
+    value::{Serial, Value},
     DefId, EdgeId, RelationshipId,
 };
 use smallvec::SmallVec;

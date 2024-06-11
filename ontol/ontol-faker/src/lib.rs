@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use fake::{Fake, Faker};
 use ontol_runtime::{
+    attr::{Attr, AttrMatrix},
     interface::serde::{
         operator::{AppliedVariants, SerdeOperator},
         processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
@@ -15,7 +16,7 @@ use ontol_runtime::{
     },
     sequence::Sequence,
     tuple::EndoTuple,
-    value::{Attr, AttrMatrix, Serial, Value, ValueTag},
+    value::{Serial, Value, ValueTag},
     DefId, EdgeId,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};

@@ -6,8 +6,11 @@ use anyhow::{anyhow, Context};
 use clap::{Parser, ValueEnum};
 use clap_stdin::FileOrStdin;
 use ontol_runtime::{
-    interface::serde::processor::ProcessorMode, ontology::Ontology, vm::VmState, MapDef,
-    MapDefFlags, MapFlags, MapKey, PackageId,
+    attr::{Attr, AttrRef},
+    interface::serde::processor::ProcessorMode,
+    ontology::Ontology,
+    vm::VmState,
+    MapDef, MapDefFlags, MapFlags, MapKey, PackageId,
 };
 use serde::de::DeserializeSeed;
 
@@ -60,7 +63,10 @@ fn main() -> anyhow::Result<()> {
 
     let args = Args::parse();
     let ontology = Arc::new(load_ontology(args.ontology)?);
-    let domain = ontology.find_domain(PackageId(1)).unwrap();
+    let Ok(pkg_id) = PackageId::from_u16(1) else {
+        return Err(anyhow!("invalid package"));
+    };
+    let domain = ontology.find_domain(pkg_id).unwrap();
     let from_name = ontology.find_text_constant(args.from.as_str()).unwrap();
     let to_name = ontology.find_text_constant(args.to.as_str()).unwrap();
     let input = MapDef {
@@ -102,7 +108,10 @@ fn main() -> anyhow::Result<()> {
             ))
             .expect("Deserialization failed"),
     };
-    let value = match ontology.new_vm(proc).run([attr.val])? {
+    let Attr::Unit(value) = attr else {
+        return Err(anyhow!("not a unit attribute"));
+    };
+    let value = match ontology.new_vm(proc).run([value])? {
         VmState::Complete(value) => value,
         VmState::Yield(_) => return Err(anyhow!("ONTOL-VM yielded!")),
     };
@@ -115,14 +124,20 @@ fn main() -> anyhow::Result<()> {
     match args.format {
         Format::Json => {
             to_processor
-                .serialize_value(&value, None, &mut serde_json::Serializer::new(&mut buf))
+                .serialize_attr(
+                    AttrRef::Unit(&value),
+                    &mut serde_json::Serializer::new(&mut buf),
+                )
                 .expect("Serialization failed");
             let output: serde_json::Value = serde_json::from_slice(&buf).unwrap();
             println!("{}", serde_json::to_string_pretty(&output).unwrap());
         }
         Format::Yaml => {
             to_processor
-                .serialize_value(&value, None, &mut serde_yaml::Serializer::new(&mut buf))
+                .serialize_attr(
+                    AttrRef::Unit(&value),
+                    &mut serde_yaml::Serializer::new(&mut buf),
+                )
                 .expect("Serialization failed");
             let output: serde_yaml::Value = serde_yaml::from_slice(&buf).unwrap();
             print!("{}", serde_yaml::to_string(&output).unwrap());

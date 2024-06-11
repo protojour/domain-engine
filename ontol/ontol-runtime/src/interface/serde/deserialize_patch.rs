@@ -3,8 +3,9 @@ use smallvec::smallvec;
 use thin_vec::{thin_vec, ThinVec};
 
 use crate::{
+    attr::Attr,
     tuple::EndoTuple,
-    value::{Attr, Value, ValueTag},
+    value::{Value, ValueTag},
     DefId,
 };
 

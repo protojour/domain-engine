@@ -5,10 +5,7 @@ use fnv::FnvHashMap;
 use ordered_float::NotNan;
 
 use crate::{
-    sequence::Sequence,
-    tuple::EndoTupleElements,
-    value::{Attr, Value},
-    RelationshipId,
+    attr::Attr, sequence::Sequence, tuple::EndoTupleElements, value::Value, RelationshipId,
 };
 
 /// Determine ONTOL equality.

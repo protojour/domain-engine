@@ -5,11 +5,12 @@ use serde::de::{DeserializeSeed, MapAccess, Visitor};
 use tracing::debug;
 
 use crate::{
+    attr::Attr,
     format_utils::{DoubleQuote, LogicOp, Missing},
     interface::serde::deserialize_raw::RawVisitor,
     ontology::{domain::TypeKind, ontol::ValueGenerator},
     phf::PhfIndexMap,
-    value::{Attr, Value, ValueTag},
+    value::{Value, ValueTag},
     vm::proc::{NParams, Procedure},
     DefId, RelationshipId,
 };

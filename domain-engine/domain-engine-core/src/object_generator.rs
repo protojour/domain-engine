@@ -1,11 +1,12 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    attr::Attr,
     interface::serde::{
         operator::{AppliedVariants, SerdeOperator, SerdeOperatorAddr, SerdeProperty},
         processor::{ProcessorLevel, ProcessorMode},
     },
     ontology::{domain::TypeInfo, ontol::ValueGenerator, Ontology},
-    value::{Attr, Value, ValueTag},
+    value::{Value, ValueTag},
     DefId, RelationshipId,
 };
 

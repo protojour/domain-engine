@@ -2,6 +2,7 @@ use fnv::FnvHashMap;
 use jsonschema::JSONSchema;
 use ontol_faker::new_constant_fake;
 use ontol_runtime::{
+    attr::Attr,
     interface::{
         json_schema::build_standalone_schema,
         serde::{
@@ -13,7 +14,7 @@ use ontol_runtime::{
     ontology::{domain::TypeInfo, Ontology},
     query::select::{Select, StructSelect},
     tuple::EndoTuple,
-    value::{Attr, Value},
+    value::Value,
     DefId, PackageId, RelationshipId,
 };
 use serde::de::DeserializeSeed;

@@ -1,9 +1,10 @@
 use ontol_runtime::{
+    attr::AttrRef,
     interface::serde::processor::ProcessorMode,
     ontology::map::Extern,
     property::ValueCardinality,
     query::filter::Filter,
-    value::{AttrRef, Value},
+    value::Value,
     vm::{
         proc::{Procedure, Yield},
         VmResult, VmState,

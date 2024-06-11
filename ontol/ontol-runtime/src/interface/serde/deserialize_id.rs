@@ -1,6 +1,6 @@
 use serde::de::Visitor;
 
-use crate::{interface::serde::processor::RecursionLimitError, ontology::Ontology, value::Attr};
+use crate::{attr::Attr, interface::serde::processor::RecursionLimitError, ontology::Ontology};
 
 use super::{operator::SerdeOperatorAddr, processor::SerdeProcessor};
 

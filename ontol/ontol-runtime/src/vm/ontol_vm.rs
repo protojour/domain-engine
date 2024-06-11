@@ -9,13 +9,14 @@ use thin_vec::ThinVec;
 use tracing::{error, trace, Level};
 
 use crate::{
+    attr::{Attr, AttrMatrix},
     cast::Cast,
     ontology::{ontol::TextConstant, Ontology},
     property::ValueCardinality,
     query::condition::{Clause, ClausePair, CondTerm},
     sequence::Sequence,
     tuple::{EndoTuple, EndoTupleElements},
-    value::{Attr, AttrMatrix, Value, ValueDebug, ValueTag},
+    value::{Value, ValueDebug, ValueTag},
     var::Var,
     vm::{
         abstract_vm::{AbstractVm, Processor, VmDebug},

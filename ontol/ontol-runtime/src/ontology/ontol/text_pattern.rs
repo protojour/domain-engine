@@ -6,9 +6,10 @@ use serde::de::{value::StrDeserializer, DeserializeSeed};
 use tracing::{debug, error};
 
 use crate::{
+    attr::Attr,
     interface::serde::processor::ProcessorMode,
     ontology::Ontology,
-    value::{Attr, FormatValueAsText, Value},
+    value::{FormatValueAsText, Value},
     DefId, RelationshipId,
 };
 
