@@ -7,16 +7,16 @@ use itertools::Itertools;
 use ontol_runtime::{
     ontology::domain::EntityOrder,
     query::filter::Filter,
-    value::{Attribute, Value},
+    value::{Attr, Value},
     DefId, RelationshipId,
 };
 
 use crate::core::{DbContext, DynamicKey};
 
-type Attrs = FnvHashMap<RelationshipId, Attribute>;
+type Attrs = FnvHashMap<RelationshipId, Attr>;
 
 pub(super) fn sort_props_vec(
-    raw_props_slice: &mut [(&DynamicKey, FnvHashMap<RelationshipId, Attribute>)],
+    raw_props_slice: &mut [(&DynamicKey, FnvHashMap<RelationshipId, Attr>)],
     def_id: DefId,
     filter: &Filter,
     ctx: &DbContext,
@@ -73,8 +73,8 @@ fn compare_order_tuple(
 /// Compare by one `order` relation (which can include a tuple of fields)
 fn compare_entity_order(a: &Attrs, b: &Attrs, order: &EntityOrder) -> DomainResult<Ordering> {
     for field_path in order.tuple.iter() {
-        let first = value_by_path(a, &field_path.0)?;
-        let second = value_by_path(b, &field_path.0)?;
+        let first = attr_by_path(a, &field_path.0)?;
+        let second = attr_by_path(b, &field_path.0)?;
 
         match first.partial_cmp(second) {
             None | Some(Ordering::Equal) => continue,
@@ -85,7 +85,7 @@ fn compare_entity_order(a: &Attrs, b: &Attrs, order: &EntityOrder) -> DomainResu
     Ok(Ordering::Equal)
 }
 
-fn value_by_path<'v>(attrs: &'v Attrs, path: &[RelationshipId]) -> DomainResult<&'v Value> {
+fn attr_by_path<'v>(attrs: &'v Attrs, path: &[RelationshipId]) -> DomainResult<&'v Attr> {
     let property_id = path.first().unwrap();
 
     let attr = attrs
@@ -93,11 +93,11 @@ fn value_by_path<'v>(attrs: &'v Attrs, path: &[RelationshipId]) -> DomainResult<
         .ok_or_else(|| DomainError::DataStore(anyhow!("property not found")))?;
 
     if path.len() > 1 {
-        match &attr.val {
-            Value::Struct(sub_attrs, _) => value_by_path(sub_attrs, &path[1..]),
+        match attr.as_unit() {
+            Some(Value::Struct(sub_attrs, _)) => attr_by_path(sub_attrs, &path[1..]),
             _ => Err(DomainError::DataStore(anyhow!("not a struct"))),
         }
     } else {
-        Ok(&attr.val)
+        Ok(attr)
     }
 }

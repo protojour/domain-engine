@@ -9,10 +9,11 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use ontol_runtime::{
     ontology::{
-        domain::{CardinalIdx, DataRelationshipInfo, TypeInfo},
+        domain::{DataRelationshipInfo, TypeInfo},
         Ontology,
     },
-    value::{Attribute, Serial, Value},
+    tuple::CardinalIdx,
+    value::{Attr, Serial, Value},
     DefId, EdgeId, RelationshipId,
 };
 use smallvec::SmallVec;
@@ -44,7 +45,7 @@ impl AsRef<DynamicKey> for DynamicKey {
     }
 }
 
-pub type VertexTable<K> = IndexMap<K, FnvHashMap<RelationshipId, Attribute>>;
+pub type VertexTable<K> = IndexMap<K, FnvHashMap<RelationshipId, Attr>>;
 
 #[derive(Debug)]
 pub(super) struct HyperEdgeTable {
@@ -135,8 +136,13 @@ impl InMemoryStore {
                     return Err(DomainError::InherentIdNotFound);
                 }
 
-                let attribute = struct_map.iter().next().unwrap();
-                Self::extract_dynamic_key(&attribute.1.val)
+                let value = struct_map
+                    .values()
+                    .next()
+                    .unwrap()
+                    .as_unit()
+                    .ok_or(DomainError::InherentIdNotFound)?;
+                Self::extract_dynamic_key(value)
             }
             Value::Text(string, _) => Ok(DynamicKey::Text(string.as_str().into())),
             Value::OctetSequence(octets, _) => {
@@ -154,7 +160,7 @@ impl InMemoryStore {
         &self,
         def_id: DefId,
         dynamic_key: &DynamicKey,
-    ) -> Option<&FnvHashMap<RelationshipId, Attribute>> {
+    ) -> Option<&FnvHashMap<RelationshipId, Attr>> {
         self.vertices.get(&def_id)?.get(dynamic_key)
     }
 }

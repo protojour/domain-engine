@@ -3,7 +3,7 @@ use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::domain::{DataRelationshipKind, EdgeCardinalProjection},
     query::condition::{Clause, CondTerm, Condition, SetOperator},
-    value::{Attribute, Value},
+    value::{Attr, AttrMatrix, Value},
     var::Var,
     DefId, RelationshipId,
 };
@@ -25,16 +25,27 @@ pub(super) enum FilterVal<'d> {
     Struct {
         type_def_id: DefId,
         dynamic_key: Option<&'d DynamicKey>,
-        prop_tree: &'d FnvHashMap<RelationshipId, Attribute>,
+        prop_tree: &'d FnvHashMap<RelationshipId, Attr>,
     },
-    Sequence(&'d [Attribute]),
+    Sequence(&'d [Value]),
     Scalar(&'d Value),
+}
+
+pub(super) enum FilterAttr<'d> {
+    Struct {
+        type_def_id: DefId,
+        dynamic_key: Option<&'d DynamicKey>,
+        prop_tree: &'d FnvHashMap<RelationshipId, Attr>,
+    },
+    Tuple(FilterVal<'d>, FilterVal<'d>),
+    Matrix(&'d AttrMatrix),
+    Scalar(FilterVal<'d>),
 }
 
 impl<'d> FilterVal<'d> {
     fn from_entity(
         entity_key: &'d VertexKey,
-        prop_tree: &'d FnvHashMap<RelationshipId, Attribute>,
+        prop_tree: &'d FnvHashMap<RelationshipId, Attr>,
     ) -> Self {
         Self::Struct {
             type_def_id: entity_key.type_def_id,
@@ -45,13 +56,36 @@ impl<'d> FilterVal<'d> {
 
     fn from_value(value: &'d Value) -> Self {
         match value {
-            Value::Struct(map, type_def_id) => Self::Struct {
-                type_def_id: *type_def_id,
+            Value::Struct(map, tag) => Self::Struct {
+                type_def_id: (*tag).into(),
                 dynamic_key: None,
                 prop_tree: map,
             },
             Value::Sequence(seq, _) => Self::Sequence(seq.elements()),
             _ => Self::Scalar(value),
+        }
+    }
+}
+
+impl<'d> FilterAttr<'d> {
+    fn from_attr(attr: &'d Attr) -> Self {
+        match attr {
+            Attr::Unit(u) => Self::Scalar(FilterVal::from_value(u)),
+            Attr::Tuple(tup) => {
+                if tup.elements.len() == 2 {
+                    Self::Tuple(
+                        FilterVal::from_value(&tup.elements[1]),
+                        FilterVal::from_value(&tup.elements[0]),
+                    )
+                } else {
+                    static UNIT: Value = Value::unit();
+                    Self::Tuple(
+                        FilterVal::from_value(&UNIT),
+                        FilterVal::from_value(&tup.elements[0]),
+                    )
+                }
+            }
+            Attr::Matrix(mat) => Self::Matrix(mat),
         }
     }
 }
@@ -141,11 +175,8 @@ impl InMemoryStore {
                     match &data_relationship.kind {
                         DataRelationshipKind::Id | DataRelationshipKind::Tree => {
                             let attr = prop_tree.get(prop_id).ok_or(ProofError::Disproven)?;
-                            proof.merge(self.eval_match_prop(
-                                (
-                                    FilterVal::from_value(&attr.rel),
-                                    FilterVal::from_value(&attr.val),
-                                ),
+                            proof.merge(self.eval_match_attr(
+                                FilterAttr::from_attr(attr),
                                 *set_op,
                                 *set_var,
                                 walker,
@@ -211,8 +242,8 @@ impl InMemoryStore {
                                 .map(|prop_tree| FilterVal::from_entity(target_key, prop_tree))
                                 .ok_or(ProofError::Disproven)?;
 
-                            proof.merge(self.eval_match_prop(
-                                (FilterVal::from_value(rel_params), entity),
+                            proof.merge(self.eval_match_attr(
+                                FilterAttr::Tuple(FilterVal::from_value(rel_params), entity),
                                 *set_op,
                                 *set_var,
                                 walker,
@@ -234,6 +265,176 @@ impl InMemoryStore {
         Ok(proof)
     }
 
+    fn eval_match_attr(
+        &self,
+        attr: FilterAttr,
+        set_op: SetOperator,
+        set_var: Var,
+        walker: ConditionWalker,
+        ctx: &DbContext,
+    ) -> Result<Proof, ProofError> {
+        let members = match walker.set_members(set_var) {
+            Members::Empty => {
+                return Err(ProofError::Disproven);
+            }
+            Members::Join(_) => {
+                warn!("Handle join");
+                return Err(ProofError::Disproven);
+            }
+            Members::Members(members) => members,
+        };
+
+        // The set operators:
+        // the left operand is (rel, val)
+        // the right operand is the members (rel_term, val_term)
+        match (attr, set_op) {
+            (FilterAttr::Scalar(val), SetOperator::ElementIn) => {
+                for (_rel_term, val_term) in members.iter() {
+                    // let r = prove(self.eval_filter_term(rel, rel_term, walker, ctx))?;
+                    let v = prove(self.eval_filter_term(val, val_term, walker, ctx))?;
+
+                    if v {
+                        return Ok(Proof::Proven);
+                    }
+                }
+
+                Err(ProofError::Disproven)
+            }
+            (FilterAttr::Tuple(rel, val), SetOperator::ElementIn) => {
+                for (rel_term, val_term) in members.iter() {
+                    let r = prove(self.eval_filter_term(rel, rel_term, walker, ctx))?;
+                    let v = prove(self.eval_filter_term(val, val_term, walker, ctx))?;
+
+                    if r && v {
+                        return Ok(Proof::Proven);
+                    }
+                }
+
+                Err(ProofError::Disproven)
+            }
+            (FilterAttr::Matrix(mat), SetOperator::SubsetOf) => {
+                for tup in mat.rows() {
+                    let mut found = false;
+
+                    for (rel_term, val_term) in members.iter() {
+                        let (r, v) = self.prove_tuple(
+                            tup.elements.as_slice(),
+                            rel_term,
+                            val_term,
+                            walker,
+                            ctx,
+                        )?;
+
+                        if r && v {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if !found {
+                        return Err(ProofError::Disproven);
+                    }
+                }
+
+                Ok(Proof::Proven)
+            }
+            (FilterAttr::Matrix(mat), SetOperator::SupersetOf) => {
+                for (rel_term, val_term) in members.iter() {
+                    let mut found = false;
+
+                    for tup in mat.rows() {
+                        let (r, v) = self.prove_tuple(
+                            tup.elements.as_slice(),
+                            rel_term,
+                            val_term,
+                            walker,
+                            ctx,
+                        )?;
+
+                        if r && v {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if !found {
+                        return Err(ProofError::Disproven);
+                    }
+                }
+
+                Ok(Proof::Proven)
+            }
+            (FilterAttr::Matrix(mat), SetOperator::SetIntersects) => {
+                for (rel_term, val_term) in members.iter() {
+                    for tup in mat.rows() {
+                        let (r, v) = self.prove_tuple(
+                            tup.elements.as_slice(),
+                            rel_term,
+                            val_term,
+                            walker,
+                            ctx,
+                        )?;
+
+                        if r && v {
+                            return Ok(Proof::Proven);
+                        }
+                    }
+                }
+
+                Err(ProofError::Disproven)
+            }
+            (FilterAttr::Matrix(mat), SetOperator::SetEquals) => {
+                if mat.row_count() != members.size() {
+                    return Err(ProofError::Disproven);
+                }
+
+                let mut matches: FnvHashMap<usize, usize> = Default::default();
+                for (index, (rel_term, val_term)) in members.iter().enumerate() {
+                    for tup in mat.rows() {
+                        let (r, v) = self.prove_tuple(
+                            tup.elements.as_slice(),
+                            rel_term,
+                            val_term,
+                            walker,
+                            ctx,
+                        )?;
+
+                        if r && v {
+                            *matches.entry(index).or_default() += 1;
+                        }
+                    }
+                }
+
+                if matches.values().all(|count| *count == 1) {
+                    Ok(Proof::Proven)
+                } else {
+                    Err(ProofError::Disproven)
+                }
+            }
+            _ => Err(ProofError::Disproven),
+        }
+    }
+
+    fn prove_tuple(
+        &self,
+        tup: &[&Value],
+        rel_term: &CondTerm,
+        val_term: &CondTerm,
+        walker: ConditionWalker,
+        ctx: &DbContext,
+    ) -> Result<(bool, bool), ProofError> {
+        if tup.len() == 1 {
+            let v = prove(self.eval_term(tup[0], val_term, walker, ctx))?;
+            Ok((true, v))
+        } else {
+            let r = prove(self.eval_term(tup[0], rel_term, walker, ctx))?;
+            let v = prove(self.eval_term(tup[1], val_term, walker, ctx))?;
+
+            Ok((r, v))
+        }
+    }
+
+    /*
     fn eval_match_prop(
         &self,
         (rel, val): (FilterVal, FilterVal),
@@ -358,6 +559,7 @@ impl InMemoryStore {
             }
         }
     }
+    */
 
     fn eval_term(
         &self,
@@ -416,12 +618,12 @@ impl InMemoryStore {
     }
 }
 
-fn get_seq(filter_val: FilterVal) -> Result<&[Attribute], ProofError> {
-    match filter_val {
-        FilterVal::Sequence(attributes) => Ok(attributes),
-        _ => Err(ProofError::Disproven),
-    }
-}
+// fn get_seq(filter_val: FilterVal) -> Result<&[Attr], ProofError> {
+//     match filter_val {
+//         FilterVal::Sequence(attributes) => Ok(attributes),
+//         _ => Err(ProofError::Disproven),
+//     }
+// }
 
 fn prove(result: Result<Proof, ProofError>) -> Result<bool, ProofError> {
     match result {

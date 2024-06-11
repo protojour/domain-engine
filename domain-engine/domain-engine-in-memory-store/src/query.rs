@@ -3,16 +3,14 @@ use std::collections::BTreeSet;
 use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    ontology::domain::{
-        DataRelationshipKind, DataRelationshipTarget, EdgeCardinalProjection, TypeInfo,
-    },
+    ontology::domain::{DataRelationshipKind, EdgeCardinalProjection, TypeInfo},
     property::ValueCardinality,
     query::{
         filter::Filter,
         select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     },
     sequence::{Sequence, SubSequence},
-    value::{Attribute, Value},
+    value::{Attr, AttrMatrix, Value},
     DefId, RelationshipId,
 };
 use tracing::{debug, error};
@@ -37,7 +35,11 @@ pub struct Limit(pub usize);
 pub struct IncludeTotalLen(pub bool);
 
 impl InMemoryStore {
-    pub fn query_entities(&self, select: &EntitySelect, ctx: &DbContext) -> DomainResult<Sequence> {
+    pub fn query_entities(
+        &self,
+        select: &EntitySelect,
+        ctx: &DbContext,
+    ) -> DomainResult<Sequence<Value>> {
         match &select.source {
             StructOrUnionSelect::Struct(struct_select) => self.query_single_vertex_collection(
                 struct_select,
@@ -66,7 +68,7 @@ impl InMemoryStore {
         after_cursor: Option<Cursor>,
         IncludeTotalLen(include_total_len): IncludeTotalLen,
         ctx: &DbContext,
-    ) -> DomainResult<Sequence> {
+    ) -> DomainResult<Sequence<Value>> {
         debug!("query single vertex collection: {struct_select:?}");
         let collection = self
             .vertices
@@ -161,7 +163,7 @@ impl InMemoryStore {
         &self,
         type_info: &TypeInfo,
         vertex_key: VertexKey<&DynamicKey>,
-        mut properties: FnvHashMap<RelationshipId, Attribute>,
+        mut properties: FnvHashMap<RelationshipId, Attr>,
         struct_def_id: DefId,
         select_properties: &FnvHashMap<RelationshipId, Select>,
         ctx: &DbContext,
@@ -177,43 +179,44 @@ impl InMemoryStore {
                 continue;
             };
 
-            let attrs = self.sub_query_attributes(projection, subselect, vertex_key, ctx)?;
+            let matrix = self.sub_query_edge(projection, subselect, vertex_key, ctx)?;
 
             match data_relationship.cardinality.1 {
                 ValueCardinality::Unit => {
-                    if let Some(attribute) = attrs.into_iter().next() {
-                        properties.insert(*rel_id, attribute);
+                    if let Some(row) = matrix.into_rows().next() {
+                        properties.insert(*rel_id, row.into());
                     }
                 }
                 ValueCardinality::IndexSet | ValueCardinality::List => {
                     properties.insert(
                         *rel_id,
-                        Value::Sequence(
-                            Sequence::from_iter(attrs),
-                            match data_relationship.target {
-                                DataRelationshipTarget::Unambiguous(def_id) => def_id,
-                                DataRelationshipTarget::Union(union_def_id) => union_def_id,
-                            },
-                        )
-                        .into(),
+                        Attr::Matrix(matrix),
+                        // Value::Sequence(
+                        //     Sequence::from_iter(attrs),
+                        //     match data_relationship.target {
+                        //         DataRelationshipTarget::Unambiguous(def_id) => def_id,
+                        //         DataRelationshipTarget::Union(union_def_id) => union_def_id,
+                        //     },
+                        // )
+                        // .into(),
                     );
                 }
             }
         }
 
-        Ok(Value::Struct(Box::new(properties), struct_def_id))
+        Ok(Value::Struct(Box::new(properties), struct_def_id.into()))
     }
 
-    fn sub_query_attributes(
+    fn sub_query_edge(
         &self,
         projection: EdgeCardinalProjection,
         select: &Select,
         parent_key: VertexKey<&DynamicKey>,
         ctx: &DbContext,
-    ) -> DomainResult<Vec<Attribute>> {
-        let edge_store = self.edges.get(&projection.id).expect("No edge collection");
+    ) -> DomainResult<AttrMatrix> {
+        let edge_store = self.edges.get(&projection.id).expect("No edge store");
 
-        let mut out = vec![];
+        let mut out = AttrMatrix::default();
 
         let mut edge_set = BTreeSet::default();
 
@@ -231,6 +234,12 @@ impl InMemoryStore {
                 _ => None,
             });
 
+        out.columns.push(Default::default());
+
+        if value_vector.is_some() {
+            out.columns.push(Default::default());
+        }
+
         if let EdgeVectorData::Keys(object_keys) =
             &edge_store.columns[projection.object.0 as usize].data
         {
@@ -246,12 +255,11 @@ impl InMemoryStore {
                     ctx,
                 )?;
 
-                out.push(Attribute {
-                    rel: value_vector
-                        .map(|vector| vector[edge_idx].clone())
-                        .unwrap_or(Value::unit()),
-                    val: entity,
-                });
+                out.columns[0].push(entity);
+
+                if let Some(value_vector) = value_vector {
+                    out.columns[1].push(value_vector[edge_idx].clone());
+                }
             }
         }
 
@@ -290,8 +298,8 @@ impl InMemoryStore {
         match select {
             Select::Leaf => {
                 // Entity leaf only includes the ID of that entity, not its other fields
-                let id_attribute = properties.get(&entity_info.id_relationship_id).unwrap();
-                Ok(id_attribute.val.clone())
+                let id_attr = properties.get(&entity_info.id_relationship_id).unwrap();
+                Ok(id_attr.as_unit().unwrap().clone())
             }
             Select::Struct(struct_select) => self.apply_struct_select(
                 type_info,
@@ -317,7 +325,7 @@ impl InMemoryStore {
 
                 Ok(Value::Struct(
                     Box::new(properties.clone()),
-                    type_info.def_id,
+                    type_info.def_id.into(),
                 ))
             }
             Select::EntityId => Err(DomainError::DataStore(anyhow!("entity id"))),

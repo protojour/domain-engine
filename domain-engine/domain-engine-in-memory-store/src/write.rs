@@ -13,9 +13,11 @@ use ontol_runtime::{
     },
     property::ValueCardinality,
     query::{filter::Filter, select::Select},
-    value::{Attribute, Serial, Value, ValueDebug},
+    tuple::EndoTuple,
+    value::{Attr, AttrRef, Serial, Value, ValueDebug},
     DefId, RelationshipId,
 };
+use smallvec::smallvec;
 use tracing::{debug, warn};
 
 use domain_engine_core::{
@@ -72,65 +74,109 @@ impl InMemoryStore {
             return Err(DomainError::EntityNotFound);
         }
 
-        let mut raw_props_update: BTreeMap<RelationshipId, Attribute> = Default::default();
+        let mut raw_props_update: BTreeMap<RelationshipId, Attr> = Default::default();
 
         let Value::StructUpdate(data_struct, _) = value else {
             return Err(DomainError::BadInput(anyhow!("Expected a struct update")));
         };
-        for (rel_id, attribute) in *data_struct {
+        for (rel_id, attr) in *data_struct {
             let data_relationship = find_data_relationship(type_info, &rel_id)?;
 
-            match data_relationship.kind {
-                DataRelationshipKind::Id => {
+            match (
+                data_relationship.kind,
+                attr,
+                data_relationship.cardinality.1,
+            ) {
+                (DataRelationshipKind::Id, ..) => {
                     warn!("ID should not be updated");
                 }
-                DataRelationshipKind::Tree => {
-                    raw_props_update.insert(rel_id, attribute);
+                (DataRelationshipKind::Tree, attr, _) => {
+                    raw_props_update.insert(rel_id, attr);
                 }
-                DataRelationshipKind::Edge(projection) => match data_relationship.cardinality.1 {
-                    ValueCardinality::Unit => {
-                        self.insert_entity_relationship(
-                            vertex_key.clone(),
-                            (projection, Some(EdgeWriteMode::Overwrite)),
-                            attribute,
-                            data_relationship,
-                            ctx,
-                        )?;
+                (
+                    DataRelationshipKind::Edge(projection),
+                    Attr::Unit(unit),
+                    ValueCardinality::Unit,
+                ) => {
+                    self.insert_entity_relationship(
+                        vertex_key.clone(),
+                        (projection, Some(EdgeWriteMode::Overwrite)),
+                        EndoTuple {
+                            elements: smallvec![unit],
+                        },
+                        data_relationship,
+                        ctx,
+                    )?;
+                }
+                (
+                    DataRelationshipKind::Edge(projection),
+                    Attr::Matrix(matrix),
+                    ValueCardinality::IndexSet | ValueCardinality::List,
+                ) => {
+                    for tuple in matrix.into_rows() {
+                        if tuple.elements.iter().any(|value| value.tag().is_delete()) {
+                            let mut iter = tuple.elements.into_iter();
+                            let foreign_key = if projection.object.0 == 0 {
+                                iter.next().unwrap()
+                            } else {
+                                iter.next().unwrap();
+                                iter.next().unwrap()
+                            };
+
+                            self.delete_entity_relationship(
+                                vertex_key.clone(),
+                                projection,
+                                foreign_key,
+                                data_relationship,
+                                ctx,
+                            )?;
+                        } else {
+                            self.insert_entity_relationship(
+                                vertex_key.clone(),
+                                (projection, Some(EdgeWriteMode::Insert)),
+                                tuple,
+                                data_relationship,
+                                ctx,
+                            )?;
+                        }
                     }
-                    ValueCardinality::IndexSet | ValueCardinality::List => match attribute.val {
-                        Value::Sequence(_sequence, _) => {
-                            return Err(DomainError::DataStore(anyhow!(
-                                "Multi-relation overwrite not yet implemented"
-                            )));
-                        }
-                        Value::Patch(patch_attributes, _) => {
-                            for attribute in patch_attributes {
-                                if matches!(attribute.rel, Value::DeleteRelationship(_)) {
-                                    self.delete_entity_relationship(
-                                        vertex_key.clone(),
-                                        projection,
-                                        attribute.val,
-                                        data_relationship,
-                                        ctx,
-                                    )?;
-                                } else {
-                                    self.insert_entity_relationship(
-                                        vertex_key.clone(),
-                                        (projection, None),
-                                        attribute,
-                                        data_relationship,
-                                        ctx,
-                                    )?;
-                                }
-                            }
-                        }
-                        _ => {
-                            return Err(DomainError::DataStoreBadRequest(anyhow!(
-                                "Invalid input for multi-relation write"
-                            )));
-                        }
-                    },
-                },
+                }
+                (
+                    DataRelationshipKind::Edge(_projection),
+                    Attr::Unit(_unit),
+                    ValueCardinality::IndexSet | ValueCardinality::List,
+                ) => {
+                    // if let Value::Patch(patch_attrs, _) = unit {
+                    //     for attr in patch_attrs {
+                    //         if matches!(attr.rel, Value::DeleteRelationship(_)) {
+                    //             self.delete_entity_relationship(
+                    //                 vertex_key.clone(),
+                    //                 projection,
+                    //                 attr.val,
+                    //                 data_relationship,
+                    //                 ctx,
+                    //             )?;
+                    //         } else {
+                    //             self.insert_entity_relationship(
+                    //                 vertex_key.clone(),
+                    //                 (projection, None),
+                    //                 attr,
+                    //                 data_relationship,
+                    //                 ctx,
+                    //             )?;
+                    //         }
+                    //     }
+                    // } else {
+                    return Err(DomainError::DataStoreBadRequest(anyhow!(
+                        "invalid input for multi-relation write"
+                    )));
+                    // }
+                }
+                _ => {
+                    return Err(DomainError::DataStoreBadRequest(anyhow!(
+                        "invalid combination for edge update"
+                    )));
+                }
             }
         }
 
@@ -163,13 +209,13 @@ impl InMemoryStore {
                     ctx,
                 )?;
 
-                for attr in entity_seq.into_elements() {
-                    let id = find_inherent_entity_id(&attr.val, &ctx.ontology)?;
+                for value in entity_seq.into_elements() {
+                    let id = find_inherent_entity_id(&value, &ctx.ontology)?;
                     if let Some(id) = id {
                         let dynamic_key = Self::extract_dynamic_key(&id)?;
 
                         if dynamic_key == target_dynamic_key {
-                            return Ok(attr.val);
+                            return Ok(value);
                         }
                     }
                 }
@@ -213,7 +259,7 @@ impl InMemoryStore {
 
         debug!("write vertex_id={}", ValueDebug(&id));
 
-        let Value::Struct(mut struct_map, type_def_id) = vertex else {
+        let Value::Struct(mut struct_map, struct_tag) = vertex else {
             return Err(DomainError::EntityMustBeStruct);
         };
 
@@ -221,53 +267,58 @@ impl InMemoryStore {
             struct_map.insert(entity_info.id_relationship_id, id.clone().into());
         }
 
-        let mut raw_props: FnvHashMap<RelationshipId, Attribute> = Default::default();
+        let mut raw_props: FnvHashMap<RelationshipId, Attr> = Default::default();
 
         let vertex_key = VertexKey {
             type_def_id: type_info.def_id,
             dynamic_key: Self::extract_dynamic_key(&id)?,
         };
 
-        for (rel_id, attribute) in *struct_map {
+        for (rel_id, attr) in *struct_map {
             let data_relationship = find_data_relationship(type_info, &rel_id)?;
 
-            match data_relationship.kind {
-                DataRelationshipKind::Id => {}
-                DataRelationshipKind::Tree => {
-                    raw_props.insert(rel_id, attribute);
+            match (
+                data_relationship.kind,
+                attr,
+                data_relationship.cardinality.1,
+            ) {
+                (DataRelationshipKind::Id, ..) => {}
+                (DataRelationshipKind::Tree, attr, _) => {
+                    raw_props.insert(rel_id, attr);
                 }
-                DataRelationshipKind::Edge(projection) => match data_relationship.cardinality.1 {
-                    ValueCardinality::Unit => {
+                (
+                    DataRelationshipKind::Edge(projection),
+                    Attr::Tuple(tuple),
+                    ValueCardinality::Unit,
+                ) => {
+                    self.insert_entity_relationship(
+                        vertex_key.clone(),
+                        (projection, Some(EdgeWriteMode::Insert)),
+                        *tuple,
+                        data_relationship,
+                        ctx,
+                    )?;
+                }
+                (
+                    DataRelationshipKind::Edge(projection),
+                    Attr::Matrix(matrix),
+                    ValueCardinality::IndexSet | ValueCardinality::List,
+                ) => {
+                    for tuple in matrix.into_rows() {
                         self.insert_entity_relationship(
                             vertex_key.clone(),
                             (projection, Some(EdgeWriteMode::Insert)),
-                            attribute,
+                            tuple,
                             data_relationship,
                             ctx,
                         )?;
                     }
-                    ValueCardinality::IndexSet | ValueCardinality::List => {
-                        let Value::Sequence(seq, _) = attribute.val else {
-                            return Err(DomainError::DataStoreBadRequest(anyhow!(
-                                "Expected sequence for ValueCardinality::Many"
-                            )));
-                        };
-
-                        for attribute in seq.into_elements() {
-                            self.insert_entity_relationship(
-                                vertex_key.clone(),
-                                (projection, Some(EdgeWriteMode::Insert)),
-                                attribute,
-                                data_relationship,
-                                ctx,
-                            )?;
-                        }
-                    }
-                },
+                }
+                _ => {}
             }
         }
 
-        let collection = self.vertices.get_mut(&type_def_id).unwrap();
+        let collection = self.vertices.get_mut(&struct_tag.def()).unwrap();
 
         if collection.contains_key(&vertex_key.dynamic_key) {
             return Err(DomainError::EntityAlreadyExists);
@@ -282,12 +333,12 @@ impl InMemoryStore {
         &mut self,
         subject_key: VertexKey,
         (projection, write_mode): (EdgeCardinalProjection, Option<EdgeWriteMode>),
-        Attribute { rel, val }: Attribute,
+        tuple: EndoTuple<Value>,
         data_relationship: &DataRelationshipInfo,
         ctx: &DbContext,
     ) -> DomainResult<()> {
         debug!(
-            "entity rel attribute: ({rel:?}, {val:?}). Data relationship: {data_relationship:?}",
+            "entity rel tuple: ({tuple:?}). Data relationship: {data_relationship:?}",
             data_relationship = ctx.ontology.debug(data_relationship)
         );
 
@@ -299,11 +350,17 @@ impl InMemoryStore {
             }
         }
 
+        let mut tuple_iter = tuple.elements.into_iter();
+        let value = tuple_iter
+            .next()
+            .ok_or_else(|| DomainError::BadInput(anyhow!("misconfigured tuple")))?;
+        let params = tuple_iter.next().unwrap_or_else(|| Value::unit());
+
         let (write_mode, foreign_key) = match &data_relationship.target {
             DataRelationshipTarget::Unambiguous(entity_def_id) => {
-                if &val.type_def_id() == entity_def_id {
-                    let write_mode = write_mode.unwrap_or(write_mode_from_value(&val));
-                    let foreign_id = self.write_new_vertex_inner(val, ctx)?;
+                if value.type_def_id() == *entity_def_id {
+                    let write_mode = write_mode.unwrap_or(write_mode_from_value(&value));
+                    let foreign_id = self.write_new_vertex_inner(value, ctx)?;
                     let foreign_key = VertexKey {
                         type_def_id: *entity_def_id,
                         dynamic_key: Self::extract_dynamic_key(&foreign_id)?,
@@ -312,14 +369,14 @@ impl InMemoryStore {
                     (write_mode, foreign_key)
                 } else {
                     (
-                        write_mode.unwrap_or(write_mode_from_value(&rel)),
+                        write_mode.unwrap_or(write_mode_from_value(&params)),
                         self.resolve_foreign_key_for_edge(
                             *entity_def_id,
                             ctx.ontology
                                 .get_type_info(*entity_def_id)
                                 .entity_info()
                                 .unwrap(),
-                            val,
+                            value,
                             ctx,
                         )?,
                     )
@@ -327,12 +384,12 @@ impl InMemoryStore {
             }
             DataRelationshipTarget::Union(union_def_id) => {
                 let variants = ctx.ontology.union_variants(*union_def_id);
-                if variants.contains(&val.type_def_id()) {
+                if variants.contains(&value.type_def_id()) {
                     // Explicit data struct of a given variant
 
-                    let write_mode = write_mode.unwrap_or(write_mode_from_value(&val));
-                    let entity_def_id = val.type_def_id();
-                    let foreign_id = self.write_new_vertex_inner(val, ctx)?;
+                    let write_mode = write_mode.unwrap_or(write_mode_from_value(&value));
+                    let entity_def_id = value.type_def_id();
+                    let foreign_id = self.write_new_vertex_inner(value, ctx)?;
                     let foreign_key = VertexKey {
                         type_def_id: entity_def_id,
                         dynamic_key: Self::extract_dynamic_key(&foreign_id)?,
@@ -349,7 +406,7 @@ impl InMemoryStore {
                                 .entity_info()
                                 .unwrap();
 
-                            if entity_info.id_value_def_id == val.type_def_id() {
+                            if entity_info.id_value_def_id == value.type_def_id() {
                                 Some((*variant_def_id, entity_info))
                             } else {
                                 None
@@ -358,8 +415,8 @@ impl InMemoryStore {
                         .expect("Corresponding entity def id not found for the given ID");
 
                     (
-                        write_mode.unwrap_or(write_mode_from_value(&rel)),
-                        self.resolve_foreign_key_for_edge(variant_def_id, entity_info, val, ctx)?,
+                        write_mode.unwrap_or(write_mode_from_value(&params)),
+                        self.resolve_foreign_key_for_edge(variant_def_id, entity_info, value, ctx)?,
                     )
                 }
             }
@@ -382,7 +439,7 @@ impl InMemoryStore {
                 } else {
                     panic!()
                 }),
-                EdgeVectorData::Values(_) => EdgeData::Value(rel.clone()),
+                EdgeVectorData::Values(_) => EdgeData::Value(params.clone()),
             })
             .collect();
 
@@ -534,12 +591,10 @@ impl InMemoryStore {
             // This type has UPSERT semantics.
             // Synthesize the entity, write it and move on..
 
-            let entity_data = FnvHashMap::from_iter([(
-                entity_info.id_relationship_id,
-                Attribute::from(id_value),
-            )]);
+            let entity_data =
+                FnvHashMap::from_iter([(entity_info.id_relationship_id, Attr::from(id_value))]);
             self.write_new_vertex_inner(
-                Value::Struct(Box::new(entity_data), foreign_entity_def_id),
+                Value::Struct(Box::new(entity_data), foreign_entity_def_id.into()),
                 ctx,
             )?;
         } else if entity_data.is_none() {
@@ -553,7 +608,10 @@ impl InMemoryStore {
 
                 let mut buf: Vec<u8> = vec![];
                 processor
-                    .serialize_value(&id_value, None, &mut serde_json::Serializer::new(&mut buf))
+                    .serialize_attr(
+                        AttrRef::Unit(&id_value),
+                        &mut serde_json::Serializer::new(&mut buf),
+                    )
                     .unwrap();
                 String::from(std::str::from_utf8(&buf).unwrap())
             } else {
@@ -587,7 +645,7 @@ impl InMemoryStore {
             GeneratedId::AutoIncrementSerial(def_id) => {
                 let serial_value = self.serial_counter;
                 self.serial_counter += 1;
-                Value::Serial(Serial(serial_value), def_id)
+                Value::Serial(Serial(serial_value), def_id.into())
             }
         }))
     }

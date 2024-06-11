@@ -5,6 +5,7 @@ use std::{
 };
 
 use ::serde::{Deserialize, Serialize};
+use bitflags::Flags;
 use fnv::FnvHashMap;
 use itertools::{Itertools, Position};
 use smallvec::{smallvec, SmallVec};
@@ -389,14 +390,32 @@ impl AttrMatrix {
         Some(AttrRef::Unit(value))
     }
 
-    pub fn into_rows(self) -> AttrMatrixRows {
+    pub fn row_count(&self) -> usize {
+        if self.columns.is_empty() {
+            0
+        } else {
+            self.columns[0].elements.len()
+        }
+    }
+
+    pub fn rows(&self) -> AttrMatrixRows {
+        let columns = self
+            .columns
+            .iter()
+            .map(|column| column.elements.iter())
+            .collect();
+
+        AttrMatrixRows { columns }
+    }
+
+    pub fn into_rows(self) -> AttrMatrixIntoRows {
         let columns = self
             .columns
             .into_iter()
             .map(|column| column.elements.into_iter())
             .collect();
 
-        AttrMatrixRows { columns }
+        AttrMatrixIntoRows { columns }
     }
 
     /// Get a full row as a tuple attribute
@@ -411,11 +430,33 @@ impl AttrMatrix {
     }
 }
 
-pub struct AttrMatrixRows {
+pub struct AttrMatrixRows<'a> {
+    columns: EndoTupleElements<core::slice::Iter<'a, Value>>,
+}
+
+impl<'a> Iterator for AttrMatrixRows<'a> {
+    type Item = EndoTuple<&'a Value>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut next_tuple = SmallVec::<&'a Value, 1>::with_capacity(self.columns.len());
+
+        for column in self.columns.iter_mut() {
+            let next = column.next()?;
+
+            next_tuple.push(next);
+        }
+
+        Some(EndoTuple {
+            elements: next_tuple,
+        })
+    }
+}
+
+pub struct AttrMatrixIntoRows {
     columns: EndoTupleElements<thin_vec::IntoIter<Value>>,
 }
 
-impl Iterator for AttrMatrixRows {
+impl Iterator for AttrMatrixIntoRows {
     type Item = EndoTuple<Value>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -522,6 +563,14 @@ impl ValueTag {
 
     pub fn set_is_update(&mut self) {
         self.first |= TagPkg::UPDATE.bits();
+    }
+
+    pub fn is_update(&self) -> bool {
+        self.first & TagPkg::UPDATE.bits() != 0
+    }
+
+    pub fn is_delete(&self) -> bool {
+        self.first & TagPkg::DELETE.bits() != 0
     }
 }
 
