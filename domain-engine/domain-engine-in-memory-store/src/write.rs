@@ -289,6 +289,21 @@ impl InMemoryStore {
                 }
                 (
                     DataRelationshipKind::Edge(projection),
+                    Attr::Unit(unit),
+                    ValueCardinality::Unit,
+                ) => {
+                    self.insert_entity_relationship(
+                        vertex_key.clone(),
+                        (projection, Some(EdgeWriteMode::Insert)),
+                        EndoTuple {
+                            elements: smallvec![unit],
+                        },
+                        data_relationship,
+                        ctx,
+                    )?;
+                }
+                (
+                    DataRelationshipKind::Edge(projection),
                     Attr::Tuple(tuple),
                     ValueCardinality::Unit,
                 ) => {
@@ -315,7 +330,9 @@ impl InMemoryStore {
                         )?;
                     }
                 }
-                _ => {}
+                (DataRelationshipKind::Edge(proj), a, c) => {
+                    todo!("{proj:?} {a:?} {c:?}")
+                }
             }
         }
 

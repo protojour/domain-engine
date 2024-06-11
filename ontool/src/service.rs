@@ -36,7 +36,7 @@ pub async fn domains_router(ontology: Arc<Ontology>, base_url: &str) -> axum::Ro
 
     for (package_id, domain) in ontology
         .domains()
-        .filter(|(package_id, _)| **package_id != PackageId(0))
+        .filter(|(package_id, _)| **package_id != PackageId::first())
     {
         let domain_path = format!(
             "/{unique_name}",

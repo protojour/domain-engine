@@ -7,14 +7,13 @@ use std::{fmt::Write, slice};
 use tracing::{trace, warn};
 
 use crate::{
-    attr::{Attr, AttrRef, AttrTupleRef},
+    attr::{Attr, AttrMatrixRef, AttrRef, AttrTupleRef},
     cast::Cast,
     interface::serde::{
         operator::AppliedVariants,
         processor::{RecursionLimitError, ScalarFormat},
     },
     ontology::ontol::text_pattern::{FormatPattern, TextPatternConstantPart},
-    sequence::Sequence,
     value::{FormatValueAsText, Value},
     DefId, RelationshipId,
 };
@@ -119,8 +118,8 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             (
                 SerdeOperator::RelationList(seq_op) | SerdeOperator::RelationIndexSet(seq_op),
                 _,
-                AttrRef::Matrix(tuple),
-            ) => self.serialize_matrix(tuple, slice::from_ref(&seq_op.range), serializer),
+                AttrRef::Matrix(matrix),
+            ) => self.serialize_matrix(matrix, slice::from_ref(&seq_op.range), serializer),
             (
                 SerdeOperator::ConstructorSequence(seq_op),
                 _,
@@ -328,42 +327,23 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
     fn serialize_matrix<'v, S: Serializer>(
         &self,
-        tuple: &[Sequence<Value>],
+        matrix: AttrMatrixRef,
         ranges: &[SequenceRange],
         serializer: S,
     ) -> Res<S> {
         let mut seq =
-            serializer.serialize_seq(tuple.iter().next().map(|seq| seq.elements.len()))?;
+            serializer.serialize_seq(matrix.columns.iter().next().map(|seq| seq.elements.len()))?;
 
-        let mut work_tuple: Vec<&Value> = Vec::with_capacity(tuple.len());
-        let mut index = 0;
-
-        #[inline]
-        fn next_item<'v>(
-            tuple: &'v [Sequence<Value>],
-            output: &mut Vec<&'v Value>,
-            index: &mut usize,
-        ) -> Option<()> {
-            output.clear();
-
-            for e in tuple {
-                if e.elements.len() <= *index {
-                    return None;
-                }
-
-                output.push(&e.elements[*index]);
-            }
-
-            *index += 1;
-
-            Some(())
-        }
+        let mut tup = Default::default();
+        let mut rows = matrix.rows();
 
         for range in ranges {
             if let Some(finite_repetition) = range.finite_repetition {
                 for _ in 0..finite_repetition {
-                    next_item(tuple, &mut work_tuple, &mut index).unwrap();
-                    let attr = AttrRef::Tuple(AttrTupleRef::Row(&work_tuple)).coerce_to_unit();
+                    let has_next = rows.iter_next(&mut tup);
+                    assert!(has_next);
+
+                    let attr = AttrRef::Tuple(AttrTupleRef::Row(&tup.elements)).coerce_to_unit();
 
                     seq.serialize_element(&Proxy {
                         attr,
@@ -371,8 +351,8 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     })?;
                 }
             } else {
-                while let Some(()) = next_item(tuple, &mut work_tuple, &mut index) {
-                    let attr = AttrRef::Tuple(AttrTupleRef::Row(&work_tuple)).coerce_to_unit();
+                while rows.iter_next(&mut tup) {
+                    let attr = AttrRef::Tuple(AttrTupleRef::Row(&tup.elements)).coerce_to_unit();
 
                     seq.serialize_element(&Proxy {
                         attr,

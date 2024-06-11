@@ -274,7 +274,7 @@ impl<'d, 'o> Display for FormatValueAsText<'d, 'o> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct ValueTag {
     first: u16,
     second: u16,
@@ -307,6 +307,13 @@ impl ValueTag {
 
     pub fn is_delete(&self) -> bool {
         self.first & TagPkg::DELETE.bits() != 0
+    }
+}
+
+impl Debug for ValueTag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let flags = TagPkg::from_bits(self.first & TagPkg::PKG_MASk.complement().bits());
+        write!(f, "tag({:?}, {:?})", self.def(), flags)
     }
 }
 

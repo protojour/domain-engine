@@ -27,4 +27,12 @@ pub struct EndoTuple<T> {
     pub elements: EndoTupleElements<T>,
 }
 
+impl<T> Default for EndoTuple<T> {
+    fn default() -> Self {
+        Self {
+            elements: Default::default(),
+        }
+    }
+}
+
 pub type EndoTupleElements<T> = SmallVec<T, 1>;

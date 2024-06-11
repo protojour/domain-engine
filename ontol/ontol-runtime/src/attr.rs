@@ -31,7 +31,7 @@ impl Attr {
         match self {
             Attr::Unit(v) => AttrRef::Unit(v),
             Attr::Tuple(t) => AttrRef::Tuple(AttrTupleRef::Tuple(&t.elements)),
-            Attr::Matrix(m) => AttrRef::Matrix(&m.columns),
+            Attr::Matrix(m) => AttrRef::Matrix(m.as_ref()),
         }
     }
 
@@ -113,6 +113,12 @@ pub struct AttrMatrix {
 }
 
 impl AttrMatrix {
+    pub fn as_ref(&self) -> AttrMatrixRef {
+        AttrMatrixRef {
+            columns: &self.columns,
+        }
+    }
+
     /// Get an AttrRef at specific coordinate in the matrix
     pub fn get_ref(&self, row_index: usize, column_index: usize) -> Option<AttrRef> {
         let column = self.columns.get(column_index)?;
@@ -162,25 +168,50 @@ impl AttrMatrix {
     }
 }
 
+impl FromIterator<Sequence<Value>> for AttrMatrix {
+    fn from_iter<T: IntoIterator<Item = Sequence<Value>>>(iter: T) -> Self {
+        AttrMatrix {
+            columns: iter.into_iter().collect(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct AttrMatrixRef<'v> {
+    pub columns: &'v [Sequence<Value>],
+}
+
+impl<'v> AttrMatrixRef<'v> {
+    pub fn rows(&self) -> AttrMatrixRows<'v> {
+        let columns = self
+            .columns
+            .iter()
+            .map(|column| column.elements.iter())
+            .collect();
+
+        AttrMatrixRows { columns }
+    }
+}
+
 pub struct AttrMatrixRows<'a> {
     columns: EndoTupleElements<core::slice::Iter<'a, Value>>,
 }
 
-impl<'a> Iterator for AttrMatrixRows<'a> {
-    type Item = EndoTuple<&'a Value>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut next_tuple = SmallVec::<&'a Value, 1>::with_capacity(self.columns.len());
+impl<'a> AttrMatrixRows<'a> {
+    /// iterate without allocating each iteration
+    pub fn iter_next(&mut self, output: &mut EndoTuple<&'a Value>) -> bool {
+        output.elements.clear();
 
         for column in self.columns.iter_mut() {
-            let next = column.next()?;
+            let Some(next) = column.next() else {
+                output.elements.clear();
+                return false;
+            };
 
-            next_tuple.push(next);
+            output.elements.push(next);
         }
 
-        Some(EndoTuple {
-            elements: next_tuple,
-        })
+        true
     }
 }
 
@@ -213,7 +244,7 @@ pub enum AttrRef<'v> {
     /// A tuple of values
     Tuple(AttrTupleRef<'v>),
     /// A whole matrix
-    Matrix(&'v [Sequence<Value>]),
+    Matrix(AttrMatrixRef<'v>),
 }
 
 impl<'v> AttrRef<'v> {
@@ -280,5 +311,11 @@ impl From<Value> for Attr {
 impl From<EndoTuple<Value>> for Attr {
     fn from(value: EndoTuple<Value>) -> Self {
         Self::Tuple(Box::new(value))
+    }
+}
+
+impl From<AttrMatrix> for Attr {
+    fn from(value: AttrMatrix) -> Self {
+        Attr::Matrix(value)
     }
 }

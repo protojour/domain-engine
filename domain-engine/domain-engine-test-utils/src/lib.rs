@@ -2,6 +2,7 @@
 
 use domain_engine_core::{DomainEngine, MaybeSelect, Session};
 use ontol_runtime::{
+    attr::AttrRef,
     interface::serde::processor::ProcessorMode,
     query::{
         condition::Condition,
@@ -58,7 +59,7 @@ impl DomainEngineTestExt for DomainEngine {
         };
 
         processor
-            .serialize_value(&value, None, &mut serializer)
+            .serialize_attr(AttrRef::Unit(&value), &mut serializer)
             .expect("Serialize output failed");
 
         serde_json::from_slice(&json_buf).unwrap()
@@ -78,13 +79,15 @@ async fn test_exec_named_map(
 
     let input_type_info = ontology.get_type_info(key.input.def_id);
 
-    let input = ontology
+    let input_value = ontology
         .new_serde_processor(input_type_info.operator_addr.unwrap(), ProcessorMode::Raw)
         .deserialize(input_json)
-        .expect("Deserialize input failed");
+        .expect("Deserialize input failed")
+        .into_unit()
+        .expect("input is not a unit attr");
 
     engine
-        .exec_map(key, input.val, &mut find_query, Session::default())
+        .exec_map(key, input_value, &mut find_query, Session::default())
         .await
         .expect("Exec map failed")
 }

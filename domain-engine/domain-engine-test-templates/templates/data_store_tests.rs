@@ -4,6 +4,7 @@ use domain_engine_test_utils::{
 };
 use ontol_macros::test;
 use ontol_runtime::{
+    attr::AttrRef,
     interface::serde::processor::{ProcessorProfile, ProcessorProfileFlags},
     ontology::Ontology,
     query::select::Select,
@@ -82,7 +83,7 @@ async fn test_conduit_db_id_generation() {
 
     expect_eq!(
         actual = format!("{:?}", explicit_user_id),
-        expected = "OctetSequence([103, 229, 80, 68, 16, 177, 66, 111, 146, 71, 187, 104, 14, 95, 224, 200], def@1:1)"
+        expected = "OctetSequence([103, 229, 80, 68, 16, 177, 66, 111, 146, 71, 187, 104, 14, 95, 224, 200], tag(def@1:1, Some(TagPkg(0x0))))"
     );
 
     let article_id: Uuid = engine
@@ -200,15 +201,15 @@ async fn test_conduit_db_store_entity_tree() {
         .unwrap();
 
     let new_user_id = users.elements()[1]
-        .val
         .get_attribute(user_type.find_property("user_id").unwrap())
         .unwrap()
-        .val
+        .as_unit()
+        .unwrap()
         .clone()
         .cast_into::<Uuid>();
 
     expect_eq!(
-        actual = serde_read(&user_type).as_json(
+        actual = serde_read(&user_type).as_json(AttrRef::Unit(
             &engine
                 .query_entities(
                     user_type
@@ -219,8 +220,7 @@ async fn test_conduit_db_store_entity_tree() {
                 .await
                 .unwrap()
                 .elements()[1]
-                .val
-        ),
+        )),
         expected = json!({
             "user_id": new_user_id.to_string(),
             "username": "new_user",
@@ -239,10 +239,10 @@ async fn test_conduit_db_store_entity_tree() {
         .unwrap();
 
     let comment_id = comments.elements()[0]
-        .val
         .get_attribute(comment_type.find_property("id").unwrap())
         .unwrap()
-        .val
+        .as_unit()
+        .unwrap()
         .clone()
         .cast_into::<Serial>();
     let comment_id = format!("{}", comment_id.0);
@@ -254,7 +254,7 @@ async fn test_conduit_db_store_entity_tree() {
                 flags: ProcessorProfileFlags::ALL_PROPS_OPTIONAL,
                 ..Default::default()
             })
-            .as_json(
+            .as_json(AttrRef::Unit(
                 &engine
                     .query_entities(
                         user_type
@@ -273,8 +273,7 @@ async fn test_conduit_db_store_entity_tree() {
                     .await
                     .unwrap()
                     .elements()[1]
-                    .val
-            ),
+            )),
         expected = json!({
             "user_id": new_user_id.to_string(),
             "username": "new_user",
@@ -353,7 +352,7 @@ async fn test_artist_and_instrument_fmt_id_generation() {
         .await
         .unwrap();
 
-    let generated_id_json = serde_read(&artist_id).as_json(&generated_id);
+    let generated_id_json = serde_read(&artist_id).as_json(AttrRef::Unit(&generated_id));
     assert!(generated_id_json.as_str().unwrap().starts_with("artist/"));
 
     let explicit_id = engine
@@ -371,7 +370,7 @@ async fn test_artist_and_instrument_fmt_id_generation() {
         .unwrap();
 
     expect_eq!(
-        actual = serde_read(&artist_id).as_json(&explicit_id),
+        actual = serde_read(&artist_id).as_json(AttrRef::Unit(&explicit_id)),
         expected = json!("artist/67e55044-10b1-426f-9247-bb680e5fe0c8")
     );
 }

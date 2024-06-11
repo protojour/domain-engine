@@ -314,7 +314,9 @@ impl InMemoryStore {
                 Err(ProofError::Disproven)
             }
             (FilterAttr::Matrix(mat), SetOperator::SubsetOf) => {
-                for tup in mat.rows() {
+                let mut tup = Default::default();
+                let mut rows = mat.rows();
+                while rows.iter_next(&mut tup) {
                     let mut found = false;
 
                     for (rel_term, val_term) in members.iter() {
@@ -340,10 +342,14 @@ impl InMemoryStore {
                 Ok(Proof::Proven)
             }
             (FilterAttr::Matrix(mat), SetOperator::SupersetOf) => {
+                let mut tup = Default::default();
+                let mut rows = mat.rows();
+
                 for (rel_term, val_term) in members.iter() {
                     let mut found = false;
 
-                    for tup in mat.rows() {
+                    let mut rows = mat.rows();
+                    while rows.iter_next(&mut tup) {
                         let (r, v) = self.prove_tuple(
                             tup.elements.as_slice(),
                             rel_term,
@@ -366,8 +372,11 @@ impl InMemoryStore {
                 Ok(Proof::Proven)
             }
             (FilterAttr::Matrix(mat), SetOperator::SetIntersects) => {
+                let mut tup = Default::default();
+
                 for (rel_term, val_term) in members.iter() {
-                    for tup in mat.rows() {
+                    let mut rows = mat.rows();
+                    while rows.iter_next(&mut tup) {
                         let (r, v) = self.prove_tuple(
                             tup.elements.as_slice(),
                             rel_term,
@@ -390,8 +399,11 @@ impl InMemoryStore {
                 }
 
                 let mut matches: FnvHashMap<usize, usize> = Default::default();
+                let mut tup = Default::default();
+
                 for (index, (rel_term, val_term)) in members.iter().enumerate() {
-                    for tup in mat.rows() {
+                    let mut rows = mat.rows();
+                    while rows.iter_next(&mut tup) {
                         let (r, v) = self.prove_tuple(
                             tup.elements.as_slice(),
                             rel_term,

@@ -14,6 +14,7 @@ use ontol_compiler::{
     SourceCodeRegistry, Sources,
 };
 use ontol_runtime::{
+    attr::AttrRef,
     interface::serde::operator::SerdeOperatorAddr,
     ontology::{
         config::{DataStoreConfig, PackageConfig},
@@ -129,14 +130,14 @@ pub fn compile_benchmark(c: &mut Criterion) {
         let ontol_value = processor
             .deserialize(&mut serde_json::Deserializer::from_str(json))
             .unwrap()
-            .val;
+            .into_unit()
+            .unwrap();
 
         b.iter(|| {
             let mut buf: Vec<u8> = vec![];
             processor
-                .serialize_value(
-                    black_box(&ontol_value),
-                    None,
+                .serialize_attr(
+                    black_box(AttrRef::Unit(&ontol_value)),
                     &mut serde_json::Serializer::new(&mut buf),
                 )
                 .unwrap();
