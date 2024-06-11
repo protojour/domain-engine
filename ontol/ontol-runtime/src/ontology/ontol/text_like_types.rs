@@ -3,7 +3,10 @@ use ontol_macros::RustDoc;
 use tracing::error;
 use uuid::Uuid;
 
-use crate::{value::Value, DefId};
+use crate::{
+    value::{Value, ValueTagError},
+    DefId,
+};
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize, RustDoc)]
 pub enum TextLikeType {
@@ -39,13 +42,13 @@ impl TextLikeType {
                     Uuid::parse_str(str).map_err(|error| ParseError(format!("{}", error)))?;
                 Ok(Value::OctetSequence(
                     uuid.as_bytes().iter().cloned().collect(),
-                    def_id,
+                    def_id.into(),
                 ))
             }
             Self::DateTime => {
                 let datetime = chrono::DateTime::parse_from_rfc3339(str)
                     .map_err(|error| ParseError(format!("{}", error)))?;
-                Ok(Value::ChronoDateTime(datetime.into(), def_id))
+                Ok(Value::ChronoDateTime(datetime.into(), def_id.into()))
             }
         }
     }
@@ -75,5 +78,11 @@ impl TextLikeType {
             }
             _ => Err(std::fmt::Error),
         }
+    }
+}
+
+impl From<ValueTagError> for ParseError {
+    fn from(_value: ValueTagError) -> Self {
+        ParseError("invalid package id".to_string())
     }
 }

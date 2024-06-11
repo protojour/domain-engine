@@ -23,6 +23,7 @@ use crate::{
     def::{DefKind, Defs},
     hir_unify::unify_to_function,
     map::UndirectedMapKey,
+    package::ONTOL_PKG,
     pattern::PatId,
     type_check::MapArmsKind,
     typed_hir::TypedRootNode,
@@ -298,7 +299,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
         for (key, task) in std::mem::take(&mut compiler.code_ctx.map_tasks) {
             match task {
                 MapCodegenTask::Auto(package_id) => {
-                    let _entered = debug_span!("auto_map", run, pkg = ?package_id.0).entered();
+                    let _entered = debug_span!("auto_map", run, pkg = ?package_id.id()).entered();
 
                     if let Some(task) = autogenerate_mapping(key, package_id, compiler) {
                         explicit_map_tasks.push((key, task));
@@ -317,7 +318,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
         for (key, task) in explicit_map_tasks {
             let _entered =
-                debug_span!("map", run, pkg = ?task.pkg_id().unwrap_or(PackageId(0)).0).entered();
+                debug_span!("map", run, pkg = ?task.pkg_id().unwrap_or(ONTOL_PKG).id()).entered();
 
             generate_explicit_map(key, task, &mut proc_table, compiler);
         }

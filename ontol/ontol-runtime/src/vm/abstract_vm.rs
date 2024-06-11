@@ -66,9 +66,9 @@ pub trait Processor {
     fn put_attr_tuple(&mut self, target: Local, arity: u8, key: RelationshipId) -> VmResult<()>;
     fn put_attr_matrix(&mut self, target: Local, arity: u8, key: RelationshipId) -> VmResult<()>;
     fn move_rest_attrs(&mut self, target: Local, source: Local) -> VmResult<()>;
-    fn push_i64(&mut self, k: i64, result_type: DefId);
-    fn push_f64(&mut self, k: f64, result_type: DefId);
-    fn push_string(&mut self, k: TextConstant, result_type: DefId);
+    fn push_i64(&mut self, k: i64, result_type: DefId) -> VmResult<()>;
+    fn push_f64(&mut self, k: f64, result_type: DefId) -> VmResult<()>;
+    fn push_string(&mut self, k: TextConstant, result_type: DefId) -> VmResult<()>;
     fn seq_append_n(&mut self, seq: Local, len: u8) -> VmResult<()>;
     fn append_string(&mut self, to: Local) -> VmResult<()>;
     fn cond_predicate(&mut self, predicate: &Predicate) -> VmResult<bool>;
@@ -218,15 +218,15 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                     self.program_counter += 1;
                 }
                 OpCode::I64(k, result_type) => {
-                    processor.push_i64(*k, *result_type);
+                    processor.push_i64(*k, *result_type)?;
                     self.program_counter += 1;
                 }
                 OpCode::F64(k, result_type) => {
-                    processor.push_f64(*k, *result_type);
+                    processor.push_f64(*k, *result_type)?;
                     self.program_counter += 1;
                 }
                 OpCode::String(constant, result_type) => {
-                    processor.push_string(*constant, *result_type);
+                    processor.push_string(*constant, *result_type)?;
                     self.program_counter += 1;
                 }
                 OpCode::Iter(seq, n, index, offset) => {

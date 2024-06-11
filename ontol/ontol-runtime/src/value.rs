@@ -18,36 +18,36 @@ use crate::{
     query::filter::Filter,
     sequence::Sequence,
     tuple::{EndoTuple, EndoTupleElements},
-    DefId, RelationshipId,
+    DefId, PackageId, RelationshipId,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Value {
     /// Unit value for DefIds that have only one possible value
-    Unit(DefId),
+    Unit(ValueTag),
     /// Void represents the absence of value - used in error detection and try mechanism
-    Void(DefId),
-    I64(i64, DefId),
-    F64(f64, DefId),
-    Serial(Serial, DefId),
-    Rational(Box<num::rational::BigRational>, DefId),
-    Text(String, DefId),
-    OctetSequence(ThinVec<u8>, DefId),
-    ChronoDateTime(chrono::DateTime<chrono::Utc>, DefId),
-    ChronoDate(chrono::NaiveDate, DefId),
-    ChronoTime(chrono::NaiveTime, DefId),
+    Void(ValueTag),
+    I64(i64, ValueTag),
+    F64(f64, ValueTag),
+    Serial(Serial, ValueTag),
+    Rational(Box<num::rational::BigRational>, ValueTag),
+    Text(String, ValueTag),
+    OctetSequence(ThinVec<u8>, ValueTag),
+    ChronoDateTime(chrono::DateTime<chrono::Utc>, ValueTag),
+    ChronoDate(chrono::NaiveDate, ValueTag),
+    ChronoTime(chrono::NaiveTime, ValueTag),
 
     /// A collection of attributes keyed by property.
-    Struct(Box<FnvHashMap<RelationshipId, Attr>>, DefId),
+    Struct(Box<FnvHashMap<RelationshipId, Attr>>, ValueTag),
 
     /// A collection of attributes keyed by property, but contains
     /// only partial information, and must contain the ID of the struct (entity) to update.
-    StructUpdate(Box<FnvHashMap<RelationshipId, Attr>>, DefId),
+    StructUpdate(Box<FnvHashMap<RelationshipId, Attr>>, ValueTag),
 
     /// A collection of arbitrary values keyed by strings.
-    Dict(Box<BTreeMap<String, Value>>, DefId),
+    Dict(Box<BTreeMap<String, Value>>, ValueTag),
 
-    /// A sequence of attributes.
+    /// A sequence of values.
     ///
     /// The difference between a Sequence and a Map is that
     /// sequences use numeric keys instead of RelationshipId.
@@ -56,7 +56,7 @@ pub enum Value {
     /// Other sequences will behave more like tuples.
     ///
     /// FIXME: Refactor this to be a pure Array of Values
-    Sequence(Sequence<Value>, DefId),
+    Sequence(Sequence<Value>, ValueTag),
 
     /// A patching of some graph property of entities.
     ///
@@ -65,20 +65,20 @@ pub enum Value {
     /// * `Attr::Tuple(Struct, rel_params)`: Write a new entity
     /// * `Attr::Tuple(StructUpdate, rel_params)`: Update the given entity with new rel_params
     /// * `Attr::Tuple(ID, Value::Delete)`: Delete the given ID
-    Patch(Vec<Attr>, DefId),
+    Patch(ThinVec<Attr>, ValueTag),
 
     /// Special rel_params used for edge deletion
-    DeleteRelationship(DefId),
+    DeleteRelationship(ValueTag),
 
-    Filter(Box<Filter>, DefId),
+    Filter(Box<Filter>, ValueTag),
 }
 
 impl Value {
     pub fn new_struct(
         props: impl IntoIterator<Item = (RelationshipId, Attr)>,
-        type_id: DefId,
+        tag: ValueTag,
     ) -> Self {
-        Self::Struct(Box::new(FnvHashMap::from_iter(props)), type_id)
+        Self::Struct(Box::new(FnvHashMap::from_iter(props)), tag)
     }
 
     pub fn sequence_of(values: impl IntoIterator<Item = Value>) -> Self {
@@ -86,59 +86,63 @@ impl Value {
         let type_def_id = sequence
             .elements()
             .first()
-            .map(|value| value.type_def_id())
-            .unwrap_or(DefId::unit());
+            .map(|value| value.tag())
+            .unwrap_or(ValueTag::unit());
         Self::Sequence(sequence, type_def_id)
     }
 
     #[inline]
     pub const fn unit() -> Self {
-        Self::Unit(DefId::unit())
+        Self::Unit(ValueTag::unit())
     }
 
-    pub fn type_def_id(&self) -> DefId {
+    pub const fn tag(&self) -> ValueTag {
         match self {
-            Value::Unit(def_id) => *def_id,
-            Value::Void(def_id) => *def_id,
-            Value::I64(_, def_id) => *def_id,
-            Value::F64(_, def_id) => *def_id,
-            Value::Serial(_, def_id) => *def_id,
-            Value::Rational(_, def_id) => *def_id,
-            Value::Text(_, def_id) => *def_id,
-            Value::OctetSequence(_, def_id) => *def_id,
-            Value::ChronoDateTime(_, def_id) => *def_id,
-            Value::ChronoDate(_, def_id) => *def_id,
-            Value::ChronoTime(_, def_id) => *def_id,
-            Value::Struct(_, def_id) => *def_id,
-            Value::Dict(_, def_id) => *def_id,
-            Value::Sequence(_, def_id) => *def_id,
-            Value::Patch(_, def_id) => *def_id,
-            Value::StructUpdate(_, def_id) => *def_id,
-            Value::DeleteRelationship(def_id) => *def_id,
-            Value::Filter(_, def_id) => *def_id,
+            Value::Unit(tag) => *tag,
+            Value::Void(tag) => *tag,
+            Value::I64(_, tag) => *tag,
+            Value::F64(_, tag) => *tag,
+            Value::Serial(_, tag) => *tag,
+            Value::Rational(_, tag) => *tag,
+            Value::Text(_, tag) => *tag,
+            Value::OctetSequence(_, tag) => *tag,
+            Value::ChronoDateTime(_, tag) => *tag,
+            Value::ChronoDate(_, tag) => *tag,
+            Value::ChronoTime(_, tag) => *tag,
+            Value::Struct(_, tag) => *tag,
+            Value::Dict(_, tag) => *tag,
+            Value::Sequence(_, tag) => *tag,
+            Value::Patch(_, tag) => *tag,
+            Value::StructUpdate(_, tag) => *tag,
+            Value::DeleteRelationship(tag) => *tag,
+            Value::Filter(_, tag) => *tag,
         }
     }
 
-    pub fn type_def_id_mut(&mut self) -> &mut DefId {
+    pub const fn type_def_id(&self) -> DefId {
+        self.tag().def()
+    }
+
+    pub fn tag_mut(&mut self) -> &mut ValueTag {
         match self {
-            Value::Unit(def_id) => def_id,
-            Value::Void(def_id) => def_id,
-            Value::I64(_, def_id) => def_id,
-            Value::F64(_, def_id) => def_id,
-            Value::Serial(_, def_id) => def_id,
-            Value::Rational(_, def_id) => def_id,
-            Value::Text(_, def_id) => def_id,
-            Value::OctetSequence(_, def_id) => def_id,
-            Value::ChronoDateTime(_, def_id) => def_id,
-            Value::ChronoDate(_, def_id) => def_id,
-            Value::ChronoTime(_, def_id) => def_id,
-            Value::Struct(_, def_id) => def_id,
-            Value::Dict(_, def_id) => def_id,
-            Value::Sequence(_, def_id) => def_id,
-            Value::Patch(_, def_id) => def_id,
-            Value::StructUpdate(_, def_id) => def_id,
-            Value::DeleteRelationship(def_id) => def_id,
-            Value::Filter(_, def_id) => def_id,
+            Value::Unit(tag) => tag,
+            Value::Void(tag) => tag,
+            Value::I64(_, tag) => tag,
+            Value::F64(_, tag) => tag,
+            Value::Serial(_, tag) => tag,
+            Value::Rational(_, tag) => tag,
+            Value::Text(_, tag) => tag,
+            Value::OctetSequence(_, tag) => tag,
+            Value::ChronoDateTime(_, tag) => tag,
+            Value::ChronoDate(_, tag) => tag,
+            Value::ChronoTime(_, tag) => tag,
+            Value::Struct(_, tag) => tag,
+            Value::Dict(_, tag) => tag,
+            Value::Sequence(_, tag) => tag,
+            Value::Patch(_, tag) => tag,
+            Value::StructUpdate(_, tag) => tag,
+            Value::DeleteRelationship(tag) => tag,
+            Value::Filter(_, tag) => tag,
         }
     }
 
@@ -150,7 +154,7 @@ impl Value {
     }
 
     pub fn is_unit(&self) -> bool {
-        self.type_def_id() == DefId::unit()
+        DefId::from(self.tag()) == DefId::unit()
     }
 
     pub fn filter_non_unit(&self) -> Option<&Self> {
@@ -250,13 +254,13 @@ impl<'d, 'o> Display for FormatValueAsText<'d, 'o> {
                     // Chrono 0.5 hopefully fixes this
                     write!(f, "{}", datetime.to_rfc3339())
                 }
-                Value::Struct(props, type_def_id) => {
+                Value::Struct(props, tag) => {
                     // concatenate every prop (not sure this is a good idea, since the order is not defined)
                     for attr in props.values() {
                         if let Attr::Unit(value) = attr {
                             FormatValueAsText {
                                 value,
-                                type_def_id: *type_def_id,
+                                type_def_id: (*tag).into(),
                                 ontology: self.ontology,
                             }
                             .fmt(f)?;
@@ -276,7 +280,7 @@ impl<'d, 'o> Display for FormatValueAsText<'d, 'o> {
 /// Attributes are part of other values. Attributes can be single or multi-valued.
 ///
 /// The variants of this enum describe how attributes may be quantified.
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, PartialEq, PartialOrd, Serialize, Deserialize, Debug)]
 pub enum Attr {
     /// The attribute has one value
     Unit(Value),
@@ -370,7 +374,7 @@ impl Attr {
 }
 
 /// A column-first matrix of attributes.
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Default, PartialEq, PartialOrd, Serialize, Deserialize, Debug)]
 pub struct AttrMatrix {
     pub columns: EndoTupleElements<Sequence<Value>>,
 }
@@ -385,6 +389,16 @@ impl AttrMatrix {
         Some(AttrRef::Unit(value))
     }
 
+    pub fn into_rows(self) -> AttrMatrixRows {
+        let columns = self
+            .columns
+            .into_iter()
+            .map(|column| column.elements.into_iter())
+            .collect();
+
+        AttrMatrixRows { columns }
+    }
+
     /// Get a full row as a tuple attribute
     pub fn get_row_cloned(&self, row_index: usize) -> Option<Attr> {
         let mut elements: SmallVec<Value, 1> = smallvec![];
@@ -394,6 +408,28 @@ impl AttrMatrix {
         }
 
         Some(Attr::Tuple(Box::new(EndoTuple { elements })))
+    }
+}
+
+pub struct AttrMatrixRows {
+    columns: EndoTupleElements<thin_vec::IntoIter<Value>>,
+}
+
+impl Iterator for AttrMatrixRows {
+    type Item = EndoTuple<Value>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut next_tuple = SmallVec::<Value, 1>::with_capacity(self.columns.len());
+
+        for column in self.columns.iter_mut() {
+            let next = column.next()?;
+
+            next_tuple.push(next);
+        }
+
+        Some(EndoTuple {
+            elements: next_tuple,
+        })
     }
 }
 
@@ -458,6 +494,60 @@ impl From<Value> for Attr {
 impl From<EndoTuple<Value>> for Attr {
     fn from(value: EndoTuple<Value>) -> Self {
         Self::Tuple(Box::new(value))
+    }
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct ValueTag {
+    first: u16,
+    second: u16,
+}
+
+impl ValueTag {
+    pub const fn unit() -> Self {
+        Self {
+            first: 0,
+            second: 0,
+        }
+    }
+
+    pub const fn def(&self) -> DefId {
+        DefId(PackageId(self.first & TagPkg::PKG_MASk.bits()), self.second)
+    }
+
+    pub fn set_def(&mut self, def_id: DefId) {
+        self.first = def_id.package_id().0 | (self.first & TagPkg::PKG_MASk.complement().bits());
+        self.second = def_id.1;
+    }
+
+    pub fn set_is_update(&mut self) {
+        self.first |= TagPkg::UPDATE.bits();
+    }
+}
+
+impl From<ValueTag> for DefId {
+    fn from(value: ValueTag) -> Self {
+        value.def()
+    }
+}
+
+impl From<DefId> for ValueTag {
+    fn from(value: DefId) -> Self {
+        Self {
+            first: value.package_id().0,
+            second: value.1,
+        }
+    }
+}
+
+pub struct ValueTagError;
+
+bitflags::bitflags! {
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
+    pub(crate) struct TagPkg: u16 {
+        const PKG_MASk = 0b0011111111111111;
+        const DELETE   = 0b1000000000000000;
+        const UPDATE   = 0b0100000000000000;
     }
 }
 

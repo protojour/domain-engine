@@ -11,9 +11,9 @@ use ontol_runtime::{
     },
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolvePath, ResolverGraph},
     sequence::Sequence,
-    value::Value,
+    value::{AttrRef, Value, ValueTag},
     vm::{ontol_vm::OntolVm, proc::Yield, VmState},
-    DefId, MapKey, PackageId,
+    MapKey, PackageId,
 };
 use serde::de::DeserializeSeed;
 use tracing::{debug, error, trace};
@@ -83,7 +83,7 @@ impl DomainEngine {
         &self,
         mut select: EntitySelect,
         session: Session,
-    ) -> DomainResult<Sequence> {
+    ) -> DomainResult<Sequence<Value>> {
         let data_store = self.get_data_store()?;
         let ontology = self.ontology();
 
@@ -117,11 +117,11 @@ impl DomainEngine {
                 .get_mapper_proc(&map_key)
                 .expect("No mapping procedure for query output");
 
-            for attr in edge_seq.elements_mut().iter_mut() {
+            for value in edge_seq.elements_mut().iter_mut() {
                 let mut vm = ontology.new_vm(procedure);
 
-                attr.val = self
-                    .run_vm_to_completion(&mut vm, attr.val.take(), &mut None, session.clone())
+                *value = self
+                    .run_vm_to_completion(&mut vm, value.take(), &mut None, session.clone())
                     .await?;
             }
         }
@@ -377,7 +377,7 @@ impl DomainEngine {
                             match value_cardinality {
                                 ValueCardinality::Unit => Ok(Value::unit()),
                                 ValueCardinality::IndexSet | ValueCardinality::List => {
-                                    Ok(Value::Sequence(Sequence::default(), def_id))
+                                    Ok(Value::Sequence(Sequence::default(), def_id.into()))
                                 }
                             }
                         }
@@ -410,9 +410,8 @@ impl DomainEngine {
                         let mut input_json: Vec<u8> = vec![];
                         self.ontology
                             .new_serde_processor(input_operator_addr, ProcessorMode::Read)
-                            .serialize_value(
-                                &input,
-                                None,
+                            .serialize_attr(
+                                AttrRef::Unit(&input),
                                 &mut serde_json::Serializer::new(&mut input_json),
                             )
                             .map_err(|_| DomainError::SerializationFailed)?;
@@ -433,7 +432,9 @@ impl DomainEngine {
                                 DomainError::DeserializationFailed
                             })?;
 
-                        Ok(output_attr.val)
+                        Ok(output_attr
+                            .into_unit()
+                            .expect("multi-valued ONTOL attribute"))
                     }
                 }
             }
@@ -520,12 +521,13 @@ impl DomainEngine {
         };
 
         match value_cardinality {
-            ValueCardinality::Unit => match edge_seq.into_elements().into_iter().next() {
-                Some(attribute) => Ok(attribute.val),
-                None => Ok(Value::unit()),
-            },
+            ValueCardinality::Unit => Ok(edge_seq
+                .into_elements()
+                .into_iter()
+                .next()
+                .unwrap_or(Value::unit())),
             ValueCardinality::IndexSet | ValueCardinality::List => {
-                Ok(Value::Sequence(edge_seq, DefId::unit()))
+                Ok(Value::Sequence(edge_seq, ValueTag::unit()))
             }
         }
     }

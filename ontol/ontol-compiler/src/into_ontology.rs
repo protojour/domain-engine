@@ -310,10 +310,10 @@ impl<'m> Compiler<'m> {
         builder
             .text_constants(strings.into_arcstr_vec())
             .ontol_domain_meta(OntolDomainMeta {
-                bool: self.primitives.bool,
-                i64: self.primitives.i64,
-                f64: self.primitives.f64,
-                text: self.primitives.text,
+                bool: self.primitives.bool.into(),
+                i64: self.primitives.i64.into(),
+                f64: self.primitives.f64.into(),
+                text: self.primitives.text.into(),
                 ascending: self.primitives.symbols.ascending,
                 descending: self.primitives.symbols.descending,
                 open_data_relationship: self.primitives.open_data_relationship,

@@ -54,7 +54,7 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
 
     fn match_unit(&self) -> Result<Value, ()> {
         let def_id = self.match_leaf_discriminant(LeafDiscriminant::IsUnit)?;
-        Ok(Value::Unit(def_id))
+        Ok(Value::Unit(def_id.try_into().map_err(|_| ())?))
     }
 
     fn match_u64(&self, value: u64) -> Result<Value, ()> {
@@ -72,7 +72,10 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
                 LeafDiscriminant::IsInt => {}
                 _ => continue,
             }
-            return Ok(Value::I64(value, variant.serde_def.def_id));
+            return Ok(Value::I64(
+                value,
+                variant.serde_def.def_id.try_into().map_err(|_| ())?,
+            ));
         }
         Err(())
     }

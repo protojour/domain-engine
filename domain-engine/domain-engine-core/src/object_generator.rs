@@ -5,7 +5,7 @@ use ontol_runtime::{
         processor::{ProcessorLevel, ProcessorMode},
     },
     ontology::{domain::TypeInfo, ontol::ValueGenerator, Ontology},
-    value::{Attribute, Value},
+    value::{Attr, Value, ValueTag},
     DefId, RelationshipId,
 };
 
@@ -35,30 +35,46 @@ impl<'e> ObjectGenerator<'e> {
         match value {
             Value::Struct(struct_map, type_def_id)
             | Value::StructUpdate(struct_map, type_def_id) => {
-                let type_info = self.ontology.get_type_info(*type_def_id);
+                let type_info = self.ontology.get_type_info(type_def_id.def());
                 if let Some(addr) = type_info.operator_addr {
                     self.generate_struct_relationships(struct_map, type_info, addr);
                 }
 
                 // recurse into sub-properties
-                for attribute in struct_map.values_mut() {
-                    self.generate_objects(&mut attribute.rel);
-                    self.generate_objects(&mut attribute.val);
+                for attr in struct_map.values_mut() {
+                    self.generate_attr(attr);
                 }
             }
             Value::Sequence(seq, _) => {
-                for attribute in seq.elements_mut() {
-                    self.generate_objects(&mut attribute.rel);
-                    self.generate_objects(&mut attribute.val);
+                for value in seq.elements_mut() {
+                    self.generate_objects(value);
                 }
             }
             _ => {}
         }
     }
 
+    fn generate_attr(&self, attr: &mut Attr) {
+        match attr {
+            Attr::Unit(unit) => self.generate_objects(unit),
+            Attr::Tuple(tuple) => {
+                for value in tuple.elements.iter_mut() {
+                    self.generate_objects(value);
+                }
+            }
+            Attr::Matrix(matrix) => {
+                for column in matrix.columns.iter_mut() {
+                    for value in column.elements_mut() {
+                        self.generate_objects(value);
+                    }
+                }
+            }
+        }
+    }
+
     fn generate_struct_relationships(
         &self,
-        struct_map: &mut FnvHashMap<RelationshipId, Attribute>,
+        struct_map: &mut FnvHashMap<RelationshipId, Attr>,
         type_info: &TypeInfo,
         addr: SerdeOperatorAddr,
     ) {
@@ -91,7 +107,7 @@ impl<'e> ObjectGenerator<'e> {
                                         .iter()
                                         .cloned()
                                         .collect(),
-                                    self.property_def_id(property),
+                                    self.property_tag(property),
                                 )
                                 .into(),
                             );
@@ -105,7 +121,7 @@ impl<'e> ObjectGenerator<'e> {
                                     property.rel_id,
                                     Value::ChronoDateTime(
                                         self.current_time,
-                                        self.property_def_id(property),
+                                        self.property_tag(property),
                                     )
                                     .into(),
                                 );
@@ -116,7 +132,7 @@ impl<'e> ObjectGenerator<'e> {
                                 property.rel_id,
                                 Value::ChronoDateTime(
                                     self.current_time,
-                                    self.property_def_id(property),
+                                    self.property_tag(property),
                                 )
                                 .into(),
                             );
@@ -139,9 +155,9 @@ impl<'e> ObjectGenerator<'e> {
         }
     }
 
-    fn property_def_id(&self, property: &SerdeProperty) -> DefId {
+    fn property_tag(&self, property: &SerdeProperty) -> ValueTag {
         let operator = &self.ontology[property.value_addr];
-        self.operator_def_id(operator)
+        self.operator_def_id(operator).into()
     }
 
     fn operator_def_id(&self, operator: &SerdeOperator) -> DefId {

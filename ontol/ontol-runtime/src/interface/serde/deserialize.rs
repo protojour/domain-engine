@@ -14,8 +14,7 @@ use crate::{
         matcher::map_matchers::MapMatchMode,
     },
     sequence::{IndexSetBuilder, ListBuilder, SequenceBuilder, WithCapacity},
-    value::{Attr, AttrMatrix, Serial, Value},
-    DefId,
+    value::{Attr, AttrMatrix, Serial, Value, ValueTag},
 };
 
 use super::{
@@ -241,7 +240,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
 
                 match &mut typed_attribute {
                     Attr::Unit(value) => {
-                        *value.type_def_id_mut() = value_op.def.def_id;
+                        value.tag_mut().set_def(value_op.def.def_id);
                     }
                     _ => panic!("can't change type"),
                 }
@@ -375,7 +374,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                     &mut sequence_matcher,
                     MakeValueList {
                         builder: ListBuilder::with_capacity(cap),
-                        def_id: type_def_id,
+                        tag: type_def_id.into(),
                     },
                 )?
             }
@@ -564,7 +563,7 @@ where
 
 struct MakeValueList<B> {
     builder: B,
-    def_id: DefId,
+    tag: ValueTag,
 }
 
 impl<B> MakeVectorAttr for MakeValueList<B>
@@ -586,6 +585,6 @@ where
     }
 
     fn into_attr(self) -> Attr {
-        Attr::Unit(Value::Sequence(self.builder.build(), self.def_id))
+        Attr::Unit(Value::Sequence(self.builder.build(), self.tag))
     }
 }

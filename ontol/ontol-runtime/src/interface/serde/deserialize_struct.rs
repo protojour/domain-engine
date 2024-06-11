@@ -9,7 +9,7 @@ use crate::{
     interface::serde::deserialize_raw::RawVisitor,
     ontology::{domain::TypeKind, ontol::ValueGenerator},
     phf::PhfIndexMap,
-    value::{Attr, Value},
+    value::{Attr, Value, ValueTag},
     vm::proc::{NParams, Procedure},
     DefId, RelationshipId,
 };
@@ -136,13 +136,18 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
             struct_deserializer.deserialize_struct(self.buffered_attrs, map)?
         };
 
+        let mut tag = ValueTag::from(type_def_id);
+        if self.ctx.is_update {
+            tag.set_is_update();
+        }
+
         let boxed_attrs = Box::new(output.attributes);
 
         Ok(Attr::unit_or_tuple(
             if self.ctx.is_update {
-                Value::StructUpdate(boxed_attrs, type_def_id)
+                Value::StructUpdate(boxed_attrs, tag)
             } else {
-                Value::Struct(boxed_attrs, type_def_id)
+                Value::Struct(boxed_attrs, tag)
             },
             output.rel_params,
         ))
@@ -283,11 +288,16 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         self.report_missing_attributes(&output)
             .map_err(serde::de::Error::custom)?;
 
+        let mut tag = ValueTag::from(self.type_def_id);
+        if self.processor.ctx.is_update {
+            tag.set_is_update();
+        }
+
         let boxed_attrs = Box::new(output.attributes);
         Ok(if self.processor.ctx.is_update {
-            Value::StructUpdate(boxed_attrs, self.type_def_id)
+            Value::StructUpdate(boxed_attrs, tag)
         } else {
-            Value::Struct(boxed_attrs, self.type_def_id)
+            Value::Struct(boxed_attrs, tag)
         })
     }
 
@@ -642,7 +652,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                     .ontology
                     .ontol_domain_meta()
                     .open_data_rel_id(),
-                Value::Dict(Box::new(open_dict), DefId::unit()).into(),
+                Value::Dict(Box::new(open_dict), ValueTag::unit()).into(),
             );
         }
     }

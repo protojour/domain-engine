@@ -526,7 +526,7 @@ fn store_key_in_type_info() {
     "
     .compile_then(|test| {
         let ontology = test.ontology();
-        let domain = ontology.find_domain(PackageId(1)).unwrap();
+        let domain = ontology.find_domain(PackageId::second()).unwrap();
 
         for type_info in domain.type_infos() {
             if let Some(text_constant) = type_info.name() {

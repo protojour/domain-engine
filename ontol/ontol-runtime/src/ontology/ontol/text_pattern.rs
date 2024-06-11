@@ -51,7 +51,10 @@ impl TextPattern {
     ) -> Result<Value, ParseError> {
         if self.constant_parts.is_empty() {
             if let Some(match_) = self.regex.find(haystack) {
-                Ok(Value::Text(haystack[match_.range()].into(), type_def_id))
+                Ok(Value::Text(
+                    haystack[match_.range()].into(),
+                    type_def_id.into(),
+                ))
             } else {
                 Err(ParseError("regular expression did not match".to_string()))
             }
@@ -77,7 +80,7 @@ impl TextPattern {
 
                         attrs.insert(
                             RelationshipId(text_def_id),
-                            Attr::Unit(Value::Text(text.into(), text_def_id)),
+                            Attr::Unit(Value::Text(text.into(), text_def_id.into())),
                         );
                     }
                     TextPatternConstantPart::Literal(_) => {}
@@ -111,7 +114,7 @@ impl TextPattern {
                 }
             }
 
-            Ok(Value::Struct(Box::new(attrs), type_def_id))
+            Ok(Value::Struct(Box::new(attrs), type_def_id.into()))
         }
     }
 }

@@ -59,7 +59,7 @@ pub enum BatchWriteRequest {
 /// Must match the corresponding Request.
 #[derive(Serialize, Deserialize)]
 pub enum Response {
-    Query(Sequence),
+    Query(Sequence<Value>),
     BatchWrite(Vec<BatchWriteResponse>),
 }
 

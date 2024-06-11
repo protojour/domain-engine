@@ -30,7 +30,7 @@ pub fn find_inherent_entity_id(
     };
 
     match struct_map.get(&entity_info.id_relationship_id) {
-        Some(attribute) => Ok(Some(attribute.val.clone())),
+        Some(attr) => Ok(attr.as_unit().cloned()),
         None => Ok(None),
     }
 }
@@ -51,7 +51,7 @@ impl GeneratedIdContainer {
             Self::Raw => id,
             Self::SingletonStruct(def_id, rel_id) => Value::Struct(
                 Box::new(FnvHashMap::from_iter([(rel_id, id.into())])),
-                def_id,
+                def_id.into(),
             ),
         }
     }
@@ -67,7 +67,7 @@ pub fn try_generate_entity_id(
         (SerdeOperator::String(def_id), ValueGenerator::Uuid) => Ok((
             GeneratedId::Generated(Value::Text(
                 format!("{}", system.generate_uuid()).into(),
-                *def_id,
+                (*def_id).into(),
             )),
             GeneratedIdContainer::Raw,
         )),
@@ -76,7 +76,7 @@ pub fn try_generate_entity_id(
                 (Some(TextLikeType::Uuid), ValueGenerator::Uuid) => Ok((
                     GeneratedId::Generated(Value::OctetSequence(
                         system.generate_uuid().as_bytes().iter().cloned().collect(),
-                        *def_id,
+                        (*def_id).into(),
                     )),
                     GeneratedIdContainer::Raw,
                 )),
@@ -114,7 +114,7 @@ pub fn try_generate_entity_id(
             _,
         ) => match try_generate_entity_id(*inner_addr, value_generator, ontology, system)? {
             (GeneratedId::Generated(mut value), container) => {
-                *value.type_def_id_mut() = def.def_id;
+                value.tag_mut().set_def(def.def_id);
                 Ok((GeneratedId::Generated(value), container))
             }
             auto => Ok(auto),

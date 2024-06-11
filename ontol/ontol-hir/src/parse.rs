@@ -531,7 +531,11 @@ fn parse_def_id(next: &str) -> ParseResult<DefId> {
     let (_, next) = parse_expect(next, Token::Colon, Class::Colon)?;
     let (idx, _) = parse_i64(next)?;
 
-    Ok((DefId(PackageId(pkg as u16), idx as u16), next_outer))
+    let Ok(pkg_id) = PackageId::from_u16(pkg.try_into().unwrap()) else {
+        panic!("invalid package id");
+    };
+
+    Ok((DefId(pkg_id, idx as u16), next_outer))
 }
 
 fn parse_i64(next: &str) -> ParseResult<i64> {

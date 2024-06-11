@@ -1,9 +1,10 @@
 use serde::de::Visitor;
 use smallvec::smallvec;
+use thin_vec::{thin_vec, ThinVec};
 
 use crate::{
     tuple::EndoTuple,
-    value::{Attr, Value},
+    value::{Attr, Value, ValueTag},
     DefId,
 };
 
@@ -38,7 +39,7 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
     where
         A: serde::de::MapAccess<'de>,
     {
-        let mut patches: Vec<Attr> = vec![];
+        let mut patches: ThinVec<Attr> = thin_vec![];
 
         while let Some(operation) = map.next_key::<Operation>()? {
             match operation {
@@ -82,13 +83,13 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
 
                     patches.extend(seq.elements.into_iter().map(|value| {
                         Attr::Tuple(Box::new(EndoTuple {
-                            elements: smallvec![value, Value::DeleteRelationship(DefId::unit())],
+                            elements: smallvec![value, Value::DeleteRelationship(ValueTag::unit())],
                         }))
                     }));
                 }
             }
         }
 
-        Ok(Attr::Unit(Value::Patch(patches, self.type_def_id)))
+        Ok(Attr::Unit(Value::Patch(patches, self.type_def_id.into())))
     }
 }

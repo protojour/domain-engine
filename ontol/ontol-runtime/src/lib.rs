@@ -4,6 +4,7 @@ use std::{fmt::Debug, str::FromStr};
 
 use ::serde::{Deserialize, Serialize};
 use ontol_macros::OntolDebug;
+use value::{TagPkg, ValueTagError};
 
 pub mod cast;
 pub mod debug;
@@ -30,7 +31,46 @@ extern crate self as ontol_runtime;
 /// but one package can consist of internal subdomains (probably).
 /// So this is called package id (for now) until we have fleshed out a full architecture..
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub struct PackageId(pub u16);
+pub struct PackageId(u16);
+
+impl PackageId {
+    pub const fn first() -> Self {
+        Self(0)
+    }
+
+    pub const fn second() -> Self {
+        Self(1)
+    }
+
+    pub const fn from_u16(value: u16) -> Result<Self, ValueTagError> {
+        if value <= TagPkg::PKG_MASk.bits() {
+            Ok(Self(value))
+        } else {
+            Err(ValueTagError)
+        }
+    }
+
+    pub fn increase(&mut self) -> Result<(), ValueTagError> {
+        if self.0 < TagPkg::PKG_MASk.bits() {
+            self.0 += 1;
+            Ok(())
+        } else {
+            Err(ValueTagError)
+        }
+    }
+
+    pub const fn id(self) -> u16 {
+        self.0
+    }
+}
+
+impl TryFrom<u16> for PackageId {
+    type Error = ValueTagError;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        Self::from_u16(value)
+    }
+}
 
 /// This forces single-line output even when pretty-printed
 impl ::std::fmt::Debug for PackageId {

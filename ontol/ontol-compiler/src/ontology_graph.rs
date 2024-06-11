@@ -62,7 +62,7 @@ impl<'m> State<'m> {
                 node_meta_table.insert(
                     *type_def_id,
                     NodeMeta {
-                        node_id: format!("{}_{type_name}", package_id.0),
+                        node_id: format!("{}_{type_name}", package_id.id()),
                         ident: Some(type_name),
                         ref_count: 0,
                     },
@@ -73,7 +73,7 @@ impl<'m> State<'m> {
                 node_meta_table.insert(
                     *type_def_id,
                     NodeMeta {
-                        node_id: format!("{}___anon{}", package_id.0, type_def_id.1),
+                        node_id: format!("{}___anon{}", package_id.id(), type_def_id.1),
                         ident: None,
                         ref_count: 0,
                     },
@@ -181,7 +181,7 @@ impl<'graph, 'm> serde::Serialize for Node<'graph, 'm> {
     {
         let mut map = serializer.serialize_map(None)?;
         map.serialize_entry("id", &self.node_meta.node_id)?;
-        map.serialize_entry("package_id", &self.def_id.0 .0)?;
+        map.serialize_entry("package_id", &self.def_id.0.id())?;
         map.serialize_entry("ident", &self.node_meta.ident)?;
 
         map.end()

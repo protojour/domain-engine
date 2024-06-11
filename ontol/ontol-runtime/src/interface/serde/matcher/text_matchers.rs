@@ -11,7 +11,7 @@ use crate::{
         },
         Ontology,
     },
-    value::{Attr, Value},
+    value::{Attr, Value, ValueTag},
     DefId, RelationshipId,
 };
 
@@ -30,7 +30,10 @@ impl<'on> ValueMatcher for StringMatcher<'on> {
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
-        Ok(Value::Text(str.into(), self.def_id))
+        Ok(Value::Text(
+            str.into(),
+            self.def_id.try_into().map_err(|_| ())?,
+        ))
     }
 }
 
@@ -47,7 +50,10 @@ impl<'on> ValueMatcher for ConstantStringMatcher<'on> {
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
         if str == self.constant {
-            Ok(Value::Text(str.into(), self.def_id))
+            Ok(Value::Text(
+                str.into(),
+                self.def_id.try_into().map_err(|_| ())?,
+            ))
         } else {
             Err(())
         }
@@ -123,16 +129,19 @@ impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
                             attrs.insert(property.rel_id, attribute);
                         }
                         TextPatternConstantPart::AnyString { .. } => {
-                            let text_def_id = self.ontology.ontol_domain_meta().text;
-                            let rel_id = RelationshipId(text_def_id);
+                            let text_tag: ValueTag = self.ontology.ontol_domain_meta().text.into();
+                            let rel_id = RelationshipId(text_tag.def());
 
-                            attrs.insert(rel_id, Attr::Unit(Value::Text(str.into(), text_def_id)));
+                            attrs.insert(rel_id, Attr::Unit(Value::Text(str.into(), text_tag)));
                         }
                         TextPatternConstantPart::Literal(_) => {}
                     }
                 }
 
-                Ok(Value::Struct(Box::new(attrs), self.def_id))
+                Ok(Value::Struct(
+                    Box::new(attrs),
+                    self.def_id.try_into().map_err(|_| ())?,
+                ))
             }
         }
     }
@@ -145,7 +154,7 @@ pub fn try_deserialize_custom_string(
 ) -> Result<Value, ParseError> {
     match ontology.data.text_like_types.get(&def_id) {
         Some(custom_string_deserializer) => custom_string_deserializer.try_deserialize(def_id, str),
-        None => Ok(Value::Text(str.into(), def_id)),
+        None => Ok(Value::Text(str.into(), def_id.into())),
     }
 }
 

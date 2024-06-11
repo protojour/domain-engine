@@ -158,7 +158,7 @@ impl<'o> GraphqlNamespace<'o> {
                             adapt_graphql_identifier(&strings[domain.unique_name()]).into_adapted();
                         output.push_str(&domain_name);
                     } else {
-                        output.push_str(&format!("domain{}", package_id.0));
+                        output.push_str(&format!("domain{}", package_id.id()));
                     }
                     output.push('_');
                 }
@@ -212,7 +212,8 @@ impl<'a, 'm> ProcessName for Typename<'a, 'm> {
             }
             None => namespace.rewrite(&format!(
                 "_anon{}_{}",
-                type_info.def_id.0 .0, type_info.def_id.1
+                type_info.def_id.0.id(),
+                type_info.def_id.1
             )),
         }
     }

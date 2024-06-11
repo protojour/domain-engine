@@ -130,6 +130,7 @@ impl<'on, 'p> TestMapper<'on, 'p> {
         self.assert_map_eq_inner((from, to), input, expected, IsVariant(true))
     }
 
+    #[track_caller]
     fn assert_map_eq_inner(
         &self,
         (from, to): (impl AsKey, impl AsKey),

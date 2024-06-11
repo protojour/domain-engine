@@ -15,7 +15,7 @@ use crate::equality::{OntolEquals, OntolHash};
 /// This type represents all ONTOL sequences.
 ///
 /// Both insertion-ordered sets and lists are sequences.
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, PartialEq, PartialOrd, Serialize, Deserialize, Debug)]
 pub struct Sequence<T> {
     /// The attributes of this sequence
     pub(crate) elements: ThinVec<T>,
@@ -96,7 +96,7 @@ impl<T> From<ThinVec<T>> for Sequence<T> {
     }
 }
 
-#[derive(Clone, Serialize, PartialEq, Eq, Hash, Deserialize, Debug)]
+#[derive(Clone, Serialize, PartialEq, Eq, PartialOrd, Hash, Deserialize, Debug)]
 pub struct SubSequence {
     /// The cursor of the _last element_ in the sub sequence
     pub end_cursor: Option<Box<[u8]>>,
@@ -320,7 +320,7 @@ mod tests {
     use tracing::debug;
 
     use crate::{
-        value::{Attr, Value},
+        value::{Attr, Value, ValueTag},
         DefId, PackageId, RelationshipId,
     };
 
@@ -405,8 +405,11 @@ mod tests {
         assert!(builder.try_push(struct1.into()).is_err());
     }
 
-    fn def(id: u16) -> DefId {
-        DefId(crate::PackageId(1337), id)
+    fn def(id: u16) -> ValueTag {
+        let Ok(tag) = DefId(crate::PackageId(1337), id).try_into() else {
+            panic!()
+        };
+        tag
     }
 
     fn text(t: &str) -> Value {

@@ -227,7 +227,7 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
             .unwrap()
             .into_unit()
             .unwrap();
-        *self.value.type_def_id_mut() = value.type_def_id();
+        self.value.tag_mut().set_def(value.type_def_id());
         match (&mut self.value, value) {
             (Value::Unit(_), value) => {
                 self.value = value;

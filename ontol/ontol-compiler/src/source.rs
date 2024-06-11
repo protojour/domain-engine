@@ -4,6 +4,8 @@ use fnv::FnvHashMap;
 use ontol_parser::U32Span;
 use ontol_runtime::PackageId;
 
+use crate::package::ONTOL_PKG;
+
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 pub struct SourceId(pub u32);
 
@@ -112,7 +114,7 @@ impl Default for Sources {
     fn default() -> Self {
         Self {
             next_source_id: SourceId(1),
-            package: PackageId(0),
+            package: ONTOL_PKG,
             sources: Default::default(),
         }
     }

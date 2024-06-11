@@ -19,8 +19,8 @@ use crate::Sources;
 use crate::Src;
 use crate::NO_SPAN;
 
-pub const ONTOL_PKG: PackageId = PackageId(0);
-const ROOT_PKG: PackageId = PackageId(1);
+pub const ONTOL_PKG: PackageId = PackageId::first();
+const ROOT_PKG: PackageId = PackageId::second();
 
 /// The compiler's loaded packages
 #[derive(Default)]
@@ -155,7 +155,9 @@ impl PackageGraphBuilder {
             .into_iter()
             .map(|package_name| {
                 let package_id = next_package_id;
-                next_package_id.0 += 1;
+                if next_package_id.increase().is_err() {
+                    panic!("package numbers exceeded");
+                }
 
                 (
                     PackageReference::Named(package_name),
@@ -293,7 +295,9 @@ impl PackageGraphBuilder {
             Entry::Occupied(occupied) => occupied.get().package_id,
             Entry::Vacant(vacant) => {
                 let package_id = self.next_package_id;
-                self.next_package_id.0 += 1;
+                if self.next_package_id.increase().is_err() {
+                    panic!("package numbers exceeded");
+                }
 
                 vacant.insert(PackageNode {
                     package_id,

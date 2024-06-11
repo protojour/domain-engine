@@ -105,29 +105,37 @@ impl<T: OntolHash> OntolHash for Sequence<T> {
 impl OntolEquals for Value {
     fn ontol_equals(&self, other: &Self) -> bool {
         match (self, other) {
-            (Value::Unit(def_a), Value::Unit(def_b)) => def_a == def_b,
+            (Value::Unit(tag_a), Value::Unit(tag_b)) => tag_a.def() == tag_b.def(),
             (Value::Void(_), Value::Void(_)) => true,
-            (Value::I64(a, def_a), Value::I64(b, def_b)) => def_a == def_b && a == b,
-            (Value::F64(a, def_a), Value::F64(b, def_b)) => def_a == def_b && a == b,
-            (Value::Serial(a, def_a), Value::Serial(b, def_b)) => def_a == def_b && a == b,
-            (Value::Rational(a, def_a), Value::Rational(b, def_b)) => def_a == def_b && a == b,
-            (Value::Text(a, def_a), Value::Text(b, def_b)) => def_a == def_b && a == b,
-            (Value::OctetSequence(a, def_a), Value::OctetSequence(b, def_b)) => {
-                def_a == def_b && a == b
+            (Value::I64(a, tag_a), Value::I64(b, tag_b)) => tag_a.def() == tag_b.def() && a == b,
+            (Value::F64(a, tag_a), Value::F64(b, tag_b)) => tag_a.def() == tag_b.def() && a == b,
+            (Value::Serial(a, tag_a), Value::Serial(b, tag_b)) => {
+                tag_a.def() == tag_b.def() && a == b
             }
-            (Value::ChronoDateTime(a, def_a), Value::ChronoDateTime(b, def_b)) => {
-                def_a == def_b && a == b
+            (Value::Rational(a, tag_a), Value::Rational(b, tag_b)) => {
+                tag_a.def() == tag_b.def() && a == b
             }
-            (Value::ChronoDate(a, def_a), Value::ChronoDate(b, def_b)) => def_a == def_b && a == b,
-            (Value::ChronoTime(a, def_a), Value::ChronoTime(b, def_b)) => def_a == def_b && a == b,
-            (Value::Struct(a, def_a), Value::Struct(b, def_b)) => {
-                def_a == def_b && property_map_equals(a, b)
+            (Value::Text(a, tag_a), Value::Text(b, tag_b)) => tag_a.def() == tag_b.def() && a == b,
+            (Value::OctetSequence(a, tag_a), Value::OctetSequence(b, tag_b)) => {
+                tag_a.def() == tag_b.def() && a == b
             }
-            (Value::StructUpdate(a, def_a), Value::StructUpdate(b, def_b)) => {
-                def_a == def_b && property_map_equals(a, b)
+            (Value::ChronoDateTime(a, tag_a), Value::ChronoDateTime(b, tag_b)) => {
+                tag_a.def() == tag_b.def() && a == b
             }
-            (Value::Dict(a, def_a), Value::Dict(b, def_b)) => {
-                def_a == def_b
+            (Value::ChronoDate(a, tag_a), Value::ChronoDate(b, tag_b)) => {
+                tag_a.def() == tag_b.def() && a == b
+            }
+            (Value::ChronoTime(a, tag_a), Value::ChronoTime(b, tag_b)) => {
+                tag_a.def() == tag_b.def() && a == b
+            }
+            (Value::Struct(a, tag_a), Value::Struct(b, tag_b)) => {
+                tag_a.def() == tag_b.def() && property_map_equals(a, b)
+            }
+            (Value::StructUpdate(a, tag_a), Value::StructUpdate(b, tag_b)) => {
+                tag_a.def() == tag_b.def() && property_map_equals(a, b)
+            }
+            (Value::Dict(a, tag_a), Value::Dict(b, tag_b)) => {
+                tag_a.def() == tag_b.def()
                     && a.len() == b.len()
                     && a.iter()
                         .zip(b.iter())
@@ -135,8 +143,8 @@ impl OntolEquals for Value {
                             key_a == key_b && val_a.ontol_equals(val_b)
                         })
             }
-            (Value::Sequence(a, def_a), Value::Sequence(b, def_b)) => {
-                def_a == def_b
+            (Value::Sequence(a, tag_a), Value::Sequence(b, tag_b)) => {
+                tag_a.def() == tag_b.def()
                     && a.elements().len() == b.elements().len()
                     && a.sub() == b.sub()
                     && a.elements()
@@ -144,12 +152,14 @@ impl OntolEquals for Value {
                         .zip(b.elements().iter())
                         .all(|(a, b)| a.ontol_equals(b))
             }
-            (Value::Patch(a, def_a), Value::Patch(b, def_b)) => {
-                def_a == def_b
+            (Value::Patch(a, tag_a), Value::Patch(b, tag_b)) => {
+                tag_a.def() == tag_b.def()
                     && a.len() == b.len()
                     && a.iter().zip(b.iter()).all(|(a, b)| a.ontol_equals(b))
             }
-            (Value::DeleteRelationship(def_a), Value::DeleteRelationship(def_b)) => def_a == def_b,
+            (Value::DeleteRelationship(tag_a), Value::DeleteRelationship(tag_b)) => {
+                tag_a.def() == tag_b.def()
+            }
             (Value::Filter(_, _), Value::Filter(_, _)) => {
                 // Does not make sense to compare, all filters are "equal"
                 true
@@ -164,49 +174,49 @@ impl OntolHash for Value {
         std::mem::discriminant(self).hash(h);
 
         match self {
-            Value::Unit(def) => def.hash(h),
+            Value::Unit(tag) => tag.def().hash(h),
             Value::Void(_) => {}
-            Value::I64(v, def) => (v, def).hash(h),
-            Value::F64(v, def) => match NotNan::new(*v) {
-                Ok(f) => (f, def).hash(h),
-                Err(_) => (-1, def).hash(h),
+            Value::I64(v, tag) => (v, tag.def()).hash(h),
+            Value::F64(v, tag) => match NotNan::new(*v) {
+                Ok(f) => (f, tag.def()).hash(h),
+                Err(_) => (-1, tag.def()).hash(h),
             },
-            Value::Serial(v, def) => (v, def).hash(h),
-            Value::Rational(v, def) => (v, def).hash(h),
-            Value::Text(v, def) => (v, def).hash(h),
-            Value::OctetSequence(v, def) => (v, def).hash(h),
-            Value::ChronoDateTime(v, def) => (v, def).hash(h),
-            Value::ChronoDate(v, def) => (v, def).hash(h),
-            Value::ChronoTime(v, def) => (v, def).hash(h),
-            Value::Struct(v, def) => {
-                def.hash(h);
+            Value::Serial(v, tag) => (v, tag.def()).hash(h),
+            Value::Rational(v, tag) => (v, tag.def()).hash(h),
+            Value::Text(v, tag) => (v, tag.def()).hash(h),
+            Value::OctetSequence(v, tag) => (v, tag.def()).hash(h),
+            Value::ChronoDateTime(v, tag) => (v, tag.def()).hash(h),
+            Value::ChronoDate(v, tag) => (v, tag.def()).hash(h),
+            Value::ChronoTime(v, tag) => (v, tag.def()).hash(h),
+            Value::Struct(v, tag) => {
+                tag.def().hash(h);
                 property_map_ontol_hash(v, h, builder);
             }
-            Value::StructUpdate(v, def) => {
-                def.hash(h);
+            Value::StructUpdate(v, tag) => {
+                tag.def().hash(h);
                 property_map_ontol_hash(v, h, builder);
             }
-            Value::Dict(v, def) => {
-                def.hash(h);
+            Value::Dict(v, tag) => {
+                tag.def().hash(h);
                 v.len().hash(h);
                 for (key, val) in v.iter() {
                     key.hash(h);
                     val.ontol_hash(h, builder);
                 }
             }
-            Value::Sequence(v, def) => {
-                def.hash(h);
+            Value::Sequence(v, tag) => {
+                tag.def().hash(h);
                 v.ontol_hash(h, builder);
             }
-            Value::Patch(v, def) => {
-                def.hash(h);
+            Value::Patch(v, tag) => {
+                tag.def().hash(h);
                 v.len().hash(h);
                 for attr in v.iter() {
                     attr.ontol_hash(h, builder);
                 }
             }
-            Value::DeleteRelationship(def) => {
-                def.hash(h);
+            Value::DeleteRelationship(tag) => {
+                tag.def().hash(h);
             }
             Value::Filter(_, _) => {}
         }

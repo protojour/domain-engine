@@ -5,7 +5,11 @@ use serde::{
     Deserializer,
 };
 
-use crate::{ontology::Ontology, sequence::Sequence, value::Value, DefId};
+use crate::{
+    ontology::Ontology,
+    sequence::Sequence,
+    value::{Value, ValueTag},
+};
 
 use super::processor::{ProcessorLevel, RecursionLimitError};
 
@@ -58,33 +62,36 @@ impl<'o, 'de> Visitor<'de> for RawVisitor<'o> {
     fn visit_bool<E: Error>(self, v: bool) -> Result<Self::Value, E> {
         Ok(Value::I64(
             if v { 1 } else { 0 },
-            self.ontology.ontol_domain_meta().bool,
+            self.ontology.ontol_domain_meta().bool.into(),
         ))
     }
 
     fn visit_u64<E: Error>(self, v: u64) -> Result<Self::Value, E> {
         Ok(Value::I64(
             v.try_into().map_err(|_| E::custom("integer overflow"))?,
-            self.ontology.ontol_domain_meta().i64,
+            self.ontology.ontol_domain_meta().i64.into(),
         ))
     }
 
     fn visit_i64<E: Error>(self, v: i64) -> Result<Self::Value, E> {
-        Ok(Value::I64(v, self.ontology.ontol_domain_meta().i64))
+        Ok(Value::I64(v, self.ontology.ontol_domain_meta().i64.into()))
     }
 
     fn visit_f64<E: Error>(self, v: f64) -> Result<Self::Value, E> {
-        Ok(Value::F64(v, self.ontology.ontol_domain_meta().f64))
+        Ok(Value::F64(v, self.ontology.ontol_domain_meta().f64.into()))
     }
 
     fn visit_f32<E: Error>(self, v: f32) -> Result<Self::Value, E> {
-        Ok(Value::F64(v as f64, self.ontology.ontol_domain_meta().f64))
+        Ok(Value::F64(
+            v as f64,
+            self.ontology.ontol_domain_meta().f64.into(),
+        ))
     }
 
     fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
         Ok(Value::Text(
             v.into(),
-            self.ontology.ontol_domain_meta().text,
+            self.ontology.ontol_domain_meta().text.into(),
         ))
     }
 
@@ -97,7 +104,7 @@ impl<'o, 'de> Visitor<'de> for RawVisitor<'o> {
             sequence.push(value);
         }
 
-        Ok(Value::Sequence(sequence, DefId::unit()))
+        Ok(Value::Sequence(sequence, ValueTag::unit()))
     }
 
     fn visit_map<A: MapAccess<'de>>(self, mut map_access: A) -> Result<Self::Value, A::Error> {
@@ -113,6 +120,6 @@ impl<'o, 'de> Visitor<'de> for RawVisitor<'o> {
             dict.insert(key, map_access.next_value_seed(child)?);
         }
 
-        Ok(Value::Dict(Box::new(dict), DefId::unit()))
+        Ok(Value::Dict(Box::new(dict), ValueTag::unit()))
     }
 }

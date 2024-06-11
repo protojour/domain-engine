@@ -2,6 +2,8 @@ use thiserror::Error;
 
 use proc::Local;
 
+use crate::value::ValueTagError;
+
 pub mod ontol_vm;
 pub mod proc;
 
@@ -37,6 +39,14 @@ pub enum VmError {
     InvalidDirection,
     #[error("invalid matrix column")]
     InvalidMatrixColumn,
+    #[error("package number exceeded")]
+    PackageNumberExceeded,
 }
 
 pub type VmResult<T> = Result<T, VmError>;
+
+impl From<ValueTagError> for VmError {
+    fn from(_value: ValueTagError) -> Self {
+        VmError::PackageNumberExceeded
+    }
+}

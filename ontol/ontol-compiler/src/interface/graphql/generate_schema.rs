@@ -66,7 +66,7 @@ pub fn generate_graphql_schema<'c>(
         return None;
     }
 
-    let _entered = debug_span!("gql", pkg = ?package_id.0).entered();
+    let _entered = debug_span!("gql", pkg = ?package_id.id()).entered();
 
     let mut schema = new_schema_with_capacity(package_id, domain.type_count());
     let mut namespace = GraphqlNamespace::with_domain_disambiguation(DomainDisambiguation {

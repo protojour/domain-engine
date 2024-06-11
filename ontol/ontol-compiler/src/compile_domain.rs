@@ -21,7 +21,7 @@ impl<'m> Compiler<'m> {
         package: ParsedPackage,
         src: Src,
     ) -> Result<(), UnifiedCompileError> {
-        let _entered = debug_span!("pkg", id = ?package.package_id.0).entered();
+        let _entered = debug_span!("pkg", id = ?package.package_id.id()).entered();
 
         for error in package.parse_errors {
             match error {

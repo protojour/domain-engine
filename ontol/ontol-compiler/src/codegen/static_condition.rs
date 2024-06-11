@@ -148,7 +148,7 @@ impl<'c, 'm> ConditionBuilder<'c, 'm> {
                                     CondTerm::Wildcard,
                                     CondTerm::Value(Value::Text(
                                         self.compiler.str_ctx[*constant].into(),
-                                        self.compiler.primitives.text,
+                                        self.compiler.primitives.text.into(),
                                     )),
                                 ),
                             );

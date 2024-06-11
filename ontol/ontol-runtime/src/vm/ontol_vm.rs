@@ -15,7 +15,7 @@ use crate::{
     query::condition::{Clause, ClausePair, CondTerm},
     sequence::Sequence,
     tuple::{EndoTuple, EndoTupleElements},
-    value::{Attr, AttrMatrix, Value, ValueDebug},
+    value::{Attr, AttrMatrix, Value, ValueDebug, ValueTag},
     var::Var,
     vm::{
         abstract_vm::{AbstractVm, Processor, VmDebug},
@@ -105,7 +105,7 @@ impl<'o> Processor for OntolProcessor<'o> {
 
     #[inline(always)]
     fn call_builtin(&mut self, proc: BuiltinProc, result_type: DefId) -> VmResult<()> {
-        let value = self.eval_builtin(proc, result_type);
+        let value = self.eval_builtin(proc, result_type.into());
         self.stack.push(value);
         Ok(())
     }
@@ -176,7 +176,7 @@ impl<'o> Processor for OntolProcessor<'o> {
                     }
                     Attr::Matrix(mat) if mat.columns.len() == arity as usize => {
                         for elem in mat.columns.into_iter() {
-                            self.stack.push(Value::Sequence(elem, DefId::unit()));
+                            self.stack.push(Value::Sequence(elem, ValueTag::unit()));
                         }
                     }
                     attr => {
@@ -263,7 +263,7 @@ impl<'o> Processor for OntolProcessor<'o> {
                 if relationship == meta.order_relationship && arity == 1 {
                     filter.set_order(Value::Sequence(
                         columns.into_iter().next().unwrap(),
-                        DefId::unit(),
+                        ValueTag::unit(),
                     ));
                 } else {
                     return Err(VmError::InvalidType(target));
@@ -284,19 +284,22 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn push_i64(&mut self, k: i64, result_type: DefId) {
-        self.stack.push(Value::I64(k, result_type));
+    fn push_i64(&mut self, k: i64, result_type: DefId) -> VmResult<()> {
+        self.stack.push(Value::I64(k, result_type.into()));
+        Ok(())
     }
 
     #[inline(always)]
-    fn push_f64(&mut self, k: f64, result_type: DefId) {
-        self.stack.push(Value::F64(k, result_type));
+    fn push_f64(&mut self, k: f64, result_type: DefId) -> VmResult<()> {
+        self.stack.push(Value::F64(k, result_type.into()));
+        Ok(())
     }
 
     #[inline(always)]
-    fn push_string(&mut self, k: TextConstant, result_type: DefId) {
+    fn push_string(&mut self, k: TextConstant, result_type: DefId) -> VmResult<()> {
         let str = &self.ontology[k];
-        self.stack.push(Value::Text(str.into(), result_type));
+        self.stack.push(Value::Text(str.into(), result_type.into()));
+        Ok(())
     }
 
     #[inline(always)]
@@ -356,9 +359,9 @@ impl<'o> Processor for OntolProcessor<'o> {
     #[inline(always)]
     fn type_pun(&mut self, local: Option<Local>, def_id: DefId) -> VmResult<()> {
         if let Some(local) = local {
-            *self.local_mut(local).type_def_id_mut() = def_id;
+            self.local_mut(local).tag_mut().set_def(def_id);
         } else {
-            *self.stack.last_mut().unwrap().type_def_id_mut() = def_id;
+            self.stack.last_mut().unwrap().tag_mut().set_def(def_id);
         }
         Ok(())
     }
@@ -382,11 +385,11 @@ impl<'o> Processor for OntolProcessor<'o> {
                 haystack,
                 &captures,
                 group_filter,
-                self.ontology.ontol_domain_meta().text,
+                self.ontology.ontol_domain_meta().text.into(),
             );
             self.stack.push(Value::Sequence(
                 attributes.into(),
-                self.ontology.ontol_domain_meta().text,
+                self.ontology.ontol_domain_meta().text.into(),
             ));
         } else {
             self.push_void();
@@ -407,7 +410,7 @@ impl<'o> Processor for OntolProcessor<'o> {
         let text_pattern = self.ontology.get_text_pattern(pattern_id).unwrap();
 
         let mut values: ThinVec<Value> = ThinVec::new();
-        let text_def_id = self.ontology.ontol_domain_meta().text;
+        let text_tag: ValueTag = self.ontology.ontol_domain_meta().text.into();
 
         for captures in text_pattern
             .regex
@@ -415,11 +418,11 @@ impl<'o> Processor for OntolProcessor<'o> {
             .captures_iter(Input::new(haystack).earliest(true))
         {
             let value_attributes =
-                extract_regex_captures(haystack, &captures, group_filter, text_def_id);
-            values.push(Value::Sequence(value_attributes.into(), text_def_id));
+                extract_regex_captures(haystack, &captures, group_filter, text_tag);
+            values.push(Value::Sequence(value_attributes.into(), text_tag));
         }
 
-        self.stack.push(Value::Sequence(values.into(), text_def_id));
+        self.stack.push(Value::Sequence(values.into(), text_tag));
         Ok(())
     }
 
@@ -431,7 +434,7 @@ impl<'o> Processor for OntolProcessor<'o> {
         let cond_var = filter.condition_mut().mk_cond_var();
 
         self.stack_mut()
-            .push(Value::I64(cond_var.0 as i64, DefId::unit()));
+            .push(Value::I64(cond_var.0 as i64, ValueTag::unit()));
 
         Ok(())
     }
@@ -487,49 +490,49 @@ impl<'o> Processor for OntolProcessor<'o> {
 }
 
 impl<'o> OntolProcessor<'o> {
-    fn eval_builtin(&mut self, proc: BuiltinProc, result_type: DefId) -> Value {
+    fn eval_builtin(&mut self, proc: BuiltinProc, tag: ValueTag) -> Value {
         match proc {
             BuiltinProc::AddI64 => {
                 let [b, a]: [i64; 2] = self.pop_n();
-                Value::I64(a + b, result_type)
+                Value::I64(a + b, tag)
             }
             BuiltinProc::SubI64 => {
                 let [b, a]: [i64; 2] = self.pop_n();
-                Value::I64(a - b, result_type)
+                Value::I64(a - b, tag)
             }
             BuiltinProc::MulI64 => {
                 let [b, a]: [i64; 2] = self.pop_n();
-                Value::I64(a * b, result_type)
+                Value::I64(a * b, tag)
             }
             BuiltinProc::DivI64 => {
                 let [b, a]: [i64; 2] = self.pop_n();
-                Value::I64(a / b, result_type)
+                Value::I64(a / b, tag)
             }
             BuiltinProc::AddF64 => {
                 let [b, a]: [f64; 2] = self.pop_n();
-                Value::F64(a + b, result_type)
+                Value::F64(a + b, tag)
             }
             BuiltinProc::SubF64 => {
                 let [b, a]: [f64; 2] = self.pop_n();
-                Value::F64(a - b, result_type)
+                Value::F64(a - b, tag)
             }
             BuiltinProc::MulF64 => {
                 let [b, a]: [f64; 2] = self.pop_n();
-                Value::F64(a * b, result_type)
+                Value::F64(a * b, tag)
             }
             BuiltinProc::DivF64 => {
                 let [b, a]: [f64; 2] = self.pop_n();
-                Value::F64(a / b, result_type)
+                Value::F64(a / b, tag)
             }
             BuiltinProc::Append => {
                 let [b, a]: [String; 2] = self.pop_n();
-                Value::Text(a + b, result_type)
+                Value::Text(a + b, tag)
             }
-            BuiltinProc::NewStruct => Value::Struct(Default::default(), result_type),
-            BuiltinProc::NewSeq => Value::Sequence(Default::default(), result_type),
-            BuiltinProc::NewUnit => Value::Unit(result_type),
-            BuiltinProc::NewFilter => Value::Filter(Default::default(), result_type),
-            BuiltinProc::NewVoid => Value::Void(result_type),
+            BuiltinProc::NewStruct => Value::Struct(Default::default(), tag),
+            BuiltinProc::NewSeq => Value::Sequence(Default::default(), tag),
+            BuiltinProc::NewUnit => Value::Unit(tag),
+            BuiltinProc::NewFilter => Value::Filter(Default::default(), tag),
+            BuiltinProc::NewVoid => Value::Void(tag),
         }
     }
 
@@ -610,7 +613,7 @@ impl<'o> OntolProcessor<'o> {
 
     #[inline(always)]
     fn push_void(&mut self) {
-        self.stack.push(Value::Void(DefId::unit()));
+        self.stack.push(Value::Void(ValueTag::unit()));
     }
 
     fn opcode_term_to_cond_term(&mut self, term: &OpCodeCondTerm) -> VmResult<CondTerm> {
@@ -643,7 +646,7 @@ fn extract_regex_captures(
     haystack: &str,
     captures: &Captures,
     group_filter: &BitVec,
-    text_def_id: DefId,
+    text_tag: ValueTag,
 ) -> ThinVec<Value> {
     group_filter
         .iter()
@@ -651,8 +654,8 @@ fn extract_regex_captures(
         .filter_map(|(index, value)| if value { Some(index) } else { None })
         .map(|index| {
             let value = match captures.get_group(index) {
-                Some(span) => Value::Text(haystack[span.start..span.end].into(), text_def_id),
-                None => Value::Void(DefId::unit()),
+                Some(span) => Value::Text(haystack[span.start..span.end].into(), text_tag),
+                None => Value::Void(ValueTag::unit()),
             };
             value
         })
@@ -699,14 +702,14 @@ mod tests {
                 [
                     (
                         "R:0:1".parse().unwrap(),
-                        Value::Text("foo".into(), def_id(0)).into(),
+                        Value::Text("foo".into(), ValueTag::unit()).into(),
                     ),
                     (
                         "R:0:2".parse().unwrap(),
-                        Value::Text("bar".into(), def_id(0)).into(),
+                        Value::Text("bar".into(), ValueTag::unit()).into(),
                     ),
                 ],
-                def_id(0),
+                ValueTag::unit(),
             )])
             .unwrap()
             .unwrap();
@@ -765,11 +768,20 @@ mod tests {
         let output = OntolVm::new(&ontology, mapping_proc)
             .run([Value::new_struct(
                 [
-                    ("R:0:1".parse().unwrap(), Value::I64(333, def_id(0)).into()),
-                    ("R:0:2".parse().unwrap(), Value::I64(10, def_id(0)).into()),
-                    ("R:0:3".parse().unwrap(), Value::I64(11, def_id(0)).into()),
+                    (
+                        "R:0:1".parse().unwrap(),
+                        Value::I64(333, ValueTag::unit()).into(),
+                    ),
+                    (
+                        "R:0:2".parse().unwrap(),
+                        Value::I64(10, ValueTag::unit()).into(),
+                    ),
+                    (
+                        "R:0:3".parse().unwrap(),
+                        Value::I64(11, ValueTag::unit()).into(),
+                    ),
                 ],
-                def_id(0),
+                ValueTag::unit(),
             )])
             .unwrap()
             .unwrap();
@@ -822,8 +834,8 @@ mod tests {
         let ontology = Ontology::builder().lib(lib).build();
         let output = OntolVm::new(&ontology, proc)
             .run([Value::sequence_of([
-                Value::I64(1, def_id(0)),
-                Value::I64(2, def_id(0)),
+                Value::I64(1, ValueTag::unit()),
+                Value::I64(2, ValueTag::unit()),
             ])])
             .unwrap()
             .unwrap();
@@ -879,17 +891,17 @@ mod tests {
         let output = OntolVm::new(&ontology, proc)
             .run([Value::new_struct(
                 [
-                    (prop_a, Value::Text("a".into(), def_id(0)).into()),
+                    (prop_a, Value::Text("a".into(), ValueTag::unit()).into()),
                     (
                         prop_b,
                         Value::sequence_of([
-                            Value::Text("b0".into(), def_id(0)),
-                            Value::Text("b1".into(), def_id(0)),
+                            Value::Text("b0".into(), ValueTag::unit()),
+                            Value::Text("b1".into(), ValueTag::unit()),
                         ])
                         .into(),
                     ),
                 ],
-                def_id(0),
+                ValueTag::unit(),
             )])
             .unwrap()
             .unwrap();
@@ -905,7 +917,9 @@ mod tests {
         let mut lib = Lib::default();
 
         let prop: RelationshipId = "R:0:42".parse().unwrap();
-        let inner_def_id = def_id(100);
+        let Ok(inner_tag) = ValueTag::try_from(def_id(100)) else {
+            panic!()
+        };
 
         let proc = lib.append_procedure(
             NParams(1),
@@ -918,7 +932,7 @@ mod tests {
                 OpCode::Return,
                 // AddressOffset(4):
                 OpCode::Cond(
-                    Predicate::MatchesDiscriminant(Local(2), inner_def_id),
+                    Predicate::MatchesDiscriminant(Local(2), inner_tag.into()),
                     AddressOffset(7),
                 ),
                 OpCode::Goto(AddressOffset(3)),
@@ -937,7 +951,7 @@ mod tests {
                 "{}",
                 ValueDebug(
                     &OntolVm::new(&ontology, proc)
-                        .run([Value::new_struct([], def_id(0))])
+                        .run([Value::new_struct([], ValueTag::unit())])
                         .unwrap()
                         .unwrap()
                 )
@@ -950,7 +964,10 @@ mod tests {
                 "{}",
                 ValueDebug(
                     &OntolVm::new(&ontology, proc)
-                        .run([Value::new_struct([(prop, Value::unit().into())], def_id(0))])
+                        .run([Value::new_struct(
+                            [(prop, Value::unit().into())],
+                            ValueTag::unit()
+                        )])
                         .unwrap()
                         .unwrap()
                 )
@@ -964,8 +981,8 @@ mod tests {
                 ValueDebug(
                     &OntolVm::new(&ontology, proc)
                         .run([Value::new_struct(
-                            [(prop, Value::Text("a".into(), inner_def_id).into(),)],
-                            def_id(0)
+                            [(prop, Value::Text("a".into(), inner_tag).into())],
+                            ValueTag::unit()
                         )])
                         .unwrap()
                         .unwrap()
