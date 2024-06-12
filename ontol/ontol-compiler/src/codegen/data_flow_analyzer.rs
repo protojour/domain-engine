@@ -9,6 +9,7 @@ use ontol_runtime::{
     var::{Var, VarSet},
     DefId, RelationshipId,
 };
+use tracing::warn;
 
 use crate::{def::LookupRelationshipMeta, typed_hir::TypedNodeRef, types::Type};
 
@@ -142,16 +143,7 @@ where
                 }
 
                 for ty in types {
-                    let value_def_id = match ty {
-                        Type::Seq(val) => val.get_single_def_id(),
-                        other => other.get_single_def_id(),
-                    };
-
-                    self.reg_scope_prop(
-                        *struct_var,
-                        *rel_id,
-                        value_def_id.unwrap_or(DefId::unit()),
-                    );
+                    self.reg_scope_prop(*struct_var, *rel_id, ty);
                 }
 
                 VarSet::default()
@@ -347,14 +339,45 @@ where
     /// The purpose of the value_def_id is for the query engine
     /// to understand which entity must be looked up.
     /// rel_params is ignored here.
-    fn reg_scope_prop(&mut self, struct_var: Var, rel_id: RelationshipId, value_def_id: DefId) {
+    fn reg_scope_prop(&mut self, struct_var: Var, rel_id: RelationshipId, ty: &Type) {
         let meta = self.defs.relationship_meta(rel_id);
         let (_, cardinality, _) = meta.relationship.subject();
 
-        self.property_flow.insert(PropertyFlow {
-            id: rel_id,
-            data: PropertyFlowData::Type(value_def_id),
-        });
+        match ty {
+            Type::Seq(ty) => {
+                if let Some(value_def_id) = ty.get_single_def_id() {
+                    self.property_flow.insert(PropertyFlow {
+                        id: rel_id,
+                        data: PropertyFlowData::UnitType(value_def_id),
+                    });
+                }
+            }
+            Type::Matrix(tuple) => {
+                for (idx, ty) in tuple.iter().enumerate() {
+                    let idx: Result<u8, _> = idx.try_into();
+                    let Ok(idx) = idx else {
+                        warn!("no type found for tuple");
+                        continue;
+                    };
+
+                    if let Some(value_def_id) = ty.get_single_def_id() {
+                        self.property_flow.insert(PropertyFlow {
+                            id: rel_id,
+                            data: PropertyFlowData::TupleType(idx, value_def_id),
+                        });
+                    }
+                }
+            }
+            ty => {
+                if let Some(value_def_id) = ty.get_single_def_id() {
+                    self.property_flow.insert(PropertyFlow {
+                        id: rel_id,
+                        data: PropertyFlowData::UnitType(value_def_id),
+                    });
+                }
+            }
+        }
+
         self.property_flow.insert(PropertyFlow {
             id: rel_id,
             data: PropertyFlowData::Cardinality(cardinality),

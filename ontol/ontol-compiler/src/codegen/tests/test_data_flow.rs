@@ -87,10 +87,6 @@ const fn default_cardinality() -> PropertyFlowData {
     PropertyFlowData::Cardinality((PropertyCardinality::Mandatory, ValueCardinality::Unit))
 }
 
-const fn default_type() -> PropertyFlowData {
-    PropertyFlowData::Type(DefId::unit())
-}
-
 #[test]
 fn test_analyze_ssa1() {
     let data_flow = analyze(
@@ -110,12 +106,10 @@ fn test_analyze_ssa1() {
 
     expect_eq!(
         actual = data_flow,
+        // note: type information is not included in ontol-hir tests:
         expected = vec![
-            prop_flow("R:1:0", default_type()),
             prop_flow("R:1:0", default_cardinality()),
-            prop_flow("R:1:1", default_type()),
             prop_flow("R:1:1", default_cardinality()),
-            prop_flow("R:1:2", default_type()),
             prop_flow("R:1:2", default_cardinality()),
             prop_flow("R:1:2", child_of("R:1:1")),
             prop_flow("R:2:0", dependent_on("R:1:0")),
@@ -168,19 +162,13 @@ fn test_analyze_ssa2() {
             prop_flow("R:1:6", dependent_on("R:2:33")),
             prop_flow("R:1:7", dependent_on("R:2:15")),
             prop_flow("R:1:8", dependent_on("R:2:53")),
-            prop_flow("R:2:15", default_type()),
             prop_flow("R:2:15", default_cardinality()),
             prop_flow("R:2:15", child_of("R:2:55")),
-            prop_flow("R:2:26", default_type()),
             prop_flow("R:2:26", default_cardinality()),
-            prop_flow("R:2:33", default_type()),
             prop_flow("R:2:33", default_cardinality()),
-            prop_flow("R:2:53", default_type()),
             prop_flow("R:2:53", default_cardinality()),
             prop_flow("R:2:53", child_of("R:2:57")),
-            prop_flow("R:2:55", default_type()),
             prop_flow("R:2:55", default_cardinality()),
-            prop_flow("R:2:57", default_type()),
             prop_flow("R:2:57", default_cardinality()),
         ]
     );
@@ -210,10 +198,8 @@ fn test_analyze_seq1() {
     expect_eq!(
         actual = data_flow,
         expected = vec![
-            prop_flow("R:1:0", default_type()),
             prop_flow("R:1:0", default_cardinality()),
             prop_flow("R:2:0", dependent_on("R:2:1")),
-            prop_flow("R:2:1", default_type()),
             prop_flow("R:2:1", default_cardinality()),
             prop_flow("R:2:1", child_of("R:1:0")),
         ]
@@ -249,7 +235,6 @@ fn test_analyze_regex_match1() {
     expect_eq!(
         actual = data_flow,
         expected = vec![
-            prop_flow("R:1:0", default_type()),
             prop_flow("R:1:0", default_cardinality()),
             prop_flow("R:2:0", dependent_on("R:1:0")),
             prop_flow("R:2:1", dependent_on("R:1:0")),

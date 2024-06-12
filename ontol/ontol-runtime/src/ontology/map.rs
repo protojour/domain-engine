@@ -33,7 +33,8 @@ pub struct PropertyFlow {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]
 pub enum PropertyFlowData {
-    Type(DefId),
+    UnitType(DefId),
+    TupleType(u8, DefId),
     Match(Var),
     Cardinality(Cardinality),
     ChildOf(RelationshipId),
