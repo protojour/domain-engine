@@ -7,15 +7,18 @@ use domain_engine_graphql::{
 };
 use ontol_macros::test;
 use ontol_runtime::{
+    attr::AttrMatrix,
     interface::serde::processor::ProcessorProfileFlags,
     sequence::{Sequence, SubSequence},
-    value::Attribute,
+    value::Value,
 };
 use ontol_test_utils::{
     examples::{ARTIST_AND_INSTRUMENT, GEOJSON, GITMESH, GUITAR_SYNTH_UNION, MUNICIPALITIES, WGS},
-    expect_eq, src_name,
-    type_binding::ToSequence,
-    SrcName, TestPackages,
+    expect_eq,
+    src_name,
+    // type_binding::ToSequence,
+    SrcName,
+    TestPackages,
 };
 use serde_json::json;
 use unimock::*;
@@ -649,7 +652,7 @@ async fn test_docs_introspection() {
 async fn test_graphql_artist_and_instrument_connections() {
     let (test, schema) = ARTIST_AND_INSTRUMENT.1.compile_single_schema();
     let [artist, instrument, plays] = test.bind(["artist", "instrument", "plays"]);
-    let ziggy: Attribute = artist
+    let ziggy: Value = artist
         .entity_builder(
             json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
             json!({
@@ -658,15 +661,20 @@ async fn test_graphql_artist_and_instrument_connections() {
         )
         .relationship(
             "plays",
-            vec![instrument
-                .entity_builder(
-                    json!("instrument/88832e20-8c6e-46b4-af79-27b19b889a58"),
-                    json!({
-                        "name": "Guitar",
-                    }),
-                )
-                .to_attr(plays.value_builder(json!({ "how_much": "A lot" })))]
-            .to_sequence_attribute(&instrument),
+            AttrMatrix::from_iter([
+                Sequence::from_iter([instrument
+                    .entity_builder(
+                        json!("instrument/88832e20-8c6e-46b4-af79-27b19b889a58"),
+                        json!({
+                            "name": "Guitar",
+                        }),
+                    )
+                    .to_value()]),
+                Sequence::from_iter([plays
+                    .value_builder(json!({ "how_much": "A lot" }))
+                    .to_value()]),
+            ])
+            .into(),
         )
         .into();
 
@@ -791,7 +799,7 @@ async fn test_graphql_artist_and_instrument_connections() {
                 root(),
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::BatchWrite(..), _session))
-                    .returns(Ok(Response::one_inserted(ziggy.val)))
+                    .returns(Ok(Response::one_inserted(ziggy)))
             )
         )
         .await,
@@ -822,7 +830,7 @@ async fn test_unified_mutation_error_on_unrecognized_arg() {
 #[test(tokio::test)]
 async fn test_unified_mutation_create() {
     let (test, schema) = ARTIST_AND_INSTRUMENT.1.compile_single_schema();
-    let ziggy: Attribute = test.bind(["artist"])[0]
+    let ziggy: Value = test.bind(["artist"])[0]
         .entity_builder(
             json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
             json!({
@@ -869,7 +877,7 @@ async fn test_unified_mutation_create() {
                 root(),
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::BatchWrite(..), _session))
-                    .returns(Ok(Response::one_inserted(ziggy.val)))
+                    .returns(Ok(Response::one_inserted(ziggy)))
             )
         )
         .await,
@@ -916,7 +924,7 @@ async fn test_create_through_mapped_domain() {
     ])
     .compile_schemas([root()]);
 
-    let ziggy: Attribute = test.bind(["artist_and_instrument.artist"])[0]
+    let ziggy: Value = test.bind(["artist_and_instrument.artist"])[0]
         .entity_builder(
             json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
             json!({ "name": "Ziggy" }),
@@ -940,7 +948,7 @@ async fn test_create_through_mapped_domain() {
                 ARTIST_AND_INSTRUMENT.0,
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::BatchWrite(..), _session))
-                    .returns(Ok(Response::one_inserted(ziggy.val)))
+                    .returns(Ok(Response::one_inserted(ziggy)))
             )
         )
         .await,
@@ -997,7 +1005,7 @@ async fn test_create_through_three_domains() {
     ])
     .compile_schemas([root()]);
 
-    let ziggy: Attribute = test.bind(["artist_and_instrument.artist"])[0]
+    let ziggy: Value = test.bind(["artist_and_instrument.artist"])[0]
         .entity_builder(
             json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
             json!({ "name": "Ziggy" }),
@@ -1021,7 +1029,7 @@ async fn test_create_through_three_domains() {
                 ARTIST_AND_INSTRUMENT.0,
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::BatchWrite(..), _session))
-                    .returns(Ok(Response::one_inserted(ziggy.val)))
+                    .returns(Ok(Response::one_inserted(ziggy)))
             )
         )
         .await,

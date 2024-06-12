@@ -10,6 +10,7 @@ use domain_engine_core::{
 use gql_scalar::GqlScalar;
 use look_ahead_utils::ArgsWrapper;
 use ontol_runtime::{
+    attr::{AttrMatrixRef, AttrRef},
     interface::{
         graphql::{
             data::{EntityMutationField, FieldData, FieldKind, Optionality, TypeModifier, TypeRef},
@@ -22,7 +23,7 @@ use ontol_runtime::{
     value::{Value, ValueDebug},
     PackageId,
 };
-use templates::sequence_type::SequenceType;
+use templates::matrix_type::MatrixType;
 use thiserror::Error;
 use tracing::{debug, trace};
 
@@ -153,7 +154,7 @@ async fn query(
 
             resolve_schema_type_field(
                 AttributeType {
-                    attr: &output.into(),
+                    attr: AttrRef::Unit(&output),
                 },
                 schema_ctx
                     .find_schema_type_by_unit(query_field.field_type.unit, TypingPurpose::Selection)
@@ -210,7 +211,7 @@ async fn mutation(
                     .inputs
                     .into_elements()
                     .into_iter()
-                    .map(|attr| attr.val)
+                    // .map(|attr| attr.val)
                     .collect();
 
                 batch_write_requests.push(match entity_mutation.kind {
@@ -235,18 +236,16 @@ async fn mutation(
                     BatchWriteResponse::Deleted(bools) => {
                         let bool_type = schema_ctx.ontology.ontol_domain_meta().bool;
 
-                        output_sequence.extend(
-                            bools
-                                .into_iter()
-                                .map(|bool| Value::I64(if bool { 1 } else { 0 }, bool_type).into()),
-                        )
+                        output_sequence.extend(bools.into_iter().map(|bool| {
+                            Value::I64(if bool { 1 } else { 0 }, bool_type.into()).into()
+                        }))
                     }
                 }
             }
 
             resolve_schema_type_field(
-                SequenceType {
-                    seq: &output_sequence,
+                MatrixType {
+                    matrix: AttrMatrixRef::from_ref(&output_sequence),
                 },
                 schema_ctx.get_schema_type(*field_unit_type_addr, TypingPurpose::Selection),
                 executor,

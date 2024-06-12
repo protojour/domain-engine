@@ -152,7 +152,8 @@ impl SchemaCtx {
                 .all(|(pred_relationship, pred_type)| {
                     attrs
                         .get(pred_relationship)
-                        .map(|attr| attr.val.type_def_id() == *pred_type)
+                        .and_then(|attr| attr.as_unit())
+                        .map(|value| value.type_def_id() == *pred_type)
                         .unwrap_or(false)
                 })
         })

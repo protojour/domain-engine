@@ -1,14 +1,15 @@
-use ontol_runtime::sequence::Sequence;
+use ontol_runtime::attr::{AttrMatrixRef, AttrRef, AttrTupleRef};
 
 use crate::{context::SchemaType, gql_scalar::GqlScalar, ServiceCtx};
 
 use super::attribute_type::AttributeType;
 
-pub struct SequenceType<'v> {
-    pub seq: &'v Sequence,
+/// A type which becomes a GraphQL list, but is a matrix in ONTOL parlance
+pub struct MatrixType<'v> {
+    pub matrix: AttrMatrixRef<'v>,
 }
 
-impl<'v> juniper::GraphQLValue<GqlScalar> for SequenceType<'v> {
+impl<'v> juniper::GraphQLValue<GqlScalar> for MatrixType<'v> {
     type Context = ServiceCtx;
     type TypeInfo = SchemaType;
 
@@ -27,10 +28,24 @@ impl<'v> juniper::GraphQLValue<GqlScalar> for SequenceType<'v> {
             .list_contents()
             .expect("Current type is not a list type")
             .is_non_null();
-        let mut result = Vec::with_capacity(self.seq.elements().len());
+        let mut result = Vec::with_capacity(
+            self.matrix
+                .columns
+                .first()
+                .map(|col| col.elements().len())
+                .unwrap_or(0),
+        );
 
-        for attr in self.seq.elements() {
-            let val = executor.resolve::<AttributeType>(info, &AttributeType { attr })?;
+        let mut tup = Default::default();
+        let mut rows = self.matrix.rows();
+
+        while rows.iter_next(&mut tup) {
+            let val = executor.resolve::<AttributeType>(
+                info,
+                &AttributeType {
+                    attr: AttrRef::Tuple(AttrTupleRef::Row(&tup.elements)),
+                },
+            )?;
             if stop_on_null && val.is_null() {
                 return Ok(val);
             } else {
@@ -42,7 +57,7 @@ impl<'v> juniper::GraphQLValue<GqlScalar> for SequenceType<'v> {
     }
 }
 
-impl<'v> juniper::GraphQLType<GqlScalar> for SequenceType<'v> {
+impl<'v> juniper::GraphQLType<GqlScalar> for MatrixType<'v> {
     fn name(_info: &Self::TypeInfo) -> Option<&str> {
         None
     }

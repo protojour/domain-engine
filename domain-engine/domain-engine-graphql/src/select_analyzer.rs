@@ -91,7 +91,8 @@ impl<'a> SelectAnalyzer<'a> {
                 input_arg,
                 (self.schema_ctx, self.service_ctx),
             )?
-            .val;
+            .into_unit()
+            .expect("not a unit");
 
         debug!("field map queries: {map_queries:?}");
 

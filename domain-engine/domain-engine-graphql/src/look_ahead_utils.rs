@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use juniper::{graphql_value, LookAheadArgument, LookAheadSelection, LookAheadValue};
 use ontol_runtime::{
+    attr::Attr,
     interface::{
         graphql::argument::{self, DefaultArg},
         serde::processor::ProcessorProfile,
@@ -28,7 +29,7 @@ pub enum EntityMutationKind {
 
 pub struct EntityMutations {
     pub kind: EntityMutationKind,
-    pub inputs: Sequence,
+    pub inputs: Sequence<Value>,
 }
 
 pub(crate) struct ArgsWrapper<'a> {
@@ -65,7 +66,7 @@ impl<'a> ArgsWrapper<'a> {
         &self,
         field_arg: &dyn argument::DomainFieldArg,
         (schema_ctx, service_ctx): (&SchemaCtx, &ServiceCtx),
-    ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
+    ) -> Result<Attr, juniper::FieldError<GqlScalar>> {
         let arg_name = field_arg.name(&schema_ctx.ontology);
         let (mode, level) = field_arg.typing_purpose().mode_and_level();
 
@@ -155,11 +156,12 @@ impl<'a> ArgsWrapper<'a> {
                     .with_profile(&processor_profile)
             };
 
-            let Value::Sequence(inputs, _) = serde_processor
-                .deserialize(LookAheadValueDeserializer::from(look_ahead_arg))?
-                .val
-            else {
-                panic!("Expected sequence")
+            let attr =
+                serde_processor.deserialize(LookAheadValueDeserializer::from(look_ahead_arg))?;
+
+            let inputs = match attr {
+                Attr::Matrix(matrix) => matrix.columns.into_iter().next().unwrap(),
+                _ => panic!("not a matrix"),
             };
 
             output.push(EntityMutations { kind, inputs });

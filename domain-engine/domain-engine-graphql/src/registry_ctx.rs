@@ -23,7 +23,8 @@ use ontol_runtime::{
             processor::ProcessorProfileFlags,
         },
     },
-    ontology::domain::{CardinalIdx, DataRelationshipKind, TypeInfo},
+    ontology::domain::{DataRelationshipKind, TypeInfo},
+    tuple::CardinalIdx,
     RelationshipId,
 };
 use tracing::{debug, trace, trace_span};

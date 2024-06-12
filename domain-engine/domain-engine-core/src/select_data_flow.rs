@@ -115,7 +115,7 @@ impl<'on> SelectFlowProcessor<'on> {
                             target.insert(property_flow.id, Select::Leaf);
                         },
                     ),
-                    PropertyFlowData::Type(_) | PropertyFlowData::DependentOn(_) => {
+                    PropertyFlowData::UnitType(_) | PropertyFlowData::DependentOn(_) => {
                         if self.depends_on_mandatory_entity(rel_id, IsDep(false)) {
                             target.insert(property_flow.id, Select::Leaf);
                         }
@@ -170,7 +170,8 @@ impl<'on> SelectFlowProcessor<'on> {
                         );
                     }
                 }
-                PropertyFlowData::Type(_)
+                PropertyFlowData::UnitType(_)
+                | PropertyFlowData::TupleType(..)
                 | PropertyFlowData::Cardinality(_)
                 | PropertyFlowData::Match(_) => {}
             }
@@ -250,7 +251,7 @@ impl<'on> SelectFlowProcessor<'on> {
                         return true;
                     }
                 }
-                PropertyFlowData::Type(def_id) if is_dep.0 => {
+                PropertyFlowData::UnitType(def_id) if is_dep.0 => {
                     let type_info = self.ontology.get_type_info(*def_id);
                     is_entity = type_info.entity_info().is_some();
                 }
@@ -277,7 +278,8 @@ impl<'on> SelectFlowProcessor<'on> {
     fn find_def_id(&self, rel_id: RelationshipId) -> Option<DefId> {
         self.property_flows_for(rel_id)
             .find_map(|property_flow| match &property_flow.data {
-                PropertyFlowData::Type(def_id) => Some(*def_id),
+                PropertyFlowData::UnitType(def_id) => Some(*def_id),
+                PropertyFlowData::TupleType(0, def_id) => Some(*def_id),
                 _ => None,
             })
     }

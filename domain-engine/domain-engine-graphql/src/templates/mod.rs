@@ -2,10 +2,10 @@ use crate::context::SchemaType;
 
 pub mod attribute_type;
 pub mod input_type;
+pub mod matrix_type;
 pub mod mutation_type;
 pub mod page_info_type;
 pub mod query_type;
-pub mod sequence_type;
 
 pub fn resolve_schema_type_field<'e, T, C, S>(
     value: T,

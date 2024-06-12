@@ -1,11 +1,17 @@
-use ontol_runtime::sequence::Sequence;
+use ontol_runtime::{attr::AttrMatrixRef, sequence::SubSequence};
 
 use crate::{
     context::SchemaType, cursor_util::serialize_cursor, gql_scalar::GqlScalar, ServiceCtx,
 };
 
 pub struct PageInfoType<'v> {
-    pub seq: &'v Sequence,
+    pub matrix: AttrMatrixRef<'v>,
+}
+
+impl<'v> PageInfoType<'v> {
+    fn find_sub(&self) -> Option<&SubSequence> {
+        self.matrix.columns.iter().find_map(|column| column.sub())
+    }
 }
 
 impl<'v> juniper::GraphQLValue<GqlScalar> for PageInfoType<'v> {
@@ -26,8 +32,7 @@ impl<'v> juniper::GraphQLValue<GqlScalar> for PageInfoType<'v> {
         match field_name {
             "hasNextPage" => {
                 let has_next_page = self
-                    .seq
-                    .sub()
+                    .find_sub()
                     .map(|sub_seq| sub_seq.has_next)
                     .unwrap_or(false);
 
@@ -35,8 +40,7 @@ impl<'v> juniper::GraphQLValue<GqlScalar> for PageInfoType<'v> {
             }
             "endCursor" => {
                 let end_cursor = self
-                    .seq
-                    .sub()
+                    .find_sub()
                     .and_then(|sub_seq| sub_seq.end_cursor.as_ref());
 
                 let value = match end_cursor {
