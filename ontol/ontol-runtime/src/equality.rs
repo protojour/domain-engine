@@ -128,9 +128,6 @@ impl OntolEquals for Value {
             (Value::Struct(a, tag_a), Value::Struct(b, tag_b)) => {
                 tag_a.def() == tag_b.def() && property_map_equals(a, b)
             }
-            (Value::StructUpdate(a, tag_a), Value::StructUpdate(b, tag_b)) => {
-                tag_a.def() == tag_b.def() && property_map_equals(a, b)
-            }
             (Value::Dict(a, tag_a), Value::Dict(b, tag_b)) => {
                 tag_a.def() == tag_b.def()
                     && a.len() == b.len()
@@ -181,10 +178,6 @@ impl OntolHash for Value {
             Value::ChronoDate(v, tag) => (v, tag.def()).hash(h),
             Value::ChronoTime(v, tag) => (v, tag.def()).hash(h),
             Value::Struct(v, tag) => {
-                tag.def().hash(h);
-                property_map_ontol_hash(v, h, builder);
-            }
-            Value::StructUpdate(v, tag) => {
                 tag.def().hash(h);
                 property_map_ontol_hash(v, h, builder);
             }

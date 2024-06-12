@@ -145,11 +145,7 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
         let boxed_attrs = Box::new(output.attributes);
 
         Ok(Attr::unit_or_tuple(
-            if self.ctx.is_update {
-                Value::StructUpdate(boxed_attrs, tag)
-            } else {
-                Value::Struct(boxed_attrs, tag)
-            },
+            Value::Struct(boxed_attrs, tag),
             output.rel_params,
         ))
     }
@@ -295,11 +291,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         }
 
         let boxed_attrs = Box::new(output.attributes);
-        Ok(if self.processor.ctx.is_update {
-            Value::StructUpdate(boxed_attrs, tag)
-        } else {
-            Value::Struct(boxed_attrs, tag)
-        })
+        Ok(Value::Struct(boxed_attrs, tag))
     }
 
     /// Read from a serde MapAccess and copy resulting attributes into output

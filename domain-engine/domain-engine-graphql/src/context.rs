@@ -140,7 +140,7 @@ impl SchemaCtx {
         value: &Value,
     ) -> Option<&InterfaceImplementor> {
         let implementors = self.schema.interface_implementors.get(&interface_addr)?;
-        let (Value::Struct(attrs, _) | Value::StructUpdate(attrs, _)) = value else {
+        let Value::Struct(attrs, _) = value else {
             debug!("Must be a struct in order to implement an interface");
             return None;
         };

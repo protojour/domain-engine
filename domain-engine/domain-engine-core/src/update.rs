@@ -5,9 +5,9 @@ use ontol_runtime::{attr::Attr, value::Value, RelationshipId};
 /// after it has gone through domain translation.
 pub fn sanitize_update(update: &mut Value) {
     let value = match update.take() {
-        Value::Struct(mut attrs, def_id) | Value::StructUpdate(mut attrs, def_id) => {
+        Value::Struct(mut attrs, tag) => {
             remove_none_attrs(&mut attrs);
-            Value::StructUpdate(attrs, def_id)
+            Value::Struct(attrs, tag)
         }
         other => other,
     };
@@ -33,9 +33,7 @@ fn attr_exists(attr: &Attr) -> bool {
 fn exists(value: &Value) -> bool {
     match value {
         Value::Void(_) => false,
-        Value::Struct(attrs, _) | Value::StructUpdate(attrs, _) => {
-            attrs.iter().all(|(_, attr)| attr_exists(attr))
-        }
+        Value::Struct(attrs, _) => attrs.iter().all(|(_, attr)| attr_exists(attr)),
         Value::Sequence(seq, _) => seq.elements().iter().all(exists),
         _other => true,
     }

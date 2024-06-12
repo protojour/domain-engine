@@ -39,11 +39,6 @@ pub enum Value {
     /// A collection of attributes keyed by property.
     Struct(Box<FnvHashMap<RelationshipId, Attr>>, ValueTag),
 
-    /// A collection of attributes keyed by property, but contains
-    /// only partial information, and must contain the ID of the struct (entity) to update.
-    /// FIXME: This is not needed, ValueTag contains this information instead
-    StructUpdate(Box<FnvHashMap<RelationshipId, Attr>>, ValueTag),
-
     /// A collection of arbitrary values keyed by strings.
     Dict(Box<BTreeMap<String, Value>>, ValueTag),
 
@@ -103,7 +98,6 @@ impl Value {
             Value::Struct(_, tag) => *tag,
             Value::Dict(_, tag) => *tag,
             Value::Sequence(_, tag) => *tag,
-            Value::StructUpdate(_, tag) => *tag,
             Value::DeleteRelationship(tag) => *tag,
             Value::Filter(_, tag) => *tag,
         }
@@ -129,7 +123,6 @@ impl Value {
             Value::Struct(_, tag) => tag,
             Value::Dict(_, tag) => tag,
             Value::Sequence(_, tag) => tag,
-            Value::StructUpdate(_, tag) => tag,
             Value::DeleteRelationship(tag) => tag,
             Value::Filter(_, tag) => tag,
         }
@@ -359,11 +352,7 @@ impl<'v> Display for ValueDebug<'v, Value> {
             Value::ChronoDateTime(dt, _) => write!(f, "datetime({dt})"),
             Value::ChronoDate(d, _) => write!(f, "date({d})"),
             Value::ChronoTime(t, _) => write!(f, "time({t})"),
-            Value::Struct(m, _) | Value::StructUpdate(m, _) => {
-                if matches!(value, Value::StructUpdate(..)) {
-                    write!(f, "update")?;
-                }
-
+            Value::Struct(m, _) => {
                 write!(f, "{{")?;
                 let mut iter = m.iter().peekable();
                 while let Some((prop, attr)) = iter.next() {

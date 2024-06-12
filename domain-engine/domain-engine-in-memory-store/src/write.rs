@@ -78,8 +78,8 @@ impl InMemoryStore {
 
         let mut raw_props_update: BTreeMap<RelationshipId, Attr> = Default::default();
 
-        let Value::StructUpdate(data_struct, _) = value else {
-            return Err(DomainError::BadInput(anyhow!("Expected a struct update")));
+        let Value::Struct(data_struct, _) = value else {
+            return Err(DomainError::BadInput(anyhow!("Expected a struct")));
         };
         for (rel_id, attr) in *data_struct {
             let data_relationship = find_data_relationship(type_info, &rel_id)?;
@@ -338,7 +338,7 @@ impl InMemoryStore {
 
         fn write_mode_from_value(value: &Value) -> EdgeWriteMode {
             match value {
-                Value::Struct(_, tag) | Value::StructUpdate(_, tag) => {
+                Value::Struct(_, tag) => {
                     if tag.is_update() {
                         EdgeWriteMode::UpdateExisting
                     } else {

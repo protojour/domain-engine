@@ -202,7 +202,7 @@ impl<'o> Processor for OntolProcessor<'o> {
         let value = self.stack.pop().unwrap();
         if !matches!(value, Value::Unit(_) | Value::Void(_)) {
             match &mut self.stack[target.0 as usize] {
-                Value::Struct(attrs, _) | Value::StructUpdate(attrs, _) => {
+                Value::Struct(attrs, _) => {
                     attrs.insert(key, Attr::Unit(value));
                 }
                 Value::Filter(filter, _) => {
@@ -254,7 +254,7 @@ impl<'o> Processor for OntolProcessor<'o> {
         }
 
         match &mut self.stack[target.0 as usize] {
-            Value::Struct(attrs, _) | Value::StructUpdate(attrs, _) => {
+            Value::Struct(attrs, _) => {
                 attrs.insert(key, Attr::Matrix(AttrMatrix { columns }));
             }
             Value::Filter(filter, _) => {
@@ -582,7 +582,7 @@ impl<'o> OntolProcessor<'o> {
         local: Local,
     ) -> VmResult<&mut FnvHashMap<RelationshipId, Attr>> {
         match self.local_mut(local) {
-            Value::Struct(attrs, _) | Value::StructUpdate(attrs, _) => Ok(attrs.as_mut()),
+            Value::Struct(attrs, _) => Ok(attrs.as_mut()),
             _ => Err(VmError::InvalidType(local)),
         }
     }
