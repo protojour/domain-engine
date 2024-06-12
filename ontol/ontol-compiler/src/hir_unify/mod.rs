@@ -8,7 +8,7 @@ use ontol_runtime::{
 
 use crate::{
     typed_hir::{HirFunc, IntoTypedHirData, TypedHir, TypedHirData},
-    Compiler,
+    Compiler, SourceSpan,
 };
 
 use self::ssa_unifier::SsaUnifier;
@@ -20,7 +20,7 @@ mod ssa_unifier_scope;
 mod ssa_util;
 
 /// note: Unifier errors are usually silent errors, and the compiler just moves on.
-#[derive(Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum UnifierError {
     /// CompileErrors have been reported, so not a silent error
     Reported,
@@ -28,6 +28,7 @@ pub enum UnifierError {
     Unsolvable,
     Unimplemented(String),
     MatrixWithoutRows,
+    PatternRequiresIteratedVariable(SourceSpan),
     #[allow(clippy::upper_case_acronyms)]
     TODO(String),
 }

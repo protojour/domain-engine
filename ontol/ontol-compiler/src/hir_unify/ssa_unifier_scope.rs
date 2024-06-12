@@ -17,7 +17,7 @@ use crate::{
     primitive::PrimitiveKind,
     typed_hir::{Meta, TypedHir, TypedHirData},
     types::{Type, UNIT_TYPE},
-    CompileError, SourceSpan, NO_SPAN,
+    SourceSpan, NO_SPAN,
 };
 
 use super::{
@@ -323,12 +323,9 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             *iter_label.meta(),
                         )))
                     } else {
-                        // TODO
-                        // Ok(Binding::Wildcard)
-                        CompileError::PatternRequiresIteratedVariable
-                            .span(node_ref.span())
-                            .report(self);
-                        Ok(Binding::Wildcard)
+                        Err(UnifierError::PatternRequiresIteratedVariable(
+                            node_ref.meta().span,
+                        ))
                     }
                 } else {
                     // TODO
@@ -555,6 +552,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             } else {
                                 self.push_let(Let::Prop(pack, (var, rel_id)), span, scoped, lets);
                             }
+                        } else {
+                            return Err(UnifierError::PatternRequiresIteratedVariable(span));
                         }
                     }
                     (_, true, true) => {

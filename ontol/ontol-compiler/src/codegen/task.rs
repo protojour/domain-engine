@@ -21,14 +21,14 @@ use crate::{
         code_generator::map_codegen, static_condition::generate_static_condition_from_scope,
     },
     def::{DefKind, Defs},
-    hir_unify::unify_to_function,
+    hir_unify::{unify_to_function, UnifierError, UnifierResult},
     map::UndirectedMapKey,
     package::ONTOL_PKG,
     pattern::PatId,
     type_check::MapArmsKind,
     typed_hir::TypedRootNode,
     types::Type,
-    CompileError, CompileErrors, Compiler, Note, SourceSpan,
+    CompileError, CompileErrors, Compiler, Note, SourceSpan, SpannedCompileError,
 };
 
 use super::{
@@ -462,7 +462,7 @@ fn generate_pattern_map<'m>(
     debug!("1st (ty={:?}):\n{}", arms[0].data().ty(), arms[0]);
     debug!("2nd (ty={:?}):\n{}", arms[1].data().ty(), arms[1]);
 
-    let down_key = {
+    let down_result = {
         let _entered = debug_span!("down").entered();
         generate_ontol_map_procs(
             &arms[0],
@@ -474,7 +474,7 @@ fn generate_pattern_map<'m>(
         )
     };
 
-    {
+    let up_result = {
         let _entered = debug_span!("up").entered();
         generate_ontol_map_procs(
             &arms[1],
@@ -483,22 +483,46 @@ fn generate_pattern_map<'m>(
             externed_outputs,
             proc_table,
             compiler,
-        );
-    }
+        )
+    };
 
-    match (compiler.map_ident(map_def_id), down_key) {
-        (Some(ident), Some(down_key)) => {
+    match (compiler.map_ident(map_def_id), down_result.clone()) {
+        (Some(ident), Ok(Some(down_key))) => {
             let ident_constant = compiler.str_ctx.intern_constant(ident);
             proc_table
                 .named_downmaps
                 .insert((map_def_id.package_id(), ident_constant), down_key);
         }
-        (Some(_), None) => {
+        (Some(_), _) => {
             CompileError::BUG("Failed to generate forward mapping")
                 .span(span)
                 .report(compiler);
         }
         _ => {}
+    }
+
+    if let (Err(down), Err(up)) = (down_result, up_result) {
+        if down == up {
+            if let Some(error) = unifier_error_to_compiler(down) {
+                error.report(compiler);
+            }
+        } else {
+            if let Some(down) = unifier_error_to_compiler(down) {
+                down.report(compiler);
+            }
+            if let Some(up) = unifier_error_to_compiler(up) {
+                up.report(compiler);
+            }
+        }
+    }
+}
+
+fn unifier_error_to_compiler(error: UnifierError) -> Option<SpannedCompileError> {
+    match error {
+        UnifierError::PatternRequiresIteratedVariable(span) => {
+            Some(CompileError::PatternRequiresIteratedVariable.span(span))
+        }
+        _ => None,
     }
 }
 
@@ -509,7 +533,7 @@ fn generate_ontol_map_procs<'m>(
     externed_outputs: &FnvHashSet<DefId>,
     proc_table: &mut ProcTable,
     compiler: &mut Compiler<'m>,
-) -> Option<MapKey> {
+) -> UnifierResult<Option<MapKey>> {
     let needs_pure_partial = match expr.as_ref().kind() {
         ontol_hir::Kind::Struct(_, flags, _) if flags.contains(StructFlags::MATCH) => expr
             .as_ref()
@@ -522,7 +546,7 @@ fn generate_ontol_map_procs<'m>(
         _ => false,
     };
 
-    let key = generate_map_proc(
+    let key_result = generate_map_proc(
         scope,
         expr,
         direction,
@@ -534,7 +558,7 @@ fn generate_ontol_map_procs<'m>(
 
     if needs_pure_partial {
         let _entered = debug_span!("pure").entered();
-        generate_map_proc(
+        let _ = generate_map_proc(
             scope,
             expr,
             direction,
@@ -545,7 +569,7 @@ fn generate_ontol_map_procs<'m>(
         );
     }
 
-    if let Some(key) = key {
+    if let Ok(Some(key)) = key_result {
         let needs_static_condition = scope
             .arena()
             .iter_data()
@@ -560,7 +584,7 @@ fn generate_ontol_map_procs<'m>(
         }
     }
 
-    key
+    key_result
 }
 
 fn generate_map_proc<'m>(
@@ -571,12 +595,12 @@ fn generate_map_proc<'m>(
     externed_outputs: &FnvHashSet<DefId>,
     proc_table: &mut ProcTable,
     compiler: &mut Compiler<'m>,
-) -> Option<MapKey> {
+) -> UnifierResult<Option<MapKey>> {
     let func = match unify_to_function(scope, expr, direction, map_flags, compiler) {
         Ok(func) => func,
         Err(err) => {
             debug!("unifier error: {err:?}");
-            return None;
+            return Err(err);
         }
     };
 
@@ -591,7 +615,7 @@ fn generate_map_proc<'m>(
         if let Some(output_def_id) = expr.data().ty().get_single_def_id() {
             if externed_outputs.contains(&output_def_id) {
                 debug!("Direction is covered by extern; skipping codegen");
-                return None;
+                return Ok(None);
             }
         }
     }
@@ -600,7 +624,7 @@ fn generate_map_proc<'m>(
 
     let key = map_codegen(proc_table, &func, map_flags, direction, compiler);
 
-    Some(key)
+    Ok(Some(key))
 }
 
 fn generate_extern_map(
