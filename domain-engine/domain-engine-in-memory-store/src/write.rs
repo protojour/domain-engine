@@ -33,6 +33,7 @@ use crate::{
 
 use super::core::InMemoryStore;
 
+#[derive(Debug)]
 enum EdgeWriteMode {
     Insert,
     Overwrite,
@@ -117,12 +118,7 @@ impl InMemoryStore {
                     for tuple in matrix.into_rows() {
                         if tuple.elements.iter().any(|value| value.tag().is_delete()) {
                             let mut iter = tuple.elements.into_iter();
-                            let foreign_key = if projection.object.0 == 0 {
-                                iter.next().unwrap()
-                            } else {
-                                iter.next().unwrap();
-                                iter.next().unwrap()
-                            };
+                            let foreign_key = iter.next().unwrap();
 
                             self.delete_entity_relationship(
                                 vertex_key.clone(),
@@ -134,7 +130,8 @@ impl InMemoryStore {
                         } else {
                             self.insert_entity_relationship(
                                 vertex_key.clone(),
-                                (projection, Some(EdgeWriteMode::Insert)),
+                                // Update/Overwriteexisting is determined from value tag
+                                (projection, None),
                                 tuple,
                                 data_relationship,
                                 ctx,
@@ -147,27 +144,6 @@ impl InMemoryStore {
                     Attr::Unit(_unit),
                     ValueCardinality::IndexSet | ValueCardinality::List,
                 ) => {
-                    // if let Value::Patch(patch_attrs, _) = unit {
-                    //     for attr in patch_attrs {
-                    //         if matches!(attr.rel, Value::DeleteRelationship(_)) {
-                    //             self.delete_entity_relationship(
-                    //                 vertex_key.clone(),
-                    //                 projection,
-                    //                 attr.val,
-                    //                 data_relationship,
-                    //                 ctx,
-                    //             )?;
-                    //         } else {
-                    //             self.insert_entity_relationship(
-                    //                 vertex_key.clone(),
-                    //                 (projection, None),
-                    //                 attr,
-                    //                 data_relationship,
-                    //                 ctx,
-                    //             )?;
-                    //         }
-                    //     }
-                    // } else {
                     return Err(DomainError::DataStoreBadRequest(anyhow!(
                         "invalid input for multi-relation write"
                     )));
@@ -362,8 +338,13 @@ impl InMemoryStore {
 
         fn write_mode_from_value(value: &Value) -> EdgeWriteMode {
             match value {
-                Value::Struct(..) => EdgeWriteMode::Insert,
-                Value::StructUpdate(..) => EdgeWriteMode::UpdateExisting,
+                Value::Struct(_, tag) | Value::StructUpdate(_, tag) => {
+                    if tag.is_update() {
+                        EdgeWriteMode::UpdateExisting
+                    } else {
+                        EdgeWriteMode::Insert
+                    }
+                }
                 _ => EdgeWriteMode::Overwrite,
             }
         }

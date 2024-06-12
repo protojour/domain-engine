@@ -1,11 +1,7 @@
 use serde::de::Visitor;
-use smallvec::smallvec;
-use thin_vec::{thin_vec, ThinVec};
 
 use crate::{
-    attr::Attr,
-    tuple::EndoTuple,
-    value::{Value, ValueTag},
+    attr::{Attr, AttrMatrix},
     DefId,
 };
 
@@ -40,7 +36,7 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
     where
         A: serde::de::MapAccess<'de>,
     {
-        let mut patches: ThinVec<Attr> = thin_vec![];
+        let mut patch_matrix: AttrMatrix = AttrMatrix::default();
 
         while let Some(operation) = map.next_key::<Operation>()? {
             match operation {
@@ -57,13 +53,23 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
                         sub_processor.ctx.is_update = true;
                     }
 
-                    let Attr::Unit(Value::Sequence(seq, _def_id)) =
-                        map.next_value_seed(sub_processor)?
-                    else {
-                        return Err(<A::Error as serde::de::Error>::custom("Not a sequence"));
+                    let attr = map.next_value_seed(sub_processor)?;
+
+                    let Attr::Matrix(mut matrix) = attr else {
+                        return Err(<A::Error as serde::de::Error>::custom(
+                            "Not a matrix (add|update)",
+                        ));
                     };
 
-                    patches.extend(seq.elements.into_iter().map(Attr::Unit));
+                    if matches!(operation, Operation::Update) {
+                        for column in matrix.columns.iter_mut() {
+                            for value in column.elements.iter_mut() {
+                                value.tag_mut().set_is_update();
+                            }
+                        }
+                    }
+
+                    patch_matrix.extend(matrix);
                 }
                 Operation::Remove => {
                     let mut sub_processor = self.entity_sequence_processor.with_level(
@@ -76,21 +82,23 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
                     // Go to id-only mode
                     sub_processor.mode = ProcessorMode::Delete;
 
-                    let Attr::Unit(Value::Sequence(seq, _def_id)) =
-                        map.next_value_seed(sub_processor)?
-                    else {
-                        return Err(<A::Error as serde::de::Error>::custom("Not a sequence"));
+                    let Attr::Matrix(mut matrix) = map.next_value_seed(sub_processor)? else {
+                        return Err(<A::Error as serde::de::Error>::custom(
+                            "Not a matrix (delete)",
+                        ));
                     };
 
-                    patches.extend(seq.elements.into_iter().map(|value| {
-                        Attr::Tuple(Box::new(EndoTuple {
-                            elements: smallvec![value, Value::DeleteRelationship(ValueTag::unit())],
-                        }))
-                    }));
+                    for column in matrix.columns.iter_mut() {
+                        for value in column.elements.iter_mut() {
+                            value.tag_mut().set_is_delete();
+                        }
+                    }
+
+                    patch_matrix.extend(matrix);
                 }
             }
         }
 
-        Ok(Attr::Unit(Value::Patch(patches, self.type_def_id.into())))
+        Ok(Attr::Matrix(patch_matrix))
     }
 }

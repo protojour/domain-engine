@@ -4,7 +4,7 @@ use std::{fmt::Debug, str::FromStr};
 
 use ::serde::{Deserialize, Serialize};
 use ontol_macros::OntolDebug;
-use value::{TagPkg, ValueTagError};
+use value::{TagFlags, ValueTagError};
 
 pub mod attr;
 pub mod cast;
@@ -44,7 +44,7 @@ impl PackageId {
     }
 
     pub const fn from_u16(value: u16) -> Result<Self, ValueTagError> {
-        if value <= TagPkg::PKG_MASk.bits() {
+        if value <= TagFlags::PKG_MASk.bits() {
             Ok(Self(value))
         } else {
             Err(ValueTagError)
@@ -52,7 +52,7 @@ impl PackageId {
     }
 
     pub fn increase(&mut self) -> Result<(), ValueTagError> {
-        if self.0 < TagPkg::PKG_MASk.bits() {
+        if self.0 < TagFlags::PKG_MASk.bits() {
             self.0 += 1;
             Ok(())
         } else {

@@ -41,6 +41,7 @@ pub enum Value {
 
     /// A collection of attributes keyed by property, but contains
     /// only partial information, and must contain the ID of the struct (entity) to update.
+    /// FIXME: This is not needed, ValueTag contains this information instead
     StructUpdate(Box<FnvHashMap<RelationshipId, Attr>>, ValueTag),
 
     /// A collection of arbitrary values keyed by strings.
@@ -56,15 +57,6 @@ pub enum Value {
     ///
     /// FIXME: Refactor this to be a pure Array of Values
     Sequence(Sequence<Value>, ValueTag),
-
-    /// A patching of some graph property of entities.
-    ///
-    /// The type of each attribute carry the patch semantics:
-    ///
-    /// * `Attr::Tuple(Struct, rel_params)`: Write a new entity
-    /// * `Attr::Tuple(StructUpdate, rel_params)`: Update the given entity with new rel_params
-    /// * `Attr::Tuple(ID, Value::Delete)`: Delete the given ID
-    Patch(ThinVec<Attr>, ValueTag),
 
     /// Special rel_params used for edge deletion
     DeleteRelationship(ValueTag),
@@ -111,7 +103,6 @@ impl Value {
             Value::Struct(_, tag) => *tag,
             Value::Dict(_, tag) => *tag,
             Value::Sequence(_, tag) => *tag,
-            Value::Patch(_, tag) => *tag,
             Value::StructUpdate(_, tag) => *tag,
             Value::DeleteRelationship(tag) => *tag,
             Value::Filter(_, tag) => *tag,
@@ -138,7 +129,6 @@ impl Value {
             Value::Struct(_, tag) => tag,
             Value::Dict(_, tag) => tag,
             Value::Sequence(_, tag) => tag,
-            Value::Patch(_, tag) => tag,
             Value::StructUpdate(_, tag) => tag,
             Value::DeleteRelationship(tag) => tag,
             Value::Filter(_, tag) => tag,
@@ -289,30 +279,39 @@ impl ValueTag {
     }
 
     pub const fn def(&self) -> DefId {
-        DefId(PackageId(self.first & TagPkg::PKG_MASk.bits()), self.second)
+        DefId(
+            PackageId(self.first & TagFlags::PKG_MASk.bits()),
+            self.second,
+        )
     }
 
     pub fn set_def(&mut self, def_id: DefId) {
-        self.first = def_id.package_id().0 | (self.first & TagPkg::PKG_MASk.complement().bits());
+        self.first = def_id.package_id().0 | (self.first & TagFlags::PKG_MASk.complement().bits());
         self.second = def_id.1;
     }
 
     pub fn set_is_update(&mut self) {
-        self.first |= TagPkg::UPDATE.bits();
+        self.first |= TagFlags::UPDATE.bits();
+        assert!(self.is_update());
+    }
+
+    pub fn set_is_delete(&mut self) {
+        self.first |= TagFlags::DELETE.bits();
+        assert!(self.is_delete());
     }
 
     pub fn is_update(&self) -> bool {
-        self.first & TagPkg::UPDATE.bits() != 0
+        (self.first & TagFlags::UPDATE.bits()) != 0
     }
 
     pub fn is_delete(&self) -> bool {
-        self.first & TagPkg::DELETE.bits() != 0
+        (self.first & TagFlags::DELETE.bits()) != 0
     }
 }
 
 impl Debug for ValueTag {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let flags = TagPkg::from_bits(self.first & TagPkg::PKG_MASk.complement().bits());
+        let flags = TagFlags::from_bits(self.first & TagFlags::PKG_MASk.complement().bits());
         write!(f, "tag({:?}, {:?})", self.def(), flags)
     }
 }
@@ -336,7 +335,7 @@ pub struct ValueTagError;
 
 bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
-    pub(crate) struct TagPkg: u16 {
+    pub(crate) struct TagFlags: u16 {
         const PKG_MASk = 0b0011111111111111;
         const DELETE   = 0b1000000000000000;
         const UPDATE   = 0b0100000000000000;
@@ -381,16 +380,6 @@ impl<'v> Display for ValueDebug<'v, Value> {
             }
             Value::Sequence(seq, _) => {
                 write!(f, "{}", ValueDebug(seq))
-            }
-            Value::Patch(patch, _) => {
-                write!(f, "patch{{")?;
-                for (pos, attr) in patch.iter().with_position() {
-                    write!(f, "{}", ValueDebug(attr),)?;
-                    if matches!(pos, Position::First | Position::Middle) {
-                        write!(f, ", ")?;
-                    }
-                }
-                write!(f, "}}")
             }
             Value::DeleteRelationship(_) => {
                 write!(f, "DELETE_RELATIONSHIP")

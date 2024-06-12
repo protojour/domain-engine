@@ -149,11 +149,6 @@ impl OntolEquals for Value {
                         .zip(b.elements().iter())
                         .all(|(a, b)| a.ontol_equals(b))
             }
-            (Value::Patch(a, tag_a), Value::Patch(b, tag_b)) => {
-                tag_a.def() == tag_b.def()
-                    && a.len() == b.len()
-                    && a.iter().zip(b.iter()).all(|(a, b)| a.ontol_equals(b))
-            }
             (Value::DeleteRelationship(tag_a), Value::DeleteRelationship(tag_b)) => {
                 tag_a.def() == tag_b.def()
             }
@@ -204,13 +199,6 @@ impl OntolHash for Value {
             Value::Sequence(v, tag) => {
                 tag.def().hash(h);
                 v.ontol_hash(h, builder);
-            }
-            Value::Patch(v, tag) => {
-                tag.def().hash(h);
-                v.len().hash(h);
-                for attr in v.iter() {
-                    attr.ontol_hash(h, builder);
-                }
             }
             Value::DeleteRelationship(tag) => {
                 tag.def().hash(h);

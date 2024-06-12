@@ -343,7 +343,6 @@ impl InMemoryStore {
             }
             (FilterAttr::Matrix(mat), SetOperator::SupersetOf) => {
                 let mut tup = Default::default();
-                let mut rows = mat.rows();
 
                 for (rel_term, val_term) in members.iter() {
                     let mut found = false;

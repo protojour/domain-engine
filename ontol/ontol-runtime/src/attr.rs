@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tracing::debug;
@@ -166,6 +168,38 @@ impl AttrMatrix {
 
         Some(Attr::Tuple(Box::new(EndoTuple { elements })))
     }
+
+    pub fn extend(&mut self, other: AttrMatrix) {
+        match self.columns.len().cmp(&other.columns.len()) {
+            Ordering::Less => {
+                self.columns
+                    .resize_with(other.columns.len(), || Default::default());
+
+                let max_column_len = self
+                    .columns
+                    .iter()
+                    .map(|col| col.elements.len())
+                    .max()
+                    .unwrap_or(0);
+
+                for column in self.columns.iter_mut() {
+                    if column.elements.len() < max_column_len {
+                        todo!("pad column values 1");
+                    }
+                }
+
+                self.extend(other);
+            }
+            Ordering::Equal => {
+                for (col, col2) in self.columns.iter_mut().zip(other.columns.into_iter()) {
+                    col.extend(col2.elements);
+                }
+            }
+            Ordering::Greater => {
+                todo!("pad column values 2");
+            }
+        }
+    }
 }
 
 impl FromIterator<Sequence<Value>> for AttrMatrix {
@@ -182,6 +216,12 @@ pub struct AttrMatrixRef<'v> {
 }
 
 impl<'v> AttrMatrixRef<'v> {
+    pub fn from_ref(seq: &'v Sequence<Value>) -> Self {
+        Self {
+            columns: std::slice::from_ref(seq),
+        }
+    }
+
     pub fn rows(&self) -> AttrMatrixRows<'v> {
         let columns = self
             .columns
@@ -271,7 +311,7 @@ impl<'v> AttrRef<'v> {
         }
     }
 
-    pub fn as_unit(&self) -> Option<&Value> {
+    pub fn as_unit(self) -> Option<&'v Value> {
         match self {
             Self::Unit(v) => Some(v),
             _ => None,
