@@ -31,10 +31,7 @@ impl<'on> ValueMatcher for StringMatcher<'on> {
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
-        Ok(Value::Text(
-            str.into(),
-            self.def_id.try_into().map_err(|_| ())?,
-        ))
+        Ok(Value::Text(str.into(), self.def_id.into()))
     }
 }
 
@@ -51,10 +48,7 @@ impl<'on> ValueMatcher for ConstantStringMatcher<'on> {
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
         if str == self.constant {
-            Ok(Value::Text(
-                str.into(),
-                self.def_id.try_into().map_err(|_| ())?,
-            ))
+            Ok(Value::Text(str.into(), self.def_id.into()))
         } else {
             Err(())
         }
@@ -139,10 +133,7 @@ impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
                     }
                 }
 
-                Ok(Value::Struct(
-                    Box::new(attrs),
-                    self.def_id.try_into().map_err(|_| ())?,
-                ))
+                Ok(Value::Struct(Box::new(attrs), self.def_id.into()))
             }
         }
     }

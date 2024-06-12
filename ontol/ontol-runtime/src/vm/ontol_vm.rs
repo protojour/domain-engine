@@ -653,12 +653,9 @@ fn extract_regex_captures(
         .iter()
         .enumerate()
         .filter_map(|(index, value)| if value { Some(index) } else { None })
-        .map(|index| {
-            let value = match captures.get_group(index) {
-                Some(span) => Value::Text(haystack[span.start..span.end].into(), text_tag),
-                None => Value::Void(ValueTag::unit()),
-            };
-            value
+        .map(|index| match captures.get_group(index) {
+            Some(span) => Value::Text(haystack[span.start..span.end].into(), text_tag),
+            None => Value::Void(ValueTag::unit()),
         })
         .collect()
 }
@@ -918,9 +915,7 @@ mod tests {
         let mut lib = Lib::default();
 
         let prop: RelationshipId = "R:0:42".parse().unwrap();
-        let Ok(inner_tag) = ValueTag::try_from(def_id(100)) else {
-            panic!()
-        };
+        let inner_tag = ValueTag::from(def_id(100));
 
         let proc = lib.append_procedure(
             NParams(1),

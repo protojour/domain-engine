@@ -236,9 +236,11 @@ async fn mutation(
                     BatchWriteResponse::Deleted(bools) => {
                         let bool_type = schema_ctx.ontology.ontol_domain_meta().bool;
 
-                        output_sequence.extend(bools.into_iter().map(|bool| {
-                            Value::I64(if bool { 1 } else { 0 }, bool_type.into()).into()
-                        }))
+                        output_sequence.extend(
+                            bools
+                                .into_iter()
+                                .map(|bool| Value::I64(if bool { 1 } else { 0 }, bool_type.into())),
+                        )
                     }
                 }
             }

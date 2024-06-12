@@ -711,10 +711,8 @@ fn find_matrix_iter_row<'a, 'm>(
     rows: &'a [MatrixRow<'m, TypedHir>],
 ) -> Option<(TypedHirData<'m, Label>, &'a Nodes)> {
     rows.iter().find_map(|MatrixRow(iter_label, elements)| {
-        if let Some(iter_label) = iter_label {
-            Some((*iter_label, elements))
-        } else {
-            None
-        }
+        iter_label
+            .as_ref()
+            .map(|iter_label| (*iter_label, elements))
     })
 }

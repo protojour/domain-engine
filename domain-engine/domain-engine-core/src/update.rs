@@ -16,7 +16,7 @@ pub fn sanitize_update(update: &mut Value) {
 }
 
 fn remove_none_attrs(attrs: &mut FnvHashMap<RelationshipId, Attr>) {
-    attrs.retain(|_, attr| attr_exists(&attr))
+    attrs.retain(|_, attr| attr_exists(attr))
 }
 
 fn attr_exists(attr: &Attr) -> bool {

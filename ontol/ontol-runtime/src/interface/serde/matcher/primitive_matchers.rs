@@ -38,15 +38,9 @@ impl ValueMatcher for BooleanMatcher {
     fn match_boolean(&self, val: bool) -> Result<Value, ()> {
         let int = if val { 1 } else { 0 };
         match (self, val) {
-            (Self::False(def_id), false) => {
-                Ok(Value::I64(int, (*def_id).try_into().map_err(|_| ())?))
-            }
-            (Self::True(def_id), true) => {
-                Ok(Value::I64(int, (*def_id).try_into().map_err(|_| ())?))
-            }
-            (Self::Boolean(def_id), _) => {
-                Ok(Value::I64(int, (*def_id).try_into().map_err(|_| ())?))
-            }
+            (Self::False(def_id), false) => Ok(Value::I64(int, (*def_id).into())),
+            (Self::True(def_id), true) => Ok(Value::I64(int, (*def_id).into())),
+            (Self::Boolean(def_id), _) => Ok(Value::I64(int, (*def_id).into())),
             _ => Err(()),
         }
     }
@@ -73,7 +67,7 @@ impl ValueMatcher for NumberMatcher<i64> {
             }
         }
 
-        Ok(Value::I64(value, self.def_id.try_into().map_err(|_| ())?))
+        Ok(Value::I64(value, self.def_id.into()))
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
@@ -99,10 +93,7 @@ impl ValueMatcher for NumberMatcher<i32> {
             }
         }
 
-        Ok(Value::I64(
-            value as i64,
-            self.def_id.try_into().map_err(|_| ())?,
-        ))
+        Ok(Value::I64(value as i64, self.def_id.into()))
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
@@ -130,7 +121,7 @@ impl ValueMatcher for NumberMatcher<f64> {
             }
         }
 
-        Ok(Value::F64(value, self.def_id.try_into().map_err(|_| ())?))
+        Ok(Value::F64(value, self.def_id.into()))
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
@@ -144,10 +135,7 @@ impl ValueMatcher for NumberMatcher<Serial> {
     }
 
     fn match_u64(&self, value: u64) -> Result<Value, ()> {
-        Ok(Value::Serial(
-            Serial(value),
-            self.def_id.try_into().map_err(|_| ())?,
-        ))
+        Ok(Value::Serial(Serial(value), self.def_id.into()))
     }
 
     fn match_i64(&self, value: i64) -> Result<Value, ()> {

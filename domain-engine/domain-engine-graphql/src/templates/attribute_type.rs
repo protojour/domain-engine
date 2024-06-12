@@ -328,7 +328,7 @@ impl<'v> AttributeType<'v> {
                 AttrRef::Unit(Value::Struct(attrs, _)),
                 FieldKind::FlattenedProperty { proxy, id, .. },
             ) => {
-                let Some(Attr::Unit(value)) = attrs.get(&proxy) else {
+                let Some(Attr::Unit(value)) = attrs.get(proxy) else {
                     warn!("proxy attribute not found");
                     return Ok(graphql_value!(None));
                 };

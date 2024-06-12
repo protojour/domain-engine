@@ -353,7 +353,7 @@ impl InMemoryStore {
         let value = tuple_iter
             .next()
             .ok_or_else(|| DomainError::BadInput(anyhow!("misconfigured tuple")))?;
-        let params = tuple_iter.next().unwrap_or_else(|| Value::unit());
+        let params = tuple_iter.next().unwrap_or_else(Value::unit);
 
         let (write_mode, foreign_key) = match &data_relationship.target {
             DataRelationshipTarget::Unambiguous(entity_def_id) => {

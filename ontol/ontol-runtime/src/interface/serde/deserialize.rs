@@ -493,7 +493,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> MatcherVisitor<'on, 'p, M> {
                 Some(attribute) => {
                     make_attr
                         .try_push(attribute)
-                        .map_err(|msg| serde::de::Error::custom(msg))?;
+                        .map_err(serde::de::Error::custom)?;
                 }
                 None => {
                     return if sequence_matcher.match_seq_end().is_ok() {

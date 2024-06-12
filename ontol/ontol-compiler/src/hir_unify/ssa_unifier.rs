@@ -239,7 +239,6 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             self.write_matrix_body(rows, *node_ref.meta(), &out_columns, mode)?;
 
                         let column_seq_types = (0..arity)
-                            .into_iter()
                             .map(|idx| node_ref.meta().ty.matrix_column_type(idx, self.types))
                             .collect_vec();
 
@@ -1206,7 +1205,7 @@ impl<'c, 'm> AsMut<CompileErrors> for SsaUnifier<'c, 'm> {
 fn mk_member_clause(term_tuple: Vec<EvalCondTerm>) -> Clause<Var, EvalCondTerm> {
     match term_tuple.len() {
         0 => Clause::Member(EvalCondTerm::Wildcard, EvalCondTerm::Wildcard),
-        1 => Clause::Member(EvalCondTerm::Wildcard, term_tuple[0].clone()),
-        _ => Clause::Member(term_tuple[1].clone(), term_tuple[0].clone()),
+        1 => Clause::Member(EvalCondTerm::Wildcard, term_tuple[0]),
+        _ => Clause::Member(term_tuple[1], term_tuple[0]),
     }
 }

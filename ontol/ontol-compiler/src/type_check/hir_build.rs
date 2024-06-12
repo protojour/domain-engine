@@ -676,17 +676,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             SmallVec::with_capacity(elements.len());
 
         for element in elements {
-            let rel = match &element.rel {
-                Some(pattern) => Some(self.build_node(
+            let rel = element.rel.as_ref().map(|pattern| {
+                self.build_node(
                     pattern,
                     NodeInfo {
                         expected_ty: Some((rel_ty, Strength::Strong)),
                         parent_struct_flags,
                     },
                     ctx,
-                )),
-                None => None,
-            };
+                )
+            });
             let val = self.build_node(
                 &element.val,
                 NodeInfo {

@@ -915,8 +915,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     span,
                     self.builder,
                 );
-                let mut scope = vec![];
-                scope.push((seq_local, ontol_hir::Binding::Binder(binders[0])));
+                let scope = vec![(seq_local, ontol_hir::Binding::Binder(binders[0]))];
 
                 self.gen_in_scope(&scope, nodes, arena, block);
                 block.pop_until(seq_local, span, self.builder);

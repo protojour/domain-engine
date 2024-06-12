@@ -125,7 +125,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 _,
                 AttrRef::Unit(Value::Sequence(seq, _)),
             ) => self.serialize_sequence(
-                seq.elements.iter().map(|value| AttrRef::Unit(value)),
+                seq.elements.iter().map(AttrRef::Unit),
                 seq.elements.len(),
                 &seq_op.ranges,
                 serializer,
@@ -313,7 +313,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     })?;
                 }
             } else {
-                while let Some(attr) = elements.next() {
+                for attr in elements.by_ref() {
                     seq.serialize_element(&Proxy {
                         attr,
                         processor: self.narrow(range.addr),
@@ -325,7 +325,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         seq.end()
     }
 
-    fn serialize_matrix<'v, S: Serializer>(
+    fn serialize_matrix<S: Serializer>(
         &self,
         matrix: AttrMatrixRef,
         ranges: &[SequenceRange],

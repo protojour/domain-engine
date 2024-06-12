@@ -407,10 +407,7 @@ mod tests {
     }
 
     fn def(id: u16) -> ValueTag {
-        let Ok(tag) = DefId(crate::PackageId(1337), id).try_into() else {
-            panic!()
-        };
-        tag
+        DefId(crate::PackageId(1337), id).into()
     }
 
     fn text(t: &str) -> Value {

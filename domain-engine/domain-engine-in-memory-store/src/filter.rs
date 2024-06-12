@@ -11,9 +11,7 @@ use ontol_runtime::{
 
 use domain_engine_core::{
     filter::walker::{ConditionWalker, Members},
-    // filter::plan::{PlanEntry, Scalar},
-    DomainError,
-    DomainResult,
+    DomainError, DomainResult,
 };
 use tracing::{error, warn};
 
@@ -28,16 +26,12 @@ pub(super) enum FilterVal<'d> {
         dynamic_key: Option<&'d DynamicKey>,
         prop_tree: &'d FnvHashMap<RelationshipId, Attr>,
     },
+    #[allow(unused)]
     Sequence(&'d [Value]),
     Scalar(&'d Value),
 }
 
 pub(super) enum FilterAttr<'d> {
-    Struct {
-        type_def_id: DefId,
-        dynamic_key: Option<&'d DynamicKey>,
-        prop_tree: &'d FnvHashMap<RelationshipId, Attr>,
-    },
     Tuple(FilterVal<'d>, FilterVal<'d>),
     Matrix(&'d AttrMatrix),
     Scalar(FilterVal<'d>),

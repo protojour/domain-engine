@@ -154,7 +154,7 @@ impl InMemoryStore {
                 ctx,
             )?;
 
-            entity_sequence.push(value.into());
+            entity_sequence.push(value);
         }
 
         Ok(entity_sequence)

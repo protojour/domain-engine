@@ -207,8 +207,8 @@ pub struct TypeMapping<'m> {
 }
 
 impl<'c, 'm> SsaUnifier<'c, 'm> {
-    pub fn scan_immediate_free_vars<'s>(
-        &'s self,
+    pub fn scan_immediate_free_vars(
+        &self,
         arena: &ontol_hir::arena::Arena<TypedHir>,
         nodes: &[ontol_hir::Node],
     ) -> VarSet {
@@ -249,7 +249,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 }
 
                 if let Some(expand_tuple) = self.iter_tuple_vars.get(&var) {
-                    for (_, var) in expand_tuple {
+                    for var in expand_tuple.values() {
                         self.visit_var(*var);
                     }
                 }
@@ -278,7 +278,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             binders: Default::default(),
             iter_tuple_vars: &self.iter_tuple_vars,
         };
-        for (index, node) in nodes.into_iter().enumerate() {
+        for (index, node) in nodes.iter().enumerate() {
             analyzer.visit_node(index, arena.node_ref(*node));
         }
         analyzer.free_vars

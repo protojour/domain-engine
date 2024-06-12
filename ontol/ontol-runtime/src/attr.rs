@@ -42,7 +42,7 @@ impl Attr {
             Self::Unit(v) => Some(v),
             Self::Tuple(t) => {
                 if t.elements.len() == 1 {
-                    t.elements.get(0)
+                    t.elements.first()
                 } else {
                     None
                 }
@@ -173,7 +173,7 @@ impl AttrMatrix {
         match self.columns.len().cmp(&other.columns.len()) {
             Ordering::Less => {
                 self.columns
-                    .resize_with(other.columns.len(), || Default::default());
+                    .resize_with(other.columns.len(), Default::default);
 
                 let max_column_len = self
                     .columns
@@ -337,7 +337,7 @@ impl<'v> AttrTupleRef<'v> {
     pub fn get(self, index: usize) -> Option<&'v Value> {
         match self {
             Self::Tuple(t) => t.get(index),
-            Self::Row(r) => r.get(index).map(|v| *v),
+            Self::Row(r) => r.get(index).copied(),
         }
     }
 }
