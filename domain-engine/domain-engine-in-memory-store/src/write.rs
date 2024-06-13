@@ -8,7 +8,7 @@ use ontol_runtime::{
     ontology::{
         domain::{
             DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget,
-            EdgeCardinalProjection, EntityInfo,
+            EdgeCardinalProjection, Entity,
         },
         ontol::ValueGenerator,
     },
@@ -216,19 +216,19 @@ impl InMemoryStore {
         );
 
         let def = ctx.ontology.def(vertex.type_def_id());
-        let entity_info = def
-            .entity_info()
+        let entity = def
+            .entity()
             .ok_or(DomainError::NotAnEntity(vertex.type_def_id()))?;
 
         let (id, id_generated) = match find_inherent_entity_id(&vertex, &ctx.ontology)? {
             Some(id) => (id, false),
             None => {
-                let value_generator = entity_info.id_value_generator.ok_or_else(|| {
+                let value_generator = entity.id_value_generator.ok_or_else(|| {
                     DomainError::DataStoreBadRequest(anyhow!("No id provided and no ID generator"))
                 })?;
 
                 (
-                    self.generate_entity_id(entity_info.id_operator_addr, value_generator, ctx)?,
+                    self.generate_entity_id(entity.id_operator_addr, value_generator, ctx)?,
                     true,
                 )
             }
@@ -241,7 +241,7 @@ impl InMemoryStore {
         };
 
         if id_generated {
-            struct_map.insert(entity_info.id_relationship_id, id.clone().into());
+            struct_map.insert(entity.id_relationship_id, id.clone().into());
         }
 
         let mut raw_props: FnvHashMap<RelationshipId, Attr> = Default::default();
@@ -371,7 +371,7 @@ impl InMemoryStore {
                         write_mode.unwrap_or(write_mode_from_value(&params)),
                         self.resolve_foreign_key_for_edge(
                             *entity_def_id,
-                            ctx.ontology.def(*entity_def_id).entity_info().unwrap(),
+                            ctx.ontology.def(*entity_def_id).entity().unwrap(),
                             value,
                             ctx,
                         )?,
@@ -393,14 +393,13 @@ impl InMemoryStore {
 
                     (write_mode, foreign_key)
                 } else {
-                    let (variant_def_id, entity_info) = variants
+                    let (variant_def_id, entity) = variants
                         .iter()
                         .find_map(|variant_def_id| {
-                            let entity_info =
-                                ctx.ontology.def(*variant_def_id).entity_info().unwrap();
+                            let entity = ctx.ontology.def(*variant_def_id).entity().unwrap();
 
-                            if entity_info.id_value_def_id == value.type_def_id() {
-                                Some((*variant_def_id, entity_info))
+                            if entity.id_value_def_id == value.type_def_id() {
+                                Some((*variant_def_id, entity))
                             } else {
                                 None
                             }
@@ -409,7 +408,7 @@ impl InMemoryStore {
 
                     (
                         write_mode.unwrap_or(write_mode_from_value(&params)),
-                        self.resolve_foreign_key_for_edge(variant_def_id, entity_info, value, ctx)?,
+                        self.resolve_foreign_key_for_edge(variant_def_id, entity, value, ctx)?,
                     )
                 }
             }
@@ -508,26 +507,26 @@ impl InMemoryStore {
             DataRelationshipTarget::Unambiguous(entity_def_id) => self
                 .resolve_foreign_key_for_edge(
                     *entity_def_id,
-                    ctx.ontology.def(*entity_def_id).entity_info().unwrap(),
+                    ctx.ontology.def(*entity_def_id).entity().unwrap(),
                     foreign_id,
                     ctx,
                 )?,
             DataRelationshipTarget::Union(union_def_id) => {
                 let variants = ctx.ontology.union_variants(*union_def_id);
-                let (variant_def_id, entity_info) = variants
+                let (variant_def_id, entity) = variants
                     .iter()
                     .find_map(|variant_def_id| {
-                        let entity_info = ctx.ontology.def(*variant_def_id).entity_info().unwrap();
+                        let entity = ctx.ontology.def(*variant_def_id).entity().unwrap();
 
-                        if entity_info.id_value_def_id == foreign_id.type_def_id() {
-                            Some((*variant_def_id, entity_info))
+                        if entity.id_value_def_id == foreign_id.type_def_id() {
+                            Some((*variant_def_id, entity))
                         } else {
                             None
                         }
                     })
                     .expect("Corresponding entity def id not found for the given ID");
 
-                self.resolve_foreign_key_for_edge(variant_def_id, entity_info, foreign_id, ctx)?
+                self.resolve_foreign_key_for_edge(variant_def_id, entity, foreign_id, ctx)?
             }
         };
 
@@ -566,19 +565,19 @@ impl InMemoryStore {
     fn resolve_foreign_key_for_edge(
         &mut self,
         foreign_entity_def_id: DefId,
-        entity_info: &EntityInfo,
+        entity: &Entity,
         id_value: Value,
         ctx: &DbContext,
     ) -> DomainResult<VertexKey> {
         let foreign_key = Self::extract_dynamic_key(&id_value)?;
         let entity_data = self.look_up_vertex(foreign_entity_def_id, &foreign_key);
 
-        if entity_data.is_none() && entity_info.is_self_identifying {
+        if entity_data.is_none() && entity.is_self_identifying {
             // This type has UPSERT semantics.
             // Synthesize the entity, write it and move on..
 
             let entity_data =
-                FnvHashMap::from_iter([(entity_info.id_relationship_id, Attr::from(id_value))]);
+                FnvHashMap::from_iter([(entity.id_relationship_id, Attr::from(id_value))]);
             self.write_new_vertex_inner(
                 Value::Struct(Box::new(entity_data), foreign_entity_def_id.into()),
                 ctx,

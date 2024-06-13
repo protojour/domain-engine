@@ -372,8 +372,8 @@ fn entity_union_in_relation_with_ids() {
     let [artist, guitar_id, synth_id] = test.bind(["artist", "guitar_id", "synth_id"]);
     let plays = artist.find_property("plays").unwrap();
 
-    assert!(artist.def.entity_info().is_some());
-    assert!(guitar_id.def.entity_info().is_none());
+    assert!(artist.def.entity().is_some());
+    assert!(guitar_id.def.entity().is_none());
 
     let json = json!({
         "name": "Someone",

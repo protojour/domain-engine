@@ -79,9 +79,7 @@ impl<'e> ObjectGenerator<'e> {
         addr: SerdeOperatorAddr,
     ) {
         let operator = &self.ontology[addr];
-        let id_relationship = def
-            .entity_info()
-            .map(|entity_info| entity_info.id_relationship_id);
+        let id_relationship = def.entity().map(|entity| entity.id_relationship_id);
 
         match operator {
             SerdeOperator::Struct(struct_op) => {

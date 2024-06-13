@@ -1,5 +1,5 @@
 use lsp_types::{CompletionItem, CompletionItemKind};
-use ontol_runtime::ontology::domain::TypeKind;
+use ontol_runtime::ontology::domain::DefKind;
 
 use crate::state::{HoverDoc, State};
 
@@ -90,9 +90,9 @@ impl State {
                                 .map(|docs_constant| &self.ontology[docs_constant])
                                 .unwrap_or_default();
                             let kind = match def.kind {
-                                TypeKind::Entity(_) | TypeKind::Data(_) => Some("Primitive"),
-                                TypeKind::Relationship(_) => Some("Relation type"),
-                                TypeKind::Generator(_) => Some("Generator type"),
+                                DefKind::Entity(_) | DefKind::Data(_) => Some("Primitive"),
+                                DefKind::Relationship(_) => Some("Relation type"),
+                                DefKind::Generator(_) => Some("Generator type"),
                                 _ => Some("")
                             };
                             kind.map(|kind| HoverDoc::from(

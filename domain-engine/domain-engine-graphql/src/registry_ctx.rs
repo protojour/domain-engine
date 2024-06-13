@@ -290,10 +290,10 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 Ok(ControlFlow::Break(()))
             }
             SerdeOperator::IdSingletonStruct(entity_id, property_name, id_operator_addr) => {
-                let entity_info = self.schema_ctx.ontology.def(*entity_id);
+                let entity = self.schema_ctx.ontology.def(*entity_id);
                 let property_name = &self.schema_ctx.ontology[*property_name];
                 if self.filter_argument_property(
-                    entity_info,
+                    entity,
                     property_name,
                     None,
                     &filter,
@@ -481,7 +481,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 // If this is an entity, use Edge + InputOrReference
                 // to get the option of just specifying an ID.
                 // TODO: Ensure this for create mutations only
-                let (query_level, typing_purpose) = if def.entity_info().is_some() {
+                let (query_level, typing_purpose) = if def.entity().is_some() {
                     (
                         QueryLevel::Edge { rel_params: None },
                         TypingPurpose::InputOrReference,

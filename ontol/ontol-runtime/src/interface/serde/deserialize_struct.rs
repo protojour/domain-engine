@@ -8,7 +8,7 @@ use crate::{
     attr::Attr,
     format_utils::{DoubleQuote, LogicOp, Missing},
     interface::serde::deserialize_raw::RawVisitor,
-    ontology::{domain::TypeKind, ontol::ValueGenerator},
+    ontology::{domain::DefKind, ontol::ValueGenerator},
     phf::PhfIndexMap,
     value::{Value, ValueTag},
     vm::proc::{NParams, Procedure},
@@ -508,10 +508,10 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         let (rel_id, _) = output.attributes.iter().next().unwrap();
         let def = self.processor.ontology.def(entity_def_id);
 
-        let TypeKind::Entity(entity_info) = &def.kind else {
+        let DefKind::Entity(entity) = &def.kind else {
             return Err(output);
         };
-        if *rel_id != entity_info.id_relationship_id {
+        if *rel_id != entity.id_relationship_id {
             return Err(output);
         }
 

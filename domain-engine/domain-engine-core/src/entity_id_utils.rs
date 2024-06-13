@@ -15,19 +15,19 @@ use ontol_runtime::{
 use crate::{system::SystemAPI, DomainError, DomainResult};
 
 pub fn find_inherent_entity_id(
-    entity: &Value,
+    entity_val: &Value,
     ontology: &Ontology,
 ) -> Result<Option<Value>, DomainError> {
-    let def_id = entity.type_def_id();
+    let def_id = entity_val.type_def_id();
     let def = ontology.def(def_id);
-    let entity_info = def.entity_info().ok_or(DomainError::NotAnEntity(def_id))?;
+    let entity = def.entity().ok_or(DomainError::NotAnEntity(def_id))?;
 
-    let struct_map = match entity {
+    let struct_map = match entity_val {
         Value::Struct(struct_map, _) => struct_map,
         _ => return Err(DomainError::EntityMustBeStruct),
     };
 
-    match struct_map.get(&entity_info.id_relationship_id) {
+    match struct_map.get(&entity.id_relationship_id) {
         Some(attr) => Ok(attr.as_unit().cloned()),
         None => Ok(None),
     }

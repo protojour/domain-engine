@@ -264,9 +264,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     fields: Default::default(),
                     kind: ObjectKind::Node(NodeData {
                         def_id: def.id,
-                        entity_id: def
-                            .entity_info()
-                            .map(|entity_info| entity_info.id_value_def_id),
+                        entity_id: def.entity().map(|entity| entity.id_value_def_id),
                         operator_addr,
                     }),
                     interface: ObjectInterface::Implements(thin_vec![]),

@@ -1,6 +1,6 @@
 use ontol_runtime::ontology::map::MapMeta;
 use ontol_runtime::ontology::ontol::TextConstant;
-use ontol_runtime::{ontology::domain::TypeKind, DefId, PackageId};
+use ontol_runtime::{ontology::domain::DefKind, DefId, PackageId};
 use ontol_runtime::{MapKey, RelationshipId};
 
 use crate::juniper;
@@ -64,13 +64,13 @@ impl Domain {
         let domain = ctx.find_domain(self.id).unwrap();
         let mut entities = vec![];
         for def in domain.defs() {
-            if matches!(def.kind, TypeKind::Entity(_)) {
+            if matches!(def.kind, DefKind::Entity(_)) {
                 entities.push(Entity { id: def.id })
             }
         }
         entities
     }
-    fn types(&self, ctx: &Ctx, kind: Option<TypeKindEnum>) -> Vec<Def> {
+    fn defs(&self, ctx: &Ctx, kind: Option<TypeKindEnum>) -> Vec<Def> {
         let infos = ctx
             .find_domain(self.id)
             .unwrap()
@@ -103,10 +103,8 @@ impl Def {
         ctx.get_docs(self.id)
             .map(|docs_constant| ctx[docs_constant].into())
     }
-    fn entity_info(&self, ctx: &Ctx) -> Option<Entity> {
-        ctx.def(self.id)
-            .entity_info()
-            .map(|_| Entity { id: self.id })
+    fn entity(&self, ctx: &Ctx) -> Option<Entity> {
+        ctx.def(self.id).entity().map(|_| Entity { id: self.id })
     }
     fn union_variants(&self, ctx: &Ctx) -> Vec<Def> {
         ctx.union_variants(self.id)
@@ -117,12 +115,12 @@ impl Def {
     }
     fn kind(&self, ctx: &Ctx) -> TypeKindEnum {
         match ctx.def(self.id).kind {
-            TypeKind::Entity(_) => TypeKindEnum::Entity,
-            TypeKind::Data(_) => TypeKindEnum::Data,
-            TypeKind::Relationship(_) => TypeKindEnum::Relationship,
-            TypeKind::Function(_) => TypeKindEnum::Function,
-            TypeKind::Domain(_) => TypeKindEnum::Domain,
-            TypeKind::Generator(_) => TypeKindEnum::Generator,
+            DefKind::Entity(_) => TypeKindEnum::Entity,
+            DefKind::Data(_) => TypeKindEnum::Data,
+            DefKind::Relationship(_) => TypeKindEnum::Relationship,
+            DefKind::Function(_) => TypeKindEnum::Function,
+            DefKind::Domain(_) => TypeKindEnum::Domain,
+            DefKind::Generator(_) => TypeKindEnum::Generator,
         }
     }
     fn data_relationships(&self, ctx: &Ctx) -> Vec<gql_rel::DataRelationshipInfo> {
@@ -175,7 +173,7 @@ impl Def {
 #[graphql(context = Ctx)]
 impl Entity {
     fn is_self_identifying(&self, ctx: &Ctx) -> bool {
-        ctx.def(self.id).entity_info().unwrap().is_self_identifying
+        ctx.def(self.id).entity().unwrap().is_self_identifying
     }
 }
 

@@ -253,7 +253,7 @@ impl<'on> SelectFlowProcessor<'on> {
                 }
                 PropertyFlowData::UnitType(def_id) if is_dep.0 => {
                     let def = self.ontology.def(*def_id);
-                    is_entity = def.entity_info().is_some();
+                    is_entity = def.entity().is_some();
                 }
                 PropertyFlowData::Cardinality((
                     PropertyCardinality::Mandatory,

@@ -7,8 +7,8 @@ use ontol_runtime::{
     },
     ontology::{
         domain::{
-            BasicTypeInfo, DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource,
-            DataRelationshipTarget, Def, Domain, EdgeCardinal, EdgeInfo, EntityInfo, TypeKind,
+            self, BasicDef, DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource,
+            DataRelationshipTarget, Def, Domain, EdgeCardinal, EdgeInfo, Entity,
         },
         map::MapMeta,
         ontol::{OntolDomainMeta, TextConstant, TextLikeType},
@@ -172,14 +172,14 @@ impl<'m> Compiler<'m> {
                         }
                         _ => true,
                     },
-                    kind: match self.entity_info(
+                    kind: match self.domain_entity(
                         type_def_id,
                         type_name_constant,
                         &mut serde_gen,
                         &data_relationships,
                     ) {
-                        Some(entity_info) => TypeKind::Entity(entity_info),
-                        None => def_kind.as_ontology_type_kind(BasicTypeInfo {
+                        Some(entity) => domain::DefKind::Entity(entity),
+                        None => def_kind.as_ontology_type_kind(BasicDef {
                             name: Some(type_name_constant),
                         }),
                     },
@@ -205,7 +205,7 @@ impl<'m> Compiler<'m> {
                     kind: self
                         .defs
                         .def_kind(type_def_id)
-                        .as_ontology_type_kind(BasicTypeInfo { name: None }),
+                        .as_ontology_type_kind(BasicDef { name: None }),
                     operator_addr: serde_gen.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
                         type_def_id,
                         SerdeModifier::json_default(),
@@ -225,7 +225,7 @@ impl<'m> Compiler<'m> {
                     domain.add_def(Def {
                         id: def_id,
                         public: false,
-                        kind: TypeKind::Data(BasicTypeInfo { name: None }),
+                        kind: domain::DefKind::Data(BasicDef { name: None }),
                         operator_addr: None,
                         store_key: None,
                         data_relationships: Default::default(),
@@ -527,13 +527,13 @@ impl<'m> Compiler<'m> {
         );
     }
 
-    fn entity_info(
+    fn domain_entity(
         &self,
         type_def_id: DefId,
         name: TextConstant,
         serde_generator: &mut SerdeGenerator,
         data_relationships: &FnvHashMap<RelationshipId, DataRelationshipInfo>,
-    ) -> Option<EntityInfo> {
+    ) -> Option<Entity> {
         let properties = self.rel_ctx.properties_by_def_id(type_def_id)?;
         let id_relationship_id = properties.identified_by?;
 
@@ -559,7 +559,7 @@ impl<'m> Compiler<'m> {
             None
         };
 
-        Some(EntityInfo {
+        Some(Entity {
             name,
             // The entity is self-identifying if it has an inherent primary_id and that is its only inherent property.
             // TODO: Is the entity still self-identifying if it has only an external primary id (i.e. it is a unit type)?

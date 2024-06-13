@@ -51,11 +51,8 @@ impl InMemoryDb {
         let mut hyper_edges: FnvHashMap<EdgeId, HyperEdgeTable> = Default::default();
 
         for def in domain.defs() {
-            if let Some(entity_info) = def.entity_info() {
-                debug!(
-                    "new collection {:?} (`{}`)",
-                    def.id, &ontology[entity_info.name]
-                );
+            if let Some(entity) = def.entity() {
+                debug!("new collection {:?} (`{}`)", def.id, &ontology[entity.name]);
 
                 collections.insert(def.id, Default::default());
             }

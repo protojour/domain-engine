@@ -6,7 +6,7 @@ use mdbook::{
 use ontol_compiler::mem::Mem;
 
 use ontol_runtime::ontology::{
-    domain::{Def, TypeKind},
+    domain::{Def, DefKind},
     Ontology,
 };
 
@@ -79,27 +79,27 @@ impl Preprocessor for OntolDocumentationPreprocessor {
             mdbook::BookItem::Chapter(c) => {
                 if c.content.contains("{{#ontol-primitives}}") {
                     let ontol_docs = get_ontol_docs_md(&ontology, &|t| {
-                        matches!(t.kind, TypeKind::Data(_) | TypeKind::Entity(_))
+                        matches!(t.kind, DefKind::Data(_) | DefKind::Entity(_))
                     });
                     let new_string = c.content.replace("{{#ontol-primitives}}", &ontol_docs);
                     c.content = new_string;
                 }
                 if c.content.contains("{{#ontol-relation-types}}") {
                     let ontol_docs = get_ontol_docs_md(&ontology, &|t| {
-                        matches!(t.kind, TypeKind::Relationship(_))
+                        matches!(t.kind, DefKind::Relationship(_))
                     });
                     let new_string = c.content.replace("{{#ontol-relation-types}}", &ontol_docs);
                     c.content = new_string;
                 }
                 if c.content.contains("{{#ontol-function-types}}") {
                     let ontol_docs =
-                        get_ontol_docs_md(&ontology, &|t| matches!(t.kind, TypeKind::Function(_)));
+                        get_ontol_docs_md(&ontology, &|t| matches!(t.kind, DefKind::Function(_)));
                     let new_string = c.content.replace("{{#ontol-function-types}}", &ontol_docs);
                     c.content = new_string;
                 }
                 if c.content.contains("{{#ontol-generator-types}}") {
                     let ontol_docs =
-                        get_ontol_docs_md(&ontology, &|t| matches!(t.kind, TypeKind::Generator(_)));
+                        get_ontol_docs_md(&ontology, &|t| matches!(t.kind, DefKind::Generator(_)));
                     let new_string = c.content.replace("{{#ontol-generator-types}}", &ontol_docs);
                     c.content = new_string;
                 }

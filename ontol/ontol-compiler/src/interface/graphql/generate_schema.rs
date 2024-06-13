@@ -41,7 +41,7 @@ pub fn generate_graphql_schema<'c>(
 ) -> Option<GraphqlSchema> {
     let domain = partial_ontology.find_domain(package_id).unwrap();
 
-    let contains_entities = domain.defs().any(|def| def.entity_info().is_some());
+    let contains_entities = domain.defs().any(|def| def.entity().is_some());
 
     let mut named_maps: Vec<(&'c str, MapKey)> = vec![];
 

@@ -3,7 +3,7 @@ use serde::{
     Deserializer,
 };
 
-use crate::{ontology::domain::TypeKind, phf::PhfIndexMap, RelationshipId};
+use crate::{ontology::domain::DefKind, phf::PhfIndexMap, RelationshipId};
 
 use super::{
     deserialize_struct::StructDeserializer,
@@ -160,13 +160,13 @@ fn fallback<'a, E: Error>(
                 .processor
                 .ontology
                 .def(deserializer.type_def_id);
-            let TypeKind::Entity(entity_info) = &def.kind else {
+            let DefKind::Entity(entity) = &def.kind else {
                 return Err(E::custom("not an entity"));
             };
 
             return Ok(PropKind::OverriddenId(
-                entity_info.id_relationship_id,
-                entity_info.id_operator_addr,
+                entity.id_relationship_id,
+                entity.id_operator_addr,
             ));
         }
         Some(SpecialProperty::Ignored | SpecialProperty::TypeAnnotation) => {

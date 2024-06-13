@@ -77,8 +77,8 @@ impl InMemoryStore {
             .ok_or(DomainError::InvalidEntityDefId)?;
 
         let def = ctx.ontology.def(struct_select.def_id);
-        let _entity_info = def
-            .entity_info()
+        let _entity = def
+            .entity()
             .ok_or(DomainError::NotAnEntity(struct_select.def_id))?;
 
         // let filter_plan = compute_filter_plan(condition, &ctx.ontology).unwrap();
@@ -292,14 +292,14 @@ impl InMemoryStore {
             .ok_or(DomainError::InherentIdNotFound)?;
 
         let def = ctx.ontology.def(vertex_key.type_def_id);
-        let entity_info = def
-            .entity_info()
+        let entity = def
+            .entity()
             .ok_or(DomainError::NotAnEntity(vertex_key.type_def_id))?;
 
         match select {
             Select::Leaf => {
                 // Entity leaf only includes the ID of that entity, not its other fields
-                let id_attr = properties.get(&entity_info.id_relationship_id).unwrap();
+                let id_attr = properties.get(&entity.id_relationship_id).unwrap();
                 Ok(id_attr.as_unit().unwrap().clone())
             }
             Select::Struct(struct_select) => self.apply_struct_select(

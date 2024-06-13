@@ -4,7 +4,7 @@ use fnv::FnvHashMap;
 use ontol_macros::RustDoc;
 use ontol_runtime::{
     ontology::{
-        domain::{BasicTypeInfo, EdgeCardinalProjection, TypeKind},
+        domain::{self, BasicDef, EdgeCardinalProjection},
         ontol::TextLikeType,
     },
     property::Cardinality,
@@ -80,13 +80,13 @@ impl<'m> DefKind<'m> {
         }
     }
 
-    pub fn as_ontology_type_kind(&self, info: BasicTypeInfo) -> TypeKind {
+    pub fn as_ontology_type_kind(&self, info: BasicDef) -> domain::DefKind {
         match self {
-            DefKind::BuiltinRelType(..) => TypeKind::Relationship(info),
-            DefKind::Fn(_) => TypeKind::Function(info),
-            DefKind::EmptySequence => TypeKind::Generator(info),
-            DefKind::Package(_) => TypeKind::Domain(info),
-            _ => TypeKind::Data(info),
+            DefKind::BuiltinRelType(..) => domain::DefKind::Relationship(info),
+            DefKind::Fn(_) => domain::DefKind::Function(info),
+            DefKind::EmptySequence => domain::DefKind::Generator(info),
+            DefKind::Package(_) => domain::DefKind::Domain(info),
+            _ => domain::DefKind::Data(info),
         }
     }
 }

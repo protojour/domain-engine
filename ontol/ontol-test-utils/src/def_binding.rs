@@ -122,10 +122,7 @@ impl<'on> DefBinding<'on> {
 
     #[track_caller]
     pub fn entity_id_def_id(&self) -> DefId {
-        self.def
-            .entity_info()
-            .expect("not an entity")
-            .id_value_def_id
+        self.def.entity().expect("not an entity").id_value_def_id
     }
 
     pub fn struct_select(
@@ -236,17 +233,17 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
     }
 
     fn with_json_id(self, json: serde_json::Value) -> Self {
-        let entity_info = self.binding.def.entity_info().expect("Not an entity!");
+        let entity = self.binding.def.entity().expect("Not an entity!");
         let id = self
             .binding
             .ontology
-            .new_serde_processor(entity_info.id_operator_addr, ProcessorMode::Create)
+            .new_serde_processor(entity.id_operator_addr, ProcessorMode::Create)
             .deserialize(&mut serde_json::Deserializer::from_str(
                 &serde_json::to_string(&json).unwrap(),
             ))
             .unwrap();
 
-        self.merge_attribute(entity_info.id_relationship_id, id)
+        self.merge_attribute(entity.id_relationship_id, id)
     }
 
     pub fn with_open_data(self, json: serde_json::Value) -> Self {

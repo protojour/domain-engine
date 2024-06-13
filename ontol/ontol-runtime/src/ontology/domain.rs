@@ -84,7 +84,7 @@ impl Domain {
         self.types.resize_with(new_size, || Def {
             id: DefId(info.id.0, 0),
             public: false,
-            kind: TypeKind::Data(BasicTypeInfo { name: None }),
+            kind: DefKind::Data(BasicDef { name: None }),
             store_key: None,
             operator_addr: None,
             data_relationships: Default::default(),
@@ -98,10 +98,11 @@ impl Domain {
     }
 }
 
+/// Metadata about any definition inside a domain
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Def {
     pub id: DefId,
-    pub kind: TypeKind,
+    pub kind: DefKind,
     pub public: bool,
     /// The SerdeOperatorAddr used for JSON.
     /// FIXME: This should really be connected to a DomainInterface.
@@ -113,18 +114,19 @@ pub struct Def {
 impl Def {
     pub fn name(&self) -> Option<TextConstant> {
         match &self.kind {
-            TypeKind::Entity(info) => Some(info.name),
-            TypeKind::Data(info)
-            | TypeKind::Relationship(info)
-            | TypeKind::Function(info)
-            | TypeKind::Domain(info)
-            | TypeKind::Generator(info) => info.name,
+            DefKind::Entity(info) => Some(info.name),
+            DefKind::Data(info)
+            | DefKind::Relationship(info)
+            | DefKind::Function(info)
+            | DefKind::Domain(info)
+            | DefKind::Generator(info) => info.name,
         }
     }
 
-    pub fn entity_info(&self) -> Option<&EntityInfo> {
+    /// Returns Some if this Def represents an entity
+    pub fn entity(&self) -> Option<&Entity> {
         match &self.kind {
-            TypeKind::Entity(entity_info) => Some(entity_info),
+            DefKind::Entity(entity) => Some(entity),
             _ => None,
         }
     }
@@ -148,22 +150,22 @@ impl Def {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub enum TypeKind {
-    Entity(EntityInfo),
-    Data(BasicTypeInfo),
-    Relationship(BasicTypeInfo),
-    Function(BasicTypeInfo),
-    Domain(BasicTypeInfo),
-    Generator(BasicTypeInfo),
+pub enum DefKind {
+    Entity(Entity),
+    Data(BasicDef),
+    Relationship(BasicDef),
+    Function(BasicDef),
+    Domain(BasicDef),
+    Generator(BasicDef),
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
-pub struct BasicTypeInfo {
+pub struct BasicDef {
     pub name: Option<TextConstant>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct EntityInfo {
+pub struct Entity {
     pub name: TextConstant,
     pub id_relationship_id: RelationshipId,
     pub id_value_def_id: DefId,
