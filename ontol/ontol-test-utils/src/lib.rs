@@ -7,6 +7,7 @@ use std::{
     sync::Arc,
 };
 
+use def_binding::DefBinding;
 use diagnostics::AnnotatedCompileError;
 use ontol_compiler::{
     error::UnifiedCompileError,
@@ -25,15 +26,14 @@ use ontol_runtime::{
     PackageId, RelationshipId,
 };
 use tracing::info;
-use type_binding::TypeBinding;
 
+pub mod def_binding;
 pub mod diagnostics;
 pub mod examples;
 pub mod json_utils;
 pub mod serde_helper;
 pub mod test_extensions;
 pub mod test_map;
-pub mod type_binding;
 
 /// Workaround for `pretty_assertions::assert_eq` arguments appearing
 /// in a (slightly?) unnatural order. The _expected_ expression ideally comes first,
@@ -131,14 +131,11 @@ impl OntolTest {
     /// Make new type bindings with the given type names.
     /// The type name may be written as "SourceName::Type" to specify a specific domain.
     /// A type without prefix is interpreted as the root domain/package.
-    pub fn bind<const N: usize>(&self, type_names: [&str; N]) -> [TypeBinding; N] {
-        type_names.map(|type_name| TypeBinding::new(self, type_name))
+    pub fn bind<const N: usize>(&self, type_names: [&str; N]) -> [DefBinding; N] {
+        type_names.map(|type_name| DefBinding::new(self, type_name))
     }
 
-    pub fn prop_ids<const N: usize>(
-        &self,
-        props: [(&TypeBinding, &str); N],
-    ) -> [RelationshipId; N] {
+    pub fn prop_ids<const N: usize>(&self, props: [(&DefBinding, &str); N]) -> [RelationshipId; N] {
         props.map(|(binding, prop_name)| {
             let rel_id = binding.find_property(prop_name).unwrap();
 

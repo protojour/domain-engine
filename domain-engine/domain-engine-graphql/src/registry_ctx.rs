@@ -23,7 +23,7 @@ use ontol_runtime::{
             processor::ProcessorProfileFlags,
         },
     },
-    ontology::domain::{DataRelationshipKind, TypeInfo},
+    ontology::domain::{DataRelationshipKind, Def},
     tuple::CardinalIdx,
     RelationshipId,
 };
@@ -131,7 +131,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
         match serde_operator {
             SerdeOperator::Struct(struct_op) => {
-                let struct_info = self.schema_ctx.ontology.get_type_info(struct_op.def.def_id);
+                let struct_info = self.schema_ctx.ontology.def(struct_op.def.def_id);
                 let (mode, _) = typing_purpose.mode_and_level();
                 let mut control_flow = ControlFlow::Break(());
 
@@ -290,7 +290,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 Ok(ControlFlow::Break(()))
             }
             SerdeOperator::IdSingletonStruct(entity_id, property_name, id_operator_addr) => {
-                let entity_info = self.schema_ctx.ontology.get_type_info(*entity_id);
+                let entity_info = self.schema_ctx.ontology.def(*entity_id);
                 let property_name = &self.schema_ctx.ontology[*property_name];
                 if self.filter_argument_property(
                     entity_info,
@@ -318,7 +318,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
     fn filter_argument_property(
         &self,
-        subject_info: &TypeInfo,
+        subject_info: &Def,
         name: &str,
         rel_id: Option<RelationshipId>,
         filter: &ArgumentFilter,
@@ -471,7 +471,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             ),
             SerdeOperator::Union(union_op) => {
                 let def_id = union_op.union_def().def_id;
-                let type_info = self.schema_ctx.ontology.get_type_info(def_id);
+                let def = self.schema_ctx.ontology.def(def_id);
 
                 // trace!(
                 //     "union unfiltered variants: {:?}",
@@ -481,7 +481,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 // If this is an entity, use Edge + InputOrReference
                 // to get the option of just specifying an ID.
                 // TODO: Ensure this for create mutations only
-                let (query_level, typing_purpose) = if type_info.entity_info().is_some() {
+                let (query_level, typing_purpose) = if def.entity_info().is_some() {
                     (
                         QueryLevel::Edge { rel_params: None },
                         TypingPurpose::InputOrReference,
@@ -528,10 +528,10 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     .schema_ctx
                     .type_addr_by_def(def_id, QueryLevel::Node)
                     .unwrap_or_else(|| {
-                        let type_info = self.schema_ctx.ontology.get_type_info(def_id);
+                        let def = self.schema_ctx.ontology.def(def_id);
                         panic!(
                             "struct not found for {def_id:?} {name:?}",
-                            name = self.schema_ctx.ontology.debug(&type_info.name())
+                            name = self.schema_ctx.ontology.debug(&def.name())
                         );
                     });
 
@@ -677,29 +677,27 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
     #[inline]
     fn modified_type<T>(
         &mut self,
-        type_info: &<T as GraphQLValue<GqlScalar>>::TypeInfo,
+        def: &<T as GraphQLValue<GqlScalar>>::TypeInfo,
         modifier: TypeModifier,
     ) -> juniper::Type<'r>
     where
         T: juniper::GraphQLType<GqlScalar>,
     {
         match modifier {
-            TypeModifier::Unit(Optionality::Mandatory) => self.registry.get_type::<T>(type_info),
-            TypeModifier::Unit(Optionality::Optional) => {
-                self.registry.get_type::<Option<T>>(type_info)
-            }
+            TypeModifier::Unit(Optionality::Mandatory) => self.registry.get_type::<T>(def),
+            TypeModifier::Unit(Optionality::Optional) => self.registry.get_type::<Option<T>>(def),
             TypeModifier::Array { array, element } => match (array, element) {
                 (Optionality::Mandatory, Optionality::Mandatory) => {
-                    self.registry.get_type::<Vec<T>>(type_info)
+                    self.registry.get_type::<Vec<T>>(def)
                 }
                 (Optionality::Mandatory, Optionality::Optional) => {
-                    self.registry.get_type::<Vec<Option<T>>>(type_info)
+                    self.registry.get_type::<Vec<Option<T>>>(def)
                 }
                 (Optionality::Optional, Optionality::Mandatory) => {
-                    self.registry.get_type::<Option<Vec<T>>>(type_info)
+                    self.registry.get_type::<Option<Vec<T>>>(def)
                 }
                 (Optionality::Optional, Optionality::Optional) => {
-                    self.registry.get_type::<Option<Vec<Option<T>>>>(type_info)
+                    self.registry.get_type::<Option<Vec<Option<T>>>>(def)
                 }
             },
         }
@@ -709,7 +707,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         &mut self,
         name: &str,
         modifier: TypeModifier,
-        type_info: &<T as GraphQLValue<GqlScalar>>::TypeInfo,
+        def: &<T as GraphQLValue<GqlScalar>>::TypeInfo,
     ) -> juniper::meta::Argument<'r, GqlScalar>
     where
         T: juniper::GraphQLType<GqlScalar>
@@ -717,22 +715,20 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             + juniper::GraphQLValue<GqlScalar>,
     {
         match modifier {
-            TypeModifier::Unit(Optionality::Mandatory) => self.registry.arg::<T>(name, type_info),
-            TypeModifier::Unit(Optionality::Optional) => {
-                self.registry.arg::<Option<T>>(name, type_info)
-            }
+            TypeModifier::Unit(Optionality::Mandatory) => self.registry.arg::<T>(name, def),
+            TypeModifier::Unit(Optionality::Optional) => self.registry.arg::<Option<T>>(name, def),
             TypeModifier::Array { array, element } => match (array, element) {
                 (Optionality::Mandatory, Optionality::Mandatory) => {
-                    self.registry.arg::<Vec<T>>(name, type_info)
+                    self.registry.arg::<Vec<T>>(name, def)
                 }
                 (Optionality::Mandatory, Optionality::Optional) => {
-                    self.registry.arg::<Vec<Option<T>>>(name, type_info)
+                    self.registry.arg::<Vec<Option<T>>>(name, def)
                 }
                 (Optionality::Optional, Optionality::Mandatory) => {
-                    self.registry.arg::<Option<Vec<T>>>(name, type_info)
+                    self.registry.arg::<Option<Vec<T>>>(name, def)
                 }
                 (Optionality::Optional, Optionality::Optional) => {
-                    self.registry.arg::<Option<Vec<Option<T>>>>(name, type_info)
+                    self.registry.arg::<Option<Vec<Option<T>>>>(name, def)
                 }
             },
         }

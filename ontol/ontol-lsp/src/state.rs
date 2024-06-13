@@ -17,7 +17,7 @@ use ontol_compiler::{
     CompileError, SourceId, SourceSpan, Sources, NO_SPAN,
 };
 use ontol_parser::cst_parse;
-use ontol_runtime::ontology::{config::PackageConfig, domain::TypeInfo, Ontology};
+use ontol_runtime::ontology::{config::PackageConfig, domain::Def, Ontology};
 use regex::Regex;
 use std::fmt::Debug;
 use std::{
@@ -46,8 +46,8 @@ pub struct State {
     /// Ontology with only the `ontol` domain
     pub ontology: Arc<Ontology>,
 
-    /// Fast lookup for TypeInfo
-    pub ontol_type_info: HashMap<String, TypeInfo>,
+    /// Fast lookup for ontology/domain Def
+    pub ontol_def: HashMap<String, Def>,
 
     /// Prebuilt data structure
     pub core_completions: Vec<CompletionItem>,
@@ -131,12 +131,12 @@ impl State {
             .into_ontology();
 
         let ontol_domain = ontology.find_domain(ONTOL_PKG).unwrap();
-        let mut ontol_type_info = HashMap::new();
+        let mut ontol_def = HashMap::new();
 
-        for type_info in ontol_domain.type_infos() {
-            if let Some(name) = type_info.name() {
+        for def in ontol_domain.defs() {
+            if let Some(name) = def.name() {
                 let name = &ontology[name];
-                ontol_type_info.insert(name.to_string(), type_info.clone());
+                ontol_def.insert(name.to_string(), def.clone());
             }
         }
 
@@ -147,7 +147,7 @@ impl State {
             srcref: Default::default(),
             regex: Default::default(),
             ontology: Arc::new(ontology),
-            ontol_type_info,
+            ontol_def,
             core_completions,
         }
     }

@@ -11,7 +11,7 @@ use ontol_runtime::{
 use serde::de::DeserializeSeed;
 use tracing::error;
 
-use crate::type_binding::{TypeBinding, TEST_JSON_SCHEMA_VALIDATION};
+use crate::def_binding::{DefBinding, TEST_JSON_SCHEMA_VALIDATION};
 
 /// A trait used in JSON tests.
 /// using this trait one can pass a serde_json::Value or a static JSON str.
@@ -46,7 +46,7 @@ impl<'a> JsonConvert for &'a str {
 }
 
 pub struct SerdeHelper<'b, 'on, 'p> {
-    binding: &'b TypeBinding<'on>,
+    binding: &'b DefBinding<'on>,
     mode: ProcessorMode,
     level: ProcessorLevel,
     profile: ProcessorProfile<'p>,
@@ -75,7 +75,7 @@ impl<'b, 'on, 'p> SerdeHelper<'b, 'on, 'p> {
             .to_attr_nocheck(json)?
             .into_unit()
             .expect("not a unit attr");
-        assert_eq!(value.type_def_id(), self.binding.type_info.def_id);
+        assert_eq!(value.type_def_id(), self.binding.def.id);
         Ok(value)
     }
 
@@ -87,7 +87,7 @@ impl<'b, 'on, 'p> SerdeHelper<'b, 'on, 'p> {
         let Attr::Unit(value) = self.to_attr_nocheck(json)? else {
             panic!("not a unit attr");
         };
-        assert_eq!(value.type_def_id(), self.binding.type_info.def_id);
+        assert_eq!(value.type_def_id(), self.binding.def.id);
         match value {
             Value::Struct(attrs, _) => Ok(*attrs),
             other => panic!("not a map: {other:?}"),
@@ -103,7 +103,7 @@ impl<'b, 'on, 'p> SerdeHelper<'b, 'on, 'p> {
             .to_attr_nocheck(json)?
             .into_unit()
             .expect("not a unit attr");
-        assert_ne!(value.type_def_id(), self.binding.type_info.def_id);
+        assert_ne!(value.type_def_id(), self.binding.def.id);
         Ok(value)
     }
 
@@ -185,7 +185,7 @@ impl<'b, 'on, 'p> SerdeHelper<'b, 'on, 'p> {
 }
 
 /// Make a helper for the data creation processor mode
-pub fn serde_create<'b, 'on, 'p>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on, 'p> {
+pub fn serde_create<'b, 'on, 'p>(binding: &'b DefBinding<'on>) -> SerdeHelper<'b, 'on, 'p> {
     SerdeHelper {
         binding,
         mode: ProcessorMode::Create,
@@ -195,7 +195,7 @@ pub fn serde_create<'b, 'on, 'p>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'
 }
 
 /// Make a helper for the `Read` processor mode
-pub fn serde_read<'b, 'on, 'p>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on, 'p> {
+pub fn serde_read<'b, 'on, 'p>(binding: &'b DefBinding<'on>) -> SerdeHelper<'b, 'on, 'p> {
     SerdeHelper {
         binding,
         mode: ProcessorMode::Read,
@@ -205,7 +205,7 @@ pub fn serde_read<'b, 'on, 'p>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b,
 }
 
 /// Make a helper for the `Raw` processor mode
-pub fn serde_raw<'b, 'on, 'p>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on, 'p> {
+pub fn serde_raw<'b, 'on, 'p>(binding: &'b DefBinding<'on>) -> SerdeHelper<'b, 'on, 'p> {
     SerdeHelper {
         binding,
         mode: ProcessorMode::Raw,
@@ -214,7 +214,7 @@ pub fn serde_raw<'b, 'on, 'p>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 
     }
 }
 
-pub fn serde_raw_tree_only<'b, 'on, 'p>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on, 'p> {
+pub fn serde_raw_tree_only<'b, 'on, 'p>(binding: &'b DefBinding<'on>) -> SerdeHelper<'b, 'on, 'p> {
     SerdeHelper {
         binding,
         mode: ProcessorMode::RawTreeOnly,

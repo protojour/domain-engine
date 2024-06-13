@@ -15,9 +15,9 @@ use serde::de::DeserializeSeed;
 use unimock::{unimock, Unimock};
 
 use crate::{
+    def_binding::DefBinding,
     expect_eq,
     serde_helper::{serde_raw, SerdeHelper},
-    type_binding::TypeBinding,
     OntolTest,
 };
 
@@ -87,7 +87,7 @@ pub trait Yielder {
 pub struct TestMapper<'on, 'p> {
     test: &'on OntolTest,
     yielder: Box<dyn Yielder>,
-    serde_helper_factory: Box<dyn for<'b> Fn(&'b TypeBinding<'on>) -> SerdeHelper<'b, 'on, 'p>>,
+    serde_helper_factory: Box<dyn for<'b> Fn(&'b DefBinding<'on>) -> SerdeHelper<'b, 'on, 'p>>,
 }
 
 impl<'on, 'p> TestMapper<'on, 'p> {
@@ -100,7 +100,7 @@ impl<'on, 'p> TestMapper<'on, 'p> {
 
     pub fn with_serde_helper(
         self,
-        factory: impl for<'b> Fn(&'b TypeBinding<'on>) -> SerdeHelper<'b, 'on, 'p> + 'static,
+        factory: impl for<'b> Fn(&'b DefBinding<'on>) -> SerdeHelper<'b, 'on, 'p> + 'static,
     ) -> Self {
         Self {
             serde_helper_factory: Box::new(factory),
@@ -158,7 +158,7 @@ impl<'on, 'p> TestMapper<'on, 'p> {
     }
 
     #[track_caller]
-    pub fn named_map_input_binding(&self, name: &str) -> TypeBinding<'on> {
+    pub fn named_map_input_binding(&self, name: &str) -> DefBinding<'on> {
         let (package_id, name) = self.test.parse_test_ident(name);
         let key = self
             .test
@@ -166,7 +166,7 @@ impl<'on, 'p> TestMapper<'on, 'p> {
             .find_named_downmap_meta(package_id, name)
             .unwrap();
 
-        TypeBinding::from_def_id(key.input.def_id, &self.test.ontology)
+        DefBinding::from_def_id(key.input.def_id, &self.test.ontology)
     }
 
     #[track_caller]
@@ -183,8 +183,8 @@ impl<'on, 'p> TestMapper<'on, 'p> {
             .find_named_downmap_meta(package_id, name)
             .unwrap();
 
-        let input_binding = TypeBinding::from_def_id(key.input.def_id, &self.test.ontology);
-        let output_binding = TypeBinding::from_def_id(key.output.def_id, &self.test.ontology);
+        let input_binding = DefBinding::from_def_id(key.input.def_id, &self.test.ontology);
+        let output_binding = DefBinding::from_def_id(key.output.def_id, &self.test.ontology);
 
         let procedure = match self.test.ontology.get_mapper_proc(&key) {
             Some(procedure) => procedure,
@@ -231,7 +231,7 @@ impl<'on, 'p> TestMapper<'on, 'p> {
             Some(procedure) => procedure,
             None => panic!(
                 "No mapping procedure found for ({:?}, {:?})",
-                input_binding.type_info.def_id, output_binding.type_info.def_id
+                input_binding.def.id, output_binding.def.id
             ),
         };
         let value = self.run_vm(procedure, param)?;
@@ -256,13 +256,13 @@ impl<'on, 'p> TestMapper<'on, 'p> {
 
         let [input_binding, output_binding] = self.test.bind([from.typename(), to.typename()]);
 
-        fn get_map_def(key: &Key, binding: &TypeBinding) -> MapDef {
+        fn get_map_def(key: &Key, binding: &DefBinding) -> MapDef {
             let mut flags = MapDefFlags::empty();
             if matches!(key, Key::Seq(_)) {
                 flags.insert(MapDefFlags::SEQUENCE);
             }
             MapDef {
-                def_id: binding.type_info.def_id,
+                def_id: binding.def.id,
                 flags,
             }
         }
@@ -287,14 +287,14 @@ impl<'on, 'p> TestMapper<'on, 'p> {
                 }
                 VmState::Yield(Yield::CallExtern(extern_def_id, extern_param, output_def_id)) => {
                     let ontology = &self.test.ontology;
-                    let input_type_info = ontology.get_type_info(extern_param.type_def_id());
-                    let output_type_info = ontology.get_type_info(output_def_id);
+                    let input_def = ontology.def(extern_param.type_def_id());
+                    let output_def = ontology.def(output_def_id);
 
                     let param_json: serde_json::Value = {
                         let mut buf: Vec<u8> = vec![];
                         ontology
                             .new_serde_processor(
-                                input_type_info.operator_addr.unwrap(),
+                                input_def.operator_addr.unwrap(),
                                 ProcessorMode::Read,
                             )
                             .serialize_attr(
@@ -313,7 +313,7 @@ impl<'on, 'p> TestMapper<'on, 'p> {
 
                             let val = ontology
                                 .new_serde_processor(
-                                    output_type_info.operator_addr.unwrap(),
+                                    output_def.operator_addr.unwrap(),
                                     ProcessorMode::Read,
                                 )
                                 .deserialize(output_json)

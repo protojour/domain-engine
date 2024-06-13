@@ -109,10 +109,9 @@ impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
                                 return Err(());
                             }
 
-                            let type_info = self.ontology.get_type_info(property.type_def_id);
+                            let def = self.ontology.def(property.type_def_id);
                             let processor = self.ontology.new_serde_processor(
-                                type_info
-                                    .operator_addr
+                                def.operator_addr
                                     .expect("No operator addr for pattern constant part"),
                                 ProcessorMode::Create,
                             );
@@ -125,7 +124,7 @@ impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
                         }
                         TextPatternConstantPart::AnyString { .. } => {
                             let text_tag: ValueTag = self.ontology.ontol_domain_meta().text.into();
-                            let rel_id = RelationshipId(text_tag.def());
+                            let rel_id = RelationshipId(text_tag.def_id());
 
                             attrs.insert(rel_id, Attr::Unit(Value::Text(str.into(), text_tag)));
                         }

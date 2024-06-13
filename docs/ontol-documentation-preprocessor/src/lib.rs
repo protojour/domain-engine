@@ -6,7 +6,7 @@ use mdbook::{
 use ontol_compiler::mem::Mem;
 
 use ontol_runtime::ontology::{
-    domain::{TypeInfo, TypeKind},
+    domain::{Def, TypeKind},
     Ontology,
 };
 
@@ -39,14 +39,14 @@ fn compile() -> Ontology {
         .into_ontology()
 }
 
-fn get_ontol_docs_md(ontology: &Ontology, predicate: &dyn Fn(&TypeInfo) -> bool) -> String {
+fn get_ontol_docs_md(ontology: &Ontology, predicate: &dyn Fn(&Def) -> bool) -> String {
     let ontol_domain = ontology.find_domain(ONTOL_PKG).unwrap();
     let mut docs: Vec<(String, String)> = vec![];
-    for t in ontol_domain.type_infos() {
+    for t in ontol_domain.defs() {
         if !predicate(t) {
             continue;
         }
-        let doc = ontology.get_docs(t.def_id);
+        let doc = ontology.get_docs(t.id);
         if let Some(name) = t.name() {
             let name = &ontology[name];
             docs.push((

@@ -374,7 +374,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
         for value in elements {
             let def_id = value.type_def_id();
-            match self.ontology.get_type_info(def_id).operator_addr {
+            match self.ontology.def(def_id).operator_addr {
                 Some(addr) => seq.serialize_element(&Proxy {
                     attr: AttrRef::Unit(value),
                     processor: self.narrow(addr),

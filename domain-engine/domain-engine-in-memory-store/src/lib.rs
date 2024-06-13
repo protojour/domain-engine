@@ -50,14 +50,14 @@ impl InMemoryDb {
         let mut collections: FnvHashMap<DefId, VertexTable<DynamicKey>> = Default::default();
         let mut hyper_edges: FnvHashMap<EdgeId, HyperEdgeTable> = Default::default();
 
-        for type_info in domain.type_infos() {
-            if let Some(entity_info) = type_info.entity_info() {
+        for def in domain.defs() {
+            if let Some(entity_info) = def.entity_info() {
                 debug!(
                     "new collection {:?} (`{}`)",
-                    type_info.def_id, &ontology[entity_info.name]
+                    def.id, &ontology[entity_info.name]
                 );
 
-                collections.insert(type_info.def_id, Default::default());
+                collections.insert(def.id, Default::default());
             }
         }
 

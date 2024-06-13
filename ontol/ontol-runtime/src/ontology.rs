@@ -28,7 +28,7 @@ use crate::{
 use self::{
     builder::OntologyBuilder,
     config::PackageConfig,
-    domain::{Domain, EdgeInfo, ExtendedEntityInfo, TypeInfo},
+    domain::{Def, Domain, EdgeInfo, ExtendedEntityInfo},
     map::{Extern, MapMeta, PropertyFlow},
     ontol::{
         text_pattern::TextPattern, OntolDomainMeta, TextConstant, TextLikeType, ValueGenerator,
@@ -117,18 +117,18 @@ impl Ontology {
         OntolVm::new(self, proc)
     }
 
-    pub fn get_type_info(&self, def_id: DefId) -> &TypeInfo {
+    pub fn def(&self, def_id: DefId) -> &Def {
         match self.find_domain(def_id.0) {
-            Some(domain) => domain.type_info(def_id),
+            Some(domain) => domain.def(def_id),
             None => {
                 panic!("No domain for {:?}", def_id.0)
             }
         }
     }
 
-    pub fn get_type_info_option(&self, def_id: DefId) -> Option<&TypeInfo> {
+    pub fn get_def(&self, def_id: DefId) -> Option<&Def> {
         match self.find_domain(def_id.0) {
-            Some(domain) => domain.type_info_option(def_id),
+            Some(domain) => domain.def_option(def_id),
             None => None,
         }
     }

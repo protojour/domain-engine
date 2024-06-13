@@ -41,9 +41,7 @@ pub fn generate_graphql_schema<'c>(
 ) -> Option<GraphqlSchema> {
     let domain = partial_ontology.find_domain(package_id).unwrap();
 
-    let contains_entities = domain
-        .type_infos()
-        .any(|type_info| type_info.entity_info().is_some());
+    let contains_entities = domain.defs().any(|def| def.entity_info().is_some());
 
     let mut named_maps: Vec<(&'c str, MapKey)> = vec![];
 
@@ -100,15 +98,15 @@ pub fn generate_graphql_schema<'c>(
     builder.register_fundamental_types(package_id, partial_ontology);
     builder.register_standard_queries(&mut query_fields);
 
-    for type_info in domain.type_infos() {
-        if !type_info.public {
+    for def in domain.defs() {
+        if !def.public {
             continue;
         }
 
-        if type_info.operator_addr.is_some() {
-            trace!("adapt type `{name:?}`", name = type_info.name());
+        if def.operator_addr.is_some() {
+            trace!("adapt def `{name:?}`", name = def.name());
 
-            let type_ref = builder.get_def_type_ref(type_info.def_id, QLevel::Node);
+            let type_ref = builder.get_def_type_ref(def.id, QLevel::Node);
 
             if let Some(entity_data) = entity_check(builder.schema, type_ref) {
                 builder.add_entity_queries_and_mutations(entity_data, &mut mutation_fields);

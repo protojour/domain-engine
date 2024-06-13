@@ -44,7 +44,7 @@ impl DomainEngineTestExt for DomainEngine {
             .find_named_downmap_meta(package_id, name)
             .expect("Named map not found");
 
-        let output_type_info = ontology.get_type_info(key.output.def_id);
+        let output_def = ontology.def(key.output.def_id);
 
         let mut json_buf: Vec<u8> = vec![];
         let mut serializer = serde_json::Serializer::new(&mut json_buf);
@@ -54,8 +54,9 @@ impl DomainEngineTestExt for DomainEngine {
                 ontology.dynamic_sequence_operator_addr(),
                 ProcessorMode::Raw,
             ),
-            _ => ontology
-                .new_serde_processor(output_type_info.operator_addr.unwrap(), ProcessorMode::Raw),
+            _ => {
+                ontology.new_serde_processor(output_def.operator_addr.unwrap(), ProcessorMode::Raw)
+            }
         };
 
         processor
@@ -77,10 +78,10 @@ async fn test_exec_named_map(
         .find_named_downmap_meta(package_id, name)
         .expect("Named map not found");
 
-    let input_type_info = ontology.get_type_info(key.input.def_id);
+    let input_def = ontology.def(key.input.def_id);
 
     let input_value = ontology
-        .new_serde_processor(input_type_info.operator_addr.unwrap(), ProcessorMode::Raw)
+        .new_serde_processor(input_def.operator_addr.unwrap(), ProcessorMode::Raw)
         .deserialize(input_json)
         .expect("Deserialize input failed")
         .into_unit()

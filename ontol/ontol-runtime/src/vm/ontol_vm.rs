@@ -360,9 +360,9 @@ impl<'o> Processor for OntolProcessor<'o> {
     #[inline(always)]
     fn type_pun(&mut self, local: Option<Local>, def_id: DefId) -> VmResult<()> {
         if let Some(local) = local {
-            self.local_mut(local).tag_mut().set_def(def_id);
+            self.local_mut(local).tag_mut().set_def_id(def_id);
         } else {
-            self.stack.last_mut().unwrap().tag_mut().set_def(def_id);
+            self.stack.last_mut().unwrap().tag_mut().set_def_id(def_id);
         }
         Ok(())
     }

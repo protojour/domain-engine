@@ -45,7 +45,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         match level {
             QLevel::Node => self.make_node_type(def_id),
             QLevel::Edge { rel_params } => {
-                let type_info = self.partial_ontology.get_type_info(def_id);
+                let def = self.partial_ontology.def(def_id);
                 let node_ref = self.get_def_type_ref(def_id, QLevel::Node);
                 let node_type_addr = node_ref.unwrap_addr();
 
@@ -62,17 +62,15 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     },
                 )]);
 
-                let node_operator_addr = self
-                    .serde_gen
-                    .gen_addr_lazy(gql_serde_key(type_info.def_id))
-                    .unwrap();
+                let node_operator_addr =
+                    self.serde_gen.gen_addr_lazy(gql_serde_key(def.id)).unwrap();
 
                 if let Some((rel_def_id, _operator_addr)) = rel_params {
-                    let rel_type_info = self.partial_ontology.get_type_info(rel_def_id);
+                    let rel_def = self.partial_ontology.def(rel_def_id);
                     let rel_edge_ref = self.get_def_type_ref(rel_def_id, QLevel::Node);
 
                     let typename = self.mk_typename_constant(|namespace, strings| {
-                        namespace.edge(Some(rel_type_info), type_info, strings)
+                        namespace.edge(Some(rel_def), def, strings)
                     });
 
                     NewType::TypeData(
@@ -80,7 +78,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                             typename,
                             input_typename: Some(self.mk_typename_constant(
                                 |namespace, strings| {
-                                    namespace.edge_input(Some(rel_type_info), type_info, strings)
+                                    namespace.edge_input(Some(rel_def), def, strings)
                                 },
                             )),
                             partial_input_typename: None,
@@ -102,10 +100,10 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     NewType::TypeData(
                         TypeData {
                             typename: self.mk_typename_constant(|namespace, strings| {
-                                namespace.edge(None, type_info, strings)
+                                namespace.edge(None, def, strings)
                             }),
                             input_typename: Some(self.mk_typename_constant(
-                                |namespace, strings| namespace.edge_input(None, type_info, strings),
+                                |namespace, strings| namespace.edge_input(None, def, strings),
                             )),
                             partial_input_typename: None,
                             kind: TypeKind::Object(ObjectData {
@@ -123,22 +121,21 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 }
             }
             QLevel::Connection { rel_params } => {
-                let type_info = self.partial_ontology.get_type_info(def_id);
+                let def = self.partial_ontology.def(def_id);
                 let edge_ref = self.get_def_type_ref(def_id, QLevel::Edge { rel_params });
                 let node_ref = self.get_def_type_ref(def_id, QLevel::Node);
                 let node_type_addr = node_ref.unwrap_addr();
 
-                let rel_type_info = rel_params.map(|(rel_params_def_id, _)| {
-                    self.partial_ontology.get_type_info(rel_params_def_id)
-                });
+                let rel_def = rel_params
+                    .map(|(rel_params_def_id, _)| self.partial_ontology.def(rel_params_def_id));
 
                 NewType::TypeData(
                     TypeData {
                         typename: self.mk_typename_constant(|namespace, strings| {
-                            namespace.connection(rel_type_info, type_info, strings)
+                            namespace.connection(rel_def, def, strings)
                         }),
                         input_typename: Some(self.mk_typename_constant(|namespace, strings| {
-                            namespace.patch_edges_input(rel_type_info, type_info, strings)
+                            namespace.patch_edges_input(rel_def, def, strings)
                         })),
                         partial_input_typename: None,
                         kind: TypeKind::Object(ObjectData {
@@ -196,13 +193,13 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 )
             }
             QLevel::MutationResult => {
-                let type_info = self.partial_ontology.get_type_info(def_id);
+                let def = self.partial_ontology.def(def_id);
                 let node_ref = self.get_def_type_ref(def_id, QLevel::Node);
 
                 NewType::TypeData(
                     TypeData {
                         typename: self.mk_typename_constant(|namespace, strings| {
-                            namespace.mutation_result(type_info, strings)
+                            namespace.mutation_result(def, strings)
                         }),
                         input_typename: None,
                         partial_input_typename: None,
@@ -259,15 +256,15 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         match repr_kind {
             ReprKind::Unit | ReprKind::Struct | ReprKind::StructIntersection(_) => {
-                let type_info = self.partial_ontology.get_type_info(def_id);
+                let def = self.partial_ontology.def(def_id);
 
                 let operator_addr = self.serde_gen.gen_addr_lazy(gql_serde_key(def_id)).unwrap();
 
                 let type_kind = TypeKind::Object(ObjectData {
                     fields: Default::default(),
                     kind: ObjectKind::Node(NodeData {
-                        def_id: type_info.def_id,
-                        entity_id: type_info
+                        def_id: def.id,
+                        entity_id: def
                             .entity_info()
                             .map(|entity_info| entity_info.id_value_def_id),
                         operator_addr,
@@ -278,23 +275,23 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 NewType::TypeData(
                     TypeData {
                         typename: self.mk_typename_constant(|namespace, strings| {
-                            namespace.typename(type_info, strings)
+                            namespace.typename(def, strings)
                         }),
                         input_typename: Some(self.mk_typename_constant(|namespace, strings| {
-                            namespace.input(type_info, strings)
+                            namespace.input(def, strings)
                         })),
                         partial_input_typename: Some(self.mk_typename_constant(
-                            |namespace, strings| namespace.partial_input(type_info, strings),
+                            |namespace, strings| namespace.partial_input(def, strings),
                         )),
                         kind: type_kind,
                     },
                     NewTypeActions {
-                        harvest_fields: Some((type_info.def_id, PropertyFieldProducer::Property)),
+                        harvest_fields: Some((def.id, PropertyFieldProducer::Property)),
                     },
                 )
             }
             ReprKind::Union(variants) | ReprKind::StructUnion(variants) => {
-                let type_info = self.partial_ontology.get_type_info(def_id);
+                let def = self.partial_ontology.def(def_id);
 
                 let mut needs_scalar = false;
                 let mut type_variants = thin_vec![];
@@ -322,19 +319,19 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 NewType::TypeData(
                     TypeData {
                         typename: self.mk_typename_constant(|namespace, strings| {
-                            namespace.typename(type_info, strings)
+                            namespace.typename(def, strings)
                         }),
                         input_typename: Some(self.mk_typename_constant(|namespace, strings| {
-                            namespace.union_input(type_info, strings)
+                            namespace.union_input(def, strings)
                         })),
                         partial_input_typename: Some(self.mk_typename_constant(
-                            |namespace, strings| namespace.union_partial_input(type_info, strings),
+                            |namespace, strings| namespace.union_partial_input(def, strings),
                         )),
                         kind: if needs_scalar {
                             TypeKind::CustomScalar(ScalarData { operator_addr })
                         } else {
                             TypeKind::Union(UnionData {
-                                union_def_id: type_info.def_id,
+                                union_def_id: def.id,
                                 variants: type_variants,
                                 operator_addr,
                             })
@@ -344,19 +341,19 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 )
             }
             ReprKind::Seq | ReprKind::Intersection(_) => {
-                let type_info = self.partial_ontology.get_type_info(def_id);
+                let def = self.partial_ontology.def(def_id);
                 let operator_addr = self.serde_gen.gen_addr_lazy(gql_serde_key(def_id)).unwrap();
 
                 NewType::TypeData(
                     TypeData {
                         typename: self.mk_typename_constant(|namespace, strings| {
-                            namespace.typename(type_info, strings)
+                            namespace.typename(def, strings)
                         }),
                         input_typename: Some(self.mk_typename_constant(|namespace, strings| {
-                            namespace.input(type_info, strings)
+                            namespace.input(def, strings)
                         })),
                         partial_input_typename: Some(self.mk_typename_constant(
-                            |namespace, strings| namespace.partial_input(type_info, strings),
+                            |namespace, strings| namespace.partial_input(def, strings),
                         )),
                         kind: TypeKind::CustomScalar(ScalarData { operator_addr }),
                     },
@@ -517,8 +514,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         // Generate typename variant
         for (_, relation_id, discriminator) in permutations.iter() {
-            let relation_type_info = self.partial_ontology.get_type_info(relation_id.0);
-            let variant_type_info = self.partial_ontology.get_type_info(discriminator.def_id());
+            let relation_def = self.partial_ontology.def(relation_id.0);
+            let variant_def = self.partial_ontology.def(discriminator.def_id());
 
             fn typename_append(output: &mut std::string::String, name: &str) {
                 if name
@@ -532,11 +529,11 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 output.push_str(name);
             }
 
-            if let Some(relation_name) = relation_type_info.name() {
+            if let Some(relation_name) = relation_def.name() {
                 typename_append(&mut typename, &self.serde_gen.str_ctx[relation_name]);
             }
 
-            if let Some(variant_name) = variant_type_info.name() {
+            if let Some(variant_name) = variant_def.name() {
                 typename_append(&mut typename, &self.serde_gen.str_ctx[variant_name]);
             }
         }

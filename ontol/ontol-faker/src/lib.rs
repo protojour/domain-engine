@@ -71,8 +71,8 @@ struct FakeGenerator<'a, R: Rng> {
 
 impl<'a, R: Rng> FakeGenerator<'a, R> {
     pub fn fake_value(&mut self, def_id: DefId) -> Result<Value, Error> {
-        let type_info = self.ontology.get_type_info(def_id);
-        let addr = type_info.operator_addr.ok_or(Error::NoSerializationInfo)?;
+        let def = self.ontology.def(def_id);
+        let addr = def.operator_addr.ok_or(Error::NoSerializationInfo)?;
 
         Ok(self
             .fake_attribute(
@@ -229,12 +229,10 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
             }
             SerdeOperator::Struct(struct_op) => {
                 let mut attrs = HashMap::default();
-                let type_info = processor.ontology().get_type_info(struct_op.def.def_id);
+                let def = processor.ontology().def(struct_op.def.def_id);
 
                 for (_, property) in struct_op.properties.iter() {
-                    if let Some(data_relationship) =
-                        type_info.data_relationships.get(&property.rel_id)
-                    {
+                    if let Some(data_relationship) = def.data_relationships.get(&property.rel_id) {
                         if let DataRelationshipKind::Edge(projection) = data_relationship.kind {
                             // FIXME: Probably can't skip when the relationship is required
                             if self.edge_saturation.contains(&projection.id) {

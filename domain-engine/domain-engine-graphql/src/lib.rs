@@ -107,17 +107,12 @@ pub fn create_graphql_schema(
 
 /// Execute a GraphQL query on the Domain Engine
 async fn query(
-    type_info: &SchemaType,
+    def: &SchemaType,
     field_name: &str,
     executor: &juniper::Executor<'_, '_, ServiceCtx, GqlScalar>,
 ) -> juniper::ExecutionResult<GqlScalar> {
-    let schema_ctx = &type_info.schema_ctx;
-    let query_field = type_info
-        .type_data()
-        .fields()
-        .unwrap()
-        .get(field_name)
-        .unwrap();
+    let schema_ctx = &def.schema_ctx;
+    let query_field = def.type_data().fields().unwrap().get(field_name).unwrap();
     let service_ctx = executor.context();
 
     match SelectAnalyzer::new(schema_ctx, service_ctx)
@@ -168,11 +163,11 @@ async fn query(
 
 /// Execute a GraphQL mutation on the Domain Engine
 async fn mutation(
-    type_info: &SchemaType,
+    def: &SchemaType,
     field_name: &str,
     executor: &juniper::Executor<'_, '_, ServiceCtx, GqlScalar>,
 ) -> juniper::ExecutionResult<GqlScalar> {
-    let schema_ctx = &type_info.schema_ctx;
+    let schema_ctx = &def.schema_ctx;
     let service_ctx = executor.context();
     let ctx = (schema_ctx.as_ref(), service_ctx);
 
@@ -180,12 +175,7 @@ async fn mutation(
     let args_wrapper = ArgsWrapper::new(look_ahead);
     let select_analyzer = SelectAnalyzer::new(schema_ctx, service_ctx);
 
-    let field_data = type_info
-        .type_data()
-        .fields()
-        .unwrap()
-        .get(field_name)
-        .unwrap();
+    let field_data = def.type_data().fields().unwrap().get(field_name).unwrap();
 
     match &field_data.kind {
         FieldKind::EntityMutation(field) => {

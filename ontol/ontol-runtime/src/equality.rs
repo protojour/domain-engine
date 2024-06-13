@@ -102,34 +102,40 @@ impl<T: OntolHash> OntolHash for Sequence<T> {
 impl OntolEquals for Value {
     fn ontol_equals(&self, other: &Self) -> bool {
         match (self, other) {
-            (Value::Unit(tag_a), Value::Unit(tag_b)) => tag_a.def() == tag_b.def(),
+            (Value::Unit(tag_a), Value::Unit(tag_b)) => tag_a.def_id() == tag_b.def_id(),
             (Value::Void(_), Value::Void(_)) => true,
-            (Value::I64(a, tag_a), Value::I64(b, tag_b)) => tag_a.def() == tag_b.def() && a == b,
-            (Value::F64(a, tag_a), Value::F64(b, tag_b)) => tag_a.def() == tag_b.def() && a == b,
+            (Value::I64(a, tag_a), Value::I64(b, tag_b)) => {
+                tag_a.def_id() == tag_b.def_id() && a == b
+            }
+            (Value::F64(a, tag_a), Value::F64(b, tag_b)) => {
+                tag_a.def_id() == tag_b.def_id() && a == b
+            }
             (Value::Serial(a, tag_a), Value::Serial(b, tag_b)) => {
-                tag_a.def() == tag_b.def() && a == b
+                tag_a.def_id() == tag_b.def_id() && a == b
             }
             (Value::Rational(a, tag_a), Value::Rational(b, tag_b)) => {
-                tag_a.def() == tag_b.def() && a == b
+                tag_a.def_id() == tag_b.def_id() && a == b
             }
-            (Value::Text(a, tag_a), Value::Text(b, tag_b)) => tag_a.def() == tag_b.def() && a == b,
+            (Value::Text(a, tag_a), Value::Text(b, tag_b)) => {
+                tag_a.def_id() == tag_b.def_id() && a == b
+            }
             (Value::OctetSequence(a, tag_a), Value::OctetSequence(b, tag_b)) => {
-                tag_a.def() == tag_b.def() && a == b
+                tag_a.def_id() == tag_b.def_id() && a == b
             }
             (Value::ChronoDateTime(a, tag_a), Value::ChronoDateTime(b, tag_b)) => {
-                tag_a.def() == tag_b.def() && a == b
+                tag_a.def_id() == tag_b.def_id() && a == b
             }
             (Value::ChronoDate(a, tag_a), Value::ChronoDate(b, tag_b)) => {
-                tag_a.def() == tag_b.def() && a == b
+                tag_a.def_id() == tag_b.def_id() && a == b
             }
             (Value::ChronoTime(a, tag_a), Value::ChronoTime(b, tag_b)) => {
-                tag_a.def() == tag_b.def() && a == b
+                tag_a.def_id() == tag_b.def_id() && a == b
             }
             (Value::Struct(a, tag_a), Value::Struct(b, tag_b)) => {
-                tag_a.def() == tag_b.def() && property_map_equals(a, b)
+                tag_a.def_id() == tag_b.def_id() && property_map_equals(a, b)
             }
             (Value::Dict(a, tag_a), Value::Dict(b, tag_b)) => {
-                tag_a.def() == tag_b.def()
+                tag_a.def_id() == tag_b.def_id()
                     && a.len() == b.len()
                     && a.iter()
                         .zip(b.iter())
@@ -138,7 +144,7 @@ impl OntolEquals for Value {
                         })
             }
             (Value::Sequence(a, tag_a), Value::Sequence(b, tag_b)) => {
-                tag_a.def() == tag_b.def()
+                tag_a.def_id() == tag_b.def_id()
                     && a.elements().len() == b.elements().len()
                     && a.sub() == b.sub()
                     && a.elements()
@@ -147,7 +153,7 @@ impl OntolEquals for Value {
                         .all(|(a, b)| a.ontol_equals(b))
             }
             (Value::DeleteRelationship(tag_a), Value::DeleteRelationship(tag_b)) => {
-                tag_a.def() == tag_b.def()
+                tag_a.def_id() == tag_b.def_id()
             }
             (Value::Filter(_, _), Value::Filter(_, _)) => {
                 // Does not make sense to compare, all filters are "equal"
@@ -163,26 +169,26 @@ impl OntolHash for Value {
         std::mem::discriminant(self).hash(h);
 
         match self {
-            Value::Unit(tag) => tag.def().hash(h),
+            Value::Unit(tag) => tag.def_id().hash(h),
             Value::Void(_) => {}
-            Value::I64(v, tag) => (v, tag.def()).hash(h),
+            Value::I64(v, tag) => (v, tag.def_id()).hash(h),
             Value::F64(v, tag) => match NotNan::new(*v) {
-                Ok(f) => (f, tag.def()).hash(h),
-                Err(_) => (-1, tag.def()).hash(h),
+                Ok(f) => (f, tag.def_id()).hash(h),
+                Err(_) => (-1, tag.def_id()).hash(h),
             },
-            Value::Serial(v, tag) => (v, tag.def()).hash(h),
-            Value::Rational(v, tag) => (v, tag.def()).hash(h),
-            Value::Text(v, tag) => (v, tag.def()).hash(h),
-            Value::OctetSequence(v, tag) => (v, tag.def()).hash(h),
-            Value::ChronoDateTime(v, tag) => (v, tag.def()).hash(h),
-            Value::ChronoDate(v, tag) => (v, tag.def()).hash(h),
-            Value::ChronoTime(v, tag) => (v, tag.def()).hash(h),
+            Value::Serial(v, tag) => (v, tag.def_id()).hash(h),
+            Value::Rational(v, tag) => (v, tag.def_id()).hash(h),
+            Value::Text(v, tag) => (v, tag.def_id()).hash(h),
+            Value::OctetSequence(v, tag) => (v, tag.def_id()).hash(h),
+            Value::ChronoDateTime(v, tag) => (v, tag.def_id()).hash(h),
+            Value::ChronoDate(v, tag) => (v, tag.def_id()).hash(h),
+            Value::ChronoTime(v, tag) => (v, tag.def_id()).hash(h),
             Value::Struct(v, tag) => {
-                tag.def().hash(h);
+                tag.def_id().hash(h);
                 property_map_ontol_hash(v, h, builder);
             }
             Value::Dict(v, tag) => {
-                tag.def().hash(h);
+                tag.def_id().hash(h);
                 v.len().hash(h);
                 for (key, val) in v.iter() {
                     key.hash(h);
@@ -190,11 +196,11 @@ impl OntolHash for Value {
                 }
             }
             Value::Sequence(v, tag) => {
-                tag.def().hash(h);
+                tag.def_id().hash(h);
                 v.ontol_hash(h, builder);
             }
             Value::DeleteRelationship(tag) => {
-                tag.def().hash(h);
+                tag.def_id().hash(h);
             }
             Value::Filter(_, _) => {}
         }

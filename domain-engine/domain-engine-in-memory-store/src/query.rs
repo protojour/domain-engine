@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     attr::{Attr, AttrMatrix},
-    ontology::domain::{DataRelationshipKind, EdgeCardinalProjection, TypeInfo},
+    ontology::domain::{DataRelationshipKind, Def, EdgeCardinalProjection},
     property::ValueCardinality,
     query::{
         filter::Filter,
@@ -76,8 +76,8 @@ impl InMemoryStore {
             .get(&struct_select.def_id)
             .ok_or(DomainError::InvalidEntityDefId)?;
 
-        let type_info = ctx.ontology.get_type_info(struct_select.def_id);
-        let _entity_info = type_info
+        let def = ctx.ontology.def(struct_select.def_id);
+        let _entity_info = def
             .entity_info()
             .ok_or(DomainError::NotAnEntity(struct_select.def_id))?;
 
@@ -89,7 +89,7 @@ impl InMemoryStore {
 
             for (key, props) in collection {
                 let filter_val = FilterVal::Struct {
-                    type_def_id: type_info.def_id,
+                    type_def_id: def.id,
                     dynamic_key: Some(key),
                     prop_tree: props,
                 };
@@ -143,7 +143,7 @@ impl InMemoryStore {
 
         for (dynamic_key, properties) in raw_props_vec {
             let value = self.apply_struct_select(
-                type_info,
+                def,
                 VertexKey {
                     type_def_id: struct_select.def_id,
                     dynamic_key,
@@ -162,7 +162,7 @@ impl InMemoryStore {
 
     fn apply_struct_select(
         &self,
-        type_info: &TypeInfo,
+        def: &Def,
         vertex_key: VertexKey<&DynamicKey>,
         mut properties: FnvHashMap<RelationshipId, Attr>,
         struct_def_id: DefId,
@@ -174,7 +174,7 @@ impl InMemoryStore {
                 continue;
             }
 
-            let data_relationship = find_data_relationship(type_info, rel_id)?;
+            let data_relationship = find_data_relationship(def, rel_id)?;
 
             let DataRelationshipKind::Edge(projection) = data_relationship.kind else {
                 continue;
@@ -291,8 +291,8 @@ impl InMemoryStore {
             .get(vertex_key.dynamic_key)
             .ok_or(DomainError::InherentIdNotFound)?;
 
-        let type_info = ctx.ontology.get_type_info(vertex_key.type_def_id);
-        let entity_info = type_info
+        let def = ctx.ontology.def(vertex_key.type_def_id);
+        let entity_info = def
             .entity_info()
             .ok_or(DomainError::NotAnEntity(vertex_key.type_def_id))?;
 
@@ -303,7 +303,7 @@ impl InMemoryStore {
                 Ok(id_attr.as_unit().unwrap().clone())
             }
             Select::Struct(struct_select) => self.apply_struct_select(
-                type_info,
+                def,
                 vertex_key,
                 properties.clone(),
                 vertex_key.type_def_id,
@@ -312,9 +312,9 @@ impl InMemoryStore {
             ),
             Select::StructUnion(_, variant_selects) => {
                 for variant_select in variant_selects {
-                    if variant_select.def_id == type_info.def_id {
+                    if variant_select.def_id == def.id {
                         return self.apply_struct_select(
-                            type_info,
+                            def,
                             vertex_key,
                             properties.clone(),
                             vertex_key.type_def_id,
@@ -324,15 +324,12 @@ impl InMemoryStore {
                     }
                 }
 
-                Ok(Value::Struct(
-                    Box::new(properties.clone()),
-                    type_info.def_id.into(),
-                ))
+                Ok(Value::Struct(Box::new(properties.clone()), def.id.into()))
             }
             Select::EntityId => Err(DomainError::DataStore(anyhow!("entity id"))),
             Select::Entity(entity_select) => match &entity_select.source {
                 StructOrUnionSelect::Struct(struct_select) => self.apply_struct_select(
-                    type_info,
+                    def,
                     vertex_key,
                     properties.clone(),
                     struct_select.def_id,
@@ -346,7 +343,7 @@ impl InMemoryStore {
                         .expect("Union variant not found");
 
                     self.apply_struct_select(
-                        type_info,
+                        def,
                         vertex_key,
                         properties.clone(),
                         struct_select.def_id,

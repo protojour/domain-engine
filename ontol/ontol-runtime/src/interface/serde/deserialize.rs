@@ -241,7 +241,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
 
                 match &mut typed_attribute {
                     Attr::Unit(value) => {
-                        value.tag_mut().set_def(value_op.def.def_id);
+                        value.tag_mut().set_def_id(value_op.def.def_id);
                     }
                     _ => panic!("can't change type"),
                 }

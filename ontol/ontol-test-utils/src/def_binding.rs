@@ -11,7 +11,7 @@ use ontol_runtime::{
             processor::{ProcessorLevel, ProcessorMode},
         },
     },
-    ontology::{domain::TypeInfo, Ontology},
+    ontology::{domain::Def, Ontology},
     query::select::{Select, StructSelect},
     tuple::EndoTuple,
     value::Value,
@@ -26,13 +26,13 @@ use crate::{serde_helper::serde_create, OntolTest};
 /// ONTOL's own deserializer does.
 pub(crate) const TEST_JSON_SCHEMA_VALIDATION: bool = true;
 
-pub struct TypeBinding<'on> {
-    pub type_info: TypeInfo,
+pub struct DefBinding<'on> {
+    pub def: Def,
     json_schema: Option<JSONSchema>,
     ontology: &'on Ontology,
 }
 
-impl<'on> TypeBinding<'on> {
+impl<'on> DefBinding<'on> {
     pub(crate) fn new(ontol_test: &'on OntolTest, type_name: &str) -> Self {
         let (package_id, type_name) = ontol_test.parse_test_ident(type_name);
         Self::new_with_package(ontol_test, package_id, type_name)
@@ -45,37 +45,35 @@ impl<'on> TypeBinding<'on> {
     ) -> Self {
         let ontology = &ontol_test.ontology;
         let domain = ontology.find_domain(package_id).unwrap();
-        let type_info = domain
-            .type_infos()
-            .find(
-                |type_info| match type_info.name().map(|name| &ontology[name]) {
-                    Some(name) => name == type_name,
-                    None => false,
-                },
-            )
+        let def = domain
+            .defs()
+            .find(|def| match def.name().map(|name| &ontology[name]) {
+                Some(name) => name == type_name,
+                None => false,
+            })
             .cloned()
             .unwrap_or_else(|| panic!("type not found: `{type_name}`"));
 
-        if !type_info.public {
-            warn!("`{:?}` is not public!", ontology.debug(&type_info.name()));
+        if !def.public {
+            warn!("`{:?}` is not public!", ontology.debug(&def.name()));
         }
 
         trace!(
             "TypeBinding::new `{type_name}` with {addr:?} create={processor:?}",
-            addr = type_info.operator_addr,
-            processor = type_info
+            addr = def.operator_addr,
+            processor = def
                 .operator_addr
                 .map(|id| ontology.new_serde_processor(id, ProcessorMode::Create))
         );
 
         let json_schema = if ontol_test.compile_json_schema {
-            Some(compile_json_schema(ontology, &type_info))
+            Some(compile_json_schema(ontology, &def))
         } else {
             None
         };
 
         Self {
-            type_info,
+            def,
             json_schema,
             ontology,
         }
@@ -83,7 +81,7 @@ impl<'on> TypeBinding<'on> {
 
     pub fn from_def_id(def_id: DefId, ontology: &'on Ontology) -> Self {
         Self {
-            type_info: ontology.get_type_info(def_id).clone(),
+            def: ontology.def(def_id).clone(),
             json_schema: None,
             ontology,
         }
@@ -102,7 +100,7 @@ impl<'on> TypeBinding<'on> {
     }
 
     pub fn new_fake(&self, processor_mode: ProcessorMode) -> Value {
-        new_constant_fake(self.ontology, self.type_info.def_id, processor_mode).unwrap()
+        new_constant_fake(self.ontology, self.def.id, processor_mode).unwrap()
     }
 
     pub fn entity_builder(
@@ -119,12 +117,12 @@ impl<'on> TypeBinding<'on> {
     }
 
     pub fn def_id(&self) -> DefId {
-        self.type_info.def_id
+        self.def.id
     }
 
     #[track_caller]
     pub fn entity_id_def_id(&self) -> DefId {
-        self.type_info
+        self.def
             .entity_info()
             .expect("not an entity")
             .id_value_def_id
@@ -135,7 +133,7 @@ impl<'on> TypeBinding<'on> {
         properties: impl IntoIterator<Item = (&'static str, Select)>,
     ) -> StructSelect {
         StructSelect {
-            def_id: self.type_info.def_id,
+            def_id: self.def.id,
             properties: FnvHashMap::from_iter(
                 properties
                     .into_iter()
@@ -145,9 +143,7 @@ impl<'on> TypeBinding<'on> {
     }
 
     pub fn serde_operator_addr(&self) -> SerdeOperatorAddr {
-        self.type_info
-            .operator_addr
-            .expect("No serde operator addr")
+        self.def.operator_addr.expect("No serde operator addr")
     }
 
     pub fn find_property(&self, prop: &str) -> Option<RelationshipId> {
@@ -161,15 +157,13 @@ impl<'on> TypeBinding<'on> {
     }
 
     pub fn new_json_schema(&self, processor_mode: ProcessorMode) -> serde_json::Value {
-        let schema =
-            build_standalone_schema(self.ontology, &self.type_info, processor_mode).unwrap();
+        let schema = build_standalone_schema(self.ontology, &self.def, processor_mode).unwrap();
         serde_json::to_value(schema).unwrap()
     }
 }
 
-fn compile_json_schema(ontology: &Ontology, type_info: &TypeInfo) -> JSONSchema {
-    let standalone_schema =
-        build_standalone_schema(ontology, type_info, ProcessorMode::Create).unwrap();
+fn compile_json_schema(ontology: &Ontology, def: &Def) -> JSONSchema {
+    let standalone_schema = build_standalone_schema(ontology, def, ProcessorMode::Create).unwrap();
 
     debug!(
         "outputted json schema: {}",
@@ -184,7 +178,7 @@ fn compile_json_schema(ontology: &Ontology, type_info: &TypeInfo) -> JSONSchema 
 
 #[derive(Clone)]
 pub struct ValueBuilder<'t, 'on> {
-    binding: &'t TypeBinding<'on>,
+    binding: &'t DefBinding<'on>,
     value: Value,
 }
 
@@ -228,7 +222,7 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
             .unwrap()
             .into_unit()
             .unwrap();
-        self.value.tag_mut().set_def(value.type_def_id());
+        self.value.tag_mut().set_def_id(value.type_def_id());
         match (&mut self.value, value) {
             (Value::Unit(_), value) => {
                 self.value = value;
@@ -242,11 +236,7 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
     }
 
     fn with_json_id(self, json: serde_json::Value) -> Self {
-        let entity_info = self
-            .binding
-            .type_info
-            .entity_info()
-            .expect("Not an entity!");
+        let entity_info = self.binding.def.entity_info().expect("Not an entity!");
         let id = self
             .binding
             .ontology
@@ -285,15 +275,3 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
         self
     }
 }
-
-/*
-pub trait ToSequence {
-    fn to_sequence_attribute(self, ty: &TypeBinding) -> Attribute;
-}
-
-impl ToSequence for Vec<Attr> {
-    fn to_sequence_attribute(self, ty: &TypeBinding) -> Attribute {
-        Value::Sequence(Sequence::from_iter(self), ty.type_info.def_id).to_attr(Value::unit())
-    }
-}
-*/

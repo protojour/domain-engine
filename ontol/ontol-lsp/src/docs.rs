@@ -84,12 +84,12 @@ impl State {
                     "#### Set modifier\nThe values must be equal."
                 )),
                 ident => {
-                    match self.ontol_type_info.get(ident) {
-                        Some(type_info) => {
-                            let doc = self.ontology.get_docs(type_info.def_id)
+                    match self.ontol_def.get(ident) {
+                        Some(def) => {
+                            let doc = self.ontology.get_docs(def.id)
                                 .map(|docs_constant| &self.ontology[docs_constant])
                                 .unwrap_or_default();
-                            let kind = match type_info.kind {
+                            let kind = match def.kind {
                                 TypeKind::Entity(_) | TypeKind::Data(_) => Some("Primitive"),
                                 TypeKind::Relationship(_) => Some("Relation type"),
                                 TypeKind::Generator(_) => Some("Generator type"),

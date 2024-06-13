@@ -61,15 +61,15 @@ impl InMemoryStore {
 
         let entity_id = find_inherent_entity_id(&value, &ctx.ontology)?
             .ok_or_else(|| DomainError::EntityNotFound)?;
-        let type_info = ctx.ontology.get_type_info(value.type_def_id());
+        let def = ctx.ontology.def(value.type_def_id());
         let vertex_key = VertexKey {
-            type_def_id: type_info.def_id,
+            type_def_id: def.id,
             dynamic_key: Self::extract_dynamic_key(&entity_id)?,
         };
 
         if !self
             .vertices
-            .get(&type_info.def_id)
+            .get(&def.id)
             .unwrap()
             .contains_key(&vertex_key.dynamic_key)
         {
@@ -82,7 +82,7 @@ impl InMemoryStore {
             return Err(DomainError::BadInput(anyhow!("Expected a struct")));
         };
         for (rel_id, attr) in *data_struct {
-            let data_relationship = find_data_relationship(type_info, &rel_id)?;
+            let data_relationship = find_data_relationship(def, &rel_id)?;
 
             match (
                 data_relationship.kind,
@@ -157,7 +157,7 @@ impl InMemoryStore {
             }
         }
 
-        let collection = self.vertices.get_mut(&type_info.def_id).unwrap();
+        let collection = self.vertices.get_mut(&def.id).unwrap();
         let raw_props = collection.get_mut(&vertex_key.dynamic_key).unwrap();
 
         for (property_id, attr) in raw_props_update {
@@ -215,8 +215,8 @@ impl InMemoryStore {
             ValueDebug(&vertex)
         );
 
-        let type_info = ctx.ontology.get_type_info(vertex.type_def_id());
-        let entity_info = type_info
+        let def = ctx.ontology.def(vertex.type_def_id());
+        let entity_info = def
             .entity_info()
             .ok_or(DomainError::NotAnEntity(vertex.type_def_id()))?;
 
@@ -247,12 +247,12 @@ impl InMemoryStore {
         let mut raw_props: FnvHashMap<RelationshipId, Attr> = Default::default();
 
         let vertex_key = VertexKey {
-            type_def_id: type_info.def_id,
+            type_def_id: def.id,
             dynamic_key: Self::extract_dynamic_key(&id)?,
         };
 
         for (rel_id, attr) in *struct_map {
-            let data_relationship = find_data_relationship(type_info, &rel_id)?;
+            let data_relationship = find_data_relationship(def, &rel_id)?;
 
             match (
                 data_relationship.kind,
@@ -312,7 +312,7 @@ impl InMemoryStore {
             }
         }
 
-        let collection = self.vertices.get_mut(&struct_tag.def()).unwrap();
+        let collection = self.vertices.get_mut(&struct_tag.def_id()).unwrap();
 
         if collection.contains_key(&vertex_key.dynamic_key) {
             return Err(DomainError::EntityAlreadyExists);
@@ -371,10 +371,7 @@ impl InMemoryStore {
                         write_mode.unwrap_or(write_mode_from_value(&params)),
                         self.resolve_foreign_key_for_edge(
                             *entity_def_id,
-                            ctx.ontology
-                                .get_type_info(*entity_def_id)
-                                .entity_info()
-                                .unwrap(),
+                            ctx.ontology.def(*entity_def_id).entity_info().unwrap(),
                             value,
                             ctx,
                         )?,
@@ -399,11 +396,8 @@ impl InMemoryStore {
                     let (variant_def_id, entity_info) = variants
                         .iter()
                         .find_map(|variant_def_id| {
-                            let entity_info = ctx
-                                .ontology
-                                .get_type_info(*variant_def_id)
-                                .entity_info()
-                                .unwrap();
+                            let entity_info =
+                                ctx.ontology.def(*variant_def_id).entity_info().unwrap();
 
                             if entity_info.id_value_def_id == value.type_def_id() {
                                 Some((*variant_def_id, entity_info))
@@ -514,10 +508,7 @@ impl InMemoryStore {
             DataRelationshipTarget::Unambiguous(entity_def_id) => self
                 .resolve_foreign_key_for_edge(
                     *entity_def_id,
-                    ctx.ontology
-                        .get_type_info(*entity_def_id)
-                        .entity_info()
-                        .unwrap(),
+                    ctx.ontology.def(*entity_def_id).entity_info().unwrap(),
                     foreign_id,
                     ctx,
                 )?,
@@ -526,11 +517,7 @@ impl InMemoryStore {
                 let (variant_def_id, entity_info) = variants
                     .iter()
                     .find_map(|variant_def_id| {
-                        let entity_info = ctx
-                            .ontology
-                            .get_type_info(*variant_def_id)
-                            .entity_info()
-                            .unwrap();
+                        let entity_info = ctx.ontology.def(*variant_def_id).entity_info().unwrap();
 
                         if entity_info.id_value_def_id == foreign_id.type_def_id() {
                             Some((*variant_def_id, entity_info))
@@ -597,8 +584,8 @@ impl InMemoryStore {
                 ctx,
             )?;
         } else if entity_data.is_none() {
-            let type_info = ctx.ontology.get_type_info(id_value.type_def_id());
-            let repr = if let Some(operator_addr) = type_info.operator_addr {
+            let def = ctx.ontology.def(id_value.type_def_id());
+            let repr = if let Some(operator_addr) = def.operator_addr {
                 // TODO: Easier way to report values in "human readable"/JSON format
 
                 let processor = ctx

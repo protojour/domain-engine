@@ -21,7 +21,7 @@ pub struct Domain {
     unique_name: TextConstant,
 
     /// Types by DefId.1 (the type's index within the domain)
-    types: Vec<TypeInfo>,
+    types: Vec<Def>,
 
     edges: BTreeMap<EdgeId, EdgeInfo>,
 }
@@ -48,15 +48,15 @@ impl Domain {
         self.types.len()
     }
 
-    pub fn type_info(&self, def_id: DefId) -> &TypeInfo {
+    pub fn def(&self, def_id: DefId) -> &Def {
         &self.types[def_id.1 as usize]
     }
 
-    pub fn type_info_option(&self, def_id: DefId) -> Option<&TypeInfo> {
+    pub fn def_option(&self, def_id: DefId) -> Option<&Def> {
         self.types.get(def_id.1 as usize)
     }
 
-    pub fn type_infos(&self) -> impl Iterator<Item = &TypeInfo> {
+    pub fn defs(&self) -> impl Iterator<Item = &Def> {
         self.types.iter()
     }
 
@@ -68,23 +68,21 @@ impl Domain {
         self.edges.get(&id)
     }
 
-    pub fn find_type_by_name(&self, name: TextConstant) -> Option<&TypeInfo> {
-        self.types
-            .iter()
-            .find(|type_info| type_info.name() == Some(name))
+    pub fn find_def_by_name(&self, name: TextConstant) -> Option<&Def> {
+        self.types.iter().find(|info| info.name() == Some(name))
     }
 
-    pub fn add_type(&mut self, type_info: TypeInfo) {
-        self.register_type_info(type_info);
+    pub fn add_def(&mut self, info: Def) {
+        self.register_def(info);
     }
 
-    fn register_type_info(&mut self, type_info: TypeInfo) {
-        let index = type_info.def_id.1 as usize;
+    fn register_def(&mut self, info: Def) {
+        let index = info.id.1 as usize;
 
         // pad the vector
         let new_size = std::cmp::max(self.types.len(), index + 1);
-        self.types.resize_with(new_size, || TypeInfo {
-            def_id: DefId(type_info.def_id.0, 0),
+        self.types.resize_with(new_size, || Def {
+            id: DefId(info.id.0, 0),
             public: false,
             kind: TypeKind::Data(BasicTypeInfo { name: None }),
             store_key: None,
@@ -92,13 +90,7 @@ impl Domain {
             data_relationships: Default::default(),
         });
 
-        self.types[index] = type_info;
-    }
-
-    pub fn find_type_info_by_name(&self, name: TextConstant) -> Option<&TypeInfo> {
-        self.types
-            .iter()
-            .find(|type_info| type_info.name() == Some(name))
+        self.types[index] = info;
     }
 
     pub fn set_edges(&mut self, edges: impl IntoIterator<Item = (EdgeId, EdgeInfo)>) {
@@ -107,8 +99,8 @@ impl Domain {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct TypeInfo {
-    pub def_id: DefId,
+pub struct Def {
+    pub id: DefId,
     pub kind: TypeKind,
     pub public: bool,
     /// The SerdeOperatorAddr used for JSON.
@@ -118,7 +110,7 @@ pub struct TypeInfo {
     pub data_relationships: FnvHashMap<RelationshipId, DataRelationshipInfo>,
 }
 
-impl TypeInfo {
+impl Def {
     pub fn name(&self) -> Option<TextConstant> {
         match &self.kind {
             TypeKind::Entity(info) => Some(info.name),

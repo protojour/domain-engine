@@ -12,11 +12,11 @@ use ontol_runtime::{
 };
 use ontol_test_utils::{
     assert_error_msg,
+    def_binding::DefBinding,
     examples::{conduit::CONDUIT_DB, ARTIST_AND_INSTRUMENT},
     expect_eq,
     json_utils::{json_map, json_prop},
     serde_helper::{serde_create, serde_read},
-    type_binding::TypeBinding,
     TestCompile, TestPackages,
 };
 use serde_json::json;
@@ -141,11 +141,11 @@ async fn test_conduit_db_id_generation() {
 async fn test_conduit_db_store_entity_tree() {
     let test = conduit_db().compile();
     let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic()).await;
-    let [user_type, article_type, comment_type] = test.bind(["User", "Article", "Comment"]);
+    let [user_def, article_def, comment_def] = test.bind(["User", "Article", "Comment"]);
 
     let pre_existing_user_id: Uuid = engine
         .store_new_entity(
-            serde_create(&user_type)
+            serde_create(&user_def)
                 .to_value(json!({
                     "username": "pre-existing",
                     "email": "pre@existing",
@@ -161,7 +161,7 @@ async fn test_conduit_db_store_entity_tree() {
 
     let article_id: Uuid = engine
         .store_new_entity(
-            serde_create(&article_type)
+            serde_create(&article_def)
                 .to_value(json!({
                     "slug": "foo",
                     "title": "Foo",
@@ -196,12 +196,12 @@ async fn test_conduit_db_store_entity_tree() {
         .cast_into();
 
     let users = engine
-        .query_entities(user_type.struct_select([]).into(), Session::default())
+        .query_entities(user_def.struct_select([]).into(), Session::default())
         .await
         .unwrap();
 
     let new_user_id = users.elements()[1]
-        .get_attribute(user_type.find_property("user_id").unwrap())
+        .get_attribute(user_def.find_property("user_id").unwrap())
         .unwrap()
         .as_unit()
         .unwrap()
@@ -209,10 +209,10 @@ async fn test_conduit_db_store_entity_tree() {
         .cast_into::<Uuid>();
 
     expect_eq!(
-        actual = serde_read(&user_type).as_json(AttrRef::Unit(
+        actual = serde_read(&user_def).as_json(AttrRef::Unit(
             &engine
                 .query_entities(
-                    user_type
+                    user_def
                         .struct_select([("authored_articles", Select::Leaf)])
                         .into(),
                     Session::default(),
@@ -234,12 +234,12 @@ async fn test_conduit_db_store_entity_tree() {
     );
 
     let comments = engine
-        .query_entities(comment_type.struct_select([]).into(), Session::default())
+        .query_entities(comment_def.struct_select([]).into(), Session::default())
         .await
         .unwrap();
 
     let comment_id = comments.elements()[0]
-        .get_attribute(comment_type.find_property("id").unwrap())
+        .get_attribute(comment_def.find_property("id").unwrap())
         .unwrap()
         .as_unit()
         .unwrap()
@@ -248,7 +248,7 @@ async fn test_conduit_db_store_entity_tree() {
     let comment_id = format!("{}", comment_id.0);
 
     expect_eq!(
-        actual = serde_read(&user_type)
+        actual = serde_read(&user_def)
             // This query intentionally violates the domain's JSON schema:
             .with_profile(ProcessorProfile {
                 flags: ProcessorProfileFlags::ALL_PROPS_OPTIONAL,
@@ -257,13 +257,13 @@ async fn test_conduit_db_store_entity_tree() {
             .as_json(AttrRef::Unit(
                 &engine
                     .query_entities(
-                        user_type
+                        user_def
                             .struct_select([(
                                 "authored_articles",
-                                article_type
+                                article_def
                                     .struct_select([(
                                         "comments",
-                                        comment_type.struct_select([]).into()
+                                        comment_def.struct_select([]).into()
                                     )])
                                     .into()
                             )])
@@ -336,8 +336,8 @@ async fn test_artist_and_instrument_fmt_id_generation() {
     let test = artist_and_instrument().compile();
     let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic()).await;
     let [artist] = test.bind(["artist"]);
-    let artist_id = TypeBinding::from_def_id(
-        artist.type_info.entity_info().unwrap().id_value_def_id,
+    let artist_id = DefBinding::from_def_id(
+        artist.def.entity_info().unwrap().id_value_def_id,
         test.ontology(),
     );
 

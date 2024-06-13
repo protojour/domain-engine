@@ -1,11 +1,11 @@
 use crate::juniper;
 
-use super::{gql_domain::TypeInfo, Ctx};
+use super::{gql_domain::Def, Ctx};
 
 pub struct DefDictionaryEntry {
     pub name: String,
 
-    pub definitions: Vec<TypeInfo>,
+    pub definitions: Vec<Def>,
 }
 
 #[juniper::graphql_object]
@@ -13,5 +13,9 @@ pub struct DefDictionaryEntry {
 impl DefDictionaryEntry {
     fn name(&self) -> &str {
         &self.name
+    }
+
+    fn definitions(&self) -> Vec<Def> {
+        self.definitions.clone()
     }
 }

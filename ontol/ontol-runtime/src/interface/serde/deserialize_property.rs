@@ -156,11 +156,11 @@ fn fallback<'a, E: Error>(
         .lookup_special_property(v)
     {
         Some(SpecialProperty::IdOverride) => {
-            let type_info = deserializer
+            let def = deserializer
                 .processor
                 .ontology
-                .get_type_info(deserializer.type_def_id);
-            let TypeKind::Entity(entity_info) = &type_info.kind else {
+                .def(deserializer.type_def_id);
+            let TypeKind::Entity(entity_info) = &def.kind else {
                 return Err(E::custom("not an entity"));
             };
 

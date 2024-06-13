@@ -104,7 +104,7 @@ impl Value {
     }
 
     pub const fn type_def_id(&self) -> DefId {
-        self.tag().def()
+        self.tag().def_id()
     }
 
     pub fn tag_mut(&mut self) -> &mut ValueTag {
@@ -271,14 +271,14 @@ impl ValueTag {
         }
     }
 
-    pub const fn def(&self) -> DefId {
+    pub const fn def_id(&self) -> DefId {
         DefId(
             PackageId(self.first & TagFlags::PKG_MASk.bits()),
             self.second,
         )
     }
 
-    pub fn set_def(&mut self, def_id: DefId) {
+    pub fn set_def_id(&mut self, def_id: DefId) {
         self.first = def_id.package_id().0 | (self.first & TagFlags::PKG_MASk.complement().bits());
         self.second = def_id.1;
     }
@@ -305,13 +305,13 @@ impl ValueTag {
 impl Debug for ValueTag {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let flags = TagFlags::from_bits(self.first & TagFlags::PKG_MASk.complement().bits());
-        write!(f, "tag({:?}, {:?})", self.def(), flags)
+        write!(f, "tag({:?}, {:?})", self.def_id(), flags)
     }
 }
 
 impl From<ValueTag> for DefId {
     fn from(value: ValueTag) -> Self {
-        value.def()
+        value.def_id()
     }
 }
 

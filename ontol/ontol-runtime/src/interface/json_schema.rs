@@ -12,7 +12,7 @@ use crate::interface::serde::operator::{
 use crate::interface::serde::processor::ProcessorMode;
 use crate::{
     ontology::{
-        domain::{Domain, TypeInfo},
+        domain::{Def, Domain},
         Ontology,
     },
     DefId, PackageId,
@@ -29,8 +29,8 @@ pub fn build_openapi_schemas<'e>(
 ) -> OpenApiSchemas<'e> {
     let mut graph_builder = SchemaGraphBuilder::default();
 
-    for type_info in domain.type_infos() {
-        if let Some(operator_addr) = &type_info.operator_addr {
+    for def in domain.defs() {
+        if let Some(operator_addr) = &def.operator_addr {
             graph_builder.visit(*operator_addr, ontology);
         }
     }
@@ -44,19 +44,19 @@ pub fn build_openapi_schemas<'e>(
 
 pub fn build_standalone_schema<'e>(
     ontology: &'e Ontology,
-    type_info: &TypeInfo,
+    def: &Def,
     mode: ProcessorMode,
 ) -> Result<StandaloneJsonSchema<'e>, &'static str> {
     let mut graph_builder = SchemaGraphBuilder::default();
 
-    let operator_addr = type_info
+    let operator_addr = def
         .operator_addr
         .ok_or("no serde operator addr available")?;
     graph_builder.visit(operator_addr, ontology);
 
     Ok(StandaloneJsonSchema {
         operator_addr,
-        def_id: type_info.def_id,
+        def_id: def.id,
         defs: graph_builder.graph,
         ontology,
         mode,
@@ -224,7 +224,7 @@ impl<'e> SchemaCtx<'e> {
         let def_id = serde_def.def_id;
         self.ontology
             .find_domain(def_id.0)
-            .and_then(|domain| domain.type_info(def_id).name())
+            .and_then(|domain| domain.def(def_id).name())
             .map(|constant| &self.ontology[constant])
             .map(|type_name| format!("{type_name}{modifier}"))
     }

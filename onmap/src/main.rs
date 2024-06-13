@@ -71,16 +71,16 @@ fn main() -> anyhow::Result<()> {
     let to_name = ontology.find_text_constant(args.to.as_str()).unwrap();
     let input = MapDef {
         def_id: domain
-            .find_type_by_name(from_name)
+            .find_def_by_name(from_name)
             .expect("--from def not found in domain")
-            .def_id,
+            .id,
         flags: MapDefFlags::empty(),
     };
     let output = MapDef {
         def_id: domain
-            .find_type_by_name(to_name)
+            .find_def_by_name(to_name)
             .expect("--to def not found in domain")
-            .def_id,
+            .id,
         flags: MapDefFlags::empty(),
     };
     let proc = ontology
@@ -91,9 +91,9 @@ fn main() -> anyhow::Result<()> {
         })
         .ok_or_else(|| anyhow!(format!("No map from {} to {}", args.from, args.to)))?;
 
-    let from_type = ontology.get_type_info(input.def_id);
+    let from_def = ontology.def(input.def_id);
     let from_processor = ontology.new_serde_processor(
-        from_type.operator_addr.expect("No deserializer found"),
+        from_def.operator_addr.expect("No deserializer found"),
         ProcessorMode::Read,
     );
     let attr = match args.format {
@@ -115,9 +115,9 @@ fn main() -> anyhow::Result<()> {
         VmState::Complete(value) => value,
         VmState::Yield(_) => return Err(anyhow!("ONTOL-VM yielded!")),
     };
-    let to_type = ontology.get_type_info(output.def_id);
+    let to_def = ontology.def(output.def_id);
     let to_processor = ontology.new_serde_processor(
-        to_type.operator_addr.expect("No deserializer found"),
+        to_def.operator_addr.expect("No deserializer found"),
         ProcessorMode::Create,
     );
     let mut buf: Vec<u8> = vec![];

@@ -8,7 +8,7 @@ use ontol_runtime::{
     ontology::{
         domain::{
             BasicTypeInfo, DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource,
-            DataRelationshipTarget, Domain, EdgeCardinal, EdgeInfo, EntityInfo, TypeInfo, TypeKind,
+            DataRelationshipTarget, Def, Domain, EdgeCardinal, EdgeInfo, EntityInfo, TypeKind,
         },
         map::MapMeta,
         ontol::{OntolDomainMeta, TextConstant, TextLikeType},
@@ -164,8 +164,8 @@ impl<'m> Compiler<'m> {
                     );
                 }
 
-                domain.add_type(TypeInfo {
-                    def_id: type_def_id,
+                domain.add_def(Def {
+                    id: type_def_id,
                     public: match def_kind {
                         DefKind::Type(TypeDef { flags, .. }) => {
                             flags.contains(TypeDefFlags::PUBLIC)
@@ -199,8 +199,8 @@ impl<'m> Compiler<'m> {
             }
 
             for type_def_id in namespace.anonymous {
-                domain.add_type(TypeInfo {
-                    def_id: type_def_id,
+                domain.add_def(Def {
+                    id: type_def_id,
                     public: false,
                     kind: self
                         .defs
@@ -222,8 +222,8 @@ impl<'m> Compiler<'m> {
 
             if package_id == ONTOL_PKG {
                 for def_id in self.defs.text_literals.values().copied() {
-                    domain.add_type(TypeInfo {
-                        def_id,
+                    domain.add_def(Def {
+                        id: def_id,
                         public: false,
                         kind: TypeKind::Data(BasicTypeInfo { name: None }),
                         operator_addr: None,

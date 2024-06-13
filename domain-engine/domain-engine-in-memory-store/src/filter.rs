@@ -161,9 +161,9 @@ impl InMemoryStore {
                         dynamic_key,
                     },
                 ) => {
-                    let type_info = ctx.ontology.get_type_info(type_def_id);
+                    let def = ctx.ontology.def(type_def_id);
 
-                    let Some(data_relationship) = type_info.data_relationships.get(prop_id) else {
+                    let Some(data_relationship) = def.data_relationships.get(prop_id) else {
                         return Err(ProofError::Disproven);
                     };
 

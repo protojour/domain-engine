@@ -390,13 +390,11 @@ impl DomainEngine {
             Yield::CallExtern(extern_def_id, input, output_def_id) => {
                 let ontology = &self.ontology;
                 let input_operator_addr = ontology
-                    .get_type_info(input.type_def_id())
+                    .def(input.type_def_id())
                     .operator_addr
                     .ok_or(DomainError::SerializationFailed)?;
-                let output_operator_addr = ontology
-                    .get_type_info(output_def_id)
-                    .operator_addr
-                    .ok_or_else(|| {
+                let output_operator_addr =
+                    ontology.def(output_def_id).operator_addr.ok_or_else(|| {
                         error!("No deserialization operator");
                         DomainError::DeserializationFailed
                     })?;

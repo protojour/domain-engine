@@ -372,8 +372,8 @@ fn entity_union_in_relation_with_ids() {
     let [artist, guitar_id, synth_id] = test.bind(["artist", "guitar_id", "synth_id"]);
     let plays = artist.find_property("plays").unwrap();
 
-    assert!(artist.type_info.entity_info().is_some());
-    assert!(guitar_id.type_info.entity_info().is_none());
+    assert!(artist.def.entity_info().is_some());
+    assert!(guitar_id.def.entity_info().is_none());
 
     let json = json!({
         "name": "Someone",
@@ -404,14 +404,14 @@ fn entity_union_in_relation_with_ids() {
     let guitar_id_attr = plays_attributes.get_row_cloned(0).unwrap();
     let synth_id_attr = plays_attributes.get_row_cloned(1).unwrap();
 
-    assert_ne!(guitar_id.type_info.def_id, synth_id.type_info.def_id);
+    assert_ne!(guitar_id.def.id, synth_id.def.id);
     assert_eq!(
         guitar_id_attr.as_unit().unwrap().type_def_id(),
-        guitar_id.type_info.def_id
+        guitar_id.def.id
     );
     assert_eq!(
         synth_id_attr.as_unit().unwrap().type_def_id(),
-        synth_id.type_info.def_id
+        synth_id.def.id
     );
 }
 
@@ -504,7 +504,7 @@ fn entity_order_ok() {
 }
 
 #[test]
-fn store_key_in_type_info() {
+fn store_key_in_def_info() {
     "
     def foobar_edge (
         rel .store_key: 'fubar'
@@ -525,28 +525,28 @@ fn store_key_in_type_info() {
         let ontology = test.ontology();
         let domain = ontology.find_domain(PackageId::second()).unwrap();
 
-        for type_info in domain.type_infos() {
-            if let Some(text_constant) = type_info.name() {
+        for def in domain.defs() {
+            if let Some(text_constant) = def.name() {
                 let name = &ontology[text_constant];
 
                 if name == "foobar_edge" {
-                    assert_eq!(&ontology[type_info.store_key.unwrap()], "fubar");
+                    assert_eq!(&ontology[def.store_key.unwrap()], "fubar");
                 }
 
                 if name == "foo" {
-                    assert_eq!(&ontology[type_info.store_key.unwrap()], "fu");
+                    assert_eq!(&ontology[def.store_key.unwrap()], "fu");
 
                     let (_prop_id, _rel_info, projection) =
-                        type_info.edge_relationships().next().unwrap();
+                        def.edge_relationships().next().unwrap();
                     let edge_info = ontology.find_edge(projection.id).unwrap();
                     assert_eq!(&ontology[edge_info.store_key.unwrap()], "fubar");
                 }
 
                 if name == "bar" {
-                    assert_eq!(&ontology[type_info.store_key.unwrap()], "bar");
+                    assert_eq!(&ontology[def.store_key.unwrap()], "bar");
 
                     let (_prop_id, _rel_info, projection) =
-                        type_info.edge_relationships().next().unwrap();
+                        def.edge_relationships().next().unwrap();
                     let edge_info = ontology.find_edge(projection.id).unwrap();
                     assert_eq!(&ontology[edge_info.store_key.unwrap()], "baaah");
                 }

@@ -13,7 +13,8 @@ pub struct Domain {
     pub id: PackageId,
 }
 
-pub struct TypeInfo {
+#[derive(Clone)]
+pub struct Def {
     pub id: DefId,
 }
 
@@ -62,21 +63,19 @@ impl Domain {
     fn entities(&self, ctx: &Ctx) -> Vec<Entity> {
         let domain = ctx.find_domain(self.id).unwrap();
         let mut entities = vec![];
-        for type_info in domain.type_infos() {
-            if matches!(type_info.kind, TypeKind::Entity(_)) {
-                entities.push(Entity {
-                    id: type_info.def_id,
-                })
+        for def in domain.defs() {
+            if matches!(def.kind, TypeKind::Entity(_)) {
+                entities.push(Entity { id: def.id })
             }
         }
         entities
     }
-    fn types(&self, ctx: &Ctx, kind: Option<TypeKindEnum>) -> Vec<TypeInfo> {
+    fn types(&self, ctx: &Ctx, kind: Option<TypeKindEnum>) -> Vec<Def> {
         let infos = ctx
             .find_domain(self.id)
             .unwrap()
-            .type_infos()
-            .map(|info| TypeInfo { id: info.def_id });
+            .defs()
+            .map(|info| Def { id: info.id });
         if let Some(kind) = kind {
             infos.filter(|info| info.kind(ctx) == kind).collect()
         } else {
@@ -93,33 +92,31 @@ impl Domain {
 
 #[juniper::graphql_object]
 #[graphql(context = Ctx)]
-impl TypeInfo {
+impl Def {
     fn id(&self) -> String {
         format!("{:?}", self.id)
     }
     fn name(&self, ctx: &Ctx) -> Option<String> {
-        ctx.get_type_info(self.id)
-            .name()
-            .map(|name| ctx[name].into())
+        ctx.def(self.id).name().map(|name| ctx[name].into())
     }
     fn doc_string(&self, ctx: &Ctx) -> Option<String> {
         ctx.get_docs(self.id)
             .map(|docs_constant| ctx[docs_constant].into())
     }
     fn entity_info(&self, ctx: &Ctx) -> Option<Entity> {
-        ctx.get_type_info(self.id)
+        ctx.def(self.id)
             .entity_info()
             .map(|_| Entity { id: self.id })
     }
-    fn union_variants(&self, ctx: &Ctx) -> Vec<TypeInfo> {
+    fn union_variants(&self, ctx: &Ctx) -> Vec<Def> {
         ctx.union_variants(self.id)
             .iter()
             .copied()
-            .map(|id| TypeInfo { id })
+            .map(|id| Def { id })
             .collect()
     }
     fn kind(&self, ctx: &Ctx) -> TypeKindEnum {
-        match ctx.get_type_info(self.id).kind {
+        match ctx.def(self.id).kind {
             TypeKind::Entity(_) => TypeKindEnum::Entity,
             TypeKind::Data(_) => TypeKindEnum::Data,
             TypeKind::Relationship(_) => TypeKindEnum::Relationship,
@@ -129,7 +126,7 @@ impl TypeInfo {
         }
     }
     fn data_relationships(&self, ctx: &Ctx) -> Vec<gql_rel::DataRelationshipInfo> {
-        ctx.get_type_info(self.id)
+        ctx.def(self.id)
             .data_relationships
             .iter()
             .map(|(rel_id, dri)| {
@@ -178,23 +175,20 @@ impl TypeInfo {
 #[graphql(context = Ctx)]
 impl Entity {
     fn is_self_identifying(&self, ctx: &Ctx) -> bool {
-        ctx.get_type_info(self.id)
-            .entity_info()
-            .unwrap()
-            .is_self_identifying
+        ctx.def(self.id).entity_info().unwrap().is_self_identifying
     }
 }
 
 #[juniper::graphql_object]
 #[graphql(context = Ctx)]
 impl MapEdge {
-    fn output(&self) -> TypeInfo {
-        TypeInfo {
+    fn output(&self) -> Def {
+        Def {
             id: self.key.output.def_id,
         }
     }
-    fn input(&self) -> TypeInfo {
-        TypeInfo {
+    fn input(&self) -> Def {
+        Def {
             id: self.key.input.def_id,
         }
     }

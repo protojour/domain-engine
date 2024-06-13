@@ -262,8 +262,8 @@ impl<'on, 'a> Probe<'on, 'a> {
             Some(edges) => edges,
             None => {
                 if self.options.must_be_entity {
-                    let type_info = self.ontology.get_type_info(def_id);
-                    if !matches!(&type_info.kind, TypeKind::Entity(_)) {
+                    let def = self.ontology.def(def_id);
+                    if !matches!(&def.kind, TypeKind::Entity(_)) {
                         return false;
                     }
                 }

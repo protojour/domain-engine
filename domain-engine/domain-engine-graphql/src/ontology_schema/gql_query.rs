@@ -43,12 +43,10 @@ impl Query {
         Ok(domains)
     }
 
-    fn def(def_id: String, ctx: &Ctx) -> FieldResult<gql_domain::TypeInfo> {
+    fn def(def_id: String, ctx: &Ctx) -> FieldResult<gql_domain::Def> {
         if let Ok(def_id) = DefId::from_str(&def_id) {
-            if let Some(type_info) = ctx.get_type_info_option(def_id) {
-                return Ok(gql_domain::TypeInfo {
-                    id: type_info.def_id,
-                });
+            if let Some(def) = ctx.get_def(def_id) {
+                return Ok(gql_domain::Def { id: def.id });
             }
         }
         Err(FieldError::new(
@@ -58,24 +56,24 @@ impl Query {
     }
 
     fn def_dictionary(ctx: &Ctx) -> Vec<DefDictionaryEntry> {
-        let mut dict: BTreeMap<String, Vec<gql_domain::TypeInfo>> = Default::default();
+        let mut dict: BTreeMap<String, Vec<gql_domain::Def>> = Default::default();
 
         for (_, domain) in ctx.domains() {
-            for type_info in domain.type_infos() {
-                if let Some(name) = type_info.name() {
+            for def in domain.defs() {
+                if let Some(name) = def.name() {
                     let name = ctx[name].to_string();
 
-                    dict.entry(name).or_default().push(gql_domain::TypeInfo {
-                        id: type_info.def_id,
-                    });
+                    dict.entry(name)
+                        .or_default()
+                        .push(gql_domain::Def { id: def.id });
                 }
             }
         }
 
         dict.into_iter()
-            .map(|(name, type_infos)| gql_dictionary::DefDictionaryEntry {
+            .map(|(name, defs)| gql_dictionary::DefDictionaryEntry {
                 name,
-                definitions: type_infos,
+                definitions: defs,
             })
             .collect()
     }

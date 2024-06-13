@@ -449,7 +449,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         entity_data: EntityData,
         fields: &mut IndexMap<std::string::String, FieldData>,
     ) {
-        let type_info = self.partial_ontology.get_type_info(entity_data.node_def_id);
+        let def = self.partial_ontology.def(entity_data.node_def_id);
 
         let mutation_result_ref =
             self.get_def_type_ref(entity_data.node_def_id, QLevel::MutationResult);
@@ -474,7 +474,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         .map(|(direction, filter)| {
             self.resolver_graph.probe_path(
                 self.partial_ontology,
-                type_info.def_id,
+                def.id,
                 ProbeOptions {
                     must_be_entity: true,
                     direction,
@@ -488,10 +488,10 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         }
 
         fields.insert(
-            mutation_namespace.typename(type_info, self.serde_gen.str_ctx),
+            mutation_namespace.typename(def, self.serde_gen.str_ctx),
             FieldData {
                 kind: FieldKind::EntityMutation(Box::new(EntityMutationField {
-                    def_id: type_info.def_id,
+                    def_id: def.id,
                     create_arg: create_down_path.is_some().then_some(
                         argument::EntityCreateInputsArg {
                             type_addr: entity_data.type_addr,

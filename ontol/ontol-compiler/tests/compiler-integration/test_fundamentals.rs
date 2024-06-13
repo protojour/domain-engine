@@ -2,8 +2,8 @@ use ontol_compiler::package::ONTOL_PKG;
 use ontol_macros::test;
 use ontol_runtime::{interface::serde::operator::SerdeOperator, RelationshipId};
 use ontol_test_utils::{
-    assert_json_io_matches, expect_eq, serde_helper::serde_create, src_name,
-    type_binding::TypeBinding, OntolTest, TestCompile, TestPackages,
+    assert_json_io_matches, def_binding::DefBinding, expect_eq, serde_helper::serde_create,
+    src_name, OntolTest, TestCompile, TestPackages,
 };
 
 #[test]
@@ -46,7 +46,7 @@ fn test_relations_are_distinct_for_different_domains() {
             expected = "other"
         );
 
-        fn extract_prop_rel_id(binding: &TypeBinding, test: &OntolTest) -> RelationshipId {
+        fn extract_prop_rel_id(binding: &DefBinding, test: &OntolTest) -> RelationshipId {
             let operator = &test.ontology()[binding.serde_operator_addr()];
 
             match operator {
@@ -95,8 +95,8 @@ fn ontol_domain_is_documented() {
     "".compile_then(|test| {
         let ontol_domain = test.ontology().find_domain(ONTOL_PKG).unwrap();
         let text = ontol_domain
-            .find_type_info_by_name(test.ontology().find_text_constant("text").unwrap())
+            .find_def_by_name(test.ontology().find_text_constant("text").unwrap())
             .unwrap();
-        assert!(test.ontology().get_docs(text.def_id).is_some());
+        assert!(test.ontology().get_docs(text.id).is_some());
     });
 }

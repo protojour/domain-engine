@@ -65,10 +65,10 @@ fn foo_operator_addr(ontology: &Ontology) -> SerdeOperatorAddr {
             name == TINY.0.as_str()
         })
         .unwrap();
-    let type_info = domain
-        .find_type_info_by_name(ontology.find_text_constant("foo").unwrap())
+    let def = domain
+        .find_def_by_name(ontology.find_text_constant("foo").unwrap())
         .unwrap();
-    type_info.operator_addr.unwrap()
+    def.operator_addr.unwrap()
 }
 
 pub fn compile_benchmark(c: &mut Criterion) {

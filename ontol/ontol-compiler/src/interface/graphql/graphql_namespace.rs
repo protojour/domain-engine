@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use heck::{AsLowerCamelCase, AsSnakeCase};
 use ontol_runtime::{
-    ontology::{domain::TypeInfo, Ontology},
+    ontology::{domain::Def, Ontology},
     DefId, PackageId,
 };
 
@@ -35,113 +35,92 @@ impl<'o> GraphqlNamespace<'o> {
         self.rewrite(&string).into()
     }
 
-    pub fn typename(&mut self, type_info: &TypeInfo, strings: &StringCtx) -> String {
-        self.concat(&[&Typename(type_info, strings)], strings)
+    pub fn typename(&mut self, def: &Def, strings: &StringCtx) -> String {
+        self.concat(&[&Typename(def, strings)], strings)
     }
 
-    pub fn connection(
-        &mut self,
-        rel_type_info: Option<&TypeInfo>,
-        type_info: &TypeInfo,
-        strings: &StringCtx,
-    ) -> String {
-        if let Some(rel_type_info) = rel_type_info {
+    pub fn connection(&mut self, rel_def: Option<&Def>, def: &Def, strings: &StringCtx) -> String {
+        if let Some(rel_def) = rel_def {
             self.concat(
                 &[
-                    &Typename(rel_type_info, strings),
-                    &Typename(type_info, strings),
+                    &Typename(rel_def, strings),
+                    &Typename(def, strings),
                     &"Connection",
                 ],
                 strings,
             )
         } else {
-            self.concat(&[&Typename(type_info, strings), &"Connection"], strings)
+            self.concat(&[&Typename(def, strings), &"Connection"], strings)
         }
     }
 
-    pub fn mutation_result(&mut self, type_info: &TypeInfo, strings: &StringCtx) -> String {
-        self.concat(&[&Typename(type_info, strings), &"Mutation"], strings)
+    pub fn mutation_result(&mut self, def: &Def, strings: &StringCtx) -> String {
+        self.concat(&[&Typename(def, strings), &"Mutation"], strings)
     }
 
-    pub fn edge(
-        &mut self,
-        rel_type_info: Option<&TypeInfo>,
-        type_info: &TypeInfo,
-        strings: &StringCtx,
-    ) -> String {
-        if let Some(rel_type_info) = rel_type_info {
+    pub fn edge(&mut self, rel_def: Option<&Def>, def: &Def, strings: &StringCtx) -> String {
+        if let Some(rel_def) = rel_def {
             self.concat(
                 &[
-                    &Typename(rel_type_info, strings),
-                    &Typename(type_info, strings),
+                    &Typename(rel_def, strings),
+                    &Typename(def, strings),
                     &"Edge",
                 ],
                 strings,
             )
         } else {
-            self.concat(&[&Typename(type_info, strings), &"Edge"], strings)
+            self.concat(&[&Typename(def, strings), &"Edge"], strings)
         }
     }
 
-    pub fn input(&mut self, type_info: &TypeInfo, strings: &StringCtx) -> String {
-        self.concat(&[&Typename(type_info, strings), &"Input"], strings)
+    pub fn input(&mut self, def: &Def, strings: &StringCtx) -> String {
+        self.concat(&[&Typename(def, strings), &"Input"], strings)
     }
 
-    pub fn partial_input(&mut self, type_info: &TypeInfo, strings: &StringCtx) -> String {
-        self.concat(&[&Typename(type_info, strings), &"PartialInput"], strings)
+    pub fn partial_input(&mut self, def: &Def, strings: &StringCtx) -> String {
+        self.concat(&[&Typename(def, strings), &"PartialInput"], strings)
     }
 
-    pub fn union_input(&mut self, type_info: &TypeInfo, strings: &StringCtx) -> String {
-        self.concat(&[&Typename(type_info, strings), &"UnionInput"], strings)
+    pub fn union_input(&mut self, def: &Def, strings: &StringCtx) -> String {
+        self.concat(&[&Typename(def, strings), &"UnionInput"], strings)
     }
 
-    pub fn union_partial_input(&mut self, type_info: &TypeInfo, strings: &StringCtx) -> String {
-        self.concat(
-            &[&Typename(type_info, strings), &"UnionPartialInput"],
-            strings,
-        )
+    pub fn union_partial_input(&mut self, def: &Def, strings: &StringCtx) -> String {
+        self.concat(&[&Typename(def, strings), &"UnionPartialInput"], strings)
     }
 
-    pub fn edge_input(
-        &mut self,
-        rel_type_info: Option<&TypeInfo>,
-        type_info: &TypeInfo,
-        strings: &StringCtx,
-    ) -> String {
-        if let Some(rel_type_info) = rel_type_info {
+    pub fn edge_input(&mut self, rel_def: Option<&Def>, def: &Def, strings: &StringCtx) -> String {
+        if let Some(rel_def) = rel_def {
             self.concat(
                 &[
-                    &Typename(rel_type_info, strings),
-                    &Typename(type_info, strings),
+                    &Typename(rel_def, strings),
+                    &Typename(def, strings),
                     &"EdgeInput",
                 ],
                 strings,
             )
         } else {
-            self.concat(&[&Typename(type_info, strings), &"EdgeInput"], strings)
+            self.concat(&[&Typename(def, strings), &"EdgeInput"], strings)
         }
     }
 
     pub fn patch_edges_input(
         &mut self,
-        rel_type_info: Option<&TypeInfo>,
-        type_info: &TypeInfo,
+        rel_def: Option<&Def>,
+        def: &Def,
         strings: &StringCtx,
     ) -> String {
-        if let Some(rel_type_info) = rel_type_info {
+        if let Some(rel_def) = rel_def {
             self.concat(
                 &[
-                    &Typename(rel_type_info, strings),
-                    &Typename(type_info, strings),
+                    &Typename(rel_def, strings),
+                    &Typename(def, strings),
                     &"PatchEdgesInput",
                 ],
                 strings,
             )
         } else {
-            self.concat(
-                &[&Typename(type_info, strings), &"PatchEdgesInput"],
-                strings,
-            )
+            self.concat(&[&Typename(def, strings), &"PatchEdgesInput"], strings)
         }
     }
 
@@ -196,25 +175,21 @@ trait ProcessName {
     fn process<'n>(&self, namespace: &'n mut GraphqlNamespace) -> &'n str;
 }
 
-struct Typename<'a, 'm>(&'a TypeInfo, &'a StringCtx<'m>);
+struct Typename<'a, 'm>(&'a Def, &'a StringCtx<'m>);
 
 impl<'a, 'm> ProcessName for Typename<'a, 'm> {
     fn def_id(&self) -> Option<DefId> {
-        Some(self.0.def_id)
+        Some(self.0.id)
     }
 
     fn process<'n>(&self, namespace: &'n mut GraphqlNamespace) -> &'n str {
-        let type_info = self.0;
-        match type_info.name() {
+        let def = self.0;
+        match def.name() {
             Some(name) => {
                 let strings = self.1;
                 namespace.rewrite(&strings[name])
             }
-            None => namespace.rewrite(&format!(
-                "_anon{}_{}",
-                type_info.def_id.0.id(),
-                type_info.def_id.1
-            )),
+            None => namespace.rewrite(&format!("_anon{}_{}", def.id.0.id(), def.id.1)),
         }
     }
 }

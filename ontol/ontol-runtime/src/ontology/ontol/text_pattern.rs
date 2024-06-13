@@ -94,10 +94,9 @@ impl TextPattern {
                             .map(|span| &haystack[span.start..span.end])
                             .expect("expected property match");
 
-                        let type_info = ontology.get_type_info(property.type_def_id);
+                        let def = ontology.def(property.type_def_id);
                         let processor = ontology.new_serde_processor(
-                            type_info
-                                .operator_addr
+                            def.operator_addr
                                 .expect("No operator addr for pattern constant part"),
                             ProcessorMode::Create,
                         );

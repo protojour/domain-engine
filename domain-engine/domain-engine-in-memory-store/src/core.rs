@@ -10,7 +10,7 @@ use itertools::Itertools;
 use ontol_runtime::{
     attr::Attr,
     ontology::{
-        domain::{DataRelationshipInfo, TypeInfo},
+        domain::{DataRelationshipInfo, Def},
         Ontology,
     },
     tuple::CardinalIdx,
@@ -167,18 +167,18 @@ impl InMemoryStore {
 }
 
 pub(crate) fn find_data_relationship<'a>(
-    type_info: &'a TypeInfo,
+    def: &'a Def,
     rel_id: &RelationshipId,
 ) -> DomainResult<&'a DataRelationshipInfo> {
-    type_info.data_relationships.get(rel_id).ok_or_else(|| {
+    def.data_relationships.get(rel_id).ok_or_else(|| {
         warn!(
             "data relationship {rel_id:?} not found in {keys:?}",
-            keys = type_info.data_relationships.keys()
+            keys = def.data_relationships.keys()
         );
 
         DomainError::DataStoreBadRequest(anyhow!(
             "data relationship {def_id:?} -> {rel_id} does not exist",
-            def_id = type_info.def_id
+            def_id = def.id
         ))
     })
 }

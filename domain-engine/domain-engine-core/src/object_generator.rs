@@ -5,7 +5,7 @@ use ontol_runtime::{
         operator::{AppliedVariants, SerdeOperator, SerdeOperatorAddr, SerdeProperty},
         processor::{ProcessorLevel, ProcessorMode},
     },
-    ontology::{domain::TypeInfo, ontol::ValueGenerator, Ontology},
+    ontology::{domain::Def, ontol::ValueGenerator, Ontology},
     value::{Value, ValueTag},
     DefId, RelationshipId,
 };
@@ -35,9 +35,9 @@ impl<'e> ObjectGenerator<'e> {
     pub fn generate_objects(&self, value: &mut Value) {
         match value {
             Value::Struct(struct_map, type_def_id) => {
-                let type_info = self.ontology.get_type_info(type_def_id.def());
-                if let Some(addr) = type_info.operator_addr {
-                    self.generate_struct_relationships(struct_map, type_info, addr);
+                let def = self.ontology.def(type_def_id.def_id());
+                if let Some(addr) = def.operator_addr {
+                    self.generate_struct_relationships(struct_map, def, addr);
                 }
 
                 // recurse into sub-properties
@@ -75,11 +75,11 @@ impl<'e> ObjectGenerator<'e> {
     fn generate_struct_relationships(
         &self,
         struct_map: &mut FnvHashMap<RelationshipId, Attr>,
-        type_info: &TypeInfo,
+        def: &Def,
         addr: SerdeOperatorAddr,
     ) {
         let operator = &self.ontology[addr];
-        let id_relationship = type_info
+        let id_relationship = def
             .entity_info()
             .map(|entity_info| entity_info.id_relationship_id);
 
@@ -146,7 +146,7 @@ impl<'e> ObjectGenerator<'e> {
             SerdeOperator::Union(union_op) => {
                 match union_op.applied_variants(ProcessorMode::Create, ProcessorLevel::new_root()) {
                     AppliedVariants::Unambiguous(child_addr) => {
-                        self.generate_struct_relationships(struct_map, type_info, child_addr);
+                        self.generate_struct_relationships(struct_map, def, child_addr);
                     }
                     AppliedVariants::OneOf(_) => panic!("BUG"),
                 }

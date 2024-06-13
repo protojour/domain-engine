@@ -340,7 +340,7 @@ impl<'v> AttributeType<'v> {
                 resolve_property(attrs, *id, field_type, schema_ctx, executor)
             }
             (AttrRef::Unit(Value::Struct(attrs, _)), FieldKind::ConnectionProperty(field)) => {
-                let type_info = schema_ctx
+                let def = schema_ctx
                     .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap();
 
@@ -349,7 +349,7 @@ impl<'v> AttributeType<'v> {
                         AttributeType {
                             attr: attr.as_ref(),
                         },
-                        type_info,
+                        def,
                         executor,
                     ),
                     None => {
@@ -359,7 +359,7 @@ impl<'v> AttributeType<'v> {
                             AttributeType {
                                 attr: AttrRef::Unit(&empty_seq),
                             },
-                            type_info,
+                            def,
                             executor,
                         )
                     }

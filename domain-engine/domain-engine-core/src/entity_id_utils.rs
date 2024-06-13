@@ -19,10 +19,8 @@ pub fn find_inherent_entity_id(
     ontology: &Ontology,
 ) -> Result<Option<Value>, DomainError> {
     let def_id = entity.type_def_id();
-    let type_info = ontology.get_type_info(def_id);
-    let entity_info = type_info
-        .entity_info()
-        .ok_or(DomainError::NotAnEntity(def_id))?;
+    let def = ontology.def(def_id);
+    let entity_info = def.entity_info().ok_or(DomainError::NotAnEntity(def_id))?;
 
     let struct_map = match entity {
         Value::Struct(struct_map, _) => struct_map,
@@ -87,9 +85,9 @@ pub fn try_generate_entity_id(
             if let Some(property) =
                 analyze_text_pattern(ontology.get_text_pattern(*def_id).unwrap())
             {
-                let type_info = ontology.get_type_info(property.type_def_id);
+                let def = ontology.def(property.type_def_id);
                 let (generated_id, _) = try_generate_entity_id(
-                    type_info.operator_addr.unwrap(),
+                    def.operator_addr.unwrap(),
                     value_generator,
                     ontology,
                     system,
@@ -114,7 +112,7 @@ pub fn try_generate_entity_id(
             _,
         ) => match try_generate_entity_id(*inner_addr, value_generator, ontology, system)? {
             (GeneratedId::Generated(mut value), container) => {
-                value.tag_mut().set_def(def.def_id);
+                value.tag_mut().set_def_id(def.def_id);
                 Ok((GeneratedId::Generated(value), container))
             }
             auto => Ok(auto),

@@ -71,8 +71,8 @@ impl DataRelationshipInfo {
         self.rel_id.to_string()
     }
     fn source(&self, ctx: &Ctx) -> DataRelationshipSource {
-        let type_info = ctx.get_type_info(self.def_id);
-        let data_relationship = type_info.data_relationships.get(&self.rel_id).unwrap();
+        let def = ctx.def(self.def_id);
+        let data_relationship = def.data_relationships.get(&self.rel_id).unwrap();
         match data_relationship.source {
             ontol_runtime::ontology::domain::DataRelationshipSource::Inherent => {
                 DataRelationshipSource::Inherent
@@ -82,23 +82,23 @@ impl DataRelationshipInfo {
             }
         }
     }
-    fn target(&self, ctx: &Ctx) -> gql_domain::TypeInfo {
-        let type_info = ctx.get_type_info(self.def_id);
-        let data_relationship = type_info.data_relationships.get(&self.rel_id).unwrap();
+    fn target(&self, ctx: &Ctx) -> gql_domain::Def {
+        let def = ctx.def(self.def_id);
+        let data_relationship = def.data_relationships.get(&self.rel_id).unwrap();
         let target_def_id = match data_relationship.target {
             ontol_runtime::ontology::domain::DataRelationshipTarget::Unambiguous(def_id) => def_id,
             ontol_runtime::ontology::domain::DataRelationshipTarget::Union(def_id) => def_id,
         };
-        gql_domain::TypeInfo { id: target_def_id }
+        gql_domain::Def { id: target_def_id }
     }
     fn name(&self, ctx: &Ctx) -> String {
-        let type_info = ctx.get_type_info(self.def_id);
-        let data_relationship = type_info.data_relationships.get(&self.rel_id).unwrap();
+        let def = ctx.def(self.def_id);
+        let data_relationship = def.data_relationships.get(&self.rel_id).unwrap();
         ctx[data_relationship.name].into()
     }
     fn cardinality(&self, ctx: &Ctx) -> Cardinality {
-        let type_info = ctx.get_type_info(self.def_id);
-        let data_relationship = type_info.data_relationships.get(&self.rel_id).unwrap();
+        let def = ctx.def(self.def_id);
+        let data_relationship = def.data_relationships.get(&self.rel_id).unwrap();
         Cardinality::from(data_relationship.cardinality)
     }
     fn kind(&self) -> RelationshipKindEnum {
@@ -131,8 +131,8 @@ impl DataRelationshipEdgeProjection {
 #[juniper::graphql_object]
 #[graphql(context = Ctx)]
 impl Edge {
-    fn type_info(&self) -> gql_domain::TypeInfo {
-        gql_domain::TypeInfo { id: self.id.0 }
+    fn def(&self) -> gql_domain::Def {
+        gql_domain::Def { id: self.id.0 }
     }
 
     fn cardinals(&self, ctx: &Ctx) -> Vec<EdgeCardinal> {
@@ -155,12 +155,12 @@ impl EdgeCardinal {
         self.idx.try_into().unwrap()
     }
 
-    fn target(&self) -> gql_domain::TypeInfo {
+    fn target(&self) -> gql_domain::Def {
         let target_def_id = match self.inner.target {
             ontol_runtime::ontology::domain::DataRelationshipTarget::Unambiguous(def_id) => def_id,
             ontol_runtime::ontology::domain::DataRelationshipTarget::Union(def_id) => def_id,
         };
-        gql_domain::TypeInfo { id: target_def_id }
+        gql_domain::Def { id: target_def_id }
     }
 }
 

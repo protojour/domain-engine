@@ -508,10 +508,9 @@ impl<'a> SelectAnalyzer<'a> {
                                 // proxying flattened properties means that the analysis is put
                                 // within the "abstracted" structure that logically exists in ONTOL.
 
-                                let type_info =
-                                    self.schema_ctx.ontology.get_type_info(node_data.def_id);
+                                let def = self.schema_ctx.ontology.def(node_data.def_id);
                                 let Some(flattened_relationship) =
-                                    type_info.data_relationships.get(proxy)
+                                    def.data_relationships.get(proxy)
                                 else {
                                     error!("Flattened relationship not found");
                                     continue;

@@ -506,9 +506,9 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         }
 
         let (rel_id, _) = output.attributes.iter().next().unwrap();
-        let type_info = self.processor.ontology.get_type_info(entity_def_id);
+        let def = self.processor.ontology.def(entity_def_id);
 
-        let TypeKind::Entity(entity_info) = &type_info.kind else {
+        let TypeKind::Entity(entity_info) = &def.kind else {
             return Err(output);
         };
         if *rel_id != entity_info.id_relationship_id {
