@@ -291,7 +291,7 @@ impl Debug for EdgeCardinalProjection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}:{}:{}->{}",
+            "{}:{}:{}<-{}",
             self.id.0 .0 .0, self.id.0 .1, self.object, self.subject,
         )
     }
