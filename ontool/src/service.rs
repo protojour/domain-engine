@@ -8,12 +8,11 @@ use std::{
 
 use crate::graphql::{domain_graphql_handler, graphiql_handler, GraphqlService};
 
-use ::juniper::{EmptyMutation, EmptySubscription};
 use axum::{routing::post, Extension};
 use domain_engine_core::{DomainEngine, DomainError, DomainResult, Session};
 use domain_engine_graphql::{
     juniper,
-    ontology_schema::{Context, Query, Schema},
+    ontology_schema::{Ctx, OntologySchema},
     CreateSchemaError,
 };
 use domain_engine_in_memory_store::InMemoryDataStoreFactory;
@@ -53,15 +52,12 @@ pub async fn domains_router(ontology: Arc<Ontology>, base_url: &str) -> axum::Ro
     // let schema = ontology_schema::new(&ontology);
 }
 pub fn ontology_router(ontology: Arc<Ontology>, base_url: &str) -> axum::Router {
-    let schema = Schema::new(
-        Query,
-        EmptyMutation::<Context>::new(),
-        EmptySubscription::<Context>::new(),
-    );
+    let ontology_schema =
+        OntologySchema::new(Default::default(), Default::default(), Default::default());
 
     pub async fn ontology_schema_graphql_handler(
-        Extension(schema): Extension<Arc<Schema>>,
-        Extension(context): Extension<Context>,
+        Extension(schema): Extension<Arc<OntologySchema>>,
+        Extension(context): Extension<Ctx>,
         JuniperRequest(req): JuniperRequest,
     ) -> (
         axum::http::StatusCode,
@@ -86,8 +82,8 @@ pub fn ontology_router(ontology: Arc<Ontology>, base_url: &str) -> axum::Router 
             "/graphql",
             post(ontology_schema_graphql_handler).get(graphiql_handler),
         )
-        .layer(Extension(Arc::new(schema)))
-        .layer(Extension(Context { ontology }))
+        .layer(Extension(Arc::new(ontology_schema)))
+        .layer(Extension(Ctx::from(ontology)))
         .layer(tower_http::trace::TraceLayer::new_for_http())
 }
 
