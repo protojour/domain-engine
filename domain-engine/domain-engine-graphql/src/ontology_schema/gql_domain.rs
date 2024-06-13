@@ -55,12 +55,12 @@ struct NamedMap {
 #[juniper::graphql_object]
 #[graphql(context = Ctx)]
 impl Domain {
-    fn name(&self, context: &Ctx) -> String {
-        let domain = context.find_domain(self.id).unwrap();
-        String::from(&context[domain.unique_name()])
+    fn name(&self, ctx: &Ctx) -> String {
+        let domain = ctx.find_domain(self.id).unwrap();
+        String::from(&ctx[domain.unique_name()])
     }
-    fn entities(&self, context: &Ctx) -> Vec<Entity> {
-        let domain = context.find_domain(self.id).unwrap();
+    fn entities(&self, ctx: &Ctx) -> Vec<Entity> {
+        let domain = ctx.find_domain(self.id).unwrap();
         let mut entities = vec![];
         for type_info in domain.type_infos() {
             if matches!(type_info.kind, TypeKind::Entity(_)) {
@@ -71,20 +71,20 @@ impl Domain {
         }
         entities
     }
-    fn types(&self, context: &Ctx, kind: Option<TypeKindEnum>) -> Vec<TypeInfo> {
-        let domain = context.find_domain(self.id).unwrap();
-        let infos = domain.type_infos().map(|info| TypeInfo { id: info.def_id });
+    fn types(&self, ctx: &Ctx, kind: Option<TypeKindEnum>) -> Vec<TypeInfo> {
+        let infos = ctx
+            .find_domain(self.id)
+            .unwrap()
+            .type_infos()
+            .map(|info| TypeInfo { id: info.def_id });
         if let Some(kind) = kind {
-            infos.filter(|info| info.kind(context) == kind).collect()
+            infos.filter(|info| info.kind(ctx) == kind).collect()
         } else {
             infos.collect()
         }
     }
-    fn maps(&self, context: &Ctx) -> Vec<NamedMap> {
-        // let domain = context.find_domain(self.id).unwrap();
-        context
-            .ontology
-            .iter_named_downmaps()
+    fn maps(&self, ctx: &Ctx) -> Vec<NamedMap> {
+        ctx.iter_named_downmaps()
             .filter(|(package_id, ..)| package_id == &self.id)
             .map(|(_, name, _)| NamedMap { name })
             .collect()
@@ -97,31 +97,29 @@ impl TypeInfo {
     fn id(&self) -> String {
         format!("{:?}", self.id)
     }
-    fn name(&self, context: &Ctx) -> Option<String> {
-        let type_info = context.get_type_info(self.id);
-        type_info.name().map(|name| context[name].into())
+    fn name(&self, ctx: &Ctx) -> Option<String> {
+        ctx.get_type_info(self.id)
+            .name()
+            .map(|name| ctx[name].into())
     }
-    fn doc_string(&self, context: &Ctx) -> Option<String> {
-        let type_info = context.get_type_info(self.id);
-        context
-            .get_docs(type_info.def_id)
-            .map(|docs_constant| context[docs_constant].into())
+    fn doc_string(&self, ctx: &Ctx) -> Option<String> {
+        ctx.get_docs(self.id)
+            .map(|docs_constant| ctx[docs_constant].into())
     }
-    fn entity_info(&self, context: &Ctx) -> Option<Entity> {
-        let type_info = context.get_type_info(self.id);
-        type_info.entity_info().map(|_| Entity { id: self.id })
+    fn entity_info(&self, ctx: &Ctx) -> Option<Entity> {
+        ctx.get_type_info(self.id)
+            .entity_info()
+            .map(|_| Entity { id: self.id })
     }
-    fn union_variants(&self, context: &Ctx) -> Vec<TypeInfo> {
-        context
-            .union_variants(self.id)
+    fn union_variants(&self, ctx: &Ctx) -> Vec<TypeInfo> {
+        ctx.union_variants(self.id)
             .iter()
             .copied()
             .map(|id| TypeInfo { id })
             .collect()
     }
-    fn kind(&self, context: &Ctx) -> TypeKindEnum {
-        let type_info = context.get_type_info(self.id);
-        match type_info.kind {
+    fn kind(&self, ctx: &Ctx) -> TypeKindEnum {
+        match ctx.get_type_info(self.id).kind {
             TypeKind::Entity(_) => TypeKindEnum::Entity,
             TypeKind::Data(_) => TypeKindEnum::Data,
             TypeKind::Relationship(_) => TypeKindEnum::Relationship,
@@ -130,9 +128,8 @@ impl TypeInfo {
             TypeKind::Generator(_) => TypeKindEnum::Generator,
         }
     }
-    fn data_relationships(&self, context: &Ctx) -> Vec<gql_rel::DataRelationshipInfo> {
-        let type_info = context.get_type_info(self.id);
-        type_info
+    fn data_relationships(&self, ctx: &Ctx) -> Vec<gql_rel::DataRelationshipInfo> {
+        ctx.get_type_info(self.id)
             .data_relationships
             .iter()
             .map(|(rel_id, dri)| {
@@ -156,9 +153,8 @@ impl TypeInfo {
             })
             .collect()
     }
-    fn maps_to(&self, context: &Ctx) -> Vec<MapEdge> {
-        context
-            .iter_map_meta()
+    fn maps_to(&self, ctx: &Ctx) -> Vec<MapEdge> {
+        ctx.iter_map_meta()
             .filter(|(map_key, _)| map_key.input.def_id == self.id)
             .map(|(key, meta)| MapEdge {
                 key,
@@ -167,9 +163,8 @@ impl TypeInfo {
             .collect()
     }
 
-    fn maps_from(&self, context: &Ctx) -> Vec<MapEdge> {
-        context
-            .iter_map_meta()
+    fn maps_from(&self, ctx: &Ctx) -> Vec<MapEdge> {
+        ctx.iter_map_meta()
             .filter(|(map_key, _)| map_key.output.def_id == self.id)
             .map(|(key, meta)| MapEdge {
                 key,
@@ -182,10 +177,11 @@ impl TypeInfo {
 #[juniper::graphql_object]
 #[graphql(context = Ctx)]
 impl Entity {
-    fn is_self_identifying(&self, context: &Ctx) -> bool {
-        let type_info = context.get_type_info(self.id);
-        let entity_info = type_info.entity_info().unwrap();
-        entity_info.is_self_identifying
+    fn is_self_identifying(&self, ctx: &Ctx) -> bool {
+        ctx.get_type_info(self.id)
+            .entity_info()
+            .unwrap()
+            .is_self_identifying
     }
 }
 
@@ -203,11 +199,9 @@ impl MapEdge {
         }
     }
 
-    fn property_flows(&self, context: &Ctx) -> Vec<PropertyFlow> {
-        let Some(slice) = context.get_prop_flow_slice(&self.meta) else {
-            return vec![];
-        };
-        slice
+    fn property_flows(&self, ctx: &Ctx) -> Vec<PropertyFlow> {
+        ctx.get_prop_flow_slice(&self.meta)
+            .unwrap_or(&[])
             .iter()
             .filter_map(|flow| match flow.data {
                 ontol_runtime::ontology::map::PropertyFlowData::ChildOf(property_id) => {

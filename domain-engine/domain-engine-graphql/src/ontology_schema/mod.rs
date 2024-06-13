@@ -6,6 +6,7 @@ use ontol_runtime::ontology::Ontology;
 
 use self::gql_query::Query;
 
+mod gql_dictionary;
 mod gql_domain;
 mod gql_query;
 mod gql_rel;

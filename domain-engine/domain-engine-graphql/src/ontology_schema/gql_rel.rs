@@ -70,8 +70,8 @@ impl DataRelationshipInfo {
     fn relationship_id(&self) -> String {
         self.rel_id.to_string()
     }
-    fn source(&self, context: &Ctx) -> DataRelationshipSource {
-        let type_info = context.get_type_info(self.def_id);
+    fn source(&self, ctx: &Ctx) -> DataRelationshipSource {
+        let type_info = ctx.get_type_info(self.def_id);
         let data_relationship = type_info.data_relationships.get(&self.rel_id).unwrap();
         match data_relationship.source {
             ontol_runtime::ontology::domain::DataRelationshipSource::Inherent => {
@@ -82,8 +82,8 @@ impl DataRelationshipInfo {
             }
         }
     }
-    fn target(&self, context: &Ctx) -> gql_domain::TypeInfo {
-        let type_info = context.get_type_info(self.def_id);
+    fn target(&self, ctx: &Ctx) -> gql_domain::TypeInfo {
+        let type_info = ctx.get_type_info(self.def_id);
         let data_relationship = type_info.data_relationships.get(&self.rel_id).unwrap();
         let target_def_id = match data_relationship.target {
             ontol_runtime::ontology::domain::DataRelationshipTarget::Unambiguous(def_id) => def_id,
@@ -91,13 +91,13 @@ impl DataRelationshipInfo {
         };
         gql_domain::TypeInfo { id: target_def_id }
     }
-    fn name(&self, context: &Ctx) -> String {
-        let type_info = context.get_type_info(self.def_id);
+    fn name(&self, ctx: &Ctx) -> String {
+        let type_info = ctx.get_type_info(self.def_id);
         let data_relationship = type_info.data_relationships.get(&self.rel_id).unwrap();
-        context[data_relationship.name].into()
+        ctx[data_relationship.name].into()
     }
-    fn cardinality(&self, context: &Ctx) -> Cardinality {
-        let type_info = context.get_type_info(self.def_id);
+    fn cardinality(&self, ctx: &Ctx) -> Cardinality {
+        let type_info = ctx.get_type_info(self.def_id);
         let data_relationship = type_info.data_relationships.get(&self.rel_id).unwrap();
         Cardinality::from(data_relationship.cardinality)
     }
@@ -135,8 +135,8 @@ impl Edge {
         gql_domain::TypeInfo { id: self.id.0 }
     }
 
-    fn cardinals(&self, context: &Ctx) -> Vec<EdgeCardinal> {
-        let edge = context.find_edge(self.id).unwrap();
+    fn cardinals(&self, ctx: &Ctx) -> Vec<EdgeCardinal> {
+        let edge = ctx.find_edge(self.id).unwrap();
         edge.cardinals
             .iter()
             .enumerate()
