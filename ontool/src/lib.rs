@@ -48,6 +48,7 @@ use std::{
 use thiserror::Error;
 use tokio::sync::broadcast::{self, Sender};
 use tokio_util::sync::CancellationToken;
+use tower_http::cors::CorsLayer;
 use tower_lsp::{LspService, Server};
 use tracing::{info, level_filters::LevelFilter};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -451,7 +452,8 @@ async fn serve(root_dir: PathBuf, root_files: Vec<PathBuf>, port: u16) -> Result
                     router: dynamic_routers.ontology.clone(),
                 },
             )
-            .route("/ws", get(|socket| ws_upgrade_handler(socket, reload_tx)));
+            .route("/ws", get(|socket| ws_upgrade_handler(socket, reload_tx)))
+            .layer(CorsLayer::permissive());
 
         info!("Serving on {base_url}");
 
