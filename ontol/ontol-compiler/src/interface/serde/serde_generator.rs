@@ -30,7 +30,7 @@ use crate::{
     compiler_queries::GetDefType,
     def::{DefKind, Defs, LookupRelationshipMeta, TypeDef, TypeDefFlags},
     interface::graphql::graphql_namespace::{adapt_graphql_identifier, GqlAdaptedIdent},
-    primitive::{PrimitiveKind, Primitives},
+    primitive::PrimitiveKind,
     relation::{Constructor, Properties, RelCtx, UnionMemberCache},
     repr::{
         repr_ctx::ReprCtx,
@@ -45,7 +45,6 @@ use crate::{
 pub struct SerdeGenerator<'c, 'm> {
     pub str_ctx: &'c mut StringCtx<'m>,
     pub defs: &'c Defs<'m>,
-    pub primitives: &'c Primitives,
     pub def_ty_ctx: &'c DefTypeCtx<'m>,
     pub rel_ctx: &'c RelCtx,
     pub repr_ctx: &'c ReprCtx,

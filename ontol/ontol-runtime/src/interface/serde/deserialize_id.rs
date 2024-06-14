@@ -1,6 +1,6 @@
 use serde::de::Visitor;
 
-use crate::{attr::Attr, interface::serde::processor::RecursionLimitError, ontology::Ontology};
+use crate::{attr::Attr, interface::serde::processor::RecursionLimitError};
 
 use super::{operator::SerdeOperatorAddr, processor::SerdeProcessor};
 
@@ -8,7 +8,6 @@ pub struct IdSingletonStructVisitor<'on, 'p> {
     pub processor: SerdeProcessor<'on, 'p>,
     pub property_name: &'on str,
     pub inner_addr: SerdeOperatorAddr,
-    pub ontology: &'on Ontology,
 }
 
 impl<'on, 'p, 'de> Visitor<'de> for IdSingletonStructVisitor<'on, 'p> {

@@ -33,6 +33,7 @@ impl EdgeCtx {
 /// An edge models relationships between certain symbols in a domain.
 ///
 /// These symbols represents the _aspect_ of an edge when seen from a certain viewpoint.
+#[allow(unused)]
 pub struct MaterializedEdge {
     /// There is one slot per edge symbol one slot connects two vertices together using a symbol.
     pub slots: FnvHashMap<DefId, Slot>,
@@ -44,6 +45,7 @@ pub struct MaterializedEdge {
     pub cardinality: u8,
 }
 
+#[allow(unused)]
 pub struct Slot {
     pub left: Option<CardinalIdx>,
     pub depth: u8,

@@ -8,6 +8,7 @@ pub struct PatId(pub u32);
 
 #[derive(Clone, Debug)]
 pub struct Pattern {
+    #[allow(unused)]
     pub id: PatId,
     pub kind: PatternKind,
     pub span: SourceSpan,
@@ -25,6 +26,8 @@ pub enum PatternKind {
         // The single attribute is a unit binding. I.e. `path: x` syntax
         is_unit_binding: bool,
         attributes: Box<[CompoundPatternAttr]>,
+
+        #[allow(unused)]
         spread_label: OptionSpreadLabel,
     },
     /// Expression enclosed in set-notation braces: `{expr..}`
@@ -57,6 +60,7 @@ pub struct CompoundPatternAttr {
 }
 
 #[derive(Clone, Debug)]
+#[allow(unused)]
 pub struct SpreadLabel(pub std::string::String, pub SourceSpan);
 
 #[derive(Clone, Debug)]

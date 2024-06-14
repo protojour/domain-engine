@@ -38,7 +38,6 @@ impl<'m> Compiler<'m> {
         SerdeGenerator {
             str_ctx,
             defs: &self.defs,
-            primitives: &self.primitives,
             def_ty_ctx: &self.def_ty_ctx,
             rel_ctx: &self.rel_ctx,
             repr_ctx: &self.repr_ctx,

@@ -155,7 +155,7 @@ impl domain_engine_core::system::SystemAPI for System {
 
 fn domain_router(
     engine: Arc<DomainEngine>,
-    domain_path: &str,
+    _domain_path: &str,
     package_id: PackageId,
 ) -> anyhow::Result<axum::Router> {
     let mut router: axum::Router = axum::Router::new();
@@ -173,7 +173,6 @@ fn domain_router(
                 .layer(Extension(Arc::new(GraphqlService {
                     schema,
                     domain_engine: engine,
-                    endpoint_url: format!("{domain_path}/graphql"),
                 })));
         }
     };

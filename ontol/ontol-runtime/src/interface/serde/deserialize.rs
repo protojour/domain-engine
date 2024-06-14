@@ -149,13 +149,8 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 }
                 .into_visitor_no_params(self),
             ),
-            (SerdeOperator::String(def_id), _) => deserializer.deserialize_str(
-                StringMatcher {
-                    def_id: *def_id,
-                    ontology: self.ontology,
-                }
-                .into_visitor_no_params(self),
-            ),
+            (SerdeOperator::String(def_id), _) => deserializer
+                .deserialize_str(StringMatcher { def_id: *def_id }.into_visitor_no_params(self)),
             (SerdeOperator::StringConstant(constant, def_id), _) => deserializer.deserialize_str(
                 ConstantStringMatcher {
                     constant: &self.ontology[*constant],
@@ -190,9 +185,6 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 {
                     deserializer.deserialize_map(GraphqlPatchVisitor {
                         entity_sequence_processor: self,
-                        inner_addr: seq_op.range.addr,
-                        type_def_id: seq_op.def.def_id,
-                        ctx: self.ctx,
                     })
                 }
                 _ => deserializer.deserialize_seq(
@@ -211,9 +203,6 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 {
                     deserializer.deserialize_map(GraphqlPatchVisitor {
                         entity_sequence_processor: self,
-                        inner_addr: seq_op.range.addr,
-                        type_def_id: seq_op.def.def_id,
-                        ctx: self.ctx,
                     })
                 }
                 _ => deserializer.deserialize_seq(
@@ -272,7 +261,6 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                     processor: self,
                     property_name: &self.ontology[*name],
                     inner_addr: *inner_addr,
-                    ontology: self.ontology,
                 }),
             (SerdeOperator::Struct(struct_op), _) => deserializer.deserialize_map(StructVisitor {
                 processor: self,

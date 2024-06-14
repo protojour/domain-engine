@@ -1,20 +1,11 @@
 use serde::de::Visitor;
 
-use crate::{
-    attr::{Attr, AttrMatrix},
-    DefId,
-};
+use crate::attr::{Attr, AttrMatrix};
 
-use super::{
-    operator::SerdeOperatorAddr,
-    processor::{ProcessorMode, RecursionLimitError, SerdeProcessor, SubProcessorContext},
-};
+use super::processor::{ProcessorMode, RecursionLimitError, SerdeProcessor};
 
 pub struct GraphqlPatchVisitor<'on, 'p> {
     pub entity_sequence_processor: SerdeProcessor<'on, 'p>,
-    pub inner_addr: SerdeOperatorAddr,
-    pub type_def_id: DefId,
-    pub ctx: SubProcessorContext,
 }
 
 #[derive(serde::Deserialize)]

@@ -14,11 +14,6 @@ use super::ir::{BlockLabel, BlockOffset, Ir, Terminator};
 /// How an instruction influences the size of the stack
 pub struct Delta(pub i32);
 
-#[derive(Default)]
-pub struct Scope {
-    pub in_scope: FnvHashMap<Var, Local>,
-}
-
 pub struct ProcBuilder {
     pub n_params: NParams,
     pub blocks: Vec<Block>,

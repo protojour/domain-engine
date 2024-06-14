@@ -16,6 +16,8 @@ pub struct CtrlFlowDepth(pub u16);
 pub struct HirBuildCtx<'m> {
     /// The ontol-hir arena that is getting built
     pub hir_arena: ontol_hir::arena::Arena<'m, TypedHir>,
+
+    #[allow(unused)]
     pub map_kw_span: SourceSpan,
     pub inference: Inference<'m>,
     pub pattern_variables: FnvHashMap<Var, PatternVariable>,

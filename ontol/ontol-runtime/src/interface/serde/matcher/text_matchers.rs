@@ -19,12 +19,11 @@ use crate::{
 use super::ValueMatcher;
 
 /// match any string
-pub struct StringMatcher<'on> {
+pub struct StringMatcher {
     pub def_id: DefId,
-    pub ontology: &'on Ontology,
 }
 
-impl<'on> ValueMatcher for StringMatcher<'on> {
+impl ValueMatcher for StringMatcher {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         // Even though it's called "text" in ONTOL, we can call it "string" in domain interfaces
         write!(f, "string")

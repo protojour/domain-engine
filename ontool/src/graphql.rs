@@ -8,7 +8,6 @@ use juniper_axum::extract::JuniperRequest;
 pub struct GraphqlService {
     pub schema: domain_engine_graphql::Schema,
     pub domain_engine: Arc<DomainEngine>,
-    pub endpoint_url: String,
 }
 
 pub async fn domain_graphql_handler(

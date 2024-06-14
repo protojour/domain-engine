@@ -157,7 +157,7 @@ impl<'de> de::Visitor<'de> for ScalarDeserializeVisitor {
     }
 
     fn visit_u64<E: de::Error>(self, v: u64) -> Result<GqlScalar, E> {
-        if v <= i64::max_value() as u64 {
+        if v <= i64::MAX as u64 {
             self.visit_i64(v as i64)
         } else {
             Err(E::custom("Overflow converting u64 to i64"))
