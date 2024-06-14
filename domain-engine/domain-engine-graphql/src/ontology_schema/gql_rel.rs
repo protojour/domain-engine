@@ -1,3 +1,5 @@
+//! GraphQL types related to ONTOL relations
+
 use crate::juniper;
 
 use ontol_runtime::{
@@ -5,11 +7,11 @@ use ontol_runtime::{
     property, DefId, EdgeId, RelationshipId,
 };
 
-use super::{gql_domain, Ctx};
+use super::{gql_def, Ctx};
 
 pub struct DataRelationshipInfo {
     pub def_id: DefId,
-    pub kind: RelationshipKindEnum,
+    pub kind: RelationshipKind,
     pub rel_id: RelationshipId,
     pub edge_projection: Option<EdgeCardinalProjection>,
 }
@@ -28,7 +30,7 @@ struct EdgeCardinal {
 }
 
 #[derive(juniper::GraphQLEnum, PartialEq, Clone, Copy)]
-pub enum RelationshipKindEnum {
+pub enum RelationshipKind {
     Id,
     Tree,
     Edge,
@@ -82,14 +84,14 @@ impl DataRelationshipInfo {
             }
         }
     }
-    fn target(&self, ctx: &Ctx) -> gql_domain::Def {
+    fn target(&self, ctx: &Ctx) -> gql_def::Def {
         let def = ctx.def(self.def_id);
         let data_relationship = def.data_relationships.get(&self.rel_id).unwrap();
         let target_def_id = match data_relationship.target {
             ontol_runtime::ontology::domain::DataRelationshipTarget::Unambiguous(def_id) => def_id,
             ontol_runtime::ontology::domain::DataRelationshipTarget::Union(def_id) => def_id,
         };
-        gql_domain::Def { id: target_def_id }
+        gql_def::Def { id: target_def_id }
     }
     fn name(&self, ctx: &Ctx) -> String {
         let def = ctx.def(self.def_id);
@@ -101,7 +103,7 @@ impl DataRelationshipInfo {
         let data_relationship = def.data_relationships.get(&self.rel_id).unwrap();
         Cardinality::from(data_relationship.cardinality)
     }
-    fn kind(&self) -> RelationshipKindEnum {
+    fn kind(&self) -> RelationshipKind {
         self.kind
     }
     fn edge_projection(&self) -> Option<DataRelationshipEdgeProjection> {
@@ -131,8 +133,8 @@ impl DataRelationshipEdgeProjection {
 #[juniper::graphql_object]
 #[graphql(context = Ctx)]
 impl Edge {
-    fn def(&self) -> gql_domain::Def {
-        gql_domain::Def { id: self.id.0 }
+    fn def(&self) -> gql_def::Def {
+        gql_def::Def { id: self.id.0 }
     }
 
     fn cardinals(&self, ctx: &Ctx) -> Vec<EdgeCardinal> {
@@ -155,12 +157,12 @@ impl EdgeCardinal {
         self.idx.try_into().unwrap()
     }
 
-    fn target(&self) -> gql_domain::Def {
+    fn target(&self) -> gql_def::Def {
         let target_def_id = match self.inner.target {
             ontol_runtime::ontology::domain::DataRelationshipTarget::Unambiguous(def_id) => def_id,
             ontol_runtime::ontology::domain::DataRelationshipTarget::Union(def_id) => def_id,
         };
-        gql_domain::Def { id: target_def_id }
+        gql_def::Def { id: target_def_id }
     }
 }
 

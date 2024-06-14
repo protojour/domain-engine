@@ -1,6 +1,6 @@
 use crate::juniper;
 
-use super::{gql_domain::Def, Ctx};
+use super::{gql_def::Def, Ctx};
 
 pub struct DefDictionaryEntry {
     pub name: String,

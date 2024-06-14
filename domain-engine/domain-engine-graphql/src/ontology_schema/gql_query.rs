@@ -5,6 +5,7 @@ use crate::juniper::{self, graphql_object, graphql_value, FieldError, FieldResul
 
 use ontol_runtime::DefId;
 
+use super::gql_def;
 use super::gql_dictionary;
 use super::gql_dictionary::DefDictionaryEntry;
 use super::gql_domain;
@@ -43,10 +44,10 @@ impl Query {
         Ok(domains)
     }
 
-    fn def(def_id: String, ctx: &Ctx) -> FieldResult<gql_domain::Def> {
+    fn def(def_id: String, ctx: &Ctx) -> FieldResult<gql_def::Def> {
         if let Ok(def_id) = DefId::from_str(&def_id) {
             if let Some(def) = ctx.get_def(def_id) {
-                return Ok(gql_domain::Def { id: def.id });
+                return Ok(gql_def::Def { id: def.id });
             }
         }
         Err(FieldError::new(
@@ -56,14 +57,14 @@ impl Query {
     }
 
     fn def_dictionary(ctx: &Ctx) -> Vec<DefDictionaryEntry> {
-        let mut dict: BTreeMap<String, Vec<gql_domain::Def>> = Default::default();
+        let mut dict: BTreeMap<String, Vec<gql_def::Def>> = Default::default();
 
         for (_, domain) in ctx.domains() {
             for def in domain.defs() {
                 if let Some(name) = def.name() {
                     dict.entry(ctx[name].to_string())
                         .or_default()
-                        .push(gql_domain::Def { id: def.id });
+                        .push(gql_def::Def { id: def.id });
                 }
             }
         }
