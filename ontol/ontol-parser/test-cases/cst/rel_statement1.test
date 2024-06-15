@@ -33,14 +33,14 @@ Ontol
                             Relation
                                 TypeModUnit
                                     IdentPath
-                                        Sym `gen`
+                                        Symbol `gen`
                                 PropCardinality
                         Colon `:`
                         Whitespace
                         RelObject
                             TypeModUnit
                                 IdentPath
-                                    Sym `auto`
+                                    Symbol `auto`
                     SquareClose `]`
                 PropCardinality
                     Question `?`
@@ -48,12 +48,12 @@ Ontol
             Relation
                 TypeModUnit
                     IdentPath
-                        Sym `id`
+                        Symbol `id`
                 PropCardinality
         Colon `:`
         Whitespace
         RelObject
             TypeModUnit
                 IdentPath
-                    Sym `text`
+                    Symbol `text`
     Whitespace

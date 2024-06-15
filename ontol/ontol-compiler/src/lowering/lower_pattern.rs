@@ -500,7 +500,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
                 Some(self.ctx.mk_pattern(PatternKind::Regex(expr_regex), span))
             }
-            Kind::Sym => match token.slice() {
+            Kind::Symbol => match token.slice() {
                 "true" => Some(self.ctx.mk_pattern(PatternKind::ConstBool(true), span)),
                 "false" => Some(self.ctx.mk_pattern(PatternKind::ConstBool(false), span)),
                 ident => {

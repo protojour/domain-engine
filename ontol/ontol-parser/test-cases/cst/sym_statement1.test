@@ -1,0 +1,27 @@
+sym {
+    /// The "a" symbol
+    a,
+    b,
+}
+
+//@ grammar=ontol
+Ontol
+    SymStatement
+        KwSym `sym`
+        Whitespace
+        CurlyOpen `{`
+        Whitespace
+        SymRelation
+            SymDecl
+                DocComment `/// The "a" symbol`
+                Whitespace
+                Symbol `a`
+        Comma `,`
+        Whitespace
+        SymRelation
+            SymDecl
+                Symbol `b`
+        Comma `,`
+        Whitespace
+        CurlyClose `}`
+    Whitespace

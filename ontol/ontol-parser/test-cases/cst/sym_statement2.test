@@ -1,0 +1,52 @@
+sym {
+    /// the variable `x`
+    (x)
+        /// the symbol `a`
+        a
+        (y),
+    (y) b (x),
+}
+
+//@ grammar=ontol
+Ontol
+    SymStatement
+        KwSym `sym`
+        Whitespace
+        CurlyOpen `{`
+        Whitespace
+        SymRelation
+            SymVar
+                DocComment `/// the variable `x``
+                Whitespace
+                ParenOpen `(`
+                Symbol `x`
+                ParenClose `)`
+            Whitespace
+            SymDecl
+                DocComment `/// the symbol `a``
+                Whitespace
+                Symbol `a`
+            Whitespace
+            SymVar
+                ParenOpen `(`
+                Symbol `y`
+                ParenClose `)`
+        Comma `,`
+        Whitespace
+        SymRelation
+            SymVar
+                ParenOpen `(`
+                Symbol `y`
+                ParenClose `)`
+            Whitespace
+            SymDecl
+                Symbol `b`
+            Whitespace
+            SymVar
+                ParenOpen `(`
+                Symbol `x`
+                ParenClose `)`
+        Comma `,`
+        Whitespace
+        CurlyClose `}`
+    Whitespace

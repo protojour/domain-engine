@@ -94,6 +94,9 @@ pub enum Kind {
     #[token("def")]
     KwDef,
 
+    #[token("sym")]
+    KwSym,
+
     #[token("rel")]
     KwRel,
 
@@ -124,7 +127,7 @@ pub enum Kind {
         // may contain `-` or `_` internally for kebab/snake-case naming
         r##"[^ \t\r\n_\(\)\{\}\[\]\.+\-\?\*,=<>\|'"/:;@0-9][^ \t\r\n\(\)\{\}\[\]\.\?\*,+=<>\|"'/:;]*"##,
     )]
-    Sym,
+    Symbol,
 
     //
     // Syntax-level nodes:
@@ -138,6 +141,12 @@ pub enum Kind {
     /// def statement
     DefStatement,
     DefBody,
+
+    /// sym statement
+    SymStatement,
+    SymRelation,
+    SymVar,
+    SymDecl,
 
     /// rel statement
     RelStatement,
@@ -285,6 +294,7 @@ impl Display for Kind {
             K![use] => write!(f, "`use`"),
             K![def] => write!(f, "`def`"),
             K![rel] => write!(f, "`rel`"),
+            K![sym] => write!(f, "`sym`"),
             K![fmt] => write!(f, "`fmt`"),
             K![map] => write!(f, "`map`"),
             Kind::Modifier => write!(f, "modifier"),
@@ -292,7 +302,7 @@ impl Display for Kind {
             Kind::DoubleQuoteText => write!(f, "text literal"),
             Kind::SingleQuoteText => write!(f, "text literal"),
             Kind::Regex => write!(f, "regex"),
-            Kind::Sym => write!(f, "symbol"),
+            Kind::Symbol => write!(f, "symbol"),
             Kind::Eof => write!(f, "end of file"),
             Kind::Error => write!(f, "error"),
             Kind::Ontol => write!(f, "ontol"),
@@ -300,6 +310,10 @@ impl Display for Kind {
             Kind::UseStatement => write!(f, "use statement"),
             Kind::DefStatement => write!(f, "def statement"),
             Kind::DefBody => write!(f, "def body"),
+            Kind::SymStatement => write!(f, "sym statement"),
+            Kind::SymRelation => write!(f, "sym relation"),
+            Kind::SymVar => write!(f, "sym relatoin variable"),
+            Kind::SymDecl => write!(f, "sym declaration"),
             Kind::RelStatement => write!(f, "rel statement"),
             Kind::RelFwdSet => write!(f, "rel forward set"),
             Kind::RelBackwdSet => write!(f, "rel backward set"),
@@ -347,6 +361,9 @@ macro_rules! K {
     };
     [rel] => {
         Kind::KwRel
+    };
+    [sym] => {
+        Kind::KwSym
     };
     [fmt] => {
         Kind::KwFmt
@@ -480,8 +497,8 @@ mod tests {
         assert_eq!(
             lex_ok(source),
             &[
-                Whitespace, DocComment, Whitespace, KwDef, Whitespace, Modifier, Whitespace, Sym,
-                Whitespace, CurlyOpen, CurlyClose, Whitespace
+                Whitespace, DocComment, Whitespace, KwDef, Whitespace, Modifier, Whitespace,
+                Symbol, Whitespace, CurlyOpen, CurlyClose, Whitespace
             ]
         );
     }
@@ -491,7 +508,7 @@ mod tests {
         assert_eq!(&lex_ok("42"), &[Number]);
         assert_eq!(&lex_ok("-42"), &[Number]);
         assert_eq!(&lex_ok("--42"), &[Minus, Number]);
-        assert_eq!(&lex_ok("42x"), &[Number, Sym]);
+        assert_eq!(&lex_ok("42x"), &[Number, Symbol]);
         assert_eq!(&lex_ok("42 "), &[Number, Whitespace]);
         assert_eq!(&lex_ok("4-2"), &[Number, Number]);
         assert_eq!(&lex_ok("4--2"), &[Number, Minus, Number]);
@@ -523,11 +540,11 @@ mod tests {
 
     #[test]
     fn test_sym() {
-        assert_eq!(&lex_ok("abc"), &[Sym]);
-        assert_eq!(&lex_ok("a0"), &[Sym]);
-        assert_eq!(&lex_ok("a-b"), &[Sym]);
-        assert_eq!(&lex_ok("a_b"), &[Sym]);
-        assert_eq!(&lex_ok("a b"), &[Sym, Whitespace, Sym]);
+        assert_eq!(&lex_ok("abc"), &[Symbol]);
+        assert_eq!(&lex_ok("a0"), &[Symbol]);
+        assert_eq!(&lex_ok("a-b"), &[Symbol]);
+        assert_eq!(&lex_ok("a_b"), &[Symbol]);
+        assert_eq!(&lex_ok("a b"), &[Symbol, Whitespace, Symbol]);
     }
 
     #[test]

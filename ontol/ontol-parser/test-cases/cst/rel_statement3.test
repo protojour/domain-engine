@@ -19,7 +19,7 @@ Ontol
             Relation
                 TypeModUnit
                     IdentPath
-                        Sym `id`
+                        Symbol `id`
                 PropCardinality
         Colon `:`
         Whitespace
@@ -38,13 +38,13 @@ Ontol
                             Relation
                                 TypeModUnit
                                     IdentPath
-                                        Sym `is`
+                                        Symbol `is`
                                 PropCardinality
                         Colon `:`
                         Whitespace
                         RelObject
                             TypeModUnit
                                 IdentPath
-                                    Sym `text`
+                                    Symbol `text`
                     ParenClose `)`
     Whitespace

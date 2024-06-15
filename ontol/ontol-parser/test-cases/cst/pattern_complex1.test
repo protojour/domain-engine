@@ -5,7 +5,7 @@ PatStruct
     Modifier `@match`
     Whitespace
     IdentPath
-        Sym `bar`
+        Symbol `bar`
     ParenOpen `(`
     StructParamAttrProp
         TypeModUnit
@@ -31,11 +31,11 @@ PatStruct
                         Colon `:`
                         Whitespace
                         PatAtom
-                            Sym `x`
+                            Symbol `x`
                     SquareClose `]`
                 Whitespace
                 PatAtom
-                    Sym `y`
+                    Symbol `y`
             Whitespace
             CurlyClose `}`
     ParenClose `)`

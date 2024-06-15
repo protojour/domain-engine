@@ -6,12 +6,12 @@ Ontol
         KwMap `map`
         Whitespace
         IdentPath
-            Sym `foo`
+            Symbol `foo`
         ParenOpen `(`
         MapArm
             PatStruct
                 IdentPath
-                    Sym `bar`
+                    Symbol `bar`
                 ParenOpen `(`
                 ParenClose `)`
         Comma `,`
@@ -19,11 +19,11 @@ Ontol
         MapArm
             PatStruct
                 IdentPath
-                    Sym `baz`
+                    Symbol `baz`
                 ParenOpen `(`
                 StructParamAttrUnit
                     PatAtom
-                        Sym `x`
+                        Symbol `x`
                 ParenClose `)`
         ParenClose `)`
     Whitespace

@@ -47,7 +47,7 @@ fn statement(p: &mut CstParser) {
         p.eat_while(|kind| {
             !matches!(
                 kind,
-                Kind::Eof | K![use] | K![def] | K![rel] | K![fmt] | K![map]
+                Kind::Eof | K![use] | K![def] | K![sym] | K![rel] | K![fmt] | K![map]
             )
         });
 
@@ -75,12 +75,16 @@ fn statement(p: &mut CstParser) {
             rel::rel(p);
             Kind::RelStatement
         }
+        K![sym] => {
+            sym::statement(p);
+            Kind::SymStatement
+        }
         K![fmt] => {
             fmt_statement(p);
             Kind::FmtStatement
         }
         K![map] => {
-            map_statement(p);
+            map::statement(p);
             Kind::MapStatement
         }
         _ => {
@@ -105,7 +109,7 @@ fn use_statement(p: &mut CstParser) {
     p.eat_trivia();
 
     let path = p.start(Kind::IdentPath);
-    p.eat(Kind::Sym);
+    p.eat(Kind::Symbol);
     p.end(path);
 }
 
@@ -116,7 +120,7 @@ fn def_like_statement(keyword: Kind, p: &mut CstParser) {
     p.eat_trivia();
 
     let ident = p.start(Kind::IdentPath);
-    p.eat(Kind::Sym);
+    p.eat(Kind::Symbol);
     p.end(ident);
 
     p.eat_trivia();
@@ -265,7 +269,7 @@ fn type_ref_inner(p: &mut CstParser, allowed: AllowedType, label: &'static str) 
     p.eat_trivia();
 
     match p.at() {
-        Kind::Sym => {
+        Kind::Symbol => {
             ident_path(p);
         }
         Kind::Number => {
@@ -347,40 +351,96 @@ fn fmt_statement(p: &mut CstParser) {
     }
 }
 
-fn map_statement(p: &mut CstParser) {
-    p.eat(K![map]);
+mod sym {
+    use super::*;
 
-    p.eat_modifiers();
+    pub fn statement(p: &mut CstParser) {
+        p.eat(K![sym]);
 
-    if p.at() == Kind::Sym {
-        let ident = p.start(Kind::IdentPath);
-        p.eat(Kind::Sym);
-        p.end(ident);
+        p.eat_trivia();
+
+        delimited_comma_separated(p, K!['{'], &sym_relation, K!['}']);
     }
 
-    p.eat_trivia();
+    fn sym_relation(p: &mut CstParser) {
+        let relation = p.start(Kind::SymRelation);
 
-    {
-        p.eat(K!['(']);
+        while p.not_peekforward(|kind| matches!(kind, K![,])) {
+            match lookahead_variant(p) {
+                Some(Kind::SymVar) => {
+                    let var = p.start(Kind::SymVar);
+                    p.eat_trivia();
+                    p.eat(K!['(']);
+                    p.eat(Kind::Symbol);
+                    p.eat(K![')']);
 
-        map_arm(p);
-        p.eat(K![,]);
-        map_arm(p);
-
-        if p.at() == K![,] {
-            p.eat(K![,]);
+                    p.end(var);
+                }
+                Some(Kind::SymDecl) => {
+                    let decl = p.start(Kind::SymDecl);
+                    p.eat_trivia();
+                    p.eat(Kind::Symbol);
+                    p.end(decl);
+                }
+                _ => break,
+            }
         }
 
-        p.eat(K![')']);
+        p.end(relation);
+    }
+
+    fn lookahead_variant(p: &CstParser) -> Option<Kind> {
+        for kind in p.peek_tokens() {
+            match kind {
+                K!['('] => return Some(Kind::SymVar),
+                Kind::Symbol => return Some(Kind::SymDecl),
+                Kind::Whitespace | Kind::Comment | Kind::DocComment => {}
+                _ => break,
+            }
+        }
+
+        None
     }
 }
 
-fn map_arm(p: &mut CstParser) {
-    let arm = p.start(Kind::MapArm);
+mod map {
+    use super::*;
 
-    pattern(p, AllowedPattern { expr: false });
+    pub fn statement(p: &mut CstParser) {
+        p.eat(K![map]);
 
-    p.end(arm);
+        p.eat_modifiers();
+
+        if p.at() == Kind::Symbol {
+            let ident = p.start(Kind::IdentPath);
+            p.eat(Kind::Symbol);
+            p.end(ident);
+        }
+
+        p.eat_trivia();
+
+        {
+            p.eat(K!['(']);
+
+            arm(p);
+            p.eat(K![,]);
+            arm(p);
+
+            if p.at() == K![,] {
+                p.eat(K![,]);
+            }
+
+            p.eat(K![')']);
+        }
+    }
+
+    fn arm(p: &mut CstParser) {
+        let arm = p.start(Kind::MapArm);
+
+        pattern(p, AllowedPattern { expr: false });
+
+        p.end(arm);
+    }
 }
 
 pub fn pattern_with_expr(p: &mut CstParser) {
@@ -417,7 +477,7 @@ pub fn lookahead_detect_pattern(p: &CstParser) -> DetectedPattern {
         }
 
         match kind {
-            Kind::Sym => {
+            Kind::Symbol => {
                 if !param_open {
                     name_before_param = true;
                 }
@@ -458,11 +518,11 @@ mod struct_pattern {
 
         p.eat_modifiers();
 
-        if p.at() == Kind::Sym {
+        if p.at() == Kind::Symbol {
             ident_path(p);
         }
 
-        delimited_comma_separated(p, K!['('], param, K![')']);
+        delimited_comma_separated(p, K!['('], &param, K![')']);
 
         p.end(pat);
     }
@@ -471,7 +531,7 @@ mod struct_pattern {
         if p.at() == K![..] {
             let spread = p.start(Kind::Spread);
             p.eat(K![..]);
-            p.eat(Kind::Sym);
+            p.eat(Kind::Symbol);
             p.end(spread);
         } else {
             fn lookahead_colon(p: &CstParser) -> bool {
@@ -517,7 +577,7 @@ mod struct_pattern {
             if p.at() == K!['['] {
                 p.eat_space();
                 let rel_args = p.start(Kind::RelArgs);
-                delimited_comma_separated(p, K!['['], param, K![']']);
+                delimited_comma_separated(p, K!['['], &param, K![']']);
                 p.end(rel_args);
             }
 
@@ -544,11 +604,11 @@ mod set_pattern {
 
         p.eat_modifiers();
 
-        if p.at() == Kind::Sym {
+        if p.at() == Kind::Symbol {
             ident_path(p);
         }
 
-        delimited_comma_separated(p, K!['{'], element, K!['}']);
+        delimited_comma_separated(p, K!['{'], &element, K!['}']);
 
         p.end(pat);
     }
@@ -564,7 +624,7 @@ mod set_pattern {
 
         if p.at() == K!['['] {
             let rel_params = p.start(Kind::RelArgs);
-            delimited_comma_separated(p, K!['['], super::struct_pattern::property, K![']']);
+            delimited_comma_separated(p, K!['['], &super::struct_pattern::property, K![']']);
             p.end(rel_params);
         }
 
@@ -583,7 +643,7 @@ pub mod expr_pattern {
 
     fn expr_pattern_delimited(p: &mut CstParser) {
         match p.at() {
-            kind @ (Kind::Sym
+            kind @ (Kind::Symbol
             | Kind::Number
             | Kind::DoubleQuoteText
             | Kind::SingleQuoteText
@@ -670,11 +730,11 @@ pub fn ident_path(p: &mut CstParser) {
 
     let ident_path = p.start(Kind::IdentPath);
 
-    p.eat(Kind::Sym);
+    p.eat(Kind::Symbol);
 
     while p.at() == K![.] {
         p.eat(K![.]);
-        p.eat(Kind::Sym);
+        p.eat(Kind::Symbol);
     }
 
     p.end(ident_path);
@@ -683,7 +743,7 @@ pub fn ident_path(p: &mut CstParser) {
 fn delimited_comma_separated(
     p: &mut CstParser,
     open: Kind,
-    inner: impl Fn(&mut CstParser),
+    inner: &dyn Fn(&mut CstParser),
     close: Kind,
 ) {
     p.eat(open);

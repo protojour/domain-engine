@@ -14,7 +14,7 @@ Ontol
         KwMap `map`
         Whitespace
         IdentPath
-            Sym `foo`
+            Symbol `foo`
         ParenOpen `(`
         Whitespace
         MapArm
@@ -27,7 +27,7 @@ Ontol
                     Colon `:`
                     Whitespace
                     PatAtom
-                        Sym `x`
+                        Symbol `x`
                 Comma `,`
                 Whitespace
                 StructParamAttrProp
@@ -39,14 +39,14 @@ Ontol
                     Colon `:`
                     Whitespace
                     PatAtom
-                        Sym `y`
+                        Symbol `y`
                 ParenClose `)`
         Comma `,`
         Whitespace
         MapArm
             PatStruct
                 IdentPath
-                    Sym `named`
+                    Symbol `named`
                 Whitespace
                 ParenOpen `(`
                 Whitespace
@@ -57,7 +57,7 @@ Ontol
                     Colon `:`
                     Whitespace
                     PatAtom
-                        Sym `y`
+                        Symbol `y`
                 Whitespace
                 ParenClose `)`
         Whitespace

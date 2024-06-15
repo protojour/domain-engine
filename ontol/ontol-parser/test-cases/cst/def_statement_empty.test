@@ -8,7 +8,7 @@ Ontol
         KwDef `def`
         Whitespace
         IdentPath
-            Sym `a`
+            Symbol `a`
         Whitespace
         DefBody
             ParenOpen `(`

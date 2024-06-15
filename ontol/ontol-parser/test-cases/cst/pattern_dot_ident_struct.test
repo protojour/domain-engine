@@ -3,9 +3,9 @@ foo.bar('baz': x)
 //@ grammar=pattern
 PatStruct
     IdentPath
-        Sym `foo`
+        Symbol `foo`
         Dot `.`
-        Sym `bar`
+        Symbol `bar`
     ParenOpen `(`
     StructParamAttrProp
         TypeModUnit
@@ -14,5 +14,5 @@ PatStruct
         Colon `:`
         Whitespace
         PatAtom
-            Sym `x`
+            Symbol `x`
     ParenClose `)`

@@ -7,13 +7,13 @@ Ontol
         Whitespace
         TypeModUnit
             IdentPath
-                Sym `a`
+                Symbol `a`
         Whitespace
         FatArrow `=>`
         Whitespace
         TypeModUnit
             IdentPath
-                Sym `b`
+                Symbol `b`
         Whitespace
         FatArrow `=>`
         Whitespace

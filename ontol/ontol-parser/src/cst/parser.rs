@@ -136,7 +136,7 @@ impl<'a> CstParser<'a> {
         let kind = self.at_exact();
         self.push_current_token(kind);
 
-        let result = if kind == Kind::Sym && self.current_text() == Some(sym) {
+        let result = if kind == Kind::Symbol && self.current_text() == Some(sym) {
             true
         } else {
             self.report_error(format!("expected symbol `{sym}`"));

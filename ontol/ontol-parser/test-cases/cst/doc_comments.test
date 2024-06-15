@@ -17,7 +17,7 @@ Ontol
         KwDef `def`
         Whitespace
         IdentPath
-            Sym `a`
+            Symbol `a`
         DefBody
             ParenOpen `(`
             Whitespace
@@ -41,7 +41,7 @@ Ontol
                 RelObject
                     TypeModUnit
                         IdentPath
-                            Sym `text`
+                            Symbol `text`
             Whitespace
             RelStatement
                 DocComment `/// r2`
@@ -63,7 +63,7 @@ Ontol
                 RelObject
                     TypeModUnit
                         IdentPath
-                            Sym `text`
+                            Symbol `text`
             Whitespace
             ParenClose `)`
     Whitespace

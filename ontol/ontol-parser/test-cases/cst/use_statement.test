@@ -11,8 +11,8 @@ Ontol
         Name
             SingleQuoteText `'a'`
         Whitespace
-        Sym `as`
+        Symbol `as`
         Whitespace
         IdentPath
-            Sym `b`
+            Symbol `b`
     Whitespace

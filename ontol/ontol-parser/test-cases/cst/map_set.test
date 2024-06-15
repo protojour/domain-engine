@@ -12,7 +12,7 @@ Ontol
         KwMap `map`
         Whitespace
         IdentPath
-            Sym `foo`
+            Symbol `foo`
         ParenOpen `(`
         Whitespace
         MapArm
@@ -25,11 +25,11 @@ Ontol
                         Modifier `@match`
                         Whitespace
                         IdentPath
-                            Sym `foo`
+                            Symbol `foo`
                         ParenOpen `(`
                         StructParamAttrUnit
                             PatAtom
-                                Sym `a`
+                                Symbol `a`
                         ParenClose `)`
                 Whitespace
                 CurlyClose `}`
@@ -41,14 +41,14 @@ Ontol
                 Whitespace
                 SetElement
                     PatAtom
-                        Sym `a`
+                        Symbol `a`
                 Comma `,`
                 Whitespace
                 SetElement
                     Spread
                         DotDot `..`
                     PatAtom
-                        Sym `b`
+                        Symbol `b`
                 Whitespace
                 CurlyClose `}`
         Whitespace

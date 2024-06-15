@@ -27,6 +27,6 @@ Ontol
             TypeModSet
                 CurlyOpen `{`
                 IdentPath
-                    Sym `c`
+                    Symbol `c`
                 CurlyClose `}`
     Whitespace

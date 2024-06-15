@@ -3,12 +3,12 @@ a(b('c'['d': e]?: f, ..g))
 //@ grammar=pattern
 PatStruct
     IdentPath
-        Sym `a`
+        Symbol `a`
     ParenOpen `(`
     StructParamAttrUnit
         PatStruct
             IdentPath
-                Sym `b`
+                Symbol `b`
             ParenOpen `(`
             StructParamAttrProp
                 TypeModUnit
@@ -23,18 +23,18 @@ PatStruct
                         Colon `:`
                         Whitespace
                         PatAtom
-                            Sym `e`
+                            Symbol `e`
                     SquareClose `]`
                 PropCardinality
                     Question `?`
                 Colon `:`
                 Whitespace
                 PatAtom
-                    Sym `f`
+                    Symbol `f`
             Comma `,`
             Whitespace
             Spread
                 DotDot `..`
-                Sym `g`
+                Symbol `g`
             ParenClose `)`
     ParenClose `)`

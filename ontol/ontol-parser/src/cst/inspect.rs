@@ -451,7 +451,7 @@ impl<V: NodeView> Name<V> {
 
 impl<V: NodeView> IdentPath<V> {
     pub fn symbols(&self) -> impl Iterator<Item = V::Token> {
-        self.view().local_tokens_filter(Kind::Sym)
+        self.view().local_tokens_filter(Kind::Symbol)
     }
 }
 
@@ -475,7 +475,7 @@ impl<V: NodeView> NumberRange<V> {
 
 impl<V: NodeView> Spread<V> {
     pub fn symbol(&self) -> Option<V::Token> {
-        self.view().local_tokens_filter(Kind::Sym).next()
+        self.view().local_tokens_filter(Kind::Symbol).next()
     }
 }
 

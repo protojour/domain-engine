@@ -7,7 +7,7 @@ Ontol
         KwDef `def`
         Whitespace
         IdentPath
-            Sym `foo`
+            Symbol `foo`
         DefBody
             ParenOpen `(`
             ParenClose `)`
@@ -18,7 +18,7 @@ Ontol
         KwDef `def`
         Whitespace
         IdentPath
-            Sym `bar`
+            Symbol `bar`
         DefBody
             ParenOpen `(`
             ParenClose `)`
