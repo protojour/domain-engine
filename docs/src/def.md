@@ -73,21 +73,6 @@ def @open all_yours (
 ```
 
 
-### `@symbol`
-
-`def @symbol` creates a _symbol_, an otherwise empty definition representing a text constant equal to the definition name itself. Symbols are only used in [_ordering_](interfaces.md#ordering) for now.
-
-```ontol
-def @symbol symbolic ()
-```
-
-This is technically equivalent to:
-
-```ontol
-def symbolic (rel .is: 'symbolic')
-```
-
-
 ### `@extern` (advanced, _unstable_)
 
 ***Note:*** _The details of `def @extern` are subject to change._

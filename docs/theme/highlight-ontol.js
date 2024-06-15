@@ -9,7 +9,7 @@ hljs.registerLanguage("ontol", (hljs) => ({
     $pattern: /@?\w+|[.,?+*/=<>-]+|[:|]/,
     punctuation: ". , - + : :: * / := =",
     operator: ".. ? | =>",
-    param: "@private @open @symbol @extern @match @in @all_in @contains_all @intersects @equals",
+    param: "@private @open @extern @match @in @all_in @contains_all @intersects @equals",
   },
   contains: [
     hljs.APOS_STRING_MODE,

@@ -8,6 +8,7 @@
 - [Definitions (`def`)](./def.md)
 - [Relationships (`rel`)](./rel.md)
 - [Imports (`use`)](./use.md)
+- [Symbols (`sym`)](./sym.md)
 - [Patterns (`fmt` and regex)](./fmt.md)
 - [Mappings (`map`)](./map.md)
 - [Comments](./comments.md)

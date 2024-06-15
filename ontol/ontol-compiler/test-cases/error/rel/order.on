@@ -33,4 +33,4 @@ def entity (
 )
 
 def by_text_bug (rel .is: text)
-def @symbol by_text()
+sym { by_text }

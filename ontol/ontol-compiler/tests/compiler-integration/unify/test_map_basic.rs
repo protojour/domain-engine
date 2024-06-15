@@ -1033,8 +1033,7 @@ fn test_map_spread_concat() {
 #[test]
 fn test_map_symbol_simple() {
     "
-    def @symbol a ()
-    def @symbol b ()
+    sym { a, b }
 
     map(a(), b())
     "
@@ -1047,22 +1046,19 @@ fn test_map_symbol_simple() {
 #[test]
 fn test_map_symbol_auto_union() {
     "
-    def @symbol a ()
-    def @symbol b ()
+    sym { a, b }
     def ab (
         rel .is?: a
         rel .is?: b
     )
 
-    def @symbol x ()
-    def @symbol y ()
+    sym { x, y }
     def xy (
         rel .is?: x
         rel .is?: y
     )
 
-    def @symbol f ()
-    def @symbol g ()
+    sym { f, g }
     def fg (
         rel .is?: f
         rel .is?: g
@@ -1087,17 +1083,14 @@ fn test_map_symbol_auto_union() {
 #[test]
 fn test_auto_union_forced_surjection() {
     "
-    def @symbol a ()
-    def @symbol b ()
-    def @symbol c ()
+    sym { a, b, c }
     def abc (
         rel .is?: a
         rel .is?: b
         rel .is?: c
     )
 
-    def @symbol x ()
-    def @symbol y ()
+    sym { x, y }
     def xy (
         rel .is?: x
         rel .is?: y

@@ -498,7 +498,7 @@ fn entity_order_ok() {
             rel .direction: descending
         ]: by_name
     )
-    def @symbol by_name ()
+    sym { by_name }
     "
     .compile();
 }

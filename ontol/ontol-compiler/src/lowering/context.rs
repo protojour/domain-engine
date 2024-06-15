@@ -50,7 +50,6 @@ pub enum Coinage {
 pub struct Open(pub Option<U32Span>);
 pub struct Private(pub Option<U32Span>);
 pub struct Extern(pub Option<U32Span>);
-pub struct Symbol(pub Option<U32Span>);
 
 #[derive(Clone, Copy)]
 pub enum RelationKey {
@@ -187,7 +186,6 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
         private: Private,
         open: Open,
         extern_: Extern,
-        symbol: Symbol,
     ) -> Result<DefId, LoweringError> {
         let (def_id, coinage) = self.named_def_id(Space::Type, ident, ident_span)?;
         if matches!(coinage, Coinage::New) {
@@ -215,43 +213,57 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
             };
 
             self.set_def_kind(def_id, kind, ident_span);
+        }
 
-            if let Some(symbol_span) = symbol.0 {
-                let span = self.source_span(symbol_span);
-                let ident_literal = self
-                    .compiler
-                    .defs
-                    .def_text_literal(ident, &mut self.compiler.str_ctx);
+        Ok(def_id)
+    }
 
-                let relationship_id = self.compiler.defs.alloc_def_id(self.package_id);
+    pub fn coin_symbol(
+        &mut self,
+        ident: &str,
+        ident_span: U32Span,
+    ) -> Result<DefId, LoweringError> {
+        let (def_id, coinage) = self.named_def_id(Space::Type, ident, ident_span)?;
+        if matches!(coinage, Coinage::New) {
+            let ident = self.compiler.str_ctx.intern(ident);
+            debug!("{def_id:?}: `{}`", ident);
 
-                self.set_def_kind(
-                    relationship_id,
-                    DefKind::Relationship(Relationship {
-                        relation_def_id: self.compiler.primitives.relations.is,
-                        projection: EdgeCardinalProjection {
-                            id: self.compiler.primitives.edges.is,
-                            subject: CardinalIdx(0),
-                            object: CardinalIdx(1),
-                        },
-                        relation_span: span,
-                        subject: (def_id, span),
-                        subject_cardinality: (
-                            PropertyCardinality::Mandatory,
-                            ValueCardinality::Unit,
-                        ),
-                        object: (ident_literal, span),
-                        object_cardinality: (
-                            PropertyCardinality::Mandatory,
-                            ValueCardinality::Unit,
-                        ),
-                        rel_params: RelParams::Unit,
-                    }),
-                    symbol_span,
-                );
+            let kind = DefKind::Type(TypeDef {
+                ident: Some(ident),
+                rel_type_for: None,
+                flags: TypeDefFlags::CONCRETE | TypeDefFlags::PUBLIC,
+            });
 
-                self.root_defs.push(relationship_id);
-            }
+            self.set_def_kind(def_id, kind, ident_span);
+
+            let span = self.source_span(ident_span);
+            let ident_literal = self
+                .compiler
+                .defs
+                .def_text_literal(ident, &mut self.compiler.str_ctx);
+
+            let relationship_id = self.compiler.defs.alloc_def_id(self.package_id);
+
+            self.set_def_kind(
+                relationship_id,
+                DefKind::Relationship(Relationship {
+                    relation_def_id: self.compiler.primitives.relations.is,
+                    projection: EdgeCardinalProjection {
+                        id: self.compiler.primitives.edges.is,
+                        subject: CardinalIdx(0),
+                        object: CardinalIdx(1),
+                    },
+                    relation_span: span,
+                    subject: (def_id, span),
+                    subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),
+                    object: (ident_literal, span),
+                    object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),
+                    rel_params: RelParams::Unit,
+                }),
+                ident_span,
+            );
+
+            self.root_defs.push(relationship_id);
         }
 
         Ok(def_id)

@@ -459,7 +459,7 @@ fn test_map_with_order_constant() {
             rel .direction: descending
         ]: by_field
     )
-    def @symbol by_field ()
+    sym { by_field }
 
     map foos(
         (),
@@ -506,7 +506,7 @@ fn test_map_with_order_variable() {
             rel .direction: descending
         ]: by_field
     )
-    def @symbol by_field ()
+    sym { by_field }
 
     map foos(
         ( 'sort': ord, 'dir': dir ),
@@ -570,8 +570,7 @@ fn test_map_with_order_indexset() {
             rel .direction: descending
         ]: by_b
     )
-    def @symbol by_a ()
-    def @symbol by_b ()
+    sym { by_a, by_b }
 
     map foos(
         (

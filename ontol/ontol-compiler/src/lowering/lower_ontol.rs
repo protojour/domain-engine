@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 
+use itertools::Itertools;
 use ontol_parser::cst::{
     inspect::{self as insp},
     view::{NodeView, TokenView},
@@ -9,13 +10,12 @@ use tracing::debug_span;
 
 use crate::{namespace::Space, package::PackageReference, CompileError, Compiler, Src};
 
-use super::context::{
-    BlockContext, CstLowering, Extern, LoweringCtx, Open, Private, RootDefs, Symbol,
-};
+use super::context::{BlockContext, CstLowering, Extern, LoweringCtx, Open, Private, RootDefs};
 
 enum PreDefinedStmt<V> {
     Domain(insp::DomainStatement<V>),
     Def(DefId, insp::DefStatement<V>),
+    Sym(Vec<DefId>),
     Rel(insp::RelStatement<V>),
     Fmt(insp::FmtStatement<V>),
     Map(insp::MapStatement<V>),
@@ -86,8 +86,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             insp::Statement::UseStatement(_use_stmt) => None,
             insp::Statement::DefStatement(def_stmt) => {
                 let ident_token = def_stmt.ident_path()?.symbols().next()?;
-                let (private, open, extern_, symbol) =
-                    self.read_def_modifiers(def_stmt.modifiers());
+                let (private, open, extern_) = self.read_def_modifiers(def_stmt.modifiers());
 
                 let def_id = self.catch(|zelf| {
                     zelf.ctx.coin_type_definition(
@@ -96,13 +95,13 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                         private,
                         open,
                         extern_,
-                        symbol,
                     )
                 })?;
                 let mut root_defs: RootDefs = [def_id].into();
                 root_defs.extend(self.lower_def_body(def_id, def_stmt)?);
                 Some(root_defs)
             }
+            insp::Statement::SymStatement(_) => None,
             insp::Statement::RelStatement(rel_stmt) => {
                 self.lower_rel_statement(rel_stmt, block_context)
             }
@@ -196,8 +195,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             }
             insp::Statement::DefStatement(def_stmt) => {
                 let ident_token = def_stmt.ident_path()?.symbols().next()?;
-                let (private, open, extern_, symbol) =
-                    self.read_def_modifiers(def_stmt.modifiers());
+                let (private, open, extern_) = self.read_def_modifiers(def_stmt.modifiers());
 
                 let def_id = self.catch(|zelf| {
                     zelf.ctx.coin_type_definition(
@@ -206,11 +204,14 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                         private,
                         open,
                         extern_,
-                        symbol,
                     )
                 })?;
 
                 Some(PreDefinedStmt::Def(def_id, def_stmt))
+            }
+            insp::Statement::SymStatement(sym_stmt) => {
+                let root_defs = self.lower_sym_statement(sym_stmt);
+                Some(PreDefinedStmt::Sym(root_defs))
             }
             insp::Statement::RelStatement(rel_stmt) => Some(PreDefinedStmt::Rel(rel_stmt)),
             insp::Statement::FmtStatement(fmt_stmt) => Some(PreDefinedStmt::Fmt(fmt_stmt)),
@@ -226,20 +227,51 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         match stmt {
             PreDefinedStmt::Domain(stmt) => self.lower_statement(stmt.into(), block_context),
             PreDefinedStmt::Def(def_id, def_stmt) => self.lower_def_body(def_id, def_stmt),
+            PreDefinedStmt::Sym(root_defs) => Some(root_defs),
             PreDefinedStmt::Rel(rel_stmt) => self.lower_statement(rel_stmt.into(), block_context),
             PreDefinedStmt::Fmt(fmt_stmt) => self.lower_statement(fmt_stmt.into(), block_context),
             PreDefinedStmt::Map(map_stmt) => self.lower_statement(map_stmt.into(), block_context),
         }
     }
 
+    fn lower_sym_statement(&mut self, sym_stmt: insp::SymStatement<V>) -> RootDefs {
+        let mut root_defs = vec![];
+
+        for sym_relation in sym_stmt.sym_relations() {
+            let items = sym_relation.items().collect_vec();
+
+            if items.len() != 1 {
+                CompileError::TODO("only one item supported at this time")
+                    .span_report(sym_relation.view().span(), &mut self.ctx);
+            } else {
+                match items.into_iter().next().unwrap() {
+                    insp::SymItem::SymDecl(sym_decl) => {
+                        let Some(symbol) = sym_decl.symbol() else {
+                            continue;
+                        };
+
+                        let opt_def_id =
+                            self.catch(|zelf| zelf.ctx.coin_symbol(symbol.slice(), symbol.span()));
+                        root_defs.extend(opt_def_id);
+                    }
+                    insp::SymItem::SymVar(sym_var) => {
+                        CompileError::TODO("sym vars not supported at this time")
+                            .span_report(sym_var.view().span(), &mut self.ctx);
+                    }
+                }
+            }
+        }
+
+        root_defs
+    }
+
     pub(super) fn read_def_modifiers(
         &mut self,
         modifiers: impl Iterator<Item = V::Token>,
-    ) -> (Private, Open, Extern, Symbol) {
+    ) -> (Private, Open, Extern) {
         let mut private = Private(None);
         let mut open = Open(None);
         let mut extern_ = Extern(None);
-        let mut symbol = Symbol(None);
 
         for modifier in modifiers {
             match modifier.slice() {
@@ -252,15 +284,12 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 "@extern" => {
                     extern_.0 = Some(modifier.span());
                 }
-                "@symbol" => {
-                    symbol.0 = Some(modifier.span());
-                }
                 _ => {
                     CompileError::InvalidModifier.span_report(modifier.span(), &mut self.ctx);
                 }
             }
         }
 
-        (private, open, extern_, symbol)
+        (private, open, extern_)
     }
 }

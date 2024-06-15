@@ -57,8 +57,13 @@ rel {TagEntity} 'tagged'::'tags'? {Article}
 rel {Comment} 'comment_on'?::'comments'? Article
 rel {Comment} 'author'::'authored_comments'? User
 
-def @symbol by_date ()
-def @symbol alphabetical ()
+sym {
+    /// An ordering by date
+    by_date,
+
+    /// An alphabetical ordering
+    alphabetical,
+}
 
 map users(
     (),

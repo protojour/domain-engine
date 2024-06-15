@@ -78,7 +78,7 @@ fn test_serde_builtin_symbol() {
 #[test]
 fn test_serde_domain_symbol() {
     "
-    def @symbol abc ()
+    sym { abc }
     def foo ( rel .'const': abc )
     "
     .compile_then(|test| {
@@ -94,8 +94,7 @@ fn test_serde_domain_symbol() {
 #[test]
 fn test_serde_domain_symbol_union() {
     "
-    def @symbol a ()
-    def @symbol b ()
+    sym { a, b, }
     def ab (
         rel .is?: a
         rel .is?: b

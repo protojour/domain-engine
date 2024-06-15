@@ -142,7 +142,7 @@ An _ordering_ is a relationship where the subject is an entity, the relation is 
 
 ```ontol
 def entity ()
-def @symbol symbol ()
+sym { symbol }
 rel entity order[...]: symbol
 ```
 
@@ -155,7 +155,7 @@ def Book (
     rel .'title': text
 )
 
-def @symbol by_title ()
+sym { by_title }
 rel Book order[
     rel .0: 'title'
     rel .direction: ascending  // default, redundant

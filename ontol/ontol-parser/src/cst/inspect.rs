@@ -103,6 +103,10 @@ nodes!(Node {
     UseStatement,
     DefStatement,
     DefBody,
+    SymStatement,
+    SymRelation,
+    SymVar,
+    SymDecl,
     RelStatement,
     RelFwdSet,
     RelBackwdSet,
@@ -139,6 +143,7 @@ node_union!(Statement {
     DomainStatement,
     UseStatement,
     DefStatement,
+    SymStatement,
     RelStatement,
     FmtStatement,
     MapStatement,
@@ -157,6 +162,8 @@ node_union!(TypeRef {
     This,
     NumberRange,
 });
+
+node_union!(SymItem { SymVar, SymDecl });
 
 node_union!(Pattern {
     PatStruct,
@@ -219,6 +226,30 @@ impl<V: NodeView> DefStatement<V> {
 impl<V: NodeView> DefBody<V> {
     pub fn statements(&self) -> impl Iterator<Item = Statement<V>> {
         self.view().sub_nodes().filter_map(Statement::from_view)
+    }
+}
+
+impl<V: NodeView> SymStatement<V> {
+    pub fn sym_relations(&self) -> impl Iterator<Item = SymRelation<V>> {
+        self.view().sub_nodes().filter_map(SymRelation::from_view)
+    }
+}
+
+impl<V: NodeView> SymRelation<V> {
+    pub fn items(&self) -> impl Iterator<Item = SymItem<V>> {
+        self.view().sub_nodes().filter_map(SymItem::from_view)
+    }
+}
+
+impl<V: NodeView> SymVar<V> {
+    pub fn symbol(&self) -> Option<V::Token> {
+        self.view().local_tokens_filter(Kind::Symbol).next()
+    }
+}
+
+impl<V: NodeView> SymDecl<V> {
+    pub fn symbol(&self) -> Option<V::Token> {
+        self.view().local_tokens_filter(Kind::Symbol).next()
     }
 }
 
