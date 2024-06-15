@@ -31,12 +31,6 @@ impl FlatSyntaxTree {
     }
 }
 
-/// A more condensed syntax tree which is more efficient for breadth-first traversal.
-pub struct SyntaxTree {
-    root: Syntax,
-    lex: Lex,
-}
-
 /// Markers in the flat syntax tree
 #[derive(Clone, PartialEq, Debug)]
 pub enum SyntaxMarker {
@@ -48,6 +42,12 @@ pub enum SyntaxMarker {
     Ignorable { index: u32 },
     /// Marks the end of a node
     End,
+}
+
+/// A more condensed syntax tree which is more efficient for breadth-first traversal.
+pub struct SyntaxTree {
+    root: Syntax,
+    lex: Lex,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -127,6 +127,27 @@ impl SyntaxTree {
             src,
         }
     }
+
+    pub fn split(self) -> (SyntaxNode, Lex) {
+        let Syntax::Node(node) = self.root else {
+            panic!("tree root is not a node");
+        };
+        (node, self.lex)
+    }
+}
+
+impl SyntaxNode {
+    pub fn view<'a>(&'a self, lex: &'a Lex, src: &'a str) -> TreeNodeView<'a> {
+        TreeNodeView {
+            node: self,
+            lex,
+            src,
+        }
+    }
+
+    pub fn children(&self) -> &[Syntax] {
+        &self.children
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -134,6 +155,16 @@ pub struct TreeNodeView<'a> {
     node: &'a SyntaxNode,
     lex: &'a Lex,
     src: &'a str,
+}
+
+impl<'a> TreeNodeView<'a> {
+    pub fn new(node: &'a SyntaxNode, lex: &'a Lex, src: &'a str) -> Self {
+        Self { node, lex, src }
+    }
+
+    pub fn syntax_node(self) -> &'a SyntaxNode {
+        self.node
+    }
 }
 
 #[derive(Clone, Copy)]

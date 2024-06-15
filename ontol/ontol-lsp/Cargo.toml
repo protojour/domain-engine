@@ -17,11 +17,7 @@ ontol-parser.path = "../ontol-parser"
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
-either = "1"
-chumsky = "0.9"
 logos = "0.14"
 lsp-types = "0.94.0"
-regex = "1.9.1"
-substring = "1.4.5"
 tower-lsp = { version = "0.20.0" }
 futures-util = { version = "0.3.28", features = ["futures-io", "io"] }

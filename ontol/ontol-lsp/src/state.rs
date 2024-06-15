@@ -1,13 +1,4 @@
-use crate::docs::{get_core_completions, get_ontol_var, COMPLETIONS};
-use crate::old_parser::{self, ast_lex, parse_statements, Spanned};
-use crate::old_parser::{
-    ast::{
-        AnyPattern, DefStatement, MapArm, Path, Statement, StructPattern, StructPatternParameter,
-        Type, TypeOrPattern, UseStatement,
-    },
-    token::Token,
-};
-use either::Either;
+use crate::docs::get_core_completions;
 use lsp_types::{CompletionItem, Location, MarkedString, Position, Range, Url};
 use ontol_compiler::ontol_syntax::OntolTreeSyntax;
 use ontol_compiler::{
@@ -16,9 +7,12 @@ use ontol_compiler::{
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage, ONTOL_PKG},
     CompileError, SourceId, SourceSpan, Sources, NO_SPAN,
 };
-use ontol_parser::cst_parse;
+use ontol_parser::cst::inspect as insp;
+use ontol_parser::cst::tree::{SyntaxNode, TreeNodeView, TreeTokenView};
+use ontol_parser::cst::view::{self, NodeView, NodeViewExt, TokenView};
+use ontol_parser::lexer::kind::Kind;
+use ontol_parser::lexer::Lex;
 use ontol_runtime::ontology::{config::PackageConfig, domain::Def, Ontology};
-use regex::Regex;
 use std::fmt::Debug;
 use std::{
     collections::{HashMap, HashSet},
@@ -27,7 +21,6 @@ use std::{
     panic,
     sync::Arc,
 };
-use substring::Substring;
 
 type UsizeRange = std::ops::Range<usize>;
 
@@ -39,9 +32,6 @@ pub struct State {
 
     /// Doc uris indexed by SourceId, as seen in UnifiedCompileErrors
     pub srcref: HashMap<SourceId, String>,
-
-    /// Precompiled regex
-    pub regex: CompiledRegex,
 
     /// Ontology with only the `ontol` domain
     pub ontology: Arc<Ontology>,
@@ -58,7 +48,6 @@ impl Debug for State {
         f.debug_struct("State")
             .field("docs", &self.docs)
             .field("srcref", &self.srcref)
-            .field("regex", &self.regex)
             .field("core_completions", &self.core_completions)
             .finish()
     }
@@ -79,20 +68,19 @@ pub struct Document {
     /// Document text
     pub text: Arc<String>,
 
-    /// Lexer tokens, low value
-    pub tokens: Vec<Spanned<Token>>,
-
     /// Unique symbols/names in this document
     pub symbols: HashSet<String>,
 
-    /// All AST Statements
-    pub statements: Vec<Spanned<Statement>>,
+    /// Lexed document
+    pub lex: Lex,
 
-    /// Def Statements indexed by name
-    pub defs: HashMap<String, Spanned<DefStatement>>,
+    /// Root syntax node
+    pub cst_root_node: Option<SyntaxNode>,
+
+    pub cst_defs: HashMap<String, SyntaxNode>,
 
     /// Use Statements
-    pub imports: Vec<UseStatement>,
+    pub cst_imports: Vec<SyntaxNode>,
 
     /// Package names by local alias
     pub aliases: HashMap<String, String>,
@@ -112,14 +100,6 @@ pub struct HoverDoc {
 
     /// Debug output, ignore
     pub(crate) debug: String,
-}
-
-/// Precompiled regex used in building documentation
-#[derive(Clone, Debug)]
-pub struct CompiledRegex {
-    pub comments: Regex,
-    pub rel_parens: Regex,
-    pub rel_subject: Regex,
 }
 
 impl State {
@@ -145,7 +125,6 @@ impl State {
         Self {
             docs: Default::default(),
             srcref: Default::default(),
-            regex: Default::default(),
             ontology: Arc::new(ontology),
             ontol_def,
             core_completions,
@@ -154,73 +133,71 @@ impl State {
 
     /// Parse ONTOL file, collecting tokens, statements and related data
     pub fn parse_statements(&mut self, uri: &str) {
-        let reserved_words = COMPLETIONS.map(|(label, _)| label);
-
         if let Some(doc) = self.docs.get_mut(uri) {
-            doc.tokens.clear();
             doc.symbols.clear();
-            doc.imports.clear();
-            doc.defs.clear();
-
-            let (tokens, _) = ast_lex(doc.text.as_str());
-            doc.tokens = tokens;
-
-            for (token, _) in &doc.tokens {
-                if let Token::Sym(sym) = token {
-                    if !reserved_words.contains(&sym.as_str()) {
-                        doc.symbols.insert(sym.to_string());
-                    }
-                }
-            }
+            doc.lex = Default::default();
+            doc.cst_defs.clear();
+            doc.cst_root_node = None;
+            doc.cst_imports.clear();
 
             /// Recursively explore the AST, collecting defs and other statements
-            fn explore(
-                statements: &Vec<Spanned<Statement>>,
-                nested: &mut Vec<Spanned<Statement>>,
-                imports: &mut Vec<UseStatement>,
-                defs: &mut HashMap<String, Spanned<DefStatement>>,
-                level: u8,
+            fn cst_explore<'a, I: Iterator<Item = insp::Statement<TreeNodeView<'a>>>>(
+                iter: I,
+                aliases: &mut HashMap<String, String>,
+                defs: &mut HashMap<String, SyntaxNode>,
             ) {
-                for (statement, range) in statements {
-                    if level > 0 {
-                        nested.push((statement.clone(), range.clone()))
-                    }
+                for statement in iter {
                     match statement {
-                        Statement::Use(stmt) => imports.push(stmt.clone()),
-                        Statement::Def(stmt) => {
-                            let name = stmt.ident.0.to_string();
-                            defs.insert(name, (stmt.clone(), range.clone()));
-                            explore(&stmt.block.0, nested, imports, defs, level + 1)
-                        }
-                        Statement::Rel(stmt) => {
-                            for rel in &stmt.relations {
-                                if let Some((ctx_block, _)) = &rel.ctx_block {
-                                    explore(ctx_block, nested, imports, defs, level + 1)
+                        insp::Statement::DomainStatement(_) => {}
+                        insp::Statement::UseStatement(stmt @ insp::UseStatement(_view)) => {
+                            if let Some(Ok(name)) = stmt.name().and_then(|name| name.text()) {
+                                if let Some(ident_path) = stmt.ident_path() {
+                                    if let Some(last_sym) = ident_path.symbols().last() {
+                                        aliases.insert(last_sym.slice().to_string(), name);
+                                    }
                                 }
                             }
                         }
-                        Statement::Fmt(_) => (),
-                        Statement::Map(_) => (),
+                        insp::Statement::DefStatement(stmt @ insp::DefStatement(view)) => {
+                            if let Some(path) = stmt.ident_path() {
+                                if let Some(sym) = path.symbols().last() {
+                                    defs.insert(
+                                        sym.slice().to_string(),
+                                        view.syntax_node().clone(),
+                                    );
+                                }
+                            }
+
+                            if let Some(body) = stmt.body() {
+                                cst_explore(body.statements(), aliases, defs);
+                            }
+                        }
+                        insp::Statement::RelStatement(stmt) => {
+                            if let Some(set) = stmt.fwd_set() {
+                                for relation in set.relations() {
+                                    if let Some(params) = relation.rel_params() {
+                                        cst_explore(params.statements(), aliases, defs);
+                                    }
+                                }
+                            }
+                        }
+                        insp::Statement::FmtStatement(_) => {}
+                        insp::Statement::MapStatement(_) => {}
                     }
                 }
             }
 
-            let (mut statements, _) = parse_statements(&doc.text);
+            let (flat_syntax_tree, _) = ontol_parser::cst_parse(&doc.text);
+            let syntax_tree = flat_syntax_tree.unflatten();
 
-            let mut nested: Vec<Spanned<Statement>> = vec![];
+            if let insp::Node::Ontol(ontol) = syntax_tree.view(&doc.text).node() {
+                cst_explore(ontol.statements(), &mut doc.aliases, &mut doc.cst_defs);
+            }
 
-            explore(&statements, &mut nested, &mut doc.imports, &mut doc.defs, 0);
+            let (root_node, lex) = syntax_tree.split();
 
-            doc.aliases = doc
-                .imports
-                .iter()
-                .map(|stmt: &UseStatement| {
-                    (stmt.as_ident.0.to_string(), stmt.reference.0.to_string())
-                })
-                .collect::<HashMap<_, _>>();
-
-            statements.append(&mut nested);
-            doc.statements = statements;
+            doc.cst_root_node = Some(root_node);
+            doc.lex = lex;
         }
     }
 
@@ -243,7 +220,7 @@ impl State {
                         let request_uri = build_uri(root_path, source_name);
 
                         if let Some(doc) = self.docs.get(&request_uri) {
-                            let (flat_tree, errors) = cst_parse(&doc.text);
+                            let (flat_tree, errors) = ontol_parser::cst_parse(&doc.text);
 
                             let package = ParsedPackage::new(
                                 request,
@@ -300,349 +277,179 @@ impl State {
 
     /// Get definition Location for the targeted statement
     pub fn get_definition(&self, uri: &str, pos: &Position) -> Option<Location> {
-        if let Some(doc) = self.docs.get(uri) {
-            let cursor = get_byte_pos(&doc.text, pos);
-            let mut loc: Option<Location> = None;
+        let doc = self.docs.get(uri)?;
+        let Ok(cursor): Result<u32, _> = get_byte_pos(&doc.text, pos).try_into() else {
+            return None;
+        };
+        let root_node = doc.cst_root_node.as_ref()?;
 
-            for (statement, span) in doc.statements.iter() {
-                if !in_range(span, cursor) {
-                    continue;
-                }
-                match statement {
-                    Statement::Use(stmt) => {
-                        let (path, _) = get_path_and_name(uri);
-                        let ref_uri = build_uri(path, &stmt.reference.0);
-                        if self.docs.contains_key(&ref_uri) {
-                            return Some(Location {
-                                uri: Url::parse(&ref_uri).unwrap(),
-                                range: Range::default(),
-                            });
-                        }
+        let (path, _) = locate_token(cursor, root_node.view(&doc.lex, &doc.text))?;
+
+        // search up, from node to root
+        for parent in path.into_iter().rev() {
+            if let insp::Node::IdentPath(ident_path) = parent.node() {
+                let lookup_path: Vec<String> = ident_path
+                    .symbols()
+                    .map(|sym| sym.slice().to_string())
+                    .collect();
+
+                match lookup_path.len() {
+                    0 => {
+                        return None;
                     }
-                    Statement::Def(stmt) => {
-                        if let Some((_, span)) = doc.defs.get(stmt.ident.0.as_str()) {
-                            loc = Some(Location {
-                                uri: Url::parse(uri).unwrap(),
-                                range: get_range(&doc.text, span),
-                            });
-                        }
+                    1 => {
+                        return self
+                            .get_location_for_ident(doc, lookup_path.first().unwrap().as_str());
                     }
-                    Statement::Rel(stmt) => {
-                        let mut rel_loc: Option<Location> = None;
-                        if in_range(&stmt.subject.1, cursor) {
-                            match &stmt.subject.0 {
-                                Either::Left(_) => return loc,
-                                Either::Right(Type::Path(path)) => {
-                                    rel_loc = self.get_location_for_path(doc, path);
-                                }
-                                _ => {}
-                            }
-                        } else if in_range(&stmt.object.1, cursor) {
-                            if let Either::Right(type_or_pattern) = &stmt.object.0 {
-                                match type_or_pattern {
-                                    TypeOrPattern::Type(Type::Path(path)) => {
-                                        rel_loc = self.get_location_for_path(doc, path);
-                                    }
-                                    TypeOrPattern::Pattern(pattern) => {
-                                        if let Some(path) = get_pattern_path(pattern, &cursor) {
-                                            rel_loc = self.get_location_for_path(doc, &path);
-                                        }
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-                        if rel_loc.is_some() {
-                            loc = rel_loc;
-                        }
-                    }
-                    Statement::Fmt(stmt) => {
-                        let mut fmt_loc: Option<Location> = None;
-                        if in_range(&stmt.origin.1, cursor) {
-                            if let Type::Path(path) = &stmt.origin.0 {
-                                fmt_loc = self.get_location_for_path(doc, path);
-                            }
-                        } else {
-                            for trans in &stmt.transitions {
-                                if in_range(&trans.1, cursor) {
-                                    match &trans.0 {
-                                        Either::Left(_) => return loc,
-                                        Either::Right(Type::Path(path)) => {
-                                            fmt_loc = self.get_location_for_path(doc, path);
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                            }
-                        }
-                        if fmt_loc.is_some() {
-                            loc = fmt_loc;
-                        }
-                    }
-                    Statement::Map(stmt) => {
-                        if in_range(&stmt.first.1, cursor) {
-                            if let Some(path) = get_map_arm_path(&stmt.first.0, &cursor) {
-                                return self.get_location_for_path(doc, &path);
-                            }
-                        } else if in_range(&stmt.second.1, cursor) {
-                            if let Some(path) = get_map_arm_path(&stmt.second.0, &cursor) {
-                                return self.get_location_for_path(doc, &path);
-                            }
-                        }
-                    }
+                    _ => return self.get_location_for_ext_ident(doc, &lookup_path),
                 }
             }
-            return loc;
         }
+
         None
-    }
-
-    /// Get Location for Path
-    fn get_location_for_path(&self, doc: &Document, path: &Path) -> Option<Location> {
-        match path {
-            Path::Ident(ident) => self.get_location_for_ident(doc, ident.as_str()),
-            Path::Path(path) => {
-                let path = path
-                    .iter()
-                    .map(|(sstring, _)| sstring.to_string())
-                    .collect::<Vec<String>>();
-                self.get_location_for_ext_ident(doc, &path)
-            }
-        }
     }
 
     /// Get Location given a local identifier
     fn get_location_for_ident(&self, doc: &Document, ident: &str) -> Option<Location> {
-        if let Some((_, span)) = doc.defs.get(ident) {
-            return Some(Location {
-                uri: Url::parse(&doc.uri).unwrap(),
-                range: get_range(&doc.text, span),
-            });
-        }
-        None
+        let node = doc.cst_defs.get(ident)?;
+
+        Some(Location {
+            uri: Url::parse(&doc.uri).ok()?,
+            range: get_range(&doc.text, &node.view(&doc.lex, &doc.text).span().into()),
+        })
     }
 
     /// Get Location given an external identifier
     fn get_location_for_ext_ident(&self, doc: &Document, path: &[String]) -> Option<Location> {
-        if let Some(root_alias) = path.first() {
-            if let Some(ident) = path.get(1) {
-                if let Some(root) = doc.aliases.get(root_alias) {
-                    let uri = build_uri(&doc.path, root);
-                    if let Some(doc) = self.docs.get(&uri) {
-                        return self.get_location_for_ident(doc, ident);
-                    }
-                }
-            }
-        }
-        None
+        let root_alias = path.first()?;
+        let ident = path.get(1)?;
+        let root = doc.aliases.get(root_alias)?;
+
+        let uri = build_uri(&doc.path, root);
+        let other_doc = self.docs.get(&uri)?;
+
+        self.get_location_for_ident(other_doc, ident)
     }
 
     /// Build hover documentation for the targeted statement
     pub fn get_hoverdoc(&self, uri: &str, pos: &Position) -> Option<HoverDoc> {
-        if let Some(doc) = self.docs.get(uri) {
-            let cursor = get_byte_pos(&doc.text, pos);
-            let mut hover = HoverDoc::from(&doc.name, "");
+        let doc = self.docs.get(uri)?;
+        let Ok(cursor): Result<u32, _> = get_byte_pos(&doc.text, pos).try_into() else {
+            return None;
+        };
+        let root_node = doc.cst_root_node.as_ref()?;
 
-            // check statements, may overlap
-            for (statement, span) in doc.statements.iter() {
-                if !span.contains(&cursor) {
-                    continue;
-                }
+        let (path, token) = locate_token(cursor, root_node.view(&doc.lex, &doc.text))?;
 
-                match statement {
-                    Statement::Use(stmt) => {
-                        hover.path = format!("{} as {}", &stmt.reference.0, &stmt.as_ident.0);
-                        hover.signature = get_signature(&doc.text, span.clone(), &self.regex);
-                        break;
-                    }
-                    Statement::Def(stmt) => {
-                        hover.path = format!("{}.{}", &doc.name, &stmt.ident.0);
-                        hover.signature = get_signature(&doc.text, span.clone(), &self.regex);
-                        hover.docs = stmt.docs.as_deref().unwrap_or("").to_string();
-                        break;
-                    }
-                    Statement::Rel(stmt) => {
-                        if stmt.subject.1.contains(&cursor) {
-                            match &stmt.subject.0 {
-                                Either::Left(_) => return self.get_ontol_docs("."),
-                                Either::Right(Type::Path(path)) => {
-                                    return self.get_hoverdoc_for_path(doc, path);
-                                }
-                                _ => {}
-                            }
-                        } else if stmt.object.1.contains(&cursor) {
-                            if let Either::Right(type_or_pattern) = &stmt.object.0 {
-                                match type_or_pattern {
-                                    TypeOrPattern::Type(Type::Path(path)) => {
-                                        return self.get_hoverdoc_for_path(doc, path);
-                                    }
-                                    TypeOrPattern::Pattern(pattern) => {
-                                        if let Some(path) = get_pattern_path(pattern, &cursor) {
-                                            return self.get_hoverdoc_for_path(doc, &path);
-                                        }
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-                        hover.signature = get_signature(&doc.text, span.clone(), &self.regex);
-                        hover.docs = stmt.docs.as_deref().unwrap_or("").to_string();
-                    }
-                    Statement::Fmt(stmt) => {
-                        if stmt.origin.1.contains(&cursor) {
-                            if let Type::Path(path) = &stmt.origin.0 {
-                                return self.get_hoverdoc_for_path(doc, path);
-                            }
-                        } else {
-                            for trans in &stmt.transitions {
-                                if trans.1.contains(&cursor) {
-                                    match &trans.0 {
-                                        Either::Left(_) => return self.get_ontol_docs("."),
-                                        Either::Right(Type::Path(path)) => {
-                                            return self.get_hoverdoc_for_path(doc, path);
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                            }
-                        }
-                        hover.signature = get_signature(&doc.text, span.clone(), &self.regex);
-                        hover.docs = stmt.docs.as_deref().unwrap_or("").to_string();
-                        break;
-                    }
-                    Statement::Map(stmt) => {
-                        if stmt.first.1.contains(&cursor) {
-                            if let Some(path) = get_map_arm_path(&stmt.first.0, &cursor) {
-                                return self.get_hoverdoc_for_path(doc, &path);
-                            }
-                        } else if stmt.second.1.contains(&cursor) {
-                            if let Some(path) = get_map_arm_path(&stmt.second.0, &cursor) {
-                                return self.get_hoverdoc_for_path(doc, &path);
-                            }
-                        }
-                        let ident = if let Some(ident) = &stmt.ident {
-                            format!("{} ", ident.0)
-                        } else {
-                            "".to_string()
-                        };
-                        let first = parse_map_arm(&stmt.first.0);
-                        let second = parse_map_arm(&stmt.second.0);
-                        hover.path = format!("map {}{}() {}()", ident, first, second);
-                        break;
-                    }
-                }
+        match token.kind() {
+            Kind::KwUse => return self.get_ontol_docs("use"),
+            Kind::KwDef => return self.get_ontol_docs("def"),
+            Kind::KwRel => return self.get_ontol_docs("rel"),
+            Kind::KwFmt => return self.get_ontol_docs("fmt"),
+            Kind::KwMap => return self.get_ontol_docs("map"),
+            Kind::DotDot => return self.get_ontol_docs(".."),
+            Kind::Question => return self.get_ontol_docs("?"),
+            Kind::Modifier => {
+                return self.get_ontol_docs(token.slice());
             }
-
-            // check tokens, may replace hover
-            for (index, (token, span)) in doc.tokens.iter().enumerate() {
-                if span.contains(&cursor) {
-                    match token {
-                        Token::Use => return self.get_ontol_docs("use"),
-                        Token::Def => return self.get_ontol_docs("def"),
-                        Token::Rel => return self.get_ontol_docs("rel"),
-                        Token::Fmt => return self.get_ontol_docs("fmt"),
-                        Token::Map => return self.get_ontol_docs("map"),
-                        Token::DotDot => return self.get_ontol_docs(".."),
-                        Token::Modifier(modifier) => {
-                            return self.get_ontol_docs(format!("{modifier}").as_str())
-                        }
-                        // Token::Number(num) => todo!(),
-                        // Token::TextLiteral(text) => todo!(),
-                        // Token::Regex(regex) => todo!(),
-                        Token::Sigil(sigil) => {
-                            if *sigil == '?' {
-                                return self.get_ontol_docs("?");
-                            }
-                        }
-                        Token::Sym(ident) => {
-                            // Peek ahead and behind, try to find a def path if any
-                            if index > 1 && index < (doc.tokens.len() - 2) {
-                                let pp = &doc.tokens[index - 2];
-                                let p = &doc.tokens[index - 1];
-                                let n = &doc.tokens[index + 1];
-                                let nn = &doc.tokens[index + 2];
-
-                                match (&pp.0, &p.0, &n.0, &nn.0) {
-                                    (Token::Sym(root), Token::Sigil('.'), _, _) => {
-                                        let path = [root.to_string(), ident.to_string()];
-                                        if let Some(doc) =
-                                            self.get_hoverdoc_for_ext_ident(doc, &path)
-                                        {
-                                            return Some(doc);
-                                        }
-                                    }
-                                    (_, _, Token::Sigil('.'), Token::Sym(ext_ident)) => {
-                                        let path = [ident.to_string(), ext_ident.to_string()];
-                                        if let Some(doc) =
-                                            self.get_hoverdoc_for_ext_ident(doc, &path)
-                                        {
-                                            return Some(doc);
-                                        }
-                                    }
-                                    _ => {}
-                                };
-                            }
-
-                            let doc_opt = self
-                                .get_hoverdoc_for_ident(doc, ident)
-                                .or(self.get_ontol_docs(ident));
-
-                            match (doc_opt, hover.path.starts_with("map")) {
-                                (Some(doc_opt), _) => return Some(doc_opt),
-                                (None, true) => return Some(get_ontol_var(ident)),
-                                _ => {}
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
-            return Some(hover);
+            _ => {}
         }
-        None
-    }
 
-    /// Get HoverDoc for Path
-    fn get_hoverdoc_for_path(&self, doc: &Document, path: &Path) -> Option<HoverDoc> {
-        match path {
-            Path::Ident(ident) => self.get_hoverdoc_for_ident(doc, ident.as_str()),
-            Path::Path(path) => {
-                let path = path
-                    .iter()
-                    .map(|(sstring, _)| sstring.to_string())
-                    .collect::<Vec<String>>();
-                self.get_hoverdoc_for_ext_ident(doc, &path)
+        let mut hover = HoverDoc::default();
+
+        fn hover_path_if_unset(hover: &mut HoverDoc, path: &str) {
+            if hover.path.is_empty() {
+                hover.path = path.to_string();
             }
         }
+
+        // bottom-up search, from leaf token to root
+        for parent in path.into_iter().rev() {
+            match parent.node() {
+                insp::Node::IdentPath(ident_path) => {
+                    let lookup_path: Vec<String> = ident_path
+                        .symbols()
+                        .map(|sym| sym.slice().to_string())
+                        .collect::<Vec<_>>();
+
+                    match lookup_path.len() {
+                        0 => {}
+                        1 => {
+                            return self.get_hoverdoc_for_ident(doc, &lookup_path[0]);
+                        }
+                        _ => return self.get_hoverdoc_for_ext_ident(doc, &lookup_path),
+                    }
+                }
+                insp::Node::DomainStatement(_) => {
+                    hover_path_if_unset(&mut hover, "domain");
+                }
+                insp::Node::UseStatement(_) => {
+                    hover_path_if_unset(&mut hover, "use");
+                }
+                insp::Node::DefStatement(_) => {
+                    hover_path_if_unset(&mut hover, "def");
+                }
+                insp::Node::RelStatement(_) => {
+                    hover_path_if_unset(&mut hover, "rel");
+                }
+                insp::Node::FmtStatement(_) => {
+                    hover_path_if_unset(&mut hover, "fmt");
+                }
+                _ => {}
+            }
+
+            if hover.docs.is_empty() {
+                let mut doc_comments = parent.local_tokens_filter(Kind::DocComment).peekable();
+
+                if doc_comments.peek().is_some() {
+                    let lines = doc_comments
+                        .map(|token| token.slice().strip_prefix("///").unwrap().to_string());
+
+                    hover.docs = ontol_parser::join_doc_lines(lines).unwrap_or(Default::default());
+                }
+            }
+        }
+
+        hover_path_if_unset(&mut hover, &doc.name);
+
+        Some(hover)
     }
 
     /// Get HoverDoc given a local identifier
     fn get_hoverdoc_for_ident(&self, doc: &Document, ident: &str) -> Option<HoverDoc> {
-        match doc.defs.get(ident) {
-            Some((stmt, span)) => Some(HoverDoc {
-                path: format!("{}.{}", doc.name, stmt.ident.0),
-                signature: get_signature(&doc.text, span.clone(), &self.regex),
-                docs: stmt.docs.as_deref().unwrap_or("").to_string(),
-                ..Default::default()
-            }),
-            None => self.get_ontol_docs(ident),
-        }
+        let Some(def) = doc.cst_defs.get(ident) else {
+            return self.get_ontol_docs(ident);
+        };
+
+        let insp::Node::DefStatement(stmt) = def.view(&doc.lex, &doc.text).node() else {
+            return None;
+        };
+
+        let ident_path = stmt.ident_path()?;
+        let last_segment = ident_path.symbols().last()?;
+        let doc_comments = get_doc_comments(stmt.view());
+
+        Some(HoverDoc {
+            path: format!(
+                "{name}.{ident}",
+                name = doc.name,
+                ident = last_segment.slice()
+            ),
+            signature: format!("def {ident}"),
+            docs: doc_comments.unwrap_or(String::new()),
+            ..Default::default()
+        })
     }
 
     /// Get HoverDoc given an external identifier
     fn get_hoverdoc_for_ext_ident(&self, doc: &Document, path: &[String]) -> Option<HoverDoc> {
-        if let Some(root_alias) = path.first() {
-            if let Some(ident) = path.get(1) {
-                if let Some(root) = doc.aliases.get(root_alias) {
-                    let uri = build_uri(&doc.path, root);
-                    if let Some(doc) = self.docs.get(&uri) {
-                        return self.get_hoverdoc_for_ident(doc, ident);
-                    }
-                }
-            }
-        }
-        None
+        let root_alias = path.first()?;
+        let root = doc.aliases.get(root_alias)?;
+
+        let uri = build_uri(&doc.path, root);
+        let other_doc = self.docs.get(&uri)?;
+
+        self.get_hoverdoc_for_ident(other_doc, path.get(1)?)
     }
 }
 
@@ -671,23 +478,6 @@ impl HoverDoc {
         vec.push(MarkedString::from_markdown(self.docs.clone()));
         vec.push(MarkedString::from_markdown(self.debug.clone()));
         vec
-    }
-}
-
-impl CompiledRegex {
-    /// Precompile regexes used in documentation
-    fn new() -> Self {
-        Self {
-            comments: Regex::new(r"(?m-s)^\s*?\/\/.*\n?").unwrap(),
-            rel_parens: Regex::new(r"(?ms)\(.*?\)").unwrap(),
-            rel_subject: Regex::new(r"(?ms):.*").unwrap(),
-        }
-    }
-}
-
-impl Default for CompiledRegex {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -783,87 +573,48 @@ fn get_byte_pos(text: &str, pos: &Position) -> usize {
     cursor
 }
 
-/// Check if index is in Range, inclusive
-fn in_range(span: &UsizeRange, cursor: usize) -> bool {
-    cursor >= span.start && cursor <= span.end
-}
-
-/// Get a stripped-down rendition of a statement
-pub fn get_signature(text: &str, span: impl Into<UsizeRange>, regex: &CompiledRegex) -> String {
-    let span = span.into();
-    let sig = text.substring(span.start, span.end);
-    let stripped = &regex.comments.replace_all(sig, "");
-    stripped.trim().replace("\n\n", "\n").to_string()
-}
-
-/// Parse the identifier or path for a map arm to String
-pub fn parse_map_arm(arm: &MapArm) -> String {
-    match arm {
-        MapArm::Struct(s) => match &s.path {
-            Some(path) => parse_path(&path.0),
-            None => "".into(),
-        },
-        MapArm::Set(s) => match &s.path {
-            Some(path) => parse_path(&path.0),
-            None => "".into(),
-        },
-    }
-}
-
-/// Parse a map path to String
-fn parse_path(path: &Path) -> String {
-    match path {
-        Path::Ident(id) => id.to_string(),
-        Path::Path(p) => p
-            .iter()
-            .map(|(s, _)| s.to_string())
-            .collect::<Vec<String>>()
-            .join("."),
-    }
-}
-
-/// Try to find a Path in a MapArm
-fn get_map_arm_path(arm: &MapArm, cursor: &usize) -> Option<Path> {
-    match arm {
-        MapArm::Struct(s) => get_struct_pattern_path(s, cursor),
-        MapArm::Set(s) => s.path.as_ref().map(|(path, _)| path.clone()),
-    }
-}
-
-/// Try to find a Path in a StructPattern
-fn get_struct_pattern_path(s: &StructPattern, cursor: &usize) -> Option<Path> {
-    let path = s.path.as_ref()?;
-    let span = &path.1;
-    if in_range(span, *cursor) {
-        return Some(path.0.to_owned());
-    }
-    if let StructPatternParameter::Attributes(attrs) = &s.param {
-        for (arg, span) in attrs {
-            match arg {
-                old_parser::ast::StructPatternAttributeKind::Attr(attr) => {
-                    if in_range(span, *cursor) {
-                        return get_pattern_path(&attr.object.0, cursor);
+/// Locate a token in the tree given a cursor position.
+///
+/// Also returns the syntax path (from top to bottom) leading to that token.
+fn locate_token(pos: u32, parent: TreeNodeView) -> Option<(Vec<TreeNodeView>, TreeTokenView)> {
+    fn search<'a>(
+        pos: u32,
+        path: &mut Vec<TreeNodeView<'a>>,
+        parent: TreeNodeView<'a>,
+    ) -> Option<TreeTokenView<'a>> {
+        for sub in parent.children() {
+            match sub {
+                view::Item::Node(node) => {
+                    if node.span().contains(pos) {
+                        path.push(node);
+                        return search(pos, path, node);
                     }
                 }
-                old_parser::ast::StructPatternAttributeKind::Spread(_) => (),
-            }
-        }
-    }
-    None
-}
-
-/// Try to find a Path in a Pattern
-fn get_pattern_path(pattern: &AnyPattern, cursor: &usize) -> Option<Path> {
-    match pattern {
-        AnyPattern::Struct((s, _)) => get_struct_pattern_path(s, cursor),
-        AnyPattern::Set((set, _)) => {
-            for (elem, span) in &set.elements {
-                if in_range(span, *cursor) {
-                    return get_pattern_path(&elem.pattern.0, cursor);
+                view::Item::Token(token) => {
+                    if token.span().contains(pos) {
+                        return Some(token);
+                    }
                 }
             }
-            None
         }
-        AnyPattern::Expr(_) => None,
+
+        None
+    }
+
+    let mut path = vec![];
+
+    search(pos, &mut path, parent).map(|token| (path, token))
+}
+
+fn get_doc_comments(parent: impl NodeViewExt) -> Option<String> {
+    let mut doc_comments = parent.local_tokens_filter(Kind::DocComment).peekable();
+
+    if doc_comments.peek().is_some() {
+        let lines =
+            doc_comments.map(|token| token.slice().strip_prefix("///").unwrap().to_string());
+
+        Some(ontol_parser::join_doc_lines(lines).unwrap_or(Default::default()))
+    } else {
+        None
     }
 }

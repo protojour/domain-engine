@@ -30,6 +30,10 @@ impl U32Span {
         self.len() == 0
     }
 
+    pub fn contains(&self, pos: u32) -> bool {
+        self.start <= pos && self.end > pos
+    }
+
     pub fn contains_usize(&self, pos: usize) -> bool {
         self.start as usize <= pos && self.end as usize > pos
     }

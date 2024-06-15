@@ -2,12 +2,13 @@
 
 use std::sync::Arc;
 
-use old_parser::ast::Statement;
+use ontol_parser::cst::inspect as insp;
+use ontol_parser::cst::view::{NodeView, NodeViewExt};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use state::{
-    build_uri, get_domain_name, get_path_and_name, get_range, get_reference_name, get_signature,
-    get_span_range, parse_map_arm, read_file, Document, State,
+    build_uri, get_domain_name, get_path_and_name, get_range, get_reference_name, get_span_range,
+    read_file, Document, State,
 };
 use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
@@ -15,7 +16,6 @@ use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer};
 
 mod docs;
-mod old_parser;
 mod state;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -289,7 +289,7 @@ impl LanguageServer for Backend {
                     .map(|s| CompletionItem {
                         label: s.to_string(),
                         kind: Some(CompletionItemKind::VARIABLE),
-                        detail: Some(match doc.defs.contains_key(s) {
+                        detail: Some(match doc.cst_defs.contains_key(s) {
                             true => format!("def {}", s),
                             false => s.to_string(),
                         }),
@@ -310,67 +310,53 @@ impl LanguageServer for Backend {
     ) -> Result<Option<DocumentSymbolResponse>> {
         let uri = params.text_document.uri.as_str();
         let state = self.state.read().await;
-        match state.docs.get(uri) {
-            #![allow(deprecated)]
-            Some(doc) => {
-                let mut symbols = Vec::<SymbolInformation>::with_capacity(doc.statements.len());
-                for (stmt, span) in doc.statements.iter() {
-                    let name = match stmt {
-                        Statement::Use(stmt) => {
-                            format!("use '{}' as {}", stmt.reference.0, stmt.as_ident.0)
-                        }
-                        Statement::Def(stmt) => match (&stmt.private, &stmt.open, &stmt.extern_) {
-                            (Some(_), None, _) => format!("def @private {}", stmt.ident.0),
-                            (Some(_), Some(_), _) => format!("def @private @open {}", stmt.ident.0),
-                            (None, Some(_), _) => format!("def @open {}", stmt.ident.0),
-                            (_, _, Some(_)) => format!("def @extern {}", stmt.ident.0),
-                            (_, _, _) => format!("def {}", stmt.ident.0),
-                        },
-                        Statement::Rel(_) => {
-                            let sig = get_signature(&doc.text, span.clone(), &state.regex);
-                            let parens_stripped = state.regex.rel_parens.replace(&sig, "");
-                            state
-                                .regex
-                                .rel_subject
-                                .replace(&parens_stripped, "")
-                                .to_string()
-                        }
-                        Statement::Fmt(_) => get_signature(&doc.text, span.clone(), &state.regex),
-                        Statement::Map(stmt) => {
-                            let ident = if let Some(ident) = &stmt.ident {
-                                format!("{} ", ident.0)
-                            } else {
-                                "".to_string()
-                            };
-                            let first = parse_map_arm(&stmt.first.0);
-                            let second = parse_map_arm(&stmt.second.0);
-                            format!("map {}{}() {}()", ident, first, second)
-                        }
-                    };
-                    let kind = match stmt {
-                        Statement::Use(_) => SymbolKind::NAMESPACE,
-                        Statement::Def(_) => SymbolKind::STRUCT,
-                        Statement::Rel(_) => SymbolKind::FIELD,
-                        Statement::Fmt(_) => SymbolKind::CONSTRUCTOR,
-                        Statement::Map(_) => SymbolKind::INTERFACE,
-                    };
-                    let symbol = SymbolInformation {
-                        name,
-                        kind,
-                        tags: None,
-                        deprecated: None,
-                        location: Location {
-                            uri: params.text_document.uri.clone(),
-                            range: get_range(&doc.text, span),
-                        },
-                        container_name: None,
-                    };
-                    symbols.push(symbol);
-                }
-                Ok(Some(DocumentSymbolResponse::Flat(symbols)))
-            }
-            None => Ok(None),
+
+        let Some(doc) = state.docs.get(uri) else {
+            return Ok(None);
+        };
+        let Some(root_node) = doc.cst_root_node.as_ref() else {
+            return Ok(None);
+        };
+        let insp::Node::Ontol(ontol) = root_node.view(&doc.lex, &doc.text).node() else {
+            return Ok(None);
+        };
+
+        let mut symbols = Vec::<SymbolInformation>::new();
+
+        for statement in ontol.statements() {
+            let name = match statement {
+                insp::Statement::DomainStatement(_) => "domain".to_string(),
+                insp::Statement::UseStatement(_) => "use".to_string(),
+                insp::Statement::DefStatement(_) => "def".to_string(),
+                insp::Statement::RelStatement(_) => "rel".to_string(),
+                insp::Statement::FmtStatement(_) => "fmt".to_string(),
+                insp::Statement::MapStatement(_) => "map".to_string(),
+            };
+            let kind = match statement {
+                insp::Statement::DomainStatement(_) => SymbolKind::NAMESPACE,
+                insp::Statement::UseStatement(_) => SymbolKind::NAMESPACE,
+                insp::Statement::DefStatement(_) => SymbolKind::STRUCT,
+                insp::Statement::RelStatement(_) => SymbolKind::FIELD,
+                insp::Statement::FmtStatement(_) => SymbolKind::CONSTRUCTOR,
+                insp::Statement::MapStatement(_) => SymbolKind::INTERFACE,
+            };
+
+            #[allow(deprecated)]
+            let symbol = SymbolInformation {
+                name,
+                kind,
+                tags: None,
+                deprecated: None,
+                location: Location {
+                    uri: params.text_document.uri.clone(),
+                    range: get_range(&doc.text, &statement.view().span().into()),
+                },
+                container_name: None,
+            };
+            symbols.push(symbol);
         }
+
+        Ok(Some(DocumentSymbolResponse::Flat(symbols)))
     }
 
     async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {

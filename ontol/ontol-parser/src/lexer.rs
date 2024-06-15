@@ -48,6 +48,7 @@ pub fn cst_lex(source: &str) -> (Lex, Vec<ParserError>) {
 }
 
 /// Raw lexed source for the CST parser
+#[derive(Clone, Default, Debug)]
 pub struct Lex {
     tokens: Vec<Kind>,
     pos: Vec<u32>,

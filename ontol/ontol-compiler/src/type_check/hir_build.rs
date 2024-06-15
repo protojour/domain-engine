@@ -697,7 +697,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             let label = if element.is_iter {
                 let Some(label) = ctx.label_map.get(&element.id) else {
-                    panic!("No label found for element id {:?}", element.id);
+                    return self.error_node(CompileError::TODO("missing label").span(span), ctx);
                 };
                 Some(TypedHirData(
                     *label,
