@@ -105,7 +105,7 @@ fn use_statement(p: &mut CstParser) {
     p.eat_text_literal();
     p.end(location);
 
-    p.eat_sym_value("as");
+    p.eat_symbol_literal("as");
     p.eat_trivia();
 
     let path = p.start(Kind::IdentPath);
@@ -365,31 +365,45 @@ mod sym {
     fn sym_relation(p: &mut CstParser) {
         let relation = p.start(Kind::SymRelation);
 
-        while p.not_peekforward(|kind| matches!(kind, K![,])) {
-            match lookahead_variant(p) {
-                Some(Kind::SymVar) => {
-                    let var = p.start(Kind::SymVar);
-                    p.eat_trivia();
-                    p.eat(K!['(']);
-                    p.eat(Kind::Symbol);
-                    p.eat(K![')']);
-
-                    p.end(var);
-                }
-                Some(Kind::SymDecl) => {
-                    let decl = p.start(Kind::SymDecl);
-                    p.eat_trivia();
-                    p.eat(Kind::Symbol);
-                    p.end(decl);
-                }
-                _ => break,
+        match lookahead_sym_variant(p) {
+            Some(Kind::SymDecl) => {
+                sym_decl(p);
             }
+            Some(Kind::SymVar) => {
+                sym_var(p);
+                sym_decl(p);
+                p.eat(K![:]);
+                sym_var(p);
+
+                while p.not_peekforward(|kind| matches!(kind, K![,] | K!['}'])) {
+                    sym_decl(p);
+                    p.eat(K![:]);
+                    sym_var(p);
+                }
+            }
+            _ => {}
         }
 
         p.end(relation);
     }
 
-    fn lookahead_variant(p: &CstParser) -> Option<Kind> {
+    fn sym_var(p: &mut CstParser) {
+        let var = p.start(Kind::SymVar);
+        p.eat_trivia();
+        p.eat(K!['(']);
+        p.eat(Kind::Symbol);
+        p.eat(K![')']);
+        p.end(var);
+    }
+
+    fn sym_decl(p: &mut CstParser) {
+        let decl = p.start(Kind::SymDecl);
+        p.eat_trivia();
+        p.eat(Kind::Symbol);
+        p.end(decl);
+    }
+
+    fn lookahead_sym_variant(p: &CstParser) -> Option<Kind> {
         for kind in p.peek_tokens() {
             match kind {
                 K!['('] => return Some(Kind::SymVar),

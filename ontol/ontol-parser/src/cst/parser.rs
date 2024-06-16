@@ -131,15 +131,15 @@ impl<'a> CstParser<'a> {
         result
     }
 
-    pub fn eat_sym_value(&mut self, sym: &str) -> bool {
+    pub fn eat_symbol_literal(&mut self, symbol: &str) -> bool {
         self.eat_trivia();
         let kind = self.at_exact();
         self.push_current_token(kind);
 
-        let result = if kind == Kind::Symbol && self.current_text() == Some(sym) {
+        let result = if kind == Kind::Symbol && self.current_text() == Some(symbol) {
             true
         } else {
-            self.report_error(format!("expected symbol `{sym}`"));
+            self.report_error(format!("expected symbol `{symbol}`"));
             false
         };
 

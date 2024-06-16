@@ -1,7 +1,7 @@
 sym {
     /// The "a" symbol
     a,
-    b,
+    b
 }
 
 //@ grammar=ontol
@@ -21,7 +21,6 @@ Ontol
         SymRelation
             SymDecl
                 Symbol `b`
-        Comma `,`
         Whitespace
         CurlyClose `}`
     Whitespace

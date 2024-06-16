@@ -2,9 +2,9 @@ sym {
     /// the variable `x`
     (x)
         /// the symbol `a`
-        a
+        a:
         (y),
-    (y) b (x),
+    (y) b: (x) c: (y)
 }
 
 //@ grammar=ontol
@@ -26,6 +26,7 @@ Ontol
                 DocComment `/// the symbol `a``
                 Whitespace
                 Symbol `a`
+            Colon `:`
             Whitespace
             SymVar
                 ParenOpen `(`
@@ -41,12 +42,21 @@ Ontol
             Whitespace
             SymDecl
                 Symbol `b`
+            Colon `:`
             Whitespace
             SymVar
                 ParenOpen `(`
                 Symbol `x`
                 ParenClose `)`
-        Comma `,`
+            Whitespace
+            SymDecl
+                Symbol `c`
+            Colon `:`
+            Whitespace
+            SymVar
+                ParenOpen `(`
+                Symbol `y`
+                ParenClose `)`
         Whitespace
         CurlyClose `}`
     Whitespace
