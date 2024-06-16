@@ -3,7 +3,7 @@ use ontol_runtime::{DefId, RelationshipId};
 use serde::ser::{SerializeMap, SerializeSeq};
 
 use crate::{
-    def::{DefKind, LookupRelationshipMeta},
+    def::{rel_def_meta, DefKind},
     package::ONTOL_PKG,
     Compiler,
 };
@@ -204,7 +204,7 @@ impl<'graph, 'm> serde::Serialize for Edges<'graph, 'm> {
             if let (Some(source_meta), Some(target_meta)) = (source_meta, target_meta) {
                 match &edge_meta.kind {
                     EdgeKind::Relationship(relationship_id) => {
-                        let meta = compiler.defs.relationship_meta(*relationship_id);
+                        let meta = rel_def_meta(*relationship_id, &compiler.defs);
                         list.serialize_element(&Edge {
                             source_meta,
                             target_meta,

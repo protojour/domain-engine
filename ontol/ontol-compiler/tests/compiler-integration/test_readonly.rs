@@ -7,7 +7,7 @@ fn readonly_property() {
     "
     def foo (
         rel .'id'|id: (rel .is: text)
-        rel .'readonly'|readonly: text // ERROR type not found
+        rel .'readonly'|readonly: text // ERROR definition not found in this scope
     )
     "
     .compile_fail();

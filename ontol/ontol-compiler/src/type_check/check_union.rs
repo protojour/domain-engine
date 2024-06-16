@@ -17,7 +17,7 @@ use patricia_tree::PatriciaMap;
 use tracing::{debug, debug_span};
 
 use crate::{
-    def::{Def, DefKind, LookupRelationshipMeta},
+    def::{rel_def_meta, Def, DefKind},
     error::CompileError,
     primitive::PrimitiveKind,
     relation::{Constructor, Property},
@@ -72,7 +72,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             if let Some(properties) = self.rel_ctx.properties_by_def_id(variant_def_id) {
                 if let Some(id_relationship_id) = &properties.identified_by {
-                    let identifies_meta = self.defs.relationship_meta(*id_relationship_id);
+                    let identifies_meta = rel_def_meta(*id_relationship_id, self.defs);
 
                     let name = match identifies_meta.relation_def_kind.value {
                         DefKind::TextLiteral(lit) => String::from(*lit),
@@ -301,15 +301,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         match repr_kind {
-            ReprKind::Scalar(scalar_def_id, ReprScalarKind::Text, _) => {
-                match self.defs.def_kind(*scalar_def_id) {
-                    DefKind::TextLiteral(lit) => Ok(DomainTypeMatchData::TextLiteral(lit)),
-                    _other => {
-                        debug!("other: {_other:?}");
-                        Err(UnionCheckError::UnitTypePartOfUnion(*scalar_def_id))
-                    }
+            ReprKind::Scalar(
+                scalar_def_id,
+                ReprScalarKind::Text | ReprScalarKind::TextConstant(_),
+                _,
+            ) => match self.defs.def_kind(*scalar_def_id) {
+                DefKind::TextLiteral(lit) => Ok(DomainTypeMatchData::TextLiteral(lit)),
+                _other => {
+                    debug!("other: {_other:?}");
+                    Err(UnionCheckError::UnitTypePartOfUnion(*scalar_def_id))
                 }
-            }
+            },
             _ => Err(UnionCheckError::UnitTypePartOfUnion(def_id)),
         }
     }
@@ -329,7 +331,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         for (rel_id, _cardinality) in property_set {
-            let meta = self.defs.relationship_meta(*rel_id);
+            let meta = rel_def_meta(*rel_id, self.defs);
 
             let (object_def_id, _) = meta.relationship.object;
             let object_ty = self.def_ty_ctx.table.get(&object_def_id).unwrap();

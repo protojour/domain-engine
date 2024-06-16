@@ -25,8 +25,7 @@ use std::{
 
 use crate::{
     def::{
-        BuiltinRelationKind, DefKind, LookupRelationshipMeta, RelParams, RelationshipMeta, TypeDef,
-        TypeDefFlags,
+        rel_def_meta, BuiltinRelationKind, DefKind, RelDefMeta, RelParams, TypeDef, TypeDefFlags,
     },
     interface::{
         graphql::generate_schema::generate_graphql_schema,
@@ -423,7 +422,7 @@ impl<'m> Compiler<'m> {
         edges: &mut FnvHashMap<EdgeId, EdgeInfo>,
         strings: &mut StringCtx<'m>,
     ) {
-        let meta = self.defs.relationship_meta(rel_id);
+        let meta = rel_def_meta(rel_id, &self.defs);
 
         let (source_def_id, _, _) = meta.relationship.subject();
         let (target_def_id, _, _) = meta.relationship.object();
@@ -537,7 +536,7 @@ impl<'m> Compiler<'m> {
         let properties = self.rel_ctx.properties_by_def_id(type_def_id)?;
         let id_relationship_id = properties.identified_by?;
 
-        let identifies_meta = self.defs.relationship_meta(id_relationship_id);
+        let identifies_meta = rel_def_meta(id_relationship_id, &self.defs);
 
         // inherent properties are the properties that are _not_ entity relationships:
         let mut inherent_property_count = 0;
@@ -553,7 +552,7 @@ impl<'m> Compiler<'m> {
         let id_value_generator = if let Some(inherent_primary_id_meta) = &inherent_primary_id_meta {
             self.rel_ctx
                 .value_generators
-                .get(&inherent_primary_id_meta.relationship_id)
+                .get(&inherent_primary_id_meta.rel_id)
                 .cloned()
         } else {
             None
@@ -565,7 +564,7 @@ impl<'m> Compiler<'m> {
             // TODO: Is the entity still self-identifying if it has only an external primary id (i.e. it is a unit type)?
             is_self_identifying: inherent_primary_id_meta.is_some() && inherent_property_count <= 1,
             id_relationship_id: match inherent_primary_id_meta {
-                Some(inherent_meta) => inherent_meta.relationship_id,
+                Some(inherent_meta) => inherent_meta.rel_id,
                 None => id_relationship_id,
             },
             id_value_def_id: identifies_meta.relationship.subject.0,
@@ -583,7 +582,7 @@ impl<'m> Compiler<'m> {
         &self,
         _entity_id: DefId,
         properties: &Properties,
-    ) -> Option<RelationshipMeta<'_, 'm>> {
+    ) -> Option<RelDefMeta<'_, 'm>> {
         let id_relationship_id = properties.identified_by?;
         let inherent_id = self
             .rel_ctx
@@ -593,7 +592,7 @@ impl<'m> Compiler<'m> {
         let map = properties.table.as_ref()?;
         let _property = map.get(&inherent_id)?;
 
-        Some(self.defs.relationship_meta(inherent_id))
+        Some(rel_def_meta(inherent_id, &self.defs))
     }
 
     fn unique_domain_names(&self) -> FnvHashMap<PackageId, TextConstant> {

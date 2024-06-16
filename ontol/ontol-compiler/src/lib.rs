@@ -4,7 +4,7 @@ use edge::EdgeCtx;
 use entity::entity_ctx::EntityCtx;
 pub use error::*;
 use fnv::FnvHashMap;
-use std::ops::Index;
+use std::ops::{Deref, Index};
 
 use codegen::task::{execute_codegen_tasks, CodeCtx};
 use def::Defs;
@@ -283,6 +283,22 @@ pub fn lower_ontol_syntax<V: ontol_parser::cst::view::NodeView>(
 impl<'m> AsMut<CompileErrors> for Compiler<'m> {
     fn as_mut(&mut self) -> &mut CompileErrors {
         &mut self.errors
+    }
+}
+
+enum OwnedOrRef<'a, T> {
+    Owned(T),
+    Borrowed(&'a T),
+}
+
+impl<'a, T> Deref for OwnedOrRef<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Owned(t) => t,
+            Self::Borrowed(t) => t,
+        }
     }
 }
 

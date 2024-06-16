@@ -1093,7 +1093,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 )
             }
             Some(ReprKind::Unit) => self.mk_node(Kind::Unit, Meta::new(&UNIT_TYPE, meta.span)),
-            Some(ReprKind::Scalar(scalar_def_id, ReprScalarKind::Text, _)) => {
+            Some(ReprKind::Scalar(scalar_def_id, ReprScalarKind::TextConstant(_), _)) => {
                 match self.defs.def_kind(*scalar_def_id) {
                     DefKind::TextLiteral(str) => self.mk_node(Kind::Text((*str).into()), meta),
                     _ => {

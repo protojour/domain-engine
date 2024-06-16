@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashSet};
+use std::{borrow::Cow, collections::HashSet, ops::Deref};
 
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
@@ -22,10 +22,10 @@ use ontol_runtime::{
 use tracing::{debug, debug_span, warn};
 
 use crate::{
-    def::{DefKind, LookupRelationshipMeta, RelParams, RelationshipMeta},
+    def::{rel_def_meta, rel_repr_meta, RelParams, RelReprMeta},
     phf_build::build_phf_index_map,
     relation::{Properties, Property},
-    repr::repr_model::ReprKind,
+    repr::repr_model::{ReprKind, ReprScalarKind},
 };
 
 use super::{
@@ -69,7 +69,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 };
 
                 for (rel_id, property) in table {
-                    let meta = self.defs.relationship_meta(*rel_id);
+                    let meta = rel_def_meta(*rel_id, self.defs);
 
                     if meta.relationship.subject.0 == *union_def_id {
                         self.add_struct_op_property(
@@ -123,7 +123,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         output: &mut IndexMap<String, (PhfKey, SerdeProperty)>,
         must_flatten_unions: &mut bool,
     ) {
-        let meta = self.defs.relationship_meta(rel_id);
+        let meta = rel_repr_meta(rel_id, self.defs, self.repr_ctx);
         let (value_type_def_id, ..) = meta.relationship.object();
 
         let (property_cardinality, value_addr) = self.get_property_operator(
@@ -140,9 +140,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             _ => todo!(),
         };
 
-        let prop_key: Cow<str> = match meta.relation_def_kind.value {
-            DefKind::TextLiteral(prop_key) => Cow::Borrowed(prop_key),
-            DefKind::Type(_) => {
+        let prop_key: Cow<str> = match meta.relation_repr_kind.deref() {
+            ReprKind::Scalar(_, ReprScalarKind::TextConstant(constant_def_id), _) => {
+                let lit = self.defs.text_literal(*constant_def_id).unwrap();
+                Cow::Borrowed(lit)
+            }
+            ReprKind::Unit => {
                 return self.add_flattened_union_properties(
                     rel_id,
                     modifier,
@@ -151,19 +154,15 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     must_flatten_unions,
                 );
             }
-            _ => {
-                panic!("Unsupported property");
+            kind => {
+                panic!("Unsupported property: {kind:?}");
             }
         };
 
         let mut value_generator: Option<ValueGenerator> = None;
         let mut flags = SerdePropertyFlags::default();
 
-        if let Some(default_const_def) = self
-            .rel_ctx
-            .default_const_objects
-            .get(&meta.relationship_id)
-        {
+        if let Some(default_const_def) = self.rel_ctx.default_const_objects.get(&meta.rel_id) {
             let proc = self
                 .code_ctx
                 .result_const_procs
@@ -218,7 +217,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         &mut self,
         rel_id: RelationshipId,
         modifier: SerdeModifier,
-        meta: RelationshipMeta,
+        meta: RelReprMeta,
         output: &mut IndexMap<String, (PhfKey, SerdeProperty)>,
         must_flatten_unions: &mut bool,
     ) {

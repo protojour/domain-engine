@@ -9,7 +9,7 @@ use crate::{
         task::{ExternMap, MapCodegenRequest},
         type_mapper::TypeMapper,
     },
-    def::{Def, DefKind, LookupRelationshipMeta},
+    def::{rel_def_meta, Def, DefKind},
     mem::Intern,
     pattern::{PatId, PatternKind, TypePath},
     types::{Type, TypeRef},
@@ -36,7 +36,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let mut extern_builder = ExternBuilder { url: None };
 
         for rel_id in table.keys() {
-            let meta = self.defs.relationship_meta(*rel_id);
+            let meta = rel_def_meta(*rel_id, self.defs);
             let (value_type_def_id, ..) = meta.relationship.object();
 
             match meta.relation_def_kind.value {

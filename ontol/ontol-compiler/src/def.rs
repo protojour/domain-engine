@@ -13,9 +13,20 @@ use ontol_runtime::{
 };
 
 use crate::{
-    mem::Intern, namespace::Space, package::ONTOL_PKG, pattern::PatId, primitive::PrimitiveKind,
-    regex_util::parse_literal_regex, source::SourceSpan, strings::StringCtx, types::Type, Compiler,
-    SpannedBorrow, NO_SPAN,
+    mem::Intern,
+    namespace::Space,
+    package::ONTOL_PKG,
+    pattern::PatId,
+    primitive::PrimitiveKind,
+    regex_util::parse_literal_regex,
+    repr::{
+        repr_ctx::ReprCtx,
+        repr_model::{ReprKind, ReprScalarKind},
+    },
+    source::SourceSpan,
+    strings::StringCtx,
+    types::Type,
+    Compiler, OwnedOrRef, SpannedBorrow, NO_SPAN,
 };
 use ontol_parser::U32Span;
 
@@ -222,10 +233,16 @@ pub enum RelParams {
 }
 
 #[derive(Clone)]
-pub struct RelationshipMeta<'d, 'm> {
-    pub relationship_id: RelationshipId,
+pub struct RelDefMeta<'d, 'm> {
+    pub rel_id: RelationshipId,
     pub relationship: SpannedBorrow<'d, Relationship>,
     pub relation_def_kind: SpannedBorrow<'d, DefKind<'m>>,
+}
+
+pub struct RelReprMeta<'a> {
+    pub rel_id: RelationshipId,
+    pub relationship: SpannedBorrow<'a, Relationship>,
+    pub relation_repr_kind: OwnedOrRef<'a, ReprKind>,
 }
 
 pub struct Defs<'m> {
@@ -268,6 +285,13 @@ impl<'m> Defs<'m> {
 
     pub fn def_span(&self, def_id: DefId) -> SourceSpan {
         self.table.get(&def_id).map(|def| def.span).unwrap()
+    }
+
+    pub fn text_literal(&self, def_id: DefId) -> Option<&'m str> {
+        match self.def_kind(def_id) {
+            DefKind::TextLiteral(str) => Some(str),
+            _ => None,
+        }
     }
 
     pub fn get_spanned_def_kind(&self, def_id: DefId) -> Option<SpannedBorrow<'_, DefKind<'m>>> {
@@ -379,33 +403,63 @@ impl<'m> Defs<'m> {
     }
 }
 
-#[cfg_attr(test, unimock::unimock(api = LookupRelationshipMetaMock))]
-pub trait LookupRelationshipMeta<'m> {
-    fn relationship_meta(&self, relationship_id: RelationshipId) -> RelationshipMeta<'_, 'm>;
+pub fn rel_def_meta<'c, 'm>(rel_id: RelationshipId, defs: &'c Defs<'m>) -> RelDefMeta<'c, 'm> {
+    let relationship = defs
+        .get_spanned_def_kind(rel_id.0)
+        .unwrap()
+        .filter(|kind| match kind {
+            DefKind::Relationship(relationship) => Some(relationship),
+            _ => None,
+        })
+        .unwrap();
+
+    let relation_def_kind = defs
+        .get_spanned_def_kind(relationship.relation_def_id)
+        .expect("no def for relation id");
+
+    RelDefMeta {
+        rel_id,
+        relationship,
+        relation_def_kind,
+    }
 }
 
-impl<'m> LookupRelationshipMeta<'m> for Defs<'m> {
-    #[track_caller]
-    fn relationship_meta(&self, relationship_id: RelationshipId) -> RelationshipMeta<'_, 'm> {
-        let relationship = self
-            .get_spanned_def_kind(relationship_id.0)
-            .unwrap()
-            .filter(|kind| match kind {
-                DefKind::Relationship(relationship) => Some(relationship),
-                _ => None,
-            })
-            .unwrap();
+pub fn rel_repr_meta<'c>(
+    rel_id: RelationshipId,
+    defs: &'c Defs,
+    repr_ctx: &'c ReprCtx,
+) -> RelReprMeta<'c> {
+    let relationship = defs
+        .get_spanned_def_kind(rel_id.0)
+        .unwrap()
+        .filter(|kind| match kind {
+            DefKind::Relationship(relationship) => Some(relationship),
+            _ => None,
+        })
+        .unwrap();
 
-        let relation_def_kind = self
-            .get_spanned_def_kind(relationship.relation_def_id)
-            .or_else(|| panic!("No def for relation id"))
-            .unwrap();
+    let relation_def_id = relationship.relation_def_id;
 
-        RelationshipMeta {
-            relationship_id,
-            relationship,
-            relation_def_kind,
-        }
+    let relation_repr_kind = repr_ctx
+        .get_repr_kind(&relation_def_id)
+        .map(OwnedOrRef::Borrowed)
+        .unwrap_or_else(|| match defs.def_kind(relation_def_id) {
+            DefKind::TextLiteral(_) => OwnedOrRef::Owned(ReprKind::Scalar(
+                relation_def_id,
+                ReprScalarKind::TextConstant(relation_def_id),
+                NO_SPAN,
+            )),
+            _ => panic!(
+                "no repr for {:?}: {:?}",
+                relationship.relation_def_id,
+                defs.def_kind(relationship.relation_def_id)
+            ),
+        });
+
+    RelReprMeta {
+        rel_id,
+        relationship,
+        relation_repr_kind,
     }
 }
 

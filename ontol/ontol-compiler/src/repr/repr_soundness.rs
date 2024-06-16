@@ -49,7 +49,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         }
 
                         let base_def_id =
-                            self.check_valid_intersection(base_defs, thesaurus_mesh)?;
+                            self.check_valid_intersection(&base_defs, thesaurus_mesh)?;
                         self.check_type_params(base_def_id, &mut repr, &mut checked_type_params)?;
                         Some(repr)
                     }
@@ -65,7 +65,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         }
 
                         let base_def_id =
-                            self.check_valid_intersection(base_defs, thesaurus_mesh)?;
+                            self.check_valid_intersection(&base_defs, thesaurus_mesh)?;
                         self.check_type_params(base_def_id, &mut repr, &mut checked_type_params)?;
 
                         if base_def_id == self.primitives.number {
@@ -117,8 +117,24 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                 }
                             }
                         } else if base_def_id == self.primitives.text {
+                            let mut repr_scalar_kind = ReprScalarKind::Text;
+
+                            if matches!(self.defs.def_kind(def_id), DefKind::TextLiteral(_)) {
+                                repr_scalar_kind = ReprScalarKind::TextConstant(def_id);
+                            } else {
+                                for def_id in &base_defs {
+                                    if matches!(
+                                        self.defs.def_kind(*def_id),
+                                        DefKind::TextLiteral(_)
+                                    ) && matches!(repr_scalar_kind, ReprScalarKind::Text)
+                                    {
+                                        repr_scalar_kind = ReprScalarKind::TextConstant(*def_id);
+                                    }
+                                }
+                            }
+
                             Some(Repr {
-                                kind: ReprKind::Scalar(def_id, ReprScalarKind::Text, span),
+                                kind: ReprKind::Scalar(def_id, repr_scalar_kind, span),
                                 type_params: Default::default(),
                             })
                         } else {
@@ -212,12 +228,12 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
 
     fn check_valid_intersection(
         &mut self,
-        base_defs: BTreeSet<DefId>,
+        base_defs: &BTreeSet<DefId>,
         collected_mesh: &IndexMap<DefId, IsData>,
     ) -> Option<DefId> {
         match base_defs.len() {
             0 => panic!("Empty intersection"),
-            1 => return base_defs.into_iter().next(),
+            1 => return base_defs.iter().next().copied(),
             _ => {}
         }
 
@@ -225,8 +241,8 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         let mut notes = vec![];
 
         for base_def in base_defs {
-            if let Some(level1_path) = self.level1_path_to_base(collected_mesh, base_def) {
-                let base_ty = self.def_types.table.get(&base_def).unwrap();
+            if let Some(level1_path) = self.level1_path_to_base(collected_mesh, *base_def) {
+                let base_ty = self.def_types.table.get(base_def).unwrap();
 
                 notes.push(
                     Note::BaseTypeIs(format!(

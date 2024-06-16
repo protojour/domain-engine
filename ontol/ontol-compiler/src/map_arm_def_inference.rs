@@ -10,7 +10,7 @@ use ontol_runtime::{
 use tracing::{debug, info};
 
 use crate::{
-    def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams, Relationship},
+    def::{rel_def_meta, Def, DefKind, Defs, RelParams, Relationship},
     entity::entity_ctx::EntityCtx,
     pattern::{CompoundPatternAttrKind, PatId, Pattern, PatternKind, Patterns, TypePath},
     primitive::Primitives,
@@ -397,7 +397,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                 }
                 PatternKind::Variable(pat_var) => {
                     let found = parent_table.iter().find_map(|(rel_id, _property)| {
-                        let meta = self.defs.relationship_meta(*rel_id);
+                        let meta = rel_def_meta(*rel_id, self.defs);
                         if meta.relationship.relation_def_id == attr_relation_id {
                             Some((*rel_id, meta))
                         } else {

@@ -1,7 +1,7 @@
 use ontol_runtime::{ontology::domain::ExtendedEntityInfo, DefId};
 
 use crate::{
-    def::{DefKind, LookupRelationshipMeta, TypeDef, TypeDefFlags},
+    def::{rel_def_meta, DefKind, TypeDef, TypeDefFlags},
     CompileError, Compiler,
 };
 
@@ -22,7 +22,7 @@ impl<'m> Compiler<'m> {
         if let Some(order_rels) = self.rel_ctx.order_relationships.remove(&def_id) {
             if !is_entity {
                 for order_rel in &order_rels {
-                    let meta = self.defs.relationship_meta(*order_rel);
+                    let meta = rel_def_meta(*order_rel, &self.defs);
                     CompileError::RelationSubjectMustBeEntity
                         .span(meta.relationship.subject.1)
                         .report(self);

@@ -1,3 +1,0 @@
-def foo ()
-rel foo 'bar':
-    baz // ERROR type not found

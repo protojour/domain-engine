@@ -10,11 +10,10 @@ use ontol_runtime::{
 };
 use ontol_test_utils::expect_eq;
 use tracing::debug;
-use unimock::{matching, MockFn, Unimock};
 
 use crate::{
     codegen::data_flow_analyzer::DataFlowAnalyzer,
-    def::{DefKind, LookupRelationshipMetaMock, RelParams, Relationship, RelationshipMeta},
+    def::{DefKind, Defs, RelDefMeta, RelParams, Relationship},
     typed_hir::TypedHir,
     SpannedBorrow, NO_SPAN,
 };
@@ -41,24 +40,19 @@ fn analyze(arg: &str, hir: &str) -> Vec<PropertyFlow> {
         .parse_root(hir)
         .unwrap()
         .0;
-    let deps = Unimock::new(
-        LookupRelationshipMetaMock::relationship_meta
-            .each_call(matching!(_))
-            .returns({
-                RelationshipMeta {
-                    relationship_id: RelationshipId(DefId::unit()),
-                    relationship: SpannedBorrow {
-                        value: &MOCK_RELATIONSHIP,
-                        span: &NO_SPAN,
-                    },
-                    relation_def_kind: SpannedBorrow {
-                        value: &MOCK_RELATION,
-                        span: &NO_SPAN,
-                    },
-                }
-            }),
-    );
-    let mut analyzer = DataFlowAnalyzer::new(&deps);
+    let defs = Defs::default();
+    let rel_def_meta = |_, _| RelDefMeta {
+        rel_id: RelationshipId(DefId::unit()),
+        relationship: SpannedBorrow {
+            value: &MOCK_RELATIONSHIP,
+            span: &NO_SPAN,
+        },
+        relation_def_kind: SpannedBorrow {
+            value: &MOCK_RELATION,
+            span: &NO_SPAN,
+        },
+    };
+    let mut analyzer = DataFlowAnalyzer::new(&defs, &rel_def_meta);
     let flow = analyzer
         .analyze(arg.parse().unwrap(), node.as_ref())
         .unwrap();

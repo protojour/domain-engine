@@ -92,14 +92,26 @@ fn test_serde_domain_symbol() {
 }
 
 #[test]
+fn test_serde_symbolic_relation() {
+    "
+    sym { prop }
+    def foo(rel .prop: text)
+    "
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        assert_json_io_matches!(serde_create(&foo), { "prop": "bar" });
+    });
+}
+
+#[test]
 fn test_serde_domain_symbol_union() {
     "
-    sym { a, b, }
+    sym { a, b, const }
     def ab (
         rel .is?: a
         rel .is?: b
     )
-    def foo ( rel .'const': ab )
+    def foo ( rel .const: ab )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);

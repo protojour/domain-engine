@@ -28,7 +28,7 @@ use super::{sequence_range_builder::SequenceRangeBuilder, SerdeIntersection, Ser
 use crate::{
     codegen::task::CodeCtx,
     compiler_queries::GetDefType,
-    def::{DefKind, Defs, LookupRelationshipMeta, TypeDef, TypeDefFlags},
+    def::{rel_def_meta, DefKind, Defs, TypeDef, TypeDefFlags},
     interface::graphql::graphql_namespace::{adapt_graphql_identifier, GqlAdaptedIdent},
     primitive::PrimitiveKind,
     relation::{Constructor, Properties, RelCtx, UnionMemberCache},
@@ -289,7 +289,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 let (rel_id, _) = table.iter().find(|(_, property)| property.is_entity_id)?;
 
-                let meta = self.defs.relationship_meta(*rel_id);
+                let meta = rel_def_meta(*rel_id, self.defs);
 
                 let DefKind::TextLiteral(property_name) = *meta.relation_def_kind.value else {
                     return None;
@@ -645,7 +645,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                                 )))
                                 .unwrap(),
                             Some(relationship_id) => {
-                                let meta = self.defs.relationship_meta(relationship_id);
+                                let meta = rel_def_meta(relationship_id, self.defs);
 
                                 self.gen_addr_lazy(SerdeKey::Def(
                                     def.with_def(meta.relationship.object.0),
@@ -707,7 +707,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         };
 
         let struct_def = def.remove_modifier(union_mod);
-        let identifies_meta = self.defs.relationship_meta(identifies_relationship_id);
+        let identifies_meta = rel_def_meta(identifies_relationship_id, self.defs);
 
         // prevent recursion
         let new_addr = self.alloc_addr(&def);

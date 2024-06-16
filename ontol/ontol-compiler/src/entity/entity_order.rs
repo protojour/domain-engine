@@ -6,7 +6,7 @@ use ontol_runtime::{
 use tracing::{debug, info};
 
 use crate::{
-    def::{DefKind, LookupRelationshipMeta, RelParams},
+    def::{rel_def_meta, DefKind, RelParams},
     relation::Constructor,
     repr::repr_model::{ReprKind, ReprScalarKind},
     thesaurus::TypeRelation,
@@ -23,12 +23,12 @@ impl<'m> Compiler<'m> {
         order_union: DefId,
     ) -> Option<(DefId, EntityOrder)> {
         let package_id = entity_def_id.package_id();
-        let meta = self.defs.relationship_meta(order_relationship);
+        let meta = rel_def_meta(order_relationship, &self.defs);
         let object = meta.relationship.object;
         let rel_span = *meta.relationship.span;
 
         match self.repr_ctx.get_repr_kind(&object.0) {
-            Some(ReprKind::Scalar(scalar_def_id, ReprScalarKind::Text, _)) => {
+            Some(ReprKind::Scalar(scalar_def_id, ReprScalarKind::TextConstant(_), _)) => {
                 if object.0.package_id() != package_id
                     || !matches!(self.defs.def_kind(*scalar_def_id), DefKind::TextLiteral(_))
                 {
@@ -100,7 +100,7 @@ impl<'m> Compiler<'m> {
                 continue;
             };
 
-            let meta = self.defs.relationship_meta(relationship_id);
+            let meta = rel_def_meta(relationship_id, &self.defs);
             match self.defs.def_kind(meta.relationship.object.0) {
                 DefKind::TextLiteral(literal) => {
                     match self.parse_order_field(
@@ -194,7 +194,7 @@ impl<'m> Compiler<'m> {
         };
 
         for (rel_id, _) in table {
-            let meta = self.defs.relationship_meta(*rel_id);
+            let meta = rel_def_meta(*rel_id, &self.defs);
 
             if meta.relationship.relation_def_id == *literal_def_id {
                 return Ok((*rel_id, meta.relationship.object.0));

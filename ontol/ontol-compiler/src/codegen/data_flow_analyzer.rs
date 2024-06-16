@@ -11,10 +11,15 @@ use ontol_runtime::{
 };
 use tracing::warn;
 
-use crate::{def::LookupRelationshipMeta, typed_hir::TypedNodeRef, types::Type};
+use crate::{
+    def::{Defs, RelDefMeta},
+    typed_hir::TypedNodeRef,
+    types::Type,
+};
 
-pub struct DataFlowAnalyzer<'c, R> {
-    defs: &'c R,
+pub struct DataFlowAnalyzer<'c, 'm> {
+    defs: &'c Defs<'m>,
+    rel_def_meta: &'c dyn Fn(RelationshipId, &'c Defs<'m>) -> RelDefMeta<'c, 'm>,
     prop_origins: FnvHashMap<RelationshipId, Var>,
     /// A table of which variable produce which properties
     prop_origins_inverted: FnvHashMap<Var, FnvHashSet<RelationshipId>>,
@@ -25,7 +30,7 @@ pub struct DataFlowAnalyzer<'c, R> {
     property_flow: BTreeSet<PropertyFlow>,
 }
 
-impl<'c, R> Debug for DataFlowAnalyzer<'c, R> {
+impl<'c, 'm> Debug for DataFlowAnalyzer<'c, 'm> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DataFlowAnalyzer")
             .field("prop_origins", &self.prop_origins)
@@ -36,13 +41,14 @@ impl<'c, R> Debug for DataFlowAnalyzer<'c, R> {
     }
 }
 
-impl<'c, 'm, R> DataFlowAnalyzer<'c, R>
-where
-    R: LookupRelationshipMeta<'m>,
-{
-    pub fn new(defs: &'c R) -> Self {
+impl<'c, 'm> DataFlowAnalyzer<'c, 'm> {
+    pub fn new(
+        defs: &'c Defs<'m>,
+        rel_def_meta: &'c dyn Fn(RelationshipId, &'c Defs<'m>) -> RelDefMeta<'c, 'm>,
+    ) -> Self {
         Self {
             defs,
+            rel_def_meta,
             prop_origins: FnvHashMap::default(),
             prop_origins_inverted: FnvHashMap::default(),
             var_origins: FnvHashMap::default(),
@@ -340,7 +346,7 @@ where
     /// to understand which entity must be looked up.
     /// rel_params is ignored here.
     fn reg_scope_prop(&mut self, struct_var: Var, rel_id: RelationshipId, ty: &Type) {
-        let meta = self.defs.relationship_meta(rel_id);
+        let meta = (*self.rel_def_meta)(rel_id, self.defs);
         let (_, cardinality, _) = meta.relationship.subject();
 
         match ty {

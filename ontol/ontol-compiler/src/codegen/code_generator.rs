@@ -22,6 +22,7 @@ use crate::{
         ir::{BlockLabel, BlockOffset, Terminator},
         proc_builder::Delta,
     },
+    def::rel_def_meta,
     error::CompileError,
     primitive::Primitives,
     repr::{
@@ -101,7 +102,8 @@ pub(super) fn map_codegen<'m>(
         None => MapLossiness::Complete,
     };
 
-    let data_flow = DataFlowAnalyzer::new(&compiler.defs).analyze(func.arg.0.var, body.as_ref());
+    let data_flow =
+        DataFlowAnalyzer::new(&compiler.defs, &rel_def_meta).analyze(func.arg.0.var, body.as_ref());
 
     let return_ty = body.data().ty();
 

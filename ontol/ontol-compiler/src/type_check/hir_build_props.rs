@@ -10,7 +10,7 @@ use smallvec::smallvec;
 use tracing::{debug, info};
 
 use crate::{
-    def::{DefKind, LookupRelationshipMeta, RelParams},
+    def::{rel_def_meta, DefKind, RelParams},
     mem::Intern,
     pattern::{
         CompoundPatternAttr, CompoundPatternAttrKind, CompoundPatternModifier, Pattern,
@@ -173,7 +173,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         )
                     }
                     _ => match (scalar_kind, self.defs.def_kind(*scalar_def_id)) {
-                        (ReprScalarKind::Text, DefKind::TextLiteral(lit)) => {
+                        (
+                            ReprScalarKind::Text | ReprScalarKind::TextConstant(_),
+                            DefKind::TextLiteral(lit),
+                        ) => {
                             // A symbol instantiation:
                             // Make a text constant with the `ty` DefId
                             ctx.mk_node(ontol_hir::Kind::Text((*lit).into()), Meta { ty, span })
@@ -244,7 +247,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         rel_id: RelationshipId,
         match_attributes: &mut IndexMap<MatchAttributeKey<'m>, MatchAttribute>,
     ) {
-        let meta = self.defs.relationship_meta(rel_id);
+        let meta = rel_def_meta(rel_id, self.defs);
         let match_key = match meta.relation_def_kind.value {
             DefKind::TextLiteral(lit) => Some(MatchAttributeKey::Named(lit)),
             _ => Some(MatchAttributeKey::Def(meta.relationship.relation_def_id)),
@@ -736,7 +739,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
 
             {
-                let meta = self.defs.relationship_meta(relationship_id);
+                let meta = rel_def_meta(relationship_id, self.defs);
                 let (target_def_id, cardinality, _span) = meta.relationship.object();
 
                 // Here we check that if the missing property refers to variably sized edges

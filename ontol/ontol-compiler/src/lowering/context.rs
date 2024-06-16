@@ -110,7 +110,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
             .lookup(&[self.package_id, ONTOL_PKG], Space::Type, ident)
         {
             Some(def_id) => Ok(def_id),
-            None => Err((CompileError::TypeNotFound, span)),
+            None => Err((CompileError::DefinitionNotFound, span)),
         }
     }
 
@@ -172,7 +172,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                     }
                     _ => Ok(*def_id),
                 },
-                None => Err((CompileError::TypeNotFound, path_span)),
+                None => Err((CompileError::DefinitionNotFound, path_span)),
             }
         } else {
             self.lookup_ident(current.slice(), current.span())

@@ -7,11 +7,11 @@ use ontol_runtime::{
 use tracing::{debug, instrument, trace};
 
 use crate::{
-    def::{Def, DefKind, LookupRelationshipMeta},
+    def::{rel_def_meta, Def, DefKind},
     error::CompileError,
     primitive::PrimitiveKind,
     relation::{Constructor, Property},
-    repr::repr_model::ReprKind,
+    repr::repr_model::{ReprKind, ReprScalarKind},
     text_patterns::TextPatternSegment,
     types::{FormatType, Type},
     SourceSpan,
@@ -47,7 +47,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         for (rel_id, property) in table {
             trace!("check pre-repr {def_id:?} {rel_id:?} {property:?}");
 
-            let meta = self.defs.relationship_meta(*rel_id);
+            let meta = rel_def_meta(*rel_id, self.defs);
 
             let object_properties = self
                 .rel_ctx
@@ -56,7 +56,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             // Check if the property is the primary id
             if let Some(id_relationship_id) = object_properties.identifies {
-                let id_meta = self.defs.relationship_meta(id_relationship_id);
+                let id_meta = rel_def_meta(id_relationship_id, self.defs);
 
                 if id_meta.relationship.object.0 == def_id {
                     debug!(
@@ -90,12 +90,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         for (rel_id, property) in table {
             trace!("check post-repr {def_id:?} {rel_id:?} {property:?}");
 
-            let meta = self.defs.relationship_meta(*rel_id);
+            let meta = rel_def_meta(*rel_id, self.defs);
 
             // Check that the same relation_def_id is not reused for subject properties
             if !subject_relation_set.insert(meta.relationship.relation_def_id) {
                 CompileError::UnionInNamedRelationshipNotSupported
-                    .span(self.defs.def_span(meta.relationship_id.0))
+                    .span(self.defs.def_span(meta.rel_id.0))
                     .report(&mut self.errors);
             }
 
@@ -106,7 +106,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             if properties.identified_by.is_some() && object_properties.identified_by.is_some() {
                 if matches!(property.cardinality.1, ValueCardinality::List) {
-                    let span = self.defs.def_span(meta.relationship_id.0);
+                    let span = self.defs.def_span(meta.rel_id.0);
                     CompileError::EntityRelationshipCannotBeAList
                         .span(span)
                         .report(&mut self.errors);
@@ -132,18 +132,21 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .get_repr_kind(&meta.relationship.relation_def_id)
                     .unwrap();
 
-                if !matches!(relation_repr_kind, ReprKind::Unit) {
-                    CompileError::InvalidRelationType
-                        .span(meta.relationship.relation_span)
-                        .report(&mut self.errors);
-                } else {
-                    let object = meta.relationship.object;
+                match relation_repr_kind {
+                    ReprKind::Unit => {
+                        let object = meta.relationship.object;
+                        let object_repr_kind = self.repr_ctx.get_repr_kind(&object.0).unwrap();
 
-                    let object_repr_kind = self.repr_ctx.get_repr_kind(&object.0).unwrap();
-
-                    if !matches!(object_repr_kind, ReprKind::StructUnion(_)) {
-                        CompileError::FlattenedRelationshipObjectMustBeStructUnion
-                            .span(object.1)
+                        if !matches!(object_repr_kind, ReprKind::StructUnion(_)) {
+                            CompileError::FlattenedRelationshipObjectMustBeStructUnion
+                                .span(object.1)
+                                .report(&mut self.errors);
+                        }
+                    }
+                    ReprKind::Scalar(_, ReprScalarKind::TextConstant(_), _) => {}
+                    _ => {
+                        CompileError::InvalidRelationType
+                            .span(meta.relationship.relation_span)
                             .report(&mut self.errors);
                     }
                 }

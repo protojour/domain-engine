@@ -31,7 +31,7 @@ use thin_vec::thin_vec;
 use tracing::{trace, trace_span, warn};
 
 use crate::{
-    def::{DefKind, LookupRelationshipMeta, RelParams, RelationshipMeta, TypeDefFlags},
+    def::{rel_def_meta, DefKind, RelDefMeta, RelParams, TypeDefFlags},
     interface::serde::{serde_generator::SerdeGenerator, SerdeKey},
     phf_build::build_phf_index_map,
     relation::Property,
@@ -418,7 +418,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         // See if it should be an interface of flattened unions
         if let Some(table) = self.relations.properties_table_by_def_id(def_id) {
             for rel_id in table.keys().copied() {
-                let meta = self.defs.relationship_meta(rel_id);
+                let meta = rel_def_meta(rel_id, self.defs);
                 let object = meta.relationship.object;
 
                 if let DefKind::Type(_) = meta.relation_def_kind.value {
@@ -652,7 +652,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 };
 
                 for (rel_id, property) in table {
-                    let meta = self.defs.relationship_meta(*rel_id);
+                    let meta = rel_def_meta(*rel_id, self.defs);
 
                     if meta.relationship.subject.0 == *union_def_id {
                         self.harvest_struct_field(
@@ -718,8 +718,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         match field_kind {
             FieldKind::Property { .. } => 0,
             FieldKind::EdgeProperty { id: rel_id, .. } => {
-                self.defs
-                    .relationship_meta(*rel_id)
+                rel_def_meta(*rel_id, self.defs)
                     .relationship
                     .projection
                     .subject
@@ -727,9 +726,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             }
             // Connections are placed after "plain" fields
             FieldKind::ConnectionProperty(field) => {
-                100 + self
-                    .defs
-                    .relationship_meta(field.rel_id)
+                100 + rel_def_meta(field.rel_id, self.defs)
                     .relationship
                     .projection
                     .subject
@@ -748,7 +745,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         harvest_variant: &HarvestVariant,
         output: &mut IndexMap<String, FieldData>,
     ) {
-        let meta = self.defs.relationship_meta(rel_id);
+        let meta = rel_def_meta(rel_id, self.defs);
         match (meta.relation_def_kind.value, harvest_variant) {
             (DefKind::TextLiteral(prop_key), _) => self.harvest_data_struct_field(
                 (rel_id, prop_key, property),
@@ -846,7 +843,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
     fn harvest_data_struct_field(
         &mut self,
         (rel_id, prop_key, property): (RelationshipId, &str, &Property),
-        meta: RelationshipMeta,
+        meta: RelDefMeta,
         property_field_producer: PropertyFieldProducer,
         field_namespace: &mut GraphqlNamespace,
         output: &mut IndexMap<String, FieldData>,

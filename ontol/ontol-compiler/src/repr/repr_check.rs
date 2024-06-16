@@ -13,13 +13,12 @@ use ontol_runtime::{DefId, RelationshipId};
 use tracing::{debug_span, trace};
 
 use crate::{
-    def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams, TypeDefFlags},
+    def::{rel_def_meta, Def, DefKind, Defs, RelParams, TypeDefFlags},
     error::CompileError,
     package::ONTOL_PKG,
     primitive::{PrimitiveKind, Primitives},
     relation::{Constructor, Properties, RelCtx},
-    thesaurus::Thesaurus,
-    thesaurus::{Is, TypeRelation},
+    thesaurus::{Is, Thesaurus, TypeRelation},
     types::{DefTypeCtx, Type},
     CompileErrors, Note, SourceId, SourceSpan, SpannedNote, NATIVE_SOURCE, NO_SPAN,
 };
@@ -209,7 +208,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
     }
 
     fn traverse_property(&mut self, rel_id: RelationshipId) {
-        let meta = self.defs.relationship_meta(rel_id);
+        let meta = rel_def_meta(rel_id, self.defs);
 
         let (value_def_id, ..) = meta.relationship.object();
         let value_def = self.defs.table.get(&value_def_id).unwrap();

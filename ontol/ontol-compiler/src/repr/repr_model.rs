@@ -41,6 +41,7 @@ pub enum ReprScalarKind {
     I64(RangeInclusive<i64>),
     F64(RangeInclusive<NotNan<f64>>),
     Text,
+    TextConstant(DefId),
     Other,
 }
 
