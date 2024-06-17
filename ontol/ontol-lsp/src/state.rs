@@ -172,6 +172,7 @@ impl State {
                                 cst_explore(body.statements(), aliases, defs);
                             }
                         }
+                        insp::Statement::SymStatement(_) => {}
                         insp::Statement::RelStatement(stmt) => {
                             if let Some(set) = stmt.fwd_set() {
                                 for relation in set.relations() {
