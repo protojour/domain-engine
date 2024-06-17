@@ -21,7 +21,7 @@ use ontol_test_utils::{
         stix::{stix_bundle, STIX},
         GITMESH, GUITAR_SYNTH_UNION,
     },
-    expect_eq, TestPackages,
+    expect_eq, SrcName, TestPackages,
 };
 
 async fn make_domain_engine(ontology: Arc<Ontology>) -> DomainEngine {
@@ -833,6 +833,78 @@ async fn entity_subtype() {
                 "nodes": [{
                     "id": "1",
                     "name": "NAME!"
+                }]
+            }
+        })
+    );
+}
+
+#[test(tokio::test)]
+async fn sym_edge_simple() {
+    let (test, [schema]) = TestPackages::with_static_sources([(
+        SrcName::default(),
+        "
+        sym {
+            (a) prop: (b),
+            (b) reverse_prop: (a),
+        }
+
+        def foo (
+            rel .'id'|id: (rel .is: text)
+            rel .prop: {bar}
+        )
+        def bar (
+            rel .'id'|id: (rel .is: text)
+            rel .reverse_prop: {foo}
+        )
+
+        map bars (
+            (),
+            bar { ..@match bar() }
+        )
+        ",
+    )])
+    .compile_schemas([SrcName::default()]);
+
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
+
+    r#"mutation {
+        foo(
+            create: [{
+                id: "foo1"
+                prop: [{ id: "bar1" }]
+            }]
+        ) { node { id } }
+    }"#
+    .exec([], &schema, &ctx)
+    .await
+    .unwrap();
+
+    let result = r#"{
+        bars {
+            nodes {
+                id
+                reverse_prop {
+                    nodes {
+                        id
+                    }
+                }
+            }
+        }
+    }"#
+    .exec([], &schema, &ctx)
+    .await
+    .unwrap();
+
+    expect_eq!(
+        actual = result,
+        expected = graphql_value!({
+            "bars": {
+                "nodes": [{
+                    "id": "bar1",
+                    "reverse_prop": {
+                        "nodes": [{ "id": "foo1" }]
+                    }
                 }]
             }
         })

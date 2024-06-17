@@ -1,8 +1,8 @@
 use std::ops::Range;
 
-use ontol_parser::cst::{
-    inspect::{self as insp},
-    view::NodeView,
+use ontol_parser::{
+    cst::{inspect as insp, view::NodeView},
+    U32Span,
 };
 use ontol_runtime::{
     ontology::domain::EdgeCardinalProjection,
@@ -102,8 +102,24 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     let span = type_mod.view().span();
 
                     match self.ctx.compiler.defs.def_kind(def_id) {
-                        DefKind::TextLiteral(_) | DefKind::Type(_) => {
-                            (RelationKey::Named(def_id), span, None)
+                        DefKind::TextLiteral(_) => (RelationKey::Named(def_id), span, None),
+                        DefKind::Type(_) => {
+                            if let Some(edge_id) =
+                                self.ctx.compiler.edge_ctx.edge_id_by_symbol(def_id)
+                            {
+                                return self.lower_edge_relationship(
+                                    subject_def,
+                                    rel_subject,
+                                    (def_id, span, edge_id),
+                                    relation,
+                                    object_def,
+                                    rel_object,
+                                    backward_relation,
+                                    rel_stmt,
+                                );
+                            } else {
+                                (RelationKey::Named(def_id), span, None)
+                            }
                         }
                         DefKind::BuiltinRelType(..) => (RelationKey::Builtin(def_id), span, None),
                         DefKind::NumberLiteral(lit) => match lit.parse::<u16>() {
@@ -122,6 +138,36 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 }
             }
         };
+
+        self.lower_literal_relationship(
+            subject_def,
+            rel_subject,
+            (key, ident_span, index_range_rel_params),
+            relation,
+            object_def,
+            rel_object,
+            backward_relation,
+            rel_stmt,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn lower_literal_relationship(
+        &mut self,
+        subject_def: DefId,
+        rel_subject: insp::RelSubject<V>,
+        (key, ident_span, index_range_rel_params): (
+            RelationKey,
+            U32Span,
+            Option<Range<Option<u16>>>,
+        ),
+        relation: insp::Relation<V>,
+        object_def: DefId,
+        rel_object: insp::RelObject<V>,
+        backward_relation: Option<insp::RelBackwdSet<V>>,
+        rel_stmt: insp::RelStatement<V>,
+    ) -> Option<RootDefs> {
+        let mut root_defs = RootDefs::new();
 
         let has_object_prop = backward_relation.is_some();
 
@@ -180,7 +226,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 edge_id,
                 MaterializedEdge {
                     slots: Default::default(),
-                    cardinality: if let RelParams::Type(_) = rel_params {
+                    arity: if let RelParams::Type(_) = rel_params {
                         3
                     } else {
                         2
@@ -303,6 +349,69 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         root_defs.push(relationship_id);
 
         Some(root_defs)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn lower_edge_relationship(
+        &mut self,
+        subject_def: DefId,
+        rel_subject: insp::RelSubject<V>,
+        (sym_id, ident_span, edge_id): (DefId, U32Span, EdgeId),
+        relation: insp::Relation<V>,
+        object_def: DefId,
+        rel_object: insp::RelObject<V>,
+        backward_relation: Option<insp::RelBackwdSet<V>>,
+        rel_stmt: insp::RelStatement<V>,
+    ) -> Option<RootDefs> {
+        let edge = self.ctx.compiler.edge_ctx.edges.get(&edge_id).unwrap();
+        let slot = edge.slots.get(&sym_id).unwrap();
+
+        let relationship_id = self.ctx.compiler.defs.alloc_def_id(self.ctx.package_id);
+
+        let relationship = {
+            let subject_cardinality = (
+                property_cardinality(relation.prop_cardinality())
+                    .unwrap_or(PropertyCardinality::Mandatory),
+                value_cardinality(match rel_object.type_mod_or_pattern() {
+                    Some(insp::TypeModOrPattern::TypeMod(type_mod)) => Some(type_mod),
+                    _ => None,
+                })
+                .unwrap_or(ValueCardinality::Unit),
+            );
+            let object_cardinality = {
+                let default = (PropertyCardinality::Optional, ValueCardinality::IndexSet);
+
+                (
+                    backward_relation
+                        .and_then(|rel| property_cardinality(rel.prop_cardinality()))
+                        .unwrap_or(default.0),
+                    value_cardinality(rel_subject.type_mod()).unwrap_or(default.1),
+                )
+            };
+
+            Relationship {
+                relation_def_id: sym_id,
+                projection: EdgeCardinalProjection {
+                    id: edge_id,
+                    subject: slot.left,
+                    object: slot.right,
+                },
+                relation_span: self.ctx.source_span(ident_span),
+                subject: (subject_def, self.ctx.source_span(rel_subject.0.span())),
+                subject_cardinality,
+                object: (object_def, self.ctx.source_span(rel_object.0.span())),
+                object_cardinality,
+                rel_params: RelParams::Unit,
+            }
+        };
+
+        self.ctx.set_def_kind(
+            relationship_id,
+            DefKind::Relationship(relationship),
+            rel_stmt.0.span(),
+        );
+
+        Some(vec![relationship_id])
     }
 }
 

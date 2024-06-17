@@ -1,14 +1,26 @@
-use std::marker::PhantomData;
-
-use itertools::Itertools;
-use ontol_parser::cst::{
-    inspect::{self as insp},
-    view::{NodeView, TokenView},
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    marker::PhantomData,
 };
-use ontol_runtime::DefId;
+
+use fnv::FnvHashMap;
+use ontol_parser::{
+    cst::{
+        inspect as insp,
+        view::{NodeView, TokenView},
+    },
+    U32Span,
+};
+use ontol_runtime::{tuple::CardinalIdx, DefId, EdgeId};
 use tracing::debug_span;
 
-use crate::{namespace::Space, package::PackageReference, CompileError, Compiler, Src};
+use crate::{
+    def::DefKind,
+    edge::{MaterializedEdge, Slot},
+    namespace::Space,
+    package::PackageReference,
+    CompileError, Compiler, Src,
+};
 
 use super::context::{BlockContext, CstLowering, Extern, LoweringCtx, Open, Private, RootDefs};
 
@@ -237,32 +249,196 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     fn lower_sym_statement(&mut self, sym_stmt: insp::SymStatement<V>) -> RootDefs {
         let mut root_defs = vec![];
 
+        let mut opt_edge_builder: Option<Option<EdgeBuilder>> = None;
+
         for sym_relation in sym_stmt.sym_relations() {
-            let items = sym_relation.items().collect_vec();
+            let mut item_iter = sym_relation.items().peekable();
 
-            if items.len() != 1 {
-                CompileError::TODO("only one item supported at this time")
-                    .span_report(sym_relation.view().span(), &mut self.ctx);
-            } else {
-                match items.into_iter().next().unwrap() {
-                    insp::SymItem::SymDecl(sym_decl) => {
-                        let Some(symbol) = sym_decl.symbol() else {
-                            continue;
-                        };
-
-                        let opt_def_id =
-                            self.catch(|zelf| zelf.ctx.coin_symbol(symbol.slice(), symbol.span()));
-                        root_defs.extend(opt_def_id);
+            match self.next_sym_item(&mut item_iter, sym_relation.view().span()) {
+                Some(insp::SymItem::SymDecl(sym_decl)) => {
+                    if matches!(opt_edge_builder, Some(Some(_))) {
+                        CompileError::TODO(
+                            "cannot mix standalone symbols with proper symbol groups",
+                        )
+                        .span_report(sym_decl.view().span(), &mut self.ctx);
                     }
-                    insp::SymItem::SymVar(sym_var) => {
-                        CompileError::TODO("sym vars not supported at this time")
-                            .span_report(sym_var.view().span(), &mut self.ctx);
+
+                    // not in "edge mode"
+                    opt_edge_builder = Some(None);
+
+                    let Some(symbol) = sym_decl.symbol() else {
+                        continue;
+                    };
+
+                    let opt_def_id =
+                        self.catch(|zelf| zelf.ctx.coin_symbol(symbol.slice(), symbol.span()));
+                    root_defs.extend(opt_def_id);
+
+                    if let Some(next) = item_iter.next() {
+                        CompileError::TODO("nothing can follow a standalone symbol declaration")
+                            .span_report(next.view().span(), &mut self.ctx);
                     }
                 }
+                Some(insp::SymItem::SymVar(sym_var)) => {
+                    let edge_builder = match &mut opt_edge_builder {
+                        None => {
+                            let edge_id =
+                                EdgeId(self.ctx.compiler.defs.alloc_def_id(self.ctx.package_id));
+                            self.ctx
+                                .set_def_kind(edge_id.0, DefKind::Edge, sym_stmt.view().span());
+
+                            opt_edge_builder = Some(Some(EdgeBuilder {
+                                edge_id,
+                                variables: Default::default(),
+                                slots: Default::default(),
+                            }));
+
+                            opt_edge_builder
+                                .as_mut()
+                                .and_then(|builder| builder.as_mut())
+                                .unwrap()
+                        }
+                        Some(Some(builder)) => builder,
+                        Some(None) => {
+                            CompileError::TODO("cannot mix symbol group with standalone symbols")
+                                .span_report(sym_var.view().span(), &mut self.ctx);
+                            continue;
+                        }
+                    };
+
+                    let Some(mut prev_cardinal) = self.add_sym_variable(sym_var, edge_builder)
+                    else {
+                        continue;
+                    };
+
+                    loop {
+                        if let Some((sym_id, next_cardinal)) = self.add_sym_decl_then_variable(
+                            &mut item_iter,
+                            prev_cardinal,
+                            edge_builder,
+                            sym_stmt.view().span(),
+                        ) {
+                            self.ctx
+                                .compiler
+                                .edge_ctx
+                                .symbols
+                                .insert(sym_id, edge_builder.edge_id);
+
+                            root_defs.push(sym_id);
+                            prev_cardinal = next_cardinal;
+                        } else {
+                            break;
+                        }
+
+                        if item_iter.peek().is_none() {
+                            break;
+                        }
+                    }
+                }
+                None => {}
             }
         }
 
+        if let Some(Some(edge_builder)) = opt_edge_builder {
+            let Ok(arity): Result<u8, _> = edge_builder.variables.len().try_into() else {
+                CompileError::TODO("edge arity exceeded")
+                    .span_report(sym_stmt.view().span(), &mut self.ctx);
+
+                return root_defs;
+            };
+
+            self.ctx.compiler.edge_ctx.edges.insert(
+                edge_builder.edge_id,
+                MaterializedEdge {
+                    slots: edge_builder.slots,
+                    arity,
+                },
+            );
+        }
+
         root_defs
+    }
+
+    fn next_sym_item(
+        &mut self,
+        item_iter: &mut impl Iterator<Item = insp::SymItem<V>>,
+        sym_relation_span: U32Span,
+    ) -> Option<insp::SymItem<V>> {
+        let item = item_iter.next();
+
+        if item.is_none() {
+            CompileError::TODO("expected a an item").span_report(sym_relation_span, &mut self.ctx);
+        }
+
+        item
+    }
+
+    fn add_sym_decl_then_variable(
+        &mut self,
+        item_iter: &mut impl Iterator<Item = insp::SymItem<V>>,
+        prev_cardinal_idx: CardinalIdx,
+        edge_builder: &mut EdgeBuilder,
+        sym_relation_span: U32Span,
+    ) -> Option<(DefId, CardinalIdx)> {
+        let next_item = self.next_sym_item(item_iter, sym_relation_span)?;
+
+        let insp::SymItem::SymDecl(sym_decl) = next_item else {
+            CompileError::TODO("expected symbol declaration")
+                .span_report(next_item.view().span(), &mut self.ctx);
+            return None;
+        };
+
+        let symbol = sym_decl.symbol()?;
+        let opt_def_id = self.catch(|zelf| zelf.ctx.coin_symbol(symbol.slice(), symbol.span()));
+        let next_item = self.next_sym_item(item_iter, sym_relation_span)?;
+
+        let insp::SymItem::SymVar(sym_var) = next_item else {
+            CompileError::TODO("expected symbol variable")
+                .span_report(next_item.view().span(), &mut self.ctx);
+            return None;
+        };
+
+        let cardinal_idx = self.add_sym_variable(sym_var, edge_builder);
+
+        match (opt_def_id, cardinal_idx) {
+            (Some(def_id), Some(cardinal_idx)) => {
+                edge_builder.slots.insert(
+                    def_id,
+                    Slot {
+                        left: prev_cardinal_idx,
+                        depth: 0,
+                        right: cardinal_idx,
+                    },
+                );
+
+                Some((def_id, cardinal_idx))
+            }
+            _ => None,
+        }
+    }
+
+    fn add_sym_variable(
+        &mut self,
+        sym_var: insp::SymVar<V>,
+        edge_builder: &mut EdgeBuilder,
+    ) -> Option<CardinalIdx> {
+        let var_symbol = sym_var.symbol()?;
+        let len = edge_builder.variables.len();
+
+        match edge_builder.variables.entry(var_symbol.slice().to_string()) {
+            Entry::Occupied(occupied) => Some(*occupied.get()),
+            Entry::Vacant(vacant) => {
+                let Ok(cardinal_idx): Result<u8, _> = len.try_into() else {
+                    CompileError::TODO("edge arity exceeded")
+                        .span_report(sym_var.view().span(), &mut self.ctx);
+
+                    return None;
+                };
+
+                vacant.insert(CardinalIdx(cardinal_idx));
+                Some(CardinalIdx(cardinal_idx))
+            }
+        }
     }
 
     pub(super) fn read_def_modifiers(
@@ -292,4 +468,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
         (private, open, extern_)
     }
+}
+
+struct EdgeBuilder {
+    edge_id: EdgeId,
+    variables: HashMap<String, CardinalIdx>,
+    slots: FnvHashMap<DefId, Slot>,
 }

@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
@@ -31,7 +33,7 @@ use thin_vec::thin_vec;
 use tracing::{trace, trace_span, warn};
 
 use crate::{
-    def::{rel_def_meta, DefKind, RelDefMeta, RelParams, TypeDefFlags},
+    def::{rel_def_meta, rel_repr_meta, DefKind, RelParams, RelReprMeta, TypeDefFlags},
     interface::serde::{serde_generator::SerdeGenerator, SerdeKey},
     phf_build::build_phf_index_map,
     relation::Property,
@@ -418,10 +420,10 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         // See if it should be an interface of flattened unions
         if let Some(table) = self.relations.properties_table_by_def_id(def_id) {
             for rel_id in table.keys().copied() {
-                let meta = rel_def_meta(rel_id, self.defs);
+                let meta = rel_repr_meta(rel_id, self.defs, self.repr_ctx);
                 let object = meta.relationship.object;
 
-                if let DefKind::Type(_) = meta.relation_def_kind.value {
+                if let ReprKind::Unit = meta.relation_repr_kind.deref() {
                     let union_discriminator =
                         self.relations.union_discriminators.get(&object.0).unwrap();
 
@@ -745,16 +747,19 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         harvest_variant: &HarvestVariant,
         output: &mut IndexMap<String, FieldData>,
     ) {
-        let meta = rel_def_meta(rel_id, self.defs);
-        match (meta.relation_def_kind.value, harvest_variant) {
-            (DefKind::TextLiteral(prop_key), _) => self.harvest_data_struct_field(
-                (rel_id, prop_key, property),
-                meta,
-                property_field_producer,
-                field_namespace,
-                output,
-            ),
-            (DefKind::Type(_), HarvestVariant::FlattenedUnionInterface(discriminator_table)) => {
+        let meta = rel_repr_meta(rel_id, self.defs, self.repr_ctx);
+        match (meta.relation_repr_kind.deref(), harvest_variant) {
+            (ReprKind::Scalar(_, ReprScalarKind::TextConstant(lit_def_id), _), _) => {
+                let literal = self.defs.text_literal(*lit_def_id).unwrap();
+                self.harvest_data_struct_field(
+                    (rel_id, literal, property),
+                    meta,
+                    property_field_producer,
+                    field_namespace,
+                    output,
+                )
+            }
+            (ReprKind::Unit, HarvestVariant::FlattenedUnionInterface(discriminator_table)) => {
                 let discriminators = discriminator_table.get(&rel_id).unwrap();
 
                 let mut prop_keys: FnvHashSet<TextConstant> = Default::default();
@@ -809,7 +814,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     warn!("No uniform discriminator property");
                 }
             }
-            (DefKind::Type(_), HarvestVariant::FlattenedUnionPermutation(discriminator_table)) => {
+            (ReprKind::Unit, HarvestVariant::FlattenedUnionPermutation(discriminator_table)) => {
                 // concrete type for a specific permutation of flattened union variants
 
                 let union_discriminator = discriminator_table.get(&rel_id).unwrap();
@@ -843,7 +848,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
     fn harvest_data_struct_field(
         &mut self,
         (rel_id, prop_key, property): (RelationshipId, &str, &Property),
-        meta: RelDefMeta,
+        meta: RelReprMeta,
         property_field_producer: PropertyFieldProducer,
         field_namespace: &mut GraphqlNamespace,
         output: &mut IndexMap<String, FieldData>,

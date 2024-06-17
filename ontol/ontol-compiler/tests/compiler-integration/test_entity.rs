@@ -256,6 +256,50 @@ fn artist_and_instrument_id_as_relation_object_invalid_id_format() {
 }
 
 #[test]
+fn test_entity_self_relationship_optional_object_sym() {
+    "
+    sym {
+        (p) children: (c),
+        (c) parent: (p),
+    }
+
+    def node_id (fmt '' => text => .)
+    def node (
+        rel .id: node_id
+        rel .'name': text
+        rel .children: {node}
+        rel .parent?: node
+    )
+    "
+    .compile_then(|test| {
+        let [node] = test.bind(["node"]);
+        assert_error_msg!(
+            serde_create(&node).to_value(json!({})),
+            r#"missing properties, expected "name" at line 1 column 2"#
+        );
+
+        assert_json_io_matches!(serde_create(&node), { "name": "a" });
+
+        assert_json_io_matches!(serde_create(&node), {
+            "name": "a",
+            "children": [{
+                "name": "b",
+            }]
+        });
+
+        assert_json_io_matches!(serde_create(&node), {
+            "name": "b",
+            "parent": {
+                "name": "a",
+            },
+            "children": [{
+                "name": "c",
+            }]
+        });
+    });
+}
+
+#[test]
 fn test_entity_self_relationship_optional_object() {
     "
     def node_id (fmt '' => text => .)

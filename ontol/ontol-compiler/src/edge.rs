@@ -1,4 +1,6 @@
-//! ONTOL edge model.
+//! ONTOL edge / sym group model.
+//!
+//! Symbol groups map to EdgeId.
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
@@ -22,11 +24,16 @@ pub struct EdgeCtx {
 }
 
 impl EdgeCtx {
+    #[allow(unused)]
+    pub fn edge_id_by_symbol(&self, symbol: DefId) -> Option<EdgeId> {
+        self.symbols.get(&symbol).copied()
+    }
+
     /// Look up an edge using a symbol from that edge
     #[allow(unused)]
-    pub fn edge_by_symbol(&self, symbol: DefId) -> Option<&MaterializedEdge> {
+    pub fn edge_by_symbol(&self, symbol: DefId) -> Option<(EdgeId, &MaterializedEdge)> {
         let edge_id = self.symbols.get(&symbol)?;
-        self.edges.get(edge_id)
+        self.edges.get(edge_id).map(|edge| (*edge_id, edge))
     }
 }
 
@@ -35,19 +42,20 @@ impl EdgeCtx {
 /// These symbols represents the _aspect_ of an edge when seen from a certain viewpoint.
 #[allow(unused)]
 pub struct MaterializedEdge {
-    /// There is one slot per edge symbol one slot connects two vertices together using a symbol.
+    /// There is one slot per edge symbol, one slot connects two vertices together using a symbol.
     pub slots: FnvHashMap<DefId, Slot>,
 
     /// How many vertex variables are in the edge.
     ///
-    /// cardinality of 2 is a classical edge.
-    /// cardinality of more than 2 is a "hyperedge".
-    pub cardinality: u8,
+    /// arity of 2 is a classical edge.
+    /// arity of more than 2 is a "hyperedge".
+    pub arity: u8,
 }
 
+#[derive(Debug)]
 #[allow(unused)]
 pub struct Slot {
-    pub left: Option<CardinalIdx>,
+    pub left: CardinalIdx,
     pub depth: u8,
     pub right: CardinalIdx,
 }

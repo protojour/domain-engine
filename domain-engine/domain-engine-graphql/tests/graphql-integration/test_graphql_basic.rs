@@ -14,11 +14,7 @@ use ontol_runtime::{
 };
 use ontol_test_utils::{
     examples::{ARTIST_AND_INSTRUMENT, GEOJSON, GITMESH, GUITAR_SYNTH_UNION, MUNICIPALITIES, WGS},
-    expect_eq,
-    src_name,
-    // type_binding::ToSequence,
-    SrcName,
-    TestPackages,
+    expect_eq, src_name, SrcName, TestPackages,
 };
 use serde_json::json;
 use unimock::*;
