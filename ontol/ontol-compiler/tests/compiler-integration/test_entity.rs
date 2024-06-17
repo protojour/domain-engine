@@ -598,3 +598,30 @@ fn store_key_in_def_info() {
         }
     });
 }
+
+#[test]
+fn entity_like_edge() {
+    "
+    sym {
+        (src) related_to: (target) with_relationship: (r),
+        (target) related_from: (src) with_relationship: (r),
+        (r) from: (src),
+        (r) to: (target),
+    }
+
+    def foo (
+        rel .'id'|id: (rel .is: text)
+    )
+    def bar (
+        rel .'id'|id: (rel .is: text)
+    )
+    def edge (
+        rel .'id'|id: (rel .is: text)
+        rel .from: foo
+        rel .to: bar
+    )
+    "
+    .compile_then(|test| {
+        let ontology = test.ontology();
+    });
+}

@@ -5,6 +5,21 @@ def user_id (rel .is: uuid)
 def slug (rel.is: text)
 def tag (rel.is: text)
 
+sym {
+    (art) tags: (tag),
+    (tag) tagged: (art),
+}
+
+sym {
+    (user) favorited: (art),
+    (art) favorited_by: (user),
+}
+
+sym {
+    (art) comments: (c),
+    (c) comment_on: (art),
+}
+
 def User (
     // TODO: This must be an Authly user id
     rel .'user_id'[rel .gen: auto]|id: user_id
@@ -21,6 +36,8 @@ def User (
 
     // TODO(constraint): User cannot follow itself
     rel .'following'::'followed_by'? {User}
+
+    rel .favorited?: {Article}
 )
 
 def Article (
@@ -32,6 +49,10 @@ def Article (
     rel .'body': text
     rel .'created_at'[rel .gen: create_time]: datetime
     rel .'updated_at'[rel .gen: update_time]: datetime
+
+    rel {.}tags?: {TagEntity}
+    rel {.}favorited_by: {User}
+    rel .comments?: {Comment}
 
     rel .order[rel .0: 'title']: alphabetical
     rel .order[
@@ -45,16 +66,16 @@ def Comment (
     rel .'body': text
     rel .'created_at'[rel .gen: create_time]: datetime
     rel .'updated_at'[rel .gen: update_time]: datetime
+
+    rel .comment_on?: Article
 )
 
 def TagEntity (
     rel .'tag'|id: tag
+    rel .tagged: {Article}
 )
 
 rel {Article} 'author'::'authored_articles'? User
-rel Article 'favorited_by'::'favorited'? {User}
-rel {TagEntity} 'tagged'::'tags'? {Article}
-rel {Comment} 'comment_on'?::'comments'? Article
 rel {Comment} 'author'::'authored_comments'? User
 
 sym {

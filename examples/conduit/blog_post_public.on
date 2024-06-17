@@ -23,7 +23,7 @@ map(
         'author': db.User(
             'username': author
         ),
-        'tags': {
+        db.tags: {
             ..db.TagEntity('tag': tag)
         },
     ),
