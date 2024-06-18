@@ -280,7 +280,14 @@ impl<'m> Defs<'m> {
     }
 
     pub fn def_kind(&self, def_id: DefId) -> &DefKind<'m> {
-        self.table.get(&def_id).map(|def| &def.kind).unwrap()
+        self.table
+            .get(&def_id)
+            .map(|def| &def.kind)
+            .unwrap_or_else(|| panic!("no DefKind for {def_id:?}"))
+    }
+
+    pub fn def_kind_option(&self, def_id: DefId) -> Option<&DefKind<'m>> {
+        self.table.get(&def_id).map(|def| &def.kind)
     }
 
     pub fn def_span(&self, def_id: DefId) -> SourceSpan {
@@ -502,7 +509,7 @@ impl<'m> Compiler<'m> {
             },
         );
         let ty = self.ty_ctx.intern(Type::Package);
-        self.def_ty_ctx.table.insert(package_def_id, ty);
+        self.def_ty_ctx.def_table.insert(package_def_id, ty);
 
         // make sure the namespace exists
         let namespace = self.namespaces.get_namespace_mut(package_id, Space::Type);

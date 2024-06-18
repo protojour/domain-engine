@@ -161,7 +161,7 @@ impl FunctionType {
                 }
             }
             Self::BinaryText => {
-                let text = *def_types.table.get(&primitives.text).unwrap();
+                let text = *def_types.def_table.get(&primitives.text).unwrap();
                 let text_text = type_ctx.intern([text, text]);
 
                 FunctionSig {
@@ -267,7 +267,7 @@ impl<'m> Intern<Vec<TypeRef<'m>>> for TypeCtx<'m> {
 /// This is populated during the type check phase.
 #[derive(Default)]
 pub struct DefTypeCtx<'m> {
-    pub table: FnvHashMap<DefId, TypeRef<'m>>,
+    pub def_table: FnvHashMap<DefId, TypeRef<'m>>,
     pub ontology_externs: FnvHashMap<DefId, Extern>,
 }
 

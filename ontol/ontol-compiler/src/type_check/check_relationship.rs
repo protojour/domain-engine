@@ -1,4 +1,4 @@
-use ontol_runtime::{property::PropertyCardinality, DefId, RelationshipId};
+use ontol_runtime::{property::PropertyCardinality, DefId, EdgeId, RelationshipId};
 use tracing::debug;
 
 use crate::{
@@ -28,8 +28,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let relation_def_kind = &self.defs.def_kind(relationship.relation_def_id);
 
         match relation_def_kind {
-            DefKind::TextLiteral(_) | DefKind::Type(_) => {
-                self.check_named_relation(relationship_id, relationship);
+            DefKind::TextLiteral(_) => {
+                self.check_named_relation(relationship_id, None, relationship);
+            }
+            DefKind::Type(_) => {
+                let edge_id = self
+                    .edge_ctx
+                    .edge_id_by_symbol(relationship.relation_def_id);
+
+                self.check_named_relation(relationship_id, edge_id, relationship);
             }
             DefKind::BuiltinRelType(kind, _) => {
                 self.check_builtin_relation(relationship_id, relationship, kind, span);
@@ -53,6 +60,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn check_named_relation(
         &mut self,
         relationship_id: RelationshipId,
+        edge_id: Option<EdgeId>,
         relationship: &Relationship,
     ) -> TypeRef<'m> {
         let subject = &relationship.subject;
@@ -98,6 +106,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         // Ensure properties in object
         self.rel_ctx.properties_by_def_id_mut(object.0);
+
+        if let Some(edge_id) = edge_id {
+            let edge = self.edge_ctx.symbolic_edges.get_mut(&edge_id).unwrap();
+            let slot = edge.symbols.get(&relationship.relation_def_id).unwrap();
+
+            edge.variables
+                .get_mut(&slot.left)
+                .unwrap()
+                .def_set
+                .insert(subject.0);
+            edge.variables
+                .get_mut(&slot.right)
+                .unwrap()
+                .def_set
+                .insert(object.0);
+        }
 
         object_ty
     }
@@ -263,7 +287,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     unreachable!();
                 };
 
-                let Some(object_ty) = self.def_ty_ctx.table.get(&outer_object.0).cloned() else {
+                let Some(object_ty) = self.def_ty_ctx.def_table.get(&outer_object.0).cloned()
+                else {
                     return CompileError::TODO(
                         "the type of the default relation has not been checked",
                     )
@@ -312,7 +337,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     unreachable!();
                 };
 
-                let Some(_) = self.def_ty_ctx.table.get(&outer_object.0) else {
+                let Some(_) = self.def_ty_ctx.def_table.get(&outer_object.0) else {
                     return CompileError::TODO("the type of the gen relation has not been checked")
                         .span(*span)
                         .report_ty(self);

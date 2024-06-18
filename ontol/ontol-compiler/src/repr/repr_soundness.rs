@@ -242,7 +242,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
 
         for base_def in base_defs {
             if let Some(level1_path) = self.level1_path_to_base(collected_mesh, *base_def) {
-                let base_ty = self.def_types.table.get(base_def).unwrap();
+                let base_ty = self.def_types.def_table.get(base_def).unwrap();
 
                 notes.push(
                     Note::BaseTypeIs(format!(

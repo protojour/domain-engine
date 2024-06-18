@@ -39,7 +39,7 @@ impl<'m> Compiler<'m> {
                             .get_namespace_mut(ONTOL_PKG, Space::Type)
                             .insert(ident, def_id);
                     }
-                    self.def_ty_ctx.table.insert(def_id, ty);
+                    self.def_ty_ctx.def_table.insert(def_id, ty);
                 }
                 DefKind::BuiltinRelType(kind, ident) => {
                     if let Some(ident) = ident {
@@ -282,7 +282,7 @@ impl<'m> Compiler<'m> {
 
     fn register_type(&mut self, def_id: DefId, ty_fn: impl Fn(DefId) -> Type<'m>) -> TypeRef<'m> {
         let ty = self.ty_ctx.intern(ty_fn(def_id));
-        self.def_ty_ctx.table.insert(def_id, ty);
+        self.def_ty_ctx.def_table.insert(def_id, ty);
         ty
     }
 
@@ -296,13 +296,13 @@ impl<'m> Compiler<'m> {
         self.namespaces
             .get_namespace_mut(ONTOL_PKG, Space::Type)
             .insert(ident, def_id);
-        self.def_ty_ctx.table.insert(def_id, ty);
+        self.def_ty_ctx.def_table.insert(def_id, ty);
         ty
     }
 
     fn def_proc(&mut self, ident: &'static str, def_kind: DefKind<'m>, ty: TypeRef<'m>) -> DefId {
         let def_id = self.add_named_def(ident, Space::Type, def_kind, ONTOL_PKG, NO_SPAN);
-        self.def_ty_ctx.table.insert(def_id, ty);
+        self.def_ty_ctx.def_table.insert(def_id, ty);
 
         def_id
     }

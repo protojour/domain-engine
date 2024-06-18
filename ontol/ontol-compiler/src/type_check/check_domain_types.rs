@@ -202,7 +202,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .insert(relationship_id, value_generator);
                     }
                     Err(_) => {
-                        let object_ty = self.def_ty_ctx.table.get(&object_def_id).unwrap();
+                        let object_ty = self.def_ty_ctx.def_table.get(&object_def_id).unwrap();
                         CompileError::CannotGenerateValue(format!(
                             "{}",
                             FormatType::new(object_ty, self.defs, self.primitives)
@@ -242,7 +242,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         match generator_def_id {
             _ if generator_def_id == generators.auto => {
-                match self.def_ty_ctx.table.get(&scalar_def_id) {
+                match self.def_ty_ctx.def_table.get(&scalar_def_id) {
                     Some(Type::Primitive(PrimitiveKind::Serial, _)) => {
                         Ok(ValueGenerator::Autoincrement)
                     }
@@ -257,7 +257,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             _ if generator_def_id == generators.create_time => {
-                match self.def_ty_ctx.table.get(&scalar_def_id) {
+                match self.def_ty_ctx.def_table.get(&scalar_def_id) {
                     Some(Type::TextLike(_, TextLikeType::DateTime)) => {
                         Ok(ValueGenerator::CreatedAtTime)
                     }
@@ -265,7 +265,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             _ if generator_def_id == generators.update_time => {
-                match self.def_ty_ctx.table.get(&scalar_def_id) {
+                match self.def_ty_ctx.def_table.get(&scalar_def_id) {
                     Some(Type::TextLike(_, TextLikeType::DateTime)) => {
                         Ok(ValueGenerator::UpdatedAtTime)
                     }

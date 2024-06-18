@@ -191,7 +191,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) where
         't: 'b,
     {
-        let variant_ty = self.def_ty_ctx.table.get(&variant_def).unwrap_or_else(|| {
+        let variant_ty = self.def_ty_ctx.def_table.get(&variant_def).unwrap_or_else(|| {
             let def = self.defs.def_kind(variant_def);
             panic!("No type found for {def:?}");
         });
@@ -334,7 +334,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             let meta = rel_def_meta(*rel_id, self.defs);
 
             let (object_def_id, _) = meta.relationship.object;
-            let object_ty = self.def_ty_ctx.table.get(&object_def_id).unwrap();
+            let object_ty = self.def_ty_ctx.def_table.get(&object_def_id).unwrap();
             let Some(property_name) = (match meta.relation_def_kind.value {
                 DefKind::TextLiteral(lit) => Some(lit),
                 _ => None,
@@ -621,7 +621,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn make_compile_error(&self, union_error: UnionCheckError) -> CompileError {
         match union_error {
             UnionCheckError::UnitTypePartOfUnion(def_id) => {
-                let ty = self.def_ty_ctx.table.get(&def_id).unwrap();
+                let ty = self.def_ty_ctx.def_table.get(&def_id).unwrap();
                 CompileError::UnitTypePartOfUnion(format!(
                     "{}",
                     FormatType::new(ty, self.defs, self.primitives)

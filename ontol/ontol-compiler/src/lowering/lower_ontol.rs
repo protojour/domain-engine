@@ -16,7 +16,7 @@ use tracing::debug_span;
 
 use crate::{
     def::DefKind,
-    edge::{MaterializedEdge, Slot},
+    edge::{Slot, SymbolicEdge, SymbolicEdgeVariable},
     namespace::Space,
     package::PackageReference,
     CompileError, Compiler, Src,
@@ -257,10 +257,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             match self.next_sym_item(&mut item_iter, sym_relation.view().span()) {
                 Some(insp::SymItem::SymDecl(sym_decl)) => {
                     if matches!(opt_edge_builder, Some(Some(_))) {
-                        CompileError::TODO(
-                            "cannot mix standalone symbols with proper symbol groups",
-                        )
-                        .span_report(sym_decl.view().span(), &mut self.ctx);
+                        CompileError::SymCannotMixStandaloneSymbolsAndSymbolicEdge
+                            .span_report(sym_decl.view().span(), &mut self.ctx);
                     }
 
                     // not in "edge mode"
@@ -275,7 +273,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     root_defs.extend(opt_def_id);
 
                     if let Some(next) = item_iter.next() {
-                        CompileError::TODO("nothing can follow a standalone symbol declaration")
+                        CompileError::SymStandaloneTrailingItems
                             .span_report(next.view().span(), &mut self.ctx);
                     }
                 }
@@ -289,8 +287,9 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
                             opt_edge_builder = Some(Some(EdgeBuilder {
                                 edge_id,
-                                variables: Default::default(),
                                 slots: Default::default(),
+                                variables: Default::default(),
+                                var_name_table: Default::default(),
                             }));
 
                             opt_edge_builder
@@ -300,7 +299,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                         }
                         Some(Some(builder)) => builder,
                         Some(None) => {
-                            CompileError::TODO("cannot mix symbol group with standalone symbols")
+                            CompileError::SymCannotMixStandaloneSymbolsAndSymbolicEdge
                                 .span_report(sym_var.view().span(), &mut self.ctx);
                             continue;
                         }
@@ -340,18 +339,11 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         }
 
         if let Some(Some(edge_builder)) = opt_edge_builder {
-            let Ok(arity): Result<u8, _> = edge_builder.variables.len().try_into() else {
-                CompileError::TODO("edge arity exceeded")
-                    .span_report(sym_stmt.view().span(), &mut self.ctx);
-
-                return root_defs;
-            };
-
-            self.ctx.compiler.edge_ctx.edges.insert(
+            self.ctx.compiler.edge_ctx.symbolic_edges.insert(
                 edge_builder.edge_id,
-                MaterializedEdge {
-                    slots: edge_builder.slots,
-                    arity,
+                SymbolicEdge {
+                    symbols: edge_builder.slots,
+                    variables: edge_builder.variables,
                 },
             );
         }
@@ -367,7 +359,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         let item = item_iter.next();
 
         if item.is_none() {
-            CompileError::TODO("expected a an item").span_report(sym_relation_span, &mut self.ctx);
+            CompileError::SymEdgeExpectedTrailingItem.span_report(sym_relation_span, &mut self.ctx);
         }
 
         item
@@ -383,8 +375,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         let next_item = self.next_sym_item(item_iter, sym_relation_span)?;
 
         let insp::SymItem::SymDecl(sym_decl) = next_item else {
-            CompileError::TODO("expected symbol declaration")
-                .span_report(next_item.view().span(), &mut self.ctx);
+            CompileError::SymEdgeExpectedSymbol.span_report(next_item.view().span(), &mut self.ctx);
             return None;
         };
 
@@ -393,7 +384,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         let next_item = self.next_sym_item(item_iter, sym_relation_span)?;
 
         let insp::SymItem::SymVar(sym_var) = next_item else {
-            CompileError::TODO("expected symbol variable")
+            CompileError::SymEdgeExpectedVariable
                 .span_report(next_item.view().span(), &mut self.ctx);
             return None;
         };
@@ -425,18 +416,30 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         let var_symbol = sym_var.symbol()?;
         let len = edge_builder.variables.len();
 
-        match edge_builder.variables.entry(var_symbol.slice().to_string()) {
+        match edge_builder
+            .var_name_table
+            .entry(var_symbol.slice().to_string())
+        {
             Entry::Occupied(occupied) => Some(*occupied.get()),
             Entry::Vacant(vacant) => {
                 let Ok(cardinal_idx): Result<u8, _> = len.try_into() else {
-                    CompileError::TODO("edge arity exceeded")
+                    CompileError::SymEdgeArityOverflow
                         .span_report(sym_var.view().span(), &mut self.ctx);
 
                     return None;
                 };
+                let cardinal_idx = CardinalIdx(cardinal_idx);
 
-                vacant.insert(CardinalIdx(cardinal_idx));
-                Some(CardinalIdx(cardinal_idx))
+                edge_builder.variables.insert(
+                    cardinal_idx,
+                    SymbolicEdgeVariable {
+                        span: self.ctx.source_span(var_symbol.span()),
+                        def_set: Default::default(),
+                    },
+                );
+
+                vacant.insert(cardinal_idx);
+                Some(cardinal_idx)
             }
         }
     }
@@ -472,6 +475,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
 struct EdgeBuilder {
     edge_id: EdgeId,
-    variables: HashMap<String, CardinalIdx>,
+    var_name_table: HashMap<String, CardinalIdx>,
     slots: FnvHashMap<DefId, Slot>,
+    variables: FnvHashMap<CardinalIdx, SymbolicEdgeVariable>,
 }

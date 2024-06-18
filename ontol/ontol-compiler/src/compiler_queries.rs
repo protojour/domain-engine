@@ -21,6 +21,6 @@ where
     T: AsRef<Defs<'m>> + AsRef<DefTypeCtx<'m>>,
 {
     fn get_def_type(&self, def_id: DefId) -> Option<TypeRef<'m>> {
-        get::<_, DefTypeCtx>(self).table.get(&def_id).copied()
+        get::<_, DefTypeCtx>(self).def_table.get(&def_id).copied()
     }
 }

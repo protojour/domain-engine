@@ -1,5 +1,5 @@
 use fnv::FnvHashSet;
-use ontol_runtime::{ontology::ontol::TextConstant, DefId, PackageId};
+use ontol_runtime::{ontology::ontol::TextConstant, DefId, EdgeId, PackageId};
 use tracing::{debug, debug_span};
 
 use crate::{
@@ -114,6 +114,21 @@ impl<'m> Compiler<'m> {
                         CompileError::EntityCannotBeSupertype
                             .span(*span)
                             .report(&mut self.errors);
+                    }
+                }
+            }
+        }
+
+        // symbolic edge check
+        for edge_id in self.defs.iter_package_def_ids(package_id) {
+            if let Some(DefKind::Edge) = self.defs.def_kind_option(edge_id) {
+                if let Some(edge) = self.edge_ctx.symbolic_edges.get(&EdgeId(edge_id)) {
+                    for variable in edge.variables.values() {
+                        if variable.def_set.is_empty() {
+                            CompileError::SymEdgeNoDefinitionForExistentialVar
+                                .span(variable.span)
+                                .report(&mut self.errors);
+                        }
                     }
                 }
             }

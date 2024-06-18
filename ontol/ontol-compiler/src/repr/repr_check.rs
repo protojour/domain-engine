@@ -213,7 +213,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         let (value_def_id, ..) = meta.relationship.object();
         let value_def = self.defs.table.get(&value_def_id).unwrap();
 
-        if let Some(Type::Error) = self.def_types.table.get(&value_def_id) {
+        if let Some(Type::Error) = self.def_types.def_table.get(&value_def_id) {
             // Avoid reporting repr errors when there are type errors on the field,
             // the type errors take precedence.
             return;

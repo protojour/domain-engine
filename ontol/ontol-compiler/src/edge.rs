@@ -2,12 +2,10 @@
 //!
 //! Symbol groups map to EdgeId.
 
-use fnv::FnvHashMap;
-use ontol_runtime::{
-    ontology::{domain::EdgeCardinalProjection, ontol::TextConstant},
-    tuple::CardinalIdx,
-    DefId, EdgeId, RelationshipId,
-};
+use fnv::{FnvHashMap, FnvHashSet};
+use ontol_runtime::{ontology::ontol::TextConstant, tuple::CardinalIdx, DefId, EdgeId};
+
+use crate::SourceSpan;
 
 #[derive(Default)]
 pub struct EdgeCtx {
@@ -16,9 +14,7 @@ pub struct EdgeCtx {
     /// This table maps from a symbol definition to an edge definition.
     pub symbols: FnvHashMap<DefId, EdgeId>,
 
-    pub edges: FnvHashMap<EdgeId, MaterializedEdge>,
-
-    pub rel_to_edge: FnvHashMap<RelationshipId, EdgeCardinalProjection>,
+    pub symbolic_edges: FnvHashMap<EdgeId, SymbolicEdge>,
 
     pub store_keys: FnvHashMap<DefId, TextConstant>,
 }
@@ -31,25 +27,24 @@ impl EdgeCtx {
 
     /// Look up an edge using a symbol from that edge
     #[allow(unused)]
-    pub fn edge_by_symbol(&self, symbol: DefId) -> Option<(EdgeId, &MaterializedEdge)> {
+    pub fn edge_by_symbol(&self, symbol: DefId) -> Option<(EdgeId, &SymbolicEdge)> {
         let edge_id = self.symbols.get(&symbol)?;
-        self.edges.get(edge_id).map(|edge| (*edge_id, edge))
+        self.symbolic_edges
+            .get(edge_id)
+            .map(|edge| (*edge_id, edge))
     }
 }
 
 /// An edge models relationships between certain symbols in a domain.
 ///
 /// These symbols represents the _aspect_ of an edge when seen from a certain viewpoint.
-#[allow(unused)]
-pub struct MaterializedEdge {
+pub struct SymbolicEdge {
     /// There is one slot per edge symbol, one slot connects two vertices together using a symbol.
-    pub slots: FnvHashMap<DefId, Slot>,
+    pub symbols: FnvHashMap<DefId, Slot>,
 
-    /// How many vertex variables are in the edge.
-    ///
-    /// arity of 2 is a classical edge.
-    /// arity of more than 2 is a "hyperedge".
-    pub arity: u8,
+    /// The variables in this symbolic edge
+    /// The variable count is the edge's arity.
+    pub variables: FnvHashMap<CardinalIdx, SymbolicEdgeVariable>,
 }
 
 #[derive(Debug)]
@@ -58,4 +53,9 @@ pub struct Slot {
     pub left: CardinalIdx,
     pub depth: u8,
     pub right: CardinalIdx,
+}
+
+pub struct SymbolicEdgeVariable {
+    pub span: SourceSpan,
+    pub def_set: FnvHashSet<DefId>,
 }

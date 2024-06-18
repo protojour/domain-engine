@@ -135,6 +135,13 @@ pub enum CompileError {
     SpreadLabelMustBeLastArgument,
     InvalidModifier,
     MultiDomainPersistenceNotAllowed,
+    SymCannotMixStandaloneSymbolsAndSymbolicEdge,
+    SymStandaloneTrailingItems,
+    SymEdgeExpectedTrailingItem,
+    SymEdgeExpectedVariable,
+    SymEdgeExpectedSymbol,
+    SymEdgeArityOverflow,
+    SymEdgeNoDefinitionForExistentialVar,
     /// A message regarded as a bug in the compiler
     Bug(String),
     /// An TODO message is an "immature" compile error, probably requires better UX design
@@ -342,6 +349,30 @@ impl std::fmt::Display for CompileError {
             }
             Self::MultiDomainPersistenceNotAllowed => {
                 write!(f, "multi-domain persistence detected")
+            }
+            Self::SymCannotMixStandaloneSymbolsAndSymbolicEdge => {
+                write!(f, "")
+            }
+            Self::SymStandaloneTrailingItems => {
+                write!(f, "no trailing item expected")
+            }
+            Self::SymEdgeExpectedTrailingItem => {
+                write!(f, "expected another item")
+            }
+            Self::SymEdgeExpectedVariable => {
+                write!(f, "expected sym variable `(var)`")
+            }
+            Self::SymEdgeExpectedSymbol => {
+                write!(f, "expected symbol")
+            }
+            Self::SymEdgeArityOverflow => {
+                write!(f, "edge arity overflow")
+            }
+            Self::SymEdgeNoDefinitionForExistentialVar => {
+                write!(
+                    f,
+                    "existential variable is not associated with a definition"
+                )
             }
             Self::Bug(msg) => write!(f, "BUG: {msg}"),
             Self::Todo(msg) => write!(f, "TODO: {msg}"),

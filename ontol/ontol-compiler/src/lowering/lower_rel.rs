@@ -13,7 +13,6 @@ use ontol_runtime::{
 
 use crate::{
     def::{DefKind, RelParams, Relationship, TypeDef, TypeDefFlags},
-    edge::MaterializedEdge,
     CompileError,
 };
 
@@ -220,30 +219,6 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         // Just reuse relationship id as the edge id
         let edge_id = EdgeId(relationship_id);
 
-        // for now: auto-allocate edge id for named relations
-        if let RelationKey::Named(_) = &key {
-            self.ctx.compiler.edge_ctx.edges.insert(
-                edge_id,
-                MaterializedEdge {
-                    slots: Default::default(),
-                    arity: if let RelParams::Type(_) = rel_params {
-                        3
-                    } else {
-                        2
-                    },
-                },
-            );
-
-            self.ctx.compiler.edge_ctx.rel_to_edge.insert(
-                RelationshipId(relationship_id),
-                EdgeCardinalProjection {
-                    id: edge_id,
-                    object: CardinalIdx(1),
-                    subject: CardinalIdx(0),
-                },
-            );
-        };
-
         let object_prop = backward_relation
             .clone()
             .and_then(|rel| rel.name())
@@ -363,8 +338,14 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         backward_relation: Option<insp::RelBackwdSet<V>>,
         rel_stmt: insp::RelStatement<V>,
     ) -> Option<RootDefs> {
-        let edge = self.ctx.compiler.edge_ctx.edges.get(&edge_id).unwrap();
-        let slot = edge.slots.get(&sym_id).unwrap();
+        let edge = self
+            .ctx
+            .compiler
+            .edge_ctx
+            .symbolic_edges
+            .get(&edge_id)
+            .unwrap();
+        let slot = edge.symbols.get(&sym_id).unwrap();
 
         let relationship_id = self.ctx.compiler.defs.alloc_def_id(self.ctx.package_id);
 
