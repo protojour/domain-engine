@@ -191,10 +191,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) where
         't: 'b,
     {
-        let variant_ty = self.def_ty_ctx.def_table.get(&variant_def).unwrap_or_else(|| {
-            let def = self.defs.def_kind(variant_def);
-            panic!("No type found for {def:?}");
-        });
+        let variant_ty = self
+            .def_ty_ctx
+            .def_table
+            .get(&variant_def)
+            .unwrap_or_else(|| {
+                let def = self.defs.def_kind(variant_def);
+                panic!("No type found for {def:?}");
+            });
 
         debug!("Add variant to builder variant_ty: {variant_ty:?}");
 

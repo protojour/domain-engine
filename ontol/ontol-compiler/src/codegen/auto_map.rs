@@ -258,7 +258,10 @@ fn autogenerate_fmt_to_transparent<'m>(
         let mut arena: TypedArena<'m> = Default::default();
         let node = arena.add(TypedHirData(
             ontol_hir::Kind::Var(transparent_var),
-            Meta::new(compiler.def_ty_ctx.def_table.get(&transparent_def_id)?, NO_SPAN),
+            Meta::new(
+                compiler.def_ty_ctx.def_table.get(&transparent_def_id)?,
+                NO_SPAN,
+            ),
         ));
         ontol_hir::RootNode::new(node, arena)
     };
