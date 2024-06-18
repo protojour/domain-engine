@@ -2,6 +2,8 @@
 //!
 //! Symbol groups map to EdgeId.
 
+use std::collections::BTreeMap;
+
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::{ontology::ontol::TextConstant, tuple::CardinalIdx, DefId, EdgeId};
 
@@ -44,10 +46,10 @@ pub struct SymbolicEdge {
 
     /// The variables in this symbolic edge
     /// The variable count is the edge's arity.
-    pub variables: FnvHashMap<CardinalIdx, SymbolicEdgeVariable>,
+    pub variables: BTreeMap<CardinalIdx, SymbolicEdgeVariable>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 #[allow(unused)]
 pub struct Slot {
     pub left: CardinalIdx,
@@ -58,4 +60,6 @@ pub struct Slot {
 pub struct SymbolicEdgeVariable {
     pub span: SourceSpan,
     pub def_set: FnvHashSet<DefId>,
+
+    pub one_to_one_count: usize,
 }

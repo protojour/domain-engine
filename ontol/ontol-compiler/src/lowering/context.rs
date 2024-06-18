@@ -252,6 +252,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                         id: self.compiler.primitives.edges.is,
                         subject: CardinalIdx(0),
                         object: CardinalIdx(1),
+                        one_to_one: false,
                     },
                     relation_span: span,
                     subject: (def_id, span),

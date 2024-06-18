@@ -261,6 +261,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     id: edge_id,
                     subject: CardinalIdx(0),
                     object: CardinalIdx(1),
+                    one_to_one: false,
                 },
                 relation_span: self.ctx.source_span(ident_span),
                 subject: (subject_def, self.ctx.source_span(rel_subject.0.span())),
@@ -281,6 +282,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     id: edge_id,
                     subject: CardinalIdx(1),
                     object: CardinalIdx(0),
+                    one_to_one: false,
                 },
                 relation_span: self.ctx.source_span(name.view().span()),
                 subject: relationship0.object,
@@ -306,6 +308,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     id: edge_id,
                     object: CardinalIdx(0),
                     subject: CardinalIdx(1),
+                    one_to_one: false,
                 },
                 relation_span: relationship0.relation_span,
                 subject: relationship0.object,
@@ -343,10 +346,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             .compiler
             .edge_ctx
             .symbolic_edges
-            .get(&edge_id)
+            .get_mut(&edge_id)
             .unwrap();
-        let slot = edge.symbols.get(&sym_id).unwrap();
-
         let relationship_id = self.ctx.compiler.defs.alloc_def_id(self.ctx.package_id);
 
         let relationship = {
@@ -370,13 +371,24 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 )
             };
 
+            let one_to_one = matches!(subject_cardinality.1, ValueCardinality::Unit);
+            let slot = *edge.symbols.get(&sym_id).unwrap();
+
+            let projection = EdgeCardinalProjection {
+                id: edge_id,
+                subject: slot.left,
+                object: slot.right,
+                one_to_one,
+            };
+
+            if one_to_one {
+                let edge_variable = edge.variables.get_mut(&slot.left).unwrap();
+                edge_variable.one_to_one_count += 1;
+            }
+
             Relationship {
                 relation_def_id: sym_id,
-                projection: EdgeCardinalProjection {
-                    id: edge_id,
-                    subject: slot.left,
-                    object: slot.right,
-                },
+                projection,
                 relation_span: self.ctx.source_span(ident_span),
                 subject: (subject_def, self.ctx.source_span(rel_subject.0.span())),
                 subject_cardinality,

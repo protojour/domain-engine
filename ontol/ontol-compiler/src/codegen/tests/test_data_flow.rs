@@ -24,6 +24,7 @@ const MOCK_RELATIONSHIP: Relationship = Relationship {
         id: EdgeId(DefId::unit()),
         object: CardinalIdx(1),
         subject: CardinalIdx(0),
+        one_to_one: false,
     },
     relation_span: NO_SPAN,
     subject: (DefId::unit(), NO_SPAN),

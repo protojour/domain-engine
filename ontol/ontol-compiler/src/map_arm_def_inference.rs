@@ -162,6 +162,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                             id: EdgeId(relationship_id),
                             object: CardinalIdx(0),
                             subject: CardinalIdx(0),
+                            one_to_one: false,
                         },
                         relation_span: pattern.span,
                         subject: (parent_def_id, pattern.span),

@@ -1,11 +1,7 @@
 use ontol_macros::test;
-use ontol_runtime::{attr::AttrRef, value::Value, PackageId};
+use ontol_runtime::{attr::AttrRef, tuple::CardinalIdx, value::Value, PackageId};
 use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches,
-    examples::{ARTIST_AND_INSTRUMENT, GUITAR_SYNTH_UNION},
-    expect_eq,
-    serde_helper::*,
-    TestCompile,
+    assert_error_msg, assert_json_io_matches, examples, expect_eq, serde_helper::*, TestCompile,
 };
 use serde_json::json;
 
@@ -125,7 +121,7 @@ fn entity_id_inline_fmt_serial() {
 
 #[test]
 fn artist_and_instrument_io_artist() {
-    let test = ARTIST_AND_INSTRUMENT.1.compile();
+    let test = examples::ARTIST_AND_INSTRUMENT.1.compile();
     let [artist] = test.bind(["artist"]);
     assert_json_io_matches!(serde_create(&artist), {
         "name": "Zappa",
@@ -142,7 +138,7 @@ fn artist_and_instrument_io_artist() {
 
 #[test]
 fn artist_and_instrument_io_instrument() {
-    let test = ARTIST_AND_INSTRUMENT.1.compile();
+    let test = examples::ARTIST_AND_INSTRUMENT.1.compile();
     let [instrument] = test.bind(["instrument"]);
     assert_json_io_matches!(serde_create(&instrument), {
         "name": "guitar",
@@ -159,7 +155,7 @@ fn artist_and_instrument_io_instrument() {
 
 #[test]
 fn artist_and_instrument_error_artist() {
-    let test = ARTIST_AND_INSTRUMENT.1.compile();
+    let test = examples::ARTIST_AND_INSTRUMENT.1.compile();
     let [artist] = test.bind(["artist"]);
     assert_error_msg!(
         serde_create(&artist).to_value(json!({
@@ -172,7 +168,7 @@ fn artist_and_instrument_error_artist() {
 
 #[test]
 fn artist_and_instrument_id_as_relation_object() {
-    let test = ARTIST_AND_INSTRUMENT.1.compile();
+    let test = examples::ARTIST_AND_INSTRUMENT.1.compile();
     let [artist, instrument_id] = test.bind(["artist", "instrument-id"]);
     let plays = artist.find_property("plays").unwrap();
     let example_id = "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8";
@@ -239,7 +235,7 @@ fn artist_and_instrument_id_as_relation_object() {
 
 #[test]
 fn artist_and_instrument_id_as_relation_object_invalid_id_format() {
-    let test = ARTIST_AND_INSTRUMENT.1.compile();
+    let test = examples::ARTIST_AND_INSTRUMENT.1.compile();
     let [artist] = test.bind(["artist"]);
 
     assert_error_msg!(
@@ -357,7 +353,7 @@ fn test_entity_self_relationship_mandatory_object() {
 
 #[test]
 fn entity_union_simple() {
-    let test = GUITAR_SYNTH_UNION.1.compile();
+    let test = examples::GUITAR_SYNTH_UNION.1.compile();
     let [instrument] = test.bind(["instrument"]);
     assert_json_io_matches!(
         serde_create(&instrument),
@@ -399,7 +395,7 @@ fn entity_union_with_union_def_id_larger_than_id() {
 
 #[test]
 fn entity_union_with_object_relation() {
-    let test = GUITAR_SYNTH_UNION.1.compile();
+    let test = examples::GUITAR_SYNTH_UNION.1.compile();
     let [instrument] = test.bind(["instrument"]);
     assert_json_io_matches!(serde_create(&instrument), {
         "type": "synth",
@@ -412,7 +408,7 @@ fn entity_union_with_object_relation() {
 
 #[test]
 fn entity_union_in_relation_with_ids() {
-    let test = GUITAR_SYNTH_UNION.1.compile();
+    let test = examples::GUITAR_SYNTH_UNION.1.compile();
     let [artist, guitar_id, synth_id] = test.bind(["artist", "guitar_id", "synth_id"]);
     let plays = artist.find_property("plays").unwrap();
 
@@ -600,30 +596,42 @@ fn store_key_in_def_info() {
 }
 
 #[test]
-// FIXME
-#[should_panic(expected = "index out of bounds")]
 fn entity_like_edge() {
-    "
-    sym {
-        (src) related_to: (target) with_relationship: (r),
-        (target) related_from: (src) with_relationship: (r),
-        (r) from: (src),
-        (r) to: (target),
-    }
+    examples::EDGE_ENTITY.1.compile_then(|test| {
+        let ontology = test.ontology();
+        let domain = ontology.find_domain(PackageId::second()).unwrap();
+        let (_, edge) = domain.edges().next().unwrap();
 
-    def foo (
-        rel .'id'|id: (rel .is: text)
-    )
-    def bar (
-        rel .'id'|id: (rel .is: text)
-    )
-    def edge (
-        rel .'id'|id: (rel .is: text)
-        rel .from: foo
-        rel .to: bar
-    )
-    "
-    .compile_then(|test| {
-        let _ontology = test.ontology();
+        assert_eq!(edge.cardinals.len(), 3);
+        assert!(edge.cardinals.iter().all(|cardinal| cardinal.is_entity));
+
+        assert!(!edge.cardinals[0].unique);
+        assert!(!edge.cardinals[1].unique);
+        assert!(edge.cardinals[2].unique);
+
+        let [foo, edge] = test.bind(["foo", "edge"]);
+
+        {
+            let mut edge_relationships = foo.def.edge_relationships();
+            let (.., related_to) = edge_relationships.next().unwrap();
+
+            assert_eq!(related_to.subject, CardinalIdx(0));
+            assert_eq!(related_to.object, CardinalIdx(1));
+            assert!(!related_to.one_to_one);
+        }
+
+        {
+            let mut edge_relationships = edge.def.edge_relationships();
+            let (.., from) = edge_relationships.next().unwrap();
+            let (.., to) = edge_relationships.next().unwrap();
+
+            assert_eq!(from.subject, CardinalIdx(2));
+            assert_eq!(from.object, CardinalIdx(0));
+            assert!(from.one_to_one);
+
+            assert_eq!(to.subject, CardinalIdx(2));
+            assert_eq!(to.object, CardinalIdx(1));
+            assert!(to.one_to_one);
+        }
     });
 }

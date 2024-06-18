@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{hash_map::Entry, BTreeMap, HashMap},
     marker::PhantomData,
 };
 
@@ -435,6 +435,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     SymbolicEdgeVariable {
                         span: self.ctx.source_span(var_symbol.span()),
                         def_set: Default::default(),
+                        one_to_one_count: 0,
                     },
                 );
 
@@ -477,5 +478,5 @@ struct EdgeBuilder {
     edge_id: EdgeId,
     var_name_table: HashMap<String, CardinalIdx>,
     slots: FnvHashMap<DefId, Slot>,
-    variables: FnvHashMap<CardinalIdx, SymbolicEdgeVariable>,
+    variables: BTreeMap<CardinalIdx, SymbolicEdgeVariable>,
 }

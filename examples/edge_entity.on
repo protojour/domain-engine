@@ -1,0 +1,25 @@
+/// This example shows how to model a hybrid between an entity and and edge.
+domain edge_entity ()
+
+sym {
+    (src) related_to: (target) with_relationship: (r),
+    (target) related_from: (src) with_relationship: (r),
+    (r) from: (src),
+    (r) to: (target),
+}
+
+def foo (
+    rel .'id'|id: (rel .is: text)
+    rel .related_to: {bar}
+)
+def bar (
+    rel .'id'|id: (rel .is: text)
+    rel .related_from: {foo}
+)
+
+/// This definition is both an entity in its own right and an edge
+def edge (
+    rel .'id'|id: (rel .is: text)
+    rel .from: foo
+    rel .to: bar
+)

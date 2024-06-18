@@ -8,7 +8,6 @@ use domain_engine_core::Session;
 use fnv::FnvHashMap;
 use ontol_runtime::interface::serde::processor::ProcessorMode;
 use ontol_runtime::ontology::{config::DataStoreConfig, Ontology};
-use ontol_runtime::property::ValueCardinality;
 use ontol_runtime::{DefId, EdgeId, PackageId};
 use tokio::sync::RwLock;
 
@@ -71,7 +70,7 @@ impl InMemoryDb {
 
                     EdgeColumn {
                         data: vector,
-                        unique: matches!(cardinal.cardinality.1, ValueCardinality::Unit),
+                        unique: cardinal.unique,
                     }
                 })
                 .collect();

@@ -253,8 +253,8 @@ pub struct EdgeCardinal {
     /// The target type of this cardinal
     pub target: DataRelationshipTarget,
 
-    /// The cardinality of the _data point_ of this cardinal
-    pub cardinality: Cardinality,
+    /// Whether the values in this edge cardinal are unique
+    pub unique: bool,
 
     pub is_entity: bool,
 }
@@ -273,6 +273,10 @@ pub struct EdgeCardinalProjection {
     /// The subject cardinal of the projection.
     /// This is the origin: The value that owns the property.
     pub subject: CardinalIdx,
+
+    /// Indicates that the subject has a one-to-one relationship with the hyperedge itself,
+    /// i.e. they are necessarily coexistent
+    pub one_to_one: bool,
 }
 
 impl EdgeCardinalProjection {

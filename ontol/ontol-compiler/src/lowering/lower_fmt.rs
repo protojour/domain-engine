@@ -114,6 +114,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     id: EdgeId(relation_def_id),
                     subject: CardinalIdx(0),
                     object: CardinalIdx(1),
+                    one_to_one: false,
                 },
                 relation_span: self.ctx.source_span(from.1),
                 subject: (from.0, self.ctx.source_span(from.1)),

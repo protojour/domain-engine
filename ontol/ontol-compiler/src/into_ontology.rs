@@ -14,7 +14,7 @@ use ontol_runtime::{
         ontol::{OntolDomainMeta, TextConstant, TextLikeType},
         Ontology,
     },
-    property::{PropertyCardinality, ValueCardinality},
+    property::ValueCardinality,
     rustdoc::RustDoc,
     DefId, EdgeId, PackageId, RelationshipId,
 };
@@ -230,6 +230,36 @@ impl<'m> Compiler<'m> {
                         data_relationships: Default::default(),
                     });
                 }
+            }
+
+            for (edge_id, edge) in &self.edge_ctx.symbolic_edges {
+                if edge_id.0.package_id() != package_id {
+                    continue;
+                }
+
+                let mut edge_info = EdgeInfo {
+                    cardinals: Vec::with_capacity(edge.variables.len()),
+                    store_key: None,
+                };
+
+                for variable in edge.variables.values() {
+                    let target_def_id = if variable.def_set.len() == 1 {
+                        variable.def_set.iter().copied().next().unwrap()
+                    } else {
+                        todo!("symbolic edge union")
+                    };
+
+                    let is_entity = self.entity_ctx.entities.contains_key(&target_def_id);
+
+                    edge_info.cardinals.push(EdgeCardinal {
+                        target: DataRelationshipTarget::Unambiguous(target_def_id),
+                        unique: is_entity && variable.one_to_one_count > 0,
+                        is_entity,
+                    });
+                }
+
+                let old_edge = edges.insert(*edge_id, edge_info);
+                assert!(old_edge.is_none());
             }
 
             domain.set_edges(edges.into_iter());
@@ -487,29 +517,36 @@ impl<'m> Compiler<'m> {
 
         // collect edge
         if let DataRelationshipKind::Edge(_) = &data_relationship_kind {
-            let edge_info = edges.entry(edge_id).or_insert_with(|| EdgeInfo {
-                cardinals: vec![],
-                store_key: self.edge_ctx.store_keys.get(&edge_id.0).copied(),
-            });
+            if !self.edge_ctx.symbolic_edges.contains_key(&edge_id) {
+                // fallback/legacy mode:
 
-            edge_info.cardinals.resize_with(2, || EdgeCardinal {
-                target: DataRelationshipTarget::Unambiguous(DefId::unit()),
-                cardinality: (PropertyCardinality::Optional, ValueCardinality::Unit),
-                is_entity: false,
-            });
+                let edge_info = edges.entry(edge_id).or_insert_with(|| EdgeInfo {
+                    cardinals: vec![],
+                    store_key: self.edge_ctx.store_keys.get(&edge_id.0).copied(),
+                });
 
-            edge_info.cardinals[edge_projection.subject.0 as usize] = EdgeCardinal {
-                target: target.clone(),
-                cardinality: meta.relationship.subject_cardinality,
-                is_entity: true,
-            };
-
-            if let Some(edge_params) = edge_params {
-                edge_info.cardinals.resize_with(3, || EdgeCardinal {
-                    target: DataRelationshipTarget::Unambiguous(edge_params),
-                    cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),
+                edge_info.cardinals.resize_with(2, || EdgeCardinal {
+                    target: DataRelationshipTarget::Unambiguous(DefId::unit()),
+                    unique: false,
                     is_entity: false,
                 });
+
+                edge_info.cardinals[edge_projection.subject.0 as usize] = EdgeCardinal {
+                    target: target.clone(),
+                    unique: matches!(
+                        meta.relationship.subject_cardinality.1,
+                        ValueCardinality::Unit
+                    ),
+                    is_entity: true,
+                };
+
+                if let Some(edge_params) = edge_params {
+                    edge_info.cardinals.resize_with(3, || EdgeCardinal {
+                        target: DataRelationshipTarget::Unambiguous(edge_params),
+                        unique: false,
+                        is_entity: false,
+                    });
+                }
             }
         }
 

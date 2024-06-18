@@ -68,6 +68,11 @@ pub const ARTIST_AND_INSTRUMENT: Example = (
 
 pub const DEMO: Example = (src_name("demo"), include_str!("../../../examples/demo.on"));
 
+pub const EDGE_ENTITY: Example = (
+    src_name("edge_entity"),
+    include_str!("../../../examples/edge_entity.on"),
+);
+
 pub const GITMESH: Example = (
     src_name("gitmesh"),
     include_str!("../../../examples/gitmesh.on"),
