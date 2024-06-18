@@ -16,7 +16,7 @@ use crate::{
     type_check::hir_build_ctx::{Arm, VariableMapping},
     typed_hir::TypedRootNode,
     types::{Type, TypeRef},
-    Note, SourceSpan,
+    MissingProperties, Note, SourceSpan,
 };
 
 use super::{
@@ -290,7 +290,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
 
-                let error = CompileError::MissingProperties(formatted_properties);
+                let error =
+                    CompileError::MissingProperties(MissingProperties(formatted_properties));
                 error
                     .span(span)
                     .with_note(Note::ConsiderUsingMatch.span(span))

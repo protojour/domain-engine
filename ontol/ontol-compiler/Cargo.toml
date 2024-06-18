@@ -17,7 +17,6 @@ fnv.workspace = true
 indexmap.workspace = true
 serde.workspace = true
 smallvec.workspace = true
-thiserror.workspace = true
 tracing.workspace = true
 bit-set.workspace = true
 thin-vec.workspace = true
@@ -25,6 +24,7 @@ regex-automata.workspace = true
 arcstr.workspace = true
 bitflags.workspace = true
 ordered-float.workspace = true
+itertools.workspace = true
 ena = "0.14"
 bumpalo = "3"
 regex-syntax = "0.8"
@@ -33,7 +33,7 @@ heck = "0.5"
 phf_shared = "0.11"
 phf_generator = "0.11"
 indoc = "2"
-itertools.workspace = true
+displaydoc = "0.2"
 
 [dev-dependencies]
 ontol-test-utils.path = "../ontol-test-utils"

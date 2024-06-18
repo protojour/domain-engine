@@ -772,6 +772,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "displaydoc"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "487585f4d0c6655fe74905e2504d8ad6908e4db67f744eb140876906c2f3175d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "domain-engine-core"
 version = "0.1.0"
 dependencies = [
@@ -1970,6 +1981,7 @@ dependencies = [
  "bit-set",
  "bitflags 2.5.0",
  "bumpalo",
+ "displaydoc",
  "ena",
  "fnv",
  "heck",
@@ -1994,7 +2006,6 @@ dependencies = [
  "serde_json",
  "smallvec 2.0.0-alpha.6",
  "thin-vec",
- "thiserror",
  "tracing",
  "tracing-subscriber",
  "unimock",

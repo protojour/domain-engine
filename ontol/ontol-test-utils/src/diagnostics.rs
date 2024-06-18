@@ -23,7 +23,6 @@ struct SpannedMessage {
     span: SourceSpan,
 }
 
-#[derive(Debug)]
 enum Message {
     Error(CompileError),
     Note(Note),
@@ -92,8 +91,15 @@ pub fn diff_errors(
         let builder = match builders.get_mut(&source_id) {
             Some(builder) => builder,
             None => panic!(
-                "No builder for {source_id:?}: {:?}",
-                spanned_message.message
+                "No builder for {source_id:?}: {} {}",
+                match &spanned_message.message {
+                    Message::Error(_) => "ERROR",
+                    Message::Note(_) => "NOTE",
+                },
+                match &spanned_message.message {
+                    Message::Error(err) => err as &dyn Display,
+                    Message::Note(note) => note,
+                }
             ),
         };
 
