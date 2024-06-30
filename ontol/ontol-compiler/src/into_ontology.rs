@@ -20,12 +20,14 @@ use ontol_runtime::{
 };
 use std::{
     collections::{BTreeSet, HashMap},
+    ops::Deref,
     sync::Arc,
 };
 
 use crate::{
     def::{
-        rel_def_meta, BuiltinRelationKind, DefKind, RelDefMeta, RelParams, TypeDef, TypeDefFlags,
+        rel_def_meta, rel_repr_meta, BuiltinRelationKind, DefKind, RelDefMeta, RelParams, TypeDef,
+        TypeDefFlags,
     },
     interface::{
         graphql::generate_schema::generate_graphql_schema,
@@ -35,7 +37,7 @@ use crate::{
     package::ONTOL_PKG,
     primitive::PrimitiveKind,
     relation::{Properties, UnionMemberCache},
-    repr::repr_model::ReprKind,
+    repr::repr_model::{ReprKind, ReprScalarKind},
     strings::StringCtx,
     Compiler,
 };
@@ -246,7 +248,7 @@ impl<'m> Compiler<'m> {
                     let target_def_id = if variable.def_set.len() == 1 {
                         variable.def_set.iter().copied().next().unwrap()
                     } else {
-                        todo!("symbolic edge union")
+                        todo!("symbolic edge union: {:?}", variable.def_set)
                     };
 
                     let is_entity = self.entity_ctx.entities.contains_key(&target_def_id);
@@ -452,7 +454,7 @@ impl<'m> Compiler<'m> {
         edges: &mut FnvHashMap<EdgeId, EdgeInfo>,
         strings: &mut StringCtx<'m>,
     ) {
-        let meta = rel_def_meta(rel_id, &self.defs);
+        let meta = rel_repr_meta(rel_id, &self.defs, &self.repr_ctx);
 
         let (source_def_id, _, _) = meta.relationship.subject();
         let (target_def_id, _, _) = meta.relationship.object();
@@ -460,13 +462,18 @@ impl<'m> Compiler<'m> {
         let Some(target_properties) = self.rel_ctx.properties_by_def_id(target_def_id) else {
             return;
         };
-        let Some(repr_kind) = self.repr_ctx.get_repr_kind(&target_def_id) else {
+        let Some(target_repr_kind) = self.repr_ctx.get_repr_kind(&target_def_id) else {
             return;
         };
-        let name = match meta.relation_def_kind.value {
-            DefKind::TextLiteral(subject_name) => strings.intern_constant(subject_name),
-            // FIXME: This doesn't _really_ have a subject "name". It represents a flattened structure:
-            DefKind::Type(_) => strings.intern_constant(""),
+        let name = match meta.relation_repr_kind.deref() {
+            ReprKind::Scalar(_, ReprScalarKind::TextConstant(constant_def_id), _) => {
+                let lit = self.defs.text_literal(*constant_def_id).unwrap();
+                strings.intern_constant(lit)
+            }
+            ReprKind::Unit => {
+                // FIXME: This doesn't _really_ have a subject "name". It represents a flattened structure:
+                strings.intern_constant("")
+            }
             _ => return,
         };
 
@@ -478,7 +485,7 @@ impl<'m> Compiler<'m> {
         let edge_id = meta.relationship.projection.id;
         let edge_projection = meta.relationship.projection;
 
-        let (data_relationship_kind, target) = match repr_kind {
+        let (data_relationship_kind, target) = match target_repr_kind {
             ReprKind::StructUnion(members) => {
                 let target = DataRelationshipTarget::Union(target_def_id);
 
@@ -494,24 +501,29 @@ impl<'m> Compiler<'m> {
                 }
             }
             _ => {
-                let target = DataRelationshipTarget::Unambiguous(target_def_id);
-                if target_properties.identified_by.is_some() {
-                    (DataRelationshipKind::Edge(edge_projection), target)
+                let kind = if let Some(identifies) = target_properties.identifies {
+                    let meta = rel_def_meta(identifies, &self.defs);
+                    if meta.relationship.object.0 == source_def_id {
+                        DataRelationshipKind::Id
+                    } else {
+                        DataRelationshipKind::Edge(edge_projection)
+                    }
+                } else if target_properties.identified_by.is_some() {
+                    DataRelationshipKind::Edge(edge_projection)
                 } else {
                     let source_properties = self.rel_ctx.properties_by_def_id(source_def_id);
                     let is_entity_id = source_properties
                         .map(|properties| properties.identified_by == Some(rel_id))
                         .unwrap_or(false);
 
-                    (
-                        if is_entity_id {
-                            DataRelationshipKind::Id
-                        } else {
-                            DataRelationshipKind::Tree
-                        },
-                        target,
-                    )
-                }
+                    if is_entity_id {
+                        DataRelationshipKind::Id
+                    } else {
+                        DataRelationshipKind::Tree
+                    }
+                };
+
+                (kind, DataRelationshipTarget::Unambiguous(target_def_id))
             }
         };
 

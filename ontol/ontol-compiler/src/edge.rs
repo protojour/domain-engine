@@ -60,6 +60,5 @@ pub struct Slot {
 pub struct SymbolicEdgeVariable {
     pub span: SourceSpan,
     pub def_set: FnvHashSet<DefId>,
-
     pub one_to_one_count: usize,
 }

@@ -8,18 +8,21 @@ sym {
     (r) to: (target),
 }
 
+def foo_id (rel .is: text)
+def bar_id (rel .is: text)
+
 def foo (
-    rel .'id'|id: (rel .is: text)
+    rel .'id'|id: foo_id
     rel .related_to: {bar}
 )
 def bar (
-    rel .'id'|id: (rel .is: text)
+    rel .'id'|id: bar_id
     rel .related_from: {foo}
 )
 
 /// This definition is both an entity in its own right and an edge
 def edge (
     rel .'id'|id: (rel .is: text)
-    rel .from: foo
-    rel .to: bar
+    rel .from: foo_id
+    rel .to: bar_id
 )

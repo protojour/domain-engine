@@ -3,7 +3,7 @@ use ontol_runtime::{ontology::ontol::TextConstant, DefId, EdgeId, PackageId};
 use tracing::{debug, debug_span};
 
 use crate::{
-    def::{DefKind, RelParams},
+    def::{rel_def_meta, DefKind, RelParams},
     edge::EdgeCtx,
     package::ParsedPackage,
     repr::repr_model::ReprKind,
@@ -122,12 +122,33 @@ impl<'m> Compiler<'m> {
         // symbolic edge check
         for edge_id in self.defs.iter_package_def_ids(package_id) {
             if let Some(DefKind::Edge) = self.defs.def_kind_option(edge_id) {
-                if let Some(edge) = self.edge_ctx.symbolic_edges.get(&EdgeId(edge_id)) {
-                    for variable in edge.variables.values() {
+                if let Some(edge) = self.edge_ctx.symbolic_edges.get_mut(&EdgeId(edge_id)) {
+                    for variable in edge.variables.values_mut() {
                         if variable.def_set.is_empty() {
                             CompileError::SymEdgeNoDefinitionForExistentialVar
                                 .span(variable.span)
                                 .report(&mut self.errors);
+                        } else {
+                            // refine def set
+                            // refinement means that it should consist only of entity defs.
+
+                            let raw_def_set = std::mem::take(&mut variable.def_set);
+                            let mut refined_def_set: FnvHashSet<DefId> = Default::default();
+
+                            for def_id in raw_def_set {
+                                if let Some(properties) = self.rel_ctx.properties_by_def_id(def_id)
+                                {
+                                    if let Some(identifies_rel_id) = properties.identifies {
+                                        let meta = rel_def_meta(identifies_rel_id, &self.defs);
+
+                                        refined_def_set.insert(meta.relationship.object.0);
+                                    } else {
+                                        refined_def_set.insert(def_id);
+                                    }
+                                }
+                            }
+
+                            variable.def_set = refined_def_set;
                         }
                     }
                 }

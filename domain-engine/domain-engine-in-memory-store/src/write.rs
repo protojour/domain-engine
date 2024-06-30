@@ -259,8 +259,7 @@ impl InMemoryStore {
                 attr,
                 data_relationship.cardinality.1,
             ) {
-                (DataRelationshipKind::Id, ..) => {}
-                (DataRelationshipKind::Tree, attr, _) => {
+                (DataRelationshipKind::Tree | DataRelationshipKind::Id, attr, _) => {
                     raw_props.insert(rel_id, attr);
                 }
                 (
