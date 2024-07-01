@@ -1,0 +1,26 @@
+services:
+  pg:
+    image: postgres:16
+    restart: always
+    # set shared memory limit when using docker-compose
+    shm_size: 128mb
+    environment:
+      POSTGRES_DB: memoriam
+      POSTGRES_USER: memoriam
+      POSTGRES_PASSWORD: memoriam
+    ports:
+      - 5432:5432
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
+
+  arangodb:
+    image: arangodb:3.11
+    environment:
+      ARANGO_NO_AUTH: 1
+    ports:
+      - 8529:8529
+    command: arangod --query.require-with # for cluster compatiblity
