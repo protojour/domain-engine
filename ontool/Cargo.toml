@@ -24,7 +24,7 @@ notify-debouncer-full = "0.3.1"
 futures = "0.3"
 tempfile = "3.5.0"
 domain-engine-core.path = "../domain-engine/domain-engine-core"
-domain-engine-in-memory-store.path = "../domain-engine/domain-engine-in-memory-store"
+domain-engine-store-inmemory.path = "../domain-engine/domain-engine-store-inmemory"
 chrono.workspace = true
 async-trait.workspace = true
 axum = { version = "0.7", features = ["ws"] }

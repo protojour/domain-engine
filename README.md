@@ -60,8 +60,8 @@ graph TD
    domain-engine-graphql-->ontol-runtime
    domain-engine-graphql-->domain-engine-core
 
-   domain-engine-in-memory-store-->ontol-runtime
-   domain-engine-in-memory-store-->domain-engine-core
+   domain-engine-store-inmemory-->ontol-runtime
+   domain-engine-store-inmemory-->domain-engine-core
 
    ontool-->ontol-compiler
    ontool-->ontol-runtime
@@ -69,7 +69,7 @@ graph TD
    ontool-->ontol-lsp
    ontool-->domain-engine-core
    ontool-->domain-engine-graphql
-   ontool-->domain-engine-in-memory-store
+   ontool-->domain-engine-store-inmemory
 ```
 
 ### ONTOL compiler transformation steps

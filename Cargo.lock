@@ -846,7 +846,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "domain-engine-core",
- "domain-engine-in-memory-store",
+ "domain-engine-store-inmemory",
  "domain-engine-test-templates",
  "domain-engine-test-utils",
  "fnv",
@@ -883,7 +883,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "domain-engine-in-memory-store"
+name = "domain-engine-store-inmemory"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -948,7 +948,7 @@ dependencies = [
  "chrono",
  "domain-engine-core",
  "domain-engine-graphql",
- "domain-engine-in-memory-store",
+ "domain-engine-store-inmemory",
  "fnv",
  "graphql-parser",
  "juniper",
@@ -2259,7 +2259,7 @@ dependencies = [
  "crossterm",
  "domain-engine-core",
  "domain-engine-graphql",
- "domain-engine-in-memory-store",
+ "domain-engine-store-inmemory",
  "domain-engine-test-utils",
  "futures",
  "http-body",

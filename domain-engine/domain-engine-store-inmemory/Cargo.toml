@@ -1,5 +1,5 @@
 [package]
-name = "domain-engine-in-memory-store"
+name = "domain-engine-store-inmemory"
 version = "0.1.0"
 edition = "2021"
 

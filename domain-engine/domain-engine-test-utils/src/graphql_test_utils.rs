@@ -11,7 +11,7 @@ use domain_engine_core::{
 use domain_engine_graphql::{
     context::ServiceCtx, create_graphql_schema, gql_scalar::GqlScalar, Schema,
 };
-use domain_engine_in_memory_store::InMemoryDataStoreFactory;
+use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use juniper::ScalarValue;
 use ontol_runtime::sequence::Sequence;
 use ontol_test_utils::{OntolTest, SrcName, TestCompile, TestPackages};

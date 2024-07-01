@@ -28,7 +28,7 @@ features = ["schema-language"]
 [dev-dependencies]
 ontol-test-utils.path = "../../ontol/ontol-test-utils"
 ontol-macros.path = "../../ontol/ontol-macros"
-domain-engine-in-memory-store.path = "../domain-engine-in-memory-store"
+domain-engine-store-inmemory.path = "../domain-engine-store-inmemory"
 domain-engine-test-utils.path = "../domain-engine-test-utils"
 tracing-subscriber.workspace = true
 tokio.workspace = true

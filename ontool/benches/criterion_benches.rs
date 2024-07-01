@@ -5,7 +5,7 @@ use std::sync::Arc;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use domain_engine_core::{DomainEngine, Session};
 use domain_engine_graphql::context::ServiceCtx;
-use domain_engine_in_memory_store::InMemoryDataStoreFactory;
+use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use domain_engine_test_utils::graphql_test_utils::Exec;
 use indoc::indoc;
 use ontol_compiler::{

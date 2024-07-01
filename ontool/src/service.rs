@@ -15,7 +15,7 @@ use domain_engine_graphql::{
     ontology_schema::{Ctx, OntologySchema},
     CreateSchemaError,
 };
-use domain_engine_in_memory_store::InMemoryDataStoreFactory;
+use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use juniper_axum::extract::JuniperRequest;
 use ontol_runtime::{ontology::Ontology, PackageId};
 use reqwest::header::HeaderName;
