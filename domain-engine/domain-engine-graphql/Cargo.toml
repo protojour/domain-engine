@@ -11,6 +11,7 @@ doctest = false
 [dependencies]
 ontol-runtime.path = "../../ontol/ontol-runtime"
 domain-engine-core.path = "../domain-engine-core"
+juniper.workspace = true
 tracing.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -18,12 +19,6 @@ fnv.workspace = true
 thiserror.workspace = true
 smartstring = { version = "1", features = ["serde"] }
 base64 = "0.22"
-
-[dependencies.juniper]
-git = "https://github.com/protojour/juniper"
-branch = "protojour-mods"
-default-features = false
-features = ["schema-language"]
 
 [dev-dependencies]
 ontol-test-utils.path = "../../ontol/ontol-test-utils"

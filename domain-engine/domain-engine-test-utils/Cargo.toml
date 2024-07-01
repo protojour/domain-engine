@@ -15,7 +15,7 @@ fnv.workspace = true
 chrono.workspace = true
 ordered-float.workspace = true
 unimock.workspace = true
+juniper.workspace = true
 async-trait = "0.1"
-juniper = { git = "https://github.com/protojour/juniper", branch = "protojour-mods", default-features = false, features = ["schema-language"] }
 graphql-parser = "0.4"
 tracing = "0.1"

@@ -1,0 +1,55 @@
+[package]
+name = "domain-engine-store-arango"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+doctest = false
+
+[features]
+test-arango = []
+
+[dependencies]
+ontol-runtime.path = "../../ontol/ontol-runtime"
+domain-engine-core.path = "../domain-engine-core"
+async-trait.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+fnv.workspace = true
+smallvec.workspace = true
+indexmap = { version = "2", features = ["serde"] }
+tracing.workspace = true
+itertools.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow = "1"
+bincode = "1"
+indoc = "2"
+deunicode = "1"
+substring = "1"
+serde-value = "0.7"
+serde_repr = "0.1"
+reqwest = { version = "0.12", default-features = false, features = [
+  "json",
+  "brotli",
+  "gzip",
+  "deflate",
+  "stream",
+  "rustls-tls",
+] }
+reqwest-middleware = { version = "0.3", features = ["json"] }
+
+[dev-dependencies]
+domain-engine-test-utils.path = "../domain-engine-test-utils"
+ontol-macros.path = "../../ontol/ontol-macros"
+domain-engine-graphql.path = "../domain-engine-graphql"
+ontol-test-utils.path = "../../ontol/ontol-test-utils"
+juniper.workspace = true
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+pretty_assertions = "1"
+uuid = "1"
+unimock = "0.6"
+
+[build-dependencies]
+domain-engine-test-templates.path = "../domain-engine-test-templates"

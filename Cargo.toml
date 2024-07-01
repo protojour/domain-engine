@@ -3,6 +3,7 @@ members = [
     "domain-engine/domain-engine-core",
     "domain-engine/domain-engine-graphql",
     "domain-engine/domain-engine-grpc",
+    "domain-engine/domain-engine-store-arango",
     "domain-engine/domain-engine-store-inmemory",
     "domain-engine/domain-engine-store-pg",
     "domain-engine/domain-engine-test-templates",
@@ -50,6 +51,12 @@ arcstr = { version = "1", features = ["serde"] }
 ordered-float = { version = "4", features = ["serde"] }
 unimock = "0.6"
 rstest = { version = "0.21", default-features = false }
+
+[workspace.dependencies.juniper]
+git = "https://github.com/protojour/juniper"
+branch = "protojour-mods"
+default-features = false
+features = ["schema-language"]
 
 [profile.release]
 strip = true

@@ -883,6 +883,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "domain-engine-store-arango"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "deunicode",
+ "domain-engine-core",
+ "domain-engine-graphql",
+ "domain-engine-test-templates",
+ "domain-engine-test-utils",
+ "fnv",
+ "indexmap",
+ "indoc",
+ "itertools 0.12.1",
+ "juniper",
+ "ontol-macros",
+ "ontol-runtime",
+ "ontol-test-utils",
+ "pretty_assertions",
+ "reqwest",
+ "reqwest-middleware",
+ "serde",
+ "serde-value",
+ "serde_json",
+ "serde_repr",
+ "smallvec 2.0.0-alpha.6",
+ "substring",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "unimock",
+ "uuid",
+]
+
+[[package]]
 name = "domain-engine-store-inmemory"
 version = "0.1.0"
 dependencies = [
@@ -2757,6 +2793,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "reqwest-middleware"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39346a33ddfe6be00cbc17a34ce996818b97b230b87229f10114693becca1268"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "http",
+ "reqwest",
+ "serde",
+ "thiserror",
+ "tower-service",
+]
+
+[[package]]
 name = "ring"
 version = "0.17.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3155,6 +3206,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
+name = "substring"
+version = "1.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42ee6433ecef213b2e72f587ef64a2f5943e7cd16fbd82dbe8bc07486c534c86"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "subtle"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3541,6 +3601,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c06d3da6113f116aaee68e4d601191614c9053067f9ab7f6edbcb161237daa54"
 dependencies = [
  "once_cell",
+ "valuable",
+]
+
+[[package]]
+name = "tracing-log"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee855f1f400bd0e5c02d150ae5de3840039a3f54b025156404e34c23c03f47c3"
+dependencies = [
+ "log",
+ "once_cell",
+ "tracing-core",
 ]
 
 [[package]]
@@ -3554,9 +3626,11 @@ dependencies = [
  "once_cell",
  "regex",
  "sharded-slab",
+ "smallvec 1.13.2",
  "thread_local",
  "tracing",
  "tracing-core",
+ "tracing-log",
 ]
 
 [[package]]
@@ -3722,6 +3796,12 @@ dependencies = [
  "getrandom",
  "rand",
 ]
+
+[[package]]
+name = "valuable"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
 
 [[package]]
 name = "version_check"
