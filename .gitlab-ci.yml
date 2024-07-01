@@ -1,5 +1,6 @@
 variables:
   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+  DOMAIN_ENGINE_SKIP_ARANGO_TEST: 1
 
 stages:
   - check

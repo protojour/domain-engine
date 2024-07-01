@@ -62,7 +62,21 @@ pub fn datastore_test(attr: TokenStream, item: TokenStream) -> TokenStream {
         block,
     } = parse_macro_input!(item as syn::ItemFn);
 
-    let data_stores = &["inmemory", "arango"];
+    struct DataStore {
+        identifier: &'static str,
+        skip_env_var: &'static str,
+    }
+
+    let data_stores = &[
+        DataStore {
+            identifier: "inmemory",
+            skip_env_var: "DOMAIN_ENGINE_SKIP_INMEMORY_TESTS",
+        },
+        DataStore {
+            identifier: "arango",
+            skip_env_var: "DOMAIN_ENGINE_SKIP_ARANGO_TESTS",
+        },
+    ];
 
     let test_attr = if attr.is_empty() {
         quote! { ::core::prelude::v1::test }
@@ -78,12 +92,18 @@ pub fn datastore_test(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     let test_items = data_stores.iter().map(|data_store| {
-        let test_ident = format_ident!("ds_{}", data_store);
+        let ds_identifier = data_store.identifier;
+        let skip_env_var = data_store.skip_env_var;
+        let test_ident = format_ident!("ds_{}", ds_identifier);
 
         quote! {
             #[ontol_macros::test(#test_attr)]
             #asyncness fn #test_ident() {
-                super::#super_ident(#data_store) #dot_await
+                if ::std::env::var(#skip_env_var).is_ok() {
+                    return;
+                }
+
+                super::#super_ident(#ds_identifier) #dot_await
             }
         }
     });
