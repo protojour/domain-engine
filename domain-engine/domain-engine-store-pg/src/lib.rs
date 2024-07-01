@@ -17,6 +17,10 @@ fn test_config() -> deadpool_postgres::Config {
 
 #[tokio::test]
 async fn pg_test() {
+    if ::std::env::var("DOMAIN_ENGINE_SKIP_PG_TESTS").is_ok() {
+        return;
+    }
+
     let config = test_config();
     let pool = config
         .create_pool(
