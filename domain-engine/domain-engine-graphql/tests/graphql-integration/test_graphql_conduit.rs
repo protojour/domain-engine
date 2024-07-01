@@ -40,7 +40,7 @@ async fn make_domain_engine(
 }
 
 #[datastore_test(tokio::test)]
-async fn test_graphql_conduit_db(ds: &str) {
+async fn conduit_db(ds: &str) {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
     let ctx: ServiceCtx =
@@ -106,7 +106,7 @@ async fn test_graphql_conduit_db(ds: &str) {
 }
 
 #[datastore_test(tokio::test)]
-async fn test_graphql_conduit_db_create_with_foreign_reference(ds: &str) {
+async fn conduit_db_create_with_foreign_reference(ds: &str) {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
     let ctx: ServiceCtx =
@@ -175,7 +175,7 @@ async fn test_graphql_conduit_db_create_with_foreign_reference(ds: &str) {
 }
 
 #[datastore_test(tokio::test)]
-async fn test_graphql_conduit_db_query_article_with_tags(ds: &str) {
+async fn conduit_db_query_article_with_tags(ds: &str) {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
     let ctx: ServiceCtx =
@@ -335,7 +335,7 @@ impl ConduitBundle {
 }
 
 #[datastore_test(tokio::test)]
-async fn test_graphql_blog_post_conduit_implicit_join(ds: &str) {
+async fn blog_post_implicit_join(ds: &str) {
     let test = ConduitBundle::new(mock_current_time_monotonic(), ds).await;
     test.create_db_article_for_teh_user("The title").await;
 
@@ -386,7 +386,7 @@ async fn test_graphql_blog_post_conduit_implicit_join(ds: &str) {
 /// The purpose of this test is to ensure that SubSequence information
 /// is threaded through the domain engine pipeline.
 #[datastore_test(tokio::test)]
-async fn test_graphql_blog_post_conduit_paginated(ds: &str) {
+async fn blog_post_paginated(ds: &str) {
     let test = ConduitBundle::new(mock_current_time_monotonic(), ds).await;
     for _ in 0..3 {
         test.create_db_article_for_teh_user("The title").await;
@@ -434,7 +434,7 @@ async fn test_graphql_blog_post_conduit_paginated(ds: &str) {
 }
 
 #[datastore_test(tokio::test)]
-async fn test_graphql_blog_post_conduit_tags(ds: &str) {
+async fn blog_post_tags(ds: &str) {
     let test = ConduitBundle::new(mock_current_time_monotonic(), ds).await;
     test.create_db_article_with_tag_for_teh_user().await;
 
@@ -469,7 +469,7 @@ async fn test_graphql_blog_post_conduit_tags(ds: &str) {
 }
 
 #[datastore_test(tokio::test)]
-async fn test_graphql_blog_post_conduit_no_join_real(ds: &str) {
+async fn blog_post_no_join_real(ds: &str) {
     let test = ConduitBundle::new(mock_current_time_monotonic(), ds).await;
     test.create_db_article_for_teh_user("The title").await;
 
@@ -500,7 +500,7 @@ async fn test_graphql_blog_post_conduit_no_join_real(ds: &str) {
 }
 
 #[datastore_test(tokio::test)]
-async fn test_graphql_blog_post_conduit_order(ds: &str) {
+async fn blog_post_order(ds: &str) {
     let test = ConduitBundle::new(mock_current_time_monotonic(), ds).await;
     test.create_db_article_for_teh_user("Oldest").await;
     test.create_db_article_for_teh_user("Middle").await;
@@ -523,7 +523,7 @@ async fn test_graphql_blog_post_conduit_order(ds: &str) {
 }
 
 #[datastore_test(tokio::test)]
-async fn test_graphql_conduit_db_article_shallow_update(ds: &str) {
+async fn conduit_db_article_shallow_update(ds: &str) {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
     let ctx: ServiceCtx =
@@ -635,7 +635,7 @@ async fn test_graphql_conduit_db_article_shallow_update(ds: &str) {
 }
 
 #[datastore_test(tokio::test)]
-async fn test_graphql_conduit_db_user_deletion(ds: &str) {
+async fn conduit_db_user_deletion(ds: &str) {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
     let ctx: ServiceCtx =
@@ -721,7 +721,7 @@ async fn test_graphql_conduit_db_user_deletion(ds: &str) {
 }
 
 #[datastore_test(tokio::test)]
-async fn test_graphql_blog_post_conduit_update_body_create_comment(ds: &str) {
+async fn blog_post_update_body_create_comment(ds: &str) {
     let test = ConduitBundle::new(mock_current_time_monotonic(), ds).await;
     let article_id = test.create_db_article_for_teh_user("The title").await;
 
@@ -788,7 +788,7 @@ async fn test_graphql_blog_post_conduit_update_body_create_comment(ds: &str) {
 }
 
 #[datastore_test(tokio::test)]
-async fn test_graphql_blog_post_conduit_delete(ds: &str) {
+async fn blog_post_delete(ds: &str) {
     let test = ConduitBundle::new(mock_current_time_monotonic(), ds).await;
     let article_id = test.create_db_article_for_teh_user("The title").await;
 
@@ -809,7 +809,7 @@ async fn test_graphql_blog_post_conduit_delete(ds: &str) {
 }
 
 #[datastore_test(tokio::test)]
-async fn test_graphql_conduit_feed_public_no_query_selection(ds: &str) {
+async fn feed_public_no_query_selection(ds: &str) {
     let test = ConduitBundle::new(
         (
             mock_current_time_monotonic(),
@@ -863,7 +863,7 @@ async fn test_graphql_conduit_feed_public_no_query_selection(ds: &str) {
 }
 
 #[datastore_test(tokio::test)]
-async fn test_graphql_conduit_feed_public_with_items_query(ds: &str) {
+async fn feed_public_with_items_query(ds: &str) {
     let test = ConduitBundle::new(
         (
             mock_current_time_monotonic(),
@@ -917,7 +917,7 @@ async fn test_graphql_conduit_feed_public_with_items_query(ds: &str) {
 }
 
 #[datastore_test(tokio::test)]
-async fn test_graphql_conduit_feed_public_is_immutable(ds: &str) {
+async fn feed_public_is_immutable(ds: &str) {
     let test = ConduitBundle::new((), ds).await;
 
     assert!(test.feed_schema.schema.mutation_type().is_none());

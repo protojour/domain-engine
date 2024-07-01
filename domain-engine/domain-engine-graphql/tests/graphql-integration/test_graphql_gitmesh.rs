@@ -5,7 +5,10 @@ use domain_engine_graphql::{
     context::ServiceCtx,
     juniper::{graphql_value, InputValue},
 };
-use domain_engine_test_utils::dynamic_data_store::DynamicDataStoreFactory;
+use domain_engine_test_utils::{
+    dynamic_data_store::DynamicDataStoreFactory,
+    graphql_test_utils::{gql_ctx_mock_data_store, TestCompileSingletonSchema},
+};
 use domain_engine_test_utils::{
     graphql_test_utils::{
         Exec, GraphqlTestResultExt, GraphqlValueResultExt, TestCompileSchema, ValueExt,
@@ -14,16 +17,9 @@ use domain_engine_test_utils::{
     system::mock_current_time_monotonic,
     unimock,
 };
-use ontol_macros::datastore_test;
+use ontol_macros::{datastore_test, test};
 use ontol_runtime::ontology::Ontology;
-use ontol_test_utils::{
-    examples::{
-        entity_subtype,
-        stix::{stix_bundle, STIX},
-        GITMESH, GUITAR_SYNTH_UNION,
-    },
-    expect_eq, SrcName, TestPackages,
-};
+use ontol_test_utils::{examples::GITMESH, expect_eq, SrcName, TestPackages};
 
 async fn make_domain_engine(ontology: Arc<Ontology>, datastore: &str) -> DomainEngine {
     DomainEngine::builder(ontology)
@@ -35,160 +31,37 @@ async fn make_domain_engine(ontology: Arc<Ontology>, datastore: &str) -> DomainE
         .unwrap()
 }
 
-/// There should only be one stix test since the domain is so big
-#[datastore_test(tokio::test)]
-async fn test_graphql_stix(ds: &str) {
-    let (test, [schema]) = stix_bundle().compile_schemas([STIX.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
+#[test(tokio::test)]
+async fn gitmesh_id_error() {
+    let (test, schema) = GITMESH.1.compile_single_schema();
 
     expect_eq!(
         actual = r#"mutation {
-            url(create:[
-                {
-                    type: "url"
-                    value: "http://jøkkagnork"
-                    defanged:true
-                    object_marking_refs: []
-                    granular_markings: []
-                }
-            ]) {
-                node { defanged }
-            }
-        }
-        "#
-        .exec([], &schema, &ctx)
-        .await,
-        expected = Ok(graphql_value!({
-            "url": [{
-                "node": {
-                    "defanged": true
-                }
-            }]
-        })),
+            Repository(
+                create: [
+                    {
+                        handle: "badproj"
+                        owner: {
+                            id: "BOGUS_PREFIX/bob"
+                        }
+                    }
+                ]
+            ) { node { id } }
+        }"#
+        .exec(
+            [],
+            &schema,
+            &gql_ctx_mock_data_store(&test, SrcName::default(), ())
+        )
+        .await
+        .unwrap_first_exec_error_msg(),
+        expected =
+            "invalid type, expected `RepositoryOwner` (id or id) in input at line 5 column 31"
     );
 }
 
 #[datastore_test(tokio::test)]
-async fn test_guitar_synth_union_mutation_and_query(ds: &str) {
-    let (test, [schema]) = TestPackages::with_static_sources([GUITAR_SYNTH_UNION])
-        .compile_schemas([GUITAR_SYNTH_UNION.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
-
-    expect_eq!(
-        actual = r#"mutation {
-            artist(
-                create: [{
-                    name: "Bowie",
-                    plays: [
-                        {
-                            type: "guitar"
-                            string_count: 6
-                        },
-                        {
-                            type: "synth"
-                            polyphony: 1
-                        },
-                        {
-                            type: "synth"
-                            polyphony: 6
-                        }
-                    ]
-                }]
-            ) {
-                node {
-                    name
-                    plays {
-                        nodes {
-                            __typename
-                            ... on guitar {
-                                string_count
-                            }
-                            ... on synth {
-                                polyphony
-                            }
-                        }
-                    }
-                }
-            }
-        }"#
-        .exec([], &schema, &ctx)
-        .await
-        .unordered(),
-        expected = Ok(graphql_value_unordered!({
-            "artist": [{
-                "node": {
-                    "name": "Bowie",
-                    "plays": {
-                        "nodes": [
-                            {
-                                "__typename": "guitar",
-                                "string_count": 6
-                            },
-                            {
-                                "__typename": "synth",
-                                "polyphony": 1
-                            },
-                            {
-                                "__typename": "synth",
-                                "polyphony": 6
-                            },
-                        ]
-                    }
-                }
-            }]
-        })),
-    );
-
-    expect_eq!(
-        actual = r#"{
-            artists {
-                nodes {
-                    name
-                    plays {
-                        nodes {
-                            __typename
-                            ... on guitar {
-                                string_count
-                            }
-                            ... on synth {
-                                polyphony
-                            }
-                        }
-                    }
-                }
-            }
-        }"#
-        .exec([], &schema, &ctx)
-        .await
-        .unordered(),
-        expected = Ok(graphql_value_unordered!({
-            "artists": {
-                "nodes": [{
-                    "name": "Bowie",
-                    "plays": {
-                        "nodes": [
-                            {
-                                "__typename": "guitar",
-                                "string_count": 6
-                            },
-                            {
-                                "__typename": "synth",
-                                "polyphony": 1
-                            },
-                            {
-                                "__typename": "synth",
-                                "polyphony": 6
-                            },
-                        ]
-                    }
-                }]
-            }
-        })),
-    );
-}
-
-#[datastore_test(tokio::test)]
-async fn test_gitmesh_misc(ds: &str) {
+async fn misc(ds: &str) {
     let (test, [schema]) =
         TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
@@ -418,7 +291,7 @@ async fn test_gitmesh_misc(ds: &str) {
 }
 
 #[datastore_test(tokio::test)]
-async fn test_gitmesh_fancy_filters(ds: &str) {
+async fn fancy_filters(ds: &str) {
     let (test, [schema]) =
         TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
@@ -488,7 +361,7 @@ async fn test_gitmesh_fancy_filters(ds: &str) {
 }
 
 #[datastore_test(tokio::test)]
-async fn test_gitmesh_update_owner_relation(ds: &str) {
+async fn update_owner_relation(ds: &str) {
     let (test, [schema]) =
         TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
@@ -568,7 +441,7 @@ async fn test_gitmesh_update_owner_relation(ds: &str) {
 }
 
 #[datastore_test(tokio::test)]
-async fn test_gitmesh_patch_members(ds: &str) {
+async fn patch_members(ds: &str) {
     let (test, [schema]) =
         TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
@@ -703,7 +576,7 @@ async fn test_gitmesh_patch_members(ds: &str) {
 }
 
 #[datastore_test(tokio::test)]
-async fn test_gitmesh_ownership_transfer(ds: &str) {
+async fn ownership_transfer(ds: &str) {
     let (test, [schema]) =
         TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
@@ -788,126 +661,5 @@ async fn test_gitmesh_ownership_transfer(ds: &str) {
                 "nodes": [{ "repositories": { "nodes": [] } }]
             }
         })),
-    );
-}
-
-#[datastore_test(tokio::test)]
-async fn test_entity_subtype(ds: &str) {
-    let (test, [derived_schema, db_schema]) =
-        TestPackages::with_static_sources([entity_subtype::DERIVED, entity_subtype::DB])
-            .compile_schemas([entity_subtype::DERIVED.0, entity_subtype::DB.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
-
-    r#"mutation {
-        foo(create: [
-            {
-                id: "1",
-                type: "bar",
-                name: "NAME!"
-            },
-            {
-                id: "2",
-                type: "baz"
-            }
-        ]) { node { id } }
-    }"#
-    .exec([], &db_schema, &ctx)
-    .await
-    .unwrap();
-
-    let result = r#"{
-        bars {
-            nodes {
-                id
-                name
-            }
-        }
-    }"#
-    .exec([], &derived_schema, &ctx)
-    .await
-    .unwrap();
-
-    expect_eq!(
-        actual = result,
-        expected = graphql_value!({
-            "bars": {
-                "nodes": [{
-                    "id": "1",
-                    "name": "NAME!"
-                }]
-            }
-        })
-    );
-}
-
-#[datastore_test(tokio::test)]
-async fn sym_edge_simple(ds: &str) {
-    let (test, [schema]) = TestPackages::with_static_sources([(
-        SrcName::default(),
-        "
-        sym {
-            (a) prop: (b),
-            (b) reverse_prop: (a),
-        }
-
-        def foo (
-            rel .'id'|id: (rel .is: text)
-            rel .prop: {bar}
-        )
-        def bar (
-            rel .'id'|id: (rel .is: text)
-            rel .reverse_prop: {foo}
-        )
-
-        map bars (
-            (),
-            bar { ..@match bar() }
-        )
-        ",
-    )])
-    .compile_schemas([SrcName::default()]);
-
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
-
-    r#"mutation {
-        foo(
-            create: [{
-                id: "foo1"
-                prop: [{ id: "bar1" }]
-            }]
-        ) { node { id } }
-    }"#
-    .exec([], &schema, &ctx)
-    .await
-    .unwrap();
-
-    let result = r#"{
-        bars {
-            nodes {
-                id
-                reverse_prop {
-                    nodes {
-                        id
-                    }
-                }
-            }
-        }
-    }"#
-    .exec([], &schema, &ctx)
-    .await
-    .unwrap();
-
-    expect_eq!(
-        actual = result,
-        expected = graphql_value!({
-            "bars": {
-                "nodes": [{
-                    "id": "bar1",
-                    "reverse_prop": {
-                        "nodes": [{ "id": "foo1" }]
-                    }
-                }]
-            }
-        })
     );
 }

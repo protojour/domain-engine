@@ -1,3 +1,5 @@
+//! GraphQL "unit" tests, i.e. only mocked datastore
+
 use domain_engine_core::data_store::{DataStoreAPIMock, Request, Response};
 use domain_engine_graphql::{
     context::ServiceCtx,
@@ -13,7 +15,7 @@ use ontol_runtime::{
     value::Value,
 };
 use ontol_test_utils::{
-    examples::{ARTIST_AND_INSTRUMENT, GEOJSON, GITMESH, GUITAR_SYNTH_UNION, MUNICIPALITIES, WGS},
+    examples::{ARTIST_AND_INSTRUMENT, GEOJSON, GUITAR_SYNTH_UNION, MUNICIPALITIES, WGS},
     expect_eq, src_name, SrcName, TestPackages,
 };
 use serde_json::json;
@@ -40,7 +42,7 @@ fn test_graphql_schema_for_entityless_domain_should_not_be_generated() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_version() {
+async fn version() {
     let (test, schema) = "
     def foo (
         rel .'id'|id: (rel .is: text)
@@ -59,7 +61,7 @@ async fn test_graphql_version() {
 }
 
 #[test]
-fn test_graphql_field_order() {
+fn field_order() {
     let (_test, schema) = "
     def ent1 (
         rel .'id'|id: (rel .is: text)
@@ -112,7 +114,7 @@ fn test_graphql_field_order() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_int_scalars() {
+async fn int_scalars() {
     let (test, schema) = "
     def foo_id (fmt '' => text => .)
     def smallint (
@@ -219,7 +221,7 @@ async fn test_graphql_int_scalars() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_non_entity_set_mutation() {
+async fn non_entity_set_mutation() {
     let (test, schema) = "
     def foo (
         rel .'id'|id: (rel .is: text)
@@ -283,7 +285,7 @@ async fn test_graphql_non_entity_set_mutation() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
+async fn basic_inherent_auto_id_anonymous_type() {
     let (test, schema) = "
     def foo (
         rel .'id'[rel .gen: auto]|id: (rel .is: text)
@@ -320,7 +322,7 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_basic_pagination() {
+async fn basic_pagination() {
     let (test, schema) = "
     def foo (
         rel .'id'[rel .gen: auto]|id: (rel .is: text)
@@ -449,7 +451,7 @@ async fn test_graphql_basic_pagination() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_nodes() {
+async fn nodes() {
     let (test, schema) = "
     def foo (
         rel .'id'[rel .gen: auto]|id: (rel .is: text)
@@ -495,7 +497,7 @@ async fn test_graphql_nodes() {
 }
 
 #[test]
-fn test_graphql_value_type_as_field() {
+fn value_type_as_field() {
     "
     def foo (rel .is: text)
     def bar (
@@ -507,7 +509,7 @@ fn test_graphql_value_type_as_field() {
 }
 
 #[test]
-fn test_graphql_value_type_in_array() {
+fn value_type_in_array() {
     "
     def foo (rel .is: text)
     def bar (
@@ -519,7 +521,7 @@ fn test_graphql_value_type_in_array() {
 }
 
 #[test(tokio::test)]
-async fn test_inner_struct() {
+async fn inner_struct() {
     let (test, schema) = "
     def foo_id (fmt '' => text => .)
     def inner (
@@ -601,7 +603,7 @@ async fn test_inner_struct() {
 }
 
 #[test(tokio::test)]
-async fn test_docs_introspection() {
+async fn docs_introspection() {
     let (test, schema) = "
     def Key (
         rel .is: text
@@ -645,7 +647,7 @@ async fn test_docs_introspection() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_artist_and_instrument_connections() {
+async fn artist_and_instrument_connections() {
     let (test, schema) = ARTIST_AND_INSTRUMENT.1.compile_single_schema();
     let [artist, instrument, plays] = test.bind(["artist", "instrument", "plays"]);
     let ziggy: Value = artist
@@ -811,7 +813,7 @@ async fn test_graphql_artist_and_instrument_connections() {
 }
 
 #[test(tokio::test)]
-async fn test_unified_mutation_error_on_unrecognized_arg() {
+async fn unified_mutation_error_on_unrecognized_arg() {
     let (test, schema) = ARTIST_AND_INSTRUMENT.1.compile_single_schema();
 
     expect_eq!(
@@ -824,7 +826,7 @@ async fn test_unified_mutation_error_on_unrecognized_arg() {
 }
 
 #[test(tokio::test)]
-async fn test_unified_mutation_create() {
+async fn unified_mutation_create() {
     let (test, schema) = ARTIST_AND_INSTRUMENT.1.compile_single_schema();
     let ziggy: Value = test.bind(["artist"])[0]
         .entity_builder(
@@ -892,7 +894,7 @@ async fn test_unified_mutation_create() {
 }
 
 #[test(tokio::test)]
-async fn test_create_through_mapped_domain() {
+async fn create_through_mapped_domain() {
     let (test, [schema]) = TestPackages::with_static_sources([
         (
             root(),
@@ -963,7 +965,7 @@ async fn test_create_through_mapped_domain() {
 }
 
 #[test(tokio::test)]
-async fn test_create_through_three_domains() {
+async fn create_through_three_domains() {
     let (test, [schema]) = TestPackages::with_static_sources([
         (
             root(),
@@ -1044,7 +1046,7 @@ async fn test_create_through_three_domains() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_guitar_synth_union_selection() {
+async fn guitar_synth_union_selection() {
     let (test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema();
     let [artist] = test.bind(["artist"]);
 
@@ -1115,7 +1117,7 @@ async fn test_graphql_guitar_synth_union_selection() {
 }
 
 #[test]
-fn test_graphql_guitar_synth_union_input_union_field_list() {
+fn guitar_synth_union_input_union_field_list() {
     let (_test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema();
     let document = schema.as_document();
 
@@ -1147,7 +1149,7 @@ fn test_graphql_guitar_synth_union_input_union_field_list() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_guitar_synth_union_input_exec() {
+async fn graphql_guitar_synth_union_input_exec() {
     let (test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema();
     let [artist] = test.bind(["artist"]);
     let store_entity_mock = DataStoreAPIMock::execute
@@ -1206,7 +1208,7 @@ async fn test_graphql_guitar_synth_union_input_exec() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_guitar_synth_union_input_error_span() {
+async fn guitar_synth_union_input_error_span() {
     let (test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema();
 
     expect_eq!(
@@ -1233,7 +1235,7 @@ async fn test_graphql_guitar_synth_union_input_error_span() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_municipalities() {
+async fn municipalities() {
     let (test, [schema]) = TestPackages::with_static_sources([MUNICIPALITIES, GEOJSON, WGS])
         .compile_schemas([MUNICIPALITIES.0]);
 
@@ -1279,7 +1281,7 @@ async fn test_graphql_municipalities() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_municipalities_named_query() {
+async fn municipalities_named_query() {
     let (test, [schema]) = TestPackages::with_static_sources([MUNICIPALITIES, GEOJSON, WGS])
         .compile_schemas([MUNICIPALITIES.0]);
     let [municipality] = test.bind(["municipality"]);
@@ -1368,7 +1370,7 @@ async fn test_graphql_municipalities_named_query() {
 }
 
 #[test]
-fn test_graphql_municipalities_geojson_union() {
+fn municipalities_geojson_union() {
     let (_test, [schema]) = TestPackages::with_static_sources([MUNICIPALITIES, GEOJSON, WGS])
         .compile_schemas([MUNICIPALITIES.0]);
 
@@ -1394,7 +1396,7 @@ fn test_graphql_municipalities_geojson_union() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_open_data() {
+async fn open_data() {
     let (test, schema) = "
     def @open foo (
         rel .'id'[rel .gen: auto]|id: (rel .is: text)
@@ -1443,7 +1445,7 @@ async fn test_graphql_open_data() {
 }
 
 #[test(tokio::test)]
-async fn test_open_data_disabled() {
+async fn open_data_disabled() {
     let (test, schema) = "
     def @open foo (
         rel .'id'[rel .gen: auto]|id: (rel .is: text)
@@ -1487,31 +1489,6 @@ async fn test_open_data_disabled() {
         .await
         .unwrap_first_exec_error_msg(),
         expected = "open data is not available in this GraphQL context"
-    );
-}
-
-#[test(tokio::test)]
-async fn test_gitmesh_id_error() {
-    let (test, schema) = GITMESH.1.compile_single_schema();
-
-    expect_eq!(
-        actual = r#"mutation {
-            Repository(
-                create: [
-                    {
-                        handle: "badproj"
-                        owner: {
-                            id: "BOGUS_PREFIX/bob"
-                        }
-                    }
-                ]
-            ) { node { id } }
-        }"#
-        .exec([], &schema, &gql_ctx_mock_data_store(&test, root(), ()))
-        .await
-        .unwrap_first_exec_error_msg(),
-        expected =
-            "invalid type, expected `RepositoryOwner` (id or id) in input at line 5 column 31"
     );
 }
 
