@@ -505,8 +505,17 @@ impl<'m> Compiler<'m> {
                     let meta = rel_def_meta(identifies, &self.defs);
                     if meta.relationship.object.0 == source_def_id {
                         DataRelationshipKind::Id
-                    } else {
+                    } else if self
+                        .rel_ctx
+                        .properties_by_def_id(source_def_id)
+                        // It can be an edge (for now) only the the source (subject) is an entity.
+                        // i.e. there is no support for "indirect" edge properties
+                        .map(|props| props.identified_by.is_some())
+                        .unwrap_or(false)
+                    {
                         DataRelationshipKind::Edge(edge_projection)
+                    } else {
+                        DataRelationshipKind::Tree
                     }
                 } else if target_properties.identified_by.is_some() {
                     DataRelationshipKind::Edge(edge_projection)
@@ -543,8 +552,23 @@ impl<'m> Compiler<'m> {
                     is_entity: false,
                 });
 
+                let cardinal_target = match target {
+                    DataRelationshipTarget::Unambiguous(mut def_id) => {
+                        // hack: the def_id could be an _identifying_ type of an entity
+                        if let Some(properties) = self.rel_ctx.properties_by_def_id(def_id) {
+                            if let Some(identifies_rel) = properties.identifies {
+                                let meta = rel_def_meta(identifies_rel, &self.defs);
+                                def_id = meta.relationship.object.0;
+                            }
+                        }
+
+                        DataRelationshipTarget::Unambiguous(def_id)
+                    }
+                    DataRelationshipTarget::Union(def_id) => DataRelationshipTarget::Union(def_id),
+                };
+
                 edge_info.cardinals[edge_projection.subject.0 as usize] = EdgeCardinal {
-                    target: target.clone(),
+                    target: cardinal_target,
                     unique: matches!(
                         meta.relationship.subject_cardinality.1,
                         ValueCardinality::Unit

@@ -380,7 +380,7 @@ impl ArangoDatabase {
                 let name = subject_names_by_edge_id
                     .get(edge_id)
                     .copied()
-                    .ok_or_else(|| anyhow!("edge subject name not found"))?;
+                    .ok_or_else(|| anyhow!("edge subject name not found for {edge_id:?}"))?;
                 let mut name = self.ontology[name]
                     .to_ascii_lossy()
                     .replace("[?]", "_")
@@ -395,10 +395,10 @@ impl ArangoDatabase {
                             DataRelationshipTarget::Union(def_id) => def_id,
                         };
 
-                        let prefix = self
-                            .collections
-                            .get(&type_disambiguation)
-                            .ok_or_else(|| anyhow!("cannot disambiguate"))?;
+                        let prefix =
+                            self.collections.get(&type_disambiguation).ok_or_else(|| {
+                                anyhow!("cannot disambiguate: {type_disambiguation:?}")
+                            })?;
 
                         name = format!("{prefix}_{name}");
                     }
