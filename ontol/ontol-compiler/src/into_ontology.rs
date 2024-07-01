@@ -615,7 +615,10 @@ impl<'m> Compiler<'m> {
         let mut inherent_property_count = 0;
 
         for data_relationship in data_relationships.values() {
-            if matches!(data_relationship.kind, DataRelationshipKind::Tree) {
+            if matches!(
+                data_relationship.kind,
+                DataRelationshipKind::Tree | DataRelationshipKind::Id
+            ) {
                 inherent_property_count += 1;
             }
         }

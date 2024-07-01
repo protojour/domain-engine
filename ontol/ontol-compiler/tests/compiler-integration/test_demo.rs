@@ -85,5 +85,15 @@ fn test_demo() {
 
 #[test]
 fn test_gitmesh() {
-    let _test = GITMESH.1.compile();
+    let test = GITMESH.1.compile();
+
+    let [repository, user, organization] = test.bind(["Repository", "User", "Organization"]);
+    let repository_entity = repository.def.entity().unwrap();
+    assert!(!repository_entity.is_self_identifying);
+
+    let user_entity = user.def.entity().unwrap();
+    assert!(!user_entity.is_self_identifying);
+
+    let organization_entity = organization.def.entity().unwrap();
+    assert!(!organization_entity.is_self_identifying);
 }
