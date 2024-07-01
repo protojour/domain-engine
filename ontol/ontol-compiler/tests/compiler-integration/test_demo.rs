@@ -95,5 +95,5 @@ fn test_gitmesh() {
     assert!(!user_entity.is_self_identifying);
 
     let organization_entity = organization.def.entity().unwrap();
-    assert!(!organization_entity.is_self_identifying);
+    assert!(organization_entity.is_self_identifying);
 }
