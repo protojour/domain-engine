@@ -1,0 +1,37 @@
+[package]
+name = "domain-engine-store-pg"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+doctest = false
+
+[dependencies]
+ontol-runtime.path = "../../ontol/ontol-runtime"
+domain-engine-core.path = "../domain-engine-core"
+async-trait.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+deadpool-postgres = { version = "0.14", features = ["rt_tokio_1"] }
+tokio-postgres = "0.7"
+fnv.workspace = true
+smallvec.workspace = true
+indexmap.workspace = true
+tracing.workspace = true
+itertools.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow = "1"
+bincode = "1"
+
+[dev-dependencies]
+ontol-test-utils.path = "../../ontol/ontol-test-utils"
+ontol-macros.path = "../../ontol/ontol-macros"
+domain-engine-test-utils.path = "../domain-engine-test-utils"
+tracing-subscriber.workspace = true
+uuid.workspace = true
+pretty_assertions = "1"
+
+[build-dependencies]
+domain-engine-test-templates.path = "../domain-engine-test-templates"
