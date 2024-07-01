@@ -1,8 +1,8 @@
 use domain_engine_core::{DomainEngine, Session};
 use domain_engine_test_utils::{
-    system::mock_current_time_monotonic, unimock, DomainEngineTestExt, TestFindQuery,
+    dynamic_data_store::DynamicDataStoreFactory, system::mock_current_time_monotonic, unimock,
+    DomainEngineTestExt, TestFindQuery,
 };
-use ontol_macros::test;
 use ontol_runtime::{
     attr::AttrRef,
     interface::serde::processor::{ProcessorProfile, ProcessorProfileFlags},
@@ -34,18 +34,19 @@ fn artist_and_instrument() -> TestPackages {
 async fn make_domain_engine(
     ontology: Arc<Ontology>,
     mock_clause: impl unimock::Clause,
+    data_store: &str,
 ) -> DomainEngine {
     DomainEngine::builder(ontology)
         .system(Box::new(unimock::Unimock::new(mock_clause)))
-        .build(crate::TestDataStoreFactory::default(), Session::default())
+        .build(DynamicDataStoreFactory::new(data_store), Session::default())
         .await
         .unwrap()
 }
 
-#[test(tokio::test)]
-async fn test_conduit_db_id_generation() {
+#[ontol_macros::datastore_test(tokio::test)]
+async fn test_conduit_db_id_generation(ds: &str) {
     let test = conduit_db().compile();
-    let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic()).await;
+    let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds).await;
     let [user, article, comment, tag_entity] =
         test.bind(["User", "Article", "Comment", "TagEntity"]);
 
@@ -137,10 +138,10 @@ async fn test_conduit_db_id_generation() {
         .unwrap();
 }
 
-#[test(tokio::test)]
-async fn test_conduit_db_store_entity_tree() {
+#[ontol_macros::datastore_test(tokio::test)]
+async fn test_conduit_db_store_entity_tree(ds: &str) {
     let test = conduit_db().compile();
-    let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic()).await;
+    let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds).await;
     let [user_def, article_def, comment_def] = test.bind(["User", "Article", "Comment"]);
 
     let pre_existing_user_id: Uuid = engine
@@ -303,10 +304,10 @@ async fn test_conduit_db_store_entity_tree() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_conduit_db_unresolved_foreign_key() {
+#[ontol_macros::datastore_test(tokio::test)]
+async fn test_conduit_db_unresolved_foreign_key(ds: &str) {
     let test = conduit_db().compile();
-    let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic()).await;
+    let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds).await;
     let [article] = test.bind(["Article"]);
 
     assert_error_msg!(
@@ -331,10 +332,10 @@ async fn test_conduit_db_unresolved_foreign_key() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_artist_and_instrument_fmt_id_generation() {
+#[ontol_macros::datastore_test(tokio::test)]
+async fn test_artist_and_instrument_fmt_id_generation(ds: &str) {
     let test = artist_and_instrument().compile();
-    let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic()).await;
+    let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds).await;
     let [artist] = test.bind(["artist"]);
     let artist_id = DefBinding::from_def_id(
         artist.def.entity().unwrap().id_value_def_id,
@@ -375,10 +376,10 @@ async fn test_artist_and_instrument_fmt_id_generation() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_artist_and_instrument_pagination() {
+#[ontol_macros::datastore_test(tokio::test)]
+async fn test_artist_and_instrument_pagination(ds: &str) {
     let test = artist_and_instrument().compile();
-    let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic()).await;
+    let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds).await;
     let [artist] = test.bind(["artist"]);
 
     let entities = vec![
@@ -414,10 +415,10 @@ async fn test_artist_and_instrument_pagination() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_artist_and_instrument_filter_condition() {
+#[ontol_macros::datastore_test(tokio::test)]
+async fn test_artist_and_instrument_filter_condition(ds: &str) {
     let test = artist_and_instrument().compile();
-    let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic()).await;
+    let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds).await;
     let [artist] = test.bind(["artist"]);
 
     let entities = vec![

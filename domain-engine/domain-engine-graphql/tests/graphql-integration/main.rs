@@ -1,8 +1,7 @@
-mod templates;
+mod graphql_conduit_tests;
+mod graphql_misc_tests;
 mod test_graphql_basic;
 mod test_graphql_input;
 mod test_graphql_smoke;
-
-type TestDataStoreFactory = domain_engine_store_inmemory::InMemoryDataStoreFactory;
 
 fn main() {}

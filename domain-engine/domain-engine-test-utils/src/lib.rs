@@ -14,6 +14,7 @@ use ontol_runtime::{
 };
 use serde::de::DeserializeSeed;
 
+pub mod dynamic_data_store;
 pub mod graphql_test_utils;
 pub mod parser_document_utils;
 

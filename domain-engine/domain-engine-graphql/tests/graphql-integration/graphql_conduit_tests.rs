@@ -9,12 +9,13 @@ use domain_engine_graphql::{
     Schema,
 };
 use domain_engine_test_utils::{
+    dynamic_data_store::DynamicDataStoreFactory,
     graphql_test_utils::{Exec, GraphQLPageDebug, TestCompileSchema, ValueExt},
     system::mock_current_time_monotonic,
     unimock,
     unimock::MockFn,
 };
-use ontol_macros::test;
+use ontol_macros::datastore_test;
 use ontol_runtime::ontology::Ontology;
 use ontol_test_utils::{
     examples::conduit::{BLOG_POST_PUBLIC, CONDUIT_DB, FEED_PUBLIC},
@@ -29,21 +30,23 @@ fn conduit_db_only() -> TestPackages {
 async fn make_domain_engine(
     ontology: Arc<Ontology>,
     mock_clause: impl unimock::Clause,
+    ds: &str,
 ) -> DomainEngine {
     DomainEngine::builder(ontology)
         .system(Box::new(unimock::Unimock::new(mock_clause)))
-        .build(crate::TestDataStoreFactory::default(), Session::default())
+        .build(DynamicDataStoreFactory::new(ds), Session::default())
         .await
         .unwrap()
 }
 
-#[test(tokio::test)]
-async fn test_graphql_conduit_db() {
+#[datastore_test(tokio::test)]
+async fn test_graphql_conduit_db(ds: &str) {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic())
-        .await
-        .into();
+    let ctx: ServiceCtx =
+        make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds)
+            .await
+            .into();
 
     expect_eq!(
         actual = r#"mutation {
@@ -102,13 +105,14 @@ async fn test_graphql_conduit_db() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_graphql_conduit_db_create_with_foreign_reference() {
+#[datastore_test(tokio::test)]
+async fn test_graphql_conduit_db_create_with_foreign_reference(ds: &str) {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic())
-        .await
-        .into();
+    let ctx: ServiceCtx =
+        make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds)
+            .await
+            .into();
 
     let response = r#"mutation {
         User(create: [{
@@ -170,13 +174,14 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_graphql_conduit_db_query_article_with_tags() {
+#[datastore_test(tokio::test)]
+async fn test_graphql_conduit_db_query_article_with_tags(ds: &str) {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic())
-        .await
-        .into();
+    let ctx: ServiceCtx =
+        make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds)
+            .await
+            .into();
 
     let _response = r#"mutation {
         Article(create: [{
@@ -242,7 +247,7 @@ struct ConduitBundle {
 }
 
 impl ConduitBundle {
-    async fn new(mock_clauses: impl unimock::Clause) -> Self {
+    async fn new(mock_clauses: impl unimock::Clause, ds: &str) -> Self {
         let test_packages =
             TestPackages::with_static_sources([BLOG_POST_PUBLIC, FEED_PUBLIC, CONDUIT_DB])
                 .with_roots([BLOG_POST_PUBLIC.0, FEED_PUBLIC.0]);
@@ -251,7 +256,9 @@ impl ConduitBundle {
             test_packages.compile_schemas([BLOG_POST_PUBLIC.0, FEED_PUBLIC.0, CONDUIT_DB.0]);
 
         Self {
-            domain_engine: Arc::new(make_domain_engine(test.ontology_owned(), mock_clauses).await),
+            domain_engine: Arc::new(
+                make_domain_engine(test.ontology_owned(), mock_clauses, ds).await,
+            ),
             db_schema,
             blog_schema,
             feed_schema,
@@ -327,9 +334,9 @@ impl ConduitBundle {
     }
 }
 
-#[test(tokio::test)]
-async fn test_graphql_blog_post_conduit_implicit_join() {
-    let test = ConduitBundle::new(mock_current_time_monotonic()).await;
+#[datastore_test(tokio::test)]
+async fn test_graphql_blog_post_conduit_implicit_join(ds: &str) {
+    let test = ConduitBundle::new(mock_current_time_monotonic(), ds).await;
     test.create_db_article_for_teh_user("The title").await;
 
     expect_eq!(
@@ -378,9 +385,9 @@ async fn test_graphql_blog_post_conduit_implicit_join() {
 
 /// The purpose of this test is to ensure that SubSequence information
 /// is threaded through the domain engine pipeline.
-#[test(tokio::test)]
-async fn test_graphql_blog_post_conduit_paginated() {
-    let test = ConduitBundle::new(mock_current_time_monotonic()).await;
+#[datastore_test(tokio::test)]
+async fn test_graphql_blog_post_conduit_paginated(ds: &str) {
+    let test = ConduitBundle::new(mock_current_time_monotonic(), ds).await;
     for _ in 0..3 {
         test.create_db_article_for_teh_user("The title").await;
     }
@@ -426,9 +433,9 @@ async fn test_graphql_blog_post_conduit_paginated() {
     }
 }
 
-#[test(tokio::test)]
-async fn test_graphql_blog_post_conduit_tags() {
-    let test = ConduitBundle::new(mock_current_time_monotonic()).await;
+#[datastore_test(tokio::test)]
+async fn test_graphql_blog_post_conduit_tags(ds: &str) {
+    let test = ConduitBundle::new(mock_current_time_monotonic(), ds).await;
     test.create_db_article_with_tag_for_teh_user().await;
 
     expect_eq!(
@@ -461,9 +468,9 @@ async fn test_graphql_blog_post_conduit_tags() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_graphql_blog_post_conduit_no_join_real() {
-    let test = ConduitBundle::new(mock_current_time_monotonic()).await;
+#[datastore_test(tokio::test)]
+async fn test_graphql_blog_post_conduit_no_join_real(ds: &str) {
+    let test = ConduitBundle::new(mock_current_time_monotonic(), ds).await;
     test.create_db_article_for_teh_user("The title").await;
 
     expect_eq!(
@@ -492,9 +499,9 @@ async fn test_graphql_blog_post_conduit_no_join_real() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_graphql_blog_post_conduit_order() {
-    let test = ConduitBundle::new(mock_current_time_monotonic()).await;
+#[datastore_test(tokio::test)]
+async fn test_graphql_blog_post_conduit_order(ds: &str) {
+    let test = ConduitBundle::new(mock_current_time_monotonic(), ds).await;
     test.create_db_article_for_teh_user("Oldest").await;
     test.create_db_article_for_teh_user("Middle").await;
     test.create_db_article_for_teh_user("Newest").await;
@@ -515,13 +522,14 @@ async fn test_graphql_blog_post_conduit_order() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_graphql_conduit_db_article_shallow_update() {
+#[datastore_test(tokio::test)]
+async fn test_graphql_conduit_db_article_shallow_update(ds: &str) {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic())
-        .await
-        .into();
+    let ctx: ServiceCtx =
+        make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds)
+            .await
+            .into();
 
     let response = r#"mutation {
         Article(
@@ -626,13 +634,14 @@ async fn test_graphql_conduit_db_article_shallow_update() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_graphql_conduit_db_user_deletion() {
+#[datastore_test(tokio::test)]
+async fn test_graphql_conduit_db_user_deletion(ds: &str) {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic())
-        .await
-        .into();
+    let ctx: ServiceCtx =
+        make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds)
+            .await
+            .into();
 
     let response = r#"mutation {
         User(
@@ -711,9 +720,9 @@ async fn test_graphql_conduit_db_user_deletion() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_graphql_blog_post_conduit_update_body_create_comment() {
-    let test = ConduitBundle::new(mock_current_time_monotonic()).await;
+#[datastore_test(tokio::test)]
+async fn test_graphql_blog_post_conduit_update_body_create_comment(ds: &str) {
+    let test = ConduitBundle::new(mock_current_time_monotonic(), ds).await;
     let article_id = test.create_db_article_for_teh_user("The title").await;
 
     expect_eq!(
@@ -778,9 +787,9 @@ async fn test_graphql_blog_post_conduit_update_body_create_comment() {
     };
 }
 
-#[test(tokio::test)]
-async fn test_graphql_blog_post_conduit_delete() {
-    let test = ConduitBundle::new(mock_current_time_monotonic()).await;
+#[datastore_test(tokio::test)]
+async fn test_graphql_blog_post_conduit_delete(ds: &str) {
+    let test = ConduitBundle::new(mock_current_time_monotonic(), ds).await;
     let article_id = test.create_db_article_for_teh_user("The title").await;
 
     expect_eq!(
@@ -799,35 +808,38 @@ async fn test_graphql_blog_post_conduit_delete() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_graphql_conduit_feed_public_no_query_selection() {
-    let test = ConduitBundle::new((
-        mock_current_time_monotonic(),
-        SystemApiMock::call_http_json_hook
-            .next_call(unimock::matching!(
-                "http://localhost:8080/map_channel",
-                _,
-                _
-            ))
-            .answers(&|_, _, _, input| {
-                // The query does not select `items` in the channel,
-                // so that query output ("items") should be empty, even if the datastore contains
-                // an article for "teh_user":
-                assert_eq!(
+#[datastore_test(tokio::test)]
+async fn test_graphql_conduit_feed_public_no_query_selection(ds: &str) {
+    let test = ConduitBundle::new(
+        (
+            mock_current_time_monotonic(),
+            SystemApiMock::call_http_json_hook
+                .next_call(unimock::matching!(
+                    "http://localhost:8080/map_channel",
+                    _,
+                    _
+                ))
+                .answers(&|_, _, _, input| {
+                    // The query does not select `items` in the channel,
+                    // so that query output ("items") should be empty, even if the datastore contains
+                    // an article for "teh_user":
+                    assert_eq!(
                     input.as_slice(),
                     br#"{"link":"http://blogs.com/teh_user/feed","username":"teh_user","items":[]}"#
                 );
 
-                // Inject "title"
-                Ok(br#"{
+                    // Inject "title"
+                    Ok(br#"{
                     "title": "http",
                     "link": "",
                     "username": "",
                     "items": []
                 }"#
-                .to_vec())
-            }),
-    ))
+                    .to_vec())
+                }),
+        ),
+        ds,
+    )
     .await;
 
     // create the article
@@ -850,23 +862,24 @@ async fn test_graphql_conduit_feed_public_no_query_selection() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_graphql_conduit_feed_public_with_items_query() {
-    let test = ConduitBundle::new((
-        mock_current_time_monotonic(),
-        SystemApiMock::call_http_json_hook
-            .next_call(unimock::matching!(
-                "http://localhost:8080/map_channel",
-                _,
-                _
-            ))
-            .answers(&|_, _, _, input| {
-                // Assert that there is at least one item (from the datastore),
-                // and there is one if the JSON contains "guid"
-                assert!(input.windows(6).any(|subslice| subslice == b"\"guid\""));
+#[datastore_test(tokio::test)]
+async fn test_graphql_conduit_feed_public_with_items_query(ds: &str) {
+    let test = ConduitBundle::new(
+        (
+            mock_current_time_monotonic(),
+            SystemApiMock::call_http_json_hook
+                .next_call(unimock::matching!(
+                    "http://localhost:8080/map_channel",
+                    _,
+                    _
+                ))
+                .answers(&|_, _, _, input| {
+                    // Assert that there is at least one item (from the datastore),
+                    // and there is one if the JSON contains "guid"
+                    assert!(input.windows(6).any(|subslice| subslice == b"\"guid\""));
 
-                // Inject "title"
-                Ok(br#"{
+                    // Inject "title"
+                    Ok(br#"{
                     "title": "http",
                     "link": "",
                     "username": "",
@@ -875,9 +888,11 @@ async fn test_graphql_conduit_feed_public_with_items_query() {
                         "title": "pwned"
                     }]
                 }"#
-                .to_vec())
-            }),
-    ))
+                    .to_vec())
+                }),
+        ),
+        ds,
+    )
     .await;
 
     test.create_db_article_for_teh_user("The title").await;
@@ -901,9 +916,9 @@ async fn test_graphql_conduit_feed_public_with_items_query() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_graphql_conduit_feed_public_is_immutable() {
-    let test = ConduitBundle::new(()).await;
+#[datastore_test(tokio::test)]
+async fn test_graphql_conduit_feed_public_is_immutable(ds: &str) {
+    let test = ConduitBundle::new((), ds).await;
 
     assert!(test.feed_schema.schema.mutation_type().is_none());
 }

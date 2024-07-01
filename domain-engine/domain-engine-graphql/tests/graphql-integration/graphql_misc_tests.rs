@@ -5,6 +5,7 @@ use domain_engine_graphql::{
     context::ServiceCtx,
     juniper::{graphql_value, InputValue},
 };
+use domain_engine_test_utils::dynamic_data_store::DynamicDataStoreFactory;
 use domain_engine_test_utils::{
     graphql_test_utils::{
         Exec, GraphqlTestResultExt, GraphqlValueResultExt, TestCompileSchema, ValueExt,
@@ -13,7 +14,7 @@ use domain_engine_test_utils::{
     system::mock_current_time_monotonic,
     unimock,
 };
-use ontol_macros::test;
+use ontol_macros::datastore_test;
 use ontol_runtime::ontology::Ontology;
 use ontol_test_utils::{
     examples::{
@@ -24,21 +25,21 @@ use ontol_test_utils::{
     expect_eq, SrcName, TestPackages,
 };
 
-async fn make_domain_engine(ontology: Arc<Ontology>) -> DomainEngine {
+async fn make_domain_engine(ontology: Arc<Ontology>, datastore: &str) -> DomainEngine {
     DomainEngine::builder(ontology)
         .system(Box::new(unimock::Unimock::new(
             mock_current_time_monotonic(),
         )))
-        .build(crate::TestDataStoreFactory::default(), Session::default())
+        .build(DynamicDataStoreFactory::new(datastore), Session::default())
         .await
         .unwrap()
 }
 
 /// There should only be one stix test since the domain is so big
-#[test(tokio::test)]
-async fn test_graphql_stix() {
+#[datastore_test(tokio::test)]
+async fn test_graphql_stix(ds: &str) {
     let (test, [schema]) = stix_bundle().compile_schemas([STIX.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
 
     expect_eq!(
         actual = r#"mutation {
@@ -67,11 +68,11 @@ async fn test_graphql_stix() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_guitar_synth_union_mutation_and_query() {
+#[datastore_test(tokio::test)]
+async fn test_guitar_synth_union_mutation_and_query(ds: &str) {
     let (test, [schema]) = TestPackages::with_static_sources([GUITAR_SYNTH_UNION])
         .compile_schemas([GUITAR_SYNTH_UNION.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
 
     expect_eq!(
         actual = r#"mutation {
@@ -186,11 +187,11 @@ async fn test_guitar_synth_union_mutation_and_query() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_gitmesh_misc() {
+#[datastore_test(tokio::test)]
+async fn test_gitmesh_misc(ds: &str) {
     let (test, [schema]) =
         TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
 
     r#"mutation {
         User(
@@ -416,11 +417,11 @@ async fn test_gitmesh_misc() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_gitmesh_fancy_filters() {
+#[datastore_test(tokio::test)]
+async fn test_gitmesh_fancy_filters(ds: &str) {
     let (test, [schema]) =
         TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
 
     r#"mutation {
         User(
@@ -486,11 +487,11 @@ async fn test_gitmesh_fancy_filters() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_gitmesh_update_owner_relation() {
+#[datastore_test(tokio::test)]
+async fn test_gitmesh_update_owner_relation(ds: &str) {
     let (test, [schema]) =
         TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
 
     let response = r#"mutation {
         User(
@@ -566,11 +567,11 @@ async fn test_gitmesh_update_owner_relation() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_gitmesh_patch_members() {
+#[datastore_test(tokio::test)]
+async fn test_gitmesh_patch_members(ds: &str) {
     let (test, [schema]) =
         TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
 
     r#"mutation {
         User(
@@ -701,11 +702,11 @@ async fn test_gitmesh_patch_members() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_gitmesh_ownership_transfer() {
+#[datastore_test(tokio::test)]
+async fn test_gitmesh_ownership_transfer(ds: &str) {
     let (test, [schema]) =
         TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
 
     let response = r#"mutation {
         User(
@@ -790,12 +791,12 @@ async fn test_gitmesh_ownership_transfer() {
     );
 }
 
-#[test(tokio::test)]
-async fn entity_subtype() {
+#[datastore_test(tokio::test)]
+async fn test_entity_subtype(ds: &str) {
     let (test, [derived_schema, db_schema]) =
         TestPackages::with_static_sources([entity_subtype::DERIVED, entity_subtype::DB])
             .compile_schemas([entity_subtype::DERIVED.0, entity_subtype::DB.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
 
     r#"mutation {
         foo(create: [
@@ -839,8 +840,8 @@ async fn entity_subtype() {
     );
 }
 
-#[test(tokio::test)]
-async fn sym_edge_simple() {
+#[datastore_test(tokio::test)]
+async fn sym_edge_simple(ds: &str) {
     let (test, [schema]) = TestPackages::with_static_sources([(
         SrcName::default(),
         "
@@ -866,7 +867,7 @@ async fn sym_edge_simple() {
     )])
     .compile_schemas([SrcName::default()]);
 
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
 
     r#"mutation {
         foo(

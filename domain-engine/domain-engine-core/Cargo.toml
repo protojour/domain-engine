@@ -23,7 +23,9 @@ serde_json.workspace = true
 anyhow = "1"
 
 [dev-dependencies]
+ontol-macros.path = "../../ontol/ontol-macros"
 ontol-test-utils.path = "../../ontol/ontol-test-utils"
 domain-engine-test-utils.path = "../domain-engine-test-utils"
 tracing-subscriber.workspace = true
+tokio.workspace = true
 pretty_assertions = "1"

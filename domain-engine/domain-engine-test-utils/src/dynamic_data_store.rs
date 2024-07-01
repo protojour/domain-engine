@@ -1,0 +1,96 @@
+use std::sync::Arc;
+
+use domain_engine_core::{
+    data_store::{DataStoreAPI, DataStoreFactory, DataStoreFactorySync},
+    system::ArcSystemApi,
+    Session,
+};
+use domain_engine_store_inmemory::InMemoryDataStoreFactory;
+use ontol_runtime::{
+    ontology::{config::DataStoreConfig, Ontology},
+    PackageId,
+};
+
+pub struct DynamicDataStoreFactory {
+    name: String,
+}
+
+impl DynamicDataStoreFactory {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self { name: name.into() }
+    }
+}
+
+#[async_trait::async_trait]
+impl DataStoreFactory for DynamicDataStoreFactory {
+    async fn new_api(
+        &self,
+        package_id: PackageId,
+        config: DataStoreConfig,
+        session: Session,
+        ontology: Arc<Ontology>,
+        system: ArcSystemApi,
+    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
+        match self.name.as_str() {
+            "arango" => {
+                ArangoTestDatastoreFactory
+                    .new_api(package_id, config, session, ontology, system)
+                    .await
+            }
+            "inmemory" => {
+                InMemoryDataStoreFactory
+                    .new_api(package_id, config, session, ontology, system)
+                    .await
+            }
+            _ => panic!(),
+        }
+    }
+}
+
+impl DataStoreFactorySync for DynamicDataStoreFactory {
+    fn new_api_sync(
+        &self,
+        package_id: PackageId,
+        config: DataStoreConfig,
+        session: Session,
+        ontology: Arc<Ontology>,
+        system: ArcSystemApi,
+    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
+        match self.name.as_str() {
+            "inmemory" => {
+                InMemoryDataStoreFactory.new_api_sync(package_id, config, session, ontology, system)
+            }
+            other => panic!("cannot synchronously create `{other}` factory"),
+        }
+    }
+}
+
+#[derive(Default)]
+struct ArangoTestDatastoreFactory;
+
+#[async_trait::async_trait]
+impl domain_engine_core::data_store::DataStoreFactory for ArangoTestDatastoreFactory {
+    async fn new_api(
+        &self,
+        package_id: ontol_runtime::PackageId,
+        _config: ontol_runtime::ontology::config::DataStoreConfig,
+        _session: Session,
+        ontology: std::sync::Arc<Ontology>,
+        system: domain_engine_core::system::ArcSystemApi,
+    ) -> anyhow::Result<Box<dyn domain_engine_core::data_store::DataStoreAPI + Send + Sync>> {
+        let client = domain_engine_store_arango::ArangoClient::new(
+            "http://localhost:8529",
+            reqwest_middleware::ClientWithMiddleware::new(reqwest::Client::new(), vec![]),
+        );
+        let thread_name = std::thread::current().name().unwrap().to_string();
+        let thread_name_no_suffix = thread_name.strip_suffix("::ds_arango").unwrap();
+        let mut db_name = thread_name_no_suffix.split("::").last().unwrap();
+        if db_name.len() >= 64 {
+            db_name = &db_name[0..63];
+        }
+        let _ = client.drop_database(db_name).await;
+        let mut db = client.db(db_name, ontology, system);
+        db.init(package_id, true).await.unwrap();
+        Ok(Box::new(db))
+    }
+}

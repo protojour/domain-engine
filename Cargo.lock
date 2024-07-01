@@ -827,12 +827,14 @@ dependencies = [
  "domain-engine-test-utils",
  "fnv",
  "itertools 0.12.1",
+ "ontol-macros",
  "ontol-runtime",
  "ontol-test-utils",
  "pretty_assertions",
  "serde",
  "serde_json",
  "thiserror",
+ "tokio",
  "tracing",
  "tracing-subscriber",
  "unimock",
@@ -847,7 +849,6 @@ dependencies = [
  "base64 0.22.1",
  "domain-engine-core",
  "domain-engine-store-inmemory",
- "domain-engine-test-templates",
  "domain-engine-test-utils",
  "fnv",
  "graphql-parser",
@@ -892,7 +893,6 @@ dependencies = [
  "deunicode",
  "domain-engine-core",
  "domain-engine-graphql",
- "domain-engine-test-templates",
  "domain-engine-test-utils",
  "fnv",
  "indexmap",
@@ -926,7 +926,6 @@ dependencies = [
  "async-trait",
  "bincode",
  "domain-engine-core",
- "domain-engine-test-templates",
  "domain-engine-test-utils",
  "fnv",
  "indexmap",
@@ -953,7 +952,6 @@ dependencies = [
  "bincode",
  "deadpool-postgres",
  "domain-engine-core",
- "domain-engine-test-templates",
  "domain-engine-test-utils",
  "fnv",
  "indexmap",
@@ -973,17 +971,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "domain-engine-test-templates"
-version = "0.1.0"
-
-[[package]]
 name = "domain-engine-test-utils"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "chrono",
  "domain-engine-core",
  "domain-engine-graphql",
+ "domain-engine-store-arango",
  "domain-engine-store-inmemory",
  "fnv",
  "graphql-parser",
@@ -991,6 +987,8 @@ dependencies = [
  "ontol-runtime",
  "ontol-test-utils",
  "ordered-float 4.2.0",
+ "reqwest",
+ "reqwest-middleware",
  "serde",
  "serde_json",
  "tracing",

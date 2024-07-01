@@ -26,9 +26,6 @@ use super::{
     {AqlQuery, ArangoCursorResponse, ArangoDatabase},
 };
 
-#[cfg(test)]
-use ontol_runtime::ontology::Ontology;
-
 /// Serialize Value and optional relations to serde_json::Value
 pub fn serialize(value: &Value, processor: &SerdeProcessor) -> serde_json::Value {
     let mut buf: Vec<u8> = vec![];
@@ -434,34 +431,6 @@ impl DataStoreAPI for ArangoDatabase {
                 Ok(Response::BatchWrite(self.batch_write(requests).await?))
             }
         }
-    }
-}
-
-#[cfg(test)]
-#[derive(Default)]
-pub struct TestDataStoreFactory;
-
-#[cfg(test)]
-#[async_trait::async_trait]
-impl domain_engine_core::data_store::DataStoreFactory for TestDataStoreFactory {
-    async fn new_api(
-        &self,
-        package_id: ontol_runtime::PackageId,
-        _config: ontol_runtime::ontology::config::DataStoreConfig,
-        _session: Session,
-        ontology: std::sync::Arc<Ontology>,
-        system: domain_engine_core::system::ArcSystemApi,
-    ) -> anyhow::Result<Box<dyn domain_engine_core::data_store::DataStoreAPI + Send + Sync>> {
-        let client = super::ArangoClient::new("http://localhost:8529", tests::default_client());
-        let thread_name = std::thread::current().name().unwrap().to_string();
-        let mut db_name = thread_name.split("::").last().unwrap();
-        if db_name.len() >= 64 {
-            db_name = &db_name[0..63];
-        }
-        let _ = client.drop_database(db_name).await;
-        let mut db = client.db(db_name, ontology, system);
-        db.init(package_id, true).await.unwrap();
-        Ok(Box::new(db))
     }
 }
 

@@ -1,5 +1,5 @@
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 use syn::parse_macro_input;
 
 mod ontol_debug;
@@ -51,4 +51,51 @@ pub fn test(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(out)
+}
+
+#[proc_macro_attribute]
+pub fn datastore_test(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let syn::ItemFn {
+        attrs,
+        vis,
+        sig,
+        block,
+    } = parse_macro_input!(item as syn::ItemFn);
+
+    let data_stores = &["inmemory", "arango"];
+
+    let test_attr = if attr.is_empty() {
+        quote! { ::core::prelude::v1::test }
+    } else {
+        attr.into()
+    };
+
+    let super_ident = &sig.ident;
+    let asyncness = &sig.asyncness;
+    let dot_await = match asyncness {
+        Some(_) => quote! { .await },
+        None => quote! {},
+    };
+
+    let test_items = data_stores.iter().map(|data_store| {
+        let test_ident = format_ident!("ds_{}", data_store);
+
+        quote! {
+            #[ontol_macros::test(#test_attr)]
+            #asyncness fn #test_ident() {
+                super::#super_ident(#data_store) #dot_await
+            }
+        }
+    });
+
+    let tokens = quote! {
+        #(#attrs)*
+        #vis #sig #block
+
+        mod #super_ident {
+            #(#test_items)*
+        }
+    };
+
+    tokens.into()
 }

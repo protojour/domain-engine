@@ -50,6 +50,3 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 pretty_assertions = "1"
 uuid = "1"
 unimock = "0.6"
-
-[build-dependencies]
-domain-engine-test-templates.path = "../domain-engine-test-templates"

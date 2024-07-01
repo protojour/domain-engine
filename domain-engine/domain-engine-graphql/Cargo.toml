@@ -31,6 +31,3 @@ unimock.workspace = true
 async-trait = "0.1"
 pretty_assertions = "1"
 graphql-parser = "0.4"
-
-[build-dependencies]
-domain-engine-test-templates.path = "../domain-engine-test-templates"
