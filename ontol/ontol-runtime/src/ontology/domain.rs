@@ -11,7 +11,10 @@ use crate::{
     query::order::Direction, tuple::CardinalIdx, DefId, EdgeId, RelationshipId,
 };
 
-use super::ontol::{TextConstant, ValueGenerator};
+use super::{
+    ontol::{TextConstant, ValueGenerator},
+    Ontology,
+};
 
 /// A domain in the ONTOL ontology.
 #[derive(Serialize, Deserialize)]
@@ -147,6 +150,17 @@ impl Def {
                 _ => None,
             })
     }
+
+    pub fn data_relationship_by_name(
+        &self,
+        name: &str,
+        ontology: &Ontology,
+    ) -> Option<(RelationshipId, &DataRelationshipInfo)> {
+        self.data_relationships
+            .iter()
+            .find(|(_, rel)| &ontology[rel.name] == name)
+            .map(|(id, rel)| (*id, rel))
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -186,6 +200,16 @@ pub struct DataRelationshipInfo {
     pub target: DataRelationshipTarget,
 }
 
+impl DataRelationshipInfo {
+    pub fn edge_kind(&self) -> Option<&EdgeCardinalProjection> {
+        if let DataRelationshipKind::Edge(projection) = &self.kind {
+            Some(projection)
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Clone, Copy, Serialize, Deserialize, OntolDebug)]
 pub enum DataRelationshipKind {
     /// The relationship is between an entity and its identifier
@@ -204,7 +228,7 @@ pub enum DataRelationshipSource {
     ByUnionProxy,
 }
 
-#[derive(Clone, Serialize, Deserialize, OntolDebug)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug, Debug)]
 pub enum DataRelationshipTarget {
     Unambiguous(DefId),
     /// The target is a union of types, only known during runtime.
@@ -248,7 +272,7 @@ pub struct EdgeInfo {
     pub store_key: Option<TextConstant>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct EdgeCardinal {
     /// The target type of this cardinal
     pub target: DataRelationshipTarget,

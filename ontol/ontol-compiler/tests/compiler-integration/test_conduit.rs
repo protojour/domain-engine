@@ -1,11 +1,8 @@
 use indoc::indoc;
 use ontol_macros::test;
 use ontol_runtime::{
-    format_utils::Literal,
-    ontology::domain::{DataRelationshipKind, DataRelationshipTarget},
-    property::ValueCardinality,
-    tuple::CardinalIdx,
-    value::Value,
+    format_utils::Literal, ontology::domain::DataRelationshipTarget, property::ValueCardinality,
+    tuple::CardinalIdx, value::Value,
 };
 use ontol_test_utils::{
     examples::conduit::{
@@ -34,24 +31,19 @@ fn test_conduit_db_ontology_smoke() {
 
     let (_, author_rel_info) = article
         .def
-        .data_relationships
-        .iter()
-        .find(|(_, rel)| &test.ontology()[rel.name] == "author")
+        .data_relationship_by_name("author", test.ontology())
         .unwrap();
+    let author_edge_projection = author_rel_info.edge_kind().unwrap();
 
-    let DataRelationshipKind::Edge(edge_projection) = &author_rel_info.kind else {
-        panic!()
-    };
-
-    assert_eq!(edge_projection.subject, CardinalIdx(0));
-    assert_eq!(edge_projection.object, CardinalIdx(1));
+    assert_eq!(author_edge_projection.subject, CardinalIdx(0));
+    assert_eq!(author_edge_projection.object, CardinalIdx(1));
 
     let (_, author_edge_info) = test
         .ontology()
         .find_domain(test.root_package())
         .unwrap()
         .edges()
-        .find(|(edge_id, _)| *edge_id == &edge_projection.id)
+        .find(|(edge_id, _)| *edge_id == &author_edge_projection.id)
         .unwrap();
 
     let DataRelationshipTarget::Unambiguous(article_target) = &author_edge_info.cardinals[0].target

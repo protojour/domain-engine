@@ -397,7 +397,7 @@ impl ArangoDatabase {
 
                         let prefix =
                             self.collections.get(&type_disambiguation).ok_or_else(|| {
-                                anyhow!("cannot disambiguate: {type_disambiguation:?}")
+                                anyhow!("cannot disambiguate for `{name}` {edge_id:?}: {type_disambiguation:?}")
                             })?;
 
                         name = format!("{prefix}_{name}");

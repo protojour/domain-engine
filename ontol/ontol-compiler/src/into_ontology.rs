@@ -553,48 +553,56 @@ impl<'m> Compiler<'m> {
         if let DataRelationshipKind::Edge(_) = &data_relationship_kind {
             if !self.edge_ctx.symbolic_edges.contains_key(&edge_id) {
                 // fallback/legacy mode:
-
                 let edge_info = edges.entry(edge_id).or_insert_with(|| EdgeInfo {
                     cardinals: vec![],
                     store_key: self.edge_ctx.store_keys.get(&edge_id.0).copied(),
                 });
 
-                edge_info.cardinals.resize_with(2, || EdgeCardinal {
-                    target: DataRelationshipTarget::Unambiguous(DefId::unit()),
-                    unique: false,
-                    is_entity: false,
-                });
-
-                let cardinal_target = match target {
-                    DataRelationshipTarget::Unambiguous(mut def_id) => {
-                        // hack: the def_id could be an _identifying_ type of an entity
-                        if let Some(properties) = self.rel_ctx.properties_by_def_id(def_id) {
-                            if let Some(identifies_rel) = properties.identifies {
-                                let meta = rel_def_meta(identifies_rel, &self.defs);
-                                def_id = meta.relationship.object.0;
-                            }
+                if edge_info.cardinals.is_empty() {
+                    // initialize edge cardinals first
+                    for i in 0_u8..2 {
+                        if i == edge_projection.subject.0 {
+                            edge_info.cardinals.push(EdgeCardinal {
+                                target: DataRelationshipTarget::Unambiguous(
+                                    self.identifier_to_vertex_def_id(source_def_id),
+                                ),
+                                unique: matches!(
+                                    meta.relationship.object_cardinality.1,
+                                    ValueCardinality::Unit
+                                ),
+                                is_entity: true,
+                            });
+                        } else {
+                            edge_info.cardinals.push(EdgeCardinal {
+                                target: DataRelationshipTarget::Unambiguous(
+                                    self.identifier_to_vertex_def_id(target_def_id),
+                                ),
+                                unique: matches!(
+                                    meta.relationship.subject_cardinality.1,
+                                    ValueCardinality::Unit
+                                ),
+                                is_entity: true,
+                            });
                         }
-
-                        DataRelationshipTarget::Unambiguous(def_id)
                     }
-                    DataRelationshipTarget::Union(def_id) => DataRelationshipTarget::Union(def_id),
-                };
 
-                edge_info.cardinals[edge_projection.object.0 as usize] = EdgeCardinal {
-                    target: cardinal_target,
-                    unique: matches!(
-                        meta.relationship.subject_cardinality.1,
-                        ValueCardinality::Unit
-                    ),
-                    is_entity: true,
-                };
+                    if let Some(edge_params) = edge_params {
+                        edge_info.cardinals.resize_with(3, || EdgeCardinal {
+                            target: DataRelationshipTarget::Unambiguous(edge_params),
+                            unique: false,
+                            is_entity: false,
+                        });
+                    }
+                }
 
-                if let Some(edge_params) = edge_params {
-                    edge_info.cardinals.resize_with(3, || EdgeCardinal {
-                        target: DataRelationshipTarget::Unambiguous(edge_params),
-                        unique: false,
-                        is_entity: false,
-                    });
+                if let (
+                    DataRelationshipTarget::Union(union_def_id),
+                    write @ DataRelationshipTarget::Unambiguous(_),
+                ) = (
+                    &target,
+                    &mut edge_info.cardinals[edge_projection.object.0 as usize].target,
+                ) {
+                    *write = DataRelationshipTarget::Union(*union_def_id);
                 }
             }
         }
@@ -665,6 +673,17 @@ impl<'m> Compiler<'m> {
                 )))
                 .unwrap(),
         })
+    }
+
+    fn identifier_to_vertex_def_id(&self, def_id: DefId) -> DefId {
+        if let Some(properties) = self.rel_ctx.properties_by_def_id(def_id) {
+            if let Some(identifies_rel) = properties.identifies {
+                let meta = rel_def_meta(identifies_rel, &self.defs);
+                return meta.relationship.object.0;
+            }
+        }
+
+        def_id
     }
 
     fn find_inherent_primary_id(
