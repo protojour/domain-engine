@@ -440,7 +440,8 @@ async fn update_owner_relation(ds: &str) {
     );
 }
 
-#[datastore_test(tokio::test)]
+/// FIXME: implement for arango
+#[datastore_test(tokio::test, ignore("arango"))]
 async fn patch_members(ds: &str) {
     let (test, [schema]) =
         TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);

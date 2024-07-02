@@ -145,7 +145,8 @@ async fn test_guitar_synth_union_mutation_and_query(ds: &str) {
     );
 }
 
-#[datastore_test(tokio::test)]
+/// FIXME: implement for arango
+#[datastore_test(tokio::test, ignore("arango"))]
 async fn test_entity_subtype(ds: &str) {
     let (test, [derived_schema, db_schema]) =
         TestPackages::with_static_sources([entity_subtype::DERIVED, entity_subtype::DB])

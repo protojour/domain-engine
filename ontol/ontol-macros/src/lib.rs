@@ -1,6 +1,8 @@
+use std::collections::HashSet;
+
 use proc_macro::TokenStream;
-use quote::{format_ident, quote};
-use syn::parse_macro_input;
+use quote::{format_ident, quote, ToTokens, TokenStreamExt};
+use syn::{parenthesized, parse_macro_input, Token};
 
 mod ontol_debug;
 mod rustdoc;
@@ -78,11 +80,21 @@ pub fn datastore_test(attr: TokenStream, item: TokenStream) -> TokenStream {
         },
     ];
 
-    let test_attr = if attr.is_empty() {
-        quote! { ::core::prelude::v1::test }
-    } else {
-        attr.into()
-    };
+    let data_store_attrs = parse_macro_input!(attr as DatastoreAttrs);
+
+    let mut test_attr = quote! { ::core::prelude::v1::test };
+    let mut ignore: HashSet<String> = Default::default();
+
+    for element in data_store_attrs.elements {
+        match element {
+            DatastoreAttr::Path(path) => {
+                test_attr = quote! { #path };
+            }
+            DatastoreAttr::Ignore(data_stores) => {
+                ignore.extend(data_stores);
+            }
+        }
+    }
 
     let super_ident = &sig.ident;
     let asyncness = &sig.asyncness;
@@ -96,8 +108,15 @@ pub fn datastore_test(attr: TokenStream, item: TokenStream) -> TokenStream {
         let skip_env_var = data_store.skip_env_var;
         let test_ident = format_ident!("ds_{}", ds_identifier);
 
+        let ignore_attr = if ignore.contains(ds_identifier) {
+            quote! { #[ignore] }
+        } else {
+            quote! {}
+        };
+
         quote! {
             #[ontol_macros::test(#test_attr)]
+            #ignore_attr
             #asyncness fn #test_ident() {
                 if ::std::env::var(#skip_env_var).is_ok() {
                     return;
@@ -118,4 +137,63 @@ pub fn datastore_test(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     tokens.into()
+}
+
+struct DatastoreAttrs {
+    elements: Vec<DatastoreAttr>,
+}
+
+enum DatastoreAttr {
+    Path(proc_macro2::TokenStream),
+    Ignore(Vec<String>),
+}
+
+impl syn::parse::Parse for DatastoreAttrs {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let mut elements = vec![];
+        loop {
+            let ident: syn::Ident = input.parse::<syn::Ident>()?;
+
+            match ident.to_string().as_str() {
+                "ignore" => {
+                    let content;
+                    parenthesized!(content in input);
+
+                    let mut ignore_vec = vec![];
+
+                    loop {
+                        let ignored = content.parse::<syn::LitStr>()?;
+                        ignore_vec.push(ignored.value());
+
+                        if content.peek(Token![,]) {
+                            content.parse::<Token![,]>()?;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    elements.push(DatastoreAttr::Ignore(ignore_vec));
+                }
+                _ => {
+                    let mut path = proc_macro2::TokenStream::new();
+                    path.append(ident);
+
+                    while input.peek(Token![::]) {
+                        path.append_all(input.parse::<Token![::]>()?.into_token_stream());
+                        path.append(input.parse::<syn::Ident>()?);
+                    }
+
+                    elements.push(DatastoreAttr::Path(path));
+                }
+            }
+
+            if input.peek(Token![,]) {
+                input.parse::<Token![,]>()?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(Self { elements })
+    }
 }
