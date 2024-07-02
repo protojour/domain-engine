@@ -599,8 +599,8 @@ fn store_key_in_def_info() {
 }
 
 #[test]
-fn entity_like_edge() {
-    examples::EDGE_ENTITY.1.compile_then(|test| {
+fn edge_entity_simple() {
+    examples::EDGE_ENTITY_SIMPLE.1.compile_then(|test| {
         let ontology = test.ontology();
         let domain = ontology.find_domain(PackageId::second()).unwrap();
         let (_, edge) = domain.edges().next().unwrap();

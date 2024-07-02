@@ -12,7 +12,7 @@ use domain_engine_test_utils::{
 use ontol_macros::datastore_test;
 use ontol_runtime::ontology::Ontology;
 use ontol_test_utils::{
-    examples::{entity_subtype, EDGE_ENTITY, GUITAR_SYNTH_UNION},
+    examples::{entity_subtype, EDGE_ENTITY_SIMPLE, GUITAR_SYNTH_UNION},
     expect_eq, SrcName, TestPackages,
 };
 use tracing::info;
@@ -264,9 +264,9 @@ async fn sym_edge_simple(ds: &str) {
 
 /// FIXME: implement for arango
 #[datastore_test(tokio::test, ignore("arango"))]
-async fn edge_entity(ds: &str) {
-    let (test, [schema]) =
-        TestPackages::with_static_sources([EDGE_ENTITY]).compile_schemas([EDGE_ENTITY.0]);
+async fn edge_entity_simple(ds: &str) {
+    let (test, [schema]) = TestPackages::with_static_sources([EDGE_ENTITY_SIMPLE])
+        .compile_schemas([EDGE_ENTITY_SIMPLE.0]);
 
     let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
 
