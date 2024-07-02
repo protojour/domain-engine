@@ -580,7 +580,7 @@ impl<'m> Compiler<'m> {
                     DataRelationshipTarget::Union(def_id) => DataRelationshipTarget::Union(def_id),
                 };
 
-                edge_info.cardinals[edge_projection.subject.0 as usize] = EdgeCardinal {
+                edge_info.cardinals[edge_projection.object.0 as usize] = EdgeCardinal {
                     target: cardinal_target,
                     unique: matches!(
                         meta.relationship.subject_cardinality.1,

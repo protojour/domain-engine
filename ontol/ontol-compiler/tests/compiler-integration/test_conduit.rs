@@ -1,6 +1,12 @@
 use indoc::indoc;
 use ontol_macros::test;
-use ontol_runtime::{format_utils::Literal, property::ValueCardinality, value::Value};
+use ontol_runtime::{
+    format_utils::Literal,
+    ontology::domain::{DataRelationshipKind, DataRelationshipTarget},
+    property::ValueCardinality,
+    tuple::CardinalIdx,
+    value::Value,
+};
 use ontol_test_utils::{
     examples::conduit::{
         BLOG_POST_PUBLIC, CONDUIT_CONTRIVED_SIGNUP, CONDUIT_DB, CONDUIT_PUBLIC, FEED_PUBLIC,
@@ -19,6 +25,46 @@ fn test_compile_conduit_public() {
 #[test]
 fn test_compile_conduit_db() {
     CONDUIT_DB.1.compile();
+}
+
+#[test]
+fn test_conduit_db_ontology_smoke() {
+    let test = CONDUIT_DB.1.compile();
+    let [article, user] = test.bind(["Article", "User"]);
+
+    let (_, author_rel_info) = article
+        .def
+        .data_relationships
+        .iter()
+        .find(|(_, rel)| &test.ontology()[rel.name] == "author")
+        .unwrap();
+
+    let DataRelationshipKind::Edge(edge_projection) = &author_rel_info.kind else {
+        panic!()
+    };
+
+    assert_eq!(edge_projection.subject, CardinalIdx(0));
+    assert_eq!(edge_projection.object, CardinalIdx(1));
+
+    let (_, author_edge_info) = test
+        .ontology()
+        .find_domain(test.root_package())
+        .unwrap()
+        .edges()
+        .find(|(edge_id, _)| *edge_id == &edge_projection.id)
+        .unwrap();
+
+    let DataRelationshipTarget::Unambiguous(article_target) = &author_edge_info.cardinals[0].target
+    else {
+        panic!()
+    };
+    let DataRelationshipTarget::Unambiguous(user_target) = &author_edge_info.cardinals[1].target
+    else {
+        panic!()
+    };
+
+    assert_eq!(article_target, &article.def_id());
+    assert_eq!(user_target, &user.def_id());
 }
 
 #[test]

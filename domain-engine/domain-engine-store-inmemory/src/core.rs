@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::anyhow;
-use fnv::FnvHashMap;
+use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use ontol_runtime::{
@@ -56,6 +56,7 @@ pub(super) struct HyperEdgeTable {
 #[derive(Debug)]
 pub(super) struct EdgeColumn {
     pub data: EdgeVectorData,
+    pub vertex_union: FnvHashSet<DefId>,
     pub unique: bool,
 }
 
@@ -83,7 +84,45 @@ impl<K: AsRef<DynamicKey>> AsRef<DynamicKey> for VertexKey<K> {
     }
 }
 
+pub enum EdgeColumnMatch {
+    VertexIdOf(DefId),
+    VertexValue(DefId),
+    EdgeValue,
+}
+
 impl InMemoryStore {
+    pub fn match_edge_column(
+        &self,
+        edge_id: EdgeId,
+        cardinal_idx: CardinalIdx,
+        value_def_id: DefId,
+        ctx: &DbContext,
+    ) -> EdgeColumnMatch {
+        let edge_store = self.edges.get(&edge_id).expect("no edge store");
+        let column = &edge_store.columns[cardinal_idx.0 as usize];
+        match &column.data {
+            EdgeVectorData::Keys(_) => {
+                if column.vertex_union.contains(&value_def_id) {
+                    EdgeColumnMatch::VertexValue(value_def_id)
+                } else {
+                    let vertex_def_id = column
+                        .vertex_union
+                        .iter()
+                        .find(|vertex_def_id| {
+                            let entity = ctx.ontology.def(**vertex_def_id).entity().unwrap();
+                            entity.id_value_def_id == value_def_id
+                        })
+                        .unwrap_or_else(|| {
+                            panic!("cardinal {cardinal_idx}: Corresponding entity def id not found for the given ID {value_def_id:?}. vertex_union = {:?}", column.vertex_union)
+                        });
+
+                    EdgeColumnMatch::VertexIdOf(*vertex_def_id)
+                }
+            }
+            EdgeVectorData::Values(_) => EdgeColumnMatch::EdgeValue,
+        }
+    }
+
     pub fn delete_entities(&mut self, ids: Vec<Value>, def_id: DefId) -> DomainResult<Vec<bool>> {
         let mut result_vec = Vec::with_capacity(ids.len());
         let mut deleted_set: HashSet<VertexKey> = HashSet::with_capacity(ids.len());
