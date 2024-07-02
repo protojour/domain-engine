@@ -171,28 +171,25 @@ async fn test_entity_subtype(ds: &str) {
     .await
     .unwrap();
 
-    let result = r#"{
-        bars {
-            nodes {
-                id
-                name
-            }
-        }
-    }"#
-    .exec([], &derived_schema, &ctx)
-    .await
-    .unwrap();
-
     expect_eq!(
-        actual = result,
-        expected = graphql_value!({
+        actual = r#"{
+            bars {
+                nodes {
+                    id
+                    name
+                }
+            }
+        }"#
+        .exec([], &derived_schema, &ctx)
+        .await,
+        expected = Ok(graphql_value!({
             "bars": {
                 "nodes": [{
                     "id": "1",
                     "name": "NAME!"
                 }]
             }
-        })
+        }))
     );
 }
 
@@ -237,25 +234,22 @@ async fn sym_edge_simple(ds: &str) {
     .await
     .unwrap();
 
-    let result = r#"{
-        bars {
-            nodes {
-                id
-                reverse_prop {
-                    nodes {
-                        id
+    expect_eq!(
+        actual = r#"{
+            bars {
+                nodes {
+                    id
+                    reverse_prop {
+                        nodes {
+                            id
+                        }
                     }
                 }
             }
-        }
-    }"#
-    .exec([], &schema, &ctx)
-    .await
-    .unwrap();
-
-    expect_eq!(
-        actual = result,
-        expected = graphql_value!({
+        }"#
+        .exec([], &schema, &ctx)
+        .await,
+        expected = Ok(graphql_value!({
             "bars": {
                 "nodes": [{
                     "id": "bar1",
@@ -264,7 +258,7 @@ async fn sym_edge_simple(ds: &str) {
                     }
                 }]
             }
-        })
+        }))
     );
 }
 
@@ -301,9 +295,8 @@ async fn edge_entity(ds: &str) {
             foos { nodes { id, related_to { nodes { id } } } }
         }"#
         .exec([], &schema, &ctx)
-        .await
-        .unwrap(),
-        expected = graphql_value!({
+        .await,
+        expected = Ok(graphql_value!({
             "edges": { "nodes": [{
                 "id": "edge1",
                 "from": "foo1",
@@ -317,7 +310,7 @@ async fn edge_entity(ds: &str) {
                     }
                 }]
             }
-        })
+        }))
     );
 
     info!("Delete edge");
@@ -339,9 +332,8 @@ async fn edge_entity(ds: &str) {
             foos { nodes { id, related_to { nodes { id } } } }
         }"#
         .exec([], &schema, &ctx)
-        .await
-        .unwrap(),
-        expected = graphql_value!({
+        .await,
+        expected = Ok(graphql_value!({
             "edges": { "nodes": [] },
             "foos": {
                 "nodes": [{
@@ -349,6 +341,6 @@ async fn edge_entity(ds: &str) {
                     "related_to": { "nodes": [] }
                 }]
             }
-        })
+        }))
     );
 }
