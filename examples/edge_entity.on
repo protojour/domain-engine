@@ -26,3 +26,13 @@ def edge (
     rel .from: foo_id
     rel .to: bar_id
 )
+
+map foos(
+    (),
+    foo { ..@match foo() }
+)
+
+map edges(
+    (),
+    edge { ..@match edge() }
+)

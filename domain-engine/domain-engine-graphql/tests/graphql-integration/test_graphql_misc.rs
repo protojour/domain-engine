@@ -15,6 +15,7 @@ use ontol_test_utils::{
     examples::{entity_subtype, EDGE_ENTITY, GUITAR_SYNTH_UNION},
     expect_eq, SrcName, TestPackages,
 };
+use tracing::info;
 
 async fn make_domain_engine(ontology: Arc<Ontology>, datastore: &str) -> DomainEngine {
     DomainEngine::builder(ontology)
@@ -267,12 +268,15 @@ async fn sym_edge_simple(ds: &str) {
     );
 }
 
-#[datastore_test(tokio::test)]
+/// FIXME: implement for arango
+#[datastore_test(tokio::test, ignore("arango"))]
 async fn edge_entity(ds: &str) {
     let (test, [schema]) =
         TestPackages::with_static_sources([EDGE_ENTITY]).compile_schemas([EDGE_ENTITY.0]);
 
     let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
+
+    info!("Create 3 vertices");
 
     r#"mutation {
         foo(
@@ -288,4 +292,63 @@ async fn edge_entity(ds: &str) {
     .exec([], &schema, &ctx)
     .await
     .unwrap();
+
+    info!("Query data");
+
+    expect_eq!(
+        actual = r#"{
+            edges { nodes { id, from, to } }
+            foos { nodes { id, related_to { nodes { id } } } }
+        }"#
+        .exec([], &schema, &ctx)
+        .await
+        .unwrap(),
+        expected = graphql_value!({
+            "edges": { "nodes": [{
+                "id": "edge1",
+                "from": "foo1",
+                "to": "bar1",
+            }]},
+            "foos": {
+                "nodes": [{
+                    "id": "foo1",
+                    "related_to": {
+                        "nodes": [{ "id": "bar1" }]
+                    }
+                }]
+            }
+        })
+    );
+
+    info!("Delete edge");
+
+    r#"mutation {
+        edge(
+            delete: ["edge1"]
+        ) { deleted }
+    }"#
+    .exec([], &schema, &ctx)
+    .await
+    .unwrap();
+
+    info!("Query data after edge deletion");
+
+    expect_eq!(
+        actual = r#"{
+            edges { nodes { id, from, to } }
+            foos { nodes { id, related_to { nodes { id } } } }
+        }"#
+        .exec([], &schema, &ctx)
+        .await
+        .unwrap(),
+        expected = graphql_value!({
+            "edges": { "nodes": [] },
+            "foos": {
+                "nodes": [{
+                    "id": "foo1",
+                    "related_to": { "nodes": [] }
+                }]
+            }
+        })
+    );
 }

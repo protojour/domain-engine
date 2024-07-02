@@ -14,7 +14,7 @@ use ontol_runtime::{
     value::Value,
     DefId, RelationshipId,
 };
-use tracing::{debug, error};
+use tracing::{debug, debug_span, error};
 
 use domain_engine_core::{DomainError, DomainResult};
 
@@ -169,6 +169,8 @@ impl InMemoryStore {
         select_properties: &FnvHashMap<RelationshipId, Select>,
         ctx: &DbContext,
     ) -> DomainResult<Value> {
+        let _entered = debug_span!("struct_sel", id = ?struct_def_id).entered();
+
         for (rel_id, subselect) in select_properties {
             if properties.contains_key(rel_id) {
                 continue;
