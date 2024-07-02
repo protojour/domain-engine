@@ -1,0 +1,35 @@
+rel . a|b: c|d
+
+//@ grammar=ontol
+Ontol
+    RelStatement
+        KwRel `rel`
+        Whitespace
+        RelSubject
+            TypeQuantUnit
+                This
+                    Dot `.`
+        Whitespace
+        RelFwdSet
+            Relation
+                TypeQuantUnit
+                    IdentPath
+                        Symbol `a`
+                PropCardinality
+            Pipe `|`
+            Relation
+                TypeQuantUnit
+                    IdentPath
+                        Symbol `b`
+                PropCardinality
+        Colon `:`
+        Whitespace
+        RelObject
+            TypeQuantUnit
+                TypeUnion
+                    IdentPath
+                        Symbol `c`
+                    Pipe `|`
+                    IdentPath
+                        Symbol `d`
+    Whitespace

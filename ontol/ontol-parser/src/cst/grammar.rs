@@ -1,4 +1,4 @@
-use crate::{lexer::kind::Kind, K};
+use crate::{cst::parser::StartNode, lexer::kind::Kind, K};
 
 use super::parser::{CstParser, SyntaxCursor};
 
@@ -15,16 +15,21 @@ enum Delimiter {
     Paren,
 }
 
-#[derive(Clone, Copy, Default)]
-struct AllowedType {
-    dot: bool,
-    anonymous: bool,
-    int_range: bool,
+bitflags::bitflags! {
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
+    struct TypeAccept: u8 {
+        const DOT       = 0b00000001;
+        const ANONYMOUS = 0b00000010;
+        const INT_RANGE = 0b00000100;
+        const UNION     = 0b00001000;
+    }
 }
 
-#[derive(Clone, Copy, Default)]
-struct AllowedPattern {
-    expr: bool,
+bitflags::bitflags! {
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
+    struct PatternAccept: u8 {
+        const EXPR       = 0b00000001;
+    }
 }
 
 pub fn ontol(p: &mut CstParser) {
@@ -145,7 +150,7 @@ mod rel {
         p.eat_trivia();
 
         let subject = p.start(Kind::RelSubject);
-        rel_type_reference(p);
+        rel_type_reference(p, TypeAccept::all());
         p.end(subject);
 
         let fwd = p.start(Kind::RelFwdSet);
@@ -194,7 +199,7 @@ mod rel {
                 p.eat(K![=]);
                 pattern_with_expr(p);
             } else {
-                rel_type_reference(p);
+                rel_type_reference(p, TypeAccept::all());
             }
 
             p.end(object);
@@ -203,7 +208,10 @@ mod rel {
 
     fn forward_relation(p: &mut CstParser) {
         p.eat_trivia();
-        rel_type_reference(p);
+        rel_type_reference(
+            p,
+            TypeAccept::DOT | TypeAccept::ANONYMOUS | TypeAccept::INT_RANGE,
+        );
 
         if p.at() == K!['['] {
             let rel_params = p.start(Kind::RelParams);
@@ -222,35 +230,29 @@ mod rel {
         prop_cardinality(p);
     }
 
-    fn rel_type_reference(p: &mut CstParser) {
-        let allowed = AllowedType {
-            dot: true,
-            anonymous: true,
-            int_range: true,
-        };
-
+    fn rel_type_reference(p: &mut CstParser, accept: TypeAccept) {
         p.eat_trivia();
 
         let label = "relation type";
 
         match p.at() {
             K!['{'] => {
-                let set = p.start(Kind::TypeModSet);
+                let set = p.start(Kind::TypeQuantSet);
                 p.eat(K!['{']);
-                type_ref_inner(p, allowed, label);
+                type_ref_inner(p, accept, label);
                 p.eat(K!['}']);
                 p.end(set);
             }
             K!['['] => {
-                let seq = p.start(Kind::TypeModList);
+                let seq = p.start(Kind::TypeQuantList);
                 p.eat(K!['[']);
-                type_ref_inner(p, allowed, label);
+                type_ref_inner(p, accept, label);
                 p.eat(K![']']);
                 p.end(seq);
             }
             _ => {
-                let unit = p.start(Kind::TypeModUnit);
-                type_ref_inner(p, allowed, label);
+                let unit = p.start(Kind::TypeQuantUnit);
+                type_ref_inner(p, accept, label);
                 p.end(unit);
             }
         }
@@ -265,65 +267,88 @@ mod rel {
     }
 }
 
-fn type_ref_inner(p: &mut CstParser, allowed: AllowedType, label: &'static str) {
+fn type_ref_inner(p: &mut CstParser, accept: TypeAccept, label: &'static str) {
     p.eat_trivia();
 
-    match p.at() {
-        Kind::Symbol => {
-            ident_path(p);
-        }
-        Kind::Number => {
-            let mut node = p.start(Kind::Literal);
-            let cursor = p.syntax_cursor();
-            p.eat(Kind::Number);
+    enum UnionState {
+        Potential(SyntaxCursor),
+        Started(StartNode),
+    }
 
-            if allowed.int_range && p.at() == K![..] {
-                p.insert_node(cursor, Kind::RangeStart);
+    let mut union_state = UnionState::Potential(p.syntax_cursor());
 
-                node.set_kind(Kind::NumberRange);
-                p.eat(K![..]);
+    loop {
+        match p.at() {
+            Kind::Symbol => {
+                ident_path(p);
+            }
+            Kind::Number => {
+                let mut node = p.start(Kind::Literal);
+                let cursor = p.syntax_cursor();
+                p.eat(Kind::Number);
 
-                if p.at() == Kind::Number {
-                    let end = p.start(Kind::RangeEnd);
-                    p.eat(Kind::Number);
-                    p.end(end);
+                if accept.contains(TypeAccept::INT_RANGE) && p.at() == K![..] {
+                    p.insert_node_closed(cursor, Kind::RangeStart);
+
+                    node.set_kind(Kind::NumberRange);
+                    p.eat(K![..]);
+
+                    if p.at() == Kind::Number {
+                        let end = p.start(Kind::RangeEnd);
+                        p.eat(Kind::Number);
+                        p.end(end);
+                    }
                 }
+
+                p.end(node);
+            }
+            K![..] if accept.contains(TypeAccept::INT_RANGE) => {
+                let range = p.start(Kind::NumberRange);
+                p.eat(K![..]);
+                let end = p.start(Kind::RangeEnd);
+                p.eat(Kind::Number);
+                p.end(end);
+                p.end(range);
+            }
+            kind @ (Kind::DoubleQuoteText | Kind::SingleQuoteText | Kind::Regex) => {
+                let literal = p.start(Kind::Literal);
+                p.eat(kind);
+                p.end(literal);
+            }
+            K!['('] if accept.contains(TypeAccept::ANONYMOUS) => {
+                let def_body = p.start(Kind::DefBody);
+                p.eat(K!['(']);
+
+                while p.not_peekforward(|kind| matches!(kind, K![')'])) {
+                    statement(p);
+                }
+
+                p.eat(K![')']);
+                p.end(def_body);
+            }
+            K![.] if accept.contains(TypeAccept::DOT) => {
+                let this = p.start(Kind::This);
+                p.eat(K![.]);
+                p.end(this);
+            }
+            _ => {
+                p.eat_error(|kind| format!("expected {label}, found {kind}"));
+            }
+        }
+
+        if p.at() == K![|] && accept.contains(TypeAccept::UNION) {
+            if let UnionState::Potential(cursor) = &union_state {
+                union_state = UnionState::Started(p.insert_node(*cursor, Kind::TypeUnion));
             }
 
-            p.end(node);
+            p.eat(K![|]);
+        } else {
+            break;
         }
-        K![..] if allowed.int_range => {
-            let range = p.start(Kind::NumberRange);
-            p.eat(K![..]);
-            let end = p.start(Kind::RangeEnd);
-            p.eat(Kind::Number);
-            p.end(end);
-            p.end(range);
-        }
-        kind @ (Kind::DoubleQuoteText | Kind::SingleQuoteText | Kind::Regex) => {
-            let literal = p.start(Kind::Literal);
-            p.eat(kind);
-            p.end(literal);
-        }
-        K!['('] if allowed.anonymous => {
-            let def_body = p.start(Kind::DefBody);
-            p.eat(K!['(']);
+    }
 
-            while p.not_peekforward(|kind| matches!(kind, K![')'])) {
-                statement(p);
-            }
-
-            p.eat(K![')']);
-            p.end(def_body);
-        }
-        K![.] if allowed.dot => {
-            let this = p.start(Kind::This);
-            p.eat(K![.]);
-            p.end(this);
-        }
-        _ => {
-            p.eat_error(|kind| format!("expected {label}, found {kind}"));
-        }
+    if let UnionState::Started(union_node) = union_state {
+        p.end(union_node);
     }
 }
 
@@ -331,16 +356,8 @@ fn fmt_statement(p: &mut CstParser) {
     p.eat(K![fmt]);
 
     loop {
-        let type_ref = p.start(Kind::TypeModUnit);
-        type_ref_inner(
-            p,
-            AllowedType {
-                dot: true,
-                anonymous: true,
-                int_range: false,
-            },
-            "type",
-        );
+        let type_ref = p.start(Kind::TypeQuantUnit);
+        type_ref_inner(p, TypeAccept::DOT | TypeAccept::ANONYMOUS, "type");
         p.end(type_ref);
 
         if p.at() == Kind::FatArrow {
@@ -451,23 +468,23 @@ mod map {
     fn arm(p: &mut CstParser) {
         let arm = p.start(Kind::MapArm);
 
-        pattern(p, AllowedPattern { expr: false });
+        pattern(p, PatternAccept::empty());
 
         p.end(arm);
     }
 }
 
 pub fn pattern_with_expr(p: &mut CstParser) {
-    pattern(p, AllowedPattern { expr: true })
+    pattern(p, PatternAccept::EXPR)
 }
 
-fn pattern(p: &mut CstParser, allowed: AllowedPattern) {
+fn pattern(p: &mut CstParser, accept: PatternAccept) {
     p.eat_space();
 
     match lookahead_detect_pattern(p) {
         DetectedPattern::Struct => struct_pattern::entry(p),
         DetectedPattern::Set => set_pattern::entry(p),
-        DetectedPattern::Expr if allowed.expr => expr_pattern::entry(p),
+        DetectedPattern::Expr if accept.contains(PatternAccept::EXPR) => expr_pattern::entry(p),
         _ => {
             p.eat_error(|kind| format!("expected pattern, found {kind}"));
         }
@@ -576,16 +593,8 @@ mod struct_pattern {
         let prop = p.start(Kind::StructParamAttrProp);
 
         {
-            let type_ref = p.start(Kind::TypeModUnit);
-            type_ref_inner(
-                p,
-                AllowedType {
-                    dot: false,
-                    anonymous: false,
-                    int_range: false,
-                },
-                "property type",
-            );
+            let type_ref = p.start(Kind::TypeQuantUnit);
+            type_ref_inner(p, TypeAccept::empty(), "property type");
             p.end(type_ref);
 
             if p.at() == K!['['] {
@@ -604,7 +613,7 @@ mod struct_pattern {
 
         p.eat(K![:]);
 
-        pattern(p, AllowedPattern { expr: true });
+        pattern(p, PatternAccept::EXPR);
 
         p.end(prop);
     }
@@ -642,7 +651,7 @@ mod set_pattern {
             p.end(rel_params);
         }
 
-        super::pattern(p, AllowedPattern { expr: true });
+        super::pattern(p, PatternAccept::EXPR);
 
         p.end(element);
     }
@@ -709,7 +718,7 @@ pub mod expr_pattern {
             while left_bp <= op_stack.last().copied().map(|(bp, _)| bp).unwrap_or(0) {
                 let (_, stack_cursor) = op_stack.pop().unwrap();
 
-                p.insert_node(stack_cursor, Kind::PatBinary);
+                p.insert_node_closed(stack_cursor, Kind::PatBinary);
                 push_cursor = stack_cursor;
             }
 
@@ -726,7 +735,7 @@ pub mod expr_pattern {
         }
 
         while let Some((_, stack_cursor)) = op_stack.pop() {
-            p.insert_node(stack_cursor, Kind::PatBinary);
+            p.insert_node_closed(stack_cursor, Kind::PatBinary);
         }
     }
 

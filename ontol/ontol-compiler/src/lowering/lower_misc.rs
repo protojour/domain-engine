@@ -124,6 +124,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     .span_report(range.0.span(), &mut self.ctx);
                 None
             }
+            (insp::TypeRef::TypeUnion(type_union), _) => {
+                CompileError::TODO("type union").span_report(type_union.0.span(), &mut self.ctx);
+                None
+            }
         }
     }
 

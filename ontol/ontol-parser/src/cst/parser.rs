@@ -257,7 +257,12 @@ impl<'a> CstParser<'a> {
         self.markers.push(SyntaxMarker::End);
     }
 
-    pub fn insert_node(&mut self, cursor: SyntaxCursor, kind: Kind) {
+    pub fn insert_node(&mut self, cursor: SyntaxCursor, kind: Kind) -> StartNode {
+        self.markers.insert(cursor.0, SyntaxMarker::Start { kind });
+        StartNode { cursor, kind }
+    }
+
+    pub fn insert_node_closed(&mut self, cursor: SyntaxCursor, kind: Kind) {
         self.markers.insert(cursor.0, SyntaxMarker::Start { kind });
         self.markers.push(SyntaxMarker::End);
     }

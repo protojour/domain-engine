@@ -110,7 +110,6 @@ impl FlatSyntaxTree {
         DebugTree {
             tree: self,
             src,
-            verify: true,
             display_end: false,
         }
     }
@@ -258,7 +257,6 @@ impl<'a> Iterator for TreeNodeChildren<'a> {
 pub struct DebugTree<'a> {
     tree: &'a FlatSyntaxTree,
     src: &'a str,
-    verify: bool,
     display_end: bool,
 }
 
@@ -301,10 +299,6 @@ impl<'a> Display for DebugTree<'a> {
                     }
                 }
             }
-        }
-
-        if self.verify {
-            assert_eq!(indent, 0);
         }
 
         Ok(())

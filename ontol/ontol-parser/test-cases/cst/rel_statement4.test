@@ -6,13 +6,13 @@ Ontol
         KwRel `rel`
         Whitespace
         RelSubject
-            TypeModUnit
+            TypeQuantUnit
                 This
                     Dot `.`
         Whitespace
         RelFwdSet
             Relation
-                TypeModUnit
+                TypeQuantUnit
                     NumberRange
                         RangeStart
                             Number `0`
@@ -23,7 +23,7 @@ Ontol
         Colon `:`
         Whitespace
         RelObject
-            TypeModUnit
+            TypeQuantUnit
                 IdentPath
                     Symbol `pos`
     Whitespace

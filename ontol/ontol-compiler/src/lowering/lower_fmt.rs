@@ -94,7 +94,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     fn lower_fmt_transition(
         &mut self,
         from: (DefId, U32Span),
-        transition: insp::TypeMod<V>,
+        transition: insp::TypeQuant<V>,
         to: (DefId, U32Span),
         final_state: FmtFinalState,
     ) -> Option<DefId> {

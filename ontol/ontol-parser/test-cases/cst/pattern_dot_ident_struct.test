@@ -8,7 +8,7 @@ PatStruct
         Symbol `bar`
     ParenOpen `(`
     StructParamAttrProp
-        TypeModUnit
+        TypeQuantUnit
             Literal
                 SingleQuoteText `'baz'`
         Colon `:`

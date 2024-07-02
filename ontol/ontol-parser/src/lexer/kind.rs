@@ -167,11 +167,13 @@ pub enum Kind {
 
     // types
     /// `x` in `rel x 'foo': y`
-    TypeModUnit,
+    TypeQuantUnit,
     /// `{x}` in `rel {x} 'foo': y`
-    TypeModSet,
+    TypeQuantSet,
     /// `[x]` in `rel [x] 'foo': y`
-    TypeModList,
+    TypeQuantList,
+    /// a|b in `rel .'foo': a|b`
+    TypeUnion,
     /// `.` in `rel .'foo': y`
     This,
     /// span of any literal value
@@ -325,9 +327,10 @@ impl Display for Kind {
             Kind::FmtStatement => write!(f, "fmt statement"),
             Kind::MapStatement => write!(f, "map statement"),
             Kind::MapArm => write!(f, "map arm"),
-            Kind::TypeModUnit => write!(f, "unit type modifier"),
-            Kind::TypeModSet => write!(f, "set type modifier"),
-            Kind::TypeModList => write!(f, "list type modifier"),
+            Kind::TypeQuantUnit => write!(f, "unit type quantifier"),
+            Kind::TypeQuantSet => write!(f, "set type quantifier"),
+            Kind::TypeQuantList => write!(f, "list type quantifier"),
+            Kind::TypeUnion => write!(f, "type union"),
             Kind::This => write!(f, "this"),
             Kind::Literal => write!(f, "literal"),
             Kind::NumberRange => write!(f, "number range"),

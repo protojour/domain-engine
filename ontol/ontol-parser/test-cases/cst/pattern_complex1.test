@@ -8,7 +8,7 @@ PatStruct
         Symbol `bar`
     ParenOpen `(`
     StructParamAttrProp
-        TypeModUnit
+        TypeQuantUnit
             Literal
                 SingleQuoteText `'baz'`
         Colon `:`
@@ -25,7 +25,7 @@ PatStruct
                 RelArgs
                     SquareOpen `[`
                     StructParamAttrProp
-                        TypeModUnit
+                        TypeQuantUnit
                             Literal
                                 SingleQuoteText `'a'`
                         Colon `:`

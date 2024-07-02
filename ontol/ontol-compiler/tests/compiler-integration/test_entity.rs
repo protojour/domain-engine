@@ -649,3 +649,8 @@ fn edge_entity_simple() {
         }
     });
 }
+
+#[test]
+fn edge_entity_union() {
+    examples::EDGE_ENTITY_UNION.1.compile();
+}

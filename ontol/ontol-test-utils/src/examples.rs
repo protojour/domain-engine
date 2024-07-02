@@ -73,6 +73,11 @@ pub const EDGE_ENTITY_SIMPLE: Example = (
     include_str!("../../../examples/edge_entity_simple.on"),
 );
 
+pub const EDGE_ENTITY_UNION: Example = (
+    src_name("edge_entity_union"),
+    include_str!("../../../examples/edge_entity_union.on"),
+);
+
 pub const GITMESH: Example = (
     src_name("gitmesh"),
     include_str!("../../../examples/gitmesh.on"),

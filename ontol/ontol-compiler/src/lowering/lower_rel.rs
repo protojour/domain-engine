@@ -31,15 +31,15 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         let mut root_defs = RootDefs::default();
 
         let subject_def_id = self.resolve_type_reference(
-            rel_subject.type_mod()?.type_ref()?,
+            rel_subject.type_quant()?.type_ref()?,
             &block,
             Some(&mut root_defs),
         )?;
-        let object_def_id = match rel_object.type_mod_or_pattern()? {
-            insp::TypeModOrPattern::TypeMod(type_mod) => {
-                self.resolve_type_reference(type_mod.type_ref()?, &block, Some(&mut root_defs))?
+        let object_def_id = match rel_object.type_quant_or_pattern()? {
+            insp::TypeQuantOrPattern::TypeQuant(type_quant) => {
+                self.resolve_type_reference(type_quant.type_ref()?, &block, Some(&mut root_defs))?
             }
-            insp::TypeModOrPattern::Pattern(pattern) => {
+            insp::TypeQuantOrPattern::Pattern(pattern) => {
                 let mut var_table = MapVarTable::default();
                 let lowered = self.lower_pattern(pattern.clone(), &mut var_table);
                 let pat_id = self.ctx.compiler.patterns.alloc_pat_id();
@@ -85,8 +85,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         let mut root_defs = RootDefs::new();
 
         let (key, ident_span, index_range_rel_params): (_, _, Option<Range<Option<u16>>>) = {
-            let type_mod = relation.relation_type()?;
-            match type_mod.type_ref()? {
+            let type_quant = relation.relation_type()?;
+            match type_quant.type_ref()? {
                 insp::TypeRef::NumberRange(range) => (
                     RelationKey::Indexed,
                     range.0.span(),
@@ -98,7 +98,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                         &BlockContext::NoContext,
                         Some(&mut root_defs),
                     )?;
-                    let span = type_mod.view().span();
+                    let span = type_quant.view().span();
 
                     match self.ctx.compiler.defs.def_kind(def_id) {
                         DefKind::TextLiteral(_) => (RelationKey::Named(def_id), span, None),
@@ -230,8 +230,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             let subject_cardinality = (
                 property_cardinality(relation.prop_cardinality())
                     .unwrap_or(PropertyCardinality::Mandatory),
-                value_cardinality(match rel_object.type_mod_or_pattern() {
-                    Some(insp::TypeModOrPattern::TypeMod(type_mod)) => Some(type_mod),
+                value_cardinality(match rel_object.type_quant_or_pattern() {
+                    Some(insp::TypeQuantOrPattern::TypeQuant(type_quant)) => Some(type_quant),
                     _ => None,
                 })
                 .unwrap_or(ValueCardinality::Unit),
@@ -251,7 +251,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     backward_relation
                         .and_then(|rel| property_cardinality(rel.prop_cardinality()))
                         .unwrap_or(default.0),
-                    value_cardinality(rel_subject.type_mod()).unwrap_or(default.1),
+                    value_cardinality(rel_subject.type_quant()).unwrap_or(default.1),
                 )
             };
 
@@ -354,8 +354,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             let subject_cardinality = (
                 property_cardinality(relation.prop_cardinality())
                     .unwrap_or(PropertyCardinality::Mandatory),
-                value_cardinality(match rel_object.type_mod_or_pattern() {
-                    Some(insp::TypeModOrPattern::TypeMod(type_mod)) => Some(type_mod),
+                value_cardinality(match rel_object.type_quant_or_pattern() {
+                    Some(insp::TypeQuantOrPattern::TypeQuant(type_quant)) => Some(type_quant),
                     _ => None,
                 })
                 .unwrap_or(ValueCardinality::Unit),
@@ -367,7 +367,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     backward_relation
                         .and_then(|rel| property_cardinality(rel.prop_cardinality()))
                         .unwrap_or(default.0),
-                    value_cardinality(rel_subject.type_mod()).unwrap_or(default.1),
+                    value_cardinality(rel_subject.type_quant()).unwrap_or(default.1),
                 )
             };
 
@@ -408,11 +408,13 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     }
 }
 
-fn value_cardinality<V: NodeView>(type_mod: Option<insp::TypeMod<V>>) -> Option<ValueCardinality> {
-    Some(match type_mod? {
-        insp::TypeMod::TypeModUnit(_) => ValueCardinality::Unit,
-        insp::TypeMod::TypeModSet(_) => ValueCardinality::IndexSet,
-        insp::TypeMod::TypeModList(_) => ValueCardinality::List,
+fn value_cardinality<V: NodeView>(
+    type_quant: Option<insp::TypeQuant<V>>,
+) -> Option<ValueCardinality> {
+    Some(match type_quant? {
+        insp::TypeQuant::TypeQuantUnit(_) => ValueCardinality::Unit,
+        insp::TypeQuant::TypeQuantSet(_) => ValueCardinality::IndexSet,
+        insp::TypeQuant::TypeQuantList(_) => ValueCardinality::List,
     })
 }
 

@@ -118,9 +118,10 @@ nodes!(Node {
     FmtStatement,
     MapStatement,
     MapArm,
-    TypeModUnit,
-    TypeModSet,
-    TypeModList,
+    TypeQuantUnit,
+    TypeQuantSet,
+    TypeQuantList,
+    TypeUnion,
     This,
     Literal,
     NumberRange,
@@ -149,10 +150,10 @@ node_union!(Statement {
     MapStatement,
 });
 
-node_union!(TypeMod {
-    TypeModUnit,
-    TypeModSet,
-    TypeModList,
+node_union!(TypeQuant {
+    TypeQuantUnit,
+    TypeQuantSet,
+    TypeQuantList,
 });
 
 node_union!(TypeRef {
@@ -161,6 +162,7 @@ node_union!(TypeRef {
     DefBody,
     This,
     NumberRange,
+    TypeUnion,
 });
 
 node_union!(SymItem { SymVar, SymDecl });
@@ -178,8 +180,8 @@ node_union!(StructParam {
     StructParamAttrUnit,
 });
 
-pub enum TypeModOrPattern<V> {
-    TypeMod(TypeMod<V>),
+pub enum TypeQuantOrPattern<V> {
+    TypeQuant(TypeQuant<V>),
     Pattern(Pattern<V>),
 }
 
@@ -272,18 +274,18 @@ impl<V: NodeView> RelStatement<V> {
 }
 
 impl<V: NodeView> RelSubject<V> {
-    pub fn type_mod(&self) -> Option<TypeMod<V>> {
-        self.view().sub_nodes().find_map(TypeMod::from_view)
+    pub fn type_quant(&self) -> Option<TypeQuant<V>> {
+        self.view().sub_nodes().find_map(TypeQuant::from_view)
     }
 }
 
 impl<V: NodeView> RelObject<V> {
-    pub fn type_mod_or_pattern(&self) -> Option<TypeModOrPattern<V>> {
+    pub fn type_quant_or_pattern(&self) -> Option<TypeQuantOrPattern<V>> {
         self.view().sub_nodes().find_map(|view| {
-            if let Some(type_mod) = TypeMod::from_view(view.clone()) {
-                Some(TypeModOrPattern::TypeMod(type_mod))
+            if let Some(type_quant) = TypeQuant::from_view(view.clone()) {
+                Some(TypeQuantOrPattern::TypeQuant(type_quant))
             } else {
-                Pattern::from_view(view).map(TypeModOrPattern::Pattern)
+                Pattern::from_view(view).map(TypeQuantOrPattern::Pattern)
             }
         })
     }
@@ -308,8 +310,8 @@ impl<V: NodeView> RelBackwdSet<V> {
 }
 
 impl<V: NodeView> Relation<V> {
-    pub fn relation_type(&self) -> Option<TypeMod<V>> {
-        self.view().sub_nodes().find_map(TypeMod::from_view)
+    pub fn relation_type(&self) -> Option<TypeQuant<V>> {
+        self.view().sub_nodes().find_map(TypeQuant::from_view)
     }
 
     pub fn rel_params(&self) -> Option<RelParams<V>> {
@@ -334,8 +336,8 @@ impl<V: NodeView> PropCardinality<V> {
 }
 
 impl<V: NodeView> FmtStatement<V> {
-    pub fn transitions(&self) -> impl Iterator<Item = TypeMod<V>> {
-        self.view().sub_nodes().filter_map(TypeMod::from_view)
+    pub fn transitions(&self) -> impl Iterator<Item = TypeQuant<V>> {
+        self.view().sub_nodes().filter_map(TypeQuant::from_view)
     }
 }
 
@@ -359,29 +361,29 @@ impl<V: NodeView> MapArm<V> {
     }
 }
 
-impl<V: NodeView> TypeMod<V> {
+impl<V: NodeView> TypeQuant<V> {
     pub fn type_ref(&self) -> Option<TypeRef<V>> {
         match self.clone() {
-            Self::TypeModUnit(t) => t.type_ref(),
-            Self::TypeModSet(t) => t.type_ref(),
-            Self::TypeModList(t) => t.type_ref(),
+            Self::TypeQuantUnit(t) => t.type_ref(),
+            Self::TypeQuantSet(t) => t.type_ref(),
+            Self::TypeQuantList(t) => t.type_ref(),
         }
     }
 }
 
-impl<V: NodeView> TypeModUnit<V> {
+impl<V: NodeView> TypeQuantUnit<V> {
     pub fn type_ref(&self) -> Option<TypeRef<V>> {
         self.view().sub_nodes().find_map(TypeRef::from_view)
     }
 }
 
-impl<V: NodeView> TypeModSet<V> {
+impl<V: NodeView> TypeQuantSet<V> {
     pub fn type_ref(&self) -> Option<TypeRef<V>> {
         self.view().sub_nodes().find_map(TypeRef::from_view)
     }
 }
 
-impl<V: NodeView> TypeModList<V> {
+impl<V: NodeView> TypeQuantList<V> {
     pub fn type_ref(&self) -> Option<TypeRef<V>> {
         self.view().sub_nodes().find_map(TypeRef::from_view)
     }
@@ -402,8 +404,8 @@ impl<V: NodeView> PatStruct<V> {
 }
 
 impl<V: NodeView> StructParamAttrProp<V> {
-    pub fn relation(&self) -> Option<TypeMod<V>> {
-        self.view().sub_nodes().find_map(TypeMod::from_view)
+    pub fn relation(&self) -> Option<TypeQuant<V>> {
+        self.view().sub_nodes().find_map(TypeQuant::from_view)
     }
 
     pub fn rel_args(&self) -> Option<RelArgs<V>> {

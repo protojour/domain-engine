@@ -6,44 +6,44 @@ Ontol
         KwRel `rel`
         Whitespace
         RelSubject
-            TypeModUnit
+            TypeQuantUnit
                 This
                     Dot `.`
         RelFwdSet
             Relation
-                TypeModUnit
+                TypeQuantUnit
                     Literal
                         SingleQuoteText `'id'`
                 PropCardinality
             Pipe `|`
             Relation
-                TypeModUnit
+                TypeQuantUnit
                     IdentPath
                         Symbol `id`
                 PropCardinality
         Colon `:`
         Whitespace
         RelObject
-            TypeModUnit
+            TypeQuantUnit
                 DefBody
                     ParenOpen `(`
                     RelStatement
                         KwRel `rel`
                         Whitespace
                         RelSubject
-                            TypeModUnit
+                            TypeQuantUnit
                                 This
                                     Dot `.`
                         RelFwdSet
                             Relation
-                                TypeModUnit
+                                TypeQuantUnit
                                     IdentPath
                                         Symbol `is`
                                 PropCardinality
                         Colon `:`
                         Whitespace
                         RelObject
-                            TypeModUnit
+                            TypeQuantUnit
                                 IdentPath
                                     Symbol `text`
                     ParenClose `)`

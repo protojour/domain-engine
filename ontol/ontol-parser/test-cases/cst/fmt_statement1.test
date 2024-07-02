@@ -5,19 +5,19 @@ Ontol
     FmtStatement
         KwFmt `fmt`
         Whitespace
-        TypeModUnit
+        TypeQuantUnit
             IdentPath
                 Symbol `a`
         Whitespace
         FatArrow `=>`
         Whitespace
-        TypeModUnit
+        TypeQuantUnit
             IdentPath
                 Symbol `b`
         Whitespace
         FatArrow `=>`
         Whitespace
-        TypeModUnit
+        TypeQuantUnit
             This
                 Dot `.`
     Whitespace

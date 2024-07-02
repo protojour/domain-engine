@@ -27,19 +27,19 @@ Ontol
                 KwRel `rel`
                 Whitespace
                 RelSubject
-                    TypeModUnit
+                    TypeQuantUnit
                         This
                             Dot `.`
                 RelFwdSet
                     Relation
-                        TypeModUnit
+                        TypeQuantUnit
                             Literal
                                 SingleQuoteText `'a'`
                         PropCardinality
                 Colon `:`
                 Whitespace
                 RelObject
-                    TypeModUnit
+                    TypeQuantUnit
                         IdentPath
                             Symbol `text`
             Whitespace
@@ -49,19 +49,19 @@ Ontol
                 KwRel `rel`
                 Whitespace
                 RelSubject
-                    TypeModUnit
+                    TypeQuantUnit
                         This
                             Dot `.`
                 RelFwdSet
                     Relation
-                        TypeModUnit
+                        TypeQuantUnit
                             Literal
                                 SingleQuoteText `'b'`
                         PropCardinality
                 Colon `:`
                 Whitespace
                 RelObject
-                    TypeModUnit
+                    TypeQuantUnit
                         IdentPath
                             Symbol `text`
             Whitespace

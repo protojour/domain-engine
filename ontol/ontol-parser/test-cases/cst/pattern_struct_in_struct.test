@@ -11,13 +11,13 @@ PatStruct
                 Symbol `b`
             ParenOpen `(`
             StructParamAttrProp
-                TypeModUnit
+                TypeQuantUnit
                     Literal
                         SingleQuoteText `'c'`
                 RelArgs
                     SquareOpen `[`
                     StructParamAttrProp
-                        TypeModUnit
+                        TypeQuantUnit
                             Literal
                                 SingleQuoteText `'d'`
                         Colon `:`
