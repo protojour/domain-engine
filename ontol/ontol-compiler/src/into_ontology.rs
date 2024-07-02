@@ -487,6 +487,7 @@ impl<'m> Compiler<'m> {
 
         let (data_relationship_kind, target) = match target_repr_kind {
             ReprKind::StructUnion(members) => {
+                // TODO: apply the same logic here as for "unambiguous" below
                 let target = DataRelationshipTarget::Union(target_def_id);
 
                 if members.iter().all(|(member_def_id, _)| {
@@ -501,10 +502,13 @@ impl<'m> Compiler<'m> {
                 }
             }
             _ => {
-                let kind = if let Some(identifies) = target_properties.identifies {
+                if let Some(identifies) = target_properties.identifies {
                     let meta = rel_def_meta(identifies, &self.defs);
                     if meta.relationship.object.0 == source_def_id {
-                        DataRelationshipKind::Id
+                        (
+                            DataRelationshipKind::Id,
+                            DataRelationshipTarget::Unambiguous(target_def_id),
+                        )
                     } else if self
                         .rel_ctx
                         .properties_by_def_id(source_def_id)
@@ -513,26 +517,35 @@ impl<'m> Compiler<'m> {
                         .map(|props| props.identified_by.is_some())
                         .unwrap_or(false)
                     {
-                        DataRelationshipKind::Edge(edge_projection)
+                        (
+                            DataRelationshipKind::Edge(edge_projection),
+                            DataRelationshipTarget::Unambiguous(meta.relationship.object.0),
+                        )
                     } else {
-                        DataRelationshipKind::Tree
+                        (
+                            DataRelationshipKind::Tree,
+                            DataRelationshipTarget::Unambiguous(target_def_id),
+                        )
                     }
                 } else if target_properties.identified_by.is_some() {
-                    DataRelationshipKind::Edge(edge_projection)
+                    (
+                        DataRelationshipKind::Edge(edge_projection),
+                        DataRelationshipTarget::Unambiguous(target_def_id),
+                    )
                 } else {
                     let source_properties = self.rel_ctx.properties_by_def_id(source_def_id);
                     let is_entity_id = source_properties
                         .map(|properties| properties.identified_by == Some(rel_id))
                         .unwrap_or(false);
 
-                    if is_entity_id {
+                    let kind = if is_entity_id {
                         DataRelationshipKind::Id
                     } else {
                         DataRelationshipKind::Tree
-                    }
-                };
+                    };
 
-                (kind, DataRelationshipTarget::Unambiguous(target_def_id))
+                    (kind, DataRelationshipTarget::Unambiguous(target_def_id))
+                }
             }
         };
 

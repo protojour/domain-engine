@@ -1,5 +1,8 @@
 use ontol_macros::test;
-use ontol_runtime::{attr::AttrRef, tuple::CardinalIdx, value::Value, PackageId};
+use ontol_runtime::{
+    attr::AttrRef, ontology::domain::DataRelationshipTarget, tuple::CardinalIdx, value::Value,
+    PackageId,
+};
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches, examples, expect_eq, serde_helper::*, TestCompile,
 };
@@ -609,7 +612,10 @@ fn entity_like_edge() {
         assert!(!edge.cardinals[1].unique);
         assert!(edge.cardinals[2].unique);
 
-        let [foo, edge] = test.bind(["foo", "edge"]);
+        let [foo, bar, edge] = test.bind(["foo", "bar", "edge"]);
+
+        assert!(foo.def.entity().is_some());
+        assert!(edge.def.entity().is_some());
 
         {
             let mut edge_relationships = foo.def.edge_relationships();
@@ -622,16 +628,24 @@ fn entity_like_edge() {
 
         {
             let mut edge_relationships = edge.def.edge_relationships();
-            let (.., from) = edge_relationships.next().unwrap();
-            let (.., to) = edge_relationships.next().unwrap();
+            let (_, from, from_proj) = edge_relationships.next().unwrap();
+            let (_, to, to_proj) = edge_relationships.next().unwrap();
 
-            assert_eq!(from.subject, CardinalIdx(2));
-            assert_eq!(from.object, CardinalIdx(0));
-            assert!(from.one_to_one);
+            let DataRelationshipTarget::Unambiguous(from_target) = from.target else {
+                panic!()
+            };
+            assert_eq!(from_target, foo.def_id());
+            assert_eq!(from_proj.subject, CardinalIdx(2));
+            assert_eq!(from_proj.object, CardinalIdx(0));
+            assert!(from_proj.one_to_one);
 
-            assert_eq!(to.subject, CardinalIdx(2));
-            assert_eq!(to.object, CardinalIdx(1));
-            assert!(to.one_to_one);
+            let DataRelationshipTarget::Unambiguous(to_target) = to.target else {
+                panic!()
+            };
+            assert_eq!(to_target, bar.def_id());
+            assert_eq!(to_proj.subject, CardinalIdx(2));
+            assert_eq!(to_proj.object, CardinalIdx(1));
+            assert!(to_proj.one_to_one);
         }
     });
 }
