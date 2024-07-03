@@ -233,7 +233,7 @@ impl ::std::fmt::Debug for EdgeId {
 impl_ontol_debug!(EdgeId);
 
 /// Sorted set of DefIds
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
+#[derive(Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub struct DefIdSet(SmallVec<DefId, 1>);
 
 impl DefIdSet {
@@ -266,5 +266,54 @@ impl FromIterator<DefId> for DefIdSet {
         let mut def_ids: SmallVec<DefId, 1> = iter.into_iter().collect();
         def_ids.sort();
         Self(def_ids)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{DefId, PackageId};
+
+    use super::DefIdSet;
+
+    fn def(i: u16) -> DefId {
+        DefId(PackageId::first(), i)
+    }
+
+    #[test]
+    fn def_id_set_insert() {
+        let mut set = DefIdSet::default();
+        assert_eq!(0, set.len());
+
+        set.insert(def(42));
+        assert_eq!(1, set.len());
+
+        set.insert(def(42));
+        assert_eq!(1, set.len());
+
+        set.insert(def(40));
+        assert_eq!(2, set.len());
+
+        set.insert(def(40));
+        assert_eq!(2, set.len());
+
+        set.insert(def(41));
+        assert_eq!(3, set.len());
+    }
+
+    #[test]
+    fn def_id_set_from_iterator() {
+        let mut set = DefIdSet::from_iter([def(10), def(5), def(15)]);
+
+        set.insert(def(5));
+        assert_eq!(3, set.len());
+
+        set.insert(def(10));
+        assert_eq!(3, set.len());
+
+        set.insert(def(15));
+        assert_eq!(3, set.len());
+
+        set.insert(def(20));
+        assert_eq!(4, set.len());
     }
 }
