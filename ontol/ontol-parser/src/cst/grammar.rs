@@ -336,7 +336,7 @@ fn type_ref_inner(p: &mut CstParser, accept: TypeAccept, label: &'static str) {
             }
         }
 
-        if p.at() == K![|] && accept.contains(TypeAccept::UNION) {
+        if accept.contains(TypeAccept::UNION) && p.at() == K![|] {
             if let UnionState::Potential(cursor) = &union_state {
                 union_state = UnionState::Started(p.insert_node(*cursor, Kind::TypeUnion));
             }
