@@ -1,4 +1,7 @@
-use std::{collections::hash_map::Entry, ops::Range};
+use std::{
+    collections::{hash_map::Entry, BTreeSet},
+    ops::Range,
+};
 
 use ontol_parser::{
     cst::{
@@ -8,6 +11,7 @@ use ontol_parser::{
     lexer::{kind::Kind, unescape::unescape_regex},
 };
 use ontol_runtime::DefId;
+use tracing::debug;
 
 use crate::{
     def::{DefKind, TypeDef, TypeDefFlags},
@@ -125,8 +129,46 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 None
             }
             (insp::TypeRef::TypeUnion(type_union), _) => {
-                CompileError::TODO("type union").span_report(type_union.0.span(), &mut self.ctx);
-                None
+                let mut members: BTreeSet<DefId> = Default::default();
+
+                for type_ref in type_union.members() {
+                    if let insp::TypeRef::IdentPath(path) = type_ref {
+                        if let Some(member_def_id) = self.lookup_path(&path) {
+                            members.insert(member_def_id);
+                        }
+                    } else {
+                        CompileError::TODO("union member must be a path")
+                            .span_report(type_ref.view().span(), &mut self.ctx);
+                    }
+                }
+
+                if let Some(union_def_id) = self.ctx.anonymous_unions.get(&members) {
+                    Some(*union_def_id)
+                } else {
+                    let union_def_id = self.ctx.compiler.defs.alloc_def_id(self.ctx.package_id);
+                    self.ctx.set_def_kind(
+                        union_def_id,
+                        DefKind::InlineUnion(members.clone()),
+                        type_union.view().span(),
+                    );
+
+                    // add to cache
+                    self.ctx.anonymous_unions.insert(members, union_def_id);
+
+                    type_union.view();
+
+                    debug!(
+                        "{union_def_id:?}: <inline_union {}>",
+                        type_union.view().display()
+                    );
+
+                    self.ctx
+                        .compiler
+                        .namespaces
+                        .add_anonymous(self.ctx.package_id, union_def_id);
+
+                    Some(union_def_id)
+                }
             }
         }
     }

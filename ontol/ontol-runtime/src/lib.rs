@@ -4,6 +4,7 @@ use std::{fmt::Debug, str::FromStr};
 
 use ::serde::{Deserialize, Serialize};
 use ontol_macros::OntolDebug;
+use smallvec::SmallVec;
 use value::{TagFlags, ValueTagError};
 
 pub mod attr;
@@ -230,3 +231,40 @@ impl ::std::fmt::Debug for EdgeId {
 }
 
 impl_ontol_debug!(EdgeId);
+
+/// Sorted set of DefIds
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
+pub struct DefIdSet(SmallVec<DefId, 1>);
+
+impl DefIdSet {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &DefId> {
+        self.0.iter()
+    }
+
+    pub fn insert(&mut self, def_id: DefId) {
+        match self.0.binary_search(&def_id) {
+            Ok(_pos) => {} // element already in vector @ `pos`
+            Err(pos) => self.0.insert(pos, def_id),
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
+}
+
+impl FromIterator<DefId> for DefIdSet {
+    fn from_iter<T: IntoIterator<Item = DefId>>(iter: T) -> Self {
+        let mut def_ids: SmallVec<DefId, 1> = iter.into_iter().collect();
+        def_ids.sort();
+        Self(def_ids)
+    }
+}

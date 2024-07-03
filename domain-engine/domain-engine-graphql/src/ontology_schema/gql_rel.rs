@@ -157,12 +157,12 @@ impl EdgeCardinal {
         self.idx.try_into().unwrap()
     }
 
-    fn target(&self) -> gql_def::Def {
-        let target_def_id = match self.inner.target {
-            ontol_runtime::ontology::domain::DataRelationshipTarget::Unambiguous(def_id) => def_id,
-            ontol_runtime::ontology::domain::DataRelationshipTarget::Union(def_id) => def_id,
-        };
-        gql_def::Def { id: target_def_id }
+    fn target(&self) -> Vec<gql_def::Def> {
+        self.inner
+            .target
+            .iter()
+            .map(|def_id| gql_def::Def { id: *def_id })
+            .collect()
     }
 }
 

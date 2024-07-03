@@ -16,7 +16,7 @@ use ontol_runtime::{
     },
     property::ValueCardinality,
     rustdoc::RustDoc,
-    DefId, EdgeId, PackageId, RelationshipId,
+    DefId, DefIdSet, EdgeId, PackageId, RelationshipId,
 };
 use std::{
     collections::{BTreeSet, HashMap},
@@ -245,16 +245,22 @@ impl<'m> Compiler<'m> {
                 };
 
                 for variable in edge.variables.values() {
-                    let target_def_id = if variable.def_set.len() == 1 {
-                        variable.def_set.iter().copied().next().unwrap()
+                    let entity_count = variable
+                        .def_set
+                        .iter()
+                        .filter(|def_id| self.entity_ctx.entities.contains_key(&def_id))
+                        .count();
+
+                    let is_entity = if entity_count == variable.def_set.len() {
+                        true
+                    } else if entity_count == 0 {
+                        false
                     } else {
-                        todo!("symbolic edge union: {:?}", variable.def_set)
+                        panic!("FIXME: mix of entity/non-entity");
                     };
 
-                    let is_entity = self.entity_ctx.entities.contains_key(&target_def_id);
-
                     edge_info.cardinals.push(EdgeCardinal {
-                        target: DataRelationshipTarget::Unambiguous(target_def_id),
+                        target: variable.def_set.iter().copied().collect(),
                         unique: is_entity && variable.one_to_one_count > 0,
                         is_entity,
                     });
@@ -563,9 +569,9 @@ impl<'m> Compiler<'m> {
                     for i in 0_u8..2 {
                         if i == edge_projection.subject.0 {
                             edge_info.cardinals.push(EdgeCardinal {
-                                target: DataRelationshipTarget::Unambiguous(
-                                    self.identifier_to_vertex_def_id(source_def_id),
-                                ),
+                                target: DefIdSet::from_iter([
+                                    self.identifier_to_vertex_def_id(source_def_id)
+                                ]),
                                 unique: matches!(
                                     meta.relationship.object_cardinality.1,
                                     ValueCardinality::Unit
@@ -574,9 +580,9 @@ impl<'m> Compiler<'m> {
                             });
                         } else {
                             edge_info.cardinals.push(EdgeCardinal {
-                                target: DataRelationshipTarget::Unambiguous(
-                                    self.identifier_to_vertex_def_id(target_def_id),
-                                ),
+                                target: DefIdSet::from_iter([
+                                    self.identifier_to_vertex_def_id(target_def_id)
+                                ]),
                                 unique: matches!(
                                     meta.relationship.subject_cardinality.1,
                                     ValueCardinality::Unit
@@ -588,21 +594,29 @@ impl<'m> Compiler<'m> {
 
                     if let Some(edge_params) = edge_params {
                         edge_info.cardinals.resize_with(3, || EdgeCardinal {
-                            target: DataRelationshipTarget::Unambiguous(edge_params),
+                            target: DefIdSet::from_iter([edge_params]),
                             unique: false,
                             is_entity: false,
                         });
                     }
                 }
 
-                if let (
-                    DataRelationshipTarget::Union(union_def_id),
-                    write @ DataRelationshipTarget::Unambiguous(_),
-                ) = (
-                    &target,
-                    &mut edge_info.cardinals[edge_projection.object.0 as usize].target,
-                ) {
-                    *write = DataRelationshipTarget::Union(*union_def_id);
+                // replace cardinal target with union members if union was found
+                if let DataRelationshipTarget::Union(union_def_id) = &target {
+                    let cardinal_target =
+                        &mut edge_info.cardinals[edge_projection.object.0 as usize].target;
+
+                    cardinal_target.clear();
+
+                    let Some(ReprKind::Union(members) | ReprKind::StructUnion(members)) =
+                        self.repr_ctx.get_repr_kind(union_def_id)
+                    else {
+                        panic!("not a union");
+                    };
+
+                    for (member, _span) in members {
+                        cardinal_target.insert(*member);
+                    }
                 }
             }
         }

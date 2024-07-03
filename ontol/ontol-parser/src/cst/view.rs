@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{
     lexer::{
         kind::Kind,
@@ -44,6 +46,10 @@ pub trait NodeViewExt: NodeView {
         self.local_tokens()
             .filter(move |token| token.kind() == kind)
     }
+
+    fn display(self) -> NodeDisplay<Self> {
+        NodeDisplay(self)
+    }
 }
 
 impl<T> NodeViewExt for T where T: NodeView {}
@@ -74,4 +80,29 @@ impl<T: TokenView> TokenViewExt for T {}
 pub enum Item<N: NodeView> {
     Node(N),
     Token(N::Token),
+}
+
+pub struct NodeDisplay<V>(V);
+
+impl<V: NodeView> Display for NodeDisplay<V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for child in self.0.children() {
+            match child {
+                Item::Node(node) => {
+                    write!(f, "{}", node.display())?;
+                }
+                Item::Token(token) => match token.kind() {
+                    Kind::Comment | Kind::DocComment => {}
+                    Kind::Whitespace => {
+                        write!(f, " ")?;
+                    }
+                    _ => {
+                        write!(f, "{}", token.slice())?;
+                    }
+                },
+            }
+        }
+
+        Ok(())
+    }
 }

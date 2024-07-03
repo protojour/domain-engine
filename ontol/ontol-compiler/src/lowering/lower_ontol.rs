@@ -48,6 +48,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 pkg_def_id,
                 package_id: src.package_id,
                 source_id: src.id,
+                anonymous_unions: Default::default(),
                 root_defs: Default::default(),
             },
             _phantom: PhantomData,

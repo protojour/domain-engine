@@ -1,6 +1,6 @@
 use fnv::FnvHashSet;
 use ontol_runtime::{ontology::ontol::TextConstant, DefId, EdgeId, PackageId};
-use tracing::{debug, debug_span};
+use tracing::{debug, debug_span, info};
 
 use crate::{
     def::{rel_def_meta, DefKind, RelParams},
@@ -66,32 +66,7 @@ impl<'m> Compiler<'m> {
     pub(crate) fn seal_domain(&mut self, package_id: PackageId) {
         debug!("seal {package_id:?}");
 
-        {
-            let mut type_check = self.type_check();
-
-            // pre repr checks
-            for def_id in type_check.defs.iter_package_def_ids(package_id) {
-                if let Some(def) = type_check.defs.table.get(&def_id) {
-                    if let DefKind::Type(_) = &def.kind {
-                        type_check.check_domain_type_pre_repr(def_id, def);
-                    }
-                }
-            }
-
-            // repr checks
-            for def_id in type_check.defs.iter_package_def_ids(package_id) {
-                type_check.repr_check(def_id).check_repr_root();
-            }
-
-            // domain type checks
-            for def_id in type_check.defs.iter_package_def_ids(package_id) {
-                if let Some(def) = type_check.defs.table.get(&def_id) {
-                    if let DefKind::Type(_) = &def.kind {
-                        type_check.check_domain_type_post_repr(def_id, def);
-                    }
-                }
-            }
-        }
+        self.domain_type_repr_check(package_id);
 
         // entity check
         // this is not in the TypeCheck context because it may
@@ -100,8 +75,50 @@ impl<'m> Compiler<'m> {
             self.check_entity(def_id);
         }
 
-        // check that no types use entities as supertypes
-        for (_, is_table) in self.thesaurus.iter() {
+        self.domain_no_entity_supertype_check(package_id);
+        self.domain_symbolic_edge_check(package_id);
+        self.domain_union_and_edge_check(package_id);
+        self.domain_rel_normalization(package_id);
+        self.domain_map_check(package_id);
+
+        self.seal_ctx.mark_domain_sealed(package_id);
+    }
+
+    /// Check repr for all types in the domain
+    fn domain_type_repr_check(&mut self, package_id: PackageId) {
+        let mut type_check = self.type_check();
+
+        // pre repr checks
+        for def_id in type_check.defs.iter_package_def_ids(package_id) {
+            if let Some(def) = type_check.defs.table.get(&def_id) {
+                if let DefKind::Type(_) = &def.kind {
+                    type_check.check_domain_type_pre_repr(def_id, def);
+                }
+            }
+        }
+
+        // repr checks
+        for def_id in type_check.defs.iter_package_def_ids(package_id) {
+            type_check.repr_check(def_id).check_repr_root();
+        }
+
+        // domain type checks
+        for def_id in type_check.defs.iter_package_def_ids(package_id) {
+            if let Some(def) = type_check.defs.table.get(&def_id) {
+                if let DefKind::Type(_) = &def.kind {
+                    type_check.check_domain_type_post_repr(def_id, def);
+                }
+            }
+        }
+    }
+
+    /// check that no types use entities as supertypes
+    fn domain_no_entity_supertype_check(&mut self, package_id: PackageId) {
+        for (def_id, is_table) in self.thesaurus.iter() {
+            if def_id.package_id() != package_id {
+                continue;
+            }
+
             for (is, span) in is_table {
                 if matches!(&is.rel, TypeRelation::Super) {
                     let identified_by = self
@@ -118,63 +135,85 @@ impl<'m> Compiler<'m> {
                 }
             }
         }
+    }
 
-        // symbolic edge check
+    /// Check/process all symbolic edges in the domain
+    fn domain_symbolic_edge_check(&mut self, package_id: PackageId) {
         for edge_id in self.defs.iter_package_def_ids(package_id) {
-            if let Some(DefKind::Edge) = self.defs.def_kind_option(edge_id) {
-                if let Some(edge) = self.edge_ctx.symbolic_edges.get_mut(&EdgeId(edge_id)) {
-                    for variable in edge.variables.values_mut() {
-                        if variable.def_set.is_empty() {
-                            CompileError::SymEdgeNoDefinitionForExistentialVar
-                                .span(variable.span)
-                                .report(&mut self.errors);
-                        } else {
-                            // refine def set
-                            // refinement means that it should consist only of entity defs.
+            let Some(DefKind::Edge) = self.defs.def_kind_option(edge_id) else {
+                continue;
+            };
+            let Some(edge) = self.edge_ctx.symbolic_edges.get_mut(&EdgeId(edge_id)) else {
+                continue;
+            };
 
-                            let raw_def_set = std::mem::take(&mut variable.def_set);
-                            let mut refined_def_set: FnvHashSet<DefId> = Default::default();
+            for variable in edge.variables.values_mut() {
+                if variable.def_set.is_empty() {
+                    // FIXME: This is actually not an error.
+                    // A domain could just define a symbolic edge, and _other_ domains
+                    // populate it.
+                    CompileError::SymEdgeNoDefinitionForExistentialVar
+                        .span(variable.span)
+                        .report(&mut self.errors);
+                    continue;
+                }
 
-                            for def_id in raw_def_set {
-                                if let Some(properties) = self.rel_ctx.properties_by_def_id(def_id)
-                                {
-                                    if let Some(identifies_rel_id) = properties.identifies {
-                                        let meta = rel_def_meta(identifies_rel_id, &self.defs);
+                // refine/normalize def set
+                // refinement means that it should consist only of entity defs.
 
-                                        refined_def_set.insert(meta.relationship.object.0);
-                                    } else {
-                                        refined_def_set.insert(def_id);
-                                    }
-                                }
+                info!("raw def set: {:?}", variable.def_set);
+
+                // step 1: resolve unions
+                for def_id in std::mem::take(&mut variable.def_set) {
+                    match self.repr_ctx.get_repr_kind(&def_id) {
+                        Some(ReprKind::Union(members) | ReprKind::StructUnion(members)) => {
+                            for (member, _span) in members {
+                                variable.def_set.insert(*member);
                             }
+                        }
+                        _ => {
+                            variable.def_set.insert(def_id);
+                        }
+                    }
+                }
 
-                            variable.def_set = refined_def_set;
+                // step 2: resolve identifier types
+                for def_id in std::mem::take(&mut variable.def_set) {
+                    if let Some(properties) = self.rel_ctx.properties_by_def_id(def_id) {
+                        if let Some(identifies_rel_id) = properties.identifies {
+                            let meta = rel_def_meta(identifies_rel_id, &self.defs);
+
+                            variable.def_set.insert(meta.relationship.object.0);
+                        } else {
+                            variable.def_set.insert(def_id);
                         }
                     }
                 }
             }
         }
+    }
 
-        {
-            let mut type_check = self.type_check();
+    fn domain_union_and_edge_check(&mut self, package_id: PackageId) {
+        let mut type_check = self.type_check();
 
-            // union and extern checks
-            for def_id in type_check.defs.iter_package_def_ids(package_id) {
-                match type_check.repr_ctx.get_repr_kind(&def_id) {
-                    Some(ReprKind::Union(_) | ReprKind::StructUnion(_)) => {
-                        for error in type_check.check_union(def_id) {
-                            error.report(&mut type_check);
-                        }
+        // union and extern checks
+        for def_id in type_check.defs.iter_package_def_ids(package_id) {
+            match type_check.repr_ctx.get_repr_kind(&def_id) {
+                Some(ReprKind::Union(_) | ReprKind::StructUnion(_)) => {
+                    for error in type_check.check_union(def_id) {
+                        error.report(&mut type_check);
                     }
-                    Some(ReprKind::Extern) => {
-                        type_check.check_extern(def_id, type_check.defs.def_span(def_id));
-                    }
-                    _ => {}
                 }
+                Some(ReprKind::Extern) => {
+                    type_check.check_extern(def_id, type_check.defs.def_span(def_id));
+                }
+                _ => {}
             }
         }
+    }
 
-        // Various cleanup/normalization
+    /// Various cleanup/normalization
+    fn domain_rel_normalization(&mut self, package_id: PackageId) {
         for def_id in self.defs.iter_package_def_ids(package_id) {
             let Some(def) = self.defs.table.get_mut(&def_id) else {
                 // Can happen in error cases
@@ -201,76 +240,73 @@ impl<'m> Compiler<'m> {
                 }
             }
         }
+    }
 
-        // check map statements
-        {
-            let mut map_defs: Vec<DefId> = vec![];
+    fn domain_map_check(&mut self, package_id: PackageId) {
+        let mut map_defs: Vec<DefId> = vec![];
 
-            for def_id in self.defs.iter_package_def_ids(package_id) {
-                {
-                    let Some(def) = self.defs.table.get(&def_id) else {
-                        // Can happen in error cases
-                        continue;
-                    };
-                    if matches!(&def.kind, DefKind::Mapping { .. }) {
-                        map_defs.push(def_id);
-                    } else {
-                        continue;
-                    }
-                }
-
-                // Infer anonymous types at root of named maps
-                if let Some(inference_info) = self.check_map_arm_def_inference(def_id) {
-                    self.type_check().check_def(inference_info.source.1);
-                    let new_defs = self
-                        .map_arm_def_inferencer(def_id)
-                        .infer_map_arm_type(inference_info);
-
-                    for def_id in new_defs {
-                        self.type_check().check_def(def_id);
-                    }
-
-                    self.type_check().check_def(inference_info.target.1);
+        for def_id in self.defs.iter_package_def_ids(package_id) {
+            {
+                let Some(def) = self.defs.table.get(&def_id) else {
+                    // Can happen in error cases
+                    continue;
+                };
+                if matches!(&def.kind, DefKind::Mapping { .. }) {
+                    map_defs.push(def_id);
+                } else {
+                    continue;
                 }
             }
 
-            let mut type_check = self.type_check();
+            // Infer anonymous types at root of named maps
+            if let Some(inference_info) = self.check_map_arm_def_inference(def_id) {
+                self.type_check().check_def(inference_info.source.1);
+                let new_defs = self
+                    .map_arm_def_inferencer(def_id)
+                    .infer_map_arm_type(inference_info);
 
-            for def_id in map_defs {
-                let def = type_check.defs.table.get(&def_id).unwrap();
+                for def_id in new_defs {
+                    self.type_check().check_def(def_id);
+                }
 
-                if let DefKind::Mapping {
-                    ident: _,
-                    arms,
-                    var_alloc,
-                    extern_def_id,
-                    is_abstract,
-                } = &def.kind
-                {
-                    if let Some(extern_def_id) = extern_def_id {
-                        type_check.check_map_extern(def, *arms, *extern_def_id);
-                    } else {
-                        match type_check.check_map(
-                            (def.id, def.span),
-                            var_alloc,
-                            *arms,
-                            if *is_abstract {
-                                MapArmsKind::Abstract
-                            } else {
-                                MapArmsKind::Concrete
-                            },
-                        ) {
-                            Ok(_) => {}
-                            Err(error) => {
-                                debug!("Check map error: {error:?}");
-                            }
+                self.type_check().check_def(inference_info.target.1);
+            }
+        }
+
+        let mut type_check = self.type_check();
+
+        for def_id in map_defs {
+            let def = type_check.defs.table.get(&def_id).unwrap();
+
+            if let DefKind::Mapping {
+                ident: _,
+                arms,
+                var_alloc,
+                extern_def_id,
+                is_abstract,
+            } = &def.kind
+            {
+                if let Some(extern_def_id) = extern_def_id {
+                    type_check.check_map_extern(def, *arms, *extern_def_id);
+                } else {
+                    match type_check.check_map(
+                        (def.id, def.span),
+                        var_alloc,
+                        *arms,
+                        if *is_abstract {
+                            MapArmsKind::Abstract
+                        } else {
+                            MapArmsKind::Concrete
+                        },
+                    ) {
+                        Ok(_) => {}
+                        Err(error) => {
+                            debug!("Check map error: {error:?}");
                         }
                     }
                 }
             }
         }
-
-        self.seal_ctx.mark_domain_sealed(package_id);
     }
 }
 

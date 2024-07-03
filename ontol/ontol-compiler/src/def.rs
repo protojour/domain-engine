@@ -1,4 +1,8 @@
-use std::{borrow::Cow, collections::HashMap, ops::Range};
+use std::{
+    borrow::Cow,
+    collections::{BTreeSet, HashMap},
+    ops::Range,
+};
 
 use fnv::FnvHashMap;
 use ontol_macros::RustDoc;
@@ -50,6 +54,7 @@ pub enum DefKind<'m> {
     Regex(&'m str),
     /// A type definition in some domain:
     Type(TypeDef<'m>),
+    InlineUnion(BTreeSet<DefId>),
     BuiltinRelType(BuiltinRelationKind, Option<&'static str>),
     Edge,
     Relationship(Relationship),
@@ -81,6 +86,7 @@ impl<'m> DefKind<'m> {
             Self::EmptySequence => None,
             Self::Fn(_) => None,
             Self::Type(domain_type) => domain_type.ident.map(|ident| ident.into()),
+            Self::InlineUnion(_) => None,
             Self::BuiltinRelType(_, ident) => ident.map(|ident| ident.into()),
             Self::Edge => None,
             Self::Relationship(_) => None,

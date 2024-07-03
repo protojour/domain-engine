@@ -105,7 +105,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         // This syntax just defines the relation the first time it's used
         let relation_def_id = self.ctx.define_relation_if_undefined(relation_key, from.1);
 
-        debug!("{:?}: <transition>", relation_def_id.0);
+        debug!("{:?}: <transition>", relation_def_id);
 
         Some(self.ctx.define_anonymous(
             DefKind::Relationship(Relationship {

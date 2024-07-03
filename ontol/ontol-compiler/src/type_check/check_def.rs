@@ -7,6 +7,7 @@ use crate::{
     codegen::task::ConstCodegenTask,
     def::{DefKind, TypeDef},
     mem::Intern,
+    thesaurus::TypeRelation,
     type_check::hir_build_ctx::HirBuildCtx,
     types::{Type, TypeRef},
 };
@@ -38,6 +39,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 ..
             }) => self.type_ctx.intern(Type::Domain(def_id)),
             DefKind::Type(TypeDef { ident: None, .. }) => {
+                self.type_ctx.intern(Type::Anonymous(def_id))
+            }
+            DefKind::InlineUnion(members) => {
+                for member in members {
+                    self.thesaurus.insert_domain_is(
+                        def_id,
+                        TypeRelation::SubVariant,
+                        *member,
+                        def.span,
+                    );
+                }
                 self.type_ctx.intern(Type::Anonymous(def_id))
             }
             DefKind::TextLiteral(_) => self.type_ctx.intern(Type::TextConstant(def_id)),

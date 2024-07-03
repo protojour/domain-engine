@@ -7,7 +7,7 @@ use ontol_runtime::{
         processor::{ProcessorProfile, ProcessorProfileFlags, ScalarFormat},
     },
     ontology::{
-        domain::{DataRelationshipKind, DataRelationshipTarget, Def},
+        domain::{DataRelationshipKind, Def},
         ontol::TextConstant,
         Ontology,
     },
@@ -390,17 +390,16 @@ impl ArangoDatabase {
                     if name == other_edge_collection.name {
                         // return Err(anyhow!("duplicate edge name: {name}"));
 
-                        let type_disambiguation = match edge_info.cardinals[0].target {
-                            DataRelationshipTarget::Unambiguous(def_id) => def_id,
-                            DataRelationshipTarget::Union(def_id) => def_id,
-                        };
-
-                        let prefix =
+                        if let Some(type_disambiguation) =
+                            edge_info.cardinals[0].target.iter().next()
+                        {
+                            let prefix =
                             self.collections.get(&type_disambiguation).ok_or_else(|| {
                                 anyhow!("cannot disambiguate for `{name}` {edge_id:?}: {type_disambiguation:?}")
                             })?;
 
-                        name = format!("{prefix}_{name}");
+                            name = format!("{prefix}_{name}");
+                        }
                     }
                 }
 
@@ -410,10 +409,8 @@ impl ArangoDatabase {
             debug!("register edge collection {name}: edge_id={edge_id:?}");
 
             let rel_params = if edge_info.cardinals.len() > 2 {
-                match edge_info.cardinals[2].target {
-                    DataRelationshipTarget::Unambiguous(def_id) => Some(def_id),
-                    DataRelationshipTarget::Union(def_id) => Some(def_id),
-                }
+                // FIXME: This could be a union
+                edge_info.cardinals[2].target.iter().copied().next()
             } else {
                 None
             };

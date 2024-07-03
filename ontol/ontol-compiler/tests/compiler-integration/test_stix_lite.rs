@@ -1,5 +1,5 @@
 use ontol_macros::test;
-use ontol_runtime::{ontology::domain::DataRelationshipTarget, tuple::CardinalIdx};
+use ontol_runtime::{tuple::CardinalIdx, DefIdSet};
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches, examples::stix::stix_bundle, serde_helper::*,
     OntolTest, TestCompile,
@@ -60,17 +60,12 @@ fn stix_ontology_smoke(test: &OntolTest) {
         .find(|(edge_id, _)| *edge_id == &creator_edge_projection.id)
         .unwrap();
 
-    let DataRelationshipTarget::Unambiguous(reg_key_target) =
-        &reg_key_user_account_edge_info.cardinals[0].target
-    else {
-        panic!()
-    };
-    let DataRelationshipTarget::Unambiguous(user_account_target) =
-        &reg_key_user_account_edge_info.cardinals[1].target
-    else {
-        panic!()
-    };
-
-    assert_eq!(reg_key_target, &windows_registry_key.def_id());
-    assert_eq!(user_account_target, &user_account.def_id());
+    assert_eq!(
+        &reg_key_user_account_edge_info.cardinals[0].target,
+        &DefIdSet::from_iter([windows_registry_key.def_id()])
+    );
+    assert_eq!(
+        &reg_key_user_account_edge_info.cardinals[1].target,
+        &DefIdSet::from_iter([user_account.def_id()])
+    );
 }

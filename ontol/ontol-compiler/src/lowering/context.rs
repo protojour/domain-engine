@@ -1,7 +1,11 @@
 //! utilities for lowering ontol-parser output
 
-use std::{collections::HashMap, marker::PhantomData};
+use std::{
+    collections::{BTreeSet, HashMap},
+    marker::PhantomData,
+};
 
+use fnv::FnvHashMap;
 use indexmap::map::Entry;
 use ontol_parser::{
     cst::view::{NodeView, TokenView},
@@ -29,6 +33,7 @@ pub struct LoweringCtx<'c, 'm> {
     pub pkg_def_id: DefId,
     pub package_id: PackageId,
     pub source_id: SourceId,
+    pub anonymous_unions: FnvHashMap<BTreeSet<DefId>, DefId>,
     pub root_defs: Vec<DefId>,
 }
 

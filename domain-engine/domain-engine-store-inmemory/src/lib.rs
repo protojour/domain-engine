@@ -7,7 +7,6 @@ use domain_engine_core::system::ArcSystemApi;
 use domain_engine_core::Session;
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::interface::serde::processor::ProcessorMode;
-use ontol_runtime::ontology::domain::DataRelationshipTarget;
 use ontol_runtime::ontology::{config::DataStoreConfig, Ontology};
 use ontol_runtime::{DefId, EdgeId, PackageId};
 use tokio::sync::RwLock;
@@ -71,15 +70,8 @@ impl InMemoryDb {
 
                     let mut vertex_union = FnvHashSet::default();
 
-                    match cardinal.target {
-                        DataRelationshipTarget::Unambiguous(def_id) => {
-                            vertex_union.insert(def_id);
-                        }
-                        DataRelationshipTarget::Union(union_def_id) => {
-                            for def_id in ontology.union_variants(union_def_id) {
-                                vertex_union.insert(*def_id);
-                            }
-                        }
+                    for def_id in cardinal.target.iter() {
+                        vertex_union.insert(*def_id);
                     }
 
                     EdgeColumn {

@@ -389,6 +389,12 @@ impl<V: NodeView> TypeQuantList<V> {
     }
 }
 
+impl<V: NodeView> TypeUnion<V> {
+    pub fn members(&self) -> impl Iterator<Item = TypeRef<V>> {
+        self.view().sub_nodes().filter_map(TypeRef::from_view)
+    }
+}
+
 impl<V: NodeView> PatStruct<V> {
     pub fn modifiers(&self) -> impl Iterator<Item = V::Token> {
         self.view().local_tokens_filter(Kind::Modifier)

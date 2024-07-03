@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     impl_ontol_debug, interface::serde::operator::SerdeOperatorAddr, property::Cardinality,
-    query::order::Direction, tuple::CardinalIdx, DefId, EdgeId, RelationshipId,
+    query::order::Direction, tuple::CardinalIdx, DefId, DefIdSet, EdgeId, RelationshipId,
 };
 
 use super::{
@@ -275,7 +275,7 @@ pub struct EdgeInfo {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct EdgeCardinal {
     /// The target type of this cardinal
-    pub target: DataRelationshipTarget,
+    pub target: DefIdSet,
 
     /// Whether the values in this edge cardinal are unique
     pub unique: bool,

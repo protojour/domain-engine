@@ -1,8 +1,7 @@
 use indoc::indoc;
 use ontol_macros::test;
 use ontol_runtime::{
-    format_utils::Literal, ontology::domain::DataRelationshipTarget, property::ValueCardinality,
-    tuple::CardinalIdx, value::Value,
+    format_utils::Literal, property::ValueCardinality, tuple::CardinalIdx, value::Value, DefIdSet,
 };
 use ontol_test_utils::{
     examples::conduit::{
@@ -46,17 +45,14 @@ fn test_conduit_db_ontology_smoke() {
         .find(|(edge_id, _)| *edge_id == &author_edge_projection.id)
         .unwrap();
 
-    let DataRelationshipTarget::Unambiguous(article_target) = &author_edge_info.cardinals[0].target
-    else {
-        panic!()
-    };
-    let DataRelationshipTarget::Unambiguous(user_target) = &author_edge_info.cardinals[1].target
-    else {
-        panic!()
-    };
-
-    assert_eq!(article_target, &article.def_id());
-    assert_eq!(user_target, &user.def_id());
+    assert_eq!(
+        &author_edge_info.cardinals[0].target,
+        &DefIdSet::from_iter([article.def_id()])
+    );
+    assert_eq!(
+        &author_edge_info.cardinals[1].target,
+        &DefIdSet::from_iter([user.def_id()])
+    );
 }
 
 #[test]
