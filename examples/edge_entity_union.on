@@ -8,10 +8,10 @@ sym {
     (r) to: (target),
 }
 
-def foo_id (fmt '' => 'foo/' => uuid => .)
-def bar_id (fmt '' => 'bar/' => uuid => .)
-def baz_id (fmt '' => 'baz/' => uuid => .)
-def qux_id (fmt '' => 'qux/' => uuid => .)
+def foo_id (fmt '' => 'foo/' => text => .)
+def bar_id (fmt '' => 'bar/' => text => .)
+def baz_id (fmt '' => 'baz/' => text => .)
+def qux_id (fmt '' => 'qux/' => text => .)
 
 def foo (
     rel .'id'|id: foo_id
