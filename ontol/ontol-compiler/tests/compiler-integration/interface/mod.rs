@@ -1,1 +1,1 @@
-mod test_graphql_interface;
+mod graphql;
