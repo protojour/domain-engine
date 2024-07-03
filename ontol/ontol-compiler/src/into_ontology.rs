@@ -1,5 +1,6 @@
 use fnv::FnvHashMap;
 use indoc::indoc;
+use itertools::Itertools;
 use ontol_runtime::{
     interface::{
         serde::{SerdeDef, SerdeModifier},
@@ -8,7 +9,8 @@ use ontol_runtime::{
     ontology::{
         domain::{
             self, BasicDef, DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource,
-            DataRelationshipTarget, Def, Domain, EdgeCardinal, EdgeInfo, Entity,
+            DataRelationshipTarget, Def, Domain, EdgeCardinal, EdgeCardinalProjection, EdgeInfo,
+            Entity,
         },
         map::MapMeta,
         ontol::{OntolDomainMeta, TextConstant, TextLikeType},
@@ -146,6 +148,17 @@ impl<'m> Compiler<'m> {
 
             let mut edges: FnvHashMap<EdgeId, EdgeInfo> = Default::default();
 
+            for type_def_id in self.defs.iter_package_def_ids(package_id) {
+                if let Some(ReprKind::Union(members) | ReprKind::StructUnion(members)) =
+                    self.repr_ctx.get_repr_kind(&type_def_id)
+                {
+                    ontology_union_variants.insert(
+                        type_def_id,
+                        members.iter().map(|(member, _)| *member).collect(),
+                    );
+                }
+            }
+
             for (type_name, type_def_id) in type_namespace {
                 let type_name_constant = serde_gen.str_ctx.intern_constant(type_name);
                 let data_relationships = self.collect_relationships_and_edges(
@@ -155,15 +168,6 @@ impl<'m> Compiler<'m> {
                     serde_gen.str_ctx,
                 );
                 let def_kind = self.defs.def_kind(type_def_id);
-
-                if let Some(ReprKind::StructUnion(members)) =
-                    self.repr_ctx.get_repr_kind(&type_def_id)
-                {
-                    ontology_union_variants.insert(
-                        type_def_id,
-                        members.iter().map(|(member, _)| *member).collect(),
-                    );
-                }
 
                 domain.add_def(Def {
                     id: type_def_id,
@@ -465,9 +469,6 @@ impl<'m> Compiler<'m> {
         let (source_def_id, _, _) = meta.relationship.subject();
         let (target_def_id, _, _) = meta.relationship.object();
 
-        let Some(target_properties) = self.rel_ctx.properties_by_def_id(target_def_id) else {
-            return;
-        };
         let Some(target_repr_kind) = self.repr_ctx.get_repr_kind(&target_def_id) else {
             return;
         };
@@ -492,67 +493,38 @@ impl<'m> Compiler<'m> {
         let edge_projection = meta.relationship.projection;
 
         let (data_relationship_kind, target) = match target_repr_kind {
-            ReprKind::StructUnion(members) => {
-                // TODO: apply the same logic here as for "unambiguous" below
-                let target = DataRelationshipTarget::Union(target_def_id);
+            ReprKind::Union(members) | ReprKind::StructUnion(members) => {
+                let kinds_and_targets = members
+                    .iter()
+                    .map(|(member_def_id, _)| {
+                        self.data_relationship_kind_and_target(
+                            rel_id,
+                            edge_projection,
+                            source_def_id,
+                            *member_def_id,
+                        )
+                    })
+                    .collect_vec();
 
-                if members.iter().all(|(member_def_id, _)| {
-                    self.rel_ctx
-                        .properties_by_def_id(*member_def_id)
-                        .map(|properties| properties.identified_by.is_some())
-                        .unwrap_or(false)
-                }) {
+                let target = DataRelationshipTarget::Union(target_def_id);
+                if kinds_and_targets
+                    .iter()
+                    .all(|(kind, _)| matches!(kind, DataRelationshipKind::Edge(_)))
+                {
                     (DataRelationshipKind::Edge(edge_projection), target)
                 } else {
-                    (DataRelationshipKind::Tree, target)
-                }
-            }
-            _ => {
-                if let Some(identifies) = target_properties.identifies {
-                    let meta = rel_def_meta(identifies, &self.defs);
-                    if meta.relationship.object.0 == source_def_id {
-                        (
-                            DataRelationshipKind::Id,
-                            DataRelationshipTarget::Unambiguous(target_def_id),
-                        )
-                    } else if self
-                        .rel_ctx
-                        .properties_by_def_id(source_def_id)
-                        // It can be an edge (for now) only the the source (subject) is an entity.
-                        // i.e. there is no support for "indirect" edge properties
-                        .map(|props| props.identified_by.is_some())
-                        .unwrap_or(false)
-                    {
-                        (
-                            DataRelationshipKind::Edge(edge_projection),
-                            DataRelationshipTarget::Unambiguous(meta.relationship.object.0),
-                        )
-                    } else {
-                        (
-                            DataRelationshipKind::Tree,
-                            DataRelationshipTarget::Unambiguous(target_def_id),
-                        )
-                    }
-                } else if target_properties.identified_by.is_some() {
                     (
-                        DataRelationshipKind::Edge(edge_projection),
-                        DataRelationshipTarget::Unambiguous(target_def_id),
+                        DataRelationshipKind::Tree,
+                        DataRelationshipTarget::Union(target_def_id),
                     )
-                } else {
-                    let source_properties = self.rel_ctx.properties_by_def_id(source_def_id);
-                    let is_entity_id = source_properties
-                        .map(|properties| properties.identified_by == Some(rel_id))
-                        .unwrap_or(false);
-
-                    let kind = if is_entity_id {
-                        DataRelationshipKind::Id
-                    } else {
-                        DataRelationshipKind::Tree
-                    };
-
-                    (kind, DataRelationshipTarget::Unambiguous(target_def_id))
                 }
             }
+            _ => self.data_relationship_kind_and_target(
+                rel_id,
+                edge_projection,
+                source_def_id,
+                target_def_id,
+            ),
         };
 
         // collect edge
@@ -632,6 +604,61 @@ impl<'m> Compiler<'m> {
                 target,
             },
         );
+    }
+
+    fn data_relationship_kind_and_target(
+        &self,
+        rel_id: RelationshipId,
+        edge_projection: EdgeCardinalProjection,
+        source_def_id: DefId,
+        target_def_id: DefId,
+    ) -> (DataRelationshipKind, DataRelationshipTarget) {
+        let target_properties = self.rel_ctx.properties_by_def_id(target_def_id);
+
+        if let Some(identifies) = target_properties.and_then(|p| p.identifies) {
+            let meta = rel_def_meta(identifies, &self.defs);
+            if meta.relationship.object.0 == source_def_id {
+                (
+                    DataRelationshipKind::Id,
+                    DataRelationshipTarget::Unambiguous(target_def_id),
+                )
+            } else if self
+                .rel_ctx
+                .properties_by_def_id(source_def_id)
+                // It can be an edge (for now) only the the source (subject) is an entity.
+                // i.e. there is no support for "indirect" edge properties
+                .map(|props| props.identified_by.is_some())
+                .unwrap_or(false)
+            {
+                (
+                    DataRelationshipKind::Edge(edge_projection),
+                    DataRelationshipTarget::Unambiguous(target_def_id),
+                )
+            } else {
+                (
+                    DataRelationshipKind::Tree,
+                    DataRelationshipTarget::Unambiguous(target_def_id),
+                )
+            }
+        } else if target_properties.and_then(|p| p.identified_by).is_some() {
+            (
+                DataRelationshipKind::Edge(edge_projection),
+                DataRelationshipTarget::Unambiguous(target_def_id),
+            )
+        } else {
+            let source_properties = self.rel_ctx.properties_by_def_id(source_def_id);
+            let is_entity_id = source_properties
+                .map(|properties| properties.identified_by == Some(rel_id))
+                .unwrap_or(false);
+
+            let kind = if is_entity_id {
+                DataRelationshipKind::Id
+            } else {
+                DataRelationshipKind::Tree
+            };
+
+            (kind, DataRelationshipTarget::Unambiguous(target_def_id))
+        }
     }
 
     fn domain_entity(

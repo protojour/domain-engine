@@ -1,7 +1,7 @@
 use ontol_macros::test;
 use ontol_runtime::{
     attr::AttrRef, ontology::domain::DataRelationshipTarget, tuple::CardinalIdx, value::Value,
-    PackageId,
+    DefIdSet, PackageId,
 };
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches, examples, expect_eq, serde_helper::*, TestCompile,
@@ -603,19 +603,21 @@ fn edge_entity_simple() {
     let test = examples::EDGE_ENTITY_SIMPLE.1.compile();
     let ontology = test.ontology();
     let domain = ontology.find_domain(PackageId::second()).unwrap();
-    let (_, edge) = domain.edges().next().unwrap();
+    let [foo_id, foo, bar_id, link] = test.bind(["foo_id", "foo", "bar_id", "link"]);
 
-    assert_eq!(edge.cardinals.len(), 3);
-    assert!(edge.cardinals.iter().all(|cardinal| cardinal.is_entity));
+    {
+        let (_, edge) = domain.edges().next().unwrap();
 
-    assert!(!edge.cardinals[0].unique);
-    assert!(!edge.cardinals[1].unique);
-    assert!(edge.cardinals[2].unique);
+        assert_eq!(edge.cardinals.len(), 3);
+        assert!(edge.cardinals.iter().all(|cardinal| cardinal.is_entity));
 
-    let [foo, bar, edge] = test.bind(["foo", "bar", "edge"]);
+        assert!(!edge.cardinals[0].unique);
+        assert!(!edge.cardinals[1].unique);
+        assert!(edge.cardinals[2].unique);
+    }
 
     assert!(foo.def.entity().is_some());
-    assert!(edge.def.entity().is_some());
+    assert!(link.def.entity().is_some());
 
     {
         let mut edge_relationships = foo.def.edge_relationships();
@@ -627,24 +629,24 @@ fn edge_entity_simple() {
     }
 
     {
-        let mut edge_relationships = edge.def.edge_relationships();
-        let (_, from, from_proj) = edge_relationships.next().unwrap();
-        let (_, to, to_proj) = edge_relationships.next().unwrap();
+        let mut link_relationships = link.def.edge_relationships();
+        let (_, from, from_proj) = link_relationships.next().unwrap();
+        let (_, to, to_proj) = link_relationships.next().unwrap();
 
         let DataRelationshipTarget::Unambiguous(from_target) = from.target else {
             panic!()
         };
-        assert_eq!(from_target, foo.def_id());
-        assert_eq!(from_proj.subject, CardinalIdx(2));
-        assert_eq!(from_proj.object, CardinalIdx(0));
+        assert_eq!(foo_id.def_id(), from_target);
+        assert_eq!(CardinalIdx(2), from_proj.subject);
+        assert_eq!(CardinalIdx(0), from_proj.object);
         assert!(from_proj.one_to_one);
 
         let DataRelationshipTarget::Unambiguous(to_target) = to.target else {
             panic!()
         };
-        assert_eq!(to_target, bar.def_id());
-        assert_eq!(to_proj.subject, CardinalIdx(2));
-        assert_eq!(to_proj.object, CardinalIdx(1));
+        assert_eq!(bar_id.def_id(), to_target);
+        assert_eq!(CardinalIdx(2), to_proj.subject);
+        assert_eq!(CardinalIdx(1), to_proj.object);
         assert!(to_proj.one_to_one);
     }
 }
@@ -654,19 +656,35 @@ fn edge_entity_union() {
     let test = examples::EDGE_ENTITY_UNION.1.compile();
     let ontology = test.ontology();
     let domain = ontology.find_domain(PackageId::second()).unwrap();
-    let (_, edge) = domain.edges().next().unwrap();
 
-    assert_eq!(edge.cardinals.len(), 3);
-    assert!(edge.cardinals.iter().all(|cardinal| cardinal.is_entity));
-
-    assert!(!edge.cardinals[0].unique);
-    assert!(!edge.cardinals[1].unique);
-    assert!(edge.cardinals[2].unique);
-
-    let [foo, bar, baz, qux, edge] = test.bind(["foo", "bar", "baz", "qux", "edge"]);
+    let [foo_id, bar_id, baz_id, qux_id] = test.bind(["foo_id", "bar_id", "baz_id", "qux_id"]);
+    let [foo, bar, baz, qux, link] = test.bind(["foo", "bar", "baz", "qux", "link"]);
 
     assert!(foo.def.entity().is_some());
-    assert!(edge.def.entity().is_some());
+    assert!(link.def.entity().is_some());
+
+    {
+        let (_, edge) = domain.edges().next().unwrap();
+
+        assert_eq!(edge.cardinals.len(), 3);
+        assert!(edge.cardinals.iter().all(|cardinal| cardinal.is_entity));
+
+        assert!(!edge.cardinals[0].unique);
+        assert_eq!(
+            DefIdSet::from_iter([foo.def_id(), bar.def_id()]),
+            edge.cardinals[0].target
+        );
+        assert_eq!(
+            DefIdSet::from_iter([baz.def_id(), qux.def_id()]),
+            edge.cardinals[1].target
+        );
+        assert!(!edge.cardinals[1].unique);
+        assert_eq!(
+            DefIdSet::from_iter([link.def_id()]),
+            edge.cardinals[2].target
+        );
+        assert!(edge.cardinals[2].unique);
+    }
 
     {
         let mut edge_relationships = foo.def.edge_relationships();
@@ -678,24 +696,20 @@ fn edge_entity_union() {
     }
 
     {
-        let mut edge_relationships = edge.def.edge_relationships();
-        let (_, from, from_proj) = edge_relationships.next().unwrap();
-        let (_, to, to_proj) = edge_relationships.next().unwrap();
+        let mut link_relationships = link.def.edge_relationships();
+        let (_, from, from_proj) = link_relationships.next().unwrap();
+        let (_, to, to_proj) = link_relationships.next().unwrap();
 
-        let DataRelationshipTarget::Unambiguous(from_target) = from.target else {
-            panic!()
-        };
-        assert_eq!(from_target, foo.def_id());
-        assert_eq!(from_proj.subject, CardinalIdx(2));
-        assert_eq!(from_proj.object, CardinalIdx(0));
+        let from_target_variants = ontology.union_variants(from.target.def_id());
+        assert_eq!(&[foo_id.def_id(), bar_id.def_id()], from_target_variants);
+        assert_eq!(CardinalIdx(2), from_proj.subject);
+        assert_eq!(CardinalIdx(0), from_proj.object);
         assert!(from_proj.one_to_one);
 
-        let DataRelationshipTarget::Unambiguous(to_target) = to.target else {
-            panic!()
-        };
-        assert_eq!(to_target, bar.def_id());
-        assert_eq!(to_proj.subject, CardinalIdx(2));
-        assert_eq!(to_proj.object, CardinalIdx(1));
+        let to_target_variants = ontology.union_variants(to.target.def_id());
+        assert_eq!(&[baz_id.def_id(), qux_id.def_id()], to_target_variants);
+        assert_eq!(CardinalIdx(2), to_proj.subject);
+        assert_eq!(CardinalIdx(1), to_proj.object);
         assert!(to_proj.one_to_one);
     }
 }

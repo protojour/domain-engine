@@ -279,8 +279,8 @@ async fn edge_entity_simple(ds: &str) {
         bar(
             create: [{ id: "bar1" }]
         ) { node { id } }
-        edge(
-            create: [{ id: "edge1", from: "foo1", to: "bar1" }]
+        link(
+            create: [{ id: "link1", from: "foo1", to: "bar1" }]
         ) { node { id } }
     }"#
     .exec([], &schema, &ctx)
@@ -291,14 +291,14 @@ async fn edge_entity_simple(ds: &str) {
 
     expect_eq!(
         actual = r#"{
-            edges { nodes { id, from, to } }
+            links { nodes { id, from, to } }
             foos { nodes { id, related_to { nodes { id } } } }
         }"#
         .exec([], &schema, &ctx)
         .await,
         expected = Ok(graphql_value!({
-            "edges": { "nodes": [{
-                "id": "edge1",
+            "links": { "nodes": [{
+                "id": "link1",
                 "from": "foo1",
                 "to": "bar1",
             }]},
@@ -313,28 +313,26 @@ async fn edge_entity_simple(ds: &str) {
         }))
     );
 
-    info!("Delete edge");
+    info!("Delete link");
 
     r#"mutation {
-        edge(
-            delete: ["edge1"]
-        ) { deleted }
+        link(delete: ["link1"]) { deleted }
     }"#
     .exec([], &schema, &ctx)
     .await
     .unwrap();
 
-    info!("Query data after edge deletion");
+    info!("Query data after link deletion");
 
     expect_eq!(
         actual = r#"{
-            edges { nodes { id, from, to } }
+            links { nodes { id, from, to } }
             foos { nodes { id, related_to { nodes { id } } } }
         }"#
         .exec([], &schema, &ctx)
         .await,
         expected = Ok(graphql_value!({
-            "edges": { "nodes": [] },
+            "links": { "nodes": [] },
             "foos": {
                 "nodes": [{
                     "id": "foo1",

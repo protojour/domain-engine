@@ -210,7 +210,7 @@ impl DataRelationshipInfo {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, OntolDebug)]
+#[derive(Clone, Copy, Serialize, Deserialize, OntolDebug, Debug)]
 pub enum DataRelationshipKind {
     /// The relationship is between an entity and its identifier
     Id,

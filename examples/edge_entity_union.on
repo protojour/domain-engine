@@ -31,7 +31,7 @@ def qux (
 )
 
 /// This definition is both an entity in its own right and an edge
-def edge (
+def link (
     rel .'id'|id: (rel .is: text)
     rel .from: foo_id|bar_id
     rel .to: baz_id|qux_id
@@ -42,7 +42,7 @@ map foos(
     foo { ..@match foo() }
 )
 
-map edges(
+map links(
     (),
-    edge { ..@match edge() }
+    link { ..@match link() }
 )
