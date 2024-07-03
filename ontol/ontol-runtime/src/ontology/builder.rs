@@ -8,7 +8,7 @@ use crate::{
     },
     query::condition::Condition,
     vm::proc::{Lib, Procedure},
-    DefId, MapKey, PackageId, RelationshipId,
+    DefId, DefIdSet, MapKey, PackageId, RelationshipId,
 };
 
 use super::{
@@ -42,7 +42,7 @@ impl OntologyBuilder {
             .insert(package_id, config);
     }
 
-    pub fn union_variants(mut self, table: FnvHashMap<DefId, Box<[DefId]>>) -> Self {
+    pub fn union_variants(mut self, table: FnvHashMap<DefId, DefIdSet>) -> Self {
         self.data().union_variants = table;
         self
     }

@@ -22,7 +22,7 @@ use crate::{
         ontol_vm::OntolVm,
         proc::{Lib, Procedure},
     },
-    DefId, EdgeId, MapKey, PackageId, RelationshipId,
+    DefId, DefIdSet, EdgeId, MapKey, PackageId, RelationshipId,
 };
 
 use self::{
@@ -65,7 +65,7 @@ pub struct Data {
     domain_table: FnvHashMap<PackageId, Domain>,
     extended_entity_table: FnvHashMap<DefId, ExtendedEntityInfo>,
     ontol_domain_meta: OntolDomainMeta,
-    union_variants: FnvHashMap<DefId, Box<[DefId]>>,
+    union_variants: FnvHashMap<DefId, DefIdSet>,
     domain_interfaces: FnvHashMap<PackageId, Vec<DomainInterface>>,
     package_config_table: FnvHashMap<PackageId, PackageConfig>,
     docs: FnvHashMap<DefId, TextConstant>,
@@ -163,7 +163,7 @@ impl Ontology {
         self.data
             .union_variants
             .get(&union_def_id)
-            .map(|slice| slice.as_ref())
+            .map(|set| set.as_slice())
             .unwrap_or(&[])
     }
 

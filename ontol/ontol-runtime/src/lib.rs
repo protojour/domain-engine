@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use std::{fmt::Debug, str::FromStr};
+use std::{collections::BTreeSet, fmt::Debug, str::FromStr};
 
 use ::serde::{Deserialize, Serialize};
 use ontol_macros::OntolDebug;
@@ -245,6 +245,10 @@ impl DefIdSet {
         self.0.is_empty()
     }
 
+    pub fn as_slice(&self) -> &[DefId] {
+        self.0.as_slice()
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = &DefId> {
         self.0.iter()
     }
@@ -266,6 +270,13 @@ impl FromIterator<DefId> for DefIdSet {
         let mut def_ids: SmallVec<DefId, 1> = iter.into_iter().collect();
         def_ids.sort();
         Self(def_ids)
+    }
+}
+
+/// A BTreeSet is pre-sorted
+impl From<BTreeSet<DefId>> for DefIdSet {
+    fn from(value: BTreeSet<DefId>) -> Self {
+        Self(value.into_iter().collect())
     }
 }
 

@@ -120,7 +120,7 @@ impl<'m> Compiler<'m> {
         let mut strings = self.str_ctx.detach();
         let mut serde_gen = self.serde_generator(&mut strings, &union_member_cache);
         let mut builder = Ontology::builder();
-        let mut ontology_union_variants: FnvHashMap<DefId, Box<[DefId]>> = Default::default();
+        let mut ontology_union_variants: FnvHashMap<DefId, BTreeSet<DefId>> = Default::default();
 
         let dynamic_sequence_operator_addr = serde_gen.make_dynamic_sequence_addr();
 
@@ -362,7 +362,12 @@ impl<'m> Compiler<'m> {
                 direction_relationship: self.primitives.relations.direction,
                 edge_property: EDGE_PROPERTY.into(),
             })
-            .union_variants(ontology_union_variants)
+            .union_variants(
+                ontology_union_variants
+                    .into_iter()
+                    .map(|(union_id, set)| (union_id, DefIdSet::from(set)))
+                    .collect(),
+            )
             .extended_entity_info(self.entity_ctx.entities)
             .lib(self.code_ctx.result_lib)
             .docs(docs)
