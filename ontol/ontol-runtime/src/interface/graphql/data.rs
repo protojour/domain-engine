@@ -75,7 +75,7 @@ pub struct NativeScalarRef {
     pub kind: NativeScalarKind,
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub enum NativeScalarKind {
     Unit,
     Boolean,

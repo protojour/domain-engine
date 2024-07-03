@@ -36,7 +36,7 @@ use crate::{
     def::{rel_def_meta, rel_repr_meta, DefKind, RelParams, RelReprMeta, TypeDefFlags},
     interface::serde::{serde_generator::SerdeGenerator, SerdeKey},
     phf_build::build_phf_index_map,
-    relation::Property,
+    relation::{identifies_any, Property},
     repr::repr_model::{ReprKind, ReprScalarKind},
 };
 
@@ -847,7 +847,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
     fn harvest_data_struct_field(
         &mut self,
-        (rel_id, prop_key, property): (RelationshipId, &str, &Property),
+        (rel_id, prop_key, _property): (RelationshipId, &str, &Property),
         meta: RelReprMeta,
         property_field_producer: PropertyFieldProducer,
         field_namespace: &mut GraphqlNamespace,
@@ -888,7 +888,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 .gen_addr_lazy(gql_serde_key(value_def_id))
                 .unwrap();
 
-            let field_type = if property.is_entity_id {
+            let field_type = if identifies_any(value_def_id, self.relations, self.repr_ctx) {
                 TypeRef {
                     modifier,
                     unit: UnitTypeRef::NativeScalar(NativeScalarRef {

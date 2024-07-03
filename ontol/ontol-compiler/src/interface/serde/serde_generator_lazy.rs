@@ -24,7 +24,7 @@ use tracing::{debug, debug_span, warn};
 use crate::{
     def::{rel_def_meta, rel_repr_meta, RelParams, RelReprMeta},
     phf_build::build_phf_index_map,
-    relation::{Properties, Property},
+    relation::{identifies_any, Properties, Property},
     repr::repr_model::{ReprKind, ReprScalarKind},
 };
 
@@ -186,6 +186,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         if property.is_entity_id {
             flags |= SerdePropertyFlags::ENTITY_ID;
+        }
+
+        if identifies_any(value_type_def_id, self.rel_ctx, self.repr_ctx) {
+            flags |= SerdePropertyFlags::ANY_ID;
         }
 
         if flags.contains(SerdePropertyFlags::OPTIONAL | SerdePropertyFlags::ENTITY_ID) {

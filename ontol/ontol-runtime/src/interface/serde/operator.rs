@@ -490,9 +490,12 @@ bitflags::bitflags! {
         /// Property represents parameters to a relation: e.g. "_edge"
         const REL_PARAMS       = 0b00000010;
         const READ_ONLY        = 0b00000100;
+        /// The property is an identifier of the entity that owns the property
         const ENTITY_ID        = 0b00001000;
+        /// The property is an identifier of any entity (self or foreign)
+        const ANY_ID           = 0b00010000;
         /// Property is part of the entity graph
-        const IN_ENTITY_GRAPH  = 0b00010000;
+        const IN_ENTITY_GRAPH  = 0b00100000;
     }
 }
 

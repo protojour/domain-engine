@@ -11,7 +11,7 @@ use ontol_runtime::{
     },
 };
 use ontol_test_utils::{
-    examples::ARTIST_AND_INSTRUMENT,
+    examples::{ARTIST_AND_INSTRUMENT, EDGE_ENTITY_UNION},
     expect_eq, src_name,
     test_extensions::{
         graphql::{ObjectDataExt, TypeDataExt, UnitTypeRefExt},
@@ -450,4 +450,27 @@ fn graphql_flattened_union_pascal_casing() {
         assert_eq!(&test.ontology()[bar.typename], "FooKindBar");
         assert_eq!(&test.ontology()[qux.typename], "FooKindQux");
     });
+}
+
+#[test]
+fn test_edge_entity_union() {
+    let test = EDGE_ENTITY_UNION.1.compile();
+    let (_schema, test) = schema_test(&test, SrcName::default());
+    let _ontology = test.test.ontology();
+
+    let link = test.type_data("link", QueryLevel::Node).object_data();
+    {
+        assert_eq!(&["id", "from", "to"], link.field_names().as_slice());
+        let id_field = link.fields.get("id").unwrap();
+        let to_field = link.fields.get("to").unwrap();
+
+        expect_eq!(
+            actual = id_field.field_type.unit.native_scalar().kind,
+            expected = NativeScalarKind::ID
+        );
+        expect_eq!(
+            actual = to_field.field_type.unit.native_scalar().kind,
+            expected = NativeScalarKind::ID
+        );
+    }
 }

@@ -502,22 +502,28 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         typing_purpose,
                     ),
                     AppliedVariants::OneOf(_variants) => {
-                        let type_addr = self.schema_ctx.type_addr_by_def(def_id, query_level)
+                        if let Some(type_addr) = self
+                            .schema_ctx
+                            .type_addr_by_def(def_id, query_level)
                             .or_else(|| self.schema_ctx.type_addr_by_def(def_id, QueryLevel::Node))
-                            .unwrap_or_else(|| {
-                                panic!(
-                                    "no union found: {def_id:?}/{query_level:?}. union_op={union_op:#?}",
-                                    union_op = self.schema_ctx.ontology.debug(union_op),
-                                )
-                            });
+                        {
+                            let info = self.schema_ctx.get_schema_type(type_addr, typing_purpose);
 
-                        let info = self.schema_ctx.get_schema_type(type_addr, typing_purpose);
-
-                        match modifier.unit_optionality() {
-                            Optionality::Mandatory => self.registry.arg::<InputType>(name, &info),
-                            Optionality::Optional => {
-                                self.registry.arg::<Option<InputType>>(name, &info)
+                            match modifier.unit_optionality() {
+                                Optionality::Mandatory => {
+                                    self.registry.arg::<InputType>(name, &info)
+                                }
+                                Optionality::Optional => {
+                                    self.registry.arg::<Option<InputType>>(name, &info)
+                                }
                             }
+                        } else if property_flags.contains(SerdePropertyFlags::ANY_ID) {
+                            self.modified_arg::<juniper::ID>(name, modifier, &())
+                        } else {
+                            panic!(
+                                "no union found: {def_id:?}/{query_level:?}. union_op={union_op:#?}",
+                                union_op = self.schema_ctx.ontology.debug(union_op),
+                            )
                         }
                     }
                 }

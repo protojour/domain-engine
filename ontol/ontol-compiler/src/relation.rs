@@ -8,7 +8,12 @@ use ontol_runtime::{
 };
 use tracing::warn;
 
-use crate::{sequence::Sequence, text_patterns::TextPatternSegment, SourceSpan};
+use crate::{
+    repr::{repr_ctx::ReprCtx, repr_model::ReprKind},
+    sequence::Sequence,
+    text_patterns::TextPatternSegment,
+    SourceSpan,
+};
 
 /// Context that tracks relation and relationship information
 #[derive(Default)]
@@ -143,4 +148,16 @@ pub struct TypeParam {
 /// Cache of which DefId is a member of which unions
 pub struct UnionMemberCache {
     pub(crate) cache: FnvHashMap<DefId, BTreeSet<DefId>>,
+}
+
+/// Check if a def identifies any entities/vertices
+pub fn identifies_any(def_id: DefId, rel_ctx: &RelCtx, repr_ctx: &ReprCtx) -> bool {
+    match repr_ctx.get_repr_kind(&def_id) {
+        Some(ReprKind::Union(members) | ReprKind::StructUnion(members)) => members
+            .iter()
+            .any(|(def_id, _span)| identifies_any(*def_id, rel_ctx, repr_ctx)),
+        _ => rel_ctx
+            .properties_by_def_id(def_id)
+            .is_some_and(|p| p.identifies.is_some()),
+    }
 }
