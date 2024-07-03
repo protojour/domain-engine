@@ -252,7 +252,7 @@ impl<'m> Compiler<'m> {
                     let entity_count = variable
                         .def_set
                         .iter()
-                        .filter(|def_id| self.entity_ctx.entities.contains_key(&def_id))
+                        .filter(|def_id| self.entity_ctx.entities.contains_key(def_id))
                         .count();
 
                     let is_entity = if entity_count == variable.def_set.len() {

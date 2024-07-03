@@ -394,7 +394,7 @@ impl ArangoDatabase {
                             edge_info.cardinals[0].target.iter().next()
                         {
                             let prefix =
-                            self.collections.get(&type_disambiguation).ok_or_else(|| {
+                            self.collections.get(type_disambiguation).ok_or_else(|| {
                                 anyhow!("cannot disambiguate for `{name}` {edge_id:?}: {type_disambiguation:?}")
                             })?;
 
