@@ -1,9 +1,9 @@
 use fnv::FnvHashSet;
-use ontol_runtime::{ontology::ontol::TextConstant, DefId, EdgeId, PackageId};
-use tracing::{debug, debug_span, info};
+use ontol_runtime::{ontology::ontol::TextConstant, DefId, PackageId};
+use tracing::{debug, debug_span};
 
 use crate::{
-    def::{rel_def_meta, DefKind, RelParams},
+    def::{DefKind, RelParams},
     edge::EdgeCtx,
     package::ParsedPackage,
     repr::repr_model::ReprKind,
@@ -76,7 +76,6 @@ impl<'m> Compiler<'m> {
         }
 
         self.domain_no_entity_supertype_check(package_id);
-        self.domain_symbolic_edge_check(package_id);
         self.domain_union_and_edge_check(package_id);
         self.domain_rel_normalization(package_id);
         self.domain_map_check(package_id);
@@ -131,62 +130,6 @@ impl<'m> Compiler<'m> {
                         CompileError::EntityCannotBeSupertype
                             .span(*span)
                             .report(&mut self.errors);
-                    }
-                }
-            }
-        }
-    }
-
-    /// Check/process all symbolic edges in the domain
-    fn domain_symbolic_edge_check(&mut self, package_id: PackageId) {
-        for edge_id in self.defs.iter_package_def_ids(package_id) {
-            let Some(DefKind::Edge) = self.defs.def_kind_option(edge_id) else {
-                continue;
-            };
-            let Some(edge) = self.edge_ctx.symbolic_edges.get_mut(&EdgeId(edge_id)) else {
-                continue;
-            };
-
-            for variable in edge.variables.values_mut() {
-                if variable.def_set.is_empty() {
-                    // FIXME: This is actually not an error.
-                    // A domain could just define a symbolic edge, and _other_ domains
-                    // populate it.
-                    CompileError::SymEdgeNoDefinitionForExistentialVar
-                        .span(variable.span)
-                        .report(&mut self.errors);
-                    continue;
-                }
-
-                // refine/normalize def set
-                // refinement means that it should consist only of entity defs.
-
-                info!("raw def set: {:?}", variable.def_set);
-
-                // step 1: resolve unions
-                for def_id in std::mem::take(&mut variable.def_set) {
-                    match self.repr_ctx.get_repr_kind(&def_id) {
-                        Some(ReprKind::Union(members) | ReprKind::StructUnion(members)) => {
-                            for (member, _span) in members {
-                                variable.def_set.insert(*member);
-                            }
-                        }
-                        _ => {
-                            variable.def_set.insert(def_id);
-                        }
-                    }
-                }
-
-                // step 2: resolve identifier types
-                for def_id in std::mem::take(&mut variable.def_set) {
-                    if let Some(properties) = self.rel_ctx.properties_by_def_id(def_id) {
-                        if let Some(identifies_rel_id) = properties.identifies {
-                            let meta = rel_def_meta(identifies_rel_id, &self.defs);
-
-                            variable.def_set.insert(meta.relationship.object.0);
-                        } else {
-                            variable.def_set.insert(def_id);
-                        }
                     }
                 }
             }

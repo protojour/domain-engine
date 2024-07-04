@@ -59,7 +59,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     /// 2. a domain-defined unit type, which defines a "flattened" property
     fn check_named_relation(
         &mut self,
-        relationship_id: RelationshipId,
+        rel_id: RelationshipId,
         edge_id: Option<EdgeId>,
         relationship: &Relationship,
     ) -> TypeRef<'m> {
@@ -79,30 +79,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         self.check_subject_data_type(subject_ty, &subject.1);
         self.check_object_data_type(object_ty, &object.1);
 
-        let properties = self.rel_ctx.properties_by_def_id_mut(subject.0);
-        match &mut properties.table {
-            None => {
-                properties.table = Some(
-                    [(
-                        relationship_id,
-                        Property {
-                            cardinality: relationship.subject_cardinality,
-                            is_entity_id: false,
-                        },
-                    )]
-                    .into(),
-                );
-            }
-            Some(map) => {
-                map.insert(
-                    relationship_id,
-                    Property {
-                        cardinality: relationship.subject_cardinality,
-                        is_entity_id: false,
-                    },
-                );
-            }
-        }
+        self.rel_ctx
+            .properties_by_def_id_mut(subject.0)
+            .table_mut()
+            .insert(
+                rel_id,
+                Property {
+                    cardinality: relationship.subject_cardinality,
+                    is_entity_id: false,
+                    is_edge_partial: false,
+                },
+            );
 
         // Ensure properties in object
         self.rel_ctx.properties_by_def_id_mut(object.0);
@@ -114,13 +101,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             edge.variables
                 .get_mut(&slot.left)
                 .unwrap()
-                .def_set
-                .insert(subject.0);
+                .members
+                .entry(subject.0)
+                .or_default()
+                .insert(rel_id);
             edge.variables
                 .get_mut(&slot.right)
                 .unwrap()
-                .def_set
-                .insert(object.0);
+                .members
+                .entry(object.0)
+                .or_default()
+                .insert(rel_id);
         }
 
         object_ty

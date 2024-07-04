@@ -173,7 +173,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
 
         if let Some(explicit_value_generator) = self.rel_ctx.value_generators.get(&rel_id) {
-            flags |= SerdePropertyFlags::READ_ONLY;
+            flags |= SerdePropertyFlags::READ_ONLY | SerdePropertyFlags::GENERATOR;
             if value_generator.is_some() {
                 panic!("BUG: Cannot have both a default value and a generator. Solve this in type check.");
             }
@@ -186,6 +186,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         if property.is_entity_id {
             flags |= SerdePropertyFlags::ENTITY_ID;
+        }
+
+        if property.is_edge_partial {
+            flags |= SerdePropertyFlags::READ_ONLY;
         }
 
         if identifies_any(value_type_def_id, self.rel_ctx, self.repr_ctx) {

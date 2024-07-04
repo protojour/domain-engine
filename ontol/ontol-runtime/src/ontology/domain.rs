@@ -277,10 +277,27 @@ pub struct EdgeCardinal {
     /// The target type of this cardinal
     pub target: DefIdSet,
 
-    /// Whether the values in this edge cardinal are unique
-    pub unique: bool,
+    pub flags: EdgeCardinalFlags,
+}
 
-    pub is_entity: bool,
+impl EdgeCardinal {
+    pub fn is_unique(&self) -> bool {
+        self.flags.contains(EdgeCardinalFlags::UNIQUE)
+    }
+
+    pub fn is_entity(&self) -> bool {
+        self.flags.contains(EdgeCardinalFlags::ENTITY)
+    }
+}
+
+bitflags::bitflags! {
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Serialize, Deserialize, Debug)]
+    pub struct EdgeCardinalFlags: u8 {
+        /// Whether the values in this edge cardinal are unique
+        const UNIQUE = 0b00000001;
+        /// Whether the values in this edge cardinal references an entity
+        const ENTITY = 0b00000010;
+    }
 }
 
 /// An edge cardinal projection.

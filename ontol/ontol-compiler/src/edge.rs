@@ -2,12 +2,15 @@
 //!
 //! Symbol groups map to EdgeId.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use fnv::{FnvHashMap, FnvHashSet};
-use ontol_runtime::{ontology::ontol::TextConstant, tuple::CardinalIdx, DefId, EdgeId};
+use ontol_runtime::{
+    ontology::ontol::TextConstant, tuple::CardinalIdx, DefId, EdgeId, RelationshipId,
+};
+use tracing::{debug, error};
 
-use crate::SourceSpan;
+use crate::{def::rel_def_meta, repr::repr_model::ReprKind, CompileError, Compiler, SourceSpan};
 
 #[derive(Default)]
 pub struct EdgeCtx {
@@ -18,6 +21,7 @@ pub struct EdgeCtx {
 
     pub symbolic_edges: FnvHashMap<EdgeId, SymbolicEdge>,
 
+    // pub edge_participants: FnvHashMap<DefId, FnvHashMap<EdgeId, EdgeParticipant>>,
     pub store_keys: FnvHashMap<DefId, TextConstant>,
 }
 
@@ -57,8 +61,139 @@ pub struct Slot {
     pub right: CardinalIdx,
 }
 
+#[derive(Debug)]
 pub struct SymbolicEdgeVariable {
     pub span: SourceSpan,
-    pub def_set: FnvHashSet<DefId>,
+    /// Defs participating in this variable.
+    pub members: FnvHashMap<DefId, BTreeSet<RelationshipId>>,
     pub one_to_one_count: usize,
+}
+
+impl<'m> Compiler<'m> {
+    /// Check/process all symbolic edges.
+    ///
+    /// This happens after all domains have been compiled
+    pub fn check_symbolic_edges(&mut self) {
+        self.normalize_variable_participants();
+        self.mark_partial_participations();
+    }
+
+    /// Resolve all variable participants to entities/vertices
+    fn normalize_variable_participants(&mut self) {
+        for edge in self.edge_ctx.symbolic_edges.values_mut() {
+            for var in edge.variables.values_mut() {
+                if var.members.is_empty() {
+                    // FIXME: This is actually not an error.
+                    // An edge does not need to have participants.
+                    // The error case is instead that some variables are populated,
+                    // while others aren't.
+                    CompileError::SymEdgeNoDefinitionForExistentialVar
+                        .span(var.span)
+                        .report(&mut self.errors);
+                    continue;
+                }
+
+                // refine/normalize def set
+                // refinement means that it should consist only of entity defs.
+
+                debug!("raw participants: {:?}", var.members);
+
+                // step 1: resolve unions
+                for (def_id, rel_set) in std::mem::take(&mut var.members) {
+                    match self.repr_ctx.get_repr_kind(&def_id) {
+                        Some(ReprKind::Union(members) | ReprKind::StructUnion(members)) => {
+                            for (member, _span) in members {
+                                var.members.entry(*member).or_default().extend(&rel_set);
+                            }
+                        }
+                        _ => {
+                            var.members.entry(def_id).or_default().extend(&rel_set);
+                        }
+                    }
+                }
+
+                // step 2: resolve identifier types
+                for (def_id, rel_set) in std::mem::take(&mut var.members) {
+                    if let Some(properties) = self.rel_ctx.properties_by_def_id(def_id) {
+                        if let Some(identifies_rel_id) = properties.identifies {
+                            let meta = rel_def_meta(identifies_rel_id, &self.defs);
+
+                            var.members.insert(meta.relationship.object.0, rel_set);
+                        } else {
+                            var.members.insert(def_id, rel_set);
+                        }
+                    }
+                }
+
+                // step 3: edge entity check
+                for (def_id, rel_set) in &var.members {
+                    if !self.entity_ctx.entities.contains_key(def_id) {
+                        let rel_id = rel_set.first().unwrap();
+                        CompileError::TODO("must be entity to participate in edge")
+                            .span(self.defs.def_span(rel_id.0))
+                            .report(&mut self.errors);
+                    }
+                }
+            }
+        }
+    }
+
+    fn mark_partial_participations(&mut self) {
+        for edge in self.edge_ctx.symbolic_edges.values_mut() {
+            let mut slot_set_per_member: BTreeMap<DefId, FnvHashSet<CardinalIdx>> =
+                Default::default();
+
+            for var in edge.variables.values() {
+                for (member_id, rel_ids) in &var.members {
+                    for rel_id in rel_ids {
+                        let meta = rel_def_meta(*rel_id, &self.defs);
+
+                        if &meta.relationship.subject.0 == member_id {
+                            let slot_set = slot_set_per_member.entry(*member_id).or_default();
+                            let symbol = edge
+                                .symbols
+                                .get(&meta.relationship.relation_def_id)
+                                .unwrap();
+
+                            slot_set.insert(symbol.left);
+                            slot_set.insert(symbol.right);
+                        }
+                    }
+                }
+            }
+
+            for (member_id, slot_set) in slot_set_per_member {
+                if slot_set.len() >= edge.variables.len() {
+                    continue;
+                }
+
+                debug!("{member_id:?} has partial participation: {slot_set:?}");
+
+                let properties = self.rel_ctx.properties_by_def_id_mut(member_id);
+                let Some(table) = &mut properties.table else {
+                    continue;
+                };
+
+                // collect relationships again
+                for var in edge.variables.values() {
+                    for rel_ids in var.members.values() {
+                        for rel_id in rel_ids {
+                            let meta = rel_def_meta(*rel_id, &self.defs);
+
+                            if meta.relationship.subject.0 == member_id {
+                                if let Some(property) = table.get_mut(rel_id) {
+                                    property.is_edge_partial = true;
+                                } else {
+                                    error!(
+                                        "property {member_id:?}.{rel_id:?} not found in {keys:?}",
+                                        keys = table.keys()
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

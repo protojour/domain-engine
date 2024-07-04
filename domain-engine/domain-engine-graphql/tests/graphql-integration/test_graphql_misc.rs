@@ -3,6 +3,7 @@ use std::sync::Arc;
 use domain_engine_core::{DomainEngine, Session};
 use domain_engine_graphql::{context::ServiceCtx, juniper::graphql_value};
 use domain_engine_test_utils::dynamic_data_store::DynamicDataStoreFactory;
+use domain_engine_test_utils::graphql_test_utils::GraphqlTestResultExt;
 use domain_engine_test_utils::{
     graphql_test_utils::{Exec, GraphqlValueResultExt, TestCompileSchema},
     graphql_value_unordered,
@@ -11,6 +12,7 @@ use domain_engine_test_utils::{
 };
 use ontol_macros::datastore_test;
 use ontol_runtime::ontology::Ontology;
+use ontol_test_utils::examples::EDGE_ENTITY_UNION;
 use ontol_test_utils::{
     examples::{entity_subtype, EDGE_ENTITY_SIMPLE, GUITAR_SYNTH_UNION},
     expect_eq, SrcName, TestPackages,
@@ -264,7 +266,7 @@ async fn sym_edge_simple(ds: &str) {
 
 /// FIXME: implement for arango
 #[datastore_test(tokio::test, ignore("arango"))]
-async fn edge_entity_simple(ds: &str) {
+async fn edge_entity_simple_happy_path(ds: &str) {
     let (test, [schema]) = TestPackages::with_static_sources([EDGE_ENTITY_SIMPLE])
         .compile_schemas([EDGE_ENTITY_SIMPLE.0]);
 
@@ -273,11 +275,8 @@ async fn edge_entity_simple(ds: &str) {
     info!("Create 3 vertices");
 
     r#"mutation {
-        foo(
-            create: [{ id: "foo1" }]
-        ) { node { id } }
         bar(
-            create: [{ id: "bar1" }]
+            create: [{ id: "bar1", bar_field: "VALUE" }]
         ) { node { id } }
         link(
             create: [{ id: "link1", from: "foo1", to: "bar1" }]
@@ -340,5 +339,142 @@ async fn edge_entity_simple(ds: &str) {
                 }]
             }
         }))
+    );
+}
+
+#[datastore_test(tokio::test, ignore("arango"))]
+async fn edge_entity_simple_foreign_violation(ds: &str) {
+    let (test, [schema]) = TestPackages::with_static_sources([EDGE_ENTITY_SIMPLE])
+        .compile_schemas([EDGE_ENTITY_SIMPLE.0]);
+
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
+
+    // foo is self-identifying, bar is not
+    expect_eq!(
+        actual = r#"mutation {
+            link(
+                create: [{ id: "link1", from: "foo1", to: "bar1" }]
+            ) { node { id from to } }
+        }"#
+        .exec([], &schema, &ctx)
+        .await
+        .unwrap_first_exec_error_msg(),
+        expected = "unresolved foreign key: \"bar1\"",
+    );
+}
+
+/// FIXME: implement for arango
+#[datastore_test(tokio::test, ignore("arango"))]
+async fn edge_entity_union_happy_path(ds: &str) {
+    let (test, [schema]) = TestPackages::with_static_sources([EDGE_ENTITY_UNION])
+        .compile_schemas([EDGE_ENTITY_UNION.0]);
+
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
+
+    info!("Create 3 vertices");
+
+    r#"mutation {
+        link(
+            create: [{ id: "link/1", from: "foo/1", to: "baz/1" }]
+        ) { node { id } }
+    }"#
+    .exec([], &schema, &ctx)
+    .await
+    .unwrap();
+
+    info!("Query data");
+
+    expect_eq!(
+        actual = r#"{
+            links { nodes { id, from, to } }
+            foos {
+                nodes {
+                    id
+                    related_to {
+                        nodes {
+                            ... on baz { id }
+                            ... on qux { id }
+                        }
+                    }
+                }
+            }
+        }"#
+        .exec([], &schema, &ctx)
+        .await,
+        expected = Ok(graphql_value!({
+            "links": { "nodes": [{
+                "id": "link/1",
+                "from": "foo/1",
+                "to": "baz/1",
+            }]},
+            "foos": {
+                "nodes": [{
+                    "id": "foo/1",
+                    "related_to": {
+                        "nodes": [{ "id": "baz/1" }]
+                    }
+                }]
+            }
+        }))
+    );
+
+    info!("Delete link");
+
+    r#"mutation {
+        link(delete: ["link/1"]) { deleted }
+    }"#
+    .exec([], &schema, &ctx)
+    .await
+    .unwrap();
+
+    info!("Query data after link deletion");
+
+    expect_eq!(
+        actual = r#"{
+            links { nodes { id, from, to } }
+            foos {
+                nodes {
+                    id
+                    related_to {
+                        nodes {
+                            ... on baz { id }
+                            ... on qux { id }
+                        }
+                    }
+                }
+            }
+        }"#
+        .exec([], &schema, &ctx)
+        .await,
+        expected = Ok(graphql_value!({
+            "links": { "nodes": [] },
+            "foos": {
+                "nodes": [{
+                    "id": "foo/1",
+                    "related_to": { "nodes": [] }
+                }]
+            }
+        }))
+    );
+}
+
+#[datastore_test(tokio::test, ignore("arango"))]
+async fn edge_entity_union_foreign_violation(ds: &str) {
+    let (test, [schema]) = TestPackages::with_static_sources([EDGE_ENTITY_UNION])
+        .compile_schemas([EDGE_ENTITY_UNION.0]);
+
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
+
+    // foo is self-identifying, qux is not
+    expect_eq!(
+        actual = r#"mutation {
+            link(
+                create: [{ id: "link/1", from: "foo/1", to: "qux/1" }]
+            ) { node { id from to } }
+        }"#
+        .exec([], &schema, &ctx)
+        .await
+        .unwrap_first_exec_error_msg(),
+        expected = "unresolved foreign key: \"qux/1\""
     );
 }

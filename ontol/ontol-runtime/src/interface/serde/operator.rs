@@ -417,6 +417,11 @@ impl SerdeProperty {
     }
 
     #[inline]
+    pub fn is_generator(&self) -> bool {
+        self.flags.contains(SerdePropertyFlags::GENERATOR)
+    }
+
+    #[inline]
     pub fn is_entity_id(&self) -> bool {
         self.flags.contains(SerdePropertyFlags::ENTITY_ID)
     }
@@ -490,12 +495,13 @@ bitflags::bitflags! {
         /// Property represents parameters to a relation: e.g. "_edge"
         const REL_PARAMS       = 0b00000010;
         const READ_ONLY        = 0b00000100;
+        const GENERATOR        = 0b00001000;
         /// The property is an identifier of the entity that owns the property
-        const ENTITY_ID        = 0b00001000;
+        const ENTITY_ID        = 0b00010000;
         /// The property is an identifier of any entity (self or foreign)
-        const ANY_ID           = 0b00010000;
+        const ANY_ID           = 0b00100000;
         /// Property is part of the entity graph
-        const IN_ENTITY_GRAPH  = 0b00100000;
+        const IN_ENTITY_GRAPH  = 0b01000000;
     }
 }
 

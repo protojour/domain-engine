@@ -104,6 +104,8 @@ pub fn compile(
         compiler.lower_and_check_next_domain(parsed_package, src)?;
     }
 
+    compiler.check_symbolic_edges();
+
     execute_codegen_tasks(&mut compiler);
     compile_all_text_patterns(&mut compiler);
     compiler.rel_ctx.sort_property_tables();

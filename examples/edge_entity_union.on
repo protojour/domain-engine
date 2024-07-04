@@ -2,10 +2,10 @@
 domain edge_entity ()
 
 sym {
-    (src) related_to: (target) with_relationship: (r),
-    (target) related_from: (src) with_relationship: (r),
-    (r) from: (src),
-    (r) to: (target),
+    (src) related_to: (target) with_link: (ln),
+    (target) related_from: (src) with_link: (ln),
+    (ln) from: (src),
+    (ln) to: (target),
 }
 
 def foo_id (fmt '' => 'foo/' => text => .)
@@ -27,6 +27,7 @@ def baz (
 )
 def qux (
     rel .'id'|id: qux_id
+    rel .'qux_field': text
     rel .related_from: {foo|bar}
 )
 

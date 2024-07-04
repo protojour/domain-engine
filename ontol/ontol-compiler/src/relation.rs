@@ -102,6 +102,9 @@ impl Properties {
 pub struct Property {
     pub cardinality: Cardinality,
     pub is_entity_id: bool,
+    /// supplies only partial information to an edge,
+    /// therefore cannot be an input property
+    pub is_edge_partial: bool,
 }
 
 /// The "Constructor" represents different (exclusive) ways

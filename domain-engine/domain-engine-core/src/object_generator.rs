@@ -84,7 +84,7 @@ impl<'e> ObjectGenerator<'e> {
         match operator {
             SerdeOperator::Struct(struct_op) => {
                 for (key, property) in struct_op.properties.iter() {
-                    if !property.is_read_only() {
+                    if !property.is_generator() {
                         continue;
                     }
 

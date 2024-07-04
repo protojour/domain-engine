@@ -9,8 +9,8 @@ use ontol_runtime::{
     ontology::{
         domain::{
             self, BasicDef, DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource,
-            DataRelationshipTarget, Def, Domain, EdgeCardinal, EdgeCardinalProjection, EdgeInfo,
-            Entity,
+            DataRelationshipTarget, Def, Domain, EdgeCardinal, EdgeCardinalFlags,
+            EdgeCardinalProjection, EdgeInfo, Entity,
         },
         map::MapMeta,
         ontol::{OntolDomainMeta, TextConstant, TextLikeType},
@@ -250,23 +250,26 @@ impl<'m> Compiler<'m> {
 
                 for variable in edge.variables.values() {
                     let entity_count = variable
-                        .def_set
-                        .iter()
+                        .members
+                        .keys()
                         .filter(|def_id| self.entity_ctx.entities.contains_key(def_id))
                         .count();
 
-                    let is_entity = if entity_count == variable.def_set.len() {
-                        true
-                    } else if entity_count == 0 {
-                        false
-                    } else {
+                    let mut flags = EdgeCardinalFlags::empty();
+
+                    if entity_count == variable.members.len() {
+                        flags.insert(EdgeCardinalFlags::ENTITY);
+
+                        if variable.one_to_one_count > 0 {
+                            flags.insert(EdgeCardinalFlags::UNIQUE);
+                        }
+                    } else if entity_count > 0 {
                         panic!("FIXME: mix of entity/non-entity");
                     };
 
                     edge_info.cardinals.push(EdgeCardinal {
-                        target: variable.def_set.iter().copied().collect(),
-                        unique: is_entity && variable.one_to_one_count > 0,
-                        is_entity,
+                        target: variable.members.keys().copied().collect(),
+                        flags,
                     });
                 }
 
@@ -544,27 +547,35 @@ impl<'m> Compiler<'m> {
                 if edge_info.cardinals.is_empty() {
                     // initialize edge cardinals first
                     for i in 0_u8..2 {
+                        let mut flags = EdgeCardinalFlags::ENTITY;
+
                         if i == edge_projection.subject.0 {
+                            if matches!(
+                                meta.relationship.object_cardinality.1,
+                                ValueCardinality::Unit
+                            ) {
+                                flags.insert(EdgeCardinalFlags::UNIQUE)
+                            };
+
                             edge_info.cardinals.push(EdgeCardinal {
                                 target: DefIdSet::from_iter([
                                     self.identifier_to_vertex_def_id(source_def_id)
                                 ]),
-                                unique: matches!(
-                                    meta.relationship.object_cardinality.1,
-                                    ValueCardinality::Unit
-                                ),
-                                is_entity: true,
+                                flags,
                             });
                         } else {
+                            if matches!(
+                                meta.relationship.subject_cardinality.1,
+                                ValueCardinality::Unit
+                            ) {
+                                flags.insert(EdgeCardinalFlags::UNIQUE);
+                            }
+
                             edge_info.cardinals.push(EdgeCardinal {
                                 target: DefIdSet::from_iter([
                                     self.identifier_to_vertex_def_id(target_def_id)
                                 ]),
-                                unique: matches!(
-                                    meta.relationship.subject_cardinality.1,
-                                    ValueCardinality::Unit
-                                ),
-                                is_entity: true,
+                                flags,
                             });
                         }
                     }
@@ -572,8 +583,7 @@ impl<'m> Compiler<'m> {
                     if let Some(edge_params) = edge_params {
                         edge_info.cardinals.resize_with(3, || EdgeCardinal {
                             target: DefIdSet::from_iter([edge_params]),
-                            unique: false,
-                            is_entity: false,
+                            flags: EdgeCardinalFlags::empty(),
                         });
                     }
                 }

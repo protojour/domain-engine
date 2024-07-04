@@ -186,6 +186,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     ValueCardinality::Unit,
                                 ),
                                 is_entity_id: true,
+                                is_edge_partial: false,
                             },
                         );
                     }

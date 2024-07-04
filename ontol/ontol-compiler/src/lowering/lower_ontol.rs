@@ -435,7 +435,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     cardinal_idx,
                     SymbolicEdgeVariable {
                         span: self.ctx.source_span(var_symbol.span()),
-                        def_set: Default::default(),
+                        members: Default::default(),
                         one_to_one_count: 0,
                     },
                 );
