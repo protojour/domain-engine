@@ -8,10 +8,10 @@ sym {
     (ln) to: (target),
 }
 
-def foo_id (fmt '' => 'foo/' => text => .)
-def bar_id (fmt '' => 'bar/' => text => .)
-def baz_id (fmt '' => 'baz/' => text => .)
-def qux_id (fmt '' => 'qux/' => text => .)
+def foo_id (fmt '' => 'foo/' => serial => .)
+def bar_id (fmt '' => 'bar/' => serial => .)
+def baz_id (fmt '' => 'baz/' => serial => .)
+def qux_id (fmt '' => 'qux/' => serial => .)
 
 def foo (
     rel .'id'|id: foo_id
@@ -33,7 +33,7 @@ def qux (
 
 /// This definition is both an entity in its own right and an edge
 def link (
-    rel .'id'|id: (rel .is: text)
+    rel .'id'|id: (fmt '' => 'link/' => serial => .)
     rel .from: foo_id|bar_id
     rel .to: baz_id|qux_id
 )
