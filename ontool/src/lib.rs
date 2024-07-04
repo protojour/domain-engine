@@ -138,7 +138,6 @@ struct Generate {
 #[derive(Clone, ValueEnum)]
 enum Format {
     Json,
-    Yaml,
 }
 
 #[derive(Args)]
@@ -166,8 +165,6 @@ pub enum OntoolError {
     Compile,
     #[error("{0:?}")]
     SerdeJson(#[from] serde_json::Error),
-    #[error("{0:?}")]
-    SerdeYaml(#[from] serde_yaml::Error),
     #[error("{0}")]
     IO(#[from] std::io::Error),
 }
@@ -216,10 +213,6 @@ pub async fn run() -> Result<(), OntoolError> {
                 Format::Json => {
                     let schemas_json = serde_json::to_string_pretty(&schemas)?;
                     println!("{}", schemas_json);
-                }
-                Format::Yaml => {
-                    let schemas_yaml = serde_yaml::to_string(&schemas)?;
-                    println!("{}", schemas_yaml);
                 }
             }
 

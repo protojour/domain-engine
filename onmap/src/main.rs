@@ -55,7 +55,6 @@ struct Args {
 #[derive(Clone, ValueEnum)]
 enum Format {
     Json,
-    Yaml,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -102,11 +101,6 @@ fn main() -> anyhow::Result<()> {
                 args.input.into_reader()?,
             ))
             .expect("Deserialization failed"),
-        Format::Yaml => from_processor
-            .deserialize(serde_yaml::Deserializer::from_reader(
-                args.input.into_reader()?,
-            ))
-            .expect("Deserialization failed"),
     };
     let Attr::Unit(value) = attr else {
         return Err(anyhow!("not a unit attribute"));
@@ -131,16 +125,6 @@ fn main() -> anyhow::Result<()> {
                 .expect("Serialization failed");
             let output: serde_json::Value = serde_json::from_slice(&buf).unwrap();
             println!("{}", serde_json::to_string_pretty(&output).unwrap());
-        }
-        Format::Yaml => {
-            to_processor
-                .serialize_attr(
-                    AttrRef::Unit(&value),
-                    &mut serde_yaml::Serializer::new(&mut buf),
-                )
-                .expect("Serialization failed");
-            let output: serde_yaml::Value = serde_yaml::from_slice(&buf).unwrap();
-            print!("{}", serde_yaml::to_string(&output).unwrap());
         }
     }
     Ok(())
