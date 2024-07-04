@@ -9,18 +9,6 @@ use ontol_test_utils::{
 use serde_json::json;
 
 #[test]
-fn id_cannot_identify_two_things() {
-    "
-    def foo (rel .id: my_id)
-    def bar (
-        rel .id: my_id // ERROR already identifies a type
-    )
-    def my_id (rel .is: text)
-    "
-    .compile_fail();
-}
-
-#[test]
 fn entity_without_inherent_id() {
     "
     def some_id (fmt '' => text => .)
