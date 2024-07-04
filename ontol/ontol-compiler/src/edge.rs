@@ -138,8 +138,12 @@ impl<'m> Compiler<'m> {
         }
     }
 
+    /// analyze the edges, for entities with partial participation, write
+    /// `Property::is_edge_partial = true` back into RelCtx.
+    /// The point is that partial edge participation must be read-only properties, because there is
+    /// not information there to construct a new edge.
     fn mark_partial_participations(&mut self) {
-        for edge in self.edge_ctx.symbolic_edges.values_mut() {
+        for edge in self.edge_ctx.symbolic_edges.values() {
             let mut slot_set_per_member: BTreeMap<DefId, FnvHashSet<CardinalIdx>> =
                 Default::default();
 
