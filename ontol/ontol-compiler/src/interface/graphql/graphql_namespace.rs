@@ -1,12 +1,13 @@
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
 use heck::{AsLowerCamelCase, AsSnakeCase};
-use ontol_runtime::{
-    ontology::{domain::Def, Ontology},
-    DefId, PackageId,
-};
+use itertools::Itertools;
+use ontol_runtime::{ontology::Ontology, DefId, PackageId};
 
-use crate::strings::StringCtx;
+use crate::{
+    def::{DefKind, Defs},
+    strings::StringCtx,
+};
 
 #[derive(Default)]
 pub struct GraphqlNamespace<'o> {
@@ -35,96 +36,84 @@ impl<'o> GraphqlNamespace<'o> {
         self.rewrite(&string).into()
     }
 
-    pub fn typename(&mut self, def: &Def, strings: &StringCtx) -> String {
-        self.concat(&[&Typename(def, strings)], strings)
+    pub fn typename(&mut self, def: DefId, ctx: NameCtx) -> String {
+        self.concat(&[&Typename(def, ctx)], ctx)
     }
 
-    pub fn connection(&mut self, rel_def: Option<&Def>, def: &Def, strings: &StringCtx) -> String {
+    pub fn connection(&mut self, rel_def: Option<DefId>, def: DefId, ctx: NameCtx) -> String {
         if let Some(rel_def) = rel_def {
             self.concat(
-                &[
-                    &Typename(rel_def, strings),
-                    &Typename(def, strings),
-                    &"Connection",
-                ],
-                strings,
+                &[&Typename(rel_def, ctx), &Typename(def, ctx), &"Connection"],
+                ctx,
             )
         } else {
-            self.concat(&[&Typename(def, strings), &"Connection"], strings)
+            self.concat(&[&Typename(def, ctx), &"Connection"], ctx)
         }
     }
 
-    pub fn mutation_result(&mut self, def: &Def, strings: &StringCtx) -> String {
-        self.concat(&[&Typename(def, strings), &"Mutation"], strings)
+    pub fn mutation_result(&mut self, def: DefId, ctx: NameCtx) -> String {
+        self.concat(&[&Typename(def, ctx), &"Mutation"], ctx)
     }
 
-    pub fn edge(&mut self, rel_def: Option<&Def>, def: &Def, strings: &StringCtx) -> String {
+    pub fn edge(&mut self, rel_def: Option<DefId>, def: DefId, ctx: NameCtx) -> String {
         if let Some(rel_def) = rel_def {
             self.concat(
-                &[
-                    &Typename(rel_def, strings),
-                    &Typename(def, strings),
-                    &"Edge",
-                ],
-                strings,
+                &[&Typename(rel_def, ctx), &Typename(def, ctx), &"Edge"],
+                ctx,
             )
         } else {
-            self.concat(&[&Typename(def, strings), &"Edge"], strings)
+            self.concat(&[&Typename(def, ctx), &"Edge"], ctx)
         }
     }
 
-    pub fn input(&mut self, def: &Def, strings: &StringCtx) -> String {
-        self.concat(&[&Typename(def, strings), &"Input"], strings)
+    pub fn input(&mut self, def: DefId, ctx: NameCtx) -> String {
+        self.concat(&[&Typename(def, ctx), &"Input"], ctx)
     }
 
-    pub fn partial_input(&mut self, def: &Def, strings: &StringCtx) -> String {
-        self.concat(&[&Typename(def, strings), &"PartialInput"], strings)
+    pub fn partial_input(&mut self, def: DefId, ctx: NameCtx) -> String {
+        self.concat(&[&Typename(def, ctx), &"PartialInput"], ctx)
     }
 
-    pub fn union_input(&mut self, def: &Def, strings: &StringCtx) -> String {
-        self.concat(&[&Typename(def, strings), &"UnionInput"], strings)
+    pub fn union_input(&mut self, def: DefId, ctx: NameCtx) -> String {
+        self.concat(&[&Typename(def, ctx), &"UnionInput"], ctx)
     }
 
-    pub fn union_partial_input(&mut self, def: &Def, strings: &StringCtx) -> String {
-        self.concat(&[&Typename(def, strings), &"UnionPartialInput"], strings)
+    pub fn union_partial_input(&mut self, def: DefId, ctx: NameCtx) -> String {
+        self.concat(&[&Typename(def, ctx), &"UnionPartialInput"], ctx)
     }
 
-    pub fn edge_input(&mut self, rel_def: Option<&Def>, def: &Def, strings: &StringCtx) -> String {
+    pub fn edge_input(&mut self, rel_def: Option<DefId>, def: DefId, ctx: NameCtx) -> String {
         if let Some(rel_def) = rel_def {
             self.concat(
-                &[
-                    &Typename(rel_def, strings),
-                    &Typename(def, strings),
-                    &"EdgeInput",
-                ],
-                strings,
+                &[&Typename(rel_def, ctx), &Typename(def, ctx), &"EdgeInput"],
+                ctx,
             )
         } else {
-            self.concat(&[&Typename(def, strings), &"EdgeInput"], strings)
+            self.concat(&[&Typename(def, ctx), &"EdgeInput"], ctx)
         }
     }
 
     pub fn patch_edges_input(
         &mut self,
-        rel_def: Option<&Def>,
-        def: &Def,
-        strings: &StringCtx,
+        rel_def: Option<DefId>,
+        def: DefId,
+        ctx: NameCtx,
     ) -> String {
         if let Some(rel_def) = rel_def {
             self.concat(
                 &[
-                    &Typename(rel_def, strings),
-                    &Typename(def, strings),
+                    &Typename(rel_def, ctx),
+                    &Typename(def, ctx),
                     &"PatchEdgesInput",
                 ],
-                strings,
+                ctx,
             )
         } else {
-            self.concat(&[&Typename(def, strings), &"PatchEdgesInput"], strings)
+            self.concat(&[&Typename(def, ctx), &"PatchEdgesInput"], ctx)
         }
     }
 
-    fn concat(&mut self, elements: &[&dyn ProcessName], strings: &StringCtx) -> String {
+    fn concat(&mut self, elements: &[&dyn ProcessName], ctx: NameCtx) -> String {
         let mut output: String = "".into();
 
         if let Some(domain_disambiguation) = &self.domain_disambiguation {
@@ -134,7 +123,8 @@ impl<'o> GraphqlNamespace<'o> {
                     output.push('_');
                     if let Some(domain) = domain_disambiguation.ontology.find_domain(package_id) {
                         let domain_name =
-                            adapt_graphql_identifier(&strings[domain.unique_name()]).into_adapted();
+                            adapt_graphql_identifier(&ctx.str_ctx[domain.unique_name()])
+                                .into_adapted();
                         output.push_str(&domain_name);
                     } else {
                         output.push_str(&format!("domain{}", package_id.id()));
@@ -175,22 +165,63 @@ trait ProcessName {
     fn process<'n>(&self, namespace: &'n mut GraphqlNamespace) -> &'n str;
 }
 
-struct Typename<'a, 'm>(&'a Def, &'a StringCtx<'m>);
+#[derive(Clone, Copy)]
+pub struct NameCtx<'c, 'm> {
+    pub str_ctx: &'c StringCtx<'m>,
+    pub defs: &'c Defs<'m>,
+}
+
+pub struct Typename<'a, 'm>(DefId, NameCtx<'a, 'm>);
 
 impl<'a, 'm> ProcessName for Typename<'a, 'm> {
     fn def_id(&self) -> Option<DefId> {
-        Some(self.0.id)
+        Some(self.0)
     }
 
     fn process<'n>(&self, namespace: &'n mut GraphqlNamespace) -> &'n str {
-        let def = self.0;
-        match def.name() {
-            Some(name) => {
-                let strings = self.1;
-                namespace.rewrite(&strings[name])
+        let def_id = self.0;
+        let ctx = self.1;
+
+        match ctx.defs.def_kind(def_id) {
+            DefKind::InlineUnion(members) => {
+                let names = members
+                    .iter()
+                    .map(|member_id| format_name_pre_rewrite(def_id, ctx.defs.def_kind(*member_id)))
+                    .collect_vec();
+
+                let mut concat = String::new();
+                let mut iter = names.iter().peekable();
+
+                while let Some(cur) = iter.next() {
+                    concat.push_str(cur);
+
+                    if let Some(next) = iter.peek() {
+                        if cur.chars().next().is_some_and(char::is_uppercase) {
+                            concat.push_str("Or");
+                        } else {
+                            concat.push_str("_or");
+                        }
+
+                        if !next.chars().next().is_some_and(char::is_uppercase) {
+                            concat.push('_');
+                        }
+                    }
+                }
+
+                namespace.rewrite(&concat)
             }
-            None => namespace.rewrite(&format!("_anon{}_{}", def.id.0.id(), def.id.1)),
+            kind => {
+                let name = format_name_pre_rewrite(def_id, kind);
+                namespace.rewrite(&name)
+            }
         }
+    }
+}
+
+fn format_name_pre_rewrite<'k>(def_id: DefId, kind: &'k DefKind) -> Cow<'k, str> {
+    match kind.opt_identifier() {
+        Some(name) => name,
+        None => Cow::Owned(format!("_anon{}_{}", def_id.0.id(), def_id.1)),
     }
 }
 

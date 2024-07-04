@@ -68,21 +68,18 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     self.serde_gen.gen_addr_lazy(gql_serde_key(def.id)).unwrap();
 
                 if let Some((rel_def_id, _operator_addr)) = rel_params {
-                    let rel_def = self.partial_ontology.def(rel_def_id);
                     let rel_edge_ref = self.get_def_type_ref(rel_def_id, QLevel::Node);
 
-                    let typename = self.mk_typename_constant(|namespace, strings| {
-                        namespace.edge(Some(rel_def), def, strings)
+                    let typename = self.mk_typename(|namespace, ctx| {
+                        namespace.edge(Some(rel_def_id), def_id, ctx)
                     });
 
                     NewType::TypeData(
                         TypeData {
                             typename,
-                            input_typename: Some(self.mk_typename_constant(
-                                |namespace, strings| {
-                                    namespace.edge_input(Some(rel_def), def, strings)
-                                },
-                            )),
+                            input_typename: Some(self.mk_typename(|namespace, ctx| {
+                                namespace.edge_input(Some(rel_def_id), def_id, ctx)
+                            })),
                             partial_input_typename: None,
                             kind: TypeKind::Object(ObjectData {
                                 fields,
@@ -101,12 +98,11 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 } else {
                     NewType::TypeData(
                         TypeData {
-                            typename: self.mk_typename_constant(|namespace, strings| {
-                                namespace.edge(None, def, strings)
-                            }),
-                            input_typename: Some(self.mk_typename_constant(
-                                |namespace, strings| namespace.edge_input(None, def, strings),
-                            )),
+                            typename: self
+                                .mk_typename(|namespace, ctx| namespace.edge(None, def_id, ctx)),
+                            input_typename: Some(self.mk_typename(|namespace, ctx| {
+                                namespace.edge_input(None, def_id, ctx)
+                            })),
                             partial_input_typename: None,
                             kind: TypeKind::Object(ObjectData {
                                 fields,
@@ -123,21 +119,19 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 }
             }
             QLevel::Connection { rel_params } => {
-                let def = self.partial_ontology.def(def_id);
                 let edge_ref = self.get_def_type_ref(def_id, QLevel::Edge { rel_params });
                 let node_ref = self.get_def_type_ref(def_id, QLevel::Node);
                 let node_type_addr = node_ref.unwrap_addr();
 
-                let rel_def = rel_params
-                    .map(|(rel_params_def_id, _)| self.partial_ontology.def(rel_params_def_id));
+                let rel_params_def_id = rel_params.map(|(def_id, _)| def_id);
 
                 NewType::TypeData(
                     TypeData {
-                        typename: self.mk_typename_constant(|namespace, strings| {
-                            namespace.connection(rel_def, def, strings)
+                        typename: self.mk_typename(|namespace, ctx| {
+                            namespace.connection(rel_params_def_id, def_id, ctx)
                         }),
-                        input_typename: Some(self.mk_typename_constant(|namespace, strings| {
-                            namespace.patch_edges_input(rel_def, def, strings)
+                        input_typename: Some(self.mk_typename(|namespace, ctx| {
+                            namespace.patch_edges_input(rel_params_def_id, def_id, ctx)
                         })),
                         partial_input_typename: None,
                         kind: TypeKind::Object(ObjectData {
@@ -195,14 +189,12 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 )
             }
             QLevel::MutationResult => {
-                let def = self.partial_ontology.def(def_id);
                 let node_ref = self.get_def_type_ref(def_id, QLevel::Node);
 
                 NewType::TypeData(
                     TypeData {
-                        typename: self.mk_typename_constant(|namespace, strings| {
-                            namespace.mutation_result(def, strings)
-                        }),
+                        typename: self
+                            .mk_typename(|namespace, ctx| namespace.mutation_result(def_id, ctx)),
                         input_typename: None,
                         partial_input_typename: None,
                         kind: TypeKind::Object(ObjectData {
@@ -274,15 +266,14 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
                 NewType::TypeData(
                     TypeData {
-                        typename: self.mk_typename_constant(|namespace, strings| {
-                            namespace.typename(def, strings)
-                        }),
-                        input_typename: Some(self.mk_typename_constant(|namespace, strings| {
-                            namespace.input(def, strings)
-                        })),
-                        partial_input_typename: Some(self.mk_typename_constant(
-                            |namespace, strings| namespace.partial_input(def, strings),
-                        )),
+                        typename: self
+                            .mk_typename(|namespace, ctx| namespace.typename(def_id, ctx)),
+                        input_typename: Some(
+                            self.mk_typename(|namespace, ctx| namespace.input(def_id, ctx)),
+                        ),
+                        partial_input_typename: Some(
+                            self.mk_typename(|namespace, ctx| namespace.partial_input(def_id, ctx)),
+                        ),
                         kind: type_kind,
                     },
                     NewTypeActions {
@@ -318,15 +309,14 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
                 NewType::TypeData(
                     TypeData {
-                        typename: self.mk_typename_constant(|namespace, strings| {
-                            namespace.typename(def, strings)
-                        }),
-                        input_typename: Some(self.mk_typename_constant(|namespace, strings| {
-                            namespace.union_input(def, strings)
+                        typename: self
+                            .mk_typename(|namespace, ctx| namespace.typename(def_id, ctx)),
+                        input_typename: Some(
+                            self.mk_typename(|namespace, ctx| namespace.union_input(def_id, ctx)),
+                        ),
+                        partial_input_typename: Some(self.mk_typename(|namespace, ctx| {
+                            namespace.union_partial_input(def_id, ctx)
                         })),
-                        partial_input_typename: Some(self.mk_typename_constant(
-                            |namespace, strings| namespace.union_partial_input(def, strings),
-                        )),
                         kind: if needs_scalar {
                             TypeKind::CustomScalar(ScalarData { operator_addr })
                         } else {
@@ -341,20 +331,18 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 )
             }
             ReprKind::Seq | ReprKind::Intersection(_) => {
-                let def = self.partial_ontology.def(def_id);
                 let operator_addr = self.serde_gen.gen_addr_lazy(gql_serde_key(def_id)).unwrap();
 
                 NewType::TypeData(
                     TypeData {
-                        typename: self.mk_typename_constant(|namespace, strings| {
-                            namespace.typename(def, strings)
-                        }),
-                        input_typename: Some(self.mk_typename_constant(|namespace, strings| {
-                            namespace.input(def, strings)
-                        })),
-                        partial_input_typename: Some(self.mk_typename_constant(
-                            |namespace, strings| namespace.partial_input(def, strings),
-                        )),
+                        typename: self
+                            .mk_typename(|namespace, ctx| namespace.typename(def_id, ctx)),
+                        input_typename: Some(
+                            self.mk_typename(|namespace, ctx| namespace.input(def_id, ctx)),
+                        ),
+                        partial_input_typename: Some(
+                            self.mk_typename(|namespace, ctx| namespace.partial_input(def_id, ctx)),
+                        ),
                         kind: TypeKind::CustomScalar(ScalarData { operator_addr }),
                     },
                     NewTypeActions::default(),

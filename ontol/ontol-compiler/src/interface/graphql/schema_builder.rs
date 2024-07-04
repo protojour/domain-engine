@@ -36,10 +36,9 @@ use crate::{
     primitive::Primitives,
     relation::{RelCtx, UnionMemberCache},
     repr::{repr_ctx::ReprCtx, repr_model::ReprKind},
-    strings::StringCtx,
 };
 
-use super::graphql_namespace::GraphqlNamespace;
+use super::graphql_namespace::{GraphqlNamespace, NameCtx};
 
 pub(super) struct SchemaBuilder<'a, 's, 'c, 'm> {
     /// Avoid deep recursion by pushing tasks to be performed later to this task list
@@ -488,7 +487,13 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         }
 
         fields.insert(
-            mutation_namespace.typename(def, self.serde_gen.str_ctx),
+            mutation_namespace.typename(
+                entity_data.node_def_id,
+                NameCtx {
+                    str_ctx: self.serde_gen.str_ctx,
+                    defs: self.serde_gen.defs,
+                },
+            ),
             FieldData {
                 kind: FieldKind::EntityMutation(Box::new(EntityMutationField {
                     def_id: def.id,
@@ -526,11 +531,17 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         );
     }
 
-    pub fn mk_typename_constant<S: AsRef<str>>(
+    pub fn mk_typename<S: AsRef<str>>(
         &mut self,
-        f: impl Fn(&mut GraphqlNamespace, &StringCtx<'m>) -> S,
+        f: impl Fn(&mut GraphqlNamespace, NameCtx<'_, 'm>) -> S,
     ) -> TextConstant {
-        let string = f(self.type_namespace, self.serde_gen.str_ctx);
+        let string = f(
+            self.type_namespace,
+            NameCtx {
+                str_ctx: self.serde_gen.str_ctx,
+                defs: self.serde_gen.defs,
+            },
+        );
         self.serde_gen.str_ctx.intern_constant(string.as_ref())
     }
 

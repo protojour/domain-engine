@@ -455,11 +455,12 @@ fn graphql_flattened_union_pascal_casing() {
 #[test]
 fn test_edge_entity_union() {
     let test = EDGE_ENTITY_UNION.1.compile();
-    let (_schema, test) = schema_test(&test, SrcName::default());
-    let _ontology = test.test.ontology();
+    let (schema, test) = schema_test(&test, SrcName::default());
+    let ontology = test.test.ontology();
 
-    let link = test.type_data("link", QueryLevel::Node).object_data();
     {
+        let link = test.type_data("link", QueryLevel::Node).object_data();
+
         assert_eq!(&["id", "from", "to"], link.field_names().as_slice());
         let id_field = link.fields.get("id").unwrap();
         let to_field = link.fields.get("to").unwrap();
@@ -471,6 +472,19 @@ fn test_edge_entity_union() {
         expect_eq!(
             actual = to_field.field_type.unit.native_scalar().kind,
             expected = NativeScalarKind::ID
+        );
+    }
+
+    {
+        let foo = test.type_data("foo", QueryLevel::Node).object_data();
+
+        assert_eq!(&["id", "related_to"], foo.field_names().as_slice());
+        let related_to = foo.fields.get("related_to").unwrap();
+        let related_to_connection = schema.type_data(related_to.field_type.unit.addr());
+
+        expect_eq!(
+            actual = &ontology[related_to_connection.typename],
+            expected = "baz_or_quxConnection"
         );
     }
 }
