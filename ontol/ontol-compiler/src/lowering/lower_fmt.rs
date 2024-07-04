@@ -34,11 +34,14 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             CompileError::TODO("missing origin").span_report(stmt.0.span(), &mut self.ctx);
             return None;
         };
-        let mut origin_def_id = self.resolve_type_reference(
-            origin.type_ref()?,
-            &BlockContext::NoContext,
-            Some(&mut root_defs),
-        )?;
+        let mut origin_def_id = self
+            .resolve_type_reference(
+                origin.type_ref()?,
+                ValueCardinality::Unit,
+                &BlockContext::NoContext,
+                Some(&mut root_defs),
+            )?
+            .def_id;
 
         let Some(mut transition) = transitions.next() else {
             CompileError::FmtTooFewTransitions.span_report(stmt.0.span(), &mut self.ctx);
@@ -78,8 +81,14 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             origin_def_id = target_def_id;
         };
 
-        let final_def =
-            self.resolve_type_reference(target.type_ref()?, &block, Some(&mut root_defs))?;
+        let final_def = self
+            .resolve_type_reference(
+                target.type_ref()?,
+                ValueCardinality::Unit,
+                &block,
+                Some(&mut root_defs),
+            )?
+            .def_id;
 
         root_defs.push(self.lower_fmt_transition(
             (origin_def_id, origin.view().span()),
@@ -98,8 +107,14 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         to: (DefId, U32Span),
         final_state: FmtFinalState,
     ) -> Option<DefId> {
-        let transition_def =
-            self.resolve_type_reference(transition.type_ref()?, &BlockContext::FmtLeading, None)?;
+        let transition_def = self
+            .resolve_type_reference(
+                transition.type_ref()?,
+                ValueCardinality::Unit,
+                &BlockContext::FmtLeading,
+                None,
+            )?
+            .def_id;
         let relation_key = RelationKey::FmtTransition(transition_def, final_state);
 
         // This syntax just defines the relation the first time it's used

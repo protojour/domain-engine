@@ -16,7 +16,10 @@ use crate::{
     CompileError,
 };
 
-use super::context::{BlockContext, CstLowering, MapVarTable, RelationKey, RootDefs};
+use super::{
+    context::{BlockContext, CstLowering, MapVarTable, RelationKey, RootDefs},
+    lower_misc::ResolvedType,
+};
 
 impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     pub(super) fn lower_rel_statement(
@@ -30,33 +33,37 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
         let mut root_defs = RootDefs::default();
 
-        let subject_def_id = self.resolve_type_reference(
-            rel_subject.type_quant()?.type_ref()?,
+        let subject_ty = self.resolve_quant_type_reference(
+            rel_subject.type_quant()?,
             &block,
             Some(&mut root_defs),
         )?;
-        let object_def_id = match rel_object.type_quant_or_pattern()? {
+        let object_ty = match rel_object.type_quant_or_pattern()? {
             insp::TypeQuantOrPattern::TypeQuant(type_quant) => {
-                self.resolve_type_reference(type_quant.type_ref()?, &block, Some(&mut root_defs))?
+                self.resolve_quant_type_reference(type_quant, &block, Some(&mut root_defs))?
             }
             insp::TypeQuantOrPattern::Pattern(pattern) => {
+                let span = pattern.view().span();
                 let mut var_table = MapVarTable::default();
                 let lowered = self.lower_pattern(pattern.clone(), &mut var_table);
                 let pat_id = self.ctx.compiler.patterns.alloc_pat_id();
                 self.ctx.compiler.patterns.table.insert(pat_id, lowered);
 
-                self.ctx
-                    .define_anonymous(DefKind::Constant(pat_id), pattern.view().span())
+                ResolvedType {
+                    def_id: self
+                        .ctx
+                        .define_anonymous(DefKind::Constant(pat_id), pattern.view().span()),
+                    cardinality: ValueCardinality::Unit,
+                    span,
+                }
             }
         };
 
         for (index, relation) in fwd_set.relations().enumerate() {
             if let Some(mut defs) = self.lower_relationship(
-                subject_def_id,
-                rel_subject.clone(),
+                subject_ty,
                 relation,
-                object_def_id,
-                rel_object.clone(),
+                object_ty,
                 if index == 0 {
                     stmt.clone().backwd_set()
                 } else {
@@ -74,11 +81,9 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     #[allow(clippy::too_many_arguments)]
     fn lower_relationship(
         &mut self,
-        subject_def: DefId,
-        rel_subject: insp::RelSubject<V>,
+        subject_ty: ResolvedType,
         relation: insp::Relation<V>,
-        object_def: DefId,
-        rel_object: insp::RelObject<V>,
+        object_ty: ResolvedType,
         backward_relation: Option<insp::RelBackwdSet<V>>,
         rel_stmt: insp::RelStatement<V>,
     ) -> Option<RootDefs> {
@@ -92,12 +97,14 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     range.0.span(),
                     Some(self.lower_u16_range(range)),
                 ),
-                type_ref => {
-                    let def_id = self.resolve_type_reference(
-                        type_ref,
-                        &BlockContext::NoContext,
-                        Some(&mut root_defs),
-                    )?;
+                _ => {
+                    let def_id = self
+                        .resolve_quant_type_reference(
+                            type_quant.clone(),
+                            &BlockContext::NoContext,
+                            Some(&mut root_defs),
+                        )?
+                        .def_id;
                     let span = type_quant.view().span();
 
                     match self.ctx.compiler.defs.def_kind(def_id) {
@@ -107,12 +114,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                                 self.ctx.compiler.edge_ctx.edge_id_by_symbol(def_id)
                             {
                                 return self.lower_edge_relationship(
-                                    subject_def,
-                                    rel_subject,
+                                    subject_ty,
                                     (def_id, span, edge_id),
                                     relation,
-                                    object_def,
-                                    rel_object,
+                                    object_ty,
                                     backward_relation,
                                     rel_stmt,
                                 );
@@ -139,12 +144,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         };
 
         self.lower_literal_relationship(
-            subject_def,
-            rel_subject,
+            subject_ty,
             (key, ident_span, index_range_rel_params),
             relation,
-            object_def,
-            rel_object,
+            object_ty,
             backward_relation,
             rel_stmt,
         )
@@ -153,16 +156,14 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     #[allow(clippy::too_many_arguments)]
     fn lower_literal_relationship(
         &mut self,
-        subject_def: DefId,
-        rel_subject: insp::RelSubject<V>,
+        subject_ty: ResolvedType,
         (key, ident_span, index_range_rel_params): (
             RelationKey,
             U32Span,
             Option<Range<Option<u16>>>,
         ),
         relation: insp::Relation<V>,
-        object_def: DefId,
-        rel_object: insp::RelObject<V>,
+        object_ty: ResolvedType,
         backward_relation: Option<insp::RelBackwdSet<V>>,
         rel_stmt: insp::RelStatement<V>,
     ) -> Option<RootDefs> {
@@ -230,11 +231,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             let subject_cardinality = (
                 property_cardinality(relation.prop_cardinality())
                     .unwrap_or(PropertyCardinality::Mandatory),
-                value_cardinality(match rel_object.type_quant_or_pattern() {
-                    Some(insp::TypeQuantOrPattern::TypeQuant(type_quant)) => Some(type_quant),
-                    _ => None,
-                })
-                .unwrap_or(ValueCardinality::Unit),
+                object_ty.cardinality,
             );
             let object_cardinality = {
                 let default = if has_object_prop {
@@ -251,7 +248,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     backward_relation
                         .and_then(|rel| property_cardinality(rel.prop_cardinality()))
                         .unwrap_or(default.0),
-                    value_cardinality(rel_subject.type_quant()).unwrap_or(default.1),
+                    subject_ty.cardinality,
                 )
             };
 
@@ -264,9 +261,9 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     one_to_one: false,
                 },
                 relation_span: self.ctx.source_span(ident_span),
-                subject: (subject_def, self.ctx.source_span(rel_subject.0.span())),
+                subject: (subject_ty.def_id, self.ctx.source_span(subject_ty.span)),
                 subject_cardinality,
-                object: (object_def, self.ctx.source_span(rel_object.0.span())),
+                object: (object_ty.def_id, self.ctx.source_span(object_ty.span)),
                 object_cardinality,
                 rel_params: rel_params.clone(),
             }
@@ -332,12 +329,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     #[allow(clippy::too_many_arguments)]
     fn lower_edge_relationship(
         &mut self,
-        subject_def: DefId,
-        rel_subject: insp::RelSubject<V>,
+        subject_ty: ResolvedType,
         (sym_id, ident_span, edge_id): (DefId, U32Span, EdgeId),
         relation: insp::Relation<V>,
-        object_def: DefId,
-        rel_object: insp::RelObject<V>,
+        object_ty: ResolvedType,
         backward_relation: Option<insp::RelBackwdSet<V>>,
         rel_stmt: insp::RelStatement<V>,
     ) -> Option<RootDefs> {
@@ -354,11 +349,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             let subject_cardinality = (
                 property_cardinality(relation.prop_cardinality())
                     .unwrap_or(PropertyCardinality::Mandatory),
-                value_cardinality(match rel_object.type_quant_or_pattern() {
-                    Some(insp::TypeQuantOrPattern::TypeQuant(type_quant)) => Some(type_quant),
-                    _ => None,
-                })
-                .unwrap_or(ValueCardinality::Unit),
+                object_ty.cardinality,
             );
             let object_cardinality = {
                 let default = (PropertyCardinality::Optional, ValueCardinality::IndexSet);
@@ -367,7 +358,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     backward_relation
                         .and_then(|rel| property_cardinality(rel.prop_cardinality()))
                         .unwrap_or(default.0),
-                    value_cardinality(rel_subject.type_quant()).unwrap_or(default.1),
+                    subject_ty.cardinality, // value_cardinality(rel_subject.type_quant()).unwrap_or(default.1),
                 )
             };
 
@@ -390,9 +381,9 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 relation_def_id: sym_id,
                 projection,
                 relation_span: self.ctx.source_span(ident_span),
-                subject: (subject_def, self.ctx.source_span(rel_subject.0.span())),
+                subject: (subject_ty.def_id, self.ctx.source_span(subject_ty.span)),
                 subject_cardinality,
-                object: (object_def, self.ctx.source_span(rel_object.0.span())),
+                object: (object_ty.def_id, self.ctx.source_span(object_ty.span)),
                 object_cardinality,
                 rel_params: RelParams::Unit,
             }
@@ -406,16 +397,6 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
         Some(vec![relationship_id])
     }
-}
-
-fn value_cardinality<V: NodeView>(
-    type_quant: Option<insp::TypeQuant<V>>,
-) -> Option<ValueCardinality> {
-    Some(match type_quant? {
-        insp::TypeQuant::TypeQuantUnit(_) => ValueCardinality::Unit,
-        insp::TypeQuant::TypeQuantSet(_) => ValueCardinality::IndexSet,
-        insp::TypeQuant::TypeQuantList(_) => ValueCardinality::List,
-    })
 }
 
 fn property_cardinality<V: NodeView>(

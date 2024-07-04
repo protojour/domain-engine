@@ -6,7 +6,7 @@ use ontol_parser::{
     lexer::{kind::Kind, unescape::unescape_regex},
     U32Span,
 };
-use ontol_runtime::DefId;
+use ontol_runtime::{property::ValueCardinality, DefId};
 
 use crate::{
     def::{TypeDef, TypeDefFlags},
@@ -195,8 +195,14 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     ) -> Option<CompoundPatternAttr> {
         let relation = attr_prop.relation()?;
         let relation_span = self.ctx.source_span(relation.view().span());
-        let relation_def =
-            self.resolve_type_reference(relation.type_ref()?, &BlockContext::NoContext, None)?;
+        let relation_def = self
+            .resolve_type_reference(
+                relation.type_ref()?,
+                ValueCardinality::Unit,
+                &BlockContext::NoContext,
+                None,
+            )?
+            .def_id;
         let bind_option = attr_prop
             .prop_cardinality()
             .and_then(|pc| pc.question())

@@ -5,12 +5,13 @@ use std::{
 
 use ontol_parser::{
     cst::{
-        inspect::{self as insp},
+        inspect as insp,
         view::{NodeView, NodeViewExt, TokenView, TokenViewExt},
     },
     lexer::{kind::Kind, unescape::unescape_regex},
+    U32Span,
 };
-use ontol_runtime::DefId;
+use ontol_runtime::{property::ValueCardinality, DefId};
 use tracing::debug;
 
 use crate::{
@@ -20,6 +21,13 @@ use crate::{
 };
 
 use super::context::{BlockContext, CstLowering, Res, RootDefs};
+
+#[derive(Clone, Copy)]
+pub struct ResolvedType {
+    pub def_id: DefId,
+    pub cardinality: ValueCardinality,
+    pub span: U32Span,
+}
 
 impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     pub(super) fn catch<T>(&mut self, f: impl FnOnce(&mut Self) -> Res<T>) -> Option<T> {
@@ -32,13 +40,52 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         }
     }
 
+    pub(super) fn resolve_quant_type_reference(
+        &mut self,
+        type_quant: insp::TypeQuant<V>,
+        block_context: &BlockContext,
+        root_defs: Option<&mut RootDefs>,
+    ) -> Option<ResolvedType> {
+        let span = type_quant.view().span();
+        let resolved_type = match type_quant {
+            insp::TypeQuant::TypeQuantUnit(unit) => self.resolve_type_reference(
+                unit.type_ref()?,
+                ValueCardinality::Unit,
+                block_context,
+                root_defs,
+            ),
+            insp::TypeQuant::TypeQuantSet(set) => self.resolve_type_reference(
+                set.type_ref()?,
+                ValueCardinality::IndexSet,
+                block_context,
+                root_defs,
+            ),
+            insp::TypeQuant::TypeQuantList(list) => self.resolve_type_reference(
+                list.type_ref()?,
+                ValueCardinality::List,
+                block_context,
+                root_defs,
+            ),
+        }?;
+
+        // extend span to cover the quantified range
+        Some(ResolvedType {
+            def_id: resolved_type.def_id,
+            cardinality: resolved_type.cardinality,
+            span,
+        })
+    }
+
     pub(super) fn resolve_type_reference(
         &mut self,
         type_ref: insp::TypeRef<V>,
+        syntax_cardinality: ValueCardinality,
         block_context: &BlockContext,
         root_defs: Option<&mut RootDefs>,
-    ) -> Option<DefId> {
-        match (type_ref, block_context) {
+    ) -> Option<ResolvedType> {
+        let span = type_ref.view().span();
+
+        let def_id = match (type_ref, block_context) {
             (insp::TypeRef::IdentPath(path), _) => self.lookup_path(&path),
             (insp::TypeRef::This(_), BlockContext::Context(func)) => Some(func()),
             (insp::TypeRef::This(this), BlockContext::NoContext) => {
@@ -86,7 +133,11 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             }
             (insp::TypeRef::DefBody(body), _) => {
                 if body.statements().next().is_none() {
-                    return Some(self.ctx.compiler.primitives.unit);
+                    return Some(ResolvedType {
+                        def_id: self.ctx.compiler.primitives.unit,
+                        cardinality: syntax_cardinality,
+                        span: body.view().span(),
+                    });
                 }
 
                 let Some(root_defs) = root_defs else {
@@ -170,7 +221,13 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     Some(union_def_id)
                 }
             }
-        }
+        };
+
+        Some(ResolvedType {
+            def_id: def_id?,
+            cardinality: syntax_cardinality,
+            span,
+        })
     }
 
     pub(super) fn unescaped_text_literal_def_id(&mut self, unescaped: &str) -> DefId {
