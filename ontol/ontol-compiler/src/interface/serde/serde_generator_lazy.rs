@@ -3,7 +3,7 @@ use std::{borrow::Cow, collections::HashSet, ops::Deref};
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
-    debug::NoFmt,
+    debug::OntolDebug,
     interface::{
         discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
         serde::{
@@ -572,7 +572,7 @@ fn find_unambiguous_struct_operator(
                     let operator = &operators_by_addr[discriminator.addr.0 as usize];
                     debug!(
                         "SKIPPED SOMETHING: {operator:?}\n\n",
-                        operator = NoFmt(operator)
+                        operator = operator.debug(&())
                     );
                 }
             }

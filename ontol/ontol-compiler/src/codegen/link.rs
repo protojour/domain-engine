@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    debug::Fmt,
+    debug::OntolDebug,
     vm::proc::{Address, Lib, OpCode, Procedure},
     DefId, MapDef, MapKey,
 };
@@ -42,7 +42,7 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
 
         let procedure =
             lib.append_procedure(n_params, opcodes.into_iter().map(|(opcode, _span)| opcode));
-        debug!("got procedure {:?}", Fmt(&(), &procedure));
+        debug!("got procedure {:?}", procedure.debug(&()));
         map_proc_table.insert(key, procedure);
     }
 

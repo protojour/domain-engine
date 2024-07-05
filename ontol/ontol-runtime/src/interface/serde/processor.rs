@@ -3,6 +3,7 @@ use std::fmt::{Debug, Display};
 use ontol_macros::OntolDebug;
 
 use crate::{
+    debug::OntolDebug,
     format_utils::{Backticks, CommaSeparated, DoubleQuote},
     ontology::Ontology,
     DefId, RelationshipId,
@@ -364,7 +365,7 @@ impl<'on, 'p> Debug for SerdeProcessor<'on, 'p> {
         // This structure might contain cycles (through operator addr),
         // so just print the topmost level.
         f.debug_struct("SerdeProcessor")
-            .field("operator", &self.ontology.debug(self.value_operator))
+            .field("operator", &self.value_operator.debug(self.ontology))
             .field("rel_params_addr", &self.ctx.rel_params_addr)
             .finish()
     }

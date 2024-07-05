@@ -11,7 +11,14 @@ use crate::ontology::ontol::TextConstant;
 ///
 /// This trait can be derived using [ontol_macros].
 pub trait OntolDebug {
-    fn fmt(&self, ontol_fmt: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result;
+    /// Format the this value with the help of an [OntolFormatter],
+    /// write output to the [core::fmt::Formatter].
+    fn fmt(&self, ontol_fmt: &dyn OntolFormatter, f: &mut core::fmt::Formatter<'_>) -> Result;
+
+    /// Convert a reference of this value into a type that implemens Debug
+    fn debug<'a>(&'a self, formatter: &'a dyn OntolFormatter) -> impl std::fmt::Debug + Sized {
+        Fmt(formatter, self)
+    }
 }
 
 /// A debugging context for [OntolDebug].
@@ -21,35 +28,23 @@ pub trait OntolFormatter {
     fn fmt_text_constant(&self, constant: TextConstant, f: &mut Formatter<'_>) -> Result;
 }
 
-/// A type that combines type T with an [OntolFormatter].
-///
-/// This type implements [Debug], and can use the ontol formatter.
-pub struct Fmt<'on, T>(pub &'on dyn OntolFormatter, pub T);
-
-/// A type that provides [Debug] for [OntolDebug] T's, but uses a dummy [OntolFormatter].
-pub struct NoFmt<T: ?Sized>(pub T);
-
 impl OntolFormatter for () {
     fn fmt_text_constant(&self, constant: TextConstant, f: &mut Formatter<'_>) -> Result {
         write!(f, "{constant:?}")
     }
 }
 
-impl<'on, T> std::fmt::Debug for Fmt<'on, &'on T>
+/// A type that combines type T with an [OntolFormatter].
+///
+/// This type implements [Debug], and can use the ontol formatter.
+struct Fmt<'f, T>(pub &'f dyn OntolFormatter, pub T);
+
+impl<'f, T> std::fmt::Debug for Fmt<'f, &'f T>
 where
     T: ?Sized + OntolDebug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         <T as OntolDebug>::fmt(self.1, self.0, f)
-    }
-}
-
-impl<T> std::fmt::Debug for NoFmt<T>
-where
-    T: ?Sized + OntolDebug,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        <T as OntolDebug>::fmt(&self.0, &(), f)
     }
 }
 

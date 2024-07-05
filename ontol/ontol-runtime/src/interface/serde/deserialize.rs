@@ -9,6 +9,7 @@ use tracing::{trace, warn};
 
 use crate::{
     attr::{Attr, AttrMatrix},
+    debug::OntolDebug,
     interface::serde::{
         deserialize_id::IdSingletonStructVisitor,
         deserialize_struct::{PossibleProps, StructDeserializer, StructVisitor},
@@ -43,7 +44,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         assert!(
             self.ctx.rel_params_addr.is_none(),
             "rel_params_addr should be None for {:?}",
-            self.ontology.debug(self.value_operator)
+            self.value_operator.debug(self.ontology)
         );
     }
 }
@@ -415,7 +416,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
 
         trace!(
             "matched map: {map_match:?} buffered attrs: {buffered_attrs:?}",
-            map_match = self.processor.ontology.debug(&map_match)
+            map_match = map_match.debug(self.processor.ontology)
         );
 
         // delegate to the real struct visitor

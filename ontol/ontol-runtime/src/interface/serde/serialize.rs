@@ -9,6 +9,7 @@ use tracing::{trace, warn};
 use crate::{
     attr::{Attr, AttrMatrixRef, AttrRef, AttrTupleRef},
     cast::Cast,
+    debug::OntolDebug,
     interface::serde::{
         operator::AppliedVariants,
         processor::{RecursionLimitError, ScalarFormat},
@@ -34,7 +35,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
     pub fn serialize_attr<S: Serializer>(&self, attr: AttrRef, serializer: S) -> Res<S> {
         trace!(
             "serializing op={:?}",
-            self.ontology.debug(self.value_operator)
+            self.value_operator.debug(self.ontology)
         );
 
         let attr = attr.coerce_to_unit();

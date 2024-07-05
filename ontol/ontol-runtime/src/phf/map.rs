@@ -4,7 +4,7 @@ use arcstr::ArcStr;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    debug::{Fmt, OntolDebug, OntolFormatter},
+    debug::{OntolDebug, OntolFormatter},
     ontology::{Ontology, OntologyInit},
 };
 
@@ -156,7 +156,7 @@ impl<V: OntolDebug> OntolDebug for PhfMap<V> {
     fn fmt(&self, ofmt: &dyn OntolFormatter, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut map = f.debug_map();
         for (key, value) in self.iter() {
-            map.entry(key.arc_str(), &Fmt(ofmt, value));
+            map.entry(key.arc_str(), &value.debug(ofmt));
         }
 
         map.finish()
@@ -177,7 +177,7 @@ impl<V: OntolDebug> OntolDebug for PhfIndexMap<V> {
     fn fmt(&self, ofmt: &dyn OntolFormatter, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut map = f.debug_map();
         for (key, value) in self.iter() {
-            map.entry(key.arc_str(), &Fmt(ofmt, value));
+            map.entry(key.arc_str(), &value.debug(ofmt));
         }
 
         map.finish()

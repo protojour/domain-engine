@@ -1,6 +1,7 @@
 use ontol_macros::OntolDebug;
 
 use crate::{
+    debug::OntolDebug,
     interface::{
         discriminator::{Discriminant, LeafDiscriminant, VariantPurpose},
         serde::{
@@ -153,7 +154,7 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                     }
                     other => panic!(
                         "Matched discriminator is not a map type: {other:?}",
-                        other = self.ontology.debug(&other)
+                        other = other.debug(self.ontology)
                     ),
                 }
             }
@@ -196,7 +197,7 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                     }
                     other => panic!(
                         "Matched discriminator is not a map type: {other:?}",
-                        other = self.ontology.debug(&other)
+                        other = other.debug(self.ontology)
                     ),
                 },
             );

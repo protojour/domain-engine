@@ -5,16 +5,17 @@ use std::{
 
 use indexmap::IndexMap;
 use ontol_runtime::{
-    debug::NoFmt,
-    interface::discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
-    interface::serde::operator::{
-        AliasOperator, ConstructorSequenceOperator, RelationSequenceOperator, SequenceRange,
-        SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdeUnionVariant, StructOperator,
-        UnionOperator,
-    },
+    debug::OntolDebug,
     interface::{
-        discriminator::LeafDiscriminant,
-        serde::{operator::SerdeStructFlags, SerdeDef, SerdeModifier},
+        discriminator::{Discriminant, LeafDiscriminant, VariantDiscriminator, VariantPurpose},
+        serde::{
+            operator::{
+                AliasOperator, ConstructorSequenceOperator, RelationSequenceOperator,
+                SequenceRange, SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdeStructFlags,
+                SerdeUnionVariant, StructOperator, UnionOperator,
+            },
+            SerdeDef, SerdeModifier,
+        },
     },
     ontology::ontol::TextConstant,
     phf::PhfKey,
@@ -168,7 +169,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 Some(OperatorAllocation::Allocated(addr, operator)) => {
                     trace!(
                         "CREATED {addr:?} {key:?} {operator:?}",
-                        operator = NoFmt(&operator)
+                        operator = operator.debug(self.str_ctx),
                     );
                     self.operators_by_addr[addr.0 as usize] = operator;
 
@@ -663,7 +664,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     }
 
                     let ranges = sequence_range_builder.build();
-                    trace!("sequence ranges: {:#?}", NoFmt(&ranges));
+                    trace!("sequence ranges: {:#?}", ranges.debug(self.str_ctx));
 
                     let addr = self.alloc_addr(&def);
                     Some(OperatorAllocation::Allocated(
@@ -731,7 +732,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         LeafDiscriminant::IsAny
                     },
                 ),
-                other => panic!("id operator was not an Id: {:?}", NoFmt(other)),
+                other => panic!("id operator was not an Id: {:?}", other.debug(self.str_ctx)),
             };
 
         Some(OperatorAllocation::Allocated(
@@ -1015,7 +1016,7 @@ pub(super) fn operator_to_leaf_discriminant(operator: &SerdeOperator) -> LeafDis
             LeafDiscriminant::IsSequence
         }
         other => {
-            warn!("Unable to match {:?} yet", NoFmt(&other));
+            warn!("Unable to match {:?} yet", other.debug(&()));
             LeafDiscriminant::IsAny
         }
     }

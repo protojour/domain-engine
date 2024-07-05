@@ -9,7 +9,7 @@ use fnv::FnvHashMap;
 use tracing::debug;
 
 use crate::{
-    debug::{self, OntolFormatter},
+    debug::{OntolDebug, OntolFormatter},
     interface::{
         serde::{
             operator::{SerdeOperator, SerdeOperatorAddr},
@@ -106,11 +106,6 @@ impl Ontology {
     /// The data is a serializable value.
     pub fn data(&self) -> &Data {
         &self.data
-    }
-
-    /// Make a value debuggable using OntolDebug.
-    pub fn debug<'a, T: ?Sized>(&'a self, value: &'a T) -> debug::Fmt<'a, &'a T> {
-        debug::Fmt(self, value)
     }
 
     pub fn new_vm(&self, proc: Procedure) -> OntolVm<'_> {
@@ -226,7 +221,7 @@ impl Ontology {
             debug!(
                 "get_mapper_proc ({:?}) => {:?}",
                 key.def_ids(),
-                self.debug(&map_info.procedure)
+                map_info.procedure.debug(self)
             );
             map_info.procedure
         })

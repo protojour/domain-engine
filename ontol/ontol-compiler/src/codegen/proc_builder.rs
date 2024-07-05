@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    debug::NoFmt,
+    debug::OntolDebug,
     var::Var,
     vm::proc::{AddressOffset, Local, NParams, OpCode},
 };
@@ -167,15 +167,15 @@ impl ProcBuilder {
     }
 
     fn debug_blocks(&self) {
-        debug!("Proc ({:?}):", NoFmt(self.n_params));
+        debug!("Proc ({:?}):", self.n_params.debug(&()));
         for block in &self.blocks {
             debug!("  BlockLabel({}):", block.label.0);
 
             for (index, (ir, _)) in block.ir.iter().enumerate() {
-                debug!("    {index}: {ir:?}", ir = NoFmt(ir));
+                debug!("    {index}: {ir:?}", ir = ir.debug(&()));
             }
 
-            debug!("    T: {:?}", NoFmt(block.terminator));
+            debug!("    T: {:?}", block.terminator.debug(&()));
         }
     }
 }
@@ -183,14 +183,11 @@ impl ProcBuilder {
 fn debug_output(n_params: NParams, output: &SpannedOpCodes) {
     trace!(
         "Built proc: {:?} {:#?}",
-        NoFmt(n_params),
+        n_params.debug(&()),
         output
             .iter()
             .enumerate()
-            .map(|(index, (opcode, _))| format!(
-                "{index}: {opcode:?}",
-                opcode = ontol_runtime::debug::Fmt(&(), opcode)
-            ))
+            .map(|(index, (opcode, _))| format!("{index}: {opcode:?}", opcode = opcode.debug(&())))
             .collect::<Vec<_>>()
     );
 }

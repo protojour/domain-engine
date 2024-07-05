@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt::Debug, ops::Index};
 
 use arcstr::ArcStr;
-use ontol_runtime::{ontology::ontol::TextConstant, phf::PhfKey};
+use ontol_runtime::{debug::OntolFormatter, ontology::ontol::TextConstant, phf::PhfKey};
 
 use crate::mem::Mem;
 
@@ -115,5 +115,19 @@ impl<'m> Index<TextConstant> for StringCtx<'m> {
 
     fn index(&self, index: TextConstant) -> &Self::Output {
         self.constants[index.0 as usize]
+    }
+}
+
+impl<'m> OntolFormatter for StringCtx<'m> {
+    fn fmt_text_constant(
+        &self,
+        constant: TextConstant,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        if let Some(str) = self.constants.get(constant.0 as usize) {
+            write!(f, "\"{str}\"")
+        } else {
+            write!(f, "{constant:?}")
+        }
     }
 }

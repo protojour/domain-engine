@@ -3,6 +3,7 @@ use std::cmp::Ordering;
 use fnv::FnvHashMap;
 use itertools::Itertools;
 use ontol_runtime::{
+    debug::OntolDebug,
     ontology::{
         map::{PropertyFlow, PropertyFlowData},
         Ontology,
@@ -61,7 +62,7 @@ fn translate_struct_select(struct_select: &mut StructSelect, key: &MapKey, ontol
 
     trace!(
         "translate_entity_select flow props: {:#?}",
-        ontology.debug(prop_flow_slice)
+        prop_flow_slice.debug(ontology)
     );
 
     let processor = SelectFlowProcessor {

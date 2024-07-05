@@ -6,6 +6,7 @@ use super::{
     VmResult,
 };
 use crate::{
+    debug::OntolDebug,
     ontology::{ontol::TextConstant, Ontology},
     property::ValueCardinality,
     query::condition::ClausePair,
@@ -107,7 +108,7 @@ pub trait Processor {
 
 impl<'o, P: Processor> AbstractVm<'o, P> {
     pub fn new(ontology: &'o Ontology, procedure: Procedure) -> Self {
-        trace!("AbstractVm::new({:?})", ontology.debug(&procedure));
+        trace!("AbstractVm::new({:?})", procedure.debug(ontology));
         Self {
             program_counter: procedure.address.0 as usize,
             proc_address: procedure.address.0 as usize,

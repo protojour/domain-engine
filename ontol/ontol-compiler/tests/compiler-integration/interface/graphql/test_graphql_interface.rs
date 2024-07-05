@@ -1,7 +1,7 @@
 use assert_matches::assert_matches;
 use ontol_macros::test;
 use ontol_runtime::{
-    debug::NoFmt,
+    debug::OntolDebug,
     interface::{
         graphql::{
             data::{FieldKind, NativeScalarKind, ObjectInterface, ObjectKind},
@@ -141,7 +141,7 @@ fn test_graphql_scalar_array() {
 
         let operator = &test.test.ontology()[native.operator_addr];
         if !matches!(operator, SerdeOperator::RelationList(_)) {
-            panic!("{:?} was not RelationSequence", NoFmt(operator));
+            panic!("{:?} was not RelationSequence", operator.debug(&()));
         }
     });
 }

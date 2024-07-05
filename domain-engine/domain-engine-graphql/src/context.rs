@@ -71,6 +71,10 @@ pub(crate) struct SchemaCtx {
 }
 
 impl SchemaCtx {
+    pub fn ontology(&self) -> &Ontology {
+        &self.ontology
+    }
+
     pub fn get_schema_type(
         self: &Arc<Self>,
         type_addr: TypeAddr,

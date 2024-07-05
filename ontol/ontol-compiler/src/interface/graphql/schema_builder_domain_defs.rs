@@ -3,7 +3,7 @@ use std::ops::Deref;
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
-    debug::NoFmt,
+    debug::OntolDebug,
     interface::{
         discriminator::{
             leaf_discriminant_scalar_union_for_has_attribute, Discriminant,
@@ -998,7 +998,9 @@ pub(super) fn get_native_scalar_kind(
         | SerdeOperator::DynamicSequence
         | SerdeOperator::RelationList(_)
         | SerdeOperator::RelationIndexSet(_)
-        | SerdeOperator::ConstructorSequence(_)) => panic!("not a native scalar: {:?}", NoFmt(op)),
+        | SerdeOperator::ConstructorSequence(_)) => {
+            panic!("not a native scalar: {:?}", op.debug(&()))
+        }
     }
 }
 

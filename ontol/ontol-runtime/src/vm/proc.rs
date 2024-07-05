@@ -5,7 +5,7 @@ use bit_vec::BitVec;
 use ontol_macros::OntolDebug;
 
 use crate::{
-    debug::NoFmt,
+    debug::OntolDebug,
     impl_ontol_debug,
     ontology::ontol::TextConstant,
     property::ValueCardinality,
@@ -203,6 +203,6 @@ pub enum OpCodeCondTerm {
 
 impl Display for OpCodeCondTerm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", NoFmt(self))
+        write!(f, "{:?}", self.debug(&()))
     }
 }

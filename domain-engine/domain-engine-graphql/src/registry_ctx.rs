@@ -2,7 +2,7 @@ use std::{cmp::Ordering, ops::ControlFlow, sync::Arc};
 
 use juniper::{GraphQLValue, ID};
 use ontol_runtime::{
-    debug::NoFmt,
+    debug::OntolDebug,
     interface::{
         discriminator::{
             leaf_discriminant_scalar_union_for_has_attribute, LeafDiscriminantScalarUnion,
@@ -243,7 +243,9 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     AppliedVariants::OneOf(possible_variants) => {
                         debug!(
                             "UNION ARGUMENTS for {:?}",
-                            NoFmt(union_op.unfiltered_variants())
+                            union_op
+                                .unfiltered_variants()
+                                .debug(self.schema_ctx.ontology())
                         );
 
                         // add edge cardinals in increasing order.
@@ -369,7 +371,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         let _entered = trace_span!("arg", name).entered();
         trace!(
             "register argument: {:?}",
-            self.schema_ctx.ontology.debug(operator)
+            operator.debug(self.schema_ctx.ontology()),
         );
 
         if property_flags.contains(SerdePropertyFlags::ENTITY_ID) {
@@ -522,7 +524,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         } else {
                             panic!(
                                 "no union found: {def_id:?}/{query_level:?}. union_op={union_op:#?}",
-                                union_op = self.schema_ctx.ontology.debug(union_op),
+                                union_op = union_op.debug(self.schema_ctx.ontology()),
                             )
                         }
                     }
@@ -537,7 +539,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         let def = self.schema_ctx.ontology.def(def_id);
                         panic!(
                             "struct not found for {def_id:?} {name:?}",
-                            name = self.schema_ctx.ontology.debug(&def.name())
+                            name = def.name().debug(self.schema_ctx.ontology())
                         );
                     });
 

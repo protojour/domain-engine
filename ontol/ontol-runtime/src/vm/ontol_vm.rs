@@ -11,6 +11,7 @@ use tracing::{error, trace, Level};
 use crate::{
     attr::{Attr, AttrMatrix},
     cast::Cast,
+    debug::OntolDebug,
     ontology::{ontol::TextConstant, Ontology},
     property::ValueCardinality,
     query::condition::{Clause, ClausePair, CondTerm},
@@ -639,7 +640,7 @@ impl<'on> VmDebug<OntolProcessor<'on>> for Tracer<'on> {
                 trace!("    L{index}: {}", ValueDebug(value));
             }
         }
-        trace!("{:?}", self.ontology.debug(&vm.pending_opcode()));
+        trace!("{:?}", &vm.pending_opcode().debug(self.ontology));
     }
 }
 

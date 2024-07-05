@@ -3,6 +3,7 @@ use jsonschema::JSONSchema;
 use ontol_faker::new_constant_fake;
 use ontol_runtime::{
     attr::Attr,
+    debug::OntolDebug,
     interface::{
         json_schema::build_standalone_schema,
         serde::{
@@ -43,7 +44,7 @@ impl<'on> DefBinding<'on> {
         package_id: PackageId,
         type_name: &str,
     ) -> Self {
-        let ontology = &ontol_test.ontology;
+        let ontology = ontol_test.ontology.as_ref();
         let domain = ontology.find_domain(package_id).unwrap();
         let def = domain
             .defs()
@@ -55,7 +56,7 @@ impl<'on> DefBinding<'on> {
             .unwrap_or_else(|| panic!("type not found: `{type_name}`"));
 
         if !def.public {
-            warn!("`{:?}` is not public!", ontology.debug(&def.name()));
+            warn!("`{:?}` is not public!", def.name().debug(ontology));
         }
 
         trace!(

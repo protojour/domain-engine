@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use ontol_runtime::{
-    debug::NoFmt,
+    debug::OntolDebug,
     interface::discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
     interface::{
         discriminator::LeafDiscriminant,
@@ -142,7 +142,7 @@ impl UnionBuilder {
                 for variant in union_op.unfiltered_variants() {
                     trace!(
                         "push UNION variant discriminator for {variant:?} {discriminator:?}",
-                        variant = NoFmt(variant)
+                        variant = variant.debug(&())
                     );
 
                     let mut child_scope: Vec<&VariantDiscriminator> = vec![];
