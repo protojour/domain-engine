@@ -254,7 +254,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         for variant in union_operator.unfiltered_variants() {
             match &variant.discriminator.discriminant {
-                Discriminant::HasAttribute(_, text_constant, _) => {
+                Discriminant::HasAttribute(_, text_constant, ..) => {
                     text_constant_set.insert(*text_constant);
                 }
                 _ => {

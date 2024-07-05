@@ -7,7 +7,9 @@ use indexmap::IndexMap;
 use ontol_runtime::{
     debug::OntolDebug,
     interface::{
-        discriminator::{Discriminant, LeafDiscriminant, VariantDiscriminator, VariantPurpose},
+        discriminator::{
+            Discriminant, LeafDiscriminant, PropCount, VariantDiscriminator, VariantPurpose,
+        },
         serde::{
             operator::{
                 AliasOperator, ConstructorSequenceOperator, RelationSequenceOperator,
@@ -746,6 +748,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             discriminant: Discriminant::HasAttribute(
                                 identifies_relationship_id,
                                 id_property_name,
+                                PropCount::Any,
                                 id_leaf_discriminant,
                             ),
                             purpose: VariantPurpose::Identification {

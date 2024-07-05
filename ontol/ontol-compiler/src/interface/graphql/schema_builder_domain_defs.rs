@@ -752,7 +752,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
                 let mut prop_keys: FnvHashSet<TextConstant> = Default::default();
                 for discriminator in discriminators.iter() {
-                    if let Discriminant::HasAttribute(_, prop_key, _) = &discriminator.discriminant
+                    if let Discriminant::HasAttribute(_, prop_key, ..) = &discriminator.discriminant
                     {
                         prop_keys.insert(*prop_key);
                     }

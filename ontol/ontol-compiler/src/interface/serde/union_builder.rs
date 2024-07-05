@@ -65,7 +65,7 @@ impl UnionBuilder {
                 Discriminant::StructFallback => {
                     panic!("MapFallback should have been filtered already");
                 }
-                Discriminant::HasAttribute(_, _, leaf @ LeafDiscriminant::IsAny) => {
+                Discriminant::HasAttribute(.., leaf @ LeafDiscriminant::IsAny) => {
                     // TODO: We don't know that we have to do any disambiguation here
                     // (there might be only one singleton property)
                     if let Some(operator) = generator.gen_operator_lazy(SerdeKey::Def(

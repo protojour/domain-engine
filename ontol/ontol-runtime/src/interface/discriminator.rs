@@ -37,9 +37,16 @@ pub enum VariantPurpose {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]
 pub enum Discriminant {
     MatchesLeaf(LeafDiscriminant),
-    HasAttribute(RelationshipId, TextConstant, LeafDiscriminant),
+    /// Has _any_ attribute that matches discriminant
+    HasAttribute(RelationshipId, TextConstant, PropCount, LeafDiscriminant),
     /// Matches any struct
     StructFallback,
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]
+pub enum PropCount {
+    One,
+    Any,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]
@@ -71,8 +78,7 @@ pub fn leaf_discriminant_scalar_union_for_has_attribute<'a>(
     let mut union = LeafDiscriminantScalarUnion::empty();
 
     for discriminator in discriminator_iterator {
-        let Discriminant::HasAttribute(_, _, leaf_discriminant) = &discriminator.discriminant
-        else {
+        let Discriminant::HasAttribute(.., leaf_discriminant) = &discriminator.discriminant else {
             continue;
         };
         match leaf_discriminant {

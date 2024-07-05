@@ -1,10 +1,12 @@
 use std::{fmt::Display, ops::RangeInclusive};
 
+use map_matcher::MapMatcher;
+
 use crate::value::Value;
 
-use self::{map_matchers::MapMatcher, sequence_matcher::SequenceRangesMatcher};
+use self::sequence_matcher::SequenceRangesMatcher;
 
-pub mod map_matchers;
+pub mod map_matcher;
 pub mod primitive_matchers;
 pub mod sequence_matcher;
 pub mod text_matchers;

@@ -1,4 +1,4 @@
-use std::slice;
+use std::{ops::ControlFlow, slice};
 
 use serde::{
     de::{DeserializeSeed, Error, MapAccess, SeqAccess, Unexpected, Visitor},
@@ -13,7 +13,7 @@ use crate::{
     interface::serde::{
         deserialize_id::IdSingletonStructVisitor,
         deserialize_struct::{PossibleProps, StructDeserializer, StructVisitor},
-        matcher::map_matchers::MapMatchMode,
+        matcher::map_matcher::MapMatchMode,
     },
     sequence::{IndexSetBuilder, ListBuilder, SequenceBuilder, WithCapacity},
     value::{Serial, Value, ValueTag},
@@ -375,7 +375,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
 
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
         trace!("visit map\n");
-        let map_matcher = self
+        let mut map_matcher = self
             .matcher
             .match_map()
             .map_err(|_| Error::invalid_type(Unexpected::Map, &self))?;
@@ -384,14 +384,14 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
         // into a buffer until the type can be properly recognized
         let mut buffered_attrs: Vec<(Box<str>, serde_value::Value)> = Default::default();
 
-        let map_match = loop {
+        let match_ok = loop {
             let property = match map.next_key::<Box<str>>()? {
                 Some(property) => property,
-                None => match map_matcher.match_fallback() {
-                    Ok(map_match) => {
-                        break map_match;
+                None => match map_matcher.consume_end(&buffered_attrs) {
+                    Ok(match_ok) => {
+                        break match_ok;
                     }
-                    Err(_indecisive) => {
+                    Err(()) => {
                         return Err(Error::custom(format!(
                             "invalid type, expected {}",
                             ExpectingMatching(&self.matcher)
@@ -400,32 +400,32 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                 },
             };
 
-            let value: serde_value::Value = map.next_value()?;
+            buffered_attrs.push((property, map.next_value()?));
 
-            match map_matcher.match_attribute(&property, &value) {
-                Ok(map_match) => {
-                    trace!("matched attribute \"{property}\"");
-                    buffered_attrs.push((property, value));
-                    break map_match;
+            match map_matcher.consume_next_attr(&buffered_attrs) {
+                ControlFlow::Break(match_ok) => {
+                    trace!(
+                        "matched attribute \"{prop}\"",
+                        prop = buffered_attrs.last().unwrap().0
+                    );
+                    break match_ok;
                 }
-                Err(_indecisive) => {}
+                ControlFlow::Continue(()) => {}
             }
-
-            buffered_attrs.push((property, value));
         };
 
         trace!(
-            "matched map: {map_match:?} buffered attrs: {buffered_attrs:?}",
-            map_match = map_match.debug(self.processor.ontology)
+            "matched map: {m:?} buffered attrs: {buffered_attrs:?}",
+            m = match_ok.debug(self.processor.ontology)
         );
 
         // delegate to the real struct visitor
-        match map_match.mode {
+        match match_ok.mode {
             MapMatchMode::Struct(_, struct_op) => StructVisitor {
                 processor: self.processor,
                 buffered_attrs,
                 struct_op,
-                ctx: map_match.ctx,
+                ctx: match_ok.ctx,
                 raw_dynamic_entity: false,
             }
             .visit_map(map),
@@ -433,7 +433,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                 processor: self.processor,
                 buffered_attrs,
                 struct_op,
-                ctx: map_match.ctx,
+                ctx: match_ok.ctx,
                 raw_dynamic_entity: true,
             }
             .visit_map(map),
@@ -446,7 +446,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                         addr,
                     },
                 )
-                .with_rel_params_addr(map_match.ctx.rel_params_addr)
+                .with_rel_params_addr(match_ok.ctx.rel_params_addr)
                 .deserialize_struct(buffered_attrs, map)?;
 
                 let id = output

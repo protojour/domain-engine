@@ -15,7 +15,7 @@ use crate::{
 };
 
 use super::{
-    map_matchers::MapMatcher,
+    map_matcher::MapMatcher,
     primitive_matchers::u64_to_i64,
     sequence_matcher::{SequenceKind, SequenceRangesMatcher},
     text_matchers::try_deserialize_custom_string,
@@ -161,14 +161,14 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
             return Err(());
         }
 
-        Ok(MapMatcher {
-            possible_variants: self.possible_variants,
-            ctx: self.ctx,
-            ontology: self.ontology,
-            profile: self.profile,
-            mode: self.mode,
-            level: self.level,
-        })
+        Ok(MapMatcher::new(
+            self.possible_variants,
+            self.ontology,
+            self.ctx,
+            self.profile,
+            self.mode,
+            self.level,
+        ))
     }
 }
 

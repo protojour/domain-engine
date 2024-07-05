@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    ops::ControlFlow,
+};
 
 use fnv::FnvHashMap;
 use serde::de::{DeserializeSeed, MapAccess, Visitor};
@@ -18,7 +21,7 @@ use crate::{
 use super::{
     deserialize_property::{IdSingletonPropVisitor, PropKind, PropertyMapVisitor},
     matcher::{
-        map_matchers::MapMatchMode, union_matcher::UnionMatcher, ExpectingMatching, ValueMatcher,
+        map_matcher::MapMatchMode, union_matcher::UnionMatcher, ExpectingMatching, ValueMatcher,
     },
     operator::{
         PossibleVariants, SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdeStructFlags,
@@ -389,22 +392,28 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                         mode: self.processor.mode,
                         level: self.processor.level,
                     };
-                    let map_matcher = union_matcher
+                    let mut map_matcher = union_matcher
                         .match_map()
                         .map_err(|_| serde::de::Error::custom("unmatchable"))?;
                     let value: serde_value::Value = map.next_value()?;
 
-                    let map_match = map_matcher
-                        .match_attribute(&key, &value)
-                        .or_else(|_| map_matcher.match_fallback())
-                        .map_err(|_indicisive| {
-                            serde::de::Error::custom(format!(
-                                "property \"{key}\": invalid value, expected {}",
-                                ExpectingMatching(&union_matcher)
-                            ))
-                        })?;
+                    let buffer = vec![(key, value)];
 
-                    let MapMatchMode::Struct(addr, _) = map_match.mode else {
+                    let match_ok = match map_matcher.consume_next_attr(&buffer) {
+                        ControlFlow::Break(match_ok) => match_ok,
+                        ControlFlow::Continue(()) => match map_matcher.consume_end(&buffer) {
+                            Ok(match_ok) => match_ok,
+                            Err(()) => {
+                                return Err(serde::de::Error::custom(format!(
+                                    "property \"{key}\": invalid value, expected {expected}",
+                                    key = buffer[0].0,
+                                    expected = ExpectingMatching(&union_matcher)
+                                )))
+                            }
+                        },
+                    };
+
+                    let MapMatchMode::Struct(addr, _) = match_ok.mode else {
                         return Err(serde::de::Error::custom(
                             "flattened union error: not a struct",
                         ));
@@ -413,7 +422,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                     output
                         .flattened_union_ops
                         .insert(serde_property.rel_id, addr);
-                    output.flattened_union_tmp_data.insert(key, value);
+                    output.flattened_union_tmp_data.extend(buffer);
 
                     if !serde_property
                         .is_optional_for(self.processor.mode, &self.processor.profile.flags)

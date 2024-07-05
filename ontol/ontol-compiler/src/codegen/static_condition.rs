@@ -129,7 +129,7 @@ impl<'c, 'm> ConditionBuilder<'c, 'm> {
                     .expect("union variant not found");
 
                 match &variant.discriminant {
-                    Discriminant::HasAttribute(relationship_id, _, leaf) => {
+                    Discriminant::HasAttribute(relationship_id, _, _, leaf) => {
                         let variant_var = self.output.mk_cond_var();
 
                         self.output.add_clause(

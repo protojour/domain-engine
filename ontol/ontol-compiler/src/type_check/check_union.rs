@@ -5,7 +5,7 @@ use indexmap::{IndexMap, IndexSet};
 use ontol_runtime::{
     interface::{
         discriminator::{
-            Discriminant, LeafDiscriminant, UnionDiscriminator, VariantDiscriminator,
+            Discriminant, LeafDiscriminant, PropCount, UnionDiscriminator, VariantDiscriminator,
             VariantPurpose,
         },
         serde::{SerdeDef, SerdeModifier},
@@ -363,6 +363,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             discriminant: Discriminant::HasAttribute(
                                 *rel_id,
                                 strings.intern_constant(property_name),
+                                PropCount::Any,
                                 LeafDiscriminant::IsTextLiteral(
                                     strings.intern_constant(string_literal),
                                 ),
@@ -565,7 +566,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     (
                         DiscriminatorType::Identification,
                         VariantKey::IdProperty { name, rel_id, .. },
-                    ) => Discriminant::HasAttribute(rel_id, name, leaf_discriminant),
+                    ) => {
+                        Discriminant::HasAttribute(rel_id, name, PropCount::Any, leaf_discriminant)
+                    }
                     (DiscriminatorType::Identification, _) => {
                         Discriminant::MatchesLeaf(leaf_discriminant)
                     }
