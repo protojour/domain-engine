@@ -25,6 +25,7 @@ use std::{
     ops::Deref,
     sync::Arc,
 };
+use tracing::info;
 
 use crate::{
     def::{
@@ -117,8 +118,8 @@ impl<'m> Compiler<'m> {
             UnionMemberCache { cache }
         };
 
-        let mut strings = self.str_ctx.detach();
-        let mut serde_gen = self.serde_generator(&mut strings, &union_member_cache);
+        let mut str_ctx = self.str_ctx.detach();
+        let mut serde_gen = self.serde_generator(&mut str_ctx, &union_member_cache);
         let mut builder = Ontology::builder();
         let mut ontology_union_variants: FnvHashMap<DefId, BTreeSet<DefId>> = Default::default();
 
@@ -348,11 +349,11 @@ impl<'m> Compiler<'m> {
 
         let docs = docs_table
             .into_iter()
-            .map(|(def_id, docs)| (def_id, strings.intern_constant(&docs)))
+            .map(|(def_id, docs)| (def_id, str_ctx.intern_constant(&docs)))
             .collect();
 
         builder
-            .text_constants(strings.into_arcstr_vec())
+            .text_constants(str_ctx.into_arcstr_vec())
             .ontol_domain_meta(OntolDomainMeta {
                 bool: self.primitives.bool,
                 i64: self.primitives.i64,
@@ -394,14 +395,14 @@ impl<'m> Compiler<'m> {
         type_def_id: DefId,
         union_member_cache: &UnionMemberCache,
         edges: &mut FnvHashMap<EdgeId, EdgeInfo>,
-        strings: &mut StringCtx<'m>,
+        str_ctx: &mut StringCtx<'m>,
     ) -> FnvHashMap<RelationshipId, DataRelationshipInfo> {
         let mut relationships = FnvHashMap::default();
         self.collect_inherent_relationships_and_edges(
             type_def_id,
             &mut relationships,
             edges,
-            strings,
+            str_ctx,
         );
 
         if let Some(ReprKind::StructIntersection(members)) =
@@ -412,7 +413,7 @@ impl<'m> Compiler<'m> {
                     *member_def_id,
                     &mut relationships,
                     edges,
-                    strings,
+                    str_ctx,
                 );
             }
         }
@@ -432,7 +433,7 @@ impl<'m> Compiler<'m> {
                         DataRelationshipSource::ByUnionProxy,
                         &mut relationships,
                         edges,
-                        strings,
+                        str_ctx,
                     );
                 }
             }
@@ -446,7 +447,7 @@ impl<'m> Compiler<'m> {
         type_def_id: DefId,
         relationships: &mut FnvHashMap<RelationshipId, DataRelationshipInfo>,
         edges: &mut FnvHashMap<EdgeId, EdgeInfo>,
-        strings: &mut StringCtx<'m>,
+        str_ctx: &mut StringCtx<'m>,
     ) {
         let Some(properties) = self.rel_ctx.properties_by_def_id(type_def_id) else {
             return;
@@ -458,7 +459,7 @@ impl<'m> Compiler<'m> {
                     DataRelationshipSource::Inherent,
                     relationships,
                     edges,
-                    strings,
+                    str_ctx,
                 );
             }
         }
@@ -470,7 +471,7 @@ impl<'m> Compiler<'m> {
         source: DataRelationshipSource,
         relationships: &mut FnvHashMap<RelationshipId, DataRelationshipInfo>,
         edges: &mut FnvHashMap<EdgeId, EdgeInfo>,
-        strings: &mut StringCtx<'m>,
+        str_ctx: &mut StringCtx<'m>,
     ) {
         let meta = rel_repr_meta(rel_id, &self.defs, &self.repr_ctx);
 
@@ -483,14 +484,16 @@ impl<'m> Compiler<'m> {
         let name = match meta.relation_repr_kind.deref() {
             ReprKind::Scalar(_, ReprScalarKind::TextConstant(constant_def_id), _) => {
                 let lit = self.defs.text_literal(*constant_def_id).unwrap();
-                strings.intern_constant(lit)
+                str_ctx.intern_constant(lit)
             }
             ReprKind::Unit => {
                 // FIXME: This doesn't _really_ have a subject "name". It represents a flattened structure:
-                strings.intern_constant("")
+                str_ctx.intern_constant("")
             }
             _ => return,
         };
+
+        info!("collect prop `{}`", &str_ctx[name]);
 
         let edge_params = match meta.relationship.rel_params {
             RelParams::Type(def_id) => Some(def_id),

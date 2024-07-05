@@ -1,6 +1,8 @@
 /// This example shows how to model a hybrid between an entity and and edge.
 domain edge_entity ()
 
+sym { id }
+
 sym {
     (src) related_to: (target) with_link: (ln),
     (target) related_from: (src) with_link: (ln),
@@ -8,24 +10,24 @@ sym {
     (ln) to: (target),
 }
 
-def foo_id (rel .is: text)
-def bar_id (rel .is: text)
+def foo_id (rel* is: text)
+def bar_id (rel* is: text)
 
 def foo (
-    rel .'id'|id: foo_id
-    rel .related_to: {bar}
+    rel. id: foo_id
+    rel* related_to: {bar}
 )
 def bar (
-    rel .'id'|id: bar_id
-    rel .'bar_field': text
-    rel .related_from: {foo}
+    rel. id: bar_id
+    rel* 'bar_field': text
+    rel* related_from: {foo}
 )
 
 /// This definition is both an entity in its own right and an edge
 def link (
-    rel .'id'|id: (rel .is: text)
-    rel .from: foo_id
-    rel .to: bar_id
+    rel. id: (rel* is: text)
+    rel* from: foo_id
+    rel* to: bar_id
 )
 
 map foos(

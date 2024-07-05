@@ -1,14 +1,14 @@
-rel .'a'::'b'? {c}
+rel* 'a'::'b'? {c}
 
 //@ grammar=ontol
 Ontol
     RelStatement
         KwRel `rel`
-        Whitespace
         RelSubject
             TypeQuantUnit
-                This
-                    Dot `.`
+                ThisSet
+                    Star `*`
+        Whitespace
         RelFwdSet
             Relation
                 TypeQuantUnit

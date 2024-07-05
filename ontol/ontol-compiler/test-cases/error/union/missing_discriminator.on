@@ -1,10 +1,10 @@
 def foo (
-    rel .'a': 'constant'
+    rel* 'a': 'constant'
 )
 def bar (
-    rel .'b': text
+    rel* 'b': text
 )
 def u (
-    rel .is?: foo
-    rel .is?: bar // ERROR cannot discriminate type
+    rel* is?: foo
+    rel* is?: bar // ERROR cannot discriminate type
 )

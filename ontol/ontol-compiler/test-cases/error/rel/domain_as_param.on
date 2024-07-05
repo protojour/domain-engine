@@ -1,7 +1,7 @@
 use 'dep0' as dep0
 use 'dep1' as dep1
 
-rel dep0 'fond_of': dep1 // ERROR subject must be a domain type// ERROR object must be a data type
+rel {dep0} 'fond_of': dep1 // ERROR subject must be a domain type// ERROR object must be a data type
 
 //@ src_name=dep0
 //@ src_name=dep1

@@ -1,6 +1,6 @@
 def foo (
-    rel .'a': text
-    rel .'b': text
+    rel* 'a': text
+    rel* 'b': text
 )
 map(
     (

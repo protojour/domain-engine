@@ -172,10 +172,12 @@ pub enum Kind {
     TypeQuantSet,
     /// `[x]` in `rel [x] 'foo': y`
     TypeQuantList,
-    /// a|b in `rel .'foo': a|b`
+    /// a|b in `rel. 'foo': a|b`
     TypeUnion,
-    /// `.` in `rel .'foo': y`
-    This,
+    /// `.` in `rel. 'foo': y`
+    ThisUnit,
+    /// `*` in `rel* 'foo': y`
+    ThisSet,
     /// span of any literal value
     Literal,
     /// `1..2`
@@ -331,7 +333,8 @@ impl Display for Kind {
             Kind::TypeQuantSet => write!(f, "set type quantifier"),
             Kind::TypeQuantList => write!(f, "list type quantifier"),
             Kind::TypeUnion => write!(f, "type union"),
-            Kind::This => write!(f, "this"),
+            Kind::ThisUnit => write!(f, "this(unit)"),
+            Kind::ThisSet => write!(f, "this(set)"),
             Kind::Literal => write!(f, "literal"),
             Kind::NumberRange => write!(f, "number range"),
             Kind::RangeStart => write!(f, "start of range"),

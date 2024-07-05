@@ -16,7 +16,7 @@ pub enum TextLikeType {
     /// [UUIDv7](https://datatracker.ietf.org/doc/html/draft-ietf-uuidrev-rfc4122bis)
     /// (time-ordered), making them naturally sortable and ideal as database primary keys.
     /// ```ontol
-    /// rel .is: uuid
+    /// rel* is: uuid
     /// ```
     Uuid,
     /// An [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339)-formatted
@@ -26,7 +26,7 @@ pub enum TextLikeType {
     /// are in UTC, and the output serializer will format values with the structure
     /// `'1970-01-01T00:00:00+00:00'`
     /// ```ontol
-    /// rel .is: datetime
+    /// rel* is: datetime
     /// ```
     DateTime,
 }

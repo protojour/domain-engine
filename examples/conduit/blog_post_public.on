@@ -1,11 +1,11 @@
 use 'conduit_db' as db
 
 def BlogPost (
-    rel .'post_id'|id: (rel .is: uuid)
-    rel .'name': text
-    rel .'contents': text
-    rel .'written_by': text
-    rel .'tags': {text}
+    rel. 'post_id': (rel* is: uuid)
+    rel* 'name': text
+    rel* 'contents': text
+    rel* 'written_by': text
+    rel* 'tags': {text}
 )
 
 map(

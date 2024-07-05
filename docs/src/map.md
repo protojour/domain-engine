@@ -14,19 +14,19 @@ In a two-way mapping, all leaf properties (properties with a value) must be acco
 
 ```ontol
 def Person (
-    rel .'Name': text
-    rel .'Born': datetime
-    rel .'Died'?: datetime
+    rel* 'Name': text
+    rel* 'Born': datetime
+    rel* 'Died'?: datetime
 )
 
 def citizen (
-    rel .'name': text
-    rel .'life_data': life
+    rel* 'name': text
+    rel* 'life_data': life
 )
 
 def life (
-    rel .'dob': datetime
-    rel .'rip'?: datetime
+    rel* 'dob': datetime
+    rel* 'rip'?: datetime
 )
 
 map (
@@ -56,18 +56,18 @@ Let's say `Person` only had the properties `'Name'` and `'Born'`, and that a val
 
 ```ontol
 def Person (
-    rel .'Name': text
-    rel .'Born': datetime
+    rel* 'Name': text
+    rel* 'Born': datetime
 )
 
 def citizen (
-    rel .'name': text
-    rel .'life_data': life
+    rel* 'name': text
+    rel* 'life_data': life
 )
 
 def life (
-    rel .'dob': datetime
-    rel .'rip': datetime
+    rel* 'dob': datetime
+    rel* 'rip': datetime
 )
 
 map (
@@ -94,8 +94,8 @@ However, if we were to make `'rip'` optional again (using `?`), a two-way mappin
 // ...
 
 def life (
-    rel .'dob': datetime
-    rel .'rip'?: datetime
+    rel* 'dob': datetime
+    rel* 'rip'?: datetime
 )
 
 map (
@@ -118,9 +118,9 @@ map (
 If there exists a map `a <-> b` and a map `b <-> c`, it follows that it is possible to map `a <-> c`. In other words, `map`s are transitive, and the domain engine makes use of this transitivity when mapping data.
 
 ```ontol
-def a ( rel .'a': text )
-def b ( rel .'b': text )
-def c ( rel .'c': text )
+def a ( rel* 'a': text )
+def b ( rel* 'b': text )
+def c ( rel* 'c': text )
 
 map (
     a( 'a': x ),
@@ -142,12 +142,12 @@ Regular expressions have a powerful use in `map` expressions, using _named group
 
 ```ontol
 def Person (
-    rel .'FullName': text
+    rel* 'FullName': text
 )
 
 def user (
-    rel .'first_name': text
-    rel .'last_name': text
+    rel* 'first_name': text
+    rel* 'last_name': text
 )
 
 map (
@@ -173,15 +173,15 @@ ONTOL also allows (limited, for now) arithmetic on numeric types, allowing built
 These examples are fairly self-explanatory:
 
 ```ontol
-def fahrenheit (rel .is: f64)
-def celsius (rel .is: f64)
+def fahrenheit (rel* is: f64)
+def celsius (rel* is: f64)
 map (
     fahrenheit(x * 9 / 5 + 32),
     celsius(x),
 )
 
-def seconds (rel .is: i64)
-def years (rel .is: i64)
+def seconds (rel* is: i64)
+def years (rel* is: i64)
 map (
     seconds(y * 60 * 60 * 24 * 365),
     years(y)
@@ -192,18 +192,18 @@ ONTOL automatically figures out the inverse function for two-way mapping. This a
 
 
 ```ontol
-def meters (rel .is: i64)
-def millimeters (rel .is: i64)
+def meters (rel* is: i64)
+def millimeters (rel* is: i64)
 map (
     meters(m),
     millimeters(m * 1000),
 )
 
 def car (
-    rel .'length': meters
+    rel* 'length': meters
 )
 def vehicle (
-    rel .'length': millimeters
+    rel* 'length': millimeters
 )
 map (
     car('length': l),

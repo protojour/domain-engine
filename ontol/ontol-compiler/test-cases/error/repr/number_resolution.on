@@ -1,10 +1,10 @@
 def a (
-    rel .is: float // NOTE base type is float
+    rel* is: float // NOTE base type is float
 )
 def b (
-    rel .is: i64 // NOTE base type is integer
+    rel* is: i64 // NOTE base type is integer
 )
 def c ( // ERROR ambiguous number resolution
-    rel .is: a
-    rel .is: b
+    rel* is: a
+    rel* is: b
 )

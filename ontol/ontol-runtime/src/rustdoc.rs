@@ -19,7 +19,7 @@ mod tests {
         /// Variant
         /// ```ontol
         /// def a (
-        ///     rel .'prop': B
+        ///     rel* 'prop': B
         /// )
         /// ```
         Variant,
@@ -43,7 +43,7 @@ mod tests {
     fn indents_correctly() {
         let doc = PrimitiveEnum::get_field_rustdoc(&PrimitiveEnum::Variant).unwrap();
         assert_eq!(
-            "Variant\n```ontol\ndef a (\n    rel .'prop': B\n)\n```",
+            "Variant\n```ontol\ndef a (\n    rel* 'prop': B\n)\n```",
             doc
         );
     }

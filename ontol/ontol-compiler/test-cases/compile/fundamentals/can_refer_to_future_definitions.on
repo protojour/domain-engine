@@ -1,2 +1,2 @@
-def a (rel .'b': b)
-def b (rel .'a': a)
+def a (rel* 'b': b)
+def b (rel* 'a': a)

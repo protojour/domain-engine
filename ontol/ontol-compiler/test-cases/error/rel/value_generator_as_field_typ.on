@@ -1,1 +1,1 @@
-def foo ( rel .'prop': auto ) // ERROR object must be a data type// ERROR type not representable// NOTE type of field is abstract
+def foo ( rel* 'prop': auto ) // ERROR object must be a data type// ERROR type not representable// NOTE type of field is abstract

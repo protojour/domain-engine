@@ -139,7 +139,7 @@ pub enum BuiltinRelationKind {
     /// The subject type takes on all properties of the object type,
     /// or binds the subject type to a [union](rel.md#unions) if the `is` relation is conditional.
     /// ```ontol
-    /// rel .is: text
+    /// rel* is: text
     /// ```
     Is,
     /// Binds an identifier to a type.
@@ -147,7 +147,7 @@ pub enum BuiltinRelationKind {
     /// Binds a type to an identifier, making instances of a type unique entities.
     /// Usually used with the `|` operator to simultaneously bind to a named property.
     /// ```ontol
-    /// rel .'id'|id: some_id
+    /// rel. 'id': some_id
     /// ```
     Id,
     Indexed,
@@ -155,32 +155,32 @@ pub enum BuiltinRelationKind {
     /// Every named type will have an implicit `store_key` name equal to their `def` name,
     /// but this allows overriding that name for storage purposes.
     /// ```ontol
-    /// rel .store_key: 'specific_table'
+    /// rel* store_key: 'specific_table'
     /// ```
     StoreKey,
     /// Minimum value for the subject type, which may be any `number`.
     /// ```ontol
-    /// rel .is: number
-    /// rel .min: 1
+    /// rel* is: number
+    /// rel* min: 1
     /// ```
     Min,
     /// Maximum value for the subject type, which may be any `number`.
     /// ```ontol
-    /// rel .is: number
-    /// rel .max: 100
+    /// rel* is: number
+    /// rel* max: 100
     /// ```
     Max,
     /// Assigns a default value to a type or property if none is given.
     /// Uses the operator `:=` to indicate assignment.
     /// Often used inline in a property relationship.
     /// ```ontol
-    /// rel .'active'[rel .default := true]: boolean
+    /// rel* 'active'[rel* default := true]: boolean
     /// ```
     Default,
     /// Generates a value using a [generator type](generator_types.md) if no value is given.
     /// Often used inline in a property relationship.
     /// ```ontol
-    /// rel .'id'[rel .gen: auto]|id: (rel .is: uuid)
+    /// rel* 'id'[rel* gen: auto]|id: (rel* is: uuid)
     /// ```
     Gen,
     /// A relation between an entity and an [ordering](interfaces.md#ordering).
@@ -195,10 +195,10 @@ pub enum BuiltinRelationKind {
     Direction,
     /// Gives an example value for a type, for documentation purposes.
     /// ```ontol
-    /// rel .is: text
-    /// rel .example: 'Alice'
-    /// rel .example: 'Bob'
-    /// rel .example: 'Carlos'
+    /// rel* is: text
+    /// rel* example: 'Alice'
+    /// rel* example: 'Bob'
+    /// rel* example: 'Carlos'
     /// ```
     Example,
 }

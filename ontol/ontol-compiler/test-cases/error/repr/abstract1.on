@@ -1,5 +1,5 @@
 def foo ( // ERROR type not representable
-    rel .'id'|id: (rel .is: text)
-    rel .'n':
+    rel. 'id': (rel* is: text)
+    rel* 'n':
         number // NOTE type of field is abstract
 )

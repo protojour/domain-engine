@@ -1,18 +1,18 @@
 def foo (
-    rel .'a': text
+    rel* 'a': text
 )
 // default foo 'a': 'default'
 
 def bar (
     // a is either a text or not present
-    rel .'maybe'?: text
+    rel* 'maybe'?: text
 
     // bar and string may be related via b many times
-    rel .'array': {text}
+    rel* 'array': {text}
 
     // a is either a text or null
-    rel bar 'nullable': text
+    rel {bar} 'nullable': text
 
     // FIXME: Should this work?
-    rel .'nullable': () // ERROR union in named relationship is not supported yet. Make a union instead
+    rel* 'nullable': () // ERROR union in named relationship is not supported yet. Make a union instead
 )

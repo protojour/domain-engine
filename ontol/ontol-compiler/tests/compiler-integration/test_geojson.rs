@@ -76,8 +76,8 @@ fn test_municipalities() {
             )
 
             def kommune(
-                rel .'kommunenummer': kommunenummer
-                rel .'geometry': geojson.Polygon
+                rel. 'kommunenummer': kommunenummer
+                rel* 'geometry': geojson.Polygon
             )
             ",
         ),

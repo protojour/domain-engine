@@ -3,13 +3,13 @@
 // The workaround is to extract 'inner' as an explicit def.
 
 def foo (
-    rel .'inner': (
-        rel .'foo_inner': text
+    rel* 'inner': (
+        rel* 'foo_inner': text
     )
 )
 
 def bar (
-    rel .'inner': text
+    rel* 'inner': text
 )
 
 map (

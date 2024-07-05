@@ -2,20 +2,20 @@ use 'conduit_db' as db
 
 /// An RRS-like channel
 def channel (
-    rel .'title': text
-    rel .is: channel_base
+    rel* 'title': text
+    rel* is: channel_base
 )
 
 def @private channel_base (
-    rel .'link': text
-    rel .'username': text
-    rel .'items': {item}
+    rel* 'link': text
+    rel* 'username': text
+    rel* 'items': {item}
 )
 
 /// An item in the channel
 def item (
-    rel .'guid': uuid
-    rel .'title': text
+    rel* 'guid': uuid
+    rel* 'title': text
 )
 
 map(
@@ -34,7 +34,7 @@ map @abstract(channel(), channel_base())
 
 /// The actual mapping logic is outsourced to a hook
 def @extern channel_hook (
-    rel .'url': 'http://localhost:8080/map_channel'
+    rel* 'url': 'http://localhost:8080/map_channel'
     map(channel_base(), channel())
 )
 

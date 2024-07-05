@@ -5,8 +5,8 @@ def code (
 )
 
 def municipality (
-    rel .'code'|id: code
-    rel .'geometry': geojson.Geometry
+    rel. 'code': code
+    rel* 'geometry': geojson.Geometry
 )
 
 /// Get a single municipality

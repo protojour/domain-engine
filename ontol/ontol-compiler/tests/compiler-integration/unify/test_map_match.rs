@@ -10,10 +10,10 @@ use unimock::{matching, MockFn};
 #[test]
 fn test_map_match_scalar_key() {
     r#"
-    def key (rel .is: text)
+    def key (rel* is: text)
     def foo (
-        rel .'key'|id: key
-        rel .'prop': text
+        rel. 'key': key
+        rel* 'prop': text
     )
     map query(
         key(key),
@@ -53,10 +53,10 @@ fn test_map_match_scalar_key() {
 #[test]
 fn test_map_match_parameterless_query() {
     r#"
-    def key (rel .is: text)
+    def key (rel* is: text)
     def foo (
-        rel .'key'|id: key
-        rel .'prop': text
+        rel. 'key': key
+        rel* 'prop': text
     )
     map query(
         (),
@@ -96,11 +96,11 @@ fn test_map_match_parameterless_query() {
 #[test]
 fn test_map_match_query_mandatory_properties() {
     r#"
-    def key (rel .is: text)
+    def key (rel* is: text)
     def foo (
-        rel .'key'|id: key
-        rel .'prop_a': text
-        rel .'prop_b': text
+        rel. 'key': key
+        rel* 'prop_a': text
+        rel* 'prop_b': text
     )
     map query(
         (
@@ -145,11 +145,11 @@ fn test_map_match_query_mandatory_properties() {
 #[test]
 fn test_map_match_query_optional_property() {
     r#"
-    def key (rel .is: text)
+    def key (rel* is: text)
     def foo (
-        rel .'key'|id: key
-        rel .'prop_a': text
-        rel .'prop_b': text
+        rel. 'key': key
+        rel* 'prop_a': text
+        rel* 'prop_b': text
     )
     map query(
         (
@@ -217,13 +217,13 @@ fn test_map_match_query_optional_property() {
 #[test]
 fn test_map_match_anonymous_with_translation() {
     r#"
-    def key (rel .is: text)
+    def key (rel* is: text)
     def foo (
-        rel .'key'|id: key
-        rel .'foo': text
+        rel. 'key': key
+        rel* 'foo': text
     )
     def bar (
-        rel .'bar': text
+        rel* 'bar': text
     )
     map(
         @match foo('foo': x),
@@ -262,13 +262,13 @@ fn test_map_match_anonymous_with_translation() {
 #[test]
 fn test_map_match_sequence_filter_in_set() {
     r#"
-    def key (rel .is: text)
+    def key (rel* is: text)
     def foo (
-        rel .'key'|id: key
-        rel .'foo': text
+        rel. 'key': key
+        rel* 'foo': text
     )
     def bar (
-        rel .'bar': text
+        rel* 'bar': text
     )
     map(
         @match foo('foo': x),
@@ -315,12 +315,12 @@ mod match_contains_all {
 
     const TEST_DOMAIN: &str = r#"
     def foo (
-        rel .'key'|id: (rel .is: text)
-        rel .'tags': {text}
-        rel .'sub': sub
+        rel. 'key': (rel* is: text)
+        rel* 'tags': {text}
+        rel* 'sub': sub
     )
     def sub (
-        rel .'tags': {text}
+        rel* 'tags': {text}
     )
     map foos(
         (
@@ -398,12 +398,12 @@ mod match_contains_all {
 fn test_map_match_in_sub_multi_edge() {
     r#"
     def foo (
-        rel .'key'|id: (rel .is: text)
-        rel .'bars': {bar}
+        rel. 'key': (rel* is: text)
+        rel* 'bars': {bar}
     )
     def bar (
-        rel .'key'|id: (rel .is: text)
-        rel .'tags': {text}
+        rel. 'key': (rel* is: text)
+        rel* 'tags': {text}
     )
     map foos(
         ('bar_tags'?: { ..tags }),
@@ -452,11 +452,11 @@ fn test_map_match_in_sub_multi_edge() {
 fn test_map_with_order_constant() {
     r#"
     def foo (
-        rel .'key'|id: (rel .is: text)
-        rel .'field': text
-        rel .order[
-            rel .0: 'field'
-            rel .direction: descending
+        rel. 'key': (rel* is: text)
+        rel* 'field': text
+        rel* order[
+            rel* 0: 'field'
+            rel* direction: descending
         ]: by_field
     )
     sym { by_field }
@@ -499,11 +499,11 @@ fn test_map_with_order_constant() {
 fn test_map_with_order_variable() {
     r#"
     def foo (
-        rel .'key'|id: (rel .is: text)
-        rel .'field': text
-        rel .order[
-            rel .0: 'field'
-            rel .direction: descending
+        rel. 'key': (rel* is: text)
+        rel* 'field': text
+        rel* order[
+            rel* 0: 'field'
+            rel* direction: descending
         ]: by_field
     )
     sym { by_field }
@@ -558,16 +558,16 @@ fn test_map_with_order_variable() {
 fn test_map_with_order_indexset() {
     r#"
     def foo (
-        rel .'key'|id: (rel .is: text)
-        rel .'a': text
-        rel .'b': text
-        rel .order[
-            rel .0: 'a'
-            rel .direction: descending
+        rel. 'key': (rel* is: text)
+        rel* 'a': text
+        rel* 'b': text
+        rel* order[
+            rel* 0: 'a'
+            rel* direction: descending
         ]: by_a
-        rel .order[
-            rel .0: 'a'
-            rel .direction: descending
+        rel* order[
+            rel* 0: 'a'
+            rel* direction: descending
         ]: by_b
     )
     sym { by_a, by_b }

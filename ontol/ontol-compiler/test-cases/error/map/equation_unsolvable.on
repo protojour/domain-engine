@@ -1,10 +1,10 @@
 def foo (
-    rel .'a': i64
-    rel .'b': i64
+    rel* 'a': i64
+    rel* 'b': i64
 )
 def bar (
-    rel .'a': i64
-    rel .'b': i64
+    rel* 'a': i64
+    rel* 'b': i64
 )
 map(
     foo(

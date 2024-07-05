@@ -4,31 +4,31 @@
 /// their properties, and their spatial extents.
 /// GeoJSON uses a geographic coordinate reference system, World Geodetic System 1984, and units of decimal degrees.
 domain geojson (
-    rel .version: '0.1.0'
+    rel. version: '0.1.0'
 )
 
 use 'wgs' as wgs
 
 def @private longitude (
-    rel .is: f64
-    rel .is: wgs.wgs84_longitude
+    rel* is: f64
+    rel* is: wgs.wgs84_longitude
 )
 
 def @private latitude (
-    rel .is: f64
-    rel .is: wgs.wgs84_latitude
+    rel* is: f64
+    rel* is: wgs.wgs84_latitude
 )
 
 /// A position is the fundamental geometry construct.
 def @private position (
-    rel .0: longitude
-    rel .1: latitude
+    rel* 0: longitude
+    rel* 1: latitude
 )
 
 /// A list of two positions or more.
 def @private position-list (
-    rel . ..2: position
-    rel . 2..: position
+    rel* ..2: position
+    rel* 2..: position
 )
 
 /// To specify a constraint specific to Polygons, it is useful to
@@ -45,59 +45,59 @@ def @private position-list (
 ///   holes are clockwise.
 ///
 def @private position-ring (
-    rel . ..4: position
-    rel . 4..: position
+    rel* ..4: position
+    rel* 4..: position
 )
 
 /// For type "Point", the "coordinates" member is a single position.
 def Point (
-    rel .'type': 'Point'
-    rel .'coordinates': position
+    rel* 'type': 'Point'
+    rel* 'coordinates': position
 )
 
 /// For type "MultiPoint", the "coordinates" member is an array of
 /// positions.
 def MultiPoint (
-    rel .'type': 'MultiPoint'
-    rel .'coordinates': [position]
+    rel* 'type': 'MultiPoint'
+    rel* 'coordinates': [position]
 )
 
 /// For type "LineString", the "coordinates" member is an array of two or
 /// more positions.
 def LineString (
-    rel .'type': 'LineString'
-    rel .'coordinates': position-list
+    rel* 'type': 'LineString'
+    rel* 'coordinates': position-list
 )
 
 /// For type "MultiLineString", the "coordinates" member is an array of
 /// LineString coordinate arrays.
 def MultiLineString (
-    rel . 'type': 'MultiLineString'
-    rel . 'coordinates': [position-list]
+    rel* 'type': 'MultiLineString'
+    rel* 'coordinates': [position-list]
 )
 
 /// For type "Polygon", the "coordinates" member MUST be an array of
 /// linear ring coordinate arrays.
 def Polygon (
-    rel .'type': 'Polygon'
-    rel .'coordinates': position-ring
+    rel* 'type': 'Polygon'
+    rel* 'coordinates': position-ring
 )
 
 /// For type "MultiPolygon", the "coordinates" member is an array of
 /// Polygon coordinate arrays.
 def MultiPolygon (
-    rel .'type': 'MultiPolygon'
-    rel .'coordinates': [position-ring]
+    rel* 'type': 'MultiPolygon'
+    rel* 'coordinates': [position-ring]
 )
 
 /// LeafGeometry is a union of geometries that does not include `GeometryCollection`.
 def LeafGeometry (
-    rel .is?: Point
-    rel .is?: MultiPoint
-    rel .is?: LineString
-    rel .is?: MultiLineString
-    rel .is?: Polygon
-    rel .is?: MultiPolygon
+    rel* is?: Point
+    rel* is?: MultiPoint
+    rel* is?: LineString
+    rel* is?: MultiLineString
+    rel* is?: Polygon
+    rel* is?: MultiPolygon
 )
 
 
@@ -106,8 +106,8 @@ def LeafGeometry (
 /// value of "geometries" is an array.  Each element of this array is a
 /// GeoJSON Geometry object.  It is possible for this array to be empty.
 def GeometryCollection (
-    rel .'type': 'GeometryCollection'
-    rel .'geometries': [LeafGeometry]
+    rel* 'type': 'GeometryCollection'
+    rel* 'geometries': [LeafGeometry]
 )
 
 /// A Geometry object represents points, curves, and surfaces in
@@ -116,17 +116,17 @@ def GeometryCollection (
 ///
 /// Note: Geometry is an extension of LeafGeometry + GeometryCollection.
 def Geometry (
-    rel .is?: Point
-    rel .is?: MultiPoint
-    rel .is?: LineString
-    rel .is?: MultiLineString
-    rel .is?: Polygon
-    rel .is?: MultiPolygon
-    rel .is?: GeometryCollection
+    rel* is?: Point
+    rel* is?: MultiPoint
+    rel* is?: LineString
+    rel* is?: MultiLineString
+    rel* is?: Polygon
+    rel* is?: MultiPolygon
+    rel* is?: GeometryCollection
 )
 
 def @private GeometryOrNull (
-    rel .is?: Geometry
+    rel* is?: Geometry
     // rel _ is?: []
 )
 
@@ -134,12 +134,12 @@ def @private GeometryOrNull (
 /// object is a GeoJSON object no matter where it occurs in a GeoJSON
 /// text.
 def @private Feature (
-    rel .'type': 'Feature'
-    rel .'geometry': GeometryOrNull
+    rel* 'type': 'Feature'
+    rel* 'geometry': GeometryOrNull
 
     // FIXME: Features is a map of 'anything'.
     // This could be a good use case for generics in ONTOL.
-    rel .'properties': ()
+    rel* 'properties': ()
 )
 
 /// A GeoJSON object with the type "FeatureCollection" is a
@@ -148,6 +148,6 @@ def @private Feature (
 /// Each element of the array is a Feature object as defined above.  It
 /// is possible for this array to be empty.
 def @private FeatureCollection (
-    rel .'type': 'FeatureCollection'
-    rel .'features': [Feature]
+    rel* 'type': 'FeatureCollection'
+    rel* 'features': [Feature]
 )

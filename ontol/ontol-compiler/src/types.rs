@@ -62,7 +62,7 @@ impl<'m> Type<'m> {
             Self::Tautology => None,
             Self::Primitive(_, def_id) => Some(*def_id),
             Self::EmptySequence(def_id) => Some(*def_id),
-            Self::IntConstant(_) | Self::FloatConstant(_) => todo!(),
+            Self::IntConstant(_) | Self::FloatConstant(_) => None,
             Self::TextConstant(def_id) => Some(*def_id),
             Self::Regex(def_id) => Some(*def_id),
             Self::TextLike(def_id, _) => Some(*def_id),

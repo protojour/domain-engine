@@ -1,2 +1,2 @@
-def foo (rel .is: number) // NOTE type is abstract
-def bar (rel .0: foo) // ERROR type not representable// NOTE type of field is abstract
+def foo (rel* is: number) // NOTE type is abstract
+def bar (rel* 0: foo) // ERROR type not representable// NOTE type of field is abstract

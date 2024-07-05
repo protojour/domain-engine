@@ -1,12 +1,12 @@
 def foo (
-    rel .'type': 'foo'
+    rel* 'type': 'foo'
 )
 def bar (
-    rel .'type': 'bar'
+    rel* 'type': 'bar'
 )
 def foobar (
-    rel .is?: foo
-    rel .is?: bar
+    rel* is?: foo
+    rel* is?: bar
 )
 
 map(

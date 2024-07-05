@@ -6,10 +6,10 @@ use serde_json::json;
 fn should_map_inherent_capturing_pattern_id() {
     "
     def foo (
-        rel .'id'|id: (fmt '' => 'foo/' => uuid => .)
+        rel. 'id': (fmt '' => 'foo/' => uuid => .)
     )
     def bar (
-        rel .'id'|id: (fmt '' => 'bar/' => uuid => .)
+        rel. 'id': (fmt '' => 'bar/' => uuid => .)
     )
 
     map(
@@ -29,40 +29,45 @@ fn should_map_inherent_capturing_pattern_id() {
 #[test]
 fn test_extract_rel_params() {
     "
+    sym { id }
+
     def a1_id(fmt '' => 'a1/' => uuid => .)
     def a2_id(fmt '' => 'a2/' => uuid => .)
     def b1_id(fmt '' => 'b1/' => uuid => .)
     def b2_id(fmt '' => 'b2/' => uuid => .)
 
     def a2(
-        rel .id: a2_id
-        rel .'foo': text
+        rel. id: a2_id
+        rel* 'foo': text
     )
     def b2(
-        rel .id: b2_id
-        rel .'foo': text
-        rel .'bar': text
+        rel. id: b2_id
+        rel* 'foo': text
+        rel* 'bar': text
     )
 
     def a_edge (
-        rel .'bar': text
+        rel* 'bar': text
     )
 
     def a1(
-        rel .id: a1_id
-        rel .'foreign'[rel .is: a_edge]: a2
+        rel. id: a1_id
+        rel* 'foreign'[rel* is: a_edge]: a2
     )
     def b1(
-        rel .id: b1_id
-        rel .'foreign': b2
+        rel. id: b1_id
+        rel* 'foreign': b2
     )
 
     map(
         a1(
-            'foreign'['bar': b]: a2('foo': f)
+            id: root_id,
+            'foreign'['bar': b]: a2(id: foreign_id, 'foo': f)
         ),
         b1(
+            id: root_id,
             'foreign': b2(
+                id: foreign_id,
                 'foo': f,
                 'bar': b,
             )
@@ -73,7 +78,9 @@ fn test_extract_rel_params() {
         test.mapper().assert_map_eq(
             ("a1", "b1"),
             json!({
+                "id": "a1/11111111-1111-1111-1111-111111111111",
                 "foreign": {
+                    "id": "a2/22222222-2222-2222-2222-222222222222",
                     "foo": "FOO",
                     "_edge": {
                         "bar": "BAR"
@@ -81,7 +88,9 @@ fn test_extract_rel_params() {
                 }
             }),
             json!({
+                "id": "b1/11111111-1111-1111-1111-111111111111",
                 "foreign": {
+                    "id": "b2/22222222-2222-2222-2222-222222222222",
                     "foo": "FOO",
                     "bar": "BAR",
                 }
@@ -91,13 +100,17 @@ fn test_extract_rel_params() {
         test.mapper().assert_map_eq(
             ("b1", "a1"),
             json!({
+                "id": "b1/11111111-1111-1111-1111-111111111111",
                 "foreign": {
+                    "id": "b2/22222222-2222-2222-2222-222222222222",
                     "foo": "FOO",
                     "bar": "BAR",
                 }
             }),
             json!({
+                "id": "a1/11111111-1111-1111-1111-111111111111",
                 "foreign": {
+                    "id": "a2/22222222-2222-2222-2222-222222222222",
                     "foo": "FOO",
                     "_edge": {
                         "bar": "BAR"
@@ -111,50 +124,52 @@ fn test_extract_rel_params() {
 #[test]
 fn test_rel_params_implicit_map() {
     "
-    def a_id (fmt '' => 'a/' => uuid => .)
-    def b_id (fmt '' => 'a/' => uuid => .)
-    def a_inner_id (fmt '' => 'a_inner/' => uuid => .)
-    def b_inner_id (fmt '' => 'b_inner/' => uuid => .)
+    def a_id (fmt '' => 'a/' => serial => .)
+    def b_id (fmt '' => 'b/' => serial => .)
+    def a_inner_id (fmt '' => 'a_inner/' => serial => .)
+    def b_inner_id (fmt '' => 'b_inner/' => serial => .)
 
     def a_inner (
-        rel .id: a_inner_id
-        rel .'a_prop': text
+        rel. 'id': a_inner_id
+        rel* 'a_prop': text
     )
     def b_inner (
-        rel .id: b_inner_id
-        rel .'b_prop': text
+        rel. 'id': b_inner_id
+        rel* 'b_prop': text
     )
 
-    def a_edge (rel .'aa': text)
-    def b_edge (rel .'bb': text)
+    def a_edge (rel* 'aa': text)
+    def b_edge (rel* 'bb': text)
 
     def a (
-        rel .id: a_id
-        rel .'foreign'[rel .is: a_edge]: a_inner
+        rel. 'id': a_id
+        rel* 'foreign'[rel* is: a_edge]: a_inner
     )
     def b (
-        rel .id: b_id
-        rel .'foreign'[rel .is: b_edge]: b_inner
+        rel. 'id': b_id
+        rel* 'foreign'[rel* is: b_edge]: b_inner
     )
 
     map(
-        a_inner('a_prop': x),
-        b_inner('b_prop': x),
+        a_inner('id': id, 'a_prop': x),
+        b_inner('id': id, 'b_prop': x),
     )
     map(
         a_edge('aa': x),
         b_edge('bb': x),
     )
     map(
-        a('foreign': x),
-        b('foreign': x),
+        a('id': id, 'foreign': x),
+        b('id': id, 'foreign': x),
     )
     "
     .compile_then(|test| {
         test.mapper().assert_map_eq(
             ("a", "b"),
             json!({
+                "id": "a/1",
                 "foreign": {
+                    "id": "a_inner/2",
                     "a_prop": "PROP",
                     "_edge": {
                         "aa": "EDGE"
@@ -162,7 +177,9 @@ fn test_rel_params_implicit_map() {
                 }
             }),
             json!({
+                "id": "b/1",
                 "foreign": {
+                    "id": "b_inner/2",
                     "b_prop": "PROP",
                     "_edge": {
                         "bb": "EDGE"
@@ -176,13 +193,13 @@ fn test_rel_params_implicit_map() {
 #[test]
 fn test_map_relation_sequence_default_fallback() {
     "
-    def foo_inner (rel .'foo_id'|id: (rel .is: text))
-    def bar_inner (rel .'bar_id'|id: (rel .is: text))
+    def foo_inner (rel. 'foo_id': (rel* is: text))
+    def bar_inner (rel. 'bar_id': (rel* is: text))
     rel {foo_inner} 'bars'::'foos'? {bar_inner}
 
     def bar (
-        rel .'id'|id: (rel .is: text)
-        rel .'foos': {text}
+        rel. 'id': (rel* is: text)
+        rel* 'foos': {text}
     )
 
     map(
@@ -222,10 +239,10 @@ fn test_map_generate_edge() {
             use 'inner' as inner
 
             def foo (
-                rel .'id'|id: (rel .is: text)
-                rel .'bars'[rel .'field': text]: {bar}
+                rel. 'id': (rel* is: text)
+                rel* 'bars'[rel* 'field': text]: {bar}
             )
-            def bar (rel .'id': (rel .is: text))
+            def bar (rel* 'id': (rel* is: text))
 
             map(
                 foo(
@@ -250,13 +267,13 @@ fn test_map_generate_edge() {
             src_name("inner"),
             "
             def foo (
-                rel .'id'|id: (rel .is: text)
-                rel .'bars': {bar}
+                rel. 'id': (rel* is: text)
+                rel* 'bars': {bar}
             )
 
             def bar (
-                rel .'id'|id: (rel .is: text)
-                rel .'field': text
+                rel. 'id': (rel* is: text)
+                rel* 'field': text
             )
             ",
         ),
@@ -287,17 +304,15 @@ def worker ()
 def technology ()
 
 def worker (
-    rel .'ID': worker_id
-    rel .id: worker_id
-    rel .'name': text
+    rel. 'ID': worker_id
+    rel* 'name': text
 
-    rel .'technologies': {technology}
+    rel* 'technologies': {technology}
 )
 
 def technology (
-    rel .'ID': tech_id
-    rel .id: tech_id
-    rel .'name': text
+    rel. 'ID': tech_id
+    rel* 'name': text
 )
 ";
 
@@ -309,17 +324,15 @@ def language ()
 def developer ()
 
 def language (
-    rel .'id': lang_id
-    rel .id: lang_id
+    rel. 'id': lang_id
 
-    rel .'name': text
-    rel .'developers': {developer}
+    rel* 'name': text
+    rel* 'developers': {developer}
 )
 
 def developer (
-    rel .'id': dev_id
-    rel .id: dev_id
-    rel .'name': text
+    rel. 'id': dev_id
+    rel* 'name': text
 )
 ";
 

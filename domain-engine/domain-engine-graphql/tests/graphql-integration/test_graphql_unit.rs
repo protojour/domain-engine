@@ -45,7 +45,7 @@ fn test_graphql_schema_for_entityless_domain_should_not_be_generated() {
 async fn version() {
     let (test, schema) = "
     def foo (
-        rel .'id'|id: (rel .is: text)
+        rel. 'id': (rel* is: text)
     )
     "
     .compile_single_schema();
@@ -64,27 +64,27 @@ async fn version() {
 fn field_order() {
     let (_test, schema) = "
     def ent1 (
-        rel .'id'|id: (rel .is: text)
-        rel {.} 'subjects'::'obj_1' {subject}
+        rel. 'id': (rel* is: text)
+        rel* 'subjects'::'obj_1' {subject}
     )
     def subject (
-        rel .is: a
-        rel .is: b
-        rel .'id'|id: (rel .is: text)
-        rel {.} 'connection': {ent1}
-        rel .'field': text
-        rel .is: c
-        rel .is: d
+        rel* is: a
+        rel* is: b
+        rel. 'id': (rel* is: text)
+        rel* 'connection': {ent1}
+        rel* 'field': text
+        rel* is: c
+        rel* is: d
     )
     def ent2 (
-        rel .'id'|id: (rel .is: text)
-        rel {.} 'subjects'::'obj_2' {subject}
+        rel. 'id': (rel* is: text)
+        rel* 'subjects'::'obj_2' {subject}
     )
 
-    def a(rel .'a': text)
-    def b(rel .'b': text)
-    def c(rel .'c': text)
-    def d(rel .'d': text)
+    def a(rel* 'a': text)
+    def b(rel* 'b': text)
+    def c(rel* 'c': text)
+    def d(rel* 'd': text)
     "
     .compile_single_schema();
 
@@ -118,14 +118,14 @@ async fn int_scalars() {
     let (test, schema) = "
     def foo_id (fmt '' => text => .)
     def smallint (
-        rel .is: integer
-        rel .min: 0
-        rel .max: 255
+        rel* is: integer
+        rel* min: 0
+        rel* max: 255
     )
     def foo (
-        rel .id: foo_id
-        rel .'small': smallint
-        rel .'big': i64
+        rel. 'id': foo_id
+        rel* 'small': smallint
+        rel* 'big': i64
     )
 
     map foos(
@@ -186,7 +186,7 @@ async fn int_scalars() {
         .returns(Ok(Response::one_inserted(
             foo.entity_builder(
                 json!("my_id"),
-                json!({ "small": 42, "big": 112233445566778899_i64 }),
+                json!({ "id": "my_id", "small": 42, "big": 112233445566778899_i64 }),
             )
             .into(),
         )));
@@ -194,6 +194,7 @@ async fn int_scalars() {
     expect_eq!(
         actual = "mutation {
             foo(create: [{
+                id: \"my_id\"
                 small: 42
                 big: 1337
             }]) {
@@ -224,11 +225,11 @@ async fn int_scalars() {
 async fn non_entity_set_mutation() {
     let (test, schema) = "
     def foo (
-        rel .'id'|id: (rel .is: text)
-        rel .'bars': {bar}
+        rel. 'id': (rel* is: text)
+        rel* 'bars': {bar}
     )
     def bar (
-        rel .'field': text
+        rel* 'field': text
     )
     "
     .compile_single_schema();
@@ -288,7 +289,7 @@ async fn non_entity_set_mutation() {
 async fn basic_inherent_auto_id_anonymous_type() {
     let (test, schema) = "
     def foo (
-        rel .'id'[rel .gen: auto]|id: (rel .is: text)
+        rel. 'id'[rel* gen: auto]: (rel* is: text)
     )
     map foos(
         (),
@@ -325,7 +326,7 @@ async fn basic_inherent_auto_id_anonymous_type() {
 async fn basic_pagination() {
     let (test, schema) = "
     def foo (
-        rel .'id'[rel .gen: auto]|id: (rel .is: text)
+        rel. 'id'[rel* gen: auto]: (rel* is: text)
     )
     map foos(
         (),
@@ -454,7 +455,7 @@ async fn basic_pagination() {
 async fn nodes() {
     let (test, schema) = "
     def foo (
-        rel .'id'[rel .gen: auto]|id: (rel .is: text)
+        rel. 'id'[rel* gen: auto]: (rel* is: text)
     )
     map foos(
         (),
@@ -499,10 +500,10 @@ async fn nodes() {
 #[test]
 fn value_type_as_field() {
     "
-    def foo (rel .is: text)
+    def foo (rel* is: text)
     def bar (
-        rel .'id'[rel .gen: auto]|id: (rel .is: text)
-        rel .'foo': foo
+        rel. 'id'[rel* gen: auto]: (rel* is: text)
+        rel* 'foo': foo
     )
     "
     .compile_single_schema();
@@ -511,10 +512,10 @@ fn value_type_as_field() {
 #[test]
 fn value_type_in_array() {
     "
-    def foo (rel .is: text)
+    def foo (rel* is: text)
     def bar (
-        rel .'id'[rel .gen: auto]|id: (rel .is: text)
-        rel .'foo': {foo}
+        rel. 'id'[rel* gen: auto]: (rel* is: text)
+        rel* 'foo': {foo}
     )
     "
     .compile_single_schema();
@@ -525,11 +526,11 @@ async fn inner_struct() {
     let (test, schema) = "
     def foo_id (fmt '' => text => .)
     def inner (
-        rel .'prop': text
+        rel* 'prop': text
     )
     def foo (
-        rel .id: foo_id
-        rel .'inner': inner
+        rel. 'id': foo_id
+        rel* 'inner': inner
     )
     map foos(
         (),
@@ -566,13 +567,17 @@ async fn inner_struct() {
     let store_entity_mock = DataStoreAPIMock::execute
         .next_call(matching!(Request::BatchWrite(_), _session))
         .returns(Ok(Response::one_inserted(
-            foo.entity_builder(json!("my_id"), json!({ "inner": { "prop": "yo" } }))
-                .into(),
+            foo.entity_builder(
+                json!("my_id"),
+                json!({ "id": "my_id", "inner": { "prop": "yo" } }),
+            )
+            .into(),
         )));
 
     expect_eq!(
         actual = r#"mutation {
             foo(create: [{
+                id: "1"
                 inner: {
                     prop: "yo"
                 }
@@ -606,14 +611,14 @@ async fn inner_struct() {
 async fn docs_introspection() {
     let (test, schema) = "
     def Key (
-        rel .is: text
+        rel* is: text
     )
 
     /// this is a type
     def PublicType (
-        rel .id: Key
+        rel. 'id': Key
         /// this is a field
-        rel .'relation': text
+        rel* 'relation': text
     )
     "
     .compile_single_schema();
@@ -636,6 +641,10 @@ async fn docs_introspection() {
                 "name": "PublicType",
                 "description": "this is a type",
                 "fields": [
+                    {
+                        "name": "id",
+                        "description": null
+                    },
                     {
                         "name": "relation",
                         "description": "this is a field"
@@ -902,8 +911,8 @@ async fn create_through_mapped_domain() {
             use 'artist_and_instrument' as ai
 
             def player (
-                rel .'id'[rel .gen: auto]|id: (rel .is: uuid)
-                rel .'nick': text
+                rel. 'id'[rel* gen: auto]: (rel* is: uuid)
+                rel* 'nick': text
             )
 
             map(
@@ -973,8 +982,8 @@ async fn create_through_three_domains() {
             use 'player' as player
 
             def actor (
-                rel .'ID'[rel .gen: auto]|id: (fmt '' => 'actor/' => uuid => .)
-                rel .'alias': text
+                rel. 'ID'[rel* gen: auto]: (fmt '' => 'actor/' => uuid => .)
+                rel* 'alias': text
             )
 
             map(
@@ -989,8 +998,8 @@ async fn create_through_three_domains() {
             use 'artist_and_instrument' as ai
 
             def player (
-                rel .'id'[rel .gen: auto]|id: (rel .is: uuid)
-                rel .'nick': text
+                rel. 'id'[rel* gen: auto]: (rel* is: uuid)
+                rel* 'nick': text
             )
 
             map(
@@ -1399,7 +1408,7 @@ fn municipalities_geojson_union() {
 async fn open_data() {
     let (test, schema) = "
     def @open foo (
-        rel .'id'[rel .gen: auto]|id: (rel .is: text)
+        rel. 'id'[rel* gen: auto]: (rel* is: text)
     )
     "
     .compile_single_schema();
@@ -1448,7 +1457,7 @@ async fn open_data() {
 async fn open_data_disabled() {
     let (test, schema) = "
     def @open foo (
-        rel .'id'[rel .gen: auto]|id: (rel .is: text)
+        rel. 'id'[rel* gen: auto]: (rel* is: text)
     )
     "
     .compile_single_schema();
@@ -1502,17 +1511,17 @@ async fn test_extension_and_member_from_foreign_domain() {
             use 'helper' as helper
 
             def foo (
-                rel .'id'|id: (rel .is: uuid)
-                rel .is: helper.ext
-                rel .'member'?: {helper.member}
+                rel. 'id': (rel* is: uuid)
+                rel* is: helper.ext
+                rel* 'member'?: {helper.member}
             )
         ",
         ),
         (
             src_name("helper"),
             "
-            def ext (rel .'ext-field': text)
-            def member (rel .'member-field': text)
+            def ext (rel* 'ext-field': text)
+            def member (rel* 'member-field': text)
             ",
         ),
     ])
@@ -1524,17 +1533,17 @@ async fn test_extension_and_member_from_foreign_domain() {
 async fn test_const_in_union_bug() {
     "
     def union (
-        rel .is?: member
-        rel {.} 'targets'::'unions' {target}
+        rel* is?: member
+        rel* 'targets'::'unions' {target}
     )
 
     def member (
-        rel .'id'[rel .gen: auto]|id: (fmt '' => 'member/' => text => .)
-        rel .'const': 'const'
+        rel. 'id'[rel* gen: auto]: (fmt '' => 'member/' => text => .)
+        rel* 'const': 'const'
     )
 
     def target (
-        rel .'id'[rel .gen: auto]|id: (fmt '' => 'target/' => text => .)
+        rel. 'id'[rel* gen: auto]: (fmt '' => 'target/' => text => .)
     )
     "
     .compile_single_schema();
@@ -1550,8 +1559,8 @@ async fn test_constant_index_panic() {
             use 'events_db' as db
 
             def event (
-                rel .'_id'[rel .gen: auto]|id: (rel .is: serial)
-                rel .'_class': 'event'
+                rel. '_id'[rel* gen: auto]: (rel* is: serial)
+                rel* '_class': 'event'
             )
 
             map(
@@ -1575,8 +1584,8 @@ async fn test_constant_index_panic() {
             src_name("events_db"),
             "
             def event (
-                rel .'_id'[rel .gen: auto]|id: (rel .is: serial)
-                rel .'_class': 'event'
+                rel. '_id'[rel* gen: auto]: (rel* is: serial)
+                rel* '_class': 'event'
             )
             ",
         ),
@@ -1610,22 +1619,22 @@ async fn flattened_union_entity() {
         def kind ()
 
         def foo (
-            rel .'id'|id: (rel .is: text)
-            rel .kind: (
-                rel .is?: bar
-                rel .is?: qux
+            rel. 'id': (rel* is: text)
+            rel* kind: (
+                rel* is?: bar
+                rel* is?: qux
             )
         )
 
         def bar (
-            rel .'kind': 'bar'
-            rel .'data': text
-            rel .'bar': i64
+            rel* 'kind': 'bar'
+            rel* 'data': text
+            rel* 'bar': i64
         )
         def qux (
-            rel .'kind': 'qux'
-            rel .'data': i64
-            rel .'qux': text
+            rel* 'kind': 'qux'
+            rel* 'data': i64
+            rel* 'qux': text
         )
 
         map foos (
@@ -1715,10 +1724,10 @@ async fn schema_bug1() {
     let (_test, [_schema]) = TestPackages::with_static_sources([(
         SrcName::default(),
         "
-        def foo (rel .'id'|id: (rel .is: text))
-        def bar (rel .'id'|id: (rel .is: text))
-        rel bar 'foo': foo
-        rel foo 'bar2'::'foo2'? {bar}
+        def foo (rel. 'id': (rel* is: text))
+        def bar (rel. 'id': (rel* is: text))
+        rel {bar} 'foo': foo
+        rel {foo} 'bar2'::'foo2'? {bar}
         ",
     )])
     .compile_schemas([SrcName::default()]);

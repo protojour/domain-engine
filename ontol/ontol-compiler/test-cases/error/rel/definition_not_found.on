@@ -1,3 +1,3 @@
 def foo ()
-rel foo 'bar':
+rel {foo} 'bar':
     baz // ERROR definition not found in this scope

@@ -12,7 +12,7 @@ Automatically generates a value if no value is given. Often used inline in a pro
 `auto` is valid for relations whose target type is [`serial`](primitives.md#serial), [`uuid`](primitives.md#uuid), or for [`fmt`](fmt.md) expressions that include them as the only variable.
 
 ```ontol
-rel .'id'[rel .gen: auto]|id?: (rel .is: uuid)
+rel. 'id'[rel* gen: auto]: (rel* is: uuid)
 ```
 
 
@@ -22,7 +22,7 @@ Generates a [`datetime`](primitives.md#datetime) **once**, when an entity is cre
 Often used inline in a property relationship.
 
 ```ontol
-rel .'created'[rel .gen: create_time]?: datetime
+rel* 'created'[rel* gen: create_time]?: datetime
 ```
 
 
@@ -32,5 +32,5 @@ Generates a [`datetime`](primitives.md#datetime) **every time** an entity is upd
 Often used inline in a property relationship.
 
 ```ontol
-rel .'updated'[rel .gen: update_time]?: datetime
+rel* 'updated'[rel* gen: update_time]?: datetime
 ```

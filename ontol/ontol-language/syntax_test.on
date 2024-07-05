@@ -13,7 +13,7 @@ use "some_domain" as some
 /// and is connected to the statement below
 def test (
 // <- keyword.declaration.def.ontol
-    rel .'id'[rel .gen: auto]|id: (
+    rel. 'id'[rel* gen: auto]: (
 //      ^ variable.language.ontol
 //  ^^^ keyword.declaration.rel.ontol
 //       ^^^^ string.quoted.single.ontol
@@ -28,28 +28,28 @@ def test (
 //                            ^^^^ storage.type.ontol
 //                                    ^ variable.language.ontol
     )
-    rel .'some_i64': i64
-    rel .'some_string': string
-    rel .'some_regex': regex
-    rel .'some_unit': ()
+    rel* 'some_i64': i64
+    rel* 'some_string': string
+    rel* 'some_regex': regex
+    rel* 'some_unit': ()
 //                    ^^ constant.language.ontol
-    rel .'some_seq': (
+    rel* 'some_seq': (
         fmt () => string => string => .
     )
-    rel .'some.some_def': some.some_def
+    rel* 'some.some_def': some.some_def
 //                            ^ keyword.operator.sigil.ontol
 )
 
 def @private test (
-    rel .'three_oh_three': 303
+    rel* 'three_oh_three': 303
 //                         ^^^ constant.numeric.ontol
-    rel .'p_value': 0.05
+    rel* 'p_value': 0.05
 //                  ^^^^ constant.numeric.ontol
-    rel .'infinity!': inf
+    rel* 'infinity!': inf
 //                    ^^^ constant.language.ontol
-    rel .'ready?': true
+    rel* 'ready?': true
 //                 ^^^^ constant.language.ontol
-    rel .'regex': /test\b.*test/
+    rel* 'regex': /test\b.*test/
 //                ^^^^^^^^^^^^^^ string.regexp.ontol
 )
 
@@ -76,18 +76,18 @@ map thing (
 )
 
 def artist (
-    rel .'id'|id: ( rel .is: uuid )
+    rel. 'id': ( rel* is: uuid )
 )
 def instrument (
-    rel .'id'|id: ( rel .is: uuid )
+    rel. 'id': ( rel* is: uuid )
 )
 
 def plays ()
 rel plays 'how_much': string
 
-rel {artist} 'plays'[rel .is: plays]::'played_by' {instrument}
+rel {artist} 'plays'[rel* is: plays]::'played_by' {instrument}
 
 def position-ring (
-    rel . ..4: position
-    rel . 4..: position
+    rel* ..4: position
+    rel* 4..: position
 )

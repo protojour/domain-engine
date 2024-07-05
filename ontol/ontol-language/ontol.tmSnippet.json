@@ -25,100 +25,100 @@
         "description": "Modified type definition block"
     },
     "rel local": {
-        "prefix": "rel .",
+        "prefix": "rel* ",
         "body": [
-            "rel .'${1:name}'$2: ${3:object}"
+            "rel* '${1:name}'$2: ${3:object}"
         ],
         "description": "Relation"
     },
-	"rel is": {
-        "prefix": "rel .is",
+    "rel is": {
+        "prefix": "rel* is",
         "body": [
-            "rel .is$1: ${2:object}"
+            "rel* is$1: ${2:object}"
         ],
         "description": "Relation"
     },
     "rel id": {
-        "prefix": "rel .id",
+        "prefix": "rel. id",
         "body": [
-            "rel .'${1:id}'$2|id: ${3:object}"
+            "rel. '${1:id}'$2|id: ${3:object}"
         ],
         "description": "Relation id"
     },
-	"rel .-1": {
-        "prefix": "rel .::1",
+    "rel* -1": {
+        "prefix": "rel* ::1",
         "body": [
-            "rel .'${1:name_a}'::'${2:name_b}' ${3:object}"
+            "rel* '${1:name_a}'::'${2:name_b}' ${3:object}"
         ],
         "description": "Relation .-to-one"
     },
-	"rel .-m": {
-        "prefix": "rel .::m",
+    "rel* -m": {
+        "prefix": "rel* ::m",
         "body": [
-            "rel .'${1:name_a}'::'${2:name_b}' {${3:object}}"
+            "rel* '${1:name_a}'::'${2:name_b}' {${3:object}}"
         ],
         "description": "Relation .-to-many"
     },
-	"rel (.)-m": {
-        "prefix": "rel {.}::m",
+    "rel(*) -m": {
+        "prefix": "rel* ::m",
         "body": [
-            "rel {.}'${1:name_a}'::'${2:name_b}' {${3:object}}"
+            "rel* '${1:name_a}'::'${2:name_b}' {${3:object}}"
         ],
         "description": "Relation {.}-to-many"
     },
-	"rel 1-1": {
+    "rel 1-1": {
         "prefix": "rel 1::1",
         "body": [
             "rel ${1:subject} '${2:name_a}'::'${3:name_b}' ${4:object}"
         ],
         "description": "Relation one-to-one"
     },
-	"rel 1-m": {
+    "rel 1-m": {
         "prefix": "rel 1::m",
         "body": [
             "rel ${1:subject} '${2:name_a}'::'${3:name_b}' {${4:object}}"
         ],
         "description": "Relation one-to-many"
     },
-	"rel m-m": {
+    "rel m-m": {
         "prefix": "rel m::m",
         "body": [
             "rel {${1:subject}} '${2:name_a}'::'${3:name_b}' {${4:object}}"
         ],
         "description": "Relation many-to-many"
     },
-	"rel gen auto": {
-        "prefix": "rel .gen auto",
+    "rel gen auto": {
+        "prefix": "rel* gen auto",
         "body": [
-            "rel .gen: auto"
+            "rel* gen: auto"
         ],
         "description": "Relation gen auto"
     },
-	"rel gen create_time": {
-        "prefix": "rel .gen create",
+    "rel gen create_time": {
+        "prefix": "rel* gen create",
         "body": [
-            "rel .gen: create_time"
+            "rel* gen: create_time"
         ],
         "description": "Relation gen create_time"
     },
-	"rel gen update_time": {
-        "prefix": "rel .gen update",
+    "rel gen update_time": {
+        "prefix": "rel* gen update",
         "body": [
-            "rel .gen: update_time"
+            "rel* gen: update_time"
         ],
         "description": "Relation gen update_time"
     },
-	"rel default": {
-        "prefix": "rel .default",
+    "rel default": {
+        "prefix": "rel* default",
         "body": [
-            "rel .default := $1"
+            "rel* default := $1"
         ],
         "description": "Relation default"
     },
     "rel example": {
-        "prefix": "rel .example",
+        "prefix": "rel* example",
         "body": [
-            "rel .example: $1"
+            "rel* example: $1"
         ],
         "description": "Relation example"
     },

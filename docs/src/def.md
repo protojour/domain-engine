@@ -18,7 +18,7 @@ def some_def ()
 // ...
 
 def some_def (
-    rel . 'some_prop': text
+    rel* 'some_prop': text
 )
 ```
 
@@ -29,11 +29,11 @@ It is possible to create _anonymous_ definitions. They are often used inline wit
 
 ```ontol
 def some_def (
-    rel . 'some_prop': (rel .is: text)
+    rel* 'some_prop': (rel* is: text)
 )
 ```
 
-`(rel .is: text)` is an anonymous `def` "with the properties of" [`text`](primitives.md#text) — you can read more on what this means in the next chapter.
+`(rel* is: text)` is an anonymous `def` "with the properties of" [`text`](primitives.md#text) — you can read more on what this means in the next chapter.
 
 Anonymous `def`s usually cannot be accessed unless they are bound to something, and may have names generated for them if necessary. They have their uses, but it is usually better to name them.
 
@@ -51,7 +51,7 @@ Anonymous `def`s usually cannot be accessed unless they are bound to something, 
 def @private private_def ()
 
 def public_def (
-    rel . 'exposed': private_def
+    rel* 'exposed': private_def
 )
 ```
 
@@ -68,7 +68,7 @@ An open def may have conventional properties added like any other, but it will a
 
 ```ontol
 def @open all_yours (
-    rel . 'predefined_property': text
+    rel* 'predefined_property': text
 )
 ```
 
@@ -83,16 +83,16 @@ The definition must include an `'url'` property and a [`map`](map.md) statement.
 
 ```ontol
 def input (
-    rel . 'prop': text
+    rel* 'prop': text
 )
 
 def output (
-    rel . 'prop': text
-    rel . 'additional_prop': text
+    rel* 'prop': text
+    rel* 'additional_prop': text
 )
 
 def @extern hook (
-    rel . 'url': 'http://localhost:8080/listener'
+    rel* 'url': 'http://localhost:8080/listener'
     map(input(), output())
 )
 ```

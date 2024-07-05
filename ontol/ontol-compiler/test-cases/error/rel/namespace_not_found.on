@@ -1,5 +1,5 @@
 def foo (
-    rel .'prop':
+    rel* 'prop':
         dep // ERROR namespace not found
         .foo
 )

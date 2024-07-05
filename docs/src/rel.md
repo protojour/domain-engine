@@ -32,15 +32,15 @@ rel subject 'property'?: object
 Here, the property `'property'` is optional, it is not required for a valid and complete `subject`.
 
 
-## `.` ("self")
+## `*` and `.` ("self")
 
 A common pattern is to define relationships within the block of a [`def`](def.md).
 
-In the scope of any block, the subject or object can be replaced by a `.`, meaning _"self"_, referring to the enclosing type. It is usually used for the subject of a relation:
+In the scope of any block, the subject or object can be replaced by `*` or `.`, both meaning _"self"_, referring to the enclosing type. It is usually used for the subject of a relation:
 
 ```ontol
 def some_def (
-    rel . 'property': text
+    rel * 'property': text
 )
 ```
 
@@ -48,14 +48,17 @@ This is the same as:
 
 ```ontol
 def some_def ()
-rel some_def 'property': text
+rel {some_def} 'property': text
 ```
 
-ONTOL is lenient with spacing and line breaks, and the `.` is often contracted into the relation:
+* The `*` is the set-quantified _"self"_, equivalent to `{self}` and `{.}`.
+* The `.` is the unit-quantified _"self"_, equivalent to `self`
+
+ONTOL is lenient with spacing and line breaks, and the `*` is often contracted into the rel keyword:
 
 ```ontol
 def some_def (
-    rel .'property': text
+    rel* 'property': text
 )
 ```
 
@@ -70,7 +73,7 @@ Not all relationships are named properties.
 
 ```ontol
 def textlike (
-    rel .is: text
+    rel* is: text
 )
 ```
 
@@ -83,16 +86,16 @@ def textlike (
 
 ```ontol
 def named (
-    rel .'name': text
+    rel* 'name': text
 )
 
 def cat (
-    rel .is: named
+    rel* is: named
 )
 
 def copycat (
-    rel .is: cat
-    rel .'name': 'ccat'
+    rel* is: cat
+    rel* 'name': 'ccat'
 )
 ```
 
@@ -107,16 +110,16 @@ Union variants must have some discriminant, so that ONTOL can tell them apart; e
 
 ```ontol
 def type_a (
-    rel .'type': 'a'
+    rel* 'type': 'a'
 )
 
 def type_b (
-    rel .'type': 'b'
+    rel* 'type': 'b'
 )
 
 def union_ab (
-    rel .is?: type_a
-    rel .is?: type_b
+    rel* is?: type_a
+    rel* is?: type_b
 )
 ```
 
@@ -124,7 +127,7 @@ The union `union_ab` may now be used as any other type.
 
 ```ontol
 def some_def (
-    rel .'a_or_b': union_ab
+    rel* 'a_or_b': union_ab
 )
 ```
 
@@ -132,8 +135,8 @@ Unions of primitives or of literals (_enumerations_) are also possible, but unio
 
 ```ontol
 def symbol_union (
-    rel .is?: 'label_a'
-    rel .is?: 'label_b'
+    rel* is?: 'label_a'
+    rel* is?: 'label_b'
 )
 ```
 
@@ -145,21 +148,21 @@ Several union variants can be combined and flattened into a single type. This al
 def type ()
 
 def foo (
-    rel .'id'|id: (rel .is: text)
-    rel .type: (
-        rel .is?: type_a
-        rel .is?: type_b
+    rel. 'id': (rel* is: text)
+    rel* type: (
+        rel* is?: type_a
+        rel* is?: type_b
     )
 )
 
 def type_a (
-    rel .'type': 'a'
-    rel .'unique_to_a': text
+    rel* 'type': 'a'
+    rel* 'unique_to_a': text
 )
 
 def type_b (
-    rel .'type': 'b'
-    rel .'unique_to_b': text
+    rel* 'type': 'b'
+    rel* 'unique_to_b': text
 )
 ```
 
@@ -177,7 +180,7 @@ _Sets_ are expressed using `{}` parentheses. The members of a set are all requir
 
 ```ontol
 def some_def (
-    rel .'texts': {text}
+    rel* 'texts': {text}
 )
 ```
 
@@ -194,7 +197,7 @@ _Lists_ are rarely used in ONTOL, but may be constructed using `[]` brackets. A 
 
 ```ontol
 def some_def (
-    rel .'texts': [text]
+    rel* 'texts': [text]
 )
 ```
 
@@ -207,12 +210,12 @@ _Tuples_ are sequences of fixed length, and can be expressed using `rel` with in
 
 ```ontol
 def text_tuple (
-    rel .0: text,
-    rel .1: text,
+    rel* 0: text,
+    rel* 1: text,
 )
 
 def some_def (
-    rel .'texts': text_tuple
+    rel* 'texts': text_tuple
 )
 ```
 
@@ -222,9 +225,9 @@ It could also have been expressed inline:
 
 ```ontol
 def some_def (
-    rel .'texts': (
-        rel .0: text,
-        rel .1: text,
+    rel* 'texts': (
+        rel* 0: text,
+        rel* 1: text,
     )
 )
 ```
@@ -233,7 +236,7 @@ Tuples members can be of any type, but if its members are homogenous, its defint
 
 ```ontol
 def text_tuple (
-    rel .0..2: text,
+    rel* 0..2: text,
 )
 ```
 
@@ -247,7 +250,7 @@ Ranges are A tuple's value might be expressed e.g. `['a', 'b']` and its contents
 If both the subject and object is an [entity](entities.md) (i.e. an identifiable type), their relationship is an ***entity relationship***, and the relationship between them are represented by edges in a graph.
 
 ```ontol
-rel def_a 'relation': def_b
+rel {def_a} 'relation': def_b
 ```
 
 In a directed graph, the direction of the relationship is indicated by the order. The relationship goes from the subject to the object, or `def_a -> def_b`.
@@ -260,7 +263,7 @@ The simplest entity relationships are one-to-one relationships.
 The relation can have different names on each end of the relationship. This is indicated by a `::` double colon operator:
 
 ```ontol
-rel def_a 'DefB'::'DefA' def_b
+rel {def_a} 'DefB'::'DefA' def_b
 ```
 
 Such a relationship can also be expressed as part of a `def` structure:
@@ -268,7 +271,7 @@ Such a relationship can also be expressed as part of a `def` structure:
 ```ontol
 def def_a (
     // ...
-    rel . 'DefB'::'DefA' def_b
+    rel* 'DefB'::'DefA' def_b
 )
 ```
 
@@ -278,7 +281,7 @@ def def_a (
 _Cardinality_ is indicated by wrapping the subject and/or object as a [set](#sets):
 
 ```ontol
-rel def_a 'DefBs'::'DefA' {def_b}
+rel {def_a} 'DefBs'::'DefA' {def_b}
 ```
 
 Here, `def_a` has a property called `'DefBs'`, which is a relationship to one or more `def_b`s. Each `def_b` has a property called `'DefA'`, which is a relationship to one `def_a`.
@@ -301,7 +304,7 @@ If there's only one `rel` statement, this is usually added inline, such as for [
 
 ```ontol
 def some_def (
-    rel . 'active'[rel .default := true]: boolean
+    rel* 'active'[rel* default := true]: boolean
 )
 ```
 
@@ -309,13 +312,13 @@ A relation may also "break out" its definition using an [`is`](#is-relationships
 
 ```ontol
 def person (
-    rel .'id'|id: (rel .is: serial)
-    rel .'best_friend'[rel .is: friendship]::'biggest_fan'? person
+    rel. 'id': (rel* is: serial)
+    rel* 'best_friend'[rel* is: friendship]::'biggest_fan'? person
 )
 
 def friendship (
-    rel .'start': datetime
-    rel .'end'?: datetime
+    rel* 'start': datetime
+    rel* 'end'?: datetime
 )
 ```
 
@@ -323,10 +326,10 @@ Multiple properties can also be added inline:
 
 ```ontol
 def person (
-    rel .'id'|id: (rel .is: serial)
-    rel .'best_friend'[
-        rel .'start': datetime
-        rel .'end'?: datetime
+    rel. 'id': (rel* is: serial)
+    rel* 'best_friend'[
+        rel* 'start': datetime
+        rel* 'end'?: datetime
     ]::'biggest_fan'? person
 )
 ```

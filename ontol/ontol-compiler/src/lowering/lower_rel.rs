@@ -75,6 +75,35 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             }
         }
 
+        if subject_ty.cardinality == ValueCardinality::Unit
+            && object_ty.cardinality == ValueCardinality::Unit
+        {
+            let relationship_id = self.ctx.compiler.defs.alloc_def_id(self.ctx.package_id);
+            let edge_id = EdgeId(relationship_id);
+            let identifies_relationship = Relationship {
+                relation_def_id: self.ctx.compiler.primitives.relations.identifies,
+                projection: EdgeCardinalProjection {
+                    id: edge_id,
+                    object: CardinalIdx(0),
+                    subject: CardinalIdx(1),
+                    one_to_one: false,
+                },
+                relation_span: self.ctx.source_span(stmt.view().span()),
+                subject: (object_ty.def_id, self.ctx.source_span(object_ty.span)),
+                subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),
+                object: (subject_ty.def_id, self.ctx.source_span(subject_ty.span)),
+                object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),
+                rel_params: RelParams::Unit,
+            };
+
+            self.ctx.set_def_kind(
+                relationship_id,
+                DefKind::Relationship(identifies_relationship),
+                stmt.view().span(),
+            );
+            root_defs.push(relationship_id);
+        }
+
         Some(root_defs)
     }
 

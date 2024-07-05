@@ -1,7 +1,7 @@
 def foo (
-    rel .'id'|id: (rel .is: text)
+    rel. 'id': (rel* is: text)
 )
 
 def bar (
-    rel .is: foo // ERROR entitities cannot be used as supertypes
+    rel* is: foo // ERROR entitities cannot be used as supertypes
 )

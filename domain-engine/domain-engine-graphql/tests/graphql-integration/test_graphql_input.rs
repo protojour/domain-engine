@@ -12,8 +12,8 @@ fn root() -> SrcName {
 async fn test_graphql_input_deserialization_error() {
     let (test, schema) = "
     def foo (
-        rel .id: (fmt '' => text => .)
-        rel .'prop': 'const'
+        rel. 'id': (fmt '' => serial => .)
+        rel* 'prop': 'const'
     )
     "
     .compile_single_schema();
@@ -22,6 +22,7 @@ async fn test_graphql_input_deserialization_error() {
     assert_error_msg!(
         r#"mutation {
             foo(create: [{
+                id: "1"
                 prop: "invalid"
             }]) {
                 node { prop }
@@ -29,7 +30,7 @@ async fn test_graphql_input_deserialization_error() {
         }"#
         .exec([], &schema, &ctx)
         .await,
-        r#"Execution: invalid type: string "invalid", expected "const" in input at line 2 column 22 (field at line 1 column 12)"#
+        r#"Execution: invalid type: string "invalid", expected "const" in input at line 3 column 22 (field at line 1 column 12)"#
     );
 }
 
@@ -41,19 +42,20 @@ async fn test_graphql_input_deserialization_error() {
 async fn test_graphql_input_constructor_sequence_as_json_scalar() {
     let (test, schema) = "
     def tuple (
-        rel .0: i64
-        rel .1: text
+        rel* 0: i64
+        rel* 1: text
     )
 
     def foo (
-        rel .id: (fmt '' => text => .)
-        rel .'prop': tuple
+        rel. 'id': (fmt '' => serial => .)
+        rel* 'prop': tuple
     )
     "
     .compile_single_schema();
 
     r#"mutation {
         foo(create: [{
+            id: "1"
             prop: [42, "text"]
         }]) {
             node { prop }

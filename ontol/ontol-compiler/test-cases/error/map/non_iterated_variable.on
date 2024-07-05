@@ -1,9 +1,9 @@
 // TODO: This should perhaps compile?
 def foo (
-    rel .'p0': {text}
+    rel* 'p0': {text}
 )
 def bar (
-    rel .'p1': {text}
+    rel* 'p1': {text}
 )
 
 map(

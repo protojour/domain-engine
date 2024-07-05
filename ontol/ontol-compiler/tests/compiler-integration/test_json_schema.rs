@@ -12,16 +12,16 @@ fn json_schema_from_simple_entity() {
 
     /// This is type entity
     def entity (
-        rel .id: some_id
+        rel. 'id': some_id
 
         /// This is property 'foo'
-        rel .'foo': text
+        rel* 'foo': text
 
         /// This is property 'bar'
-        rel .'bar': true
+        rel* 'bar': true
 
         // This is just a regular comment
-        rel .'baz': i64
+        rel* 'baz': i64
     )
     "
     .compile_then(|test| {
@@ -34,6 +34,9 @@ fn json_schema_from_simple_entity() {
                         "type": "object",
                         "description": "This is type entity",
                         "properties": {
+                            "id": {
+                                "type": "string",
+                            },
                             "foo": {
                                 "type": "string",
                                 "description": "This is property 'foo'",
@@ -49,6 +52,7 @@ fn json_schema_from_simple_entity() {
                             },
                         },
                         "required": [
+                            "id",
                             "foo",
                             "bar",
                             "baz"

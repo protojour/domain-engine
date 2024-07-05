@@ -29,7 +29,7 @@ fn deserialize_empty_type() {
 fn deserialize_is_i64() {
     "
     def foo ()
-    rel foo is: i64
+    rel {foo} is: i64
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -57,7 +57,7 @@ fn deserialize_is_i64() {
 fn deserialize_is_maybe_i64() {
     "
     def foo ()
-    rel foo is?: i64
+    rel {foo} is?: i64
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -85,7 +85,7 @@ fn deserialize_is_maybe_i64() {
 fn deserialize_string() {
     "
     def foo ()
-    rel foo is?: text
+    rel {foo} is?: text
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -105,8 +105,8 @@ fn deserialize_string() {
 fn deserialize_object_properties() {
     "
     def obj ()
-    rel obj 'a': text
-    rel obj 'b': i64
+    rel {obj} 'a': text
+    rel {obj} 'b': i64
     "
     .compile_then(|test| {
         let [obj] = test.bind(["obj"]);
@@ -134,7 +134,7 @@ fn deserialize_object_properties() {
 fn deserialize_read_only_property_error() {
     "
     def obj ()
-    rel obj 'created'[rel .gen: create_time]: datetime
+    rel {obj} 'created'[rel* gen: create_time]: datetime
     "
     .compile_then(|test| {
         let [obj] = test.bind(["obj"]);
@@ -151,10 +151,10 @@ fn deserialize_nested() {
     def one ()
     def two ()
     def three ()
-    rel one 'x': two
-    rel one 'y': three
-    rel two 'y': three
-    rel three is?: text
+    rel {one} 'x': two
+    rel {one} 'y': three
+    rel {two} 'y': three
+    rel {three} is?: text
     "
     .compile_then(|test| {
         let [one] = test.bind(["one"]);
@@ -197,8 +197,8 @@ fn deserialize_recursive() {
 fn deserialize_union_of_primitives() {
     "
     def foo ()
-    rel foo is?: text
-    rel foo is?: i64
+    rel {foo} is?: text
+    rel {foo} is?: i64
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -218,7 +218,7 @@ fn deserialize_union_of_primitives() {
 fn deserialize_string_constant() {
     "
     def foo ()
-    rel foo is?: 'my_value'
+    rel {foo} is?: 'my_value'
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -241,8 +241,8 @@ fn deserialize_string_constant() {
 fn deserialize_finite_non_uniform_sequence() {
     "
     def foo ()
-    rel foo 0: i64
-    rel foo 1: 'a'
+    rel {foo} 0: i64
+    rel {foo} 1: 'a'
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -269,7 +269,7 @@ fn deserialize_finite_non_uniform_sequence() {
 fn deserialize_finite_uniform_sequence() {
     "
     def foo ()
-    rel foo ..2: i64
+    rel {foo} ..2: i64
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -296,8 +296,8 @@ fn deserialize_finite_uniform_sequence() {
 fn deserialize_string_union() {
     "
     def foo ()
-    rel foo is?: 'a'
-    rel foo is?: 'b'
+    rel {foo} is?: 'a'
+    rel {foo} is?: 'b'
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -317,13 +317,13 @@ fn deserialize_map_union() {
     "
     def foo ()
     def bar ()
-    rel foo 'variant': 'foo'
-    rel bar 'variant': 'bar'
-    rel bar 'prop': i64
+    rel {foo} 'variant': 'foo'
+    rel {bar} 'variant': 'bar'
+    rel {bar} 'prop': i64
 
     def union (
-        rel .is?: foo
-        rel .is?: bar
+        rel* is?: foo
+        rel* is?: bar
     )
     "
     .compile_then(|test| {
@@ -355,16 +355,16 @@ fn deserialize_map_union() {
 fn union_tree() {
     "
     def u1 (
-        rel .is?: '1a'
-        rel .is?: '1b'
+        rel* is?: '1a'
+        rel* is?: '1b'
     )
     def u2 (
-        rel .is?: '2a'
-        rel .is?: '2b'
+        rel* is?: '2a'
+        rel* is?: '2b'
     )
     def u3 (
-        rel .is?: u1
-        rel .is?: u2
+        rel* is?: u1
+        rel* is?: u2
     )
     "
     .compile_then(|test| {
@@ -384,7 +384,7 @@ fn union_tree() {
 fn test_deserialize_open_data() {
     "
     def @open foo (
-        rel .'closed': i64
+        rel* 'closed': i64
     )
     "
     .compile_then(|test| {

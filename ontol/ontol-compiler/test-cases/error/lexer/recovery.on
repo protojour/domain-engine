@@ -1,8 +1,8 @@
 def foo (
-    rel .'prop': text
+    rel* 'prop': text
 )
 def bar (
-    rel .'prop': integer
+    rel* 'prop': integer
 )
 map(
     foo(

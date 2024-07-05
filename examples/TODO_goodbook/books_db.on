@@ -1,40 +1,40 @@
 def Tag (
-    rel .'id'|id: (rel .is: text)
+    rel 'id': (rel* is: text)
 )
 
-def Book_id (rel .is: uuid)
+def Book_id (rel* is: uuid)
 def Book (
-    rel .'id'|id: Book_id
-    rel .'title': text
+    rel. 'id': Book_id
+    rel* 'title': text
 )
 
-def Author_id (rel .is: uuid)
+def Author_id (rel* is: uuid)
 def Author (
-    rel .'id'|id: Author_id
-    rel .'name': text
-    rel .'born': datetime
-    rel .'died'?: datetime
+    rel. 'id': Author_id
+    rel* 'name': text
+    rel* 'born': datetime
+    rel* 'died'?: datetime
 )
 
-def Edition_id (rel .is: uuid)
+def Edition_id (rel* is: uuid)
 def Edition (
-    rel .'id'|id: Edition_id
-    rel .'published': datetime
-    rel .'isbn': text
-    rel .'pages': i64
+    rel. 'id': Edition_id
+    rel* 'published': datetime
+    rel* 'isbn': text
+    rel* 'pages': i64
 )
 
-def Publisher_id (rel .is: uuid)
+def Publisher_id (rel* is: uuid)
 def Publisher (
-    rel .'id'|id: Publisher_id
-    rel .'name': text
+    rel. 'id': Publisher_id
+    rel* 'name': text
 )
 
-def User_id (rel .is: uuid)
+def User_id (rel* is: uuid)
 def User (
-    rel .'id'|id: User_id
-    rel .'username': text
-    rel .'email': text
+    rel. 'id': User_id
+    rel* 'username': text
+    rel* 'email': text
 )
 
 rel Book 'editions'::'edition_of' {Edition}

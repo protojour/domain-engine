@@ -291,13 +291,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     return None;
                 };
 
-                let object_addr = self
-                    .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
-                        meta.relationship.object.0,
-                        def.modifier.cross_def_flags(),
-                    )))
-                    .expect("No object operator for primary id property");
-
                 let (ident, adaption) = make_property_name(property_name, def.modifier);
                 if matches!(adaption, IdentAdaption::Verbatim)
                     && def.modifier != SerdeModifier::PRIMARY_ID
@@ -308,8 +301,18 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         SerdeModifier::PRIMARY_ID,
                     )))
                 } else {
+                    // prevent recursion, in case something identifies itself
+                    let addr = self.alloc_addr_for_key(&key);
+
+                    let object_addr = self
+                        .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
+                            meta.relationship.object.0,
+                            def.modifier.cross_def_flags(),
+                        )))
+                        .expect("No object operator for primary id property");
+
                     Some(OperatorAllocation::Allocated(
-                        self.alloc_addr_for_key(&key),
+                        addr,
                         SerdeOperator::IdSingletonStruct(
                             def.def_id,
                             self.str_ctx.intern_constant(&ident),

@@ -15,7 +15,7 @@ fn test_relations_are_distinct_for_different_domains() {
             use 'other' as other
 
             def foo (
-                rel .'prop': text
+                rel* 'prop': text
             )
             ",
         ),
@@ -23,7 +23,7 @@ fn test_relations_are_distinct_for_different_domains() {
             src_name("other"),
             "
             def foo (
-                rel .'prop': text
+                rel* 'prop': text
             )
             ",
         ),
@@ -75,13 +75,13 @@ fn test_relations_are_distinct_for_different_domains() {
 fn ontol_domain_is_defined_in_the_namespace() {
     "
     def i64(
-        rel .is: boolean
+        rel* is: boolean
     )
     def text (
-        rel .is: ontol.i64
+        rel* is: ontol.i64
     )
     def integer (
-        rel .is: text
+        rel* is: text
     )
     "
     .compile_then(|test| {

@@ -6,7 +6,7 @@ Everything in the `ontol` namespace is automatically imported and available in o
 
 ```ontol
 def text (
-    rel .is: ontol.text
+    rel* is: ontol.text
 )
 ```
 

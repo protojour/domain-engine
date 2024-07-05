@@ -47,8 +47,8 @@ These fields are either _ignored_ or _handled_ by the ArangoDB integration, and 
 
 ```ontol
 def Book (
-    rel .'id'|id: (rel .is: serial)
-    rel .'title': text
+    rel. 'id': (rel* is: serial)
+    rel* 'title': text
 )
 ```
 
@@ -60,8 +60,8 @@ You can simulate the `_id` fields in ArangoDB like this:
 
 ```ontol
 def Book (
-    rel .'_id'[rel .gen: auto]|id: ( fmt '' => 'book/' => serial => . )
-    rel .'title': text
+    rel. '_id'[rel* gen: auto]: ( fmt '' => 'book/' => serial => . )
+    rel* 'title': text
 )
 ```
 
@@ -78,14 +78,14 @@ This domain will generate or require three collections:
 
 ```ontol
 def Book (
-    rel .'id'|id: (rel .is: serial)
-    rel .'title': text
-    rel {.}'author': author
+    rel. 'id': (rel* is: serial)
+    rel* 'title': text
+    rel* 'author': author
 )
 
 def Author (
-    rel .'id'|id: (rel .is: serial)
-    rel .'name': text
+    rel. 'id': (rel* is: serial)
+    rel* 'name': text
 )
 ```
 
@@ -97,14 +97,14 @@ If we used lowercase `def` names:
 
 ```ontol
 def book (
-    rel .'id'|id: (rel .is: serial)
-    rel .'title': text
-    rel {.}'author': author
+    rel. 'id': (rel* is: serial)
+    rel* 'title': text
+    rel* 'author': author
 )
 
 def author (
-    rel .'id'|id: (rel .is: serial)
-    rel .'name': text
+    rel. 'id': (rel* is: serial)
+    rel* 'name': text
 )
 ```
 
@@ -119,16 +119,16 @@ It is possible to set explicit collection names using [`store_key`](relation_typ
 
 ```ontol
 def book (
-    rel .store_key: 'books'
-    rel .'id'|id: (rel .is: serial)
-    rel .'title': text
-    rel {.}'author'[rel .store_key: 'has_author']: author
+    rel* store_key: 'books'
+    rel. 'id': (rel* is: serial)
+    rel* 'title': text
+    rel* 'author'[rel* store_key: 'has_author']: author
 )
 
 def author (
-    rel .store_key: 'authors'
-    rel .'id'|id: (rel .is: serial)
-    rel .'name': text
+    rel* store_key: 'authors'
+    rel. 'id': (rel* is: serial)
+    rel* 'name': text
 )
 ```
 

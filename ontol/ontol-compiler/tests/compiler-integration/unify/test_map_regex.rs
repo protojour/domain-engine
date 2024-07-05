@@ -6,11 +6,11 @@ use serde_json::json;
 fn test_map_regex_duplex1() {
     r#"
     def foo (
-        rel .'input': text
+        rel* 'input': text
     )
     def bar (
-        rel .'first': text
-        rel .'second': text
+        rel* 'first': text
+        rel* 'second': text
     )
     map(
         foo(
@@ -40,14 +40,14 @@ fn test_map_regex_duplex1() {
 fn test_map_regex_alternation1() {
     r#"
     def foo (
-        rel .'input': text
+        rel* 'input': text
     )
     def capture (
-        rel .'value': text
+        rel* 'value': text
     )
     def bar (
-        rel .'first'?: text
-        rel .'second'?: text
+        rel* 'first'?: text
+        rel* 'second'?: text
     )
     map(
         @match foo(
@@ -77,14 +77,14 @@ fn test_map_regex_alternation1() {
 fn test_map_regex_loop_pattern() {
     r#"
     def in (
-        rel .'input': text
+        rel* 'input': text
     )
     def capture (
-        rel .'first': text
-        rel .'second': text
+        rel* 'first': text
+        rel* 'second': text
     )
     def out (
-        rel .'captures': {capture}
+        rel* 'captures': {capture}
     )
     map(
         @match in(
@@ -121,14 +121,14 @@ fn test_map_regex_loop_pattern() {
 fn test_map_regex_loop_alternation() {
     r#"
     def in (
-        rel .'input': text
+        rel* 'input': text
     )
     def capture (
-        rel .'value': text
+        rel* 'value': text
     )
     def out (
-        rel .'foo': {capture}
-        rel .'bar': {capture}
+        rel* 'foo': {capture}
+        rel* 'bar': {capture}
     )
     map(
         @match in(

@@ -8,7 +8,7 @@ def spec_version_object (
     ///
     /// If objects are found where this property is not present, the implicit value for all STIX Objects other than SCOs is `2.0`.
     /// Since SCOs are now top-level objects in STIX 2.1, the default value for SCOs is `2.1`.
-    rel .'spec_version': common.spec_version
+    rel* 'spec_version': common.spec_version
 )
 
 /// Type providing the `created` and `modified` properties
@@ -20,7 +20,7 @@ def created_modified_object (
     /// The **created** property **MUST NOT** be changed when creating a new version of the object.
     ///
     /// See section [3.6](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_rye5q2hkacu) for further definition of versioning.
-    rel .'created': common.timestamp
+    rel* 'created': common.timestamp
 
     /// The **modified** property is only used by STIX Objects that support versioning and represents the time that this particular version of the object was last modified.
     ///
@@ -32,7 +32,7 @@ def created_modified_object (
     /// Object creators **MUST** set the **modified** property when creating a new version of an object if the **created** property was set.
     ///
     /// See section [3.6](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_rye5q2hkacu) for further definition of versioning.
-    rel .'modified': common.timestamp
+    rel* 'modified': common.timestamp
 )
 
 /// Type providing the `confidence` property
@@ -43,7 +43,7 @@ def confidence_object (
     /// [Appendix A](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_1v6elyto0uqg) contains a table of normative mappings to other confidence scales that MUST be used when presenting the confidence value in one of those scales.
     ///
     /// If the confidence property is not present, then the confidence of the content is unspecified.
-    rel .'confidence'?: common.confidence
+    rel* 'confidence'?: common.confidence
 )
 
 /// Type providing the `revoked` property
@@ -57,7 +57,7 @@ def revoked_object (
     ///
     /// See section [3.6](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_rye5q2hkacu) for further definition of versioning.
     // FIXME: Default value `false`
-    rel .'revoked'?: boolean
+    rel* 'revoked'?: boolean
 )
 
 /// Type providing the `labels` property
@@ -68,7 +68,7 @@ def labels_object (
     /// Where an object has a specific property defined in the specification for characterizing subtypes of that object, the labels property **MUST NOT** be used for that purpose.
     ///
     /// For example, the Malware SDO has a property **malware_types** that contains a list of Malware subtypes (dropper, RAT, etc.). In this example, the labels property cannot be used to describe these Malware subtypes.
-    rel .'labels'?: {common.string}
+    rel* 'labels'?: {common.string}
 )
 
 /// Type providing the `lang` property
@@ -80,14 +80,14 @@ def lang_object (
     /// This property **SHOULD** be present if the object type contains translatable text properties (e.g. name, description).
     ///
     /// The language of individual fields in this object **MAY** be overridden by the **lang** property in granular markings (see section 7.2.3).
-    rel .'lang'?: common.lang-rfc5646
+    rel* 'lang'?: common.lang-rfc5646
 )
 
 /// Type providing the `external_references` property
 def external_references_object (
     /// The **external_references** property specifies a list of external references which refers to non-STIX information.
     /// This property is used to provide one or more URLs, descriptions, or IDs to records in other systems.
-    rel .'external_references'?: {common.external-reference}
+    rel* 'external_references'?: {common.external-reference}
 )
 
 /// Type providing the `defanged` property
@@ -95,5 +95,5 @@ def defanged_object (
     /// This property defines whether or not the data contained within the object has been defanged.
     /// The default value for this property is false.
     /// This property MUST NOT be used on any STIX Objects other than SCOs.
-    rel .'defanged'?: boolean
+    rel* 'defanged'?: boolean
 )

@@ -12,8 +12,8 @@ use serde_json::json;
 fn test_fake_primitives() {
     "
     def foo (
-        rel .'s': text
-        rel .'i': i64
+        rel* 's': text
+        rel* 'i': i64
     )
     "
     .compile_then(|test| {
@@ -32,8 +32,8 @@ fn test_fake_primitives() {
 fn test_fake_text_like_types() {
     "
     def foo (
-        rel .'id': uuid
-        rel .'created_at': datetime
+        rel* 'id': uuid
+        rel* 'created_at': datetime
     )
     "
     .compile_then(|test| {

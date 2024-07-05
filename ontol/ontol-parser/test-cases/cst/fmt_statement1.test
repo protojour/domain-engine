@@ -18,6 +18,6 @@ Ontol
         FatArrow `=>`
         Whitespace
         TypeQuantUnit
-            This
+            ThisUnit
                 Dot `.`
     Whitespace

@@ -206,12 +206,12 @@ async fn sym_edge_simple(ds: &str) {
         }
 
         def foo (
-            rel .'id'|id: (rel .is: text)
-            rel .prop: {bar}
+            rel. 'id': (rel* is: text)
+            rel* prop: {bar}
         )
         def bar (
-            rel .'id'|id: (rel .is: text)
-            rel .reverse_prop: {foo}
+            rel. 'id': (rel* is: text)
+            rel* reverse_prop: {foo}
         )
 
         map bars (

@@ -20,7 +20,7 @@ Doc comments are not discarded, but kept as documentation of the statement immed
 /// It may span multiple lines and include **Markdown**.
 def some_def (
     /// This is documentation for `some_field`
-    rel .'some_field': text
+    rel* 'some_field': text
     // ...
 )
 ```

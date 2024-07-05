@@ -13,14 +13,14 @@
 /// It is still possible to represent Cyber-observable Objects in this way, but this method has been deprecated.
 /// See section 2.13.
 def stix_cyber_observable_object (
-    rel .is: stix_markings_object
+    rel* is: stix_markings_object
 
     /// This property defines whether or not the data contained within the object has been defanged.
     ///
     /// The default value for this property is `false`.
     ///
     /// This property **MUST NOT** be used on any STIX Objects other than SCOs.
-    rel .'defanged'?: boolean
+    rel* 'defanged'?: boolean
 )
 
 def mime-part-type (

@@ -79,7 +79,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     pub(super) fn resolve_type_reference(
         &mut self,
         type_ref: insp::TypeRef<V>,
-        syntax_cardinality: ValueCardinality,
+        mut syntax_cardinality: ValueCardinality,
         block_context: &BlockContext,
         root_defs: Option<&mut RootDefs>,
     ) -> Option<ResolvedType> {
@@ -87,14 +87,17 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
         let def_id = match (type_ref, block_context) {
             (insp::TypeRef::IdentPath(path), _) => self.lookup_path(&path),
-            (insp::TypeRef::This(_), BlockContext::Context(func)) => Some(func()),
-            (insp::TypeRef::This(this), BlockContext::NoContext) => {
-                CompileError::WildcardNeedsContextualBlock
-                    .span_report(this.0.span(), &mut self.ctx);
+            (insp::TypeRef::ThisUnit(_), BlockContext::Context(func)) => Some(func()),
+            (insp::TypeRef::ThisSet(_), BlockContext::Context(func)) => {
+                syntax_cardinality = ValueCardinality::IndexSet;
+                Some(func())
+            }
+            (insp::TypeRef::ThisUnit(_) | insp::TypeRef::ThisSet(_), BlockContext::NoContext) => {
+                CompileError::WildcardNeedsContextualBlock.span_report(span, &mut self.ctx);
                 None
             }
-            (insp::TypeRef::This(this), BlockContext::FmtLeading) => {
-                CompileError::FmtMisplacedSelf.span_report(this.0.span(), &mut self.ctx);
+            (insp::TypeRef::ThisUnit(_) | insp::TypeRef::ThisSet(_), BlockContext::FmtLeading) => {
+                CompileError::FmtMisplacedSelf.span_report(span, &mut self.ctx);
                 None
             }
             (insp::TypeRef::Literal(literal), _) => {

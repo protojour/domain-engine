@@ -1,7 +1,7 @@
-def outer1(rel .'a'?: inner1)
-def outer2(rel .'a'?: inner2)
-def inner1(rel .'b': text)
-def inner2(rel .'b': text)
+def outer1(rel* 'a'?: inner1)
+def outer2(rel* 'a'?: inner2)
+def inner1(rel* 'b': text)
+def inner2(rel* 'b': text)
 
 map(
     outer1(

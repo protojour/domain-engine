@@ -1,9 +1,9 @@
 def foo ()
 def bar ()
-rel foo 'prop0': bar
-rel foo 'prop1': bar
-rel foo 'prop2': bar
-rel bar is: i64
+rel {foo} 'prop0': bar
+rel {foo} 'prop1': bar
+rel {foo} 'prop2': bar
+rel {bar} is: i64
 map (
     foo(x),
     bar() // ERROR expected attribute

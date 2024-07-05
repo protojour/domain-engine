@@ -9,12 +9,13 @@ use ontol_test_utils::{
 use serde_json::json;
 
 #[test]
+#[ignore = "non-inherent ID in this way is no longer possible"]
 fn entity_without_inherent_id() {
     "
     def some_id (fmt '' => text => .)
     def entity (
-        rel .id: some_id
-        rel .'foo': text
+        rel. id: some_id
+        rel. 'foo': text
     )
     "
     .compile_then(|test| {
@@ -26,11 +27,10 @@ fn entity_without_inherent_id() {
 #[test]
 fn inherent_id_no_autogen() {
     "
-    def foo_id (rel .is: text)
+    def foo_id (rel* is: text)
     def foo (
-        rel .id: foo_id
-        rel .'key': foo_id
-        rel .'children': {foo}
+        rel. 'key': foo_id
+        rel* 'children': {foo}
     )
     "
     .compile_then(|test| {
@@ -48,10 +48,10 @@ fn inherent_id_no_autogen() {
 #[test]
 fn inherent_id_autogen() {
     "
-    def foo_id (rel .is: text)
+    def foo_id (rel* is: text)
     def foo (
-        rel .'key'[rel .gen: auto]|id: foo_id
-        rel .'children': {foo}
+        rel. 'key'[rel* gen: auto]: foo_id
+        rel* 'children': {foo}
     )
     "
     .compile_then(|test| {
@@ -70,8 +70,8 @@ fn inherent_id_autogen() {
 fn id_and_inherent_property_inline_type() {
     "
     def foo (
-        rel .'key'|id: (rel . is: text)
-        rel .'children': {foo}
+        rel. 'key': (rel* is: text)
+        rel* 'children': {foo}
     )
     "
     .compile_then(|test| {
@@ -94,7 +94,7 @@ fn id_and_inherent_property_inline_type() {
 fn entity_id_inline_fmt_uuid() {
     "
     def foo (
-        rel .'key'|id: ( fmt '' => 'foo/' => uuid => . )
+        rel. 'key': ( fmt '' => 'foo/' => uuid => . )
     )
     "
     .compile();
@@ -104,7 +104,7 @@ fn entity_id_inline_fmt_uuid() {
 fn entity_id_inline_fmt_serial() {
     "
     def foo (
-        rel .'key'|id: ( fmt '' => 'foo/' => serial => . )
+        rel. 'key': ( fmt '' => 'foo/' => serial => . )
     )
     "
     .compile();
@@ -251,35 +251,39 @@ fn test_entity_self_relationship_optional_object_sym() {
 
     def node_id (fmt '' => text => .)
     def node (
-        rel .id: node_id
-        rel .'name': text
-        rel .children: {node}
-        rel .parent?: node
+        rel. 'id': node_id
+        rel* 'name': text
+        rel* children: {node}
+        rel* parent?: node
     )
     "
     .compile_then(|test| {
         let [node] = test.bind(["node"]);
         assert_error_msg!(
             serde_create(&node).to_value(json!({})),
-            r#"missing properties, expected "name" at line 1 column 2"#
+            r#"missing properties, expected "id" and "name" at line 1 column 2"#
         );
 
-        assert_json_io_matches!(serde_create(&node), { "name": "a" });
+        assert_json_io_matches!(serde_create(&node), { "id": "1", "name": "a" });
 
         assert_json_io_matches!(serde_create(&node), {
+            "id": "1",
             "name": "a",
             "children": [{
-                "name": "b",
+                "id": "2",
             }]
         });
 
         assert_json_io_matches!(serde_create(&node), {
+            "id": "1",
             "name": "b",
             "parent": {
                 "name": "a",
+                "id": "2",
             },
             "children": [{
                 "name": "c",
+                "id": "3",
             }]
         });
     });
@@ -288,37 +292,36 @@ fn test_entity_self_relationship_optional_object_sym() {
 #[test]
 fn test_entity_self_relationship_optional_object() {
     "
-    def node_id (fmt '' => text => .)
+    sym { (p) children: (c), (c) parent: (p) }
+
+    def node_id (fmt '' => serial => .)
     def node (
-        rel .id: node_id
-        rel .'name': text
-        rel .'children'::'parent'? {node}
+        rel. 'id': node_id
+        rel* 'name': text
+        rel* children: {node}
+        rel* parent?: node
     )
     "
     .compile_then(|test| {
         let [node] = test.bind(["node"]);
         assert_error_msg!(
-            serde_create(&node).to_value(json!({})),
-            r#"missing properties, expected "name" at line 1 column 2"#
+            serde_create(&node).to_value(json!({ "id": "1" })),
+            r#"missing properties, expected "name" at line 1 column 10"#
         );
 
-        assert_json_io_matches!(serde_create(&node), { "name": "a" });
+        assert_json_io_matches!(serde_create(&node), { "id": "1", "name": "a" });
 
         assert_json_io_matches!(serde_create(&node), {
+            "id": "1",
             "name": "a",
-            "children": [{
-                "name": "b",
-            }]
+            "children": [{ "id": "2" }]
         });
 
         assert_json_io_matches!(serde_create(&node), {
+            "id": "2",
             "name": "b",
-            "parent": {
-                "name": "a",
-            },
-            "children": [{
-                "name": "c",
-            }]
+            "parent": { "id": "1" },
+            "children": [{ "id": "3" }]
         });
     });
 }
@@ -326,17 +329,20 @@ fn test_entity_self_relationship_optional_object() {
 #[test]
 fn test_entity_self_relationship_mandatory_object() {
     "
-    def node_id (fmt '' => text => .)
+    sym { (p) children: (c), (c) parent: (p) }
+
+    def node_id (fmt '' => serial => .)
     def node (
-        rel .id: node_id
-        rel .'children'::'parent' {.}
+        rel. 'id': node_id
+        rel* children: {node}
+        rel* parent: node
     )
     "
     .compile_then(|test| {
         let [node] = test.bind(["node"]);
         assert_error_msg!(
-            serde_create(&node).to_value(json!({})),
-            r#"missing properties, expected "parent" at line 1 column 2"#
+            serde_create(&node).to_value(json!({ "id": "1" })),
+            r#"missing properties, expected "parent" at line 1 column 10"#
         );
     });
 }
@@ -366,18 +372,18 @@ fn entity_union_simple() {
 fn entity_union_with_union_def_id_larger_than_id() {
     "
     def Repository (
-        rel .'id'[rel .gen: auto]|id: (rel .is: uuid)
-        rel {.}'owner'::'repositories' RepositoryOwner
+        rel. 'id'[rel* gen: auto]: (rel* is: uuid)
+        rel* 'owner'::'repositories' RepositoryOwner
     )
 
     def org_id (fmt '' => 'org/' => text => .)
 
     def Organization (
-        rel .'id'|id: org_id
+        rel. 'id': org_id
     )
 
     def RepositoryOwner (
-        rel .is?: Organization
+        rel* is?: Organization
     )
     "
     .compile();
@@ -449,20 +455,20 @@ fn entity_union_in_relation_with_ids() {
 fn entity_relationship_without_reverse() {
     "
     def lang_id (fmt '' => text => .)
-    def prog_id (fmt '' => text => .)
+    def prog_id (fmt '' => serial => .)
     def language (
-        rel .id: lang_id
-        rel .'lang-id': lang_id
+        rel. 'lang-id': lang_id
     )
     def programmer (
-        rel .id: prog_id
-        rel .'name': text
-        rel .'favorite-language': language
+        rel. 'id': prog_id
+        rel* 'name': text
+        rel* 'favorite-language': language
     )
     "
     .compile_then(|test| {
         let [programmer] = test.bind(["programmer"]);
         assert_json_io_matches!(serde_create(&programmer), {
+            "id": "1",
             "name": "audun",
             "favorite-language": { "lang-id": "rust" }
         });
@@ -472,27 +478,27 @@ fn entity_relationship_without_reverse() {
 #[test]
 fn recursive_entity_union() {
     "
-    def animal_id (fmt '' => 'animal/' => text => .)
-    def plant_id (fmt '' => 'plant/' => text => .)
+    def animal_id (fmt '' => 'animal/' => serial => .)
+    def plant_id (fmt '' => 'plant/' => serial => .)
     def owner_id (fmt '' => text => .)
 
     def lifeform ()
     def animal (
-        rel .id: animal_id
-        rel .'class': 'animal'
-        rel .'eats': {lifeform}
+        rel. 'id'[rel* gen: auto]: animal_id
+        rel* 'class': 'animal'
+        rel* 'eats': {lifeform}
     )
     def plant (
-        rel .id: plant_id
-        rel .'class': 'plant'
+        rel. 'id'[rel* gen: auto]: plant_id
+        rel* 'class': 'plant'
     )
-    rel lifeform is?: animal
-    rel lifeform is?: plant
+    rel {lifeform} is?: animal
+    rel {lifeform} is?: plant
 
     def owner (
-        rel .id: owner_id
-        rel .'name': text
-        rel .'owns': {lifeform}
+        rel. 'id': owner_id
+        rel* 'name': text
+        rel* 'owns': {lifeform}
     )
     "
     .compile_then(|test| {
@@ -511,7 +517,7 @@ fn recursive_entity_union() {
 fn serial_gen_auto() {
     "
     def foo (
-        rel .'id'[rel .gen: auto]|id: (fmt '' => 'prefix/' => serial => .)
+        rel. 'id'[rel* gen: auto]: (fmt '' => 'prefix/' => serial => .)
     )
     "
     .compile();
@@ -521,11 +527,11 @@ fn serial_gen_auto() {
 fn entity_order_ok() {
     "
     def foo (
-        rel .'id'|id: (rel .is: text)
-        rel .'name': text
-        rel .order[
-            rel .0: 'name'
-            rel .direction: descending
+        rel. 'id': (rel* is: text)
+        rel* 'name': text
+        rel* order[
+            rel* 0: 'name'
+            rel* direction: descending
         ]: by_name
     )
     sym { by_name }
@@ -537,18 +543,18 @@ fn entity_order_ok() {
 fn store_key_in_def_info() {
     "
     def foobar_edge (
-        rel .store_key: 'fubar'
+        rel* store_key: 'fubar'
     )
 
     def foo (
-        rel .'id'|id: (rel .is: text)
-        rel .store_key: 'fu'
-        rel .'bar'[rel .is: foobar_edge]: bar
+        rel. 'id': (rel* is: text)
+        rel* store_key: 'fu'
+        rel* 'bar'[rel* is: foobar_edge]: bar
     )
 
     def bar (
-        rel .'id'|id: (rel .is: text)
-        rel .'foo'[rel .store_key: 'baaah']: bar
+        rel. 'id': (rel* is: text)
+        rel* 'foo'[rel* store_key: 'baaah']: bar
     )
     "
     .compile_then(|test| {
@@ -683,9 +689,19 @@ fn edge_entity_union() {
     }
 
     {
-        let mut link_relationships = link.def.edge_relationships();
-        let (_, from, from_proj) = link_relationships.next().unwrap();
-        let (_, to, to_proj) = link_relationships.next().unwrap();
+        let (_, from, from_proj) = link
+            .def
+            .edge_relationships()
+            .find(|(_, rel, _)| &ontology[rel.name] == "from")
+            .unwrap();
+        let (_, to, to_proj) = link
+            .def
+            .edge_relationships()
+            .find(|(_, rel, _)| &ontology[rel.name] == "to")
+            .unwrap();
+
+        assert_eq!(&ontology[from.name], "from");
+        assert_eq!(&ontology[to.name], "to");
 
         let from_target_variants = ontology.union_variants(from.target.def_id());
         assert_eq!(&[foo_id.def_id(), bar_id.def_id()], from_target_variants);

@@ -8,10 +8,10 @@ use serde_json::json;
 fn test_map_simple() {
     "
     def foo (
-        rel foo 'f': text
+        rel {foo} 'f': text
     )
     def bar (
-        rel bar 'b': text
+        rel {bar} 'b': text
     )
     map(
         foo('f': x),
@@ -35,9 +35,9 @@ fn test_map_simple() {
 #[test]
 fn test_map_value_to_primitive() {
     "
-    def string (rel.is: text)
-    def foo (rel .'a': string)
-    def bar (rel .'b': text)
+    def string (rel* is: text)
+    def foo (rel* 'a': string)
+    def bar (rel* 'b': text)
     map(
         foo('a': x),
         bar('b': x),
@@ -60,8 +60,8 @@ fn test_map_value_to_primitive() {
 #[test]
 fn test_meters() {
     "
-    def meters (rel .is: i64)
-    def millimeters (rel .is: i64)
+    def meters (rel* is: i64)
+    def millimeters (rel* is: i64)
     map(
         millimeters(m * 1000),
         meters(m),
@@ -78,8 +78,8 @@ fn test_meters() {
 #[test]
 fn test_temperature() {
     "
-    def celsius (rel .is: f64)
-    def fahrenheit (rel .is: f64)
+    def celsius (rel* is: f64)
+    def fahrenheit (rel* is: f64)
     map(
         fahrenheit(c * 9 / 5 + 32),
         celsius(c),
@@ -104,24 +104,24 @@ fn test_temperature() {
 #[test]
 fn test_nested_optional_attribute() {
     "
-    def seconds (rel .is: i64)
-    def years (rel .is: i64)
+    def seconds (rel* is: i64)
+    def years (rel* is: i64)
 
     map(
         seconds(y * 60 * 60 * 24 * 365),
         years(y)
     )
 
-    def person (rel .'age'?: years)
-    def creature (rel .'age'?: seconds)
+    def person (rel* 'age'?: years)
+    def creature (rel* 'age'?: seconds)
 
     map(
         person('age'?: a),
         creature('age'?: a),
     )
 
-    def person_container (rel .'person'?: person)
-    def creature_container (rel .'creature'?: creature)
+    def person_container (rel* 'person'?: person)
+    def creature_container (rel* 'creature'?: creature)
 
     map(
         person_container(
@@ -165,8 +165,8 @@ fn test_nested_optional_attribute() {
 #[test]
 fn test_map_value_to_struct_no_func() {
     "
-    def one (rel .is: text)
-    def two (rel .'a': text)
+    def one (rel* is: text)
+    def two (rel* 'a': text)
     map(
         one(x),
         two('a': x)
@@ -183,8 +183,8 @@ fn test_map_value_to_struct_no_func() {
 #[test]
 fn test_map_value_to_struct_func() {
     "
-    def one (rel .is: i64)
-    def two (rel .'a': i64)
+    def one (rel* is: i64)
+    def two (rel* 'a': i64)
     map(
         one(x),
         two('a': x * 2),
@@ -203,7 +203,7 @@ fn test_map_into_default_field_using_default_value() {
     "
     def empty ()
     def target (
-        rel .'field'[rel .default := 'Default!']: text
+        rel* 'field'[rel* default := 'Default!']: text
     )
     map(
         empty(),
@@ -228,10 +228,10 @@ fn test_map_into_default_field_using_default_value() {
 fn test_map_into_default_field_using_provided_value() {
     "
     def required (
-        rel .'field': text
+        rel* 'field': text
     )
     def target (
-        rel .'field'[rel .default := 'Default!']: text
+        rel* 'field'[rel* default := 'Default!']: text
     )
     map(
         required('field': val),
@@ -257,7 +257,7 @@ fn test_map_into_default_field_using_map_provided() {
     "
     def empty ()
     def target (
-        rel .'field'[rel .default := 'Default!']: text
+        rel* 'field'[rel* default := 'Default!']: text
     )
     map(
         empty(),
@@ -282,25 +282,25 @@ fn test_map_into_default_field_using_map_provided() {
 fn test_deep_structural_map() {
     "
     def foo (
-        rel .'a': text
+        rel* 'a': text
     )
     def foo_inner (
-        rel .'b': text
-        rel .'c': text
+        rel* 'b': text
+        rel* 'c': text
     )
     def foo (
-        rel .'inner': foo_inner
+        rel* 'inner': foo_inner
     )
 
     def bar_inner ()
     def bar (
-        rel .'a': text
-        rel .'b': text
-        rel .'inner': bar_inner
+        rel* 'a': text
+        rel* 'b': text
+        rel* 'inner': bar_inner
     )
 
     def bar_inner (
-        rel .'c': text
+        rel* 'c': text
     )
 
     map(
@@ -333,10 +333,10 @@ fn test_deep_structural_map() {
 fn test_map_matching_sequence() {
     "
     def foo (
-        rel .'a': {i64}
+        rel* 'a': {i64}
     )
     def bar (
-        rel .'b': {i64}
+        rel* 'b': {i64}
     )
     map(
         foo(
@@ -357,10 +357,10 @@ fn test_map_matching_sequence() {
 
 // map call inside sequence
 const MAP_IN_SEQUENCE: &str = "
-def foo (rel .'f': text)
-def bar (rel .'b': text)
-def foos (rel .'foos': {foo})
-def bars (rel .'bars': {bar})
+def foo (rel* 'f': text)
+def bar (rel* 'b': text)
+def foos (rel* 'foos': {foo})
+def bars (rel* 'bars': {bar})
 
 map(
     foos('foos': {..x}),
@@ -420,20 +420,20 @@ fn test_map_in_sequence_item_many() {
 #[test]
 fn test_sequence_cross_parallel() {
     "
-    def foo (rel .'f': text)
-    def bar (rel .'b': text)
+    def foo (rel* 'f': text)
+    def bar (rel* 'b': text)
     map(
         foo('f': x),
         bar('b': x),
     )
 
     def foos (
-        rel .'f1': {foo}
-        rel .'f2': {foo}
+        rel* 'f1': {foo}
+        rel* 'f2': {foo}
     )
     def bars (
-        rel .'b1': {bar}
-        rel .'b2': {bar}
+        rel* 'b1': {bar}
+        rel* 'b2': {bar}
     )
     map(
         foos(
@@ -458,28 +458,28 @@ fn test_sequence_cross_parallel() {
 #[test]
 fn test_sequence_inner_loop() {
     "
-    def foo (rel .'P': text)
-    def bar (rel .'Q': text)
+    def foo (rel* 'P': text)
+    def bar (rel* 'Q': text)
     map(
         foo('P': x),
         bar('Q': x),
     )
 
     def f0(
-        rel .'a': {foo}
-        rel .'b': {foo}
+        rel* 'a': {foo}
+        rel* 'b': {foo}
     )
     def f1(
-        rel .'a': {f0}
-        rel .'b': {f0}
+        rel* 'a': {f0}
+        rel* 'b': {f0}
     )
     def b0(
-        rel .'a': {bar}
-        rel .'b': {bar}
+        rel* 'a': {bar}
+        rel* 'b': {bar}
     )
     def b1(
-        rel .'a': {b0}
-        rel .'b': {b0}
+        rel* 'a': {b0}
+        rel* 'b': {b0}
     )
     map(
         f1(
@@ -517,16 +517,16 @@ fn test_sequence_inner_loop() {
 fn test_sequence_flat_map1() {
     "
     def foo (
-        rel .'a': text
+        rel* 'a': text
 
         def foo_inner (
-            rel .'b': text
+            rel* 'b': text
         )
-        rel .'inner': {foo_inner}
+        rel* 'inner': {foo_inner}
     )
     def bar (
-        rel .'a': text
-        rel .'b': text
+        rel* 'a': text
+        rel* 'b': text
     )
 
     map(
@@ -558,11 +558,11 @@ fn test_sequence_flat_map1() {
 fn test_sequence_composer_no_iteration() {
     "
     def foo (
-        rel .'a': i64
-        rel .'b': i64
+        rel* 'a': i64
+        rel* 'b': i64
     )
     def bar (
-        rel .'ab': {i64}
+        rel* 'ab': {i64}
     )
 
     map(
@@ -591,12 +591,12 @@ fn test_sequence_composer_no_iteration() {
 fn test_sequence_composer_with_iteration() {
     "
     def foo (
-        rel .'a': i64
-        rel .'b': {i64}
-        rel .'c': i64
+        rel* 'a': i64
+        rel* 'b': {i64}
+        rel* 'c': i64
     )
     def bar (
-        rel .'abc': {i64}
+        rel* 'abc': {i64}
     )
 
     map(
@@ -633,14 +633,14 @@ fn test_map_complex_flow() {
     // For example, when two `:x`es flow into one property, we can choose the first one.
     "
     def one (
-        rel .'a': text
-        rel .'b': text
+        rel* 'a': text
+        rel* 'b': text
     )
     def two (
-        rel .'a': text
-        rel .'b': text
-        rel .'c': text
-        rel .'d': text
+        rel* 'a': text
+        rel* 'b': text
+        rel* 'c': text
+        rel* 'd': text
     )
 
     map(
@@ -673,8 +673,8 @@ fn test_map_delegation() {
             "
             use 'SI' as SI
 
-            def car (rel .'length': SI.meters)
-            def vehicle (rel .'length': SI.millimeters)
+            def car (rel* 'length': SI.meters)
+            def vehicle (rel* 'length': SI.millimeters)
 
             map(
                 car('length': l),
@@ -685,8 +685,8 @@ fn test_map_delegation() {
         (
             src_name("SI"),
             "
-            def meters (rel .is: f64)
-            def millimeters (rel .is: f64)
+            def meters (rel* is: f64)
+            def millimeters (rel* is: f64)
 
             map(
                 millimeters(m * 1000),
@@ -719,16 +719,16 @@ fn test_map_abstract_scalar_repr_templating() {
             use 'SI' as SI
 
             def vehicle (
-                rel .'l': length
-                rel .'h': height
+                rel* 'l': length
+                rel* 'h': height
             )
             def length (
-                rel .is: SI.millimeters
-                rel .is: f64
+                rel* is: SI.millimeters
+                rel* is: f64
             )
             def height (
-                rel .is: SI.millimeters
-                rel .is: i64
+                rel* is: SI.millimeters
+                rel* is: i64
             )
 
             map(
@@ -743,24 +743,24 @@ fn test_map_abstract_scalar_repr_templating() {
             use 'SI' as SI
 
             def car (
-                rel .'l': length
-                rel .'h': height
+                rel* 'l': length
+                rel* 'h': height
             )
             def length (
-                rel .is: SI.meters
-                rel .is: f64
+                rel* is: SI.meters
+                rel* is: f64
             )
             def height (
-                rel .is: SI.meters
-                rel .is: i64
+                rel* is: SI.meters
+                rel* is: i64
             )
             ",
         ),
         (
             src_name("SI"),
             "
-            def meters (rel .is: number)
-            def millimeters (rel .is: number)
+            def meters (rel* is: number)
+            def millimeters (rel* is: number)
 
             map @abstract(
                 millimeters(m * 1000),
@@ -793,11 +793,11 @@ fn test_map_abstract_scalar_trivial() {
             use 'SI' as SI
 
             def vehicle (
-                rel .'l': length
+                rel* 'l': length
             )
             def length (
-                rel .is: SI.millimeters
-                rel .is: f64
+                rel* is: SI.millimeters
+                rel* is: f64
             )
 
             map(
@@ -812,19 +812,19 @@ fn test_map_abstract_scalar_trivial() {
             use 'SI' as SI
 
             def car (
-                rel .'l': length
+                rel* 'l': length
             )
             def length (
-                rel .is: SI.millimeters
-                rel .is: f64
+                rel* is: SI.millimeters
+                rel* is: f64
             )
             ",
         ),
         (
             src_name("SI"),
             "
-            def meters (rel .is: number)
-            def millimeters (rel .is: number)
+            def meters (rel* is: number)
+            def millimeters (rel* is: number)
 
             map @abstract(
                 millimeters(m * 1000),
@@ -856,12 +856,12 @@ fn test_map_abstract_scalar_trivial() {
 fn test_map_dependent_scoping() {
     "
     def one (
-        rel .'total_weight': i64
-        rel .'net_weight': i64
+        rel* 'total_weight': i64
+        rel* 'net_weight': i64
     )
     def two (
-        rel .'net_weight': i64
-        rel .'container_weight': i64
+        rel* 'net_weight': i64
+        rel* 'container_weight': i64
     )
 
     map(
@@ -895,17 +895,17 @@ fn test_seq_scope_escape1() {
     def foo ()
 
     def bar (
-        rel .'foo': foo
-        rel .'p1': {text}
+        rel* 'foo': foo
+        rel* 'p1': {text}
     )
 
     def baz (
-        rel .'foo': foo
-        rel .'p1': {text}
+        rel* 'foo': foo
+        rel* 'p1': {text}
     )
 
     def qux (
-        rel .'baz': baz
+        rel* 'baz': baz
     )
 
     map(
@@ -934,21 +934,21 @@ fn test_seq_scope_escape1() {
 fn test_seq_scope_escape2() {
     "
     def foo (
-        rel .'p0': {text}
+        rel* 'p0': {text}
     )
 
     def bar (
-        rel .'foo': foo
-        rel .'p1': {text}
+        rel* 'foo': foo
+        rel* 'p1': {text}
     )
 
     def baz (
-        rel .'foo': foo
-        rel .'p1': {text}
+        rel* 'foo': foo
+        rel* 'p1': {text}
     )
 
     def qux (
-        rel .'baz': baz
+        rel* 'baz': baz
     )
 
     map(
@@ -980,8 +980,8 @@ fn test_seq_scope_escape2() {
 #[test]
 fn test_map_open_data_on_root_struct() {
     "
-    def @open foo (rel .'p0': {text})
-    def @open bar (rel .'p1': {text})
+    def @open foo (rel* 'p0': {text})
+    def @open bar (rel* 'p1': {text})
 
     map(
         foo('p0': {..x}),
@@ -1004,8 +1004,8 @@ fn test_map_open_data_on_root_struct() {
 #[test]
 fn test_map_spread_concat() {
     "
-    def foo (rel .'p0': {text} rel .'p1': {text})
-    def bar (rel .'p2': {text})
+    def foo (rel* 'p0': {text} rel* 'p1': {text})
+    def bar (rel* 'p2': {text})
 
     map(
         @match foo(
@@ -1048,20 +1048,20 @@ fn test_map_symbol_auto_union() {
     "
     sym { a, b }
     def ab (
-        rel .is?: a
-        rel .is?: b
+        rel* is?: a
+        rel* is?: b
     )
 
     sym { x, y }
     def xy (
-        rel .is?: x
-        rel .is?: y
+        rel* is?: x
+        rel* is?: y
     )
 
     sym { f, g }
     def fg (
-        rel .is?: f
-        rel .is?: g
+        rel* is?: f
+        rel* is?: g
     )
 
     map(a(), x())
@@ -1085,15 +1085,15 @@ fn test_auto_union_forced_surjection() {
     "
     sym { a, b, c }
     def abc (
-        rel .is?: a
-        rel .is?: b
-        rel .is?: c
+        rel* is?: a
+        rel* is?: b
+        rel* is?: c
     )
 
     sym { x, y }
     def xy (
-        rel .is?: x
-        rel .is?: y
+        rel* is?: x
+        rel* is?: y
     )
 
     // abc maps to xy, but not vice versa:

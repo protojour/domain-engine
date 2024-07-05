@@ -1,6 +1,6 @@
 def foo ()
 def bar ()
 def u (
-    rel .is?: foo // ERROR unit type `foo` cannot be part of a union
-    rel .is?: bar // ERROR unit type `bar` cannot be part of a union
+    rel* is?: foo // ERROR unit type `foo` cannot be part of a union
+    rel* is?: bar // ERROR unit type `bar` cannot be part of a union
 )

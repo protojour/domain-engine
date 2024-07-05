@@ -1,14 +1,14 @@
 def a (
-    rel .max: 20 // NOTE defined here
+    rel* max: 20 // NOTE defined here
 )
 def b (
-    rel .max: 10 // NOTE defined here
+    rel* max: 10 // NOTE defined here
 )
 def c (
-    rel .max: 5 // NOTE defined here
+    rel* max: 5 // NOTE defined here
 )
 def d ( // ERROR duplicate type param `max`
-    rel .is: a
-    rel .is: b
-    rel .is: c
+    rel* is: a
+    rel* is: b
+    rel* is: c
 )

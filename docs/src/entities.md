@@ -4,7 +4,7 @@ A simple `def` just defines a type or data structure:
 
 ```ontol
 def book (
-    rel .'title': text
+    rel* 'title': text
 )
 ```
 
@@ -12,33 +12,34 @@ There is no way to adress a specific instance of a `book`. In reality, several d
 
 ```ontol
 def book (
-    rel .'id'|id: (rel .is: serial)
-    rel .'title': text
+    rel. 'id': (rel* is: serial)
+    rel* 'title': text
 )
 ```
 
 An instance of `book` is now an ***entity***.
 
-The value of the [`'id'|id`](relation_types.md#id) property is required to be unique, and _identifies_ a unique `book`.
+The subject type of the `'id'` relationship is `.`, which is the _unit_-quantified form of the current definition.
+The relationship means that values of the anonymous type (that `is` serial) identifies one _unique book_.
 
-Notice how we do not say `rel .'id'|id: serial`. The base type [`serial`](primitives.md#serial) is used for all sorts of ids, not just book-identifiers. Thus, `serial` itself cannot identify a book, but an anonymous type that inherits from it, `is: serial` can.
+Notice how we do not say `rel. 'id': serial`. The base type [`serial`](primitives.md#serial) is used for all sorts of ids, not just book-identifiers. Thus, `serial` itself cannot identify a book, but an anonymous type that inherits from it, `is: serial` can.
 
 It may be wise to give your id types names, as they often need to be referred to in [interfaces](interfaces.md):
 
 ```ontol
-def book_id (rel .is: serial)
+def book_id (rel* is: serial)
 ```
 
 Relationships between types and entities are different:
 
 ```ontol
 def book (
-    rel .'title': text
-    rel .'author': author
+    rel* 'title': text
+    rel* 'author': author
 )
 
 def author (
-    rel .'name': text
+    rel* 'name': text
 )
 ```
 
@@ -46,13 +47,13 @@ Here, the structure of `author` becomes part of the tree-structure `book`, which
 
 ```ontol
 def book (
-    rel .'id'|id: book_id
-    rel .'title': text
+    rel. 'id': book_id
+    rel* 'title': text
 )
 
 def author (
-    rel .'id'|id: author_id
-    rel .'name': text
+    rel. 'id': author_id
+    rel* 'name': text
 )
 
 rel {book} 'author': author

@@ -1,28 +1,28 @@
 
 def Repository (
-    rel .'id'[rel .gen: auto]|id: (rel .is: uuid)
-    rel .'handle': text
-    rel {.}'owner'::'repositories'? RepositoryOwner
-    rel .'origin'?: .
+    rel. 'id'[rel* gen: auto]: (rel* is: uuid)
+    rel* 'handle': text
+    rel* 'owner'::'repositories'? RepositoryOwner
+    rel* 'origin'?: .
 )
 
 def RepositoryOwner (
-    rel .is?: User
-    rel .is?: Organization
+    rel* is?: User
+    rel* is?: Organization
 )
 
 def User (
-    rel .'id'|id: (fmt '' => 'user/' => text => .)
-    rel .'email': text
+    rel. 'id': (fmt '' => 'user/' => text => .)
+    rel* 'email': text
 )
 
 def Organization (
-    rel .'id'|id: (fmt '' => 'org/' => text => .)
-    rel {.}'members'[rel .is: OrganizationMember]::'member_of' {User}
+    rel. 'id': (fmt '' => 'org/' => text => .)
+    rel* 'members'[rel. is: OrganizationMember]::'member_of' {User}
 )
 
 def OrganizationMember (
-    rel .'role': text
+    rel* 'role': text
 )
 
 map users(

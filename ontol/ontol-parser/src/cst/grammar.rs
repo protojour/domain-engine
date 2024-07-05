@@ -18,7 +18,7 @@ enum Delimiter {
 bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
     struct TypeAccept: u8 {
-        const DOT       = 0b00000001;
+        const THIS      = 0b00000001;
         const ANONYMOUS = 0b00000010;
         const INT_RANGE = 0b00000100;
         const UNION     = 0b00001000;
@@ -210,7 +210,7 @@ mod rel {
         p.eat_trivia();
         rel_type_reference(
             p,
-            TypeAccept::DOT | TypeAccept::ANONYMOUS | TypeAccept::INT_RANGE,
+            TypeAccept::THIS | TypeAccept::ANONYMOUS | TypeAccept::INT_RANGE,
         );
 
         if p.at() == K!['['] {
@@ -326,9 +326,14 @@ fn type_ref_inner(p: &mut CstParser, accept: TypeAccept, label: &'static str) {
                 p.eat(K![')']);
                 p.end(def_body);
             }
-            K![.] if accept.contains(TypeAccept::DOT) => {
-                let this = p.start(Kind::This);
+            K![.] if accept.contains(TypeAccept::THIS) => {
+                let this = p.start(Kind::ThisUnit);
                 p.eat(K![.]);
+                p.end(this);
+            }
+            K![*] if accept.contains(TypeAccept::THIS) => {
+                let this = p.start(Kind::ThisSet);
+                p.eat(K![*]);
                 p.end(this);
             }
             _ => {
@@ -357,7 +362,7 @@ fn fmt_statement(p: &mut CstParser) {
 
     loop {
         let type_ref = p.start(Kind::TypeQuantUnit);
-        type_ref_inner(p, TypeAccept::DOT | TypeAccept::ANONYMOUS, "type");
+        type_ref_inner(p, TypeAccept::THIS | TypeAccept::ANONYMOUS, "type");
         p.end(type_ref);
 
         if p.at() == Kind::FatArrow {

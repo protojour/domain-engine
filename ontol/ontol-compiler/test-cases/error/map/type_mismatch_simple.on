@@ -1,7 +1,7 @@
 def foo ()
 def bar ()
-rel foo 'prop': text
-rel bar 'prop': i64
+rel {foo} 'prop': text
+rel {bar} 'prop': i64
 map(
     foo(
         'prop': x

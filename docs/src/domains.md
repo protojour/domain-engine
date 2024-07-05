@@ -10,32 +10,32 @@ Here's a simple example domain:
 use 'world' as world
 
 def book (
-    rel .'id'|id: (rel .is: serial)
-    rel .'title': text
-    rel .'editions': {edition}
-    rel {.} 'author': {author}
+    rel. 'id': (rel* is: serial)
+    rel* 'title': text
+    rel* 'editions': {edition}
+    rel* 'author': {author}
 )
 
 def author (
-    rel .'id'|id: (rel .is: serial)
-    rel .'name': text
-    rel .'nationality': world.country
-    rel .'born': datetime
-    rel .'died'?: datetime
+    rel. 'id': (rel* is: serial)
+    rel* 'name': text
+    rel* 'nationality': world.country
+    rel* 'born': datetime
+    rel* 'died'?: datetime
 )
 
 def edition (
-    rel .'id'|id: (rel .is: serial)
-    rel .'publisher': publisher
-    rel .'published': datetime
-    rel .'isbn': text
-    rel .'pages': i64
+    rel. 'id': (rel* is: serial)
+    rel* 'publisher': publisher
+    rel* 'published': datetime
+    rel* 'isbn': text
+    rel* 'pages': i64
 )
 
 def publisher (
-    rel .'id'|id: (rel .is: serial)
-    rel .'name': text
-    rel .'headquarters': world.city
+    rel. 'id': (rel* is: serial)
+    rel* 'name': text
+    rel* 'headquarters': world.city
 )
 ```
 

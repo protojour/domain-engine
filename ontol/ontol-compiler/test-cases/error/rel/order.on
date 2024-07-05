@@ -1,36 +1,36 @@
 def struct (
-    rel . // ERROR relation subject must be an entity
+    rel* // ERROR relation subject must be an entity
         order[]: text
 )
 
 def entity (
-    rel .'id'|id: (rel .is: text)
-    rel .'field': text
+    rel. 'id': (rel* is: text)
+    rel* 'field': text
 
-    rel .order[
+    rel* order[
     ]: by_text_bug // ERROR order identifier must be a symbol in this domain
 
-    rel .order[
+    rel* order[
     ]: ontol.ascending // ERROR order identifier must be a symbol in this domain
 
-    rel .order[
+    rel* order[
     ]: 'by_text' // ERROR order identifier must be a symbol in this domain
 
-    rel .order[
+    rel* order[
     ]: 42 // ERROR order identifier must be a symbol in this domain
 
-    rel .order[ // ERROR order tuple parameters expected
+    rel* order[ // ERROR order tuple parameters expected
     ]: by_text
 
-    rel .order[
-        rel .0: 'missing' // ERROR TODO: no such field: `missing`
+    rel* order[
+        rel* 0: 'missing' // ERROR TODO: no such field: `missing`
     ]: by_text
 
-    rel .order[
-        rel .0: 'field'
-        rel .direction: 'ASC' // ERROR TODO: invalid direction
+    rel* order[
+        rel* 0: 'field'
+        rel* direction: 'ASC' // ERROR TODO: invalid direction
     ]: by_text
 )
 
-def by_text_bug (rel .is: text)
+def by_text_bug (rel* is: text)
 sym { by_text }

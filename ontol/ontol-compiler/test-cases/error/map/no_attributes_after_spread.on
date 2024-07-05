@@ -1,5 +1,5 @@
-def foo (rel .'a': i64)
-def bar (rel .'a': i64)
+def foo (rel* 'a': i64)
+def bar (rel* 'a': i64)
 map(
     foo(..rest,
         'a': x // ERROR spread label must be the last argument

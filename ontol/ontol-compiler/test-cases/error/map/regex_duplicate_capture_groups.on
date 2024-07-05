@@ -1,4 +1,4 @@
-def a (rel .'a': text)
+def a (rel* 'a': text)
 def b ()
 map(
     a(

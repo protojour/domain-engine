@@ -92,8 +92,8 @@ fn test_text_pattern_constructor_union() {
         fmt '' => 'bar/' => uuid => .
     )
     def foobar (
-        rel .is?: foo
-        rel .is?: bar
+        rel* is?: foo
+        rel* is?: bar
     )
     "
     .compile_then(|test| {
@@ -119,7 +119,7 @@ fn test_text_pattern_constructor_union() {
 fn test_regex_property() {
     "
     def foo (
-        rel .'prop': /abc*/
+        rel* 'prop': /abc*/
     )
     "
     .compile_then(|test| {
@@ -184,7 +184,7 @@ fn test_text_patterns() {
 fn regex_named_group_as_relation() {
     "
     def lol (
-        rel .is: /abc(?<named>.)/
+        rel* is: /abc(?<named>.)/
     )
     "
     .compile_then(|_test| {});

@@ -1,4 +1,4 @@
 def u1(
-    rel .is?: 'a'
-    rel .is?: 'a' // ERROR duplicate anonymous relationship
+    rel* is?: 'a'
+    rel* is?: 'a' // ERROR duplicate anonymous relationship
 )

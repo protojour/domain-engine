@@ -1,7 +1,7 @@
 def tup (
-    rel .0..2: i64
+    rel* 0..2: i64
 )
 
 def bar (
-    rel .'tup': tup
+    rel* 'tup': tup
 )

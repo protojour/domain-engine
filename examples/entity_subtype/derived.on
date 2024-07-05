@@ -1,8 +1,8 @@
 use 'db' as db
 
 def bar (
-    rel .'id'|id: (rel .is: text)
-    rel .'name': text
+    rel. 'id': (rel* is: text)
+    rel* 'name': text
 )
 
 map (

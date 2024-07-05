@@ -29,7 +29,7 @@ fn test_serde_empty_type() {
 #[test]
 fn test_serde_type_alias() {
     "
-    def foo ( rel .is: text )
+    def foo ( rel* is: text )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -40,9 +40,9 @@ fn test_serde_type_alias() {
 #[test]
 fn test_serde_booleans() {
     "
-    def f ( rel .is: false )
-    def t ( rel .is: true )
-    def b ( rel .is: boolean )
+    def f ( rel* is: false )
+    def t ( rel* is: true )
+    def b ( rel* is: boolean )
     "
     .compile_then(|test| {
         let [f, t, b] = test.bind(["f", "t", "b"]);
@@ -65,7 +65,7 @@ fn test_serde_booleans() {
 
 #[test]
 fn test_serde_builtin_symbol() {
-    "def foo ( rel .'const': ontol.ascending )".compile_then(|test| {
+    "def foo ( rel* 'const': ontol.ascending )".compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(serde_create(&foo), { "const": "ascending" });
         assert_error_msg!(
@@ -79,7 +79,7 @@ fn test_serde_builtin_symbol() {
 fn test_serde_domain_symbol() {
     "
     sym { abc }
-    def foo ( rel .'const': abc )
+    def foo ( rel* 'const': abc )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -95,7 +95,7 @@ fn test_serde_domain_symbol() {
 fn test_serde_symbolic_relation() {
     "
     sym { prop }
-    def foo(rel .prop: text)
+    def foo(rel* prop: text)
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -108,10 +108,10 @@ fn test_serde_domain_symbol_union() {
     "
     sym { a, b, const }
     def ab (
-        rel .is?: a
-        rel .is?: b
+        rel* is?: a
+        rel* is?: b
     )
-    def foo ( rel .const: ab )
+    def foo ( rel. const: ab )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -126,7 +126,7 @@ fn test_serde_domain_symbol_union() {
 #[test]
 fn test_serde_struct_type() {
     "
-    def foo ( rel .'a': text )
+    def foo ( rel* 'a': text )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -138,7 +138,7 @@ fn test_serde_struct_type() {
 fn test_serde_struct_optional_field() {
     "
     def foo (
-        rel .'a'?: text
+        rel* 'a'?: text
     )
     "
     .compile_then(|test| {
@@ -154,9 +154,9 @@ fn test_serde_complex_type() {
     "
     def foo ()
     def bar ()
-    rel foo 'a': text
-    rel foo 'b': bar
-    rel bar 'c': text
+    rel {foo} 'a': text
+    rel {foo} 'b': bar
+    rel {bar} 'c': text
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -168,8 +168,8 @@ fn test_serde_complex_type() {
 fn test_serde_sequence() {
     "
     def t (
-        rel .0: text
-        rel .1: i64
+        rel* 0: text
+        rel* 1: i64
     )
     "
     .compile_then(|test| {
@@ -182,8 +182,8 @@ fn test_serde_sequence() {
 fn test_serde_value_union1() {
     "
     def u (
-        rel .is?: 'a'
-        rel .is?: 'b'
+        rel* is?: 'a'
+        rel* is?: 'b'
     )
     "
     .compile_then(|test| {
@@ -196,12 +196,12 @@ fn test_serde_value_union1() {
 fn test_serde_string_or_unit() {
     "
     def text-or-unit (
-        rel .is?: text
-        rel .is?: ()
+        rel* is?: text
+        rel* is?: ()
     )
 
     def foo (
-        rel .'a': text-or-unit
+        rel* 'a': text-or-unit
     )
     "
     .compile_then(|test| {
@@ -215,16 +215,16 @@ fn test_serde_string_or_unit() {
 fn test_serde_map_union() {
     "
     def foo (
-        rel .'type': 'foo'
-        rel .'c': i64
+        rel* 'type': 'foo'
+        rel* 'c': i64
     )
     def bar (
-        rel .'type': 'bar'
-        rel .'d': i64
+        rel* 'type': 'bar'
+        rel* 'd': i64
     )
     def u (
-        rel .is?: foo
-        rel .is?: bar
+        rel* is?: foo
+        rel* is?: bar
     )
     "
     .compile_then(|test| {
@@ -238,8 +238,8 @@ fn test_serde_noop_intersection() {
     "
     def bar ()
     def foo (
-        rel .is: bar
-        rel .'foobar': bar
+        rel* is: bar
+        rel* 'foobar': bar
     )
     "
     .compile_then(|test| {
@@ -252,7 +252,7 @@ fn test_serde_noop_intersection() {
 fn test_serde_index_set_cardinality() {
     "
     def foo (
-        rel .'s': {text}
+        rel* 's': {text}
     )
     "
     .compile_then(|test| {
@@ -270,7 +270,7 @@ fn test_serde_index_set_cardinality() {
 fn test_serde_index_list_cardinality() {
     "
     def foo (
-        rel .'s': [text]
+        rel* 's': [text]
     )
     "
     .compile_then(|test| {
@@ -284,10 +284,10 @@ fn test_serde_index_list_cardinality() {
 fn test_serde_infinite_sequence() {
     "
     def foo (
-        rel .  ..2: i64
-        rel . 2..4: text
-        rel . 5..6: i64
-        rel . 6.. : i64
+        rel*  ..2: i64
+        rel* 2..4: text
+        rel* 5..6: i64
+        rel* 6.. : i64
     )
     "
     .compile_then(|test| {
@@ -304,7 +304,7 @@ fn test_serde_infinite_sequence() {
 #[test]
 fn test_serde_uuid() {
     "
-    def my_id ( rel .is: uuid )
+    def my_id ( rel* is: uuid )
     "
     .compile_then(|test| {
         let [my_id] = test.bind(["my_id"]);
@@ -327,7 +327,7 @@ fn test_serde_uuid() {
 #[test]
 fn test_serde_datetime() {
     "
-    def my_dt ( rel .is: datetime )
+    def my_dt ( rel* is: datetime )
     "
     .compile_then(|test| {
         let [my_dt] = test.bind(["my_dt"]);
@@ -354,7 +354,7 @@ fn test_serde_datetime() {
 fn test_integer_default() {
     "
     def foo (
-        rel .'bar'[rel .default := 42]: i64
+        rel* 'bar'[rel* default := 42]: i64
     )
     "
     .compile_then(|test| {
@@ -368,7 +368,7 @@ fn test_integer_default() {
 fn test_boolean_default() {
     "
     def foo (
-        rel .'active'[rel .default := true]: boolean
+        rel* 'active'[rel* default := true]: boolean
     )
     "
     .compile_then(|test| {
@@ -382,9 +382,9 @@ fn test_boolean_default() {
 fn test_i64_range_constrained() {
     "
     def percentage (
-        rel .is: i64
-        rel .min: 0
-        rel .max: 100
+        rel* is: i64
+        rel* min: 0
+        rel* max: 100
     )
     "
     .compile_then(|test| {
@@ -402,9 +402,9 @@ fn test_i64_range_constrained() {
 fn test_integer_range_constrained() {
     "
     def foo (
-        rel .is: integer
-        rel .min: -1
-        rel .max: 1
+        rel* is: integer
+        rel* min: -1
+        rel* max: 1
     )
     "
     .compile_then(|test| {
@@ -422,9 +422,9 @@ fn test_integer_range_constrained() {
 fn test_f64_range_constrained() {
     "
     def fraction (
-        rel .is: f64
-        rel .min: 0
-        rel .max: 1
+        rel* is: f64
+        rel* min: 0
+        rel* max: 1
     )
     "
     .compile_then(|test| {
@@ -444,7 +444,7 @@ fn test_f64_range_constrained() {
 fn test_float_default() {
     "
     def foo (
-        rel .'bar'[rel .default := 42]: f64
+        rel* 'bar'[rel* default := 42]: f64
     )
     "
     .compile_then(|test| {
@@ -458,7 +458,7 @@ fn test_float_default() {
 fn test_string_default() {
     "
     def foo (
-        rel .'bar'[rel .default := 'baz']: text
+        rel* 'bar'[rel* default := 'baz']: text
     )
     "
     .compile_then(|test| {
@@ -473,8 +473,8 @@ fn test_prop_union() {
     "
     def vec3(
         /// A vector component
-        rel .'x'|'y'|'z': (
-            rel .is: i64
+        rel* 'x'|'y'|'z': (
+            rel* is: i64
         )
     )
     "
@@ -488,9 +488,9 @@ fn test_prop_union() {
 fn union_integers() {
     "
     def level (
-        rel .is?: 1
-        rel .is?: 2
-        rel .is?: 3
+        rel* is?: 1
+        rel* is?: 2
+        rel* is?: 3
     )
     "
     .compile_then(|test| {
@@ -511,24 +511,24 @@ fn test_jsonml() {
     def attributes ()
 
     def element (
-        rel .is?: tag
-        rel .is?: text
+        rel* is?: tag
+        rel* is?: text
     )
 
-    rel tag 0: tag_name
+    rel {tag} 0: tag_name
 
     // BUG: should have default `{}` and serde would skip this if not a map
     // (also in serialization if this equals the default value!)
-    rel tag 1: attributes
+    rel {tag} 1: attributes
 
-    rel tag 2..: element
+    rel {tag} 2..: element
 
-    rel tag_name is?: 'div'
-    rel tag_name is?: 'em'
-    rel tag_name is?: 'strong'
+    rel {tag_name} is?: 'div'
+    rel {tag_name} is?: 'em'
+    rel {tag_name} is?: 'strong'
 
     // BUG: should accept any string as key
-    rel attributes 'class'?: text
+    rel {attributes} 'class'?: text
     "
     .compile_then(|test| {
         let [element] = test.bind(["element"]);
@@ -560,13 +560,13 @@ fn test_serde_with_raw_id_overridde_profile() {
 
     "
     def foo (
-        rel .'prefix_id'|id: (
+        rel. 'prefix_id': (
             fmt '' => 'prefix/' => uuid => .
         )
     )
 
     def bar (
-        rel .'int_id'|id: ( rel .is: i64 )
+        rel. 'int_id': ( rel* is: i64 )
     )
     "
     .compile_then(|test| {
@@ -626,7 +626,7 @@ fn test_serde_with_raw_prefix_text_id_overridde_profile() {
 
     "
     def baz (
-        rel .'prefix_id'|id: (
+        rel. 'prefix_id': (
             fmt '' => 'prefix/' => text => .
         )
     )
@@ -669,7 +669,7 @@ fn test_serde_with_raw_prefix_int_id_overridde_profile() {
 
     "
     def baz (
-        rel .'prefix_id'|id: (
+        rel. 'prefix_id': (
             fmt '' => 'prefix/' => serial => .
         )
     )
@@ -712,16 +712,16 @@ mod serde_raw_dynamic_entity_in_union {
     const ONTOL: &str = "
     def foo_id (fmt '' => 'foo/' => text => .)
     def foo (
-        rel .'id'|id: foo_id
-        rel .'data': text
+        rel. 'id': foo_id
+        rel* 'data': text
     )
     def bar (
-        rel .'id'|id: (fmt '' => 'bar/' => text => .)
-        rel .'data': text
+        rel. 'id': (fmt '' => 'bar/' => text => .)
+        rel* 'data': text
     )
     def foobar (
-        rel .is?: foo
-        rel .is?: bar
+        rel* is?: foo
+        rel* is?: bar
     )
     ";
 
@@ -860,7 +860,7 @@ mod serde_raw_dynamic_entity_in_union {
 fn test_serde_open_properties() {
     "
     def @open foo (
-        rel .'closed': text
+        rel* 'closed': text
     )
     "
     .compile_then(|test| {
@@ -883,7 +883,7 @@ fn test_serde_open_properties() {
 fn test_serde_recursion_limit() {
     "
     def foo (
-        rel .'child': foo
+        rel* 'child': foo
     )
     "
     .compile_then(|test| {
@@ -915,13 +915,13 @@ fn test_serde_recursion_limit() {
 fn test_serialize_raw_tree_only() {
     "
     def bar (
-        rel .'key'|id: ( rel .is: text )
-        rel .'bar_field': text
+        rel. 'key': ( rel* is: text )
+        rel* 'bar_field': text
     )
     def foo (
-        rel .'key'|id: ( rel .is: text )
-        rel .'foo_field': text
-        rel .'bar'?: bar
+        rel. 'key': ( rel* is: text )
+        rel* 'foo_field': text
+        rel* 'bar'?: bar
     )
     "
     .compile_then(|test| {
@@ -992,21 +992,21 @@ fn test_flattened_union1() {
     def @private anonymous ()
 
     def @open foo (
-        rel .'foo': text
-        rel .anonymous: (
-            rel .is?: bar
-            rel .is?: baz
+        rel* 'foo': text
+        rel. anonymous: (
+            rel* is?: bar
+            rel* is?: baz
         )
     )
 
     def bar (
-        rel .'kind': 'bar'
-        rel .'bar': text
+        rel* 'kind': 'bar'
+        rel* 'bar': text
     )
     def baz (
-        rel .'kind': 'baz'
-        rel .'baz0': text
-        rel .'baz1': text
+        rel* 'kind': 'baz'
+        rel* 'baz0': text
+        rel* 'baz1': text
     )
     "
     .compile_then(|test| {

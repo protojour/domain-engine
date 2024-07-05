@@ -1,7 +1,7 @@
 use 'other' as other
 
 def foo (
-    rel .'bar': 'constant'
+    rel* 'bar': 'constant'
 )
 
 map(
@@ -15,5 +15,5 @@ map(
 
 //@ src_name=other
 def foo (
-    rel .'bar'?: 'constant'
+    rel* 'bar'?: 'constant'
 )

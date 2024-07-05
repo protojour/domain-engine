@@ -28,8 +28,8 @@ async fn test_default_mapping_error() {
             use 'events_db' as db
 
             def event (
-                rel .'_id'[rel .gen: auto]|id: (rel .is: serial)
-                rel .'level'[rel .default := 1]: i64
+                rel. '_id'[rel* gen: auto]: (rel* is: serial)
+                rel* 'level'[rel* default := 1]: i64
             )
 
             map(
@@ -53,8 +53,8 @@ async fn test_default_mapping_error() {
             src_name("events_db"),
             "
             def event (
-                rel .'_id'[rel .gen: auto]|id: (rel .is: serial)
-                rel .'level'[rel .default := 1]: i64
+                rel. '_id'[rel* gen: auto]: (rel* is: serial)
+                rel* 'level'[rel* default := 1]: i64
             )
             ",
         ),

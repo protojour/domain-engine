@@ -14,11 +14,11 @@ The details on how entities are exposed may be subject to change.
 In order to expose entities in an interface, we create named [`map`](map.md) statements called queries:
 
 ```ontol
-def book_id (rel .is: serial)
+def book_id (rel* is: serial)
 
 def Book (
-    rel .'id'|id: book_id
-    rel .'title': text
+    rel. 'id': book_id
+    rel* 'title': text
 )
 
 /// Single `Book` query
@@ -143,22 +143,22 @@ An _ordering_ is a relationship where the subject is an entity, the relation is 
 ```ontol
 def entity ()
 sym { symbol }
-rel entity order[...]: symbol
+rel {entity} order[...]: symbol
 ```
 
 The relation should have tuple relationships referencing one or more field names on the subject, and may have a [`direction`](relation_types.md#direction) relationship to either [`ascending`](primitives.md#ascending) (default) or [`descending`](primitives.md#descending).
 
 ```ontol
-def book_id (rel .is: serial)
+def book_id (rel* is: serial)
 def Book (
-    rel .'id'|id: book_id
-    rel .'title': text
+    rel. 'id': book_id
+    rel* 'title': text
 )
 
 sym { by_title }
 rel Book order[
-    rel .0: 'title'
-    rel .direction: ascending  // default, redundant
+    rel* 0: 'title'
+    rel* direction: ascending  // default, redundant
 ]: by_title
 ```
 
@@ -194,18 +194,18 @@ map books_ordered (
 Memoriam and [`ontool`](ontool.md) both expose a GraphQL interface for every domain. Let's see what is generated from a simple domain like this:
 
 ```ontol
-def book_id (rel .is: serial)
+def book_id (rel* is: serial)
 def Book (
-    rel .'id'[rel .gen: auto]|id: book_id
-    rel .'title': text
-    rel .'author'?: Author
+    rel. 'id'[rel* gen: auto]: book_id
+    rel* 'title': text
+    rel* 'author'?: Author
 )
 
-def author_id (rel .is: serial)
+def author_id (rel* is: serial)
 def Author (
-    rel .'id'[rel .gen: auto]|id: author_id
-    rel .'name': text
-    rel .'books_written'?: {Book}
+    rel. 'id'[rel* gen: auto]|id: author_id
+    rel* 'name': text
+    rel* 'books_written'?: {Book}
 )
 
 map book (

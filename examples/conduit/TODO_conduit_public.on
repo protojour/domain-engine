@@ -1,70 +1,70 @@
 
-def username (rel .is: text)
-def article_slug (rel .is: text)
+def username (rel* is: text)
+def article_slug (rel* is: text)
 
 def User (
-    rel .'email'|id: (rel .is: text)
-    rel .'username': text
-    rel .'bio': text
-    rel .'image'?: text
+    rel. 'email': (rel* is: text)
+    rel* 'username': text
+    rel* 'bio': text
+    rel* 'image'?: text
 )
 
 def Profile (
-    rel .'username'|id: username
-    rel .'bio': text
-    rel .'image'?: text
-    rel .'following': boolean
+    rel. 'username': username
+    rel* 'bio': text
+    rel* 'image'?: text
+    rel* 'following': boolean
 )
 
 def Article (
-    rel .'slug'|id: article_slug
-    rel .'title': text
-    rel .'description': text
-    rel .'body': text
-    rel .'createdAt': datetime
-    rel .'updatedAt': datetime
-    rel .'favorited': boolean
-    rel .'favoritesCount': i64
-    rel .'author': Profile
+    rel. 'slug': article_slug
+    rel* 'title': text
+    rel* 'description': text
+    rel* 'body': text
+    rel* 'createdAt': datetime
+    rel* 'updatedAt': datetime
+    rel* 'favorited': boolean
+    rel* 'favoritesCount': i64
+    rel* 'author': Profile
 )
 
 def Comment (
-    rel .'id'|id: (rel .is: i64)
-    rel .'createdAt': datetime
-    rel .'updatedAt': datetime
-    rel .'body': text
-    rel .'author': Profile
+    rel. 'id': (rel* is: i64)
+    rel* 'createdAt': datetime
+    rel* 'updatedAt': datetime
+    rel* 'body': text
+    rel* 'author': Profile
 )
 
 def SingleArticle (
-    rel .'article': Article
+    rel* 'article': Article
 )
 
 def MultipleArticles (
-    rel .'articles': {Article}
-    rel .'articlesCount': i64
+    rel* 'articles': {Article}
+    rel* 'articlesCount': i64
 )
 
 def SingleComment (
-    rel .'comment': Comment
+    rel* 'comment': Comment
 )
 
 def MultipleComments (
-    rel .'comments': {Comment}
+    rel* 'comments': {Comment}
 )
 
 def Tags (
-    rel .'tags': {text}
+    rel* 'tags': {text}
 )
 
 def ArticleFilter (
-    rel .'slug'?: article_slug
+    rel* 'slug'?: article_slug
     // NB: These must be a sets, not lists:
-    rel .'tag'?: {text}
-    rel .'author'?: {username}
-    rel .'favorited'?: {username}
-    rel .'limit'?: i64
-    rel .'offset'?: i64
+    rel* 'tag'?: {text}
+    rel* 'author'?: {username}
+    rel* 'favorited'?: {username}
+    rel* 'limit'?: i64
+    rel* 'offset'?: i64
 )
 
 // endpoint '/api/articles/:slug'

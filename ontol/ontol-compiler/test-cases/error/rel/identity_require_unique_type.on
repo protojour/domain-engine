@@ -1,8 +1,8 @@
-def my_id (rel .is: serial)
+def my_id (rel* is: serial)
 
 def a (
-    rel .'id'|id: my_id
+    rel. 'id': my_id
 )
 def b (
-    rel .'id'|id: my_id // ERROR already identifies a type
+    rel. 'id': my_id // ERROR already identifies a type
 )

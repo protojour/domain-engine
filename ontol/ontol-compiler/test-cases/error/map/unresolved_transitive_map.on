@@ -1,8 +1,8 @@
-def a (rel .is?: i64)
-def b (rel .is?: i64)
+def a (rel* is?: i64)
+def b (rel* is?: i64)
 
-def c (rel .'p0': a)
-def d (rel .'p1': b)
+def c (rel* 'p0': a)
+def d (rel* 'p1': b)
 
 map(
     c(

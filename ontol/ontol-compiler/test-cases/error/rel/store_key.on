@@ -1,4 +1,4 @@
 def foo (
-    rel .'id'|id: (rel .is: text)
-    rel .store_key: 303 // ERROR type mismatch: expected text constant, found `ontol.int(303)`
+    rel. 'id': (rel* is: text)
+    rel* store_key: 303 // ERROR type mismatch: expected text constant, found `ontol.int(303)`
 )

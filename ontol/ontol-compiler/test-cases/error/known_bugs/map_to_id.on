@@ -1,10 +1,13 @@
-// BUG: This should work somehow
+// note: before it was possible to have a "non-inherent id",
+// because all struct properties used the string literal syntax,
+// and an id relationship was marked using the special `ontol.id` relation.
+// This is no longer possible because symbols are now also valid properties.
 
-def key (rel .is: text)
-def ent (rel .id: key)
+def key (rel* is: text)
+def ent (rel. id: key) // ERROR definition not found in this scope
 map(
     key(key),
-    @match ent( // ERROR no properties expected
-        id: key
+    @match ent(
+        id: key // ERROR definition not found in this scope
     )
 )

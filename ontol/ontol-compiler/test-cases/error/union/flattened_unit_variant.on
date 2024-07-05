@@ -5,18 +5,18 @@
 def anonymous ()
 
 def foo (
-    rel .anonymous: ( // ERROR type not representable
-        rel .is?: bar
-        rel .is?: baz
+    rel* anonymous: ( // ERROR type not representable
+        rel* is?: bar
+        rel* is?: baz
     )
 )
 
-def bar (rel .'type': 'bar')
+def bar (rel* 'type': 'bar')
 def baz () // NOTE type cannot be part of a struct union
 
 def foo_inverted (
-    rel .anonymous: (
-        rel .is?: baz // ERROR unit type `baz` cannot be part of a union
-        rel .is?: bar
+    rel* anonymous: (
+        rel* is?: baz // ERROR unit type `baz` cannot be part of a union
+        rel* is?: bar
     )
 )

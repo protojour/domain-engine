@@ -29,8 +29,8 @@ fn test_domain_docs_as_query_docs() {
     domain foo ()
 
     def foo (
-        rel .id: (fmt '' => text => .)
-        rel .'prop': i64
+        rel. 'id': (fmt '' => text => .)
+        rel* 'prop': i64
     )
     "
     .compile_then(|test| {
@@ -50,13 +50,13 @@ fn test_domain_docs_as_query_docs() {
 fn test_graphql_small_range_number_becomes_int() {
     "
     def myint (
-        rel .is: integer
-        rel .min: 0
-        rel .max: 100
+        rel* is: integer
+        rel* min: 0
+        rel* max: 100
     )
     def foo (
-        rel .id: (fmt '' => text => .)
-        rel .'prop': myint
+        rel. 'id': (fmt '' => text => .)
+        rel* 'prop': myint
     )
     "
     .compile_then(|test| {
@@ -76,8 +76,8 @@ fn test_graphql_small_range_number_becomes_int() {
 fn test_graphql_i64_custom_scalar() {
     "
     def foo (
-        rel .id: (fmt '' => text => .)
-        rel .'prop': i64
+        rel. 'id': (fmt '' => text => .)
+        rel* 'prop': i64
     )
     "
     .compile_then(|test| {
@@ -103,8 +103,8 @@ fn test_graphql_i64_custom_scalar() {
 fn test_graphql_default_scalar() {
     "
     def foo (
-        rel .id: (fmt '' => text => .)
-        rel .'default'[rel .default := '']: text
+        rel. 'id': (fmt '' => text => .)
+        rel* 'default'[rel* default := '']: text
     )
     "
     .compile_then(|test| {
@@ -124,8 +124,8 @@ fn test_graphql_default_scalar() {
 fn test_graphql_scalar_array() {
     "
     def foo (
-        rel .id: (fmt '' => text => .)
-        rel .'tags': {text}
+        rel. 'id': (fmt '' => text => .)
+        rel* 'tags': {text}
     )
     "
     .compile_then(|test| {
@@ -150,9 +150,9 @@ fn test_graphql_scalar_array() {
 fn test_graphql_serde_renaming() {
     "
     def foo (
-        rel .id: (fmt '' => text => .)
-        rel .'must-rewrite': text
-        rel .'must_rewrite': text
+        rel. 'id': (fmt '' => text => .)
+        rel* 'must-rewrite': text
+        rel* 'must_rewrite': text
     )
     "
     .compile_then(|test| {
@@ -171,7 +171,7 @@ fn test_graphql_serde_renaming() {
 
         expect_eq!(
             actual = fields.as_slice(),
-            expected = &["must_rewrite", "must_rewrite_", "_edge"]
+            expected = &["id", "must_rewrite", "must_rewrite_", "_edge"]
         );
     });
 }
@@ -180,7 +180,7 @@ fn test_graphql_serde_renaming() {
 fn test_query_map_empty_input_becomes_hidden_arg() {
     "
     def entity (
-        rel .'id'|id: (rel .is: text)
+        rel. 'id': (rel* is: text)
     )
     def empty ()
 
@@ -246,8 +246,8 @@ fn test_imperfect_mapping_mutation() {
             use 'lower' as lower
 
             def upper (
-                rel .'id'|id: (rel .is: text)
-                rel .'x': text
+                rel. 'id': (rel* is: text)
+                rel* 'x': text
             )
 
             map(
@@ -266,9 +266,9 @@ fn test_imperfect_mapping_mutation() {
             src_name("lower"),
             "
             def lower (
-                rel .'id'|id: (rel .is: text)
-                rel .'a': text
-                rel .'b': text
+                rel. 'id': (rel* is: text)
+                rel* 'a': text
+                rel* 'b': text
             )
             ",
         ),
@@ -292,15 +292,15 @@ fn test_imperfect_mapping_mutation() {
 fn incompatible_edge_types_are_distinct() {
     "
     def edge_type (
-        rel .'edge_field': text
+        rel* 'edge_field': text
     )
 
     def source (
-        rel .'id'|id: (rel .is: text)
-        rel .'targets'[rel .is: edge_type]: {target}
+        rel. 'id': (rel* is: text)
+        rel* 'targets'[rel* is: edge_type]: {target}
     )
     def target (
-        rel .'id'|id: (rel .is: text)
+        rel. 'id': (rel* is: text)
     )
 
     map targets (
@@ -375,22 +375,22 @@ fn graphql_flattened_union() {
     def kind ()
 
     def foo (
-        rel .'id'|id: (rel .is: text)
-        rel .kind: (
-            rel .is?: bar
-            rel .is?: qux
+        rel. 'id': (rel* is: text)
+        rel* kind: (
+            rel* is?: bar
+            rel* is?: qux
         )
     )
 
     def bar (
-        rel .'kind': 'bar'
-        rel .'data': text
-        rel .'bar': i64
+        rel* 'kind': 'bar'
+        rel* 'data': text
+        rel* 'bar': i64
     )
     def qux (
-        rel .'kind': 'qux'
-        rel .'data': i64
-        rel .'qux': text
+        rel* 'kind': 'qux'
+        rel* 'data': i64
+        rel* 'qux': text
     )
     "
     .compile_then(|test| {
@@ -427,15 +427,15 @@ fn graphql_flattened_union_pascal_casing() {
     def Kind ()
 
     def Foo (
-        rel .'id'|id: (rel .is: text)
-        rel .Kind: (
-            rel .is?: Bar
-            rel .is?: Qux
+        rel. 'id': (rel* is: text)
+        rel* Kind: (
+            rel* is?: Bar
+            rel* is?: Qux
         )
     )
 
-    def Bar (rel .'kind': 'bar')
-    def Qux (rel .'kind': 'qux')
+    def Bar (rel* 'kind': 'bar')
+    def Qux (rel* 'kind': 'qux')
     "
     .compile_then(|test| {
         let (_schema, schema_test) = schema_test(&test, SrcName::default());

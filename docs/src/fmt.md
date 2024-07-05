@@ -29,7 +29,7 @@ Or, as an [anonymous `def`](def.md#anonymous-defs):
 `fmt` expressions using `serial` or `uuid` as the variable part may also be used with used with [`gen: auto`](generator_types.md#auto), which ensures only the variable part gets generated:
 
 ```ontol
-rel some_def '_id'[rel .gen: auto]|id: (fmt '' => 'prefix/' => uuid => .)
+rel some_def '_id'[rel* gen: auto]: (fmt '' => 'prefix/' => uuid => .)
 ```
 
 
@@ -39,7 +39,7 @@ Regular expressions can be used in a similar way to `fmt` expressions, but are l
 
 ```ontol
 def prefixed_text (
-    rel .is: /prefix--.*/
+    rel* is: /prefix--.*/
 )
 ```
 

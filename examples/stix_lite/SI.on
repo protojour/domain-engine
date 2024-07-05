@@ -3,7 +3,7 @@
 ///
 /// Also not sure wheter to use singular or plural names for units.
 domain SI (
-    rel .version: '0.1.0'
+    rel. version: '0.1.0'
 )
 
 /// The meter (m) is defined by taking the fixed numerical value of the speed of light in vacuum c to be 299,792,458 when expressed in the unit m s−1, where the second is defined in terms of ∆νCs.
@@ -17,17 +17,17 @@ domain SI (
 /// * unit of area is the square meter (m2).
 /// * unit of volume is the cubic meter (m3). The liter (1 cubic decimeter), although not an SI unit, is accepted for use with the SI and is commonly used when measuring fluid volume, but is also used when measuring gases and solids.
 def meter (
-    rel .is: number
+    rel* is: number
 )
 
 /// The millimeter is defined as 1/1000 of a meter.
 def millimeter (
-    rel .is: number
+    rel* is: number
 )
 
 /// The kilometer is defined as 1000 meters.
 def kilometer (
-    rel .is: number
+    rel* is: number
 )
 
 map @abstract(

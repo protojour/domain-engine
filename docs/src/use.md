@@ -12,7 +12,7 @@ Public (non-`@private`) [`def`](def.md)s from the domain `'domain'` are now avai
 
 ```ontol
 def some_def (
-    rel .'domain_def_a': other.def_a
+    rel* 'domain_def_a': other.def_a
 )
 ```
 
@@ -27,7 +27,7 @@ For extending foreign `def`s, use [`is`](relation_types.md#is) relationships:
 use 'foreign_domain' as foreign
 
 def some_def (
-    rel .is: foreign.thing
+    rel* is: foreign.thing
 )
 ```
 

@@ -11,12 +11,12 @@
 /// }
 /// ```
 def string (
-    rel .is: ontol.text
+    rel* is: ontol.text
 )
 
 def spec_version (
-    rel .is?: '2.0'
-    rel .is?: '2.1'
+    rel* is?: '2.0'
+    rel* is?: '2.1'
 )
 
 // placeholder for ONTOL dictionary
@@ -24,7 +24,7 @@ def dictionary ()
 
 // FIXME: should maybe be defined in ONTOL_PKG?
 def url (
-    rel .is: ontol.text
+    rel* is: ontol.text
 )
 
 /// The integer data type represents a whole number. Unless otherwise specified, all integers MUST be capable of being represented as a signed 54-bit value ([-(2**53)+1, (2**53)-1]) as defined in [RFC7493].
@@ -32,33 +32,33 @@ def url (
 ///
 /// In the JSON MTI serialization, integers are represented by the JSON Number type [RFC7493].
 def integer (
-    rel .is: i64
+    rel* is: i64
 )
 
 /// The timestamp type defines how dates and times are represented in STIX.
 ///
 /// The JSON MTI serialization uses the JSON String type [RFC8259] when representing timestamp.
 def timestamp (
-    rel .is: datetime
+    rel* is: datetime
 )
 
 /// The hex data type encodes an array of octets (8-bit bytes) as hexadecimal.
 /// The string MUST consist of an even number of hexadecimal characters, which are the digits '0' through '9' and the lower-case letters 'a' through 'f'.
 /// In order to allow pattern matching on custom objects, for all properties that use the hex type, the property name MUST end with '_hex'.
 def hex (
-    rel .is: /^[0-9a-f]*$/
+    rel* is: /^[0-9a-f]*$/
 )
 
 /// A language code conformant to [RFC5646](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.1js008hntuzu).
 def lang-rfc5646(
-    rel .is: string
+    rel* is: string
 )
 
 /// The `confidence` property identifies the confidence that the creator has in the correctness of their data. The confidence value **MUST** be a number in the range of 0-100.
 def confidence (
-    rel .is: integer
-    rel .min: 0
-    rel .max: 100
+    rel* is: integer
+    rel* min: 0
+    rel* max: 100
 )
 
 /// The `Hashes` type represents one or more cryptographic hashes, as a special set of key/value pairs.
@@ -82,7 +82,7 @@ def confidence (
 /// ```
 def hashes (
     // FIXME: Dictionary support:
-    // rel ./(a-zA-Z0-9-_){3,250}/: string
+    // rel* /(a-zA-Z0-9-_){3,250}/: string
 )
 
 /// External references are used to describe pointers to information represented outside of STIX.
@@ -90,34 +90,34 @@ def hashes (
 /// For example, a Malware object could use an external reference to indicate an ID for that malware in an external database or a report could use references to represent source material.
 def external-reference (
     /// The name of the source that the external-reference is defined within (system, registry, organization, etc.).
-    rel .'source_name': string
+    rel* 'source_name': string
 
     /// A human readable description.
-    rel .'description'?: string
+    rel* 'description'?: string
 
     /// A URL reference to an external resource [[RFC3986](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.vaucl8w7ov0y)].
-    rel .'url'?: url
+    rel* 'url'?: url
 
     /// Specifies a dictionary of hashes for the contents of the **url**. This **SHOULD** be provided when the **url** property is present.
     ///
     /// Dictionary keys **MUST** come from one of the entries listed in the `hash-algorithm-ov` open vocabulary.
     ///
     /// As stated in Section [2.7](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_odoabbtwuxyd), to ensure interoperability, a SHA-256 hash **SHOULD** be included whenever possible.
-    rel .'hashes'?: hashes
+    rel* 'hashes'?: hashes
 
     /// An identifier for the external reference content.
-    rel .'external_id'?: string
+    rel* 'external_id'?: string
 )
 
 /// The `kill-chain-phase` represents a phase in a kill chain, which describes the various phases an attacker may undertake in order to achieve their objectives.
 def kill-chain-phase (
     /// The name of the kill chain.
     /// The value of this property **SHOULD** be all lowercase and **SHOULD** use hyphens instead of spaces or underscores as word separators.
-    rel .'kill_chain_name': string
+    rel* 'kill_chain_name': string
 
     /// The name of the phase in the kill chain.
     /// The value of this property **SHOULD** be all lowercase and **SHOULD** use hyphens instead of spaces or underscores as word separators.
-    rel .'phase_name': string
+    rel* 'phase_name': string
 )
 
 /// The binary data type represents a sequence of bytes. In order to allow pattern matching on custom objects, for all properties that use the binary type, the property name MUST end with '_bin'.
@@ -127,5 +127,5 @@ def kill-chain-phase (
 /// Other serializations SHOULD use a native binary type, if available.
 def binary (
     // FIXME: ONTOL support for binary?
-    rel .is: string
+    rel* is: string
 )

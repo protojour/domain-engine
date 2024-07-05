@@ -4,31 +4,31 @@
 /// Item type enum
 def @private ItemType (
     /// worthless junk
-    rel .is?: 'worthless junk'
+    rel* is?: 'worthless junk'
     /// ancient treasure
-    rel .is?: 'ancient treasure'
+    rel* is?: 'ancient treasure'
     /// alien artifact
-    rel .is?: 'alien artifact'
+    rel* is?: 'alien artifact'
 )
 def @private archive_item (
-    rel .'id'|id: (fmt '' => 'archive_item/' => uuid => .)
-    rel .'created': datetime
-    rel .'updated': datetime
-    rel .'archived': datetime
-    rel .'name': text
-    rel .'description': text
-    rel .'asset_score': i64
-    rel .'type': ItemType
+    rel. 'id': (fmt '' => 'archive_item/' => uuid => .)
+    rel* 'created': datetime
+    rel* 'updated': datetime
+    rel* 'archived': datetime
+    rel* 'name': text
+    rel* 'description': text
+    rel* 'asset_score': i64
+    rel* 'type': ItemType
 )
 def @private archive_group (
-    rel .'id'|id: (fmt '' => 'archive_group/' => uuid => .)
-    rel .'created': datetime
-    rel .'updated': datetime
-    rel .'archived': datetime
-    rel .'name': text
-    rel .'description': text
-    rel .'start_date': datetime
-    rel .'end_date': datetime
+    rel. 'id': (fmt '' => 'archive_group/' => uuid => .)
+    rel* 'created': datetime
+    rel* 'updated': datetime
+    rel* 'archived': datetime
+    rel* 'name': text
+    rel* 'description': text
+    rel* 'start_date': datetime
+    rel* 'end_date': datetime
 )
 rel {archive_group} 'archive_items'::'archive_groups' {archive_item}
 
@@ -38,45 +38,45 @@ rel {archive_group} 'archive_items'::'archive_groups' {archive_item}
 /// Common dates for Archive entities
 def ArchiveDates (
     /// The (estimated) date the archived object was created
-    rel .'createdAt': datetime
+    rel* 'createdAt': datetime
     /// The date the archived object was last updated
-    rel .'updatedAt': datetime
+    rel* 'updatedAt': datetime
     /// The date the archived object was entered into the collection
-    rel .'archivedAt': datetime
+    rel* 'archivedAt': datetime
 )
 /// ## An Archived Object
 /// Comments support [Markdown](https://www.markdownguide.org/)
 def ArchiveObject (
     /// ID of the object
-    rel .'id'|id: (fmt '' => 'archive_item/' => uuid => .)
+    rel. 'id': (fmt '' => 'archive_item/' => uuid => .)
     /// Relevant dates for the object
-    rel .'dates': ArchiveDates
+    rel* 'dates': ArchiveDates
     /// Name of the object
-    rel .'name': text
+    rel* 'name': text
     /// Description of the object
-    rel .'description': text
+    rel* 'description': text
     /// Relative value of the object
-    rel .'assetScoreTimesTen': i64
+    rel* 'assetScoreTimesTen': i64
     /// Classification of the object
-    rel .'kind': ItemType
+    rel* 'kind': ItemType
 )
 /// ## An Archived Object Collection
 /// A collection of archived objects
 def ArchiveCollection (
     /// ID of the collection
-    rel .'id'|id: (fmt '' => 'archive_group/' => uuid => .)
+    rel. 'id': (fmt '' => 'archive_group/' => uuid => .)
     /// Relevant dates for the collection
-    rel .'dates': ArchiveDates
+    rel* 'dates': ArchiveDates
     /// Name of the collection
-    rel .'name': text
+    rel* 'name': text
     /// Description of the collection
-    rel .'description': text
+    rel* 'description': text
     /// Start date; earliest (estimated)
     /// creation date of object in collection
-    rel .'startDate': datetime
+    rel* 'startDate': datetime
     /// Start date; latest (estimated)
     /// creation date of object in collection
-    rel .'endDate': datetime
+    rel* 'endDate': datetime
 )
 /// Relation between ArchiveCollections and ArchiveObjects
 rel {ArchiveCollection} 'archiveObjects'::'archiveCollections' {ArchiveObject}

@@ -4,7 +4,7 @@ use ontol_test_utils::{expect_eq, TestCompile};
 fn error_spans_are_correct_projected_from_regex_syntax_errors() {
     r"
     def lol ()
-    rel () /abc\/(?P<42>.)/: lol // ERROR invalid regex: invalid capture group character
+    rel {()} /abc\/(?P<42>.)/: lol // ERROR invalid regex: invalid capture group character
     "
     .compile_fail_then(|errors| {
         expect_eq!(actual = errors[0].span_text, expected = "4");
@@ -14,7 +14,7 @@ fn error_spans_are_correct_projected_from_regex_syntax_errors() {
 #[test]
 fn regex_error_span1() {
     r"
-    def a (rel .'a': text)
+    def a (rel* 'a': text)
     def b ()
     map(
         a(
@@ -32,7 +32,7 @@ fn regex_error_span1() {
 fn regex_error_span2() {
     r"
     def a ()
-    def b (rel .'b': text)
+    def b (rel* 'b': text)
     map(
         a(),
         b(

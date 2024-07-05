@@ -1,7 +1,7 @@
 use 'a' as a
 use 'b' as b
 
-rel a 'to'[]: b // ERROR subject must be a domain type// ERROR object must be a data type
+rel {a} 'to'[]: b // ERROR subject must be a domain type// ERROR object must be a data type
 
 //@ src_name=a
 //@ src_name=b

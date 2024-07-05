@@ -1,5 +1,5 @@
 def U (
-    rel .'field': text
-    rel .is?: M // ERROR unit type `M` cannot be part of a union
+    rel* 'field': text
+    rel* is?: M // ERROR unit type `M` cannot be part of a union
 )
 def M ()

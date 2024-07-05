@@ -1,5 +1,5 @@
-def foo ( rel .'a'|'b': text )
-def bar ( rel .'c'|'d': text )
+def foo ( rel* 'a'|'b': text )
+def bar ( rel* 'c'|'d': text )
 map (
     @match foo( 'a': x ),
     bar( 'c': x ) // ERROR missing property `d`// NOTE consider using `match {}`

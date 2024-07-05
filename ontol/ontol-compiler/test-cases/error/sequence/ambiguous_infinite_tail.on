@@ -1,4 +1,4 @@
 def u (
-    rel .0..: i64
-    rel .1..: text // ERROR overlapping indexes
+    rel* 0..: i64
+    rel* 1..: text // ERROR overlapping indexes
 )

@@ -1,5 +1,5 @@
-def a(rel .'id'[rel .gen: auto]|id: (rel .is: text))
-def b(rel .'id'[rel .gen: auto]|id: (rel .is: text))
+def a(rel. 'id'[rel* gen: auto]: (rel* is: text))
+def b(rel. 'id'[rel* gen: auto]: (rel* is: text))
 map(
     a('id': id),
     b('id': id),

@@ -2,7 +2,7 @@
 use 'lower' as lower
 
 def foo (
-    rel .'_id'[rel .gen: auto]|id: (rel .is: serial)
+    rel. '_id'[rel* gen: auto]: (rel* is: serial)
 )
 
 map(
@@ -18,5 +18,5 @@ map(
 
 //@ src_name=lower
 def bar (
-    rel .'_id'[rel .gen: auto]|id: (rel .is: serial)
+    rel. '_id'[rel* gen: auto]: (rel* is: serial)
 )

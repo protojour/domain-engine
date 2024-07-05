@@ -1,6 +1,6 @@
 def foo ()
 def bar ()
 def baz ()
-rel foo is: bar // ERROR circular subtyping relation
-rel bar is: baz // ERROR circular subtyping relation
-rel baz is: foo // ERROR circular subtyping relation
+rel {foo} is: bar // ERROR circular subtyping relation
+rel {bar} is: baz // ERROR circular subtyping relation
+rel {baz} is: foo // ERROR circular subtyping relation

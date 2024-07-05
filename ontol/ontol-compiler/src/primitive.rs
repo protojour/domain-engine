@@ -13,61 +13,61 @@ pub enum PrimitiveKind {
     Unit,
     /// The set of `false` and `true`.
     /// ```ontol
-    /// rel .'active': boolean
+    /// rel* 'active': boolean
     /// ```
     Boolean,
     /// The false value.
     /// ```ontol
-    /// rel .'documentation_done': false
+    /// rel* 'documentation_done': false
     /// ```
     False,
     /// The true value.
     /// ```ontol
-    /// rel .'truism': true
+    /// rel* 'truism': true
     /// ```
     True,
     /// The set of all numbers (realistically all rational numbers, as all computer numbers are rational).
     /// `number` is an abstract type.
     /// ```ontol
-    /// rel .is: number
+    /// rel* is: number
     /// ```
     Number,
     /// The set of all the integers.
     /// `integer` is an abstract type.
     /// ```ontol
-    /// rel .is: integer
+    /// rel* is: integer
     /// ```
     Integer,
     /// 64-bit signed integers.
     /// ```ontol
-    /// rel .is: i64
+    /// rel* is: i64
     /// ```
     I64,
     /// The set of all the floating-point numbers.
     /// `float` is an abstract type.
     /// ```ontol
-    /// rel .is: float
+    /// rel* is: float
     /// ```
     Float,
     /// 32-bit floating point.
     /// ```ontol
-    /// rel .is: f32
+    /// rel* is: f32
     /// ```
     F32,
     /// 64-bit floating point.
     /// ```ontol
-    /// rel .is: f64
+    /// rel* is: f64
     /// ```
     F64,
     /// Unsigned 64-bit integer that can be used as a numeric identifier in data stores.
     /// While `serial` is an integer, it cannot be used in arithmetic.
     /// ```ontol
-    /// rel .'id'|id: (rel .is: serial)
+    /// rel. 'id': (rel* is: serial)
     /// ```
     Serial,
     /// The set of all possible texts.
     /// ```ontol
-    /// rel .is: text
+    /// rel* is: text
     /// ```
     Text,
     /// Open relationship to domainless data
@@ -197,7 +197,7 @@ impl Primitives {
             relations: OntolRelations {
                 is: defs.add_builtin_relation(BuiltinRelationKind::Is, Some("is")),
                 identifies: defs.add_builtin_relation(BuiltinRelationKind::Identifies, None),
-                id: defs.add_builtin_relation(BuiltinRelationKind::Id, Some("id")),
+                id: defs.add_builtin_relation(BuiltinRelationKind::Id, None),
                 indexed: defs.add_builtin_relation(BuiltinRelationKind::Indexed, None),
                 store_key: defs
                     .add_builtin_relation(BuiltinRelationKind::StoreKey, Some("store_key")),

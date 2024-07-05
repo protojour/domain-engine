@@ -10,17 +10,17 @@ fn test_repr_valid_mesh1() {
             use 'si' as si
 
             def length (
-                rel .is: si.meters
-                rel .is: i64
+                rel* is: si.meters
+                rel* is: i64
             )
 
             def bar (
-                rel .id: (rel .is: text)
-                rel .'len': length
+                rel. 'id': (rel* is: text)
+                rel* 'len': length
             )
             ",
         ),
-        (src_name("si"), "def meters (rel .is: number)"),
+        (src_name("si"), "def meters (rel* is: number)"),
     ])
     .compile_then(|test| {
         let [meters, length] = test.bind(["si.meters", "length"]);

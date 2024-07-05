@@ -1,15 +1,15 @@
 def anonymous ()
 
 def foo (
-    rel .anonymous: (
-        rel .is?: bar
-        rel .is?: baz
+    rel* anonymous: (
+        rel* is?: bar
+        rel* is?: baz
     )
 )
 
 def bar (
-    rel .'type': 'bar'
+    rel* 'type': 'bar'
 )
 def baz (
-    rel .'type': 'baz'
+    rel* 'type': 'baz'
 )

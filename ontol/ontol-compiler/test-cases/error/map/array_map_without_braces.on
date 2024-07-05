@@ -1,5 +1,5 @@
-def foo (rel .'a': {text})
-def bar (rel .'b': {text})
+def foo (rel* 'a': {text})
+def bar (rel* 'b': {text})
 
 map(
     foo(

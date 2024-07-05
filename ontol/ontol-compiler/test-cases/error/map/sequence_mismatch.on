@@ -1,11 +1,11 @@
 def foo (
-    rel .'a': {text}
-    rel .'b': {text}
+    rel* 'a': {text}
+    rel* 'b': {text}
 )
 
 def bar (
-    rel .'a': text
-    rel .'b': {i64}
+    rel* 'a': text
+    rel* 'b': {i64}
 )
 
 map(

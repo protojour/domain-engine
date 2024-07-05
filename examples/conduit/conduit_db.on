@@ -1,9 +1,9 @@
 /// The conduit persistence layer
 domain conduit_db ()
 
-def user_id (rel .is: uuid)
-def slug (rel.is: text)
-def tag (rel.is: text)
+def user_id (rel* is: uuid)
+def slug (rel* is: text)
+def tag (rel* is: text)
 
 sym {
     (art) tags: (tag),
@@ -22,57 +22,57 @@ sym {
 
 def User (
     // TODO: This must be an Authly user id
-    rel .'user_id'[rel .gen: auto]|id: user_id
+    rel. 'user_id'[rel* gen: auto]: user_id
     // TODO: This is.. an authly user name? Maybe?
-    rel .'username': text
+    rel* 'username': text
 
     // TODO: Should not store auth-related fields in memoriam,
     // this is the responsibility of Authly.
-    rel .'email': text
-    rel .'password_hash': text
+    rel* 'email': text
+    rel* 'password_hash': text
 
-    rel .'bio'[rel .default := '']: text
-    rel .'image'?: text
+    rel* 'bio'[rel* default := '']: text
+    rel* 'image'?: text
 
     // TODO(constraint): User cannot follow itself
-    rel .'following'::'followed_by'? {User}
+    rel* 'following'::'followed_by'? {User}
 
-    rel .favorited?: {Article}
+    rel* favorited?: {Article}
 )
 
 def Article (
-    rel .'article_id'[rel .gen: auto]|id: (rel .is: uuid)
+    rel. 'article_id'[rel* gen: auto]: (rel* is: uuid)
     // TODO(constraint): slug is unique
-    rel .'slug': slug
-    rel .'title': text
-    rel .'description': text
-    rel .'body': text
-    rel .'created_at'[rel .gen: create_time]: datetime
-    rel .'updated_at'[rel .gen: update_time]: datetime
+    rel* 'slug': slug
+    rel* 'title': text
+    rel* 'description': text
+    rel* 'body': text
+    rel* 'created_at'[rel* gen: create_time]: datetime
+    rel* 'updated_at'[rel* gen: update_time]: datetime
 
-    rel {.}tags?: {TagEntity}
-    rel {.}favorited_by: {User}
-    rel .comments?: {Comment}
+    rel* tags?: {TagEntity}
+    rel* favorited_by: {User}
+    rel* comments?: {Comment}
 
-    rel .order[rel .0: 'title']: alphabetical
-    rel .order[
-        rel .0: 'created_at'
-        rel .direction: descending
+    rel* order[rel* 0: 'title']: alphabetical
+    rel* order[
+        rel* 0: 'created_at'
+        rel* direction: descending
     ]: by_date
 )
 
 def Comment (
-    rel .'id'[rel .gen: auto]|id: (rel .is: serial)
-    rel .'body': text
-    rel .'created_at'[rel .gen: create_time]: datetime
-    rel .'updated_at'[rel .gen: update_time]: datetime
+    rel. 'id'[rel* gen: auto]: (rel* is: serial)
+    rel* 'body': text
+    rel* 'created_at'[rel* gen: create_time]: datetime
+    rel* 'updated_at'[rel* gen: update_time]: datetime
 
-    rel .comment_on?: Article
+    rel* comment_on?: Article
 )
 
 def TagEntity (
-    rel .'tag'|id: tag
-    rel .tagged: {Article}
+    rel. 'tag': tag
+    rel* tagged: {Article}
 )
 
 rel {Article} 'author'::'authored_articles'? User

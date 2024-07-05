@@ -1,5 +1,5 @@
 /// comment
-rel {.} 'id'[rel .gen: auto]?|id: text
+rel {.} 'id'[rel* gen: auto]?|id: text
 
 //@ grammar=ontol
 Ontol
@@ -11,7 +11,7 @@ Ontol
         RelSubject
             TypeQuantSet
                 CurlyOpen `{`
-                This
+                ThisUnit
                     Dot `.`
                 CurlyClose `}`
         Whitespace
@@ -24,11 +24,11 @@ Ontol
                     SquareOpen `[`
                     RelStatement
                         KwRel `rel`
-                        Whitespace
                         RelSubject
                             TypeQuantUnit
-                                This
-                                    Dot `.`
+                                ThisSet
+                                    Star `*`
+                        Whitespace
                         RelFwdSet
                             Relation
                                 TypeQuantUnit

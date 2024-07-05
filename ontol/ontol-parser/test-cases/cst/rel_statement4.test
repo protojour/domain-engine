@@ -1,14 +1,13 @@
-rel . 0..42: pos
+rel* 0..42: pos
 
 //@ grammar=ontol
 Ontol
     RelStatement
         KwRel `rel`
-        Whitespace
         RelSubject
             TypeQuantUnit
-                This
-                    Dot `.`
+                ThisSet
+                    Star `*`
         Whitespace
         RelFwdSet
             Relation

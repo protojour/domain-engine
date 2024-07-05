@@ -1,13 +1,13 @@
 // I think this test wants `..spread` patterns..
 
 def Filter (
-    rel .'foo'?: text
-    rel .'bar'?: text
+    rel* 'foo'?: text
+    rel* 'bar'?: text
 )
 
 def Foo (
-    rel .'foo': text
-    rel .'bar': text
+    rel* 'foo': text
+    rel* 'bar': text
 )
 
 map(

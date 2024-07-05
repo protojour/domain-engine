@@ -2,10 +2,10 @@
 /// c1
 def a(
     /// r1
-    rel .'a': text
+    rel* 'a': text
 
     /// r2
-    rel .'b': text
+    rel* 'b': text
 )
 
 //@ grammar=ontol
@@ -25,11 +25,11 @@ Ontol
                 DocComment `/// r1`
                 Whitespace
                 KwRel `rel`
-                Whitespace
                 RelSubject
                     TypeQuantUnit
-                        This
-                            Dot `.`
+                        ThisSet
+                            Star `*`
+                Whitespace
                 RelFwdSet
                     Relation
                         TypeQuantUnit
@@ -47,11 +47,11 @@ Ontol
                 DocComment `/// r2`
                 Whitespace
                 KwRel `rel`
-                Whitespace
                 RelSubject
                     TypeQuantUnit
-                        This
-                            Dot `.`
+                        ThisSet
+                            Star `*`
+                Whitespace
                 RelFwdSet
                     Relation
                         TypeQuantUnit

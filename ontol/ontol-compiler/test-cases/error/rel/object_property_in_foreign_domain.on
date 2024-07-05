@@ -1,11 +1,11 @@
 use 'foreign' as foreign
 
 def bar (
-    rel .'foo': foreign.foo // This is OK
+    rel* 'foo': foreign.foo // This is OK
 )
 
 def baz (
-    rel .'foo'::'baz'
+    rel* 'foo'::'baz'
         foreign.foo // ERROR definition is sealed and cannot be modified
 )
 

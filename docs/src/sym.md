@@ -10,7 +10,7 @@ sym { symbolic }
 This statement creates one symbol called `symbolic`, and it's technically equivalent to
 
 ```ontol
-def symbolic (rel .is: 'symbolic')
+def symbolic (rel* is: 'symbolic')
 ```
 
 which also declares a domain-specific subtype of that text literal.

@@ -6,23 +6,23 @@ def synth_id (
 )
 
 def guitar (
-    rel .'instrument-id'[rel .gen: auto]|id: guitar_id
-    rel .'type': 'guitar'
-    rel .'string_count': i64
+    rel. 'instrument-id'[rel* gen: auto]: guitar_id
+    rel* 'type': 'guitar'
+    rel* 'string_count': i64
 )
 def synth (
-    rel .'instrument-id'[rel .gen: auto]|id: synth_id
-    rel .'type': 'synth'
-    rel .'polyphony': i64
+    rel. 'instrument-id'[rel* gen: auto]: synth_id
+    rel* 'type': 'synth'
+    rel* 'polyphony': i64
 )
 def instrument (
-    rel .is?: guitar
-    rel .is?: synth
+    rel* is?: guitar
+    rel* is?: synth
 )
 def artist (
-    rel .'artist-id'[rel .gen: auto]|id: ( fmt '' => text => . )
-    rel .'name': text
-    rel {.} 'plays'::'played-by'? {instrument}
+    rel. 'artist-id'[rel* gen: auto]: ( fmt '' => text => . )
+    rel* 'name': text
+    rel* 'plays'::'played-by'? {instrument}
 )
 
 map artists(
