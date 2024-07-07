@@ -45,7 +45,7 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
                     .into_iter()
                     .map(|discriminator| self
                         .ontology
-                        .new_serde_processor(discriminator.addr, self.mode))
+                        .new_serde_processor(discriminator.deserialize.addr, self.mode))
                     .collect(),
                 logic_op: LogicOp::Or,
             }
@@ -63,7 +63,7 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
 
     fn match_i64(&self, value: i64) -> Result<Value, ()> {
         for variant in self.possible_variants {
-            let Discriminant::MatchesLeaf(leaf_discriminant) = &variant.discriminant else {
+            let Discriminant::MatchesLeaf(leaf_discriminant) = variant.discriminant() else {
                 continue;
             };
 
@@ -72,14 +72,14 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
                 LeafDiscriminant::IsInt => {}
                 _ => continue,
             }
-            return Ok(Value::I64(value, variant.serde_def.def_id.into()));
+            return Ok(Value::I64(value, variant.deserialize.def_id.into()));
         }
         Err(())
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
         for variant in self.possible_variants {
-            let Discriminant::MatchesLeaf(scalar_discriminant) = &variant.discriminant else {
+            let Discriminant::MatchesLeaf(scalar_discriminant) = variant.discriminant() else {
                 continue;
             };
 
@@ -87,7 +87,7 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
                 LeafDiscriminant::IsText => {
                     return try_deserialize_custom_string(
                         self.ontology,
-                        variant.serde_def.def_id,
+                        variant.deserialize.def_id,
                         str,
                     )
                     .map_err(|_| ())
@@ -96,14 +96,14 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
                     if str == &self.ontology[*constant] {
                         return try_deserialize_custom_string(
                             self.ontology,
-                            variant.serde_def.def_id,
+                            variant.deserialize.def_id,
                             str,
                         )
                         .map_err(|_| ());
                     }
                 }
                 LeafDiscriminant::MatchesCapturingTextPattern(def_id) => {
-                    let result_type = variant.serde_def.def_id;
+                    let result_type = variant.deserialize.def_id;
                     let pattern = self.ontology.data.text_patterns.get(def_id).unwrap();
 
                     if let Ok(value) = pattern.try_capturing_match(str, result_type, self.ontology)
@@ -120,12 +120,12 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
 
     fn match_sequence(&self) -> Result<SequenceRangesMatcher, ()> {
         for variant in self.possible_variants {
-            let Discriminant::MatchesLeaf(leaf_discriminant) = &variant.discriminant else {
+            let Discriminant::MatchesLeaf(leaf_discriminant) = variant.discriminant() else {
                 continue;
             };
 
             if leaf_discriminant == &LeafDiscriminant::IsSequence {
-                match &self.ontology[variant.addr] {
+                match &self.ontology[variant.deserialize.addr] {
                     SerdeOperator::RelationList(seq_op) => {
                         return Ok(SequenceRangesMatcher::new(
                             slice::from_ref(&seq_op.range),
@@ -153,7 +153,7 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
     fn match_map(&self) -> Result<MapMatcher<'on, 'p>, ()> {
         if !self.possible_variants.into_iter().any(|variant| {
             matches!(
-                &variant.discriminant,
+                variant.discriminant(),
                 Discriminant::StructFallback | Discriminant::HasAttribute(..)
             )
         }) {
@@ -175,12 +175,12 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
 impl<'on, 'p> UnionMatcher<'on, 'p> {
     fn match_leaf_discriminant(&self, discriminant: LeafDiscriminant) -> Result<DefId, ()> {
         for variant in self.possible_variants {
-            let Discriminant::MatchesLeaf(leaf_discriminant) = &variant.discriminant else {
+            let Discriminant::MatchesLeaf(leaf_discriminant) = variant.discriminant() else {
                 continue;
             };
 
             if leaf_discriminant == &discriminant {
-                return Ok(variant.serde_def.def_id);
+                return Ok(variant.deserialize.def_id);
             }
         }
 

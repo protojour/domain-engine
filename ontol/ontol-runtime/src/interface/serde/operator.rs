@@ -187,12 +187,20 @@ impl UnionOperator {
     }
 
     /// Get the variant(s) that applies in the given context
-    pub fn applied_variants(
+    pub fn applied_deserialize_variants(
         &self,
         mode: ProcessorMode,
         level: ProcessorLevel,
     ) -> AppliedVariants<'_> {
-        PossibleVariants::new(&self.variants, mode, level).applied()
+        PossibleVariants::new(&self.variants, mode, level).applied_deserialize()
+    }
+
+    pub fn applied_serialize_variants(
+        &self,
+        mode: ProcessorMode,
+        level: ProcessorLevel,
+    ) -> AppliedVariants<'_> {
+        PossibleVariants::new(&self.variants, mode, level).applied_deserialize()
     }
 
     pub fn unfiltered_variants(&self) -> &[SerdeUnionVariant] {
@@ -229,9 +237,17 @@ impl<'on> PossibleVariants<'on> {
         }
     }
 
-    pub fn applied(self) -> AppliedVariants<'on> {
-        if let Some(certain_addr) = self.into_iter().find_unambiguous_addr() {
-            AppliedVariants::Unambiguous(certain_addr)
+    pub fn applied_deserialize(self) -> AppliedVariants<'on> {
+        if let Some(variant) = self.into_iter().find_unambiguous_next() {
+            AppliedVariants::Unambiguous(variant.deserialize.addr)
+        } else {
+            AppliedVariants::OneOf(self)
+        }
+    }
+
+    pub fn applied_serialize(self) -> AppliedVariants<'on> {
+        if let Some(variant) = self.into_iter().find_unambiguous_next() {
+            AppliedVariants::Unambiguous(variant.serialize.addr)
         } else {
             AppliedVariants::OneOf(self)
         }
@@ -240,7 +256,7 @@ impl<'on> PossibleVariants<'on> {
 
 impl<'on> IntoIterator for PossibleVariants<'on> {
     type IntoIter = PossibleVariantsIter<'on>;
-    type Item = PossibleVariant<'on>;
+    type Item = &'on SerdeUnionVariant;
 
     fn into_iter(self) -> Self::IntoIter {
         PossibleVariantsIter {
@@ -258,7 +274,7 @@ pub struct PossibleVariantsIter<'on> {
 }
 
 impl<'on> Iterator for PossibleVariantsIter<'on> {
-    type Item = PossibleVariant<'on>;
+    type Item = &'on SerdeUnionVariant;
 
     fn next(&mut self) -> Option<Self::Item> {
         // note: this continues iteration where the previous next() call left off
@@ -273,12 +289,12 @@ impl<'on> Iterator for PossibleVariantsIter<'on> {
 }
 
 impl<'on> PossibleVariantsIter<'on> {
-    fn find_unambiguous_addr(&mut self) -> Option<SerdeOperatorAddr> {
-        let addr = self.next().map(|variant| variant.addr)?;
+    fn find_unambiguous_next(&mut self) -> Option<&'on SerdeUnionVariant> {
+        let variant = self.next()?;
         if self.next().is_some() {
             None
         } else {
-            Some(addr)
+            Some(variant)
         }
     }
 
@@ -286,40 +302,45 @@ impl<'on> PossibleVariantsIter<'on> {
         variant: &'on SerdeUnionVariant,
         mode: ProcessorMode,
         level: ProcessorLevel,
-    ) -> Option<PossibleVariant<'on>> {
+    ) -> Option<&'on SerdeUnionVariant> {
         match (mode, variant.discriminator.purpose) {
-            (ProcessorMode::Raw, VariantPurpose::RawDynamicEntity) => Some(PossibleVariant {
-                discriminant: &variant.discriminator.discriminant,
-                purpose: variant.discriminator.purpose,
-                addr: variant.addr,
-                serde_def: variant.discriminator.serde_def,
-            }),
+            (ProcessorMode::Raw, VariantPurpose::RawDynamicEntity) => Some(variant),
             (ProcessorMode::Raw, VariantPurpose::Identification { .. }) => None,
             (ProcessorMode::Delete, VariantPurpose::Data) => None,
             (_, VariantPurpose::RawDynamicEntity) => None,
             (_, VariantPurpose::Identification { .. }) if level.is_global_root() => None,
-            _ => Some(PossibleVariant {
-                discriminant: &variant.discriminator.discriminant,
-                purpose: variant.discriminator.purpose,
-                addr: variant.addr,
-                serde_def: variant.discriminator.serde_def,
-            }),
+            _ => Some(variant),
         }
     }
-}
-
-#[derive(OntolDebug)]
-pub struct PossibleVariant<'on> {
-    pub discriminant: &'on Discriminant,
-    pub purpose: VariantPurpose,
-    pub addr: SerdeOperatorAddr,
-    pub serde_def: SerdeDef,
 }
 
 #[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub struct SerdeUnionVariant {
     pub discriminator: VariantDiscriminator,
+    pub deserialize: SerdeDefAddr,
+    pub serialize: SerdeDefAddr,
+}
+
+impl SerdeUnionVariant {
+    pub fn discriminant(&self) -> &Discriminant {
+        &self.discriminator.discriminant
+    }
+
+    pub fn purpose(&self) -> &VariantPurpose {
+        &self.discriminator.purpose
+    }
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, OntolDebug)]
+pub struct SerdeDefAddr {
+    pub def_id: DefId,
     pub addr: SerdeOperatorAddr,
+}
+
+impl SerdeDefAddr {
+    pub fn new(def_id: DefId, addr: SerdeOperatorAddr) -> Self {
+        Self { def_id, addr }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, OntolDebug)]

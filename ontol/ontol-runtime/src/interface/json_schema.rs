@@ -614,7 +614,7 @@ impl<'e> Serialize for UnionRefLinks<'e> {
             // BUG: Must filter variants
             .unfiltered_variants()
         {
-            seq.serialize_element(&self.ctx.reference(discriminator.addr))?;
+            seq.serialize_element(&self.ctx.reference(discriminator.serialize.addr))?;
         }
 
         seq.end()
@@ -812,7 +812,7 @@ impl SchemaGraphBuilder {
                 self.add_to_graph(union_op.union_def(), addr);
 
                 for discriminator in union_op.unfiltered_variants() {
-                    self.visit(discriminator.addr, ontology);
+                    self.visit(discriminator.serialize.addr, ontology);
                 }
             }
             SerdeOperator::IdSingletonStruct(_, _, id_operator_addr) => {

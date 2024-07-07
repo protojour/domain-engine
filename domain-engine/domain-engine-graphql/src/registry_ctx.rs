@@ -231,7 +231,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             }
             SerdeOperator::Union(union_op) => {
                 let (mode, level) = typing_purpose.mode_and_level();
-                match union_op.applied_variants(mode, level) {
+                match union_op.applied_deserialize_variants(mode, level) {
                     AppliedVariants::Unambiguous(operator_addr) => {
                         self.collect_operator_arguments(
                             operator_addr,
@@ -262,7 +262,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
                             for variant in possible_variants {
                                 let next = self.collect_operator_arguments(
-                                    variant.addr,
+                                    variant.deserialize.addr,
                                     output,
                                     TypingPurpose::PartialInput,
                                     ArgumentFilter {
@@ -494,7 +494,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
                 let (mode, level) = typing_purpose.mode_and_level();
 
-                match union_op.applied_variants(mode, level) {
+                match union_op.applied_deserialize_variants(mode, level) {
                     AppliedVariants::Unambiguous(single_addr) => self.get_operator_argument(
                         name,
                         single_addr,

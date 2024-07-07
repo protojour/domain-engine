@@ -57,7 +57,7 @@ impl UnionBuilder {
         }
 
         for candidate in &mut variant_candidates {
-            let result_def = candidate.discriminator.serde_def;
+            let result_def = candidate.serde_def;
 
             candidate.addr = map_operator_fn(generator, candidate.addr, result_def);
 
@@ -169,6 +169,7 @@ impl UnionBuilder {
                                 .push(SerdeUnionVariant {
                                     discriminator: (*scoping).clone(),
                                     addr,
+                                    serialize: (scoping.serde_def.def_id, addr),
                                 });
 
                             Ok(())
@@ -183,6 +184,7 @@ impl UnionBuilder {
                             .push(SerdeUnionVariant {
                                 discriminator: discriminator.clone(),
                                 addr,
+                                serialize: (discriminator.serde_def.def_id, addr),
                             });
                         Ok(())
                     }

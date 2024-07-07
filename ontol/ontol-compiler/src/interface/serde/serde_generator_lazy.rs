@@ -1,6 +1,6 @@
-use std::{borrow::Cow, collections::HashSet, ops::Deref};
+use std::{borrow::Cow, ops::Deref};
 
-use fnv::{FnvHashMap, FnvHashSet};
+use fnv::FnvHashSet;
 use indexmap::IndexMap;
 use ontol_runtime::{
     debug::OntolDebug,
@@ -8,7 +8,7 @@ use ontol_runtime::{
         discriminator::{Discriminant, PropCount, VariantDiscriminator, VariantPurpose},
         serde::{
             operator::{
-                SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdePropertyFlags,
+                SerdeDefAddr, SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdePropertyFlags,
                 SerdePropertyKind, SerdeStructFlags, SerdeUnionVariant, StructOperator,
                 UnionOperator,
             },
@@ -30,7 +30,6 @@ use crate::{
 
 use super::{
     serde_generator::{insert_property, operator_to_leaf_discriminant, SerdeGenerator},
-    union_builder::UnionBuilder,
     SerdeIntersection, SerdeKey, EDGE_PROPERTY,
 };
 
@@ -300,9 +299,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         // detect set of all properties belonging to the union
         for variant in union_operator.unfiltered_variants() {
-            variant_addrs.push(variant.addr);
+            variant_addrs.push(variant.deserialize.addr);
 
-            let SerdeOperator::Struct(struct_op) = self.get_operator(variant.addr) else {
+            let SerdeOperator::Struct(struct_op) = self.get_operator(variant.deserialize.addr)
+            else {
                 todo!("handle non-struct-op");
             };
 
@@ -452,6 +452,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             return;
         }
 
+        panic!();
+
+        /*
         let _entered = debug_span!("lazy_union", def=?def.def_id).entered();
 
         let union_discriminator = self
@@ -564,6 +567,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                                 serde_def: struct_def,
                             },
                             addr: struct_properties_addr,
+                            serialize: (struct_def.def_id, struct_properties_addr),
                         });
                     }
                 }
@@ -574,6 +578,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         self.operators_by_addr[addr.0 as usize] =
             SerdeOperator::Union(Box::new(UnionOperator::new(typename, def, variants)));
+            */
     }
 
     pub(super) fn populate_union_repr_operator2(
@@ -597,13 +602,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         let mut serde_variants: Vec<SerdeUnionVariant> = vec![];
 
-        for source_discriminator in &union_discriminator.variants {
-            let type_def_id = match &source_discriminator.purpose {
+        for source_variant in &union_discriminator.variants {
+            let type_def_id = match &source_variant.discriminator.purpose {
                 VariantPurpose::Identification { entity_id } => *entity_id,
-                VariantPurpose::Data | VariantPurpose::Identification2 => {
-                    source_discriminator.def_id()
-                }
-                VariantPurpose::RawDynamicEntity => source_discriminator.def_id(),
+                VariantPurpose::Data | VariantPurpose::Identification2 => source_variant.def_id,
+                VariantPurpose::RawDynamicEntity => source_variant.def_id,
             };
 
             let mut variant_serde_def = def.with_def(type_def_id);
@@ -611,8 +614,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
             let addr = self.gen_addr_lazy(SerdeKey::Def(variant_serde_def));
 
-            let mut discriminator = source_discriminator.clone();
-            discriminator.purpose = match &source_discriminator.purpose {
+            let mut discriminator = source_variant.discriminator.clone();
+            discriminator.purpose = match &source_variant.discriminator.purpose {
                 VariantPurpose::Identification { .. } => VariantPurpose::Identification2,
                 _ => VariantPurpose::Data,
             };
@@ -625,7 +628,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 let variant = SerdeUnionVariant {
                     discriminator,
-                    addr,
+                    deserialize: SerdeDefAddr::new(source_variant.def_id, addr),
+                    serialize: SerdeDefAddr::new(type_def_id, addr),
                 };
 
                 debug!(
@@ -671,6 +675,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             return Err("no address for ID");
         };
 
+        let identifies_meta = rel_def_meta(identifies_relationship_id, self.defs);
+
         let (id_property_name, id_leaf_discriminant) =
             match self.operators_by_addr.get(id_addr.0 as usize).unwrap() {
                 SerdeOperator::IdSingletonStruct(_entity_id, id_property_name, inner_addr) => (
@@ -698,9 +704,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     id_leaf_discriminant,
                 ),
                 purpose: VariantPurpose::Identification2,
-                serde_def: SerdeDef::new(type_def_id, cross_def_flags),
             },
-            addr: target_addr,
+            deserialize: SerdeDefAddr::new(type_def_id, target_addr),
+            serialize: SerdeDefAddr::new(identifies_meta.relationship.subject.0, id_addr),
         };
 
         debug!("add ID variant {:?}", id_variant.debug(self.str_ctx));
@@ -722,13 +728,14 @@ fn find_unambiguous_struct_operator(
             let mut result = Err(operator);
 
             for discriminator in union_op.unfiltered_variants() {
-                if let Ok(map_type) =
-                    find_unambiguous_struct_operator(discriminator.addr, operators_by_addr)
-                {
+                if let Ok(map_type) = find_unambiguous_struct_operator(
+                    discriminator.deserialize.addr,
+                    operators_by_addr,
+                ) {
                     result = Ok(map_type);
                     map_count += 1;
                 } else {
-                    let operator = &operators_by_addr[discriminator.addr.0 as usize];
+                    let operator = &operators_by_addr[discriminator.deserialize.addr.0 as usize];
                     debug!(
                         "SKIPPED SOMETHING: {operator:?}\n\n",
                         operator = operator.debug(&())
@@ -747,10 +754,4 @@ fn find_unambiguous_struct_operator(
         }
         _ => Err(operator),
     }
-}
-
-#[derive(Default)]
-struct UnionDefVariantCoverage {
-    has_id: bool,
-    has_data: bool,
 }

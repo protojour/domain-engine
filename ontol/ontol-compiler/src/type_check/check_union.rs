@@ -3,12 +3,8 @@ use std::collections::HashSet;
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::{IndexMap, IndexSet};
 use ontol_runtime::{
-    interface::{
-        discriminator::{
-            Discriminant, LeafDiscriminant, PropCount, UnionDiscriminator, VariantDiscriminator,
-            VariantPurpose,
-        },
-        serde::{SerdeDef, SerdeModifier},
+    interface::discriminator::{
+        Discriminant, LeafDiscriminant, PropCount, VariantDiscriminator, VariantPurpose,
     },
     ontology::ontol::TextConstant,
     DefId, RelationshipId,
@@ -20,7 +16,7 @@ use crate::{
     def::{rel_def_meta, Def, DefKind},
     error::CompileError,
     primitive::PrimitiveKind,
-    relation::{Constructor, Property},
+    relation::{Constructor, Property, UnionDiscriminator, UnionDiscriminatorVariant},
     repr::repr_model::{ReprKind, ReprScalarKind},
     sequence::Sequence,
     strings::StringCtx,
@@ -525,32 +521,46 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let mut union_discriminator = UnionDiscriminator { variants: vec![] };
 
         if let Some(def_id) = builder.unit {
-            union_discriminator.variants.push(VariantDiscriminator {
-                discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsUnit),
-                purpose: discriminator_type.into_purpose(&VariantKey::Instance),
-                serde_def: SerdeDef::new(def_id, SerdeModifier::NONE),
-            })
+            union_discriminator
+                .variants
+                .push(UnionDiscriminatorVariant {
+                    discriminator: VariantDiscriminator {
+                        discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsUnit),
+                        purpose: discriminator_type.into_purpose(&VariantKey::Instance),
+                        // serde_def: SerdeDef::new(def_id, SerdeModifier::NONE),
+                    },
+                    def_id,
+                });
         }
 
         match builder.number {
             IntDiscriminator::None => {}
             IntDiscriminator::Any(def_id) => {
-                union_discriminator.variants.push(VariantDiscriminator {
-                    discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsInt),
-                    purpose: discriminator_type.into_purpose(&VariantKey::Instance),
-                    serde_def: SerdeDef::new(def_id, SerdeModifier::NONE),
-                });
+                union_discriminator
+                    .variants
+                    .push(UnionDiscriminatorVariant {
+                        discriminator: VariantDiscriminator {
+                            discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsInt),
+                            purpose: discriminator_type.into_purpose(&VariantKey::Instance),
+                            // serde_def: SerdeDef::new(def_id, SerdeModifier::NONE),
+                        },
+                        def_id,
+                    });
             }
             IntDiscriminator::Literals(literals) => {
                 for keyed in literals {
                     let (literal, def_id) = keyed.value;
-                    union_discriminator.variants.push(VariantDiscriminator {
-                        purpose: discriminator_type.into_purpose(&keyed.key),
-                        discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsIntLiteral(
-                            literal,
-                        )),
-                        serde_def: SerdeDef::new(def_id, SerdeModifier::NONE),
-                    });
+                    union_discriminator
+                        .variants
+                        .push(UnionDiscriminatorVariant {
+                            discriminator: VariantDiscriminator {
+                                purpose: discriminator_type.into_purpose(&keyed.key),
+                                discriminant: Discriminant::MatchesLeaf(
+                                    LeafDiscriminant::IsIntLiteral(literal),
+                                ),
+                            },
+                            def_id,
+                        });
                 }
             }
         }
@@ -559,62 +569,92 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         for (variant_def_id, keyed) in builder.pattern_candidates {
             let leaf_discriminant = LeafDiscriminant::MatchesCapturingTextPattern(variant_def_id);
 
-            union_discriminator.variants.push(VariantDiscriminator {
-                purpose: discriminator_type.into_purpose(&keyed.key),
-                discriminant: match (discriminator_type, keyed.key) {
-                    (DiscriminatorType::Data, _) => Discriminant::MatchesLeaf(leaf_discriminant),
-                    (
-                        DiscriminatorType::Identification,
-                        VariantKey::IdProperty { name, rel_id, .. },
-                    ) => {
-                        Discriminant::HasAttribute(rel_id, name, PropCount::Any, leaf_discriminant)
-                    }
-                    (DiscriminatorType::Identification, _) => {
-                        Discriminant::MatchesLeaf(leaf_discriminant)
-                    }
-                },
-                serde_def: SerdeDef::new(variant_def_id, SerdeModifier::NONE),
-            });
+            union_discriminator
+                .variants
+                .push(UnionDiscriminatorVariant {
+                    discriminator: VariantDiscriminator {
+                        purpose: discriminator_type.into_purpose(&keyed.key),
+                        discriminant: match (discriminator_type, keyed.key) {
+                            (DiscriminatorType::Data, _) => {
+                                Discriminant::MatchesLeaf(leaf_discriminant)
+                            }
+                            (
+                                DiscriminatorType::Identification,
+                                VariantKey::IdProperty { name, rel_id, .. },
+                            ) => Discriminant::HasAttribute(
+                                rel_id,
+                                name,
+                                PropCount::Any,
+                                leaf_discriminant,
+                            ),
+                            (DiscriminatorType::Identification, _) => {
+                                Discriminant::MatchesLeaf(leaf_discriminant)
+                            }
+                        },
+                    },
+                    def_id: variant_def_id,
+                });
         }
 
         match builder.string {
             TextDiscriminator::None => {}
             TextDiscriminator::Any(def_id) => {
-                union_discriminator.variants.push(VariantDiscriminator {
-                    discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsText),
-                    purpose: discriminator_type.into_purpose(&VariantKey::Instance),
-                    serde_def: SerdeDef::new(def_id, SerdeModifier::NONE),
-                });
+                union_discriminator
+                    .variants
+                    .push(UnionDiscriminatorVariant {
+                        discriminator: VariantDiscriminator {
+                            discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsText),
+                            purpose: discriminator_type.into_purpose(&VariantKey::Instance),
+                        },
+                        def_id,
+                    });
             }
             TextDiscriminator::Literals(literals) => {
                 for keyed in literals {
                     let (literal, def_id) = keyed.value;
-                    union_discriminator.variants.push(VariantDiscriminator {
-                        purpose: discriminator_type.into_purpose(&keyed.key),
-                        discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsTextLiteral(
-                            strings.intern_constant(&literal),
-                        )),
-                        serde_def: SerdeDef::new(def_id, SerdeModifier::NONE),
-                    });
+                    union_discriminator
+                        .variants
+                        .push(UnionDiscriminatorVariant {
+                            discriminator: VariantDiscriminator {
+                                purpose: discriminator_type.into_purpose(&keyed.key),
+                                discriminant: Discriminant::MatchesLeaf(
+                                    LeafDiscriminant::IsTextLiteral(
+                                        strings.intern_constant(&literal),
+                                    ),
+                                ),
+                                // serde_def: SerdeDef::new(def_id, SerdeModifier::NONE),
+                            },
+                            def_id,
+                        });
                 }
             }
         }
 
         if let Some(variant_keyed) = builder.sequence {
-            union_discriminator.variants.push(VariantDiscriminator {
-                discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsSequence),
-                purpose: discriminator_type.into_purpose(&variant_keyed.key),
-                serde_def: SerdeDef::new(variant_keyed.value, SerdeModifier::NONE),
-            });
+            union_discriminator
+                .variants
+                .push(UnionDiscriminatorVariant {
+                    discriminator: VariantDiscriminator {
+                        discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsSequence),
+                        purpose: discriminator_type.into_purpose(&variant_keyed.key),
+                        // serde_def: SerdeDef::new(variant_keyed.value, SerdeModifier::NONE),
+                    },
+                    def_id: variant_keyed.value,
+                });
         }
 
         for map_discriminator in builder.map_discriminator_candidates {
             for candidate in map_discriminator.property_candidates {
-                union_discriminator.variants.push(VariantDiscriminator {
-                    discriminant: candidate.discriminant,
-                    purpose: discriminator_type.into_purpose(&VariantKey::Instance),
-                    serde_def: SerdeDef::new(map_discriminator.result_type, SerdeModifier::NONE),
-                })
+                union_discriminator
+                    .variants
+                    .push(UnionDiscriminatorVariant {
+                        discriminator: VariantDiscriminator {
+                            discriminant: candidate.discriminant,
+                            purpose: discriminator_type.into_purpose(&VariantKey::Instance),
+                            // serde_def: SerdeDef::new(map_discriminator.result_type, SerdeModifier::NONE),
+                        },
+                        def_id: map_discriminator.result_type,
+                    })
             }
         }
 

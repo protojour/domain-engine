@@ -13,8 +13,8 @@ use ontol_runtime::{
         serde::{
             operator::{
                 AliasOperator, ConstructorSequenceOperator, RelationSequenceOperator,
-                SequenceRange, SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdeStructFlags,
-                SerdeUnionVariant, StructOperator, UnionOperator,
+                SequenceRange, SerdeDefAddr, SerdeOperator, SerdeOperatorAddr, SerdeProperty,
+                SerdeStructFlags, SerdeUnionVariant, StructOperator, UnionOperator,
             },
             SerdeDef, SerdeModifier,
         },
@@ -198,11 +198,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
     pub fn get_operator(&self, addr: SerdeOperatorAddr) -> &SerdeOperator {
         &self.operators_by_addr[addr.0 as usize]
-    }
-
-    pub fn gen_operator_lazy(&mut self, key: SerdeKey) -> Option<&SerdeOperator> {
-        let addr = self.gen_addr_lazy(key)?;
-        Some(&self.operators_by_addr[addr.0 as usize])
     }
 
     pub(super) fn get_property_operator(
@@ -769,20 +764,23 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             purpose: VariantPurpose::Identification {
                                 entity_id: def.def_id,
                             },
-                            serde_def: SerdeDef::new(
-                                identifies_meta.relationship.subject.0,
-                                def.modifier.cross_def_flags(),
-                            ),
                         },
-                        addr: id_addr,
+                        deserialize: SerdeDefAddr::new(
+                            identifies_meta.relationship.subject.0,
+                            id_addr,
+                        ),
+                        serialize: SerdeDefAddr::new(
+                            identifies_meta.relationship.subject.0,
+                            id_addr,
+                        ),
                     },
                     SerdeUnionVariant {
                         discriminator: VariantDiscriminator {
                             discriminant: Discriminant::StructFallback,
                             purpose: VariantPurpose::Data,
-                            serde_def: struct_def,
                         },
-                        addr: struct_properties_addr,
+                        deserialize: SerdeDefAddr::new(struct_def.def_id, struct_properties_addr),
+                        serialize: SerdeDefAddr::new(struct_def.def_id, struct_properties_addr),
                     },
                 ],
             ))),
@@ -905,9 +903,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 SerdeModifier::INHERENT_PROPS | def.modifier.cross_def_flags(),
             );
 
-            for root_discriminator in &union_discriminator.variants {
+            for root_variant in &union_discriminator.variants {
                 let variant_def = SerdeDef::new(
-                    root_discriminator.serde_def.def_id,
+                    root_variant.def_id,
                     SerdeModifier::INHERENT_PROPS | def.modifier.cross_def_flags(),
                 );
 

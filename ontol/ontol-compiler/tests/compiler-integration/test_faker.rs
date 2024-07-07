@@ -79,9 +79,9 @@ fn test_fake_guitar_synth() {
             "name": "delectus molestias aspernatur voluptatem reprehenderit",
             "plays": [
                 {
-                    "instrument-id": "guitar/c6f2c9be-dcaa-7bfa-8763-dd16ca1baa0a",
+                    "instrument-id": "guitar/aec6f2c9-eccf-9a1c-faba-639dd16ca1ba",
                     "type": "guitar",
-                    "string_count": 1500328598,
+                    "string_count": -1917199177,
                 }
             ]
         }),

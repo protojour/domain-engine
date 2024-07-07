@@ -9,8 +9,8 @@ use crate::{
         discriminator::{Discriminant, LeafDiscriminant, PropCount, VariantPurpose},
         serde::{
             operator::{
-                AppliedVariants, PossibleVariant, PossibleVariants, SerdeOperator,
-                SerdeOperatorAddr, StructOperator,
+                AppliedVariants, PossibleVariants, SerdeOperator, SerdeOperatorAddr,
+                SerdeUnionVariant, StructOperator,
             },
             processor::{
                 ProcessorLevel, ProcessorMode, ProcessorProfile, ScalarFormat, SpecialProperty,
@@ -25,7 +25,7 @@ use crate::{
 /// A state machine for map matching
 pub struct MapMatcher<'on, 'p> {
     possible_variants: PossibleVariants<'on>,
-    match_if_singleton: Option<PossibleVariant<'on>>,
+    match_if_singleton: Option<&'on SerdeUnionVariant>,
     ontology: &'on Ontology,
     ctx: SubProcessorContext,
     profile: &'p ProcessorProfile<'p>,
@@ -48,8 +48,8 @@ pub enum MapMatchMode<'on> {
 
 enum AttrMatch<'on> {
     Unmatched,
-    Match(PossibleVariant<'on>),
-    MatchIfSingleton(PossibleVariant<'on>),
+    Match(&'on SerdeUnionVariant),
+    MatchIfSingleton(&'on SerdeUnionVariant),
 }
 
 impl<'on, 'p> MapMatcher<'on, 'p> {
@@ -119,11 +119,11 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
         }
 
         for variant in self.possible_variants {
-            if matches!(variant.discriminant, Discriminant::StructFallback) {
-                match &self.ontology[variant.addr] {
+            if matches!(variant.discriminant(), Discriminant::StructFallback) {
+                match &self.ontology[variant.deserialize.addr] {
                     SerdeOperator::Struct(struct_op) => {
                         return Ok(MatchOk {
-                            mode: MapMatchMode::Struct(variant.addr, struct_op),
+                            mode: MapMatchMode::Struct(variant.deserialize.addr, struct_op),
                             ctx: self.ctx,
                         })
                     }
@@ -187,7 +187,7 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
         let (property, value) = &buffer[index];
 
         for possible_variant in self.possible_variants.into_iter() {
-            match &possible_variant.discriminant {
+            match possible_variant.discriminant() {
                 Discriminant::HasAttribute(
                     _,
                     match_property,
@@ -197,7 +197,7 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                     if property.as_ref() == &self.ontology[*match_property]
                         && self.match_attribute_value(
                             value,
-                            &possible_variant.purpose,
+                            possible_variant.purpose(),
                             scalar_discriminant,
                         )
                     {
@@ -215,7 +215,7 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                         && buffer.len() == 1
                         && self.match_attribute_value(
                             value,
-                            &possible_variant.purpose,
+                            possible_variant.purpose(),
                             scalar_discriminant,
                         )
                     {
@@ -234,15 +234,15 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                 if property.as_ref() == type_annotation_property {
                     if let Some(def_id) = profile_api.annotate_type(value) {
                         for variant in self.possible_variants.into_iter() {
-                            if variant.serde_def.def_id == def_id {
+                            if variant.deserialize.def_id == def_id {
                                 return AttrMatch::Match(variant);
                             } else if let VariantPurpose::Identification { entity_id } =
-                                variant.purpose
+                                variant.purpose()
                             {
-                                if entity_id == def_id {
+                                if entity_id == &def_id {
                                     return AttrMatch::Match(variant);
                                 }
-                            } else if let VariantPurpose::Identification2 = variant.purpose {
+                            } else if let VariantPurpose::Identification2 = variant.purpose() {
                                 return AttrMatch::Match(variant);
                             }
                         }
@@ -300,23 +300,24 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
 
     fn commit_match(
         &mut self,
-        matched_variant: PossibleVariant<'on>,
+        matched_variant: &'on SerdeUnionVariant,
     ) -> ControlFlow<MapMatchMode<'on>> {
         match (
-            &self.ontology[matched_variant.addr],
-            matched_variant.purpose,
+            &self.ontology[matched_variant.deserialize.addr],
+            matched_variant.purpose(),
         ) {
             (SerdeOperator::Struct(struct_op), VariantPurpose::RawDynamicEntity) => {
                 ControlFlow::Break(MapMatchMode::RawDynamicEntity(struct_op))
             }
-            (SerdeOperator::Struct(struct_op), _) => {
-                ControlFlow::Break(MapMatchMode::Struct(matched_variant.addr, struct_op))
-            }
+            (SerdeOperator::Struct(struct_op), _) => ControlFlow::Break(MapMatchMode::Struct(
+                matched_variant.deserialize.addr,
+                struct_op,
+            )),
             (SerdeOperator::IdSingletonStruct(entity_id, name_constant, addr), _) => {
                 ControlFlow::Break(MapMatchMode::EntityId(*entity_id, *name_constant, *addr))
             }
             (SerdeOperator::Union(union_op), _) => {
-                match union_op.applied_variants(self.mode, self.level) {
+                match union_op.applied_deserialize_variants(self.mode, self.level) {
                     AppliedVariants::Unambiguous(_) => todo!(),
                     AppliedVariants::OneOf(variants) => {
                         self.possible_variants = variants;

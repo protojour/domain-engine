@@ -125,10 +125,10 @@ impl<'c, 'm> ConditionBuilder<'c, 'm> {
                 let variant = discr
                     .variants
                     .iter()
-                    .find(|variant| variant.def_id() == narrowed_def_id)
+                    .find(|variant| variant.def_id == narrowed_def_id)
                     .expect("union variant not found");
 
-                match &variant.discriminant {
+                match &variant.discriminator.discriminant {
                     Discriminant::HasAttribute(relationship_id, _, _, leaf) => {
                         let variant_var = self.output.mk_cond_var();
 

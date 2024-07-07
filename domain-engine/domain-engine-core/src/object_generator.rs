@@ -142,7 +142,9 @@ impl<'e> ObjectGenerator<'e> {
                 }
             }
             SerdeOperator::Union(union_op) => {
-                match union_op.applied_variants(ProcessorMode::Create, ProcessorLevel::new_root()) {
+                match union_op
+                    .applied_deserialize_variants(ProcessorMode::Create, ProcessorLevel::new_root())
+                {
                     AppliedVariants::Unambiguous(child_addr) => {
                         self.generate_struct_relationships(struct_map, def, child_addr);
                     }

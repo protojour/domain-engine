@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
-    interface::discriminator::UnionDiscriminator, ontology::ontol::ValueGenerator,
+    interface::discriminator::VariantDiscriminator, ontology::ontol::ValueGenerator,
     property::Cardinality, DefId, PackageId, RelationshipId,
 };
 use tracing::warn;
@@ -77,6 +77,17 @@ impl RelCtx {
             }
         }
     }
+}
+
+#[derive(Debug)]
+pub struct UnionDiscriminator {
+    pub variants: Vec<UnionDiscriminatorVariant>,
+}
+
+#[derive(Debug)]
+pub struct UnionDiscriminatorVariant {
+    pub discriminator: VariantDiscriminator,
+    pub def_id: DefId,
 }
 
 #[derive(Default, Debug)]

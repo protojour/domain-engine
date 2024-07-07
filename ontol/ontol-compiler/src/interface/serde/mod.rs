@@ -11,7 +11,7 @@ pub mod serde_generator;
 
 mod sequence_range_builder;
 mod serde_generator_lazy;
-mod union_builder;
+// mod union_builder;
 
 pub const EDGE_PROPERTY: &str = "_edge";
 

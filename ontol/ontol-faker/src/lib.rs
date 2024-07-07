@@ -213,7 +213,9 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 return self.fake_attribute(processor.narrow(alias_op.inner_addr));
             }
             SerdeOperator::Union(union_op) => {
-                return match union_op.applied_variants(self.processor_mode, processor.level()) {
+                return match union_op
+                    .applied_deserialize_variants(self.processor_mode, processor.level())
+                {
                     AppliedVariants::Unambiguous(addr) => {
                         self.fake_attribute(processor.narrow(addr))
                     }
@@ -223,7 +225,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                         let index: usize = self.rng.gen_range(0..variants.len());
                         let variant = &variants[index];
 
-                        self.fake_attribute(processor.narrow(variant.addr))
+                        self.fake_attribute(processor.narrow(variant.deserialize.addr))
                     }
                 }
             }

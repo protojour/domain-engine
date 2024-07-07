@@ -241,7 +241,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
             }
             (SerdeOperator::Union(union_op), _) => {
                 debug!("deserialize union {:?}", union_op.union_def().def_id);
-                match union_op.applied_variants(self.mode, self.level) {
+                match union_op.applied_deserialize_variants(self.mode, self.level) {
                     AppliedVariants::Unambiguous(addr) => {
                         self.narrow(addr).deserialize(deserializer)
                     }

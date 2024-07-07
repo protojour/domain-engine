@@ -137,20 +137,20 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             (SerdeOperator::Union(union_op), _, _) => {
                 let val = attr.first_unit().expect("matrix union");
 
-                match union_op.applied_variants(self.mode, self.level) {
+                match union_op.applied_serialize_variants(self.mode, self.level) {
                     AppliedVariants::Unambiguous(addr) => {
                         self.narrow(addr).serialize_attr(attr, serializer)
                     }
                     AppliedVariants::OneOf(possible_variants) => {
                         let variant = possible_variants
                             .into_iter()
-                            .find(|variant| val.type_def_id() == variant.serde_def.def_id);
+                            .find(|variant| val.type_def_id() == variant.serialize.def_id);
 
                         if let Some(variant) = variant {
-                            let processor = self.narrow(variant.addr);
+                            let processor = self.narrow(variant.serialize.addr);
                             trace!(
                                 "serializing union variant with {:?} {processor:}",
-                                variant.addr
+                                variant.serialize.addr
                             );
 
                             processor.serialize_attr(attr, serializer)
@@ -573,15 +573,18 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                             panic!("expected union operator");
                         };
                         let value = attr.as_unit().unwrap();
-                        let addr = match union_op.applied_variants(self.mode, self.level) {
+                        let addr = match union_op
+                            .applied_deserialize_variants(self.mode, self.level)
+                        {
                             AppliedVariants::Unambiguous(addr) => addr,
                             AppliedVariants::OneOf(possible_variants) => {
                                 possible_variants
                                     .into_iter()
-                                    .find(|variant| value.type_def_id() == variant.serde_def.def_id)
+                                    .find(|variant| value.type_def_id() == variant.serialize.def_id)
                                     .ok_or(serde::ser::Error::custom(
                                         "flattened union variant not found",
                                     ))?
+                                    .serialize
                                     .addr
                             }
                         };

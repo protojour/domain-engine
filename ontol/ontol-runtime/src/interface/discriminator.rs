@@ -1,24 +1,12 @@
 use ::serde::{Deserialize, Serialize};
 use ontol_macros::OntolDebug;
 
-use crate::{interface::serde::SerdeDef, ontology::ontol::TextConstant, DefId, RelationshipId};
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct UnionDiscriminator {
-    pub variants: Vec<VariantDiscriminator>,
-}
+use crate::{ontology::ontol::TextConstant, DefId, RelationshipId};
 
 #[derive(Clone, Serialize, Deserialize, OntolDebug, Debug)]
 pub struct VariantDiscriminator {
     pub discriminant: Discriminant,
     pub purpose: VariantPurpose,
-    pub serde_def: SerdeDef,
-}
-
-impl VariantDiscriminator {
-    pub fn def_id(&self) -> DefId {
-        self.serde_def.def_id
-    }
 }
 
 #[derive(

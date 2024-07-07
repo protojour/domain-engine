@@ -7,7 +7,7 @@ use ontol_runtime::{
     interface::{
         discriminator::{
             leaf_discriminant_scalar_union_for_has_attribute, Discriminant,
-            LeafDiscriminantScalarUnion, VariantDiscriminator,
+            LeafDiscriminantScalarUnion,
         },
         graphql::{
             argument,
@@ -36,7 +36,7 @@ use crate::{
     def::{rel_def_meta, rel_repr_meta, DefKind, RelParams, RelReprMeta, TypeDefFlags},
     interface::serde::{serde_generator::SerdeGenerator, SerdeKey},
     phf_build::build_phf_index_map,
-    relation::{identifies_any, Property},
+    relation::{identifies_any, Property, UnionDiscriminatorVariant},
     repr::repr_model::{ReprKind, ReprScalarKind},
 };
 
@@ -402,8 +402,11 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         def_id: DefId,
         property_field_producer: PropertyFieldProducer,
     ) {
-        let mut interface_variants: Vec<(RelationshipId, RelationId, &[VariantDiscriminator])> =
-            Default::default();
+        let mut interface_variants: Vec<(
+            RelationshipId,
+            RelationId,
+            &[UnionDiscriminatorVariant],
+        )> = Default::default();
 
         // See if it should be an interface of flattened unions
         if let Some(table) = self.relations.properties_table_by_def_id(def_id) {
@@ -462,9 +465,9 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         interface_addr: TypeAddr,
         interface_def_id: DefId,
         property_field_producer: PropertyFieldProducer,
-        interface_variants: &[(RelationshipId, RelationId, &'c [VariantDiscriminator])],
+        interface_variants: &[(RelationshipId, RelationId, &'c [UnionDiscriminatorVariant])],
         interface_variant_index: usize,
-        permutations: &mut Vec<(RelationshipId, RelationId, &'c VariantDiscriminator)>,
+        permutations: &mut Vec<(RelationshipId, RelationId, &'c UnionDiscriminatorVariant)>,
     ) {
         if interface_variant_index < interface_variants.len() {
             let (relationship_id, relation_id, discriminators) =
@@ -503,7 +506,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         // Generate typename variant
         for (_, relation_id, discriminator) in permutations.iter() {
             let relation_def = self.partial_ontology.def(relation_id.0);
-            let variant_def = self.partial_ontology.def(discriminator.def_id());
+            let variant_def = self.partial_ontology.def(discriminator.def_id);
 
             fn typename_append(output: &mut std::string::String, name: &str) {
                 if name
@@ -551,7 +554,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     .iter()
                     .copied()
                     .map(|(relationship_id, _, discriminator)| {
-                        (relationship_id, discriminator.def_id())
+                        (relationship_id, discriminator.def_id)
                     })
                     .collect(),
             });
@@ -748,18 +751,20 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 )
             }
             (ReprKind::Unit, HarvestVariant::FlattenedUnionInterface(discriminator_table)) => {
-                let discriminators = discriminator_table.get(&rel_id).unwrap();
+                let variants = discriminator_table.get(&rel_id).unwrap();
 
                 let mut prop_keys: FnvHashSet<TextConstant> = Default::default();
-                for discriminator in discriminators.iter() {
-                    if let Discriminant::HasAttribute(_, prop_key, ..) = &discriminator.discriminant
+                for variant in variants.iter() {
+                    if let Discriminant::HasAttribute(_, prop_key, ..) =
+                        &variant.discriminator.discriminant
                     {
                         prop_keys.insert(*prop_key);
                     }
                 }
 
-                let scalar_union =
-                    leaf_discriminant_scalar_union_for_has_attribute(discriminators.iter());
+                let scalar_union = leaf_discriminant_scalar_union_for_has_attribute(
+                    variants.iter().map(|v| &v.discriminator),
+                );
 
                 if prop_keys.len() == 1 {
                     let unit_type_ref = if scalar_union == LeafDiscriminantScalarUnion::TEXT {
@@ -778,11 +783,11 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
                     let prop_key = &self.serde_gen.str_ctx[prop_keys.into_iter().next().unwrap()];
 
-                    let resolvers: FnvHashMap<DefId, RelationshipId> = discriminators
+                    let resolvers: FnvHashMap<DefId, RelationshipId> = variants
                         .iter()
-                        .filter_map(|discriminator| match &discriminator.discriminant {
+                        .filter_map(|variant| match &variant.discriminator.discriminant {
                             Discriminant::HasAttribute(relationship_id, ..) => {
-                                Some((discriminator.def_id(), *relationship_id))
+                                Some((variant.def_id, *relationship_id))
                             }
                             _ => None,
                         })
@@ -809,7 +814,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
                 let Some(table) = self
                     .relations
-                    .properties_table_by_def_id(union_discriminator.def_id())
+                    .properties_table_by_def_id(union_discriminator.def_id)
                 else {
                     return;
                 };
@@ -1006,8 +1011,8 @@ pub(super) fn get_native_scalar_kind(
 
 enum HarvestVariant<'c> {
     Object,
-    FlattenedUnionInterface(FnvHashMap<RelationshipId, &'c [VariantDiscriminator]>),
-    FlattenedUnionPermutation(FnvHashMap<RelationshipId, &'c VariantDiscriminator>),
+    FlattenedUnionInterface(FnvHashMap<RelationshipId, &'c [UnionDiscriminatorVariant]>),
+    FlattenedUnionPermutation(FnvHashMap<RelationshipId, &'c UnionDiscriminatorVariant>),
 }
 
 #[derive(Clone, Copy)]
