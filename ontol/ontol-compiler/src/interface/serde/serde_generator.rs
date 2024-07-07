@@ -691,6 +691,15 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: TextConstant,
         properties: &'c Properties,
     ) -> Option<OperatorAllocation> {
+        if true {
+            let mut def = def.clone();
+            def.modifier.remove(SerdeModifier::UNION);
+            def.modifier.remove(SerdeModifier::PRIMARY_ID);
+            let flags = self.struct_flags_from_def_id(def.def_id);
+
+            return Some(self.alloc_struct_operator(def, typename, properties, flags));
+        }
+
         let union_mod = SerdeModifier::UNION | SerdeModifier::PRIMARY_ID;
 
         if !def.modifier.contains(union_mod) {
@@ -944,7 +953,29 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             }
         }
 
+        self.estimate_identifiable_flag(def_id, &mut flags);
+
         flags
+    }
+
+    fn estimate_identifiable_flag(&self, def_id: DefId, flags: &mut SerdeStructFlags) {
+        let Some(properties) = self.rel_ctx.properties_by_def_id(def_id) else {
+            return;
+        };
+        if properties.identified_by.is_none() {
+            return;
+        }
+
+        let Some(table) = &properties.table else {
+            return;
+        };
+
+        if table.len() <= 1 {
+            return;
+        }
+
+        // NB: This flag is only an estimate at this point
+        flags.insert(SerdeStructFlags::IDENTIFIABLE);
     }
 
     pub(super) fn get_typename(&self, def_id: DefId) -> &'c str {

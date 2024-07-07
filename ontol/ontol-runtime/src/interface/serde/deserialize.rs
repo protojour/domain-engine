@@ -5,7 +5,7 @@ use serde::{
     Deserializer,
 };
 use smallvec::{smallvec, SmallVec};
-use tracing::{trace, warn};
+use tracing::{debug, trace, warn};
 
 use crate::{
     attr::{Attr, AttrMatrix},
@@ -14,6 +14,7 @@ use crate::{
         deserialize_id::IdSingletonStructVisitor,
         deserialize_struct::{PossibleProps, StructDeserializer, StructVisitor},
         matcher::map_matcher::MapMatchMode,
+        operator::SerdeStructFlags,
     },
     sequence::{IndexSetBuilder, ListBuilder, SequenceBuilder, WithCapacity},
     value::{Serial, Value, ValueTag},
@@ -239,22 +240,27 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 Ok(typed_attribute)
             }
             (SerdeOperator::Union(union_op), _) => {
+                debug!("deserialize union {:?}", union_op.union_def().def_id);
                 match union_op.applied_variants(self.mode, self.level) {
                     AppliedVariants::Unambiguous(addr) => {
                         self.narrow(addr).deserialize(deserializer)
                     }
-                    AppliedVariants::OneOf(variants) => deserializer.deserialize_any(
-                        UnionMatcher {
-                            typename: union_op.typename(),
-                            possible_variants: variants,
-                            ontology: self.ontology,
-                            ctx: self.ctx,
-                            profile: self.profile,
-                            mode: self.mode,
-                            level: self.level,
-                        }
-                        .into_visitor(self),
-                    ),
+                    AppliedVariants::OneOf(possible_variants) => {
+                        debug!("  {:?}", possible_variants.debug(self.ontology));
+
+                        deserializer.deserialize_any(
+                            UnionMatcher {
+                                typename: union_op.typename(),
+                                possible_variants,
+                                ontology: self.ontology,
+                                ctx: self.ctx,
+                                profile: self.profile,
+                                mode: self.mode,
+                                level: self.level,
+                            }
+                            .into_visitor(self),
+                        )
+                    }
                 }
             }
             (SerdeOperator::IdSingletonStruct(_, name, inner_addr), _) => deserializer
@@ -263,13 +269,15 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                     property_name: &self.ontology[*name],
                     inner_addr: *inner_addr,
                 }),
-            (SerdeOperator::Struct(struct_op), _) => deserializer.deserialize_map(StructVisitor {
-                processor: self,
-                buffered_attrs: Default::default(),
-                struct_op,
-                ctx: self.ctx,
-                raw_dynamic_entity: false,
-            }),
+            (SerdeOperator::Struct(struct_op), _) => {
+                debug!("deserialize struct NORMAL: {:?}", struct_op.flags);
+                deserializer.deserialize_map(StructVisitor {
+                    processor: self,
+                    buffered_attrs: Default::default(),
+                    struct_op,
+                    ctx: self.ctx,
+                })
+            }
         }
     }
 }
@@ -421,22 +429,69 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
 
         // delegate to the real struct visitor
         match match_ok.mode {
-            MapMatchMode::Struct(_, struct_op) => StructVisitor {
-                processor: self.processor,
-                buffered_attrs,
-                struct_op,
-                ctx: match_ok.ctx,
-                raw_dynamic_entity: false,
+            MapMatchMode::Struct(_, struct_op) => {
+                let output = StructDeserializer::new(
+                    struct_op.def.def_id,
+                    self.processor,
+                    PossibleProps::Any(&struct_op.properties),
+                    struct_op.flags,
+                    self.processor.level,
+                )
+                .with_required_props_bitset(struct_op.required_props_bitset(
+                    self.processor.mode,
+                    self.processor.ctx.parent_property_id,
+                    self.processor.profile.flags,
+                ))
+                .with_rel_params_addr(match_ok.ctx.rel_params_addr)
+                .deserialize_struct(buffered_attrs, map)?;
+
+                if output.resolved_to_id {
+                    Ok(Attr::unit_or_tuple(output.id.unwrap(), output.rel_params))
+                } else {
+                    Ok(Attr::unit_or_tuple(
+                        Value::Struct(
+                            Box::new(output.attributes),
+                            ValueTag::from(struct_op.def.def_id)
+                                .with_is_update(match_ok.ctx.is_update),
+                        ),
+                        output.rel_params,
+                    ))
+                }
             }
-            .visit_map(map),
-            MapMatchMode::RawDynamicEntity(struct_op) => StructVisitor {
-                processor: self.processor,
-                buffered_attrs,
-                struct_op,
-                ctx: match_ok.ctx,
-                raw_dynamic_entity: true,
+            MapMatchMode::RawDynamicEntity(struct_op) => {
+                let mut struct_deserializer = StructDeserializer::new(
+                    struct_op.def.def_id,
+                    self.processor,
+                    PossibleProps::Any(&struct_op.properties),
+                    struct_op.flags,
+                    self.processor.level,
+                )
+                .with_required_props_bitset(struct_op.required_props_bitset(
+                    self.processor.mode,
+                    self.processor.ctx.parent_property_id,
+                    self.processor.profile.flags,
+                ))
+                .with_rel_params_addr(match_ok.ctx.rel_params_addr);
+
+                let output = {
+                    struct_deserializer.dynamic_id_unchecked = true;
+                    let output = struct_deserializer.deserialize_struct(buffered_attrs, map)?;
+
+                    if output.id.is_some() {
+                        return Ok(Attr::unit_or_tuple(output.id.unwrap(), output.rel_params));
+                    } else {
+                        output
+                    }
+                };
+
+                Ok(Attr::unit_or_tuple(
+                    Value::Struct(
+                        Box::new(output.attributes),
+                        ValueTag::from(struct_op.def.def_id).with_is_update(match_ok.ctx.is_update),
+                    ),
+                    output.rel_params,
+                ))
             }
-            .visit_map(map),
             MapMatchMode::EntityId(entity_id, name_constant, addr) => {
                 let output = StructDeserializer::new(
                     entity_id,
@@ -445,6 +500,8 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                         name: &self.processor.ontology[name_constant],
                         addr,
                     },
+                    SerdeStructFlags::empty(),
+                    self.processor.level,
                 )
                 .with_rel_params_addr(match_ok.ctx.rel_params_addr)
                 .deserialize_struct(buffered_attrs, map)?;

@@ -158,7 +158,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                             panic!(
                                 "Discriminator not found while serializing union type {:?}: {:#?}",
                                 val.type_def_id(),
-                                possible_variants.into_iter().collect::<Vec<_>>()
+                                possible_variants.debug(self.ontology)
                             );
                         }
                     }
@@ -402,6 +402,44 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 panic!("attr matrix")
             }
         };
+
+        if value.tag().def_id() != struct_op.def.def_id {
+            if let Some(entity) = self
+                .ontology
+                .get_def(struct_op.def.def_id)
+                .unwrap()
+                .entity()
+            {
+                assert!(
+                    entity.id_value_def_id == value.tag().def_id(),
+                    "not the entity ID"
+                );
+
+                let (key, prop) = struct_op
+                    .properties
+                    .iter()
+                    .find(|(_, prop)| prop.is_entity_id())
+                    .unwrap();
+
+                let mut map = serializer.serialize_map(Some(1))?;
+                map.serialize_entry(
+                    &self.ontology[key.constant],
+                    &Proxy {
+                        attr: AttrRef::Unit(value),
+                        processor: self
+                            .new_child(prop.value_addr)
+                            .map_err(RecursionLimitError::to_ser_error)?,
+                    },
+                )?;
+                self.serialize_rel_params::<S>(
+                    &self.ontology.ontol_domain_meta().edge_property,
+                    rel_params,
+                    &mut map,
+                )?;
+
+                return map.end();
+            }
+        }
 
         let attributes = match value {
             Value::Struct(attributes, _) => attributes,

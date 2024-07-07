@@ -110,6 +110,27 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let SerdeOperator::Struct(struct_op) = &mut self.operators_by_addr[addr.0 as usize] else {
             panic!();
         };
+
+        // post-process IDENTIFIABLE
+        if struct_op.flags.contains(SerdeStructFlags::IDENTIFIABLE) {
+            let mut inherent_property_count = 0;
+
+            // BUG: This might not be accurate
+            // the point is to unset IDENTIFIABLE for self-identifying structs
+            // (structs whose only property is an identifier)
+            for (_, property) in serde_properties.values() {
+                if !property.flags.contains(SerdePropertyFlags::IN_ENTITY_GRAPH)
+                    && !property.flags.contains(SerdePropertyFlags::REL_PARAMS)
+                {
+                    inherent_property_count += 1;
+                }
+            }
+
+            if inherent_property_count <= 1 {
+                struct_op.flags.remove(SerdeStructFlags::IDENTIFIABLE);
+            }
+        }
+
         struct_op.properties = build_phf_index_map(serde_properties.into_values());
         struct_op.flags.extend(struct_flags);
     }

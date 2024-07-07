@@ -34,6 +34,10 @@ pub struct PhfIndexMap<V> {
 }
 
 impl<V> PhfMap<V> {
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
@@ -42,11 +46,19 @@ impl<V> PhfMap<V> {
         self.get_entry(key).is_some()
     }
 
+    #[inline]
     pub fn get(&self, key: &str) -> Option<&V> {
-        self.get_entry(key).map(|(_, value)| value)
+        self.get_entry_with_index(key).map(|(.., value)| value)
     }
 
+    #[inline]
     pub fn get_entry(&self, key: &str) -> Option<(&ArcStr, &V)> {
+        self.get_entry_with_index(key)
+            .map(|(_, key, value)| (key, value))
+    }
+
+    /// Get the entry along with the position in the map
+    pub fn get_entry_with_index(&self, key: &str) -> Option<(usize, &ArcStr, &V)> {
         if self.disps.is_empty() {
             return None;
         }
@@ -57,7 +69,7 @@ impl<V> PhfMap<V> {
         let entry_key = &entry.0.string;
 
         if entry_key == key {
-            Some((&entry.0.string, &entry.1))
+            Some((index as usize, &entry.0.string, &entry.1))
         } else {
             None
         }
@@ -81,6 +93,10 @@ impl<V> Default for PhfMap<V> {
 }
 
 impl<V> PhfIndexMap<V> {
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.map.entries.is_empty()
     }
@@ -89,12 +105,19 @@ impl<V> PhfIndexMap<V> {
         self.get_entry(key).is_some()
     }
 
+    #[inline]
     pub fn get(&self, key: &str) -> Option<&V> {
         self.map.get(key)
     }
 
+    #[inline]
     pub fn get_entry(&self, key: &str) -> Option<(&ArcStr, &V)> {
         self.map.get_entry(key)
+    }
+
+    /// get the raw inner map, that does not have a defined iteration order
+    pub fn raw_map(&self) -> &PhfMap<V> {
+        &self.map
     }
 
     pub fn iter(&self) -> IndexMapIter<V> {

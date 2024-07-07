@@ -104,6 +104,7 @@ impl<'on> DefBinding<'on> {
         new_constant_fake(self.ontology, self.def.id, processor_mode).unwrap()
     }
 
+    #[track_caller]
     pub fn entity_builder(
         &self,
         id: serde_json::Value,
@@ -214,6 +215,7 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
         }))
     }
 
+    #[track_caller]
     fn with_json_data(mut self, json: serde_json::Value) -> Self {
         let value = serde_create(self.binding)
             .to_attr_nocheck(json)

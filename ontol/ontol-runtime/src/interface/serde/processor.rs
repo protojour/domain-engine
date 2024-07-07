@@ -153,7 +153,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, OntolDebug)]
 pub enum ProcessorMode {
     Create,
     Read,
@@ -168,7 +168,7 @@ pub enum ProcessorMode {
     RawTreeOnly,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, OntolDebug)]
 pub struct ProcessorLevel {
     global_level: u16,
     recursion_limit: u16,

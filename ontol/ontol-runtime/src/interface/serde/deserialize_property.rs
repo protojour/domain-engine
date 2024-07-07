@@ -17,11 +17,11 @@ pub struct RelParamsAddr(pub Option<SerdeOperatorAddr>);
 
 /// The types of properties the deserializer understands.
 pub enum PropKind<'on> {
-    Property(&'on SerdeProperty, RelParamsAddr),
+    Property(usize, &'on SerdeProperty, RelParamsAddr),
     RelParams(SerdeOperatorAddr),
     SingletonId(SerdeOperatorAddr),
     OverriddenId(RelationshipId, SerdeOperatorAddr),
-    FlatUnionDiscriminator(Box<str>, &'on SerdeProperty, SerdeOperatorAddr),
+    FlatUnionDiscriminator(usize, Box<str>, &'on SerdeProperty, SerdeOperatorAddr),
     FlatUnionData(Box<str>),
     Open(smartstring::alias::String),
     Ignored,
@@ -51,7 +51,8 @@ impl<'a, 'de> Visitor<'de> for PropertyMapVisitor<'a> {
     }
 
     fn visit_str<E: Error>(self, v: &str) -> Result<PropKind<'a>, E> {
-        let Some(serde_property) = self.properties.get(v) else {
+        let Some((prop_idx, _, serde_property)) = self.properties.raw_map().get_entry_with_index(v)
+        else {
             return fallback(v, self.deserializer);
         };
 
@@ -76,10 +77,11 @@ impl<'a, 'de> Visitor<'de> for PropertyMapVisitor<'a> {
         {
             Ok(match &serde_property.kind {
                 SerdePropertyKind::Plain { rel_params_addr } => {
-                    PropKind::Property(serde_property, RelParamsAddr(*rel_params_addr))
+                    PropKind::Property(prop_idx, serde_property, RelParamsAddr(*rel_params_addr))
                 }
                 SerdePropertyKind::FlatUnionDiscriminator { union_addr } => {
                     PropKind::FlatUnionDiscriminator(
+                        prop_idx,
                         v.to_string().into_boxed_str(),
                         serde_property,
                         *union_addr,

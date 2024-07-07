@@ -450,9 +450,9 @@ fn serialize_schema_inline<S: Serializer>(
                 },
             )?;
 
-            let required_count =
-                struct_op.required_count(ctx.mode, None, ProcessorProfileFlags::default());
-            if required_count > 0 {
+            let required =
+                struct_op.required_props_bitset(ctx.mode, None, ProcessorProfileFlags::default());
+            if required.iter().count() > 0 {
                 map.serialize_entry(
                     "required",
                     &RequiredMapProperties {

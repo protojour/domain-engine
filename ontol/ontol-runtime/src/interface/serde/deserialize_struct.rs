@@ -3,12 +3,14 @@ use std::{
     ops::ControlFlow,
 };
 
+use bit_set::BitSet;
 use fnv::FnvHashMap;
 use serde::de::{DeserializeSeed, MapAccess, Visitor};
-use tracing::debug;
+use tracing::{debug, trace, trace_span};
 
 use crate::{
     attr::Attr,
+    debug::OntolDebug,
     format_utils::{DoubleQuote, LogicOp, Missing},
     interface::serde::deserialize_raw::RawVisitor,
     ontology::{domain::DefKind, ontol::ValueGenerator},
@@ -27,7 +29,10 @@ use super::{
         PossibleVariants, SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdeStructFlags,
         StructOperator,
     },
-    processor::{ProcessorProfileFlags, RecursionLimitError, SerdeProcessor, SubProcessorContext},
+    processor::{
+        ProcessorLevel, ProcessorMode, ProcessorProfileFlags, RecursionLimitError, SerdeProcessor,
+        SubProcessorContext,
+    },
     utils::BufferedAttrsReader,
 };
 
@@ -37,7 +42,11 @@ pub struct Struct {
     pub attributes: FnvHashMap<RelationshipId, Attr>,
     pub id: Option<Value>,
     pub rel_params: Value,
-    observed_required_count: usize,
+
+    /// Whether the struct was interpreted as only the ID of an existing entity
+    pub resolved_to_id: bool,
+
+    observed_props_bitset: BitSet,
 
     /// Pre-discriminated flattened unions
     flattened_union_ops: FnvHashMap<RelationshipId, SerdeOperatorAddr>,
@@ -57,7 +66,6 @@ pub struct StructVisitor<'on, 'p> {
 
     pub struct_op: &'on StructOperator,
     pub ctx: SubProcessorContext,
-    pub raw_dynamic_entity: bool,
 }
 
 /// The struct deserializer itself.
@@ -65,18 +73,20 @@ pub struct StructDeserializer<'on, 'p> {
     pub(super) type_def_id: DefId,
     pub(super) processor: SerdeProcessor<'on, 'p>,
     pub(super) flags: SerdeStructFlags,
+    level: ProcessorLevel,
 
     possible_props: PossibleProps<'on>,
 
-    /// The number of expected properties
-    expected_required_count: usize,
+    /// The required props
+    required_props_bitset: BitSet,
 
     /// The operator address for rel_params/edge
     pub(super) rel_params_addr: Option<SerdeOperatorAddr>,
 
-    /// Whether to handle "raw dynamic entity" deserialization
-    /// (i.e. dynamic ID/data detection)
-    raw_dynamic_entity: Option<DefId>,
+    pub(super) dynamic_id_unchecked: bool,
+    // Whether to handle "raw dynamic entity" deserialization
+    // (i.e. dynamic ID/data detection)
+    // pub(super) raw_dynamic_entity: Option<DefId>,
 }
 
 pub enum PossibleProps<'on> {
@@ -92,11 +102,12 @@ impl Default for Struct {
         Self {
             attributes: FnvHashMap::default(),
             id: None,
+            resolved_to_id: false,
             rel_params: Value::unit(),
             open_dict: BTreeMap::default(),
             flattened_union_ops: FnvHashMap::default(),
             flattened_union_tmp_data: HashMap::default(),
-            observed_required_count: 0,
+            observed_props_bitset: BitSet::default(),
         }
     }
 }
@@ -114,43 +125,39 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
 
     fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
         let type_def_id = self.struct_op.def.def_id;
-        let mut struct_deserializer = StructDeserializer::new(
+        let struct_deserializer = StructDeserializer::new(
             self.struct_op.def.def_id,
             self.processor,
             PossibleProps::Any(&self.struct_op.properties),
+            self.struct_op.flags,
+            self.processor.level,
         )
-        .with_struct_flags(self.struct_op.flags)
-        .with_expected_required_count(self.struct_op.required_count(
+        .with_required_props_bitset(self.struct_op.required_props_bitset(
             self.processor.mode,
             self.processor.ctx.parent_property_id,
             self.processor.profile.flags,
         ))
         .with_rel_params_addr(self.ctx.rel_params_addr);
 
-        let output = if self.raw_dynamic_entity {
-            struct_deserializer.raw_dynamic_entity = Some(type_def_id);
-            let output = struct_deserializer.deserialize_struct(self.buffered_attrs, map)?;
+        let output = struct_deserializer.deserialize_struct(self.buffered_attrs, map)?;
 
-            if output.id.is_some() {
-                return Ok(Attr::unit_or_tuple(output.id.unwrap(), output.rel_params));
-            } else {
-                output
-            }
+        if self
+            .struct_op
+            .flags
+            .contains(SerdeStructFlags::IDENTIFIABLE)
+            && output.id.is_some()
+            && output.resolved_to_id
+        {
+            Ok(Attr::unit_or_tuple(output.id.unwrap(), output.rel_params))
         } else {
-            struct_deserializer.deserialize_struct(self.buffered_attrs, map)?
-        };
-
-        let mut tag = ValueTag::from(type_def_id);
-        if self.ctx.is_update {
-            tag.set_is_update();
+            Ok(Attr::unit_or_tuple(
+                Value::Struct(
+                    Box::new(output.attributes),
+                    ValueTag::from(type_def_id).with_is_update(self.ctx.is_update),
+                ),
+                output.rel_params,
+            ))
         }
-
-        let boxed_attrs = Box::new(output.attributes);
-
-        Ok(Attr::unit_or_tuple(
-            Value::Struct(boxed_attrs, tag),
-            output.rel_params,
-        ))
     }
 }
 
@@ -159,25 +166,26 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         type_def_id: DefId,
         processor: SerdeProcessor<'on, 'p>,
         possible_props: PossibleProps<'on>,
+        flags: SerdeStructFlags,
+        level: ProcessorLevel,
     ) -> Self {
         Self {
             type_def_id,
             processor,
             possible_props,
-            flags: SerdeStructFlags::empty(),
-            expected_required_count: 0,
+            flags,
+            level,
+            required_props_bitset: BitSet::default(),
             rel_params_addr: None,
-            raw_dynamic_entity: None,
+            dynamic_id_unchecked: matches!(
+                processor.mode,
+                ProcessorMode::Raw | ProcessorMode::RawTreeOnly
+            ) && flags.contains(SerdeStructFlags::IDENTIFIABLE),
         }
     }
 
-    fn with_struct_flags(mut self, flags: SerdeStructFlags) -> Self {
-        self.flags = flags;
-        self
-    }
-
-    pub fn with_expected_required_count(mut self, count: usize) -> Self {
-        self.expected_required_count = count;
+    pub fn with_required_props_bitset(mut self, required: BitSet) -> Self {
+        self.required_props_bitset = required;
         self
     }
 
@@ -203,6 +211,12 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                     properties,
                 };
 
+                trace!(
+                    "deserialize properties {:?} {:#?}",
+                    self.processor.mode.debug(&()),
+                    properties.raw_map().debug(self.processor.ontology)
+                );
+
                 self.consume(buf_reader, prop_visitor, &mut output)?;
                 self.consume(map, prop_visitor, &mut output)?;
             }
@@ -218,9 +232,14 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             }
         }
 
-        match self.try_convert_to_raw_dynamic_id(output) {
-            Ok(id_struct) => Ok(id_struct),
-            Err(mut output) => {
+        match self
+            .try_convert_to_raw_dynamic_id(output)
+            .map_err(serde::de::Error::custom)?
+        {
+            IdOrStruct::Id(id_struct) => Ok(id_struct),
+            IdOrStruct::Struct(mut output) => {
+                debug!("not a dynamic id");
+
                 self.generate_missing_attributes(&mut output)
                     .map_err(serde::de::Error::custom)?;
 
@@ -249,7 +268,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
 
         let mut output = Struct::default();
 
-        for (key, serde_property) in properties.iter() {
+        for (prop_idx, (key, serde_property)) in properties.raw_map().iter().enumerate() {
             let property_processor = self
                 .processor
                 .new_child_with_context(
@@ -270,10 +289,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                 let attr = property_processor
                     .deserialize(serde_value::ValueDeserializer::<E>::new(serde_value))?;
                 output.attributes.insert(serde_property.rel_id, attr);
-
-                if !is_optional {
-                    output.observed_required_count += 1;
-                }
+                output.observed_props_bitset.insert(prop_idx);
             } else if !is_optional {
                 return Err(serde::de::Error::custom(format!(
                     "missing property `{}`",
@@ -340,10 +356,31 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                     output.attributes.insert(relationship_id, attr);
 
                     if !self.flags.contains(SerdeStructFlags::ENTITY_ID_OPTIONAL) {
-                        output.observed_required_count += 1;
+                        let PossibleProps::Any(properties) = self.possible_props else {
+                            panic!();
+                        };
+                        let (prop_idx, _) = properties
+                            .raw_map()
+                            .iter()
+                            .enumerate()
+                            .find(|(_, (_, prop))| prop.is_entity_id())
+                            .ok_or_else(|| {
+                                serde::de::Error::custom(
+                                    "corresponding id property for overridden id not found",
+                                )
+                            })?;
+
+                        output.observed_props_bitset.insert(prop_idx);
                     }
                 }
-                PropKind::Property(serde_property, rel_params_addr) => {
+                PropKind::Property(prop_idx, serde_property, rel_params_addr) => {
+                    let _entered = trace_span!(
+                        "prop",
+                        rel = ?serde_property.rel_id,
+                        addr = serde_property.value_addr.0
+                    )
+                    .entered();
+
                     let property_processor = self
                         .processor
                         .new_child_with_context(
@@ -356,6 +393,8 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                             },
                         )
                         .map_err(RecursionLimitError::to_de_error)?;
+
+                    output.observed_props_bitset.insert(prop_idx);
 
                     if serde_property
                         .is_optional_for(self.processor.mode, &self.processor.profile.flags)
@@ -371,10 +410,13 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                             map.next_value_seed(property_processor)?,
                         );
 
-                        output.observed_required_count += 1;
+                        debug!(
+                            "observe required prop {prop_idx} {:?}",
+                            serde_property.rel_id
+                        );
                     }
                 }
-                PropKind::FlatUnionDiscriminator(key, serde_property, union_addr) => {
+                PropKind::FlatUnionDiscriminator(prop_idx, key, serde_property, union_addr) => {
                     let SerdeOperator::Union(union_op) = &self.processor.ontology[union_addr]
                     else {
                         panic!("expected a union operator");
@@ -423,12 +465,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                         .flattened_union_ops
                         .insert(serde_property.rel_id, addr);
                     output.flattened_union_tmp_data.extend(buffer);
-
-                    if !serde_property
-                        .is_optional_for(self.processor.mode, &self.processor.profile.flags)
-                    {
-                        output.observed_required_count += 1;
-                    }
+                    output.observed_props_bitset.insert(prop_idx);
                 }
                 PropKind::FlatUnionData(key) => {
                     output
@@ -466,9 +503,10 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                 struct_op.def.def_id,
                 self.processor,
                 PossibleProps::Any(&struct_op.properties),
+                struct_op.flags,
+                self.processor.level,
             )
-            .with_struct_flags(struct_op.flags)
-            .with_expected_required_count(struct_op.required_count(
+            .with_required_props_bitset(struct_op.required_props_bitset(
                 self.processor.mode,
                 self.processor.ctx.parent_property_id,
                 self.processor.profile.flags,
@@ -506,22 +544,28 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
     }
 
     /// If in dynamic raw entity mode, try to convert to a singleton ID struct
-    fn try_convert_to_raw_dynamic_id(&self, mut output: Struct) -> Result<Struct, Struct> {
-        let Some(entity_def_id) = self.raw_dynamic_entity else {
-            return Err(output);
-        };
+    fn try_convert_to_raw_dynamic_id(&self, mut output: Struct) -> Result<IdOrStruct, String> {
         if output.attributes.len() != 1 {
-            return Err(output);
+            return Ok(IdOrStruct::Struct(output));
         }
 
         let (rel_id, _) = output.attributes.iter().next().unwrap();
-        let def = self.processor.ontology.def(entity_def_id);
+        let def = self.processor.ontology.def(self.type_def_id);
 
         let DefKind::Entity(entity) = &def.kind else {
-            return Err(output);
+            return Ok(IdOrStruct::Struct(output));
         };
         if *rel_id != entity.id_relationship_id {
-            return Err(output);
+            return Ok(IdOrStruct::Struct(output));
+        }
+
+        if self.flags.contains(SerdeStructFlags::IDENTIFIABLE) && !self.level.is_global_root() {
+            let mut items = vec![];
+            if self.try_report_missing_edge(&output, &mut items) {
+                return Err(format_missing_attrs_error(items));
+            }
+        } else if !self.dynamic_id_unchecked {
+            return Ok(IdOrStruct::Struct(output));
         }
 
         let attributes = std::mem::take(&mut output.attributes);
@@ -529,17 +573,24 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             Attr::Unit(id) => Some(id),
             _ => None,
         };
-        Ok(output)
+        output.resolved_to_id = true;
+        debug!("  made a dynamic entity id: {:?}", output.id);
+
+        Ok(IdOrStruct::Id(output))
     }
 
     /// Generate default values if missing
     fn generate_missing_attributes(&self, output: &mut Struct) -> Result<(), std::string::String> {
-        if output.observed_required_count >= self.expected_required_count {
+        if output
+            .observed_props_bitset
+            .is_superset(&self.required_props_bitset)
+        {
+            // early return: nothing needs to be generated
             return Ok(());
         }
 
         if let PossibleProps::Any(properties) = &self.possible_props {
-            for (_, property) in properties.iter() {
+            for (prop_idx, (_, property)) in properties.raw_map().iter().enumerate() {
                 // Only _default values_ are handled in the deserializer:
                 if let Some(ValueGenerator::DefaultProc(address)) = property.value_generator {
                     if !property.is_optional_for(self.processor.mode, &self.processor.profile.flags)
@@ -559,7 +610,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
 
                         // BUG: No support for rel_params:
                         output.attributes.insert(property.rel_id, value.into());
-                        output.observed_required_count += 1;
+                        output.observed_props_bitset.insert(prop_idx);
                     }
                 }
             }
@@ -569,19 +620,23 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
     }
 
     fn report_missing_attributes(&self, output: &Struct) -> Result<(), std::string::String> {
-        if output.observed_required_count >= self.expected_required_count
+        if output
+            .observed_props_bitset
+            .is_superset(&self.required_props_bitset)
             && (output.rel_params.is_unit() == self.rel_params_addr.is_none())
         {
+            // nothing is missing
             return Ok(());
         }
 
         debug!(
-            "Missing attributes(mode={:?}). Rel params match: {}, special_rel: {} parent_relationship: {:?} expected_required_count: {}",
-            self.processor.mode,
+            "Missing attributes(mode={:?}). Rel params match: {}, special_rel: {}, parent_relationship: {:?}, observed/expected: {:?}/{:?}",
+            self.processor.mode.debug(&()),
             output.rel_params.is_unit(),
             self.rel_params_addr.is_none(),
             self.processor.ctx.parent_property_id,
-            self.expected_required_count
+            output.observed_props_bitset,
+            self.required_props_bitset
         );
         for attr in &output.attributes {
             debug!("    attr {:?}", attr.0);
@@ -610,21 +665,34 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             PossibleProps::Any(properties) => properties
                 .iter()
                 .filter(|(_, property)| {
-                    property
-                        .filter(
-                            self.processor.mode,
-                            self.processor.ctx.parent_property_id,
-                            self.processor.profile.flags,
-                        )
-                        .is_some()
-                        && !property.is_optional()
-                        && !output.attributes.contains_key(&property.rel_id)
+                    !output.attributes.contains_key(&property.rel_id)
+                        && property
+                            .filter(
+                                self.processor.mode,
+                                self.processor.ctx.parent_property_id,
+                                self.processor.profile.flags,
+                            )
+                            .is_some()
+                        && !property
+                            .is_optional_for(self.processor.mode, &self.processor.profile.flags)
                 })
                 .map(|(key, _)| DoubleQuote(key.arc_str().as_str().into()))
                 .collect(),
             PossibleProps::IdSingleton { .. } => vec![],
         };
 
+        self.try_report_missing_edge(output, &mut items);
+
+        debug!("    items len: {}", items.len());
+
+        Err(format_missing_attrs_error(items))
+    }
+
+    fn try_report_missing_edge(
+        &self,
+        output: &Struct,
+        items: &mut Vec<DoubleQuote<String>>,
+    ) -> bool {
         if self.rel_params_addr.is_some() && output.rel_params.type_def_id() == DefId::unit() {
             items.push(DoubleQuote(
                 self.processor
@@ -633,16 +701,10 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                     .edge_property
                     .clone(),
             ));
+            true
+        } else {
+            false
         }
-
-        debug!("    items len: {}", items.len());
-
-        let missing_keys = Missing {
-            items,
-            logic_op: LogicOp::And,
-        };
-
-        Err(format!("missing properties, expected {missing_keys}"))
     }
 
     fn finalize_output(&self, output: &mut Struct) {
@@ -658,4 +720,18 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             );
         }
     }
+}
+
+fn format_missing_attrs_error(items: Vec<DoubleQuote<String>>) -> String {
+    let missing_keys = Missing {
+        items,
+        logic_op: LogicOp::And,
+    };
+
+    format!("missing properties, expected {missing_keys}")
+}
+
+enum IdOrStruct {
+    Id(Struct),
+    Struct(Struct),
 }

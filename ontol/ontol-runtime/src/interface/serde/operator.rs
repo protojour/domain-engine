@@ -4,6 +4,7 @@ use std::{
 };
 
 use ::serde::{Deserialize, Serialize};
+use bit_set::BitSet;
 use ontol_macros::OntolDebug;
 use thin_vec::ThinVec;
 
@@ -208,7 +209,7 @@ pub enum AppliedVariants<'on> {
     OneOf(PossibleVariants<'on>),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, OntolDebug)]
 pub struct PossibleVariants<'on> {
     all_variants: &'on [SerdeUnionVariant],
     mode: ProcessorMode,
@@ -307,7 +308,7 @@ impl<'on> PossibleVariantsIter<'on> {
     }
 }
 
-#[derive(Debug)]
+#[derive(OntolDebug)]
 pub struct PossibleVariant<'on> {
     pub discriminant: &'on Discriminant,
     pub purpose: VariantPurpose,
@@ -368,6 +369,35 @@ impl StructOperator {
             .filter(|(_, property)| !property.is_optional_for(mode, &profile_flags))
             .count()
     }
+
+    /// Get the bitset of required props
+    /// NB: The bitset has the order of the _inner_ PhfMap, not the ordered PhfIndexMap
+    pub fn required_props_bitset(
+        &self,
+        mode: ProcessorMode,
+        parent_property_id: Option<RelationshipId>,
+        profile_flags: ProcessorProfileFlags,
+    ) -> BitSet {
+        if profile_flags.contains(ProcessorProfileFlags::ALL_PROPS_OPTIONAL) {
+            BitSet::default()
+        } else {
+            BitSet::from_bit_vec(
+                self.properties
+                    .raw_map()
+                    .iter()
+                    .map(|(_, property)| {
+                        if let Some(property) =
+                            property.filter(mode, parent_property_id, profile_flags)
+                        {
+                            !property.is_optional_for(mode, &profile_flags)
+                        } else {
+                            false
+                        }
+                    })
+                    .collect(),
+            )
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, OntolDebug)]
@@ -408,6 +438,7 @@ impl SerdeProperty {
         self.is_optional()
             || (matches!(mode, ProcessorMode::Update | ProcessorMode::GraphqlUpdate)
                 && !self.is_entity_id())
+            || self.is_generator()
             || profile_flags.contains(ProcessorProfileFlags::ALL_PROPS_OPTIONAL)
     }
 
@@ -435,7 +466,7 @@ impl SerdeProperty {
     ) -> Option<&Self> {
         match mode {
             ProcessorMode::Create => {
-                if self.is_read_only() {
+                if self.is_read_only() && !self.is_entity_id() {
                     return None;
                 }
             }
@@ -510,7 +541,10 @@ bitflags::bitflags! {
     pub struct SerdeStructFlags: u8 {
         /// This struct operator supports open/domainless properties
         const OPEN_DATA          = 0b00000001;
-        const ENTITY_ID_OPTIONAL = 0b00000010;
+        /// An identifiable struct is a struct that has at least two properties:
+        /// at least one ID and at least one non-ID
+        const IDENTIFIABLE       = 0b00000010;
+        const ENTITY_ID_OPTIONAL = 0b00000100;
     }
 }
 

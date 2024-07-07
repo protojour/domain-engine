@@ -278,6 +278,13 @@ impl ValueTag {
         )
     }
 
+    pub fn with_is_update(mut self, is_update: bool) -> Self {
+        if is_update {
+            self.set_is_update()
+        }
+        self
+    }
+
     pub fn set_def_id(&mut self, def_id: DefId) {
         self.first = def_id.package_id().0 | (self.first & TagFlags::PKG_MASk.complement().bits());
         self.second = def_id.1;
