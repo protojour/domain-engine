@@ -104,7 +104,7 @@ impl UnionBuilder {
                 inner_def.modifier = SerdeModifier::PRIMARY_ID;
                 inner_def
             }
-            VariantPurpose::Data => {
+            VariantPurpose::Data | VariantPurpose::Identification2 => {
                 let cross_def_flags = self.def.modifier.cross_def_flags();
 
                 discriminator.serde_def.modifier |= SerdeModifier::INHERENT_PROPS;

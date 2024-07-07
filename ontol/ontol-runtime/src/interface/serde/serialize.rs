@@ -410,9 +410,11 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 .unwrap()
                 .entity()
             {
-                assert!(
-                    entity.id_value_def_id == value.tag().def_id(),
-                    "not the entity ID"
+                assert_eq!(
+                    value.tag().def_id(),
+                    entity.id_value_def_id,
+                    "not the entity ID for {:?}",
+                    struct_op.def.def_id
                 );
 
                 let (key, prop) = struct_op

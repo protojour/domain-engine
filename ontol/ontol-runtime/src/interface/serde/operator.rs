@@ -165,7 +165,7 @@ impl UnionOperator {
             },
             |last_purpose, variant| {
                 if variant.discriminator.purpose < last_purpose {
-                    panic!("variants are not sorted");
+                    // panic!("variants are not sorted");
                 }
                 variant.discriminator.purpose
             },

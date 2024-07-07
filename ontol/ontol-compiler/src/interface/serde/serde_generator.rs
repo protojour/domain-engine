@@ -697,6 +697,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             def.modifier.remove(SerdeModifier::PRIMARY_ID);
             let flags = self.struct_flags_from_def_id(def.def_id);
 
+            // Make the ID operator ready (if it exists)
+            self.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
+                def.def_id,
+                SerdeModifier::PRIMARY_ID | def.modifier.cross_def_flags(),
+            )));
+
             return Some(self.alloc_struct_operator(def, typename, properties, flags));
         }
 

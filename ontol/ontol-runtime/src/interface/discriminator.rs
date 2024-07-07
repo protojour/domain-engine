@@ -26,7 +26,10 @@ impl VariantDiscriminator {
 )]
 pub enum VariantPurpose {
     /// The purpose is explusively for identifying some entity
-    Identification { entity_id: DefId },
+    Identification {
+        entity_id: DefId,
+    },
+    Identification2,
     /// The purpose is providing _data_ for the data type, NOT entity identification
     Data,
     /// A combination of the two above, used in Raw deserialization:

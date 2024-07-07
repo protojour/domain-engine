@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use ontol_runtime::{
     debug::OntolDebug,
     interface::{
-        discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
+        discriminator::{Discriminant, PropCount, VariantDiscriminator, VariantPurpose},
         serde::{
             operator::{
                 SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdePropertyFlags,
@@ -29,7 +29,7 @@ use crate::{
 };
 
 use super::{
-    serde_generator::{insert_property, SerdeGenerator},
+    serde_generator::{insert_property, operator_to_leaf_discriminant, SerdeGenerator},
     union_builder::UnionBuilder,
     SerdeIntersection, SerdeKey, EDGE_PROPERTY,
 };
@@ -447,6 +447,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: TextConstant,
         properties: &'c Properties,
     ) {
+        if true {
+            self.populate_union_repr_operator2(addr, def, typename, properties);
+            return;
+        }
+
         let _entered = debug_span!("lazy_union", def=?def.def_id).entered();
 
         let union_discriminator = self
@@ -520,7 +525,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     VariantPurpose::Identification { entity_id } => {
                         cov_table.entry(entity_id).or_default().has_id = true;
                     }
-                    VariantPurpose::Data => {
+                    VariantPurpose::Data | VariantPurpose::Identification2 => {
                         cov_table
                             .entry(discriminator.serde_def.def_id)
                             .or_default()
@@ -569,6 +574,139 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         self.operators_by_addr[addr.0 as usize] =
             SerdeOperator::Union(Box::new(UnionOperator::new(typename, def, variants)));
+    }
+
+    pub(super) fn populate_union_repr_operator2(
+        &mut self,
+        addr: SerdeOperatorAddr,
+        def: SerdeDef,
+        typename: TextConstant,
+        _properties: &'c Properties,
+    ) {
+        let _entered = debug_span!("lazy_union", addr=?addr.0, def=?def.def_id).entered();
+
+        let union_discriminator = self
+            .rel_ctx
+            .union_discriminators
+            .get(&def.def_id)
+            .expect("no union discriminator available. Should fail earlier");
+
+        if union_discriminator.variants.is_empty() {
+            panic!("No input variants");
+        }
+
+        let mut serde_variants: Vec<SerdeUnionVariant> = vec![];
+
+        for source_discriminator in &union_discriminator.variants {
+            let type_def_id = match &source_discriminator.purpose {
+                VariantPurpose::Identification { entity_id } => *entity_id,
+                VariantPurpose::Data | VariantPurpose::Identification2 => {
+                    source_discriminator.def_id()
+                }
+                VariantPurpose::RawDynamicEntity => source_discriminator.def_id(),
+            };
+
+            let mut variant_serde_def = def.with_def(type_def_id);
+            variant_serde_def.modifier |= SerdeModifier::INHERENT_PROPS;
+
+            let addr = self.gen_addr_lazy(SerdeKey::Def(variant_serde_def));
+
+            let mut discriminator = source_discriminator.clone();
+            discriminator.purpose = match &source_discriminator.purpose {
+                VariantPurpose::Identification { .. } => VariantPurpose::Identification2,
+                _ => VariantPurpose::Data,
+            };
+
+            if let Some(addr) = addr {
+                debug!(
+                    "  made sub-operator: {:?} ",
+                    self.get_operator(addr).debug(self.str_ctx)
+                );
+
+                let variant = SerdeUnionVariant {
+                    discriminator,
+                    addr,
+                };
+
+                debug!(
+                    "add union serde variant: {:#?}",
+                    variant.debug(self.str_ctx)
+                );
+                serde_variants.push(variant);
+
+                if let Err(err) = self.try_add_id_variant(
+                    type_def_id,
+                    def.modifier.cross_def_flags(),
+                    addr,
+                    &mut serde_variants,
+                ) {
+                    debug!("id not added: {err}");
+                }
+            }
+        }
+
+        self.operators_by_addr[addr.0 as usize] =
+            SerdeOperator::Union(Box::new(UnionOperator::new(typename, def, serde_variants)));
+    }
+
+    fn try_add_id_variant(
+        &mut self,
+        type_def_id: DefId,
+        cross_def_flags: SerdeModifier,
+        target_addr: SerdeOperatorAddr,
+        serde_variants: &mut Vec<SerdeUnionVariant>,
+    ) -> Result<(), &str> {
+        let Some(properties) = self.rel_ctx.properties_by_def_id(type_def_id) else {
+            return Err("no properties");
+        };
+
+        let Some(identifies_relationship_id) = properties.identified_by else {
+            return Err("not identified");
+        };
+        let Some(id_addr) = self.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
+            type_def_id,
+            SerdeModifier::PRIMARY_ID | cross_def_flags,
+        ))) else {
+            // This type has no inherent id
+            return Err("no address for ID");
+        };
+
+        let (id_property_name, id_leaf_discriminant) =
+            match self.operators_by_addr.get(id_addr.0 as usize).unwrap() {
+                SerdeOperator::IdSingletonStruct(_entity_id, id_property_name, inner_addr) => (
+                    *id_property_name,
+                    if true {
+                        operator_to_leaf_discriminant(self.get_operator(*inner_addr))
+                    } else {
+                        panic!();
+                        // The point of using IsAny is that as soon as the `ìd_property_name`
+                        // matches, the variant has been found. The _value_ matcher
+                        // is then decided, without further fallback.
+                        // I.e. handled properly by its deserializer.
+                        // LeafDiscriminant::IsAny
+                    },
+                ),
+                other => panic!("id operator was not an Id: {:?}", other.debug(self.str_ctx)),
+            };
+
+        let id_variant = SerdeUnionVariant {
+            discriminator: VariantDiscriminator {
+                discriminant: Discriminant::HasAttribute(
+                    identifies_relationship_id,
+                    id_property_name,
+                    PropCount::Any,
+                    id_leaf_discriminant,
+                ),
+                purpose: VariantPurpose::Identification2,
+                serde_def: SerdeDef::new(type_def_id, cross_def_flags),
+            },
+            addr: target_addr,
+        };
+
+        debug!("add ID variant {:?}", id_variant.debug(self.str_ctx));
+
+        serde_variants.push(id_variant);
+        Ok(())
     }
 }
 

@@ -1,6 +1,7 @@
 use std::ops::ControlFlow;
 
 use ontol_macros::OntolDebug;
+use tracing::debug;
 
 use crate::{
     debug::OntolDebug,
@@ -200,6 +201,7 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                             scalar_discriminant,
                         )
                     {
+                        debug!("matched attribute name `{:?}`", property.as_ref());
                         return AttrMatch::Match(possible_variant);
                     }
                 }
@@ -240,6 +242,8 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                                 if entity_id == def_id {
                                     return AttrMatch::Match(variant);
                                 }
+                            } else if let VariantPurpose::Identification2 = variant.purpose {
+                                return AttrMatch::Match(variant);
                             }
                         }
                     }
@@ -261,7 +265,9 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
         // instead we have to fall back to relying on explicit type annotation.
         if matches!(
             variant_purpose,
-            VariantPurpose::Identification { .. } | VariantPurpose::RawDynamicEntity
+            VariantPurpose::Identification { .. }
+                | VariantPurpose::RawDynamicEntity
+                | VariantPurpose::Identification2
         ) && matches!(self.profile.id_format, ScalarFormat::RawText)
         {
             return false;
