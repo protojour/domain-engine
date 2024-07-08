@@ -159,18 +159,6 @@ impl UnionOperator {
         union_def: SerdeDef,
         variants: Vec<SerdeUnionVariant>,
     ) -> Self {
-        variants.iter().fold(
-            VariantPurpose::Identification {
-                entity_id: DefId::unit(),
-            },
-            |last_purpose, variant| {
-                if variant.discriminator.purpose < last_purpose {
-                    // panic!("variants are not sorted");
-                }
-                variant.discriminator.purpose
-            },
-        );
-
         Self {
             typename,
             union_def,
@@ -207,8 +195,10 @@ impl UnionOperator {
         &self.variants
     }
 
-    pub fn unfiltered_discriminators(&self) -> impl Iterator<Item = &VariantDiscriminator> {
-        self.variants.iter().map(|variant| &variant.discriminator)
+    pub fn unfiltered_discriminants(&self) -> impl Iterator<Item = &Discriminant> {
+        self.variants
+            .iter()
+            .map(|variant| &variant.discriminator.discriminant)
     }
 }
 
@@ -301,14 +291,12 @@ impl<'on> PossibleVariantsIter<'on> {
     fn filter_possible(
         variant: &'on SerdeUnionVariant,
         mode: ProcessorMode,
-        level: ProcessorLevel,
+        _level: ProcessorLevel,
     ) -> Option<&'on SerdeUnionVariant> {
         match (mode, variant.discriminator.purpose) {
             (ProcessorMode::Raw, VariantPurpose::RawDynamicEntity) => Some(variant),
-            (ProcessorMode::Raw, VariantPurpose::Identification { .. }) => None,
             (ProcessorMode::Delete, VariantPurpose::Data) => None,
             (_, VariantPurpose::RawDynamicEntity) => None,
-            (_, VariantPurpose::Identification { .. }) if level.is_global_root() => None,
             _ => Some(variant),
         }
     }

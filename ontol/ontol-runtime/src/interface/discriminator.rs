@@ -13,13 +13,10 @@ pub struct VariantDiscriminator {
     Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug,
 )]
 pub enum VariantPurpose {
-    /// The purpose is explusively for identifying some entity
-    Identification {
-        entity_id: DefId,
-    },
-    Identification2,
     /// The purpose is providing _data_ for the data type, NOT entity identification
     Data,
+    /// The purpose is to identify ID fields
+    Identification,
     /// A combination of the two above, used in Raw deserialization:
     /// Must dynamically support both the full data AND IdSingletonStruct if only the primary id is given.
     RawDynamicEntity,
@@ -29,15 +26,9 @@ pub enum VariantPurpose {
 pub enum Discriminant {
     MatchesLeaf(LeafDiscriminant),
     /// Has _any_ attribute that matches discriminant
-    HasAttribute(RelationshipId, TextConstant, PropCount, LeafDiscriminant),
+    HasAttribute(RelationshipId, TextConstant, LeafDiscriminant),
     /// Matches any struct
     StructFallback,
-}
-
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]
-pub enum PropCount {
-    One,
-    Any,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]
@@ -64,12 +55,12 @@ bitflags::bitflags! {
 
 /// Returns the type-set of scalar matchers for HasAttribute discriminants
 pub fn leaf_discriminant_scalar_union_for_has_attribute<'a>(
-    discriminator_iterator: impl Iterator<Item = &'a VariantDiscriminator>,
+    discriminant_iterator: impl Iterator<Item = &'a Discriminant>,
 ) -> LeafDiscriminantScalarUnion {
     let mut union = LeafDiscriminantScalarUnion::empty();
 
-    for discriminator in discriminator_iterator {
-        let Discriminant::HasAttribute(.., leaf_discriminant) = &discriminator.discriminant else {
+    for discriminant in discriminant_iterator {
+        let Discriminant::HasAttribute(.., leaf_discriminant) = discriminant else {
             continue;
         };
         match leaf_discriminant {

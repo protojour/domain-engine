@@ -158,7 +158,7 @@ fn artist_and_instrument_error_artist() {
 }
 
 #[test]
-fn artist_and_instrument_id_as_relation_object() {
+fn artist_and_instrument_id_as_relation_object_ok() {
     let test = examples::ARTIST_AND_INSTRUMENT.1.compile();
     let [artist, instrument_id] = test.bind(["artist", "instrument-id"]);
     let plays = artist.find_property("plays").unwrap();
@@ -207,20 +207,19 @@ fn artist_and_instrument_id_as_relation_object() {
         r#"missing properties, expected "_edge" at line 1 column 88"#
     );
 
-    // The following tests show that { "ID" } and the property map is a type union:
     assert_error_msg!(
         serde_create(&artist).to_value(json!({
             "name": "Tony Levin",
             "plays": [{ "ID": example_id, "name": "Chapman stick" }]
         })),
-        r#"unknown property `name` at line 1 column 92"#
+        r#"missing properties, expected "_edge" at line 1 column 109"#
     );
     assert_error_msg!(
         serde_create(&artist).to_value(json!({
             "name": "Allan Holdsworth",
             "plays": [{ "name": "Synthaxe", "ID": example_id }]
         })),
-        r#"unknown property `name` at line 1 column 98"#
+        r#"missing properties, expected "_edge" at line 1 column 110"#
     );
 }
 
@@ -238,7 +237,7 @@ fn artist_and_instrument_id_as_relation_object_invalid_id_format() {
                 }
             ]
         })),
-        r#"invalid type: string "junk", expected string matching /(?:\A(?:instrument/)((?:[0-9A-Fa-f]{32}|(?:[0-9A-Fa-f]{8}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{12})))\z)/ at line 1 column 40"#
+        r#"invalid type: string "junk", expected string matching /(?:\A(?:instrument/)((?:[0-9A-Fa-f]{32}|(?:[0-9A-Fa-f]{8}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{12})))\z)/ at line 1 column 39"#
     );
 }
 

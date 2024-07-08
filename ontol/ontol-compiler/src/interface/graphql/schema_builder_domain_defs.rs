@@ -755,15 +755,13 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
                 let mut prop_keys: FnvHashSet<TextConstant> = Default::default();
                 for variant in variants.iter() {
-                    if let Discriminant::HasAttribute(_, prop_key, ..) =
-                        &variant.discriminator.discriminant
-                    {
+                    if let Discriminant::HasAttribute(_, prop_key, ..) = &variant.discriminant {
                         prop_keys.insert(*prop_key);
                     }
                 }
 
                 let scalar_union = leaf_discriminant_scalar_union_for_has_attribute(
-                    variants.iter().map(|v| &v.discriminator),
+                    variants.iter().map(|v| &v.discriminant),
                 );
 
                 if prop_keys.len() == 1 {
@@ -785,7 +783,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
                     let resolvers: FnvHashMap<DefId, RelationshipId> = variants
                         .iter()
-                        .filter_map(|variant| match &variant.discriminator.discriminant {
+                        .filter_map(|variant| match &variant.discriminant {
                             Discriminant::HasAttribute(relationship_id, ..) => {
                                 Some((variant.def_id, *relationship_id))
                             }

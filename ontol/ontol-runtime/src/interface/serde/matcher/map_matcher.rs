@@ -6,7 +6,7 @@ use tracing::debug;
 use crate::{
     debug::OntolDebug,
     interface::{
-        discriminator::{Discriminant, LeafDiscriminant, PropCount, VariantPurpose},
+        discriminator::{Discriminant, LeafDiscriminant, VariantPurpose},
         serde::{
             operator::{
                 AppliedVariants, PossibleVariants, SerdeOperator, SerdeOperatorAddr,
@@ -49,7 +49,6 @@ pub enum MapMatchMode<'on> {
 enum AttrMatch<'on> {
     Unmatched,
     Match(&'on SerdeUnionVariant),
-    MatchIfSingleton(&'on SerdeUnionVariant),
 }
 
 impl<'on, 'p> MapMatcher<'on, 'p> {
@@ -91,10 +90,6 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                 }),
                 ControlFlow::Continue(()) => self.match_whole_buffer(buffer),
             },
-            AttrMatch::MatchIfSingleton(possible) => {
-                self.match_if_singleton = Some(possible);
-                ControlFlow::Continue(())
-            }
             AttrMatch::Unmatched => ControlFlow::Continue(()),
         }
     }
@@ -167,10 +162,6 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                             continue 'outer;
                         }
                     },
-                    AttrMatch::MatchIfSingleton(possible) => {
-                        self.match_if_singleton = Some(possible);
-                        return ControlFlow::Continue(());
-                    }
                     AttrMatch::Unmatched => {}
                 }
             }
@@ -188,12 +179,7 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
 
         for possible_variant in self.possible_variants.into_iter() {
             match possible_variant.discriminant() {
-                Discriminant::HasAttribute(
-                    _,
-                    match_property,
-                    PropCount::Any,
-                    scalar_discriminant,
-                ) => {
+                Discriminant::HasAttribute(_, match_property, scalar_discriminant) => {
                     if property.as_ref() == &self.ontology[*match_property]
                         && self.match_attribute_value(
                             value,
@@ -203,23 +189,6 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                     {
                         debug!("matched attribute name `{:?}`", property.as_ref());
                         return AttrMatch::Match(possible_variant);
-                    }
-                }
-                Discriminant::HasAttribute(
-                    _,
-                    match_property,
-                    PropCount::One,
-                    scalar_discriminant,
-                ) => {
-                    if property.as_ref() == &self.ontology[*match_property]
-                        && buffer.len() == 1
-                        && self.match_attribute_value(
-                            value,
-                            possible_variant.purpose(),
-                            scalar_discriminant,
-                        )
-                    {
-                        return AttrMatch::MatchIfSingleton(possible_variant);
                     }
                 }
                 _ => {}
@@ -236,13 +205,7 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                         for variant in self.possible_variants.into_iter() {
                             if variant.deserialize.def_id == def_id {
                                 return AttrMatch::Match(variant);
-                            } else if let VariantPurpose::Identification { entity_id } =
-                                variant.purpose()
-                            {
-                                if entity_id == &def_id {
-                                    return AttrMatch::Match(variant);
-                                }
-                            } else if let VariantPurpose::Identification2 = variant.purpose() {
+                            } else if let VariantPurpose::Identification = variant.purpose() {
                                 return AttrMatch::Match(variant);
                             }
                         }
@@ -265,9 +228,7 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
         // instead we have to fall back to relying on explicit type annotation.
         if matches!(
             variant_purpose,
-            VariantPurpose::Identification { .. }
-                | VariantPurpose::RawDynamicEntity
-                | VariantPurpose::Identification2
+            VariantPurpose::Identification | VariantPurpose::RawDynamicEntity
         ) && matches!(self.profile.id_format, ScalarFormat::RawText)
         {
             return false;

@@ -128,8 +128,8 @@ impl<'c, 'm> ConditionBuilder<'c, 'm> {
                     .find(|variant| variant.def_id == narrowed_def_id)
                     .expect("union variant not found");
 
-                match &variant.discriminator.discriminant {
-                    Discriminant::HasAttribute(relationship_id, _, _, leaf) => {
+                match &variant.discriminant {
+                    Discriminant::HasAttribute(relationship_id, _, leaf) => {
                         let variant_var = self.output.mk_cond_var();
 
                         self.output.add_clause(

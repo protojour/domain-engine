@@ -197,7 +197,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                             };
 
                             let scalar_union = leaf_discriminant_scalar_union_for_has_attribute(
-                                union_op.unfiltered_discriminators(),
+                                union_op.unfiltered_discriminants(),
                             );
 
                             if scalar_union == LeafDiscriminantScalarUnion::TEXT {

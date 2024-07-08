@@ -3,8 +3,8 @@ use std::collections::BTreeSet;
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
-    interface::discriminator::VariantDiscriminator, ontology::ontol::ValueGenerator,
-    property::Cardinality, DefId, PackageId, RelationshipId,
+    interface::discriminator::Discriminant, ontology::ontol::ValueGenerator, property::Cardinality,
+    DefId, PackageId, RelationshipId,
 };
 use tracing::warn;
 
@@ -86,8 +86,15 @@ pub struct UnionDiscriminator {
 
 #[derive(Debug)]
 pub struct UnionDiscriminatorVariant {
-    pub discriminator: VariantDiscriminator,
+    pub discriminant: Discriminant,
+    pub role: UnionDiscriminatorRole,
     pub def_id: DefId,
+}
+
+#[derive(Debug)]
+pub enum UnionDiscriminatorRole {
+    Data,
+    IdentifierOf(DefId),
 }
 
 #[derive(Default, Debug)]

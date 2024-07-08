@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use ontol_runtime::{
     debug::OntolDebug,
     interface::{
-        discriminator::{Discriminant, PropCount, VariantDiscriminator, VariantPurpose},
+        discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
         serde::{
             operator::{
                 SerdeDefAddr, SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdePropertyFlags,
@@ -24,7 +24,7 @@ use tracing::{debug, debug_span, warn};
 use crate::{
     def::{rel_def_meta, rel_repr_meta, RelParams, RelReprMeta},
     phf_build::build_phf_index_map,
-    relation::{identifies_any, Properties, Property},
+    relation::{identifies_any, Properties, Property, UnionDiscriminatorRole},
     repr::repr_model::{ReprKind, ReprScalarKind},
 };
 
@@ -603,10 +603,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let mut serde_variants: Vec<SerdeUnionVariant> = vec![];
 
         for source_variant in &union_discriminator.variants {
-            let type_def_id = match &source_variant.discriminator.purpose {
-                VariantPurpose::Identification { entity_id } => *entity_id,
-                VariantPurpose::Data | VariantPurpose::Identification2 => source_variant.def_id,
-                VariantPurpose::RawDynamicEntity => source_variant.def_id,
+            let type_def_id = match &source_variant.role {
+                UnionDiscriminatorRole::Data => source_variant.def_id,
+                UnionDiscriminatorRole::IdentifierOf(entity_id) => *entity_id,
             };
 
             let mut variant_serde_def = def.with_def(type_def_id);
@@ -614,10 +613,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
             let addr = self.gen_addr_lazy(SerdeKey::Def(variant_serde_def));
 
-            let mut discriminator = source_variant.discriminator.clone();
-            discriminator.purpose = match &source_variant.discriminator.purpose {
-                VariantPurpose::Identification { .. } => VariantPurpose::Identification2,
-                _ => VariantPurpose::Data,
+            let discriminator = VariantDiscriminator {
+                discriminant: source_variant.discriminant.clone(),
+                purpose: match &source_variant.role {
+                    UnionDiscriminatorRole::Data => VariantPurpose::Data,
+                    UnionDiscriminatorRole::IdentifierOf(_) => VariantPurpose::Identification,
+                },
             };
 
             if let Some(addr) = addr {
@@ -700,10 +701,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 discriminant: Discriminant::HasAttribute(
                     identifies_relationship_id,
                     id_property_name,
-                    PropCount::Any,
                     id_leaf_discriminant,
                 ),
-                purpose: VariantPurpose::Identification2,
+                purpose: VariantPurpose::Identification,
             },
             deserialize: SerdeDefAddr::new(type_def_id, struct_addr),
             serialize: SerdeDefAddr::new(identifies_meta.relationship.subject.0, id_addr),

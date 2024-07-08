@@ -3,9 +3,7 @@ use std::collections::HashSet;
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::{IndexMap, IndexSet};
 use ontol_runtime::{
-    interface::discriminator::{
-        Discriminant, LeafDiscriminant, PropCount, VariantDiscriminator, VariantPurpose,
-    },
+    interface::discriminator::{Discriminant, LeafDiscriminant},
     ontology::ontol::TextConstant,
     DefId, RelationshipId,
 };
@@ -16,7 +14,10 @@ use crate::{
     def::{rel_def_meta, Def, DefKind},
     error::CompileError,
     primitive::PrimitiveKind,
-    relation::{Constructor, Property, UnionDiscriminator, UnionDiscriminatorVariant},
+    relation::{
+        Constructor, Property, UnionDiscriminator, UnionDiscriminatorRole,
+        UnionDiscriminatorVariant,
+    },
     repr::repr_model::{ReprKind, ReprScalarKind},
     sequence::Sequence,
     strings::StringCtx,
@@ -359,7 +360,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             discriminant: Discriminant::HasAttribute(
                                 *rel_id,
                                 strings.intern_constant(property_name),
-                                PropCount::Any,
                                 LeafDiscriminant::IsTextLiteral(
                                     strings.intern_constant(string_literal),
                                 ),
@@ -524,11 +524,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             union_discriminator
                 .variants
                 .push(UnionDiscriminatorVariant {
-                    discriminator: VariantDiscriminator {
-                        discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsUnit),
-                        purpose: discriminator_type.into_purpose(&VariantKey::Instance),
-                        // serde_def: SerdeDef::new(def_id, SerdeModifier::NONE),
-                    },
+                    discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsUnit),
+                    role: discriminator_type.into_role(&VariantKey::Instance),
                     def_id,
                 });
         }
@@ -539,11 +536,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 union_discriminator
                     .variants
                     .push(UnionDiscriminatorVariant {
-                        discriminator: VariantDiscriminator {
-                            discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsInt),
-                            purpose: discriminator_type.into_purpose(&VariantKey::Instance),
-                            // serde_def: SerdeDef::new(def_id, SerdeModifier::NONE),
-                        },
+                        discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsInt),
+                        role: discriminator_type.into_role(&VariantKey::Instance),
                         def_id,
                     });
             }
@@ -553,12 +547,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     union_discriminator
                         .variants
                         .push(UnionDiscriminatorVariant {
-                            discriminator: VariantDiscriminator {
-                                purpose: discriminator_type.into_purpose(&keyed.key),
-                                discriminant: Discriminant::MatchesLeaf(
-                                    LeafDiscriminant::IsIntLiteral(literal),
-                                ),
-                            },
+                            discriminant: Discriminant::MatchesLeaf(
+                                LeafDiscriminant::IsIntLiteral(literal),
+                            ),
+                            role: discriminator_type.into_role(&keyed.key),
                             def_id,
                         });
                 }
@@ -572,25 +564,18 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             union_discriminator
                 .variants
                 .push(UnionDiscriminatorVariant {
-                    discriminator: VariantDiscriminator {
-                        purpose: discriminator_type.into_purpose(&keyed.key),
-                        discriminant: match (discriminator_type, keyed.key) {
-                            (DiscriminatorType::Data, _) => {
-                                Discriminant::MatchesLeaf(leaf_discriminant)
-                            }
-                            (
-                                DiscriminatorType::Identification,
-                                VariantKey::IdProperty { name, rel_id, .. },
-                            ) => Discriminant::HasAttribute(
-                                rel_id,
-                                name,
-                                PropCount::Any,
-                                leaf_discriminant,
-                            ),
-                            (DiscriminatorType::Identification, _) => {
-                                Discriminant::MatchesLeaf(leaf_discriminant)
-                            }
-                        },
+                    role: discriminator_type.into_role(&keyed.key),
+                    discriminant: match (discriminator_type, keyed.key) {
+                        (DiscriminatorType::Data, _) => {
+                            Discriminant::MatchesLeaf(leaf_discriminant)
+                        }
+                        (
+                            DiscriminatorType::Identification,
+                            VariantKey::IdProperty { name, rel_id, .. },
+                        ) => Discriminant::HasAttribute(rel_id, name, leaf_discriminant),
+                        (DiscriminatorType::Identification, _) => {
+                            Discriminant::MatchesLeaf(leaf_discriminant)
+                        }
                     },
                     def_id: variant_def_id,
                 });
@@ -602,10 +587,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 union_discriminator
                     .variants
                     .push(UnionDiscriminatorVariant {
-                        discriminator: VariantDiscriminator {
-                            discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsText),
-                            purpose: discriminator_type.into_purpose(&VariantKey::Instance),
-                        },
+                        discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsText),
+                        role: discriminator_type.into_role(&VariantKey::Instance),
                         def_id,
                     });
             }
@@ -615,15 +598,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     union_discriminator
                         .variants
                         .push(UnionDiscriminatorVariant {
-                            discriminator: VariantDiscriminator {
-                                purpose: discriminator_type.into_purpose(&keyed.key),
-                                discriminant: Discriminant::MatchesLeaf(
-                                    LeafDiscriminant::IsTextLiteral(
-                                        strings.intern_constant(&literal),
-                                    ),
-                                ),
-                                // serde_def: SerdeDef::new(def_id, SerdeModifier::NONE),
-                            },
+                            discriminant: Discriminant::MatchesLeaf(
+                                LeafDiscriminant::IsTextLiteral(strings.intern_constant(&literal)),
+                            ),
+                            role: discriminator_type.into_role(&keyed.key),
                             def_id,
                         });
                 }
@@ -634,11 +612,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             union_discriminator
                 .variants
                 .push(UnionDiscriminatorVariant {
-                    discriminator: VariantDiscriminator {
-                        discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsSequence),
-                        purpose: discriminator_type.into_purpose(&variant_keyed.key),
-                        // serde_def: SerdeDef::new(variant_keyed.value, SerdeModifier::NONE),
-                    },
+                    discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsSequence),
+                    role: discriminator_type.into_role(&variant_keyed.key),
                     def_id: variant_keyed.value,
                 });
         }
@@ -648,11 +623,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 union_discriminator
                     .variants
                     .push(UnionDiscriminatorVariant {
-                        discriminator: VariantDiscriminator {
-                            discriminant: candidate.discriminant,
-                            purpose: discriminator_type.into_purpose(&VariantKey::Instance),
-                            // serde_def: SerdeDef::new(map_discriminator.result_type, SerdeModifier::NONE),
-                        },
+                        discriminant: candidate.discriminant,
+                        role: discriminator_type.into_role(&VariantKey::Instance),
                         def_id: map_discriminator.result_type,
                     })
             }
@@ -753,13 +725,11 @@ enum DiscriminatorType {
 }
 
 impl DiscriminatorType {
-    fn into_purpose(self, key: &VariantKey) -> VariantPurpose {
+    fn into_role(self, key: &VariantKey) -> UnionDiscriminatorRole {
         match (self, key) {
-            (Self::Data, VariantKey::Instance) => VariantPurpose::Data,
+            (Self::Data, VariantKey::Instance) => UnionDiscriminatorRole::Data,
             (Self::Identification, VariantKey::IdProperty { entity_id, .. }) => {
-                VariantPurpose::Identification {
-                    entity_id: *entity_id,
-                }
+                UnionDiscriminatorRole::IdentifierOf(*entity_id)
             }
             _ => unreachable!(),
         }

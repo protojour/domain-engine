@@ -7,14 +7,12 @@ use indexmap::IndexMap;
 use ontol_runtime::{
     debug::OntolDebug,
     interface::{
-        discriminator::{
-            Discriminant, LeafDiscriminant, PropCount, VariantDiscriminator, VariantPurpose,
-        },
+        discriminator::LeafDiscriminant,
         serde::{
             operator::{
                 AliasOperator, ConstructorSequenceOperator, RelationSequenceOperator,
-                SequenceRange, SerdeDefAddr, SerdeOperator, SerdeOperatorAddr, SerdeProperty,
-                SerdeStructFlags, SerdeUnionVariant, StructOperator, UnionOperator,
+                SequenceRange, SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdeStructFlags,
+                StructOperator,
             },
             SerdeDef, SerdeModifier,
         },
@@ -686,105 +684,18 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: TextConstant,
         properties: &'c Properties,
     ) -> Option<OperatorAllocation> {
-        if true {
-            let mut def = def.clone();
-            def.modifier.remove(SerdeModifier::UNION);
-            def.modifier.remove(SerdeModifier::PRIMARY_ID);
-            let flags = self.struct_flags_from_def_id(def.def_id);
+        let mut def = def.clone();
+        def.modifier.remove(SerdeModifier::UNION);
+        def.modifier.remove(SerdeModifier::PRIMARY_ID);
+        let flags = self.struct_flags_from_def_id(def.def_id);
 
-            // Make the ID operator ready (if it exists)
-            self.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
-                def.def_id,
-                SerdeModifier::PRIMARY_ID | def.modifier.cross_def_flags(),
-            )));
-
-            return Some(self.alloc_struct_operator(def, typename, properties, flags));
-        }
-
-        let union_mod = SerdeModifier::UNION | SerdeModifier::PRIMARY_ID;
-
-        if !def.modifier.contains(union_mod) {
-            let flags = self.struct_flags_from_def_id(def.def_id);
-            return Some(self.alloc_struct_operator(def, typename, properties, flags));
-        }
-
-        let Some(identifies_relationship_id) = properties.identified_by else {
-            return Some(OperatorAllocation::Redirect(def.remove_modifier(union_mod)));
-        };
-        let Some(id_addr) = self.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
+        // Make the ID operator ready (if it exists)
+        self.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
             def.def_id,
             SerdeModifier::PRIMARY_ID | def.modifier.cross_def_flags(),
-        ))) else {
-            // This type has no inherent id
-            return Some(OperatorAllocation::Redirect(def.remove_modifier(union_mod)));
-        };
+        )));
 
-        let struct_def = def.remove_modifier(union_mod);
-        let identifies_meta = rel_def_meta(identifies_relationship_id, self.defs);
-
-        // prevent recursion
-        let new_addr = self.alloc_addr(&def);
-
-        // Create a union between { '_id' } and the map properties itself
-        let struct_properties_addr = self
-            .gen_addr_lazy(SerdeKey::Def(struct_def))
-            .expect("No property struct operator");
-
-        let (id_property_name, id_leaf_discriminant) =
-            match self.operators_by_addr.get(id_addr.0 as usize).unwrap() {
-                SerdeOperator::IdSingletonStruct(_entity_id, id_property_name, inner_addr) => (
-                    *id_property_name,
-                    if false {
-                        operator_to_leaf_discriminant(self.get_operator(*inner_addr))
-                    } else {
-                        // The point of using IsAny is that as soon as the `ìd_property_name`
-                        // matches, the variant has been found. The _value_ matcher
-                        // is then decided, without further fallback.
-                        // I.e. handled properly by its deserializer.
-                        LeafDiscriminant::IsAny
-                    },
-                ),
-                other => panic!("id operator was not an Id: {:?}", other.debug(self.str_ctx)),
-            };
-
-        Some(OperatorAllocation::Allocated(
-            new_addr,
-            SerdeOperator::Union(Box::new(UnionOperator::new(
-                typename,
-                def,
-                vec![
-                    SerdeUnionVariant {
-                        discriminator: VariantDiscriminator {
-                            discriminant: Discriminant::HasAttribute(
-                                identifies_relationship_id,
-                                id_property_name,
-                                PropCount::Any,
-                                id_leaf_discriminant,
-                            ),
-                            purpose: VariantPurpose::Identification {
-                                entity_id: def.def_id,
-                            },
-                        },
-                        deserialize: SerdeDefAddr::new(
-                            identifies_meta.relationship.subject.0,
-                            id_addr,
-                        ),
-                        serialize: SerdeDefAddr::new(
-                            identifies_meta.relationship.subject.0,
-                            id_addr,
-                        ),
-                    },
-                    SerdeUnionVariant {
-                        discriminator: VariantDiscriminator {
-                            discriminant: Discriminant::StructFallback,
-                            purpose: VariantPurpose::Data,
-                        },
-                        deserialize: SerdeDefAddr::new(struct_def.def_id, struct_properties_addr),
-                        serialize: SerdeDefAddr::new(struct_def.def_id, struct_properties_addr),
-                    },
-                ],
-            ))),
-        ))
+        Some(self.alloc_struct_operator(def, typename, properties, flags))
     }
 
     fn alloc_struct_intersection_operator(
