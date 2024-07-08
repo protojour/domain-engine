@@ -154,12 +154,11 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
     }
 
     fn match_map(&self) -> Result<MapMatcher<'on, 'p>, ()> {
-        if !self.possible_variants.into_iter().any(|variant| {
-            matches!(
-                variant.discriminant(),
-                Discriminant::StructFallback | Discriminant::HasAttribute(..)
-            )
-        }) {
+        if !self
+            .possible_variants
+            .into_iter()
+            .any(|variant| matches!(variant.discriminant(), Discriminant::HasAttribute(..)))
+        {
             // None of the discriminators are matching a map.
             return Err(());
         }

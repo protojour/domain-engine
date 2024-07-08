@@ -1,3 +1,5 @@
+//! discriminators for serde
+
 use ::serde::{Deserialize, Serialize};
 use ontol_macros::OntolDebug;
 
@@ -22,11 +24,9 @@ pub enum VariantPurpose {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]
 pub enum Discriminant {
     MatchesLeaf(LeafDiscriminant),
-    /// Has _any_ attribute that matches discriminant
+    /// Has _any_ struct attribute that matches discriminant
+    /// (it is implied that the value must a map/object!)
     HasAttribute(RelationshipId, TextConstant, LeafDiscriminant),
-    /// Matches any struct
-    /// FIXME: This is unused
-    StructFallback,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]

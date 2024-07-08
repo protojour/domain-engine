@@ -100,24 +100,6 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
             }
         }
 
-        for variant in self.possible_variants {
-            if matches!(variant.discriminant(), Discriminant::StructFallback) {
-                match &self.ontology[variant.deserialize.addr] {
-                    SerdeOperator::Struct(struct_op) => {
-                        return Ok(MatchOk {
-                            struct_op,
-                            addr: variant.deserialize.addr,
-                            ctx: self.ctx,
-                        })
-                    }
-                    other => panic!(
-                        "Matched discriminator is not a map type: {other:?}",
-                        other = other.debug(self.ontology)
-                    ),
-                }
-            }
-        }
-
         Err(())
     }
 
