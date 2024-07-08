@@ -1,7 +1,9 @@
 use std::slice;
 
+use itertools::Itertools;
+
 use crate::{
-    format_utils::{Backticks, LogicOp, Missing},
+    format_utils::{Backticks, LogicOp, LogicalConcat},
     interface::{
         discriminator::{Discriminant, LeafDiscriminant},
         serde::{
@@ -39,13 +41,14 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
             f,
             "{} ({})",
             Backticks(&self.ontology[self.typename]),
-            Missing {
+            LogicalConcat {
                 items: self
                     .possible_variants
                     .into_iter()
-                    .map(|discriminator| self
+                    .dedup_by(|a, b| { a.deserialize.def_id == b.deserialize.def_id })
+                    .map(|variant| self
                         .ontology
-                        .new_serde_processor(discriminator.deserialize.addr, self.mode))
+                        .new_serde_processor(variant.deserialize.addr, self.mode))
                     .collect(),
                 logic_op: LogicOp::Or,
             }

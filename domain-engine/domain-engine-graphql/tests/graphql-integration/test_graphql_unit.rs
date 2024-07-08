@@ -1230,7 +1230,7 @@ async fn guitar_synth_union_input_error_span() {
         .exec([], &schema, &gql_ctx_mock_data_store(&test, root(), ()))
         .await
         .unwrap_first_exec_error_msg(),
-        expected = "invalid type, expected `instrument` (one of id, id, `guitar`, `synth`) in input at line 4 column 20"
+        expected = "invalid type, expected `instrument` (`guitar` or `synth`) in input at line 4 column 20"
     );
 }
 

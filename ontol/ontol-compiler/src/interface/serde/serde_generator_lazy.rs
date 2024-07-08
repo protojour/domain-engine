@@ -628,7 +628,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 let variant = SerdeUnionVariant {
                     discriminator,
-                    deserialize: SerdeDefAddr::new(source_variant.def_id, addr),
+                    deserialize: SerdeDefAddr::new(type_def_id, addr),
                     serialize: SerdeDefAddr::new(type_def_id, addr),
                 };
 
@@ -657,7 +657,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         &mut self,
         type_def_id: DefId,
         cross_def_flags: SerdeModifier,
-        target_addr: SerdeOperatorAddr,
+        struct_addr: SerdeOperatorAddr,
         serde_variants: &mut Vec<SerdeUnionVariant>,
     ) -> Result<(), &str> {
         let Some(properties) = self.rel_ctx.properties_by_def_id(type_def_id) else {
@@ -705,7 +705,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 ),
                 purpose: VariantPurpose::Identification2,
             },
-            deserialize: SerdeDefAddr::new(type_def_id, target_addr),
+            deserialize: SerdeDefAddr::new(type_def_id, struct_addr),
             serialize: SerdeDefAddr::new(identifies_meta.relationship.subject.0, id_addr),
         };
 

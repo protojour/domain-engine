@@ -11,7 +11,7 @@ use tracing::{debug, trace, trace_span};
 use crate::{
     attr::Attr,
     debug::OntolDebug,
-    format_utils::{DoubleQuote, LogicOp, Missing},
+    format_utils::{DoubleQuote, LogicOp, LogicalConcat},
     interface::serde::deserialize_raw::RawVisitor,
     ontology::{domain::DefKind, ontol::ValueGenerator},
     phf::PhfIndexMap,
@@ -726,7 +726,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
 }
 
 fn format_missing_attrs_error(items: Vec<DoubleQuote<String>>) -> String {
-    let missing_keys = Missing {
+    let missing_keys = LogicalConcat {
         items,
         logic_op: LogicOp::And,
     };

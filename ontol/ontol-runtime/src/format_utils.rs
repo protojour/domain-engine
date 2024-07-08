@@ -1,11 +1,11 @@
 use std::fmt::{Debug, Display};
 
-pub struct Missing<T> {
+pub struct LogicalConcat<T> {
     pub items: Vec<T>,
     pub logic_op: LogicOp,
 }
 
-impl<T: Display> Display for Missing<T> {
+impl<T: Display> Display for LogicalConcat<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.items.as_slice() {
             [] => panic!("BUG: Nothing is missing!"),

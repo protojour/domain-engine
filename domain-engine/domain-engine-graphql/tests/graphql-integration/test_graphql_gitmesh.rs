@@ -57,7 +57,7 @@ async fn gitmesh_id_error() {
         .await
         .unwrap_first_exec_error_msg(),
         expected =
-            "invalid type, expected `RepositoryOwner` (id or id) in input at line 5 column 31"
+            "invalid type, expected `RepositoryOwner` (`User` or `Organization`) in input at line 5 column 31"
     );
 }
 
