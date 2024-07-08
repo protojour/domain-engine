@@ -17,9 +17,6 @@ pub enum VariantPurpose {
     Data,
     /// The purpose is to identify ID fields
     Identification,
-    /// A combination of the two above, used in Raw deserialization:
-    /// Must dynamically support both the full data AND IdSingletonStruct if only the primary id is given.
-    RawDynamicEntity,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]
@@ -28,6 +25,7 @@ pub enum Discriminant {
     /// Has _any_ attribute that matches discriminant
     HasAttribute(RelationshipId, TextConstant, LeafDiscriminant),
     /// Matches any struct
+    /// FIXME: This is unused
     StructFallback,
 }
 

@@ -269,15 +269,12 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                     property_name: &self.ontology[*name],
                     inner_addr: *inner_addr,
                 }),
-            (SerdeOperator::Struct(struct_op), _) => {
-                debug!("deserialize struct NORMAL: {:?}", struct_op.flags);
-                deserializer.deserialize_map(StructVisitor {
-                    processor: self,
-                    buffered_attrs: Default::default(),
-                    struct_op,
-                    ctx: self.ctx,
-                })
-            }
+            (SerdeOperator::Struct(struct_op), _) => deserializer.deserialize_map(StructVisitor {
+                processor: self,
+                buffered_attrs: Default::default(),
+                struct_op,
+                ctx: self.ctx,
+            }),
         }
     }
 }
@@ -463,40 +460,6 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                         output.rel_params,
                     ))
                 }
-            }
-            MapMatchMode::RawDynamicEntity(struct_op) => {
-                let mut struct_deserializer = StructDeserializer::new(
-                    struct_op.def.def_id,
-                    self.processor,
-                    PossibleProps::Any(&struct_op.properties),
-                    struct_op.flags,
-                    self.processor.level,
-                )
-                .with_required_props_bitset(struct_op.required_props_bitset(
-                    self.processor.mode,
-                    self.processor.ctx.parent_property_id,
-                    self.processor.profile.flags,
-                ))
-                .with_rel_params_addr(match_ok.ctx.rel_params_addr);
-
-                let output = {
-                    struct_deserializer.dynamic_id_unchecked = true;
-                    let output = struct_deserializer.deserialize_struct(buffered_attrs, map)?;
-
-                    if output.id.is_some() {
-                        return Ok(Attr::unit_or_tuple(output.id.unwrap(), output.rel_params));
-                    } else {
-                        output
-                    }
-                };
-
-                Ok(Attr::unit_or_tuple(
-                    Value::Struct(
-                        Box::new(output.attributes),
-                        ValueTag::from(struct_op.def.def_id).with_is_update(match_ok.ctx.is_update),
-                    ),
-                    output.rel_params,
-                ))
             }
             MapMatchMode::EntityId(entity_id, name_constant, addr) => {
                 let output = StructDeserializer::new(

@@ -84,9 +84,6 @@ pub struct StructDeserializer<'on, 'p> {
     pub(super) rel_params_addr: Option<SerdeOperatorAddr>,
 
     pub(super) dynamic_id_unchecked: bool,
-    // Whether to handle "raw dynamic entity" deserialization
-    // (i.e. dynamic ID/data detection)
-    // pub(super) raw_dynamic_entity: Option<DefId>,
 }
 
 pub enum PossibleProps<'on> {

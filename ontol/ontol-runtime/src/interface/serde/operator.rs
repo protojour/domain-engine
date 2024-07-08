@@ -294,9 +294,7 @@ impl<'on> PossibleVariantsIter<'on> {
         _level: ProcessorLevel,
     ) -> Option<&'on SerdeUnionVariant> {
         match (mode, variant.discriminator.purpose) {
-            (ProcessorMode::Raw, VariantPurpose::RawDynamicEntity) => Some(variant),
             (ProcessorMode::Delete, VariantPurpose::Data) => None,
-            (_, VariantPurpose::RawDynamicEntity) => None,
             _ => Some(variant),
         }
     }

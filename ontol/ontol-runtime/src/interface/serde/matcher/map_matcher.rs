@@ -1,7 +1,7 @@
 use std::ops::ControlFlow;
 
 use ontol_macros::OntolDebug;
-use tracing::debug;
+use tracing::trace;
 
 use crate::{
     debug::OntolDebug,
@@ -43,7 +43,6 @@ pub struct MatchOk<'on> {
 pub enum MapMatchMode<'on> {
     Struct(SerdeOperatorAddr, &'on StructOperator),
     EntityId(DefId, TextConstant, SerdeOperatorAddr),
-    RawDynamicEntity(&'on StructOperator),
 }
 
 enum AttrMatch<'on> {
@@ -187,7 +186,7 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                             scalar_discriminant,
                         )
                     {
-                        debug!("matched attribute name `{:?}`", property.as_ref());
+                        trace!("matched attribute name `{:?}`", property.as_ref());
                         return AttrMatch::Match(possible_variant);
                     }
                 }
@@ -202,10 +201,9 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
             {
                 if property.as_ref() == type_annotation_property {
                     if let Some(def_id) = profile_api.annotate_type(value) {
+                        trace!("type annotated as {def_id:?}");
                         for variant in self.possible_variants.into_iter() {
                             if variant.deserialize.def_id == def_id {
-                                return AttrMatch::Match(variant);
-                            } else if let VariantPurpose::Identification = variant.purpose() {
                                 return AttrMatch::Match(variant);
                             }
                         }
@@ -226,10 +224,8 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
         // Prevent ID pattern "injection":
         // When the id_format is RawText, it cannot not be used for disambiguation,
         // instead we have to fall back to relying on explicit type annotation.
-        if matches!(
-            variant_purpose,
-            VariantPurpose::Identification | VariantPurpose::RawDynamicEntity
-        ) && matches!(self.profile.id_format, ScalarFormat::RawText)
+        if matches!(variant_purpose, VariantPurpose::Identification)
+            && matches!(self.profile.id_format, ScalarFormat::RawText)
         {
             return false;
         }
@@ -267,9 +263,6 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
             &self.ontology[matched_variant.deserialize.addr],
             matched_variant.purpose(),
         ) {
-            (SerdeOperator::Struct(struct_op), VariantPurpose::RawDynamicEntity) => {
-                ControlFlow::Break(MapMatchMode::RawDynamicEntity(struct_op))
-            }
             (SerdeOperator::Struct(struct_op), _) => ControlFlow::Break(MapMatchMode::Struct(
                 matched_variant.deserialize.addr,
                 struct_op,
