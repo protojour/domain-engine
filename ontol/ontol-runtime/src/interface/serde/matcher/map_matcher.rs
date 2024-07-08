@@ -139,20 +139,19 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
         let (property, value) = &buffer[index];
 
         for possible_variant in self.possible_variants.into_iter() {
-            match possible_variant.discriminant() {
-                Discriminant::HasAttribute(_, match_property, scalar_discriminant) => {
-                    if property.as_ref() == &self.ontology[*match_property]
-                        && self.match_attribute_value(
-                            value,
-                            possible_variant.purpose(),
-                            scalar_discriminant,
-                        )
-                    {
-                        trace!("matched attribute name `{:?}`", property.as_ref());
-                        return AttrMatch::Match(possible_variant);
-                    }
+            if let Discriminant::HasAttribute(_, match_property, scalar_discriminant) =
+                possible_variant.discriminant()
+            {
+                if property.as_ref() == &self.ontology[*match_property]
+                    && self.match_attribute_value(
+                        value,
+                        possible_variant.purpose(),
+                        scalar_discriminant,
+                    )
+                {
+                    trace!("matched attribute name `{:?}`", property.as_ref());
+                    return AttrMatch::Match(possible_variant);
                 }
-                _ => {}
             }
         }
 

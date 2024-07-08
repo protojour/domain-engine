@@ -537,12 +537,10 @@ impl<'a> MetaQuery<'a> {
                             if *variant_def_id == tag.def_id() {
                                 assert!(entity.is_self_identifying);
                                 Some((variant_def_id, def))
+                            } else if entity.id_value_def_id == tag.def_id() {
+                                Some((variant_def_id, def))
                             } else {
-                                if entity.id_value_def_id == tag.def_id() {
-                                    Some((variant_def_id, def))
-                                } else {
-                                    None
-                                }
+                                None
                             }
                         })
                         .expect("union variant not identified"),

@@ -193,7 +193,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
 
         let prop_visitor = PropertyMapVisitor {
             deserializer: &self,
-            properties: &self.properties,
+            properties: self.properties,
         };
 
         trace!(

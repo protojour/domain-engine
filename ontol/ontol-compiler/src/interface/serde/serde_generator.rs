@@ -680,11 +680,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
     fn alloc_struct_constructor_operator(
         &mut self,
-        def: SerdeDef,
+        mut def: SerdeDef,
         typename: TextConstant,
         properties: &'c Properties,
     ) -> Option<OperatorAllocation> {
-        let mut def = def.clone();
         def.modifier.remove(SerdeModifier::UNION);
         def.modifier.remove(SerdeModifier::PRIMARY_ID);
         let flags = self.struct_flags_from_def_id(def.def_id);
