@@ -18,8 +18,7 @@ use crate::{
             },
         },
     },
-    ontology::{ontol::TextConstant, Ontology},
-    DefId,
+    ontology::Ontology,
 };
 
 /// A state machine for map matching
@@ -35,14 +34,9 @@ pub struct MapMatcher<'on, 'p> {
 
 #[derive(OntolDebug)]
 pub struct MatchOk<'on> {
-    pub mode: MapMatchMode<'on>,
+    pub struct_op: &'on StructOperator,
+    pub addr: SerdeOperatorAddr,
     pub ctx: SubProcessorContext,
-}
-
-#[derive(OntolDebug)]
-pub enum MapMatchMode<'on> {
-    Struct(SerdeOperatorAddr, &'on StructOperator),
-    EntityId(DefId, TextConstant, SerdeOperatorAddr),
 }
 
 enum AttrMatch<'on> {
@@ -83,10 +77,7 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
 
         match self.match_attribute(buffer, buffer.len() - 1) {
             AttrMatch::Match(variant) => match self.commit_match(variant) {
-                ControlFlow::Break(mode) => ControlFlow::Break(MatchOk {
-                    mode,
-                    ctx: self.ctx,
-                }),
+                ControlFlow::Break(match_ok) => ControlFlow::Break(match_ok),
                 ControlFlow::Continue(()) => self.match_whole_buffer(buffer),
             },
             AttrMatch::Unmatched => ControlFlow::Continue(()),
@@ -100,12 +91,9 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
         if let Some(variant) = std::mem::take(&mut self.match_if_singleton) {
             if buffer.len() == 1 {
                 return match self.commit_match(variant) {
-                    ControlFlow::Break(mode) => Ok(MatchOk {
-                        mode,
-                        ctx: self.ctx,
-                    }),
+                    ControlFlow::Break(match_ok) => Ok(match_ok),
                     ControlFlow::Continue(()) => match self.match_whole_buffer(buffer) {
-                        ControlFlow::Break(ok) => Ok(ok),
+                        ControlFlow::Break(match_ok) => Ok(match_ok),
                         ControlFlow::Continue(()) => Err(()),
                     },
                 };
@@ -117,13 +105,8 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                 match &self.ontology[variant.deserialize.addr] {
                     SerdeOperator::Struct(struct_op) => {
                         return Ok(MatchOk {
-                            mode: MapMatchMode::Struct(variant.deserialize.addr, struct_op),
-                            ctx: self.ctx,
-                        })
-                    }
-                    SerdeOperator::IdSingletonStruct(entity_id, name_constant, addr) => {
-                        return Ok(MatchOk {
-                            mode: MapMatchMode::EntityId(*entity_id, *name_constant, *addr),
+                            struct_op,
+                            addr: variant.deserialize.addr,
                             ctx: self.ctx,
                         })
                     }
@@ -150,11 +133,8 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
             for index in (0..buffer.len()).rev() {
                 match self.match_attribute(buffer, index) {
                     AttrMatch::Match(variant) => match self.commit_match(variant) {
-                        ControlFlow::Break(mode) => {
-                            return ControlFlow::Break(MatchOk {
-                                mode,
-                                ctx: self.ctx,
-                            });
+                        ControlFlow::Break(ok) => {
+                            return ControlFlow::Break(ok);
                         }
                         ControlFlow::Continue(()) => {
                             retry = true;
@@ -258,18 +238,16 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
     fn commit_match(
         &mut self,
         matched_variant: &'on SerdeUnionVariant,
-    ) -> ControlFlow<MapMatchMode<'on>> {
+    ) -> ControlFlow<MatchOk<'on>> {
         match (
             &self.ontology[matched_variant.deserialize.addr],
             matched_variant.purpose(),
         ) {
-            (SerdeOperator::Struct(struct_op), _) => ControlFlow::Break(MapMatchMode::Struct(
-                matched_variant.deserialize.addr,
+            (SerdeOperator::Struct(struct_op), _) => ControlFlow::Break(MatchOk {
                 struct_op,
-            )),
-            (SerdeOperator::IdSingletonStruct(entity_id, name_constant, addr), _) => {
-                ControlFlow::Break(MapMatchMode::EntityId(*entity_id, *name_constant, *addr))
-            }
+                addr: matched_variant.deserialize.addr,
+                ctx: self.ctx,
+            }),
             (SerdeOperator::Union(union_op), _) => {
                 match union_op.applied_deserialize_variants(self.mode, self.level) {
                     AppliedVariants::Unambiguous(_) => todo!(),

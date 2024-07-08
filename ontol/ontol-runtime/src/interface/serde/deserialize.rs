@@ -12,9 +12,8 @@ use crate::{
     debug::OntolDebug,
     interface::serde::{
         deserialize_id::IdSingletonStructVisitor,
-        deserialize_struct::{PossibleProps, StructDeserializer, StructVisitor},
-        matcher::map_matcher::MapMatchMode,
-        operator::SerdeStructFlags,
+        deserialize_struct::{StructDeserializer, StructVisitor},
+        matcher::map_matcher::MatchOk,
     },
     sequence::{IndexSetBuilder, ListBuilder, SequenceBuilder, WithCapacity},
     value::{Serial, Value, ValueTag},
@@ -424,63 +423,40 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
             m = match_ok.debug(self.processor.ontology)
         );
 
-        // delegate to the real struct visitor
-        match match_ok.mode {
-            MapMatchMode::Struct(addr, struct_op) => {
-                let _entered =
-                    trace_span!("match_ok", addr = addr.0, id = ?struct_op.def.def_id).entered();
+        let MatchOk {
+            struct_op, addr, ..
+        } = match_ok;
 
-                let output = StructDeserializer::new(
-                    struct_op.def.def_id,
-                    self.processor,
-                    PossibleProps::Any(&struct_op.properties),
-                    struct_op.flags,
-                    self.processor.level,
-                )
-                .with_required_props_bitset(struct_op.required_props_bitset(
-                    self.processor.mode,
-                    self.processor.ctx.parent_property_id,
-                    self.processor.profile.flags,
-                ))
-                .with_rel_params_addr(match_ok.ctx.rel_params_addr)
-                .deserialize_struct(buffered_attrs, map)?;
+        let _entered = trace_span!("match_ok", addr = addr.0, id = ?struct_op.def.def_id).entered();
 
-                if output.resolved_to_id {
-                    let mut id = output.id.unwrap();
-                    *(id.tag_mut()) = id.tag().with_is_update(match_ok.ctx.is_update);
+        let output = StructDeserializer::new(
+            struct_op.def.def_id,
+            self.processor,
+            &struct_op.properties,
+            struct_op.flags,
+            self.processor.level,
+        )
+        .with_required_props_bitset(struct_op.required_props_bitset(
+            self.processor.mode,
+            self.processor.ctx.parent_property_id,
+            self.processor.profile.flags,
+        ))
+        .with_rel_params_addr(match_ok.ctx.rel_params_addr)
+        .deserialize_struct(buffered_attrs, map)?;
 
-                    Ok(Attr::unit_or_tuple(id, output.rel_params))
-                } else {
-                    Ok(Attr::unit_or_tuple(
-                        Value::Struct(
-                            Box::new(output.attributes),
-                            ValueTag::from(struct_op.def.def_id)
-                                .with_is_update(match_ok.ctx.is_update),
-                        ),
-                        output.rel_params,
-                    ))
-                }
-            }
-            MapMatchMode::EntityId(entity_id, name_constant, addr) => {
-                let output = StructDeserializer::new(
-                    entity_id,
-                    self.processor,
-                    PossibleProps::IdSingleton {
-                        name: &self.processor.ontology[name_constant],
-                        addr,
-                    },
-                    SerdeStructFlags::empty(),
-                    self.processor.level,
-                )
-                .with_rel_params_addr(match_ok.ctx.rel_params_addr)
-                .deserialize_struct(buffered_attrs, map)?;
+        if output.resolved_to_id {
+            let mut id = output.id.unwrap();
+            *(id.tag_mut()) = id.tag().with_is_update(match_ok.ctx.is_update);
 
-                let id = output
-                    .id
-                    .ok_or_else(|| Error::custom("missing identifier attribute".to_string()))?;
-
-                Ok(Attr::unit_or_tuple(id, output.rel_params))
-            }
+            Ok(Attr::unit_or_tuple(id, output.rel_params))
+        } else {
+            Ok(Attr::unit_or_tuple(
+                Value::Struct(
+                    Box::new(output.attributes),
+                    ValueTag::from(struct_op.def.def_id).with_is_update(match_ok.ctx.is_update),
+                ),
+                output.rel_params,
+            ))
         }
     }
 }

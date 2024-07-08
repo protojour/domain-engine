@@ -21,10 +21,8 @@ use crate::{
 };
 
 use super::{
-    deserialize_property::{IdSingletonPropVisitor, PropKind, PropertyMapVisitor},
-    matcher::{
-        map_matcher::MapMatchMode, union_matcher::UnionMatcher, ExpectingMatching, ValueMatcher,
-    },
+    deserialize_property::{PropKind, PropertyMapVisitor},
+    matcher::{union_matcher::UnionMatcher, ExpectingMatching, ValueMatcher},
     operator::{
         PossibleVariants, SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdeStructFlags,
         StructOperator,
@@ -75,7 +73,7 @@ pub struct StructDeserializer<'on, 'p> {
     pub(super) flags: SerdeStructFlags,
     level: ProcessorLevel,
 
-    possible_props: PossibleProps<'on>,
+    properties: &'on PhfIndexMap<SerdeProperty>,
 
     /// The required props
     required_props_bitset: BitSet,
@@ -84,14 +82,6 @@ pub struct StructDeserializer<'on, 'p> {
     pub(super) rel_params_addr: Option<SerdeOperatorAddr>,
 
     pub(super) dynamic_id_unchecked: bool,
-}
-
-pub enum PossibleProps<'on> {
-    Any(&'on PhfIndexMap<SerdeProperty>),
-    IdSingleton {
-        name: &'on str,
-        addr: SerdeOperatorAddr,
-    },
 }
 
 impl Default for Struct {
@@ -125,7 +115,7 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
         let struct_deserializer = StructDeserializer::new(
             self.struct_op.def.def_id,
             self.processor,
-            PossibleProps::Any(&self.struct_op.properties),
+            &self.struct_op.properties,
             self.struct_op.flags,
             self.processor.level,
         )
@@ -162,14 +152,14 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
     pub fn new(
         type_def_id: DefId,
         processor: SerdeProcessor<'on, 'p>,
-        possible_props: PossibleProps<'on>,
+        properties: &'on PhfIndexMap<SerdeProperty>,
         flags: SerdeStructFlags,
         level: ProcessorLevel,
     ) -> Self {
         Self {
             type_def_id,
             processor,
-            possible_props,
+            properties,
             flags,
             level,
             required_props_bitset: BitSet::default(),
@@ -201,33 +191,19 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
 
         let buf_reader = BufferedAttrsReader::new(buffered_attrs);
 
-        match self.possible_props {
-            PossibleProps::Any(properties) => {
-                let prop_visitor = PropertyMapVisitor {
-                    deserializer: &self,
-                    properties,
-                };
+        let prop_visitor = PropertyMapVisitor {
+            deserializer: &self,
+            properties: &self.properties,
+        };
 
-                trace!(
-                    "deserialize properties {:?} {:#?}",
-                    self.processor.mode.debug(&()),
-                    properties.raw_map().debug(self.processor.ontology)
-                );
+        trace!(
+            "deserialize properties {:?} {:#?}",
+            self.processor.mode.debug(&()),
+            self.properties.raw_map().debug(self.processor.ontology)
+        );
 
-                self.consume(buf_reader, prop_visitor, &mut output)?;
-                self.consume(map, prop_visitor, &mut output)?;
-            }
-            PossibleProps::IdSingleton { name, addr } => {
-                let prop_visitor = IdSingletonPropVisitor {
-                    deserializer: &self,
-                    id_prop_name: name,
-                    id_prop_addr: addr,
-                };
-
-                self.consume(buf_reader, prop_visitor, &mut output)?;
-                self.consume(map, prop_visitor, &mut output)?;
-            }
-        }
+        self.consume(buf_reader, prop_visitor, &mut output)?;
+        self.consume(map, prop_visitor, &mut output)?;
 
         match self
             .try_convert_to_raw_dynamic_id(output)
@@ -259,13 +235,9 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         &self,
         all_attrs: &mut HashMap<Box<str>, serde_value::Value>,
     ) -> Result<Value, E> {
-        let PossibleProps::Any(properties) = &self.possible_props else {
-            panic!("expected any properties");
-        };
-
         let mut output = Struct::default();
 
-        for (prop_idx, (key, serde_property)) in properties.raw_map().iter().enumerate() {
+        for (prop_idx, (key, serde_property)) in self.properties.raw_map().iter().enumerate() {
             let property_processor = self
                 .processor
                 .new_child_with_context(
@@ -353,10 +325,8 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                     output.attributes.insert(relationship_id, attr);
 
                     if !self.flags.contains(SerdeStructFlags::ENTITY_ID_OPTIONAL) {
-                        let PossibleProps::Any(properties) = self.possible_props else {
-                            panic!();
-                        };
-                        let (prop_idx, _) = properties
+                        let (prop_idx, _) = self
+                            .properties
                             .raw_map()
                             .iter()
                             .enumerate()
@@ -452,15 +422,9 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                         },
                     };
 
-                    let MapMatchMode::Struct(addr, _) = match_ok.mode else {
-                        return Err(serde::de::Error::custom(
-                            "flattened union error: not a struct",
-                        ));
-                    };
-
                     output
                         .flattened_union_ops
-                        .insert(serde_property.rel_id, addr);
+                        .insert(serde_property.rel_id, match_ok.addr);
                     output.flattened_union_tmp_data.extend(buffer);
                     output.observed_props_bitset.insert(prop_idx);
                 }
@@ -499,7 +463,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             let struct_deserializer = StructDeserializer::new(
                 struct_op.def.def_id,
                 self.processor,
-                PossibleProps::Any(&struct_op.properties),
+                &struct_op.properties,
                 struct_op.flags,
                 self.processor.level,
             )
@@ -586,29 +550,27 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             return Ok(());
         }
 
-        if let PossibleProps::Any(properties) = &self.possible_props {
-            for (prop_idx, (_, property)) in properties.raw_map().iter().enumerate() {
-                // Only _default values_ are handled in the deserializer:
-                if let Some(ValueGenerator::DefaultProc(address)) = property.value_generator {
-                    if !property.is_optional_for(self.processor.mode, &self.processor.profile.flags)
-                        && !output.attributes.contains_key(&property.rel_id)
-                    {
-                        let procedure = Procedure {
-                            address,
-                            n_params: NParams(0),
-                        };
-                        let value = self
-                            .processor
-                            .ontology
-                            .new_vm(procedure)
-                            .run([])
-                            .map_err(|vm_error| format!("{vm_error}"))?
-                            .unwrap();
+        for (prop_idx, (_, property)) in self.properties.raw_map().iter().enumerate() {
+            // Only _default values_ are handled in the deserializer:
+            if let Some(ValueGenerator::DefaultProc(address)) = property.value_generator {
+                if !property.is_optional_for(self.processor.mode, &self.processor.profile.flags)
+                    && !output.attributes.contains_key(&property.rel_id)
+                {
+                    let procedure = Procedure {
+                        address,
+                        n_params: NParams(0),
+                    };
+                    let value = self
+                        .processor
+                        .ontology
+                        .new_vm(procedure)
+                        .run([])
+                        .map_err(|vm_error| format!("{vm_error}"))?
+                        .unwrap();
 
-                        // BUG: No support for rel_params:
-                        output.attributes.insert(property.rel_id, value.into());
-                        output.observed_props_bitset.insert(prop_idx);
-                    }
+                    // BUG: No support for rel_params:
+                    output.attributes.insert(property.rel_id, value.into());
+                    output.observed_props_bitset.insert(prop_idx);
                 }
             }
         }
@@ -639,44 +601,38 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             debug!("    attr {:?}", attr.0);
         }
 
-        if let PossibleProps::Any(properties) = &self.possible_props {
-            for prop in properties.iter() {
-                debug!(
-                    "    prop {:?}('{}') {:?} visible={} optional={}",
-                    prop.1.rel_id,
-                    prop.0.arc_str(),
-                    prop.1.flags,
-                    prop.1
+        for (key, prop) in self.properties.raw_map().iter() {
+            debug!(
+                "    prop {:?}('{}') {:?} visible={} optional={}",
+                prop.rel_id,
+                key.arc_str(),
+                prop.flags,
+                prop.filter(
+                    self.processor.mode,
+                    self.processor.ctx.parent_property_id,
+                    self.processor.profile.flags
+                )
+                .is_some(),
+                prop.is_optional()
+            );
+        }
+
+        let mut items = self
+            .properties
+            .iter()
+            .filter(|(_, property)| {
+                !output.attributes.contains_key(&property.rel_id)
+                    && property
                         .filter(
                             self.processor.mode,
                             self.processor.ctx.parent_property_id,
-                            self.processor.profile.flags
+                            self.processor.profile.flags,
                         )
-                        .is_some(),
-                    prop.1.is_optional()
-                );
-            }
-        };
-
-        let mut items: Vec<DoubleQuote<String>> = match &self.possible_props {
-            PossibleProps::Any(properties) => properties
-                .iter()
-                .filter(|(_, property)| {
-                    !output.attributes.contains_key(&property.rel_id)
-                        && property
-                            .filter(
-                                self.processor.mode,
-                                self.processor.ctx.parent_property_id,
-                                self.processor.profile.flags,
-                            )
-                            .is_some()
-                        && !property
-                            .is_optional_for(self.processor.mode, &self.processor.profile.flags)
-                })
-                .map(|(key, _)| DoubleQuote(key.arc_str().as_str().into()))
-                .collect(),
-            PossibleProps::IdSingleton { .. } => vec![],
-        };
+                        .is_some()
+                    && !property.is_optional_for(self.processor.mode, &self.processor.profile.flags)
+            })
+            .map(|(key, _)| DoubleQuote(key.arc_str().as_str().into()))
+            .collect();
 
         self.try_report_missing_edge(output, &mut items);
 
