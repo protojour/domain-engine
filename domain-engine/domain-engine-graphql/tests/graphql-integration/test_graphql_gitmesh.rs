@@ -20,6 +20,7 @@ use domain_engine_test_utils::{
 use ontol_macros::{datastore_test, test};
 use ontol_runtime::ontology::Ontology;
 use ontol_test_utils::{examples::GITMESH, expect_eq, SrcName, TestPackages};
+use tracing::info;
 
 async fn make_domain_engine(ontology: Arc<Ontology>, datastore: &str) -> DomainEngine {
     DomainEngine::builder(ontology)
@@ -66,6 +67,8 @@ async fn misc(ds: &str) {
         TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
 
+    info!("Create two users");
+
     r#"mutation {
         User(
             create: [
@@ -78,6 +81,8 @@ async fn misc(ds: &str) {
     .await
     .unwrap();
 
+    info!("Create duplicate user, should fail");
+
     r#"mutation {
         User(
             create: [{ id: "user/bob" email: "bob2@bob.com" }]
@@ -86,6 +91,8 @@ async fn misc(ds: &str) {
     .exec([], &schema, &ctx)
     .await
     .expect_err("user/bob already exists, so this should be an error");
+
+    info!("Create organization");
 
     r#"mutation {
         Organization(
@@ -103,6 +110,8 @@ async fn misc(ds: &str) {
     .exec([], &schema, &ctx)
     .await
     .unwrap();
+
+    info!("Create two repositories");
 
     r#"mutation {
         Repository(
@@ -230,7 +239,7 @@ async fn misc(ds: &str) {
         })),
     );
 
-    tracing::info!("Last query");
+    info!("Last query");
 
     // With all selections:
     expect_eq!(

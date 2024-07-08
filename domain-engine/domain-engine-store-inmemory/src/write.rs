@@ -349,10 +349,14 @@ impl InMemoryStore {
         let collection = self.vertices.get_mut(&struct_tag.def_id()).unwrap();
 
         if collection.contains_key(&vertex_key.dynamic_key) {
-            return Err(DomainError::EntityAlreadyExists);
+            if !entity.is_self_identifying {
+                return Err(DomainError::EntityAlreadyExists);
+            } else {
+                // "upsert", not an error
+            }
+        } else {
+            collection.insert(vertex_key.dynamic_key, raw_props);
         }
-
-        collection.insert(vertex_key.dynamic_key, raw_props);
 
         Ok(id)
     }

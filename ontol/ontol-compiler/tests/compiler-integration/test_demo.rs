@@ -1,4 +1,8 @@
 use ontol_macros::test;
+use ontol_runtime::interface::serde::{
+    operator::{SerdeOperator, SerdeStructFlags},
+    processor::ProcessorMode,
+};
 use ontol_test_utils::{
     examples::{DEMO, GITMESH},
     TestCompile,
@@ -96,4 +100,12 @@ fn test_gitmesh() {
 
     let organization_entity = organization.def.entity().unwrap();
     assert!(organization_entity.is_self_identifying);
+
+    let org_op = test
+        .ontology()
+        .new_serde_processor(organization.serde_operator_addr(), ProcessorMode::Create);
+    let SerdeOperator::Struct(org_op) = org_op.value_operator else {
+        panic!();
+    };
+    assert!(!org_op.flags.contains(SerdeStructFlags::PROPER_ENTITY));
 }

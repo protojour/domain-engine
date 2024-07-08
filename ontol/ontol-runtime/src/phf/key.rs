@@ -1,9 +1,10 @@
 use arcstr::ArcStr;
+use ontol_macros::OntolDebug;
 use serde::{Deserialize, Serialize, Serializer};
 
 use crate::ontology::ontol::TextConstant;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, OntolDebug)]
 pub struct PhfKey {
     pub string: ArcStr,
     pub constant: TextConstant,

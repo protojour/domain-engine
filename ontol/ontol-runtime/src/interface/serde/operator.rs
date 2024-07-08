@@ -562,9 +562,11 @@ bitflags::bitflags! {
     pub struct SerdeStructFlags: u8 {
         /// This struct operator supports open/domainless properties
         const OPEN_DATA          = 0b00000001;
-        /// An identifiable struct is a struct that has at least two properties:
-        /// at least one ID and at least one non-ID
-        const IDENTIFIABLE       = 0b00000010;
+        /// A "proper entity" struct is a struct that has at least two properties:
+        /// at least one ID property and at least one non-ID/data property.
+        /// The consequence for non-proper entities that has only an ID and no other data,
+        /// is that they are always deserialized in their struct form.
+        const PROPER_ENTITY      = 0b00000010;
         const ENTITY_ID_OPTIONAL = 0b00000100;
     }
 }

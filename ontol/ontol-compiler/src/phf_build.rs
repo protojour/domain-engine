@@ -1,6 +1,7 @@
 use arcstr::ArcStr;
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::{
+    debug::OntolDebug,
     ontology::ontol::TextConstant,
     phf::{PhfIndexMap, PhfKey, PhfMap},
 };
@@ -51,7 +52,10 @@ fn build<V>(entries: impl IntoIterator<Item = (PhfKey, V)>) -> (PhfMap<V>, Vec<u
             let hash_key = HashKey(phf_key.string.clone());
 
             if !duplication_guard.insert(phf_key.constant) {
-                panic!("BUG: duplicate key in phf map: {phf_key:?}");
+                panic!(
+                    "BUG: duplicate key in phf map: {key:?}",
+                    key = phf_key.debug(&())
+                );
             }
 
             let table_entry = (index, (phf_key, value));

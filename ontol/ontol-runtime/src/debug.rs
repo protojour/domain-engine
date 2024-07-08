@@ -78,6 +78,7 @@ impl_ontol_debug!(f64);
 impl_ontol_debug!(usize);
 impl_ontol_debug!(std::string::String);
 impl_ontol_debug!(smartstring::alias::String);
+impl_ontol_debug!(arcstr::ArcStr);
 impl_ontol_debug!(bit_vec::BitVec);
 
 impl<'a, T: ?Sized + OntolDebug> OntolDebug for &'a T {

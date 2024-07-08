@@ -143,6 +143,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     }
 
                     if property.is_read_only()
+                        && !property.is_entity_id()
                         && matches!(
                             typing_purpose,
                             TypingPurpose::Input | TypingPurpose::PartialInput

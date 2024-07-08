@@ -144,7 +144,7 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
         if self
             .struct_op
             .flags
-            .contains(SerdeStructFlags::IDENTIFIABLE)
+            .contains(SerdeStructFlags::PROPER_ENTITY)
             && output.id.is_some()
             && output.resolved_to_id
         {
@@ -180,7 +180,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             dynamic_id_unchecked: matches!(
                 processor.mode,
                 ProcessorMode::Raw | ProcessorMode::RawTreeOnly
-            ) && flags.contains(SerdeStructFlags::IDENTIFIABLE),
+            ) && flags.contains(SerdeStructFlags::PROPER_ENTITY),
         }
     }
 
@@ -559,7 +559,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             return Ok(IdOrStruct::Struct(output));
         }
 
-        if self.flags.contains(SerdeStructFlags::IDENTIFIABLE) && !self.level.is_global_root() {
+        if self.flags.contains(SerdeStructFlags::PROPER_ENTITY) && !self.level.is_global_root() {
             let mut items = vec![];
             if self.try_report_missing_edge(&output, &mut items) {
                 return Err(format_missing_attrs_error(items));
@@ -693,7 +693,10 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         output: &Struct,
         items: &mut Vec<DoubleQuote<String>>,
     ) -> bool {
-        if self.rel_params_addr.is_some() && output.rel_params.type_def_id() == DefId::unit() {
+        if self.rel_params_addr.is_some()
+            && output.rel_params.type_def_id() == DefId::unit()
+            && !matches!(self.processor.mode, ProcessorMode::Delete)
+        {
             items.push(DoubleQuote(
                 self.processor
                     .ontology

@@ -957,12 +957,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             }
         }
 
-        self.estimate_identifiable_flag(def_id, &mut flags);
+        self.estimate_proper_entity_flag(def_id, &mut flags);
 
         flags
     }
 
-    fn estimate_identifiable_flag(&self, def_id: DefId, flags: &mut SerdeStructFlags) {
+    fn estimate_proper_entity_flag(&self, def_id: DefId, flags: &mut SerdeStructFlags) {
         let Some(properties) = self.rel_ctx.properties_by_def_id(def_id) else {
             return;
         };
@@ -979,7 +979,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
 
         // NB: This flag is only an estimate at this point
-        flags.insert(SerdeStructFlags::IDENTIFIABLE);
+        flags.insert(SerdeStructFlags::PROPER_ENTITY);
     }
 
     pub(super) fn get_typename(&self, def_id: DefId) -> &'c str {

@@ -5,7 +5,7 @@ use serde::{
     Deserializer,
 };
 use smallvec::{smallvec, SmallVec};
-use tracing::{debug, trace, warn};
+use tracing::{debug, trace, trace_span, warn};
 
 use crate::{
     attr::{Attr, AttrMatrix},
@@ -429,7 +429,10 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
 
         // delegate to the real struct visitor
         match match_ok.mode {
-            MapMatchMode::Struct(_, struct_op) => {
+            MapMatchMode::Struct(addr, struct_op) => {
+                let _entered =
+                    trace_span!("match_ok", addr = addr.0, id = ?struct_op.def.def_id).entered();
+
                 let output = StructDeserializer::new(
                     struct_op.def.def_id,
                     self.processor,
@@ -446,7 +449,10 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                 .deserialize_struct(buffered_attrs, map)?;
 
                 if output.resolved_to_id {
-                    Ok(Attr::unit_or_tuple(output.id.unwrap(), output.rel_params))
+                    let mut id = output.id.unwrap();
+                    *(id.tag_mut()) = id.tag().with_is_update(match_ok.ctx.is_update);
+
+                    Ok(Attr::unit_or_tuple(id, output.rel_params))
                 } else {
                     Ok(Attr::unit_or_tuple(
                         Value::Struct(

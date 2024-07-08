@@ -110,8 +110,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             panic!();
         };
 
-        // post-process IDENTIFIABLE
-        if struct_op.flags.contains(SerdeStructFlags::IDENTIFIABLE) {
+        // post-process PROPER_ENTITY
+        if struct_op.flags.contains(SerdeStructFlags::PROPER_ENTITY) {
             let mut inherent_property_count = 0;
 
             // BUG: This might not be accurate
@@ -126,7 +126,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             }
 
             if inherent_property_count <= 1 {
-                struct_op.flags.remove(SerdeStructFlags::IDENTIFIABLE);
+                struct_op.flags.remove(SerdeStructFlags::PROPER_ENTITY);
             }
         }
 
