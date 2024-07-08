@@ -49,6 +49,7 @@ pub enum EdgeWriteMode {
     OverwriteInverse,
     UpdateExisting,
     Delete,
+    ExperimentalUpsertSelfIdentifying,
 }
 
 #[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]

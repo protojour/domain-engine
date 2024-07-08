@@ -34,6 +34,10 @@ use super::{
     AqlQuery, ArangoDatabase,
 };
 
+/// This enables an experiment that uses AQL UPSERT to insert self-identifying structs.
+/// Enabling this results in flaky arango tests - sometimes it works and sometimes not.
+const EXPERIMENTAL_UPSERT_SELF_IDENTIFYING: bool = true;
+
 impl AqlQuery {
     /// Build write-oriented AqlQuery from an entity Value and a Select
     pub fn build_write(
@@ -160,6 +164,24 @@ impl AqlQuery {
                             collection: collection.to_string(),
                             options: metadata.options.clone(),
                         })],
+                        EdgeWriteMode::ExperimentalUpsertSelfIdentifying => {
+                            vec![Operation::Upsert(Upsert {
+                                search: data.clone(),
+                                insert: Insert {
+                                    data: data.clone(),
+                                    collection: collection.to_string(),
+                                    options: None,
+                                },
+                                update: Update {
+                                    var: None,
+                                    data: "{}".to_string(),
+                                    collection: collection.to_string(),
+                                    options: None,
+                                },
+                                collection: collection.to_string(),
+                                options: Some(json!({ "ignoreErrors": true }).to_string()),
+                            })]
+                        }
                         EdgeWriteMode::Overwrite | EdgeWriteMode::OverwriteInverse => {
                             metadata.selection = Some(Selection::Loop(For {
                                 var: "obj".to_string(),
@@ -511,11 +533,16 @@ impl<'a> MetaQuery<'a> {
                         .iter()
                         .find_map(|variant_def_id| {
                             let def = self.ontology.def(*variant_def_id);
-                            let entity_info = def.entity().unwrap();
-                            if entity_info.id_value_def_id == tag.def_id() {
+                            let entity = def.entity().unwrap();
+                            if *variant_def_id == tag.def_id() {
+                                assert!(entity.is_self_identifying);
                                 Some((variant_def_id, def))
                             } else {
-                                None
+                                if entity.id_value_def_id == tag.def_id() {
+                                    Some((variant_def_id, def))
+                                } else {
+                                    None
+                                }
                             }
                         })
                         .expect("union variant not identified"),
@@ -527,10 +554,11 @@ impl<'a> MetaQuery<'a> {
                     .get(def_id)
                     .expect("collection should exist");
 
+                let entity = self.ontology.def(*def_id).entity().unwrap();
+
                 // handle simple id reference
                 if *def_id != tag.def_id() {
-                    let val = val.clone();
-
+                    let id_val = val.clone();
                     let def = self.ontology.def(*def_id);
                     let operator_addr = def.entity().unwrap().id_operator_addr;
                     let profile = self.database.profile();
@@ -544,7 +572,7 @@ impl<'a> MetaQuery<'a> {
                         .with_profile(&profile)
                         .with_known_context(id_context);
 
-                    let key = serialize(&val, &processor)
+                    let key = serialize(&id_val, &processor)
                         .as_str()
                         .expect("entity id should serialize to str")
                         .to_owned();
@@ -554,7 +582,7 @@ impl<'a> MetaQuery<'a> {
 
                     return self.write_relation_edge(
                         mode,
-                        val.tag(),
+                        id_val.tag(),
                         rel_params,
                         var_name,
                         id,
@@ -611,6 +639,10 @@ impl<'a> MetaQuery<'a> {
                 self.with.insert(collection.clone());
 
                 let entry = self.upserts.entry(collection.clone()).or_default();
+                if entity.is_self_identifying && EXPERIMENTAL_UPSERT_SELF_IDENTIFYING {
+                    entry.mode = Some(EdgeWriteMode::ExperimentalUpsertSelfIdentifying);
+                }
+
                 entry.var.clone_from(&var_name);
                 entry.data.push(data.to_string());
                 entry.return_vars = sub_meta.return_vars;

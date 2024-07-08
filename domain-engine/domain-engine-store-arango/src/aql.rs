@@ -781,6 +781,61 @@ mod tests {
     }
 
     #[test]
+    fn test_let_upsert() {
+        let aql = Query {
+            operations: Some(vec![Operation::Let(Let {
+                var: "test".to_string(),
+                query: Query {
+                    selection: None,
+                    operations: Some(vec![Operation::Upsert(Upsert {
+                        search: json!({
+                            "_key": "lolsoft",
+                        })
+                        .to_string(),
+                        insert: Insert {
+                            data: json!({ "_key": "lolsoft" }).to_string(),
+                            collection: "Organization".to_string(),
+                            options: None,
+                        },
+                        update: Update {
+                            var: None,
+                            data: "{}".to_string(),
+                            collection: "Organization".to_string(),
+                            options: None,
+                        },
+                        collection: "Organization".to_string(),
+                        options: None,
+                    })]),
+                    returns: Return {
+                        var: "NEW".to_string(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            })]),
+            returns: Return {
+                var: "test".to_string(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        expect_eq!(
+            expected = indoc! {r#"
+            LET test = (
+                UPSERT {"_key":"lolsoft"}
+                INSERT {"_key":"lolsoft"}
+                UPDATE {}
+                IN Organization
+                RETURN NEW
+            )
+            RETURN test
+            "#},
+            actual = format!("{aql}")
+        );
+    }
+
+    #[test]
     fn test_let_data() {
         let aql = Query {
             operations: Some(vec![
