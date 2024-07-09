@@ -317,6 +317,9 @@ impl Display for Query {
                         writeln!(f, "{indent}INSERT {}", op.insert.data)?;
                         writeln!(f, "{indent}UPDATE {}", op.update.data)?;
                         writeln!(f, "{indent}IN {}", op.collection)?;
+                        if let Some(options) = &op.options {
+                            write!(f, "{indent}OPTIONS {options}")?;
+                        }
                     }
                     _ => writeln!(f, "{indent}{op}")?,
                 }

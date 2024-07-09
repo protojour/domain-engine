@@ -34,10 +34,6 @@ use super::{
     AqlQuery, ArangoDatabase,
 };
 
-/// This enables an experiment that uses AQL UPSERT to insert self-identifying structs.
-/// Enabling this results in flaky arango tests - sometimes it works and sometimes not.
-const EXPERIMENTAL_UPSERT_SELF_IDENTIFYING: bool = true;
-
 impl AqlQuery {
     /// Build write-oriented AqlQuery from an entity Value and a Select
     pub fn build_write(
@@ -164,7 +160,7 @@ impl AqlQuery {
                             collection: collection.to_string(),
                             options: metadata.options.clone(),
                         })],
-                        EdgeWriteMode::ExperimentalUpsertSelfIdentifying => {
+                        EdgeWriteMode::UpsertSelfIdentifying => {
                             vec![Operation::Upsert(Upsert {
                                 search: data.clone(),
                                 insert: Insert {
@@ -179,7 +175,9 @@ impl AqlQuery {
                                     options: None,
                                 },
                                 collection: collection.to_string(),
-                                options: Some(json!({ "ignoreErrors": true }).to_string()),
+                                options: Some(
+                                    json!({ "ignoreErrors": true, "exclusive": true }).to_string(),
+                                ),
                             })]
                         }
                         EdgeWriteMode::Overwrite | EdgeWriteMode::OverwriteInverse => {
@@ -637,8 +635,8 @@ impl<'a> MetaQuery<'a> {
                 self.with.insert(collection.clone());
 
                 let entry = self.upserts.entry(collection.clone()).or_default();
-                if entity.is_self_identifying && EXPERIMENTAL_UPSERT_SELF_IDENTIFYING {
-                    entry.mode = Some(EdgeWriteMode::ExperimentalUpsertSelfIdentifying);
+                if entity.is_self_identifying {
+                    entry.mode = Some(EdgeWriteMode::UpsertSelfIdentifying);
                 }
 
                 entry.var.clone_from(&var_name);
