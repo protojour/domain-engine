@@ -12,7 +12,7 @@ def spec_version_object (
 )
 
 /// Type providing the `created` and `modified` properties
-def created_modified_object (
+def created_object (
     /// The **created** property represents the time at which the object was originally created.
     ///
     /// The object creator can use the time it deems most appropriate as the time the object was created. The minimum precision **MUST** be milliseconds (three digits after the decimal place in seconds), but **MAY** be more precise.
@@ -21,7 +21,10 @@ def created_modified_object (
     ///
     /// See section [3.6](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_rye5q2hkacu) for further definition of versioning.
     rel* 'created': common.timestamp
+)
 
+/// Type providing the `created` and `modified` properties
+def modified_object (
     /// The **modified** property is only used by STIX Objects that support versioning and represents the time that this particular version of the object was last modified.
     ///
     /// The object creator can use the time it deems most appropriate as the time this version of the object was modified.
@@ -34,6 +37,7 @@ def created_modified_object (
     /// See section [3.6](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_rye5q2hkacu) for further definition of versioning.
     rel* 'modified': common.timestamp
 )
+
 
 /// Type providing the `confidence` property
 def confidence_object (
