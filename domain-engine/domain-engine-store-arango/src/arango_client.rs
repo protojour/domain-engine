@@ -7,7 +7,7 @@ use ontol_runtime::{
         processor::{ProcessorProfile, ProcessorProfileFlags, ScalarFormat},
     },
     ontology::{
-        domain::{DataRelationshipKind, Def},
+        domain::{DataRelationshipKind, Def, EdgeInfo},
         ontol::TextConstant,
         Ontology,
     },
@@ -374,38 +374,8 @@ impl ArangoDatabase {
 
         // edges
         for (edge_id, edge_info) in domain.edges() {
-            let name = if let Some(store_key) = edge_info.store_key {
-                self.ontology[store_key].to_string()
-            } else {
-                let name = subject_names_by_edge_id
-                    .get(edge_id)
-                    .copied()
-                    .ok_or_else(|| anyhow!("edge subject name not found for {edge_id:?}"))?;
-                let mut name = self.ontology[name]
-                    .to_ascii_lossy()
-                    .replace("[?]", "_")
-                    .to_string();
-
-                for other_edge_collection in self.edge_collections.values_mut() {
-                    if name == other_edge_collection.name {
-                        // return Err(anyhow!("duplicate edge name: {name}"));
-
-                        if let Some(type_disambiguation) =
-                            edge_info.cardinals[0].target.iter().next()
-                        {
-                            let prefix =
-                            self.collections.get(type_disambiguation).ok_or_else(|| {
-                                anyhow!("cannot disambiguate for `{name}` {edge_id:?}: {type_disambiguation:?}")
-                            })?;
-
-                            name = format!("{prefix}_{name}");
-                        }
-                    }
-                }
-
-                name
-            };
-
+            let name =
+                self.find_edge_collection_name(*edge_id, edge_info, &subject_names_by_edge_id)?;
             debug!("register edge collection {name}: edge_id={edge_id:?}");
 
             let rel_params = if edge_info.cardinals.len() > 2 {
@@ -420,6 +390,65 @@ impl ArangoDatabase {
         }
 
         Ok(())
+    }
+
+    fn find_edge_collection_name(
+        &self,
+        edge_id: EdgeId,
+        edge_info: &EdgeInfo,
+        subject_names_by_edge_id: &HashMap<EdgeId, TextConstant>,
+    ) -> anyhow::Result<String> {
+        if let Some(store_key) = edge_info.store_key {
+            return Ok(self.ontology[store_key].to_string());
+        }
+
+        if let Some(name) = subject_names_by_edge_id.get(&edge_id).copied() {
+            let mut name = self.ontology[name]
+                .to_ascii_lossy()
+                .replace("[?]", "_")
+                .to_string();
+
+            for other_edge_collection in self.edge_collections.values() {
+                if name == other_edge_collection.name {
+                    // return Err(anyhow!("duplicate edge name: {name}"));
+
+                    if let Some(type_disambiguation) = edge_info.cardinals[0].target.iter().next() {
+                        let prefix =
+                            self.collections.get(type_disambiguation).ok_or_else(|| {
+                                anyhow!(
+                                    "cannot disambiguate for `{name}` {edge_id:?}: {type_disambiguation:?}"
+                                )
+                            })?;
+
+                        name = format!("{prefix}_{name}");
+                    }
+                }
+            }
+
+            return Ok(name);
+        }
+
+        // find non-union type in the cardinals
+        for cardinal in &edge_info.cardinals {
+            if cardinal.target.len() == 1 {
+                let def = self.ontology.def(*cardinal.target.iter().next().unwrap());
+
+                if let Some(name) = def.name() {
+                    let mut concat = self.ontology[name].to_string();
+
+                    for (_, rel_info, projection) in def.edge_relationships() {
+                        if projection.id == edge_id {
+                            concat.push('_');
+                            concat.push_str(&self.ontology[rel_info.name]);
+                        }
+                    }
+
+                    return Ok(concat);
+                }
+            }
+        }
+
+        Err(anyhow!("edge collection name not found for {edge_id:?}"))
     }
 
     pub fn profile(&self) -> ProcessorProfile {
