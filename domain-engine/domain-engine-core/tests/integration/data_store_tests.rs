@@ -288,14 +288,14 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
                     "title": "Foo",
                     "description": "An article",
                     "body": "The body",
-                    "created_at": "1971-01-01T00:00:00+00:00",
-                    "updated_at": "1971-01-01T00:00:00+00:00",
+                    "created_at": "1971-01-01T00:00:00Z",
+                    "updated_at": "1971-01-01T00:00:00Z",
                     "comments": [
                         {
                             "id": comment_id,
                             "body": "First post!",
-                            "created_at": "1971-01-01T00:00:00+00:00",
-                            "updated_at": "1971-01-01T00:00:00+00:00",
+                            "created_at": "1971-01-01T00:00:00Z",
+                            "updated_at": "1971-01-01T00:00:00Z",
                         }
                     ]
                 }
