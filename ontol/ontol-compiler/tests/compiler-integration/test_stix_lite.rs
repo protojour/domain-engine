@@ -19,13 +19,12 @@ fn test_stix_lite() {
         r#"missing properties, expected all of "name", "spec_version", "created", "modified" at line 1 column 25"#
     );
 
-    // BUG: In this domain at least, the ID is allocated externally.
-    // the "POST" body is currently a UNION of (id OR data), instead of an intersection
     assert_json_io_matches!(serde_create(&attack_pattern), {
+        "id": "attack-pattern--11111111-1111-1111-1111-111111111111",
         "type": "attack-pattern",
         "spec_version": "2.1",
-        "created": "2023-01-01T00:00:00+00:00",
-        "modified": "2023-01-01T00:00:00+00:00",
+        "created": "2023-01-01T00:00:00Z",
+        "modified": "2023-01-01T00:00:00Z",
         "name": "My attack pattern",
         "confidence": 42,
     });

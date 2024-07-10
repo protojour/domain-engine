@@ -245,7 +245,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                         self.narrow(addr).deserialize(deserializer)
                     }
                     AppliedVariants::OneOf(possible_variants) => {
-                        debug!("  OneOf {:?}", possible_variants.debug(self.ontology));
+                        trace!("  OneOf {:?}", possible_variants.debug(self.ontology));
 
                         deserializer.deserialize_any(
                             UnionMatcher {

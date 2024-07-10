@@ -234,7 +234,12 @@ impl<'d, 'o> Display for FormatValueAsText<'d, 'o> {
                 Value::ChronoDateTime(datetime, _) => {
                     // FIXME: A way to not do this via String
                     // Chrono 0.5 hopefully fixes this
-                    write!(f, "{}", datetime.to_rfc3339())
+                    let use_z = true;
+                    write!(
+                        f,
+                        "{}",
+                        datetime.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, use_z)
+                    )
                 }
                 Value::Struct(props, tag) => {
                     // concatenate every prop (not sure this is a good idea, since the order is not defined)

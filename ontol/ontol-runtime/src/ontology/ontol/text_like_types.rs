@@ -74,7 +74,12 @@ impl TextLikeType {
             (Self::DateTime, Value::ChronoDateTime(datetime, _)) => {
                 // FIXME: A way to not do this via String
                 // Chrono 0.5 hopefully fixes this
-                write!(f, "{}", datetime.to_rfc3339())
+                let use_z = true;
+                write!(
+                    f,
+                    "{}",
+                    datetime.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, use_z)
+                )
             }
             _ => Err(std::fmt::Error),
         }
