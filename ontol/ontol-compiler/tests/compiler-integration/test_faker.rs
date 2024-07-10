@@ -42,7 +42,7 @@ fn test_fake_text_like_types() {
             actual = serde_read(&foo).as_json(AttrRef::Unit(&foo.new_fake(ProcessorMode::Raw))),
             expected = json!({
                 "id": "be63cfde-00db-4e4f-04e9-5224a7b8351a",
-                "created_at": "2249-06-21T19:23:34.131225284+00:00",
+                "created_at": "2249-06-21T19:23:34.131225284Z",
             }),
         );
     });

@@ -32,8 +32,8 @@ fn test_stix_lite() {
     assert_json_io_matches!(serde_create(&attack_pattern), {
         "type": "attack-pattern",
         "spec_version": "2.1",
-        "created": "2023-01-01T00:00:00+00:00",
-        "modified": "2023-01-01T00:00:00+00:00",
+        "created": "2023-01-01T00:00:00Z",
+        "modified": "2023-01-01T00:00:00Z",
         "name": "My attack pattern",
         "created_by_ref": "identity--a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
     });

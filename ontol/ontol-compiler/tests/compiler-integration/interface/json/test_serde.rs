@@ -337,7 +337,7 @@ fn test_serde_datetime() {
         );
         assert_json_io_matches!(
             serde_create(&my_dt),
-            "1983-10-01T01:31:32.59+01:00" == "1983-10-01T00:31:32.590+00:00"
+            "1983-10-01T01:31:32.59+01:00" == "1983-10-01T00:31:32.590Z"
         );
         assert_error_msg!(
             serde_create(&my_dt).to_value(json!(42)),
