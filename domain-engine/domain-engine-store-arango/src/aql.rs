@@ -287,7 +287,7 @@ impl Display for Query {
                     write!(f, ", ")?;
                 }
             }
-            writeln!(f, "")?;
+            writeln!(f)?;
         }
         if let Some(selection) = &self.selection {
             writeln!(f, "{indent}{}", selection)?;
@@ -623,7 +623,7 @@ impl Expr {
         match self {
             Self::Var(ident) => ident.raw_str(),
             Self::Const(v) => v,
-            Self::Complex(v) => &v,
+            Self::Complex(v) => v,
         }
     }
 }
@@ -670,7 +670,7 @@ impl Ident {
     pub fn raw_str(&self) -> &str {
         match self {
             Self::Const(s) => s,
-            Self::Dynamic(s) => &s,
+            Self::Dynamic(s) => s,
         }
     }
 

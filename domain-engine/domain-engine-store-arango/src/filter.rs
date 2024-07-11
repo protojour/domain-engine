@@ -166,11 +166,11 @@ impl<'a> MetaQuery<'a> {
                         }
                         DataRelationshipKind::Edge(_projection) => {
                             let var_name =
-                                format!("{}_{}", self.var, &self.ontology[rel_info.name]);
+                                format!("{}_{}", self.var.raw_str(), &self.ontology[rel_info.name]);
 
                             if !self.ops.iter().any(|op| {
                                 if let Operation::Let(Let { var, .. }) = op {
-                                    var.raw_str() == &var_name
+                                    var.raw_str() == var_name
                                 } else {
                                     false
                                 }
@@ -197,7 +197,7 @@ impl<'a> MetaQuery<'a> {
 
                             for op in self.ops.iter_mut() {
                                 if let Operation::Let(Let { var, query }) = op {
-                                    if var.raw_str() != &var_name {
+                                    if var.raw_str() != var_name {
                                         continue;
                                     }
                                     if let Some(sub_ops) = query.operations.as_mut() {

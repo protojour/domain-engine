@@ -68,10 +68,10 @@ impl<'a> MetaQuery<'a> {
     pub fn query_select(&mut self, select: Select) -> DomainResult<()> {
         match select {
             Select::EntityId => {
-                self.return_var = Expr::complex(&format!("{}[0]", self.var));
+                self.return_var = Expr::complex(format!("{}[0]", self.var));
             }
             Select::Leaf => {
-                self.return_var = Expr::complex(&format!("{{ _key: {}._key }}", self.var));
+                self.return_var = Expr::complex(format!("{{ _key: {}._key }}", self.var));
             }
             Select::Struct(struct_select) => {
                 let def = self.ontology.def(struct_select.def_id);
@@ -164,12 +164,12 @@ impl<'a> MetaQuery<'a> {
         };
 
         let sub_var = Ident::new(format!("sub_{}", self.var.raw_str())).to_var();
-        let sub_var_edge = Ident::new(&format!("{}_edge", sub_var.raw_str())).to_var();
+        let sub_var_edge = Ident::new(format!("{}_edge", sub_var.raw_str())).to_var();
         let mut sub_meta = MetaQuery::from(sub_var.clone(), self.ontology, self.database);
         sub_meta.query_select(select)?;
 
         let rel_name = rel_info.name;
-        let var_name = Ident::new(&format!(
+        let var_name = Ident::new(format!(
             "{}_{}",
             self.var.raw_str(),
             &self.ontology[rel_name]
