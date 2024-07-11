@@ -532,7 +532,9 @@ impl<'a> MetaQuery<'a> {
                         .iter()
                         .find_map(|variant_def_id| {
                             let def = self.ontology.def(*variant_def_id);
-                            let entity = def.entity().unwrap();
+                            let entity = def
+                                .entity()
+                                .unwrap_or_else(|| panic!("{variant_def_id:?} is not an entity"));
                             if *variant_def_id == tag.def_id() {
                                 assert!(entity.is_self_identifying);
                                 Some((variant_def_id, def))
