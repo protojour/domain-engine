@@ -11,7 +11,8 @@ fn test_stix_lite() {
     let test = stix_bundle().compile();
     stix_ontology_smoke(&test);
 
-    let [attack_pattern, relationship] = test.bind(["attack-pattern", "relationship"]);
+    let [stix_object, attack_pattern, relationship] =
+        test.bind(["stix-object", "attack-pattern", "relationship"]);
     assert_error_msg!(
         serde_create(&attack_pattern).to_value(json!({
             "type": "attack-pattern",
@@ -19,7 +20,19 @@ fn test_stix_lite() {
         r#"missing properties, expected all of "name", "spec_version", "created", "modified" at line 1 column 25"#
     );
 
+    // can create through concrete type
     assert_json_io_matches!(serde_create(&attack_pattern), {
+        "id": "attack-pattern--11111111-1111-1111-1111-111111111111",
+        "type": "attack-pattern",
+        "spec_version": "2.1",
+        "created": "2023-01-01T00:00:00Z",
+        "modified": "2023-01-01T00:00:00Z",
+        "name": "My attack pattern",
+        "confidence": 42,
+    });
+
+    // can create through type union
+    assert_json_io_matches!(serde_create(&stix_object), {
         "id": "attack-pattern--11111111-1111-1111-1111-111111111111",
         "type": "attack-pattern",
         "spec_version": "2.1",

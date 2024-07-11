@@ -17,9 +17,9 @@ pub mod stix {
         include_str!("../../../examples/stix_lite/stix_common.on"),
     );
 
-    pub const STIX_META: Example = (
-        src_name("stix_meta"),
-        include_str!("../../../examples/stix_lite/stix_meta.on"),
+    pub const STIX_INTERFACE: Example = (
+        src_name("stix_interface"),
+        include_str!("../../../examples/stix_lite/stix_interface.on"),
     );
 
     pub const STIX_OPEN_VOCAB: Example = (
@@ -28,7 +28,7 @@ pub mod stix {
     );
 
     pub fn stix_bundle() -> TestPackages {
-        TestPackages::with_static_sources([STIX, STIX_META, STIX_COMMON, STIX_OPEN_VOCAB, SI])
+        TestPackages::with_static_sources([STIX, STIX_INTERFACE, STIX_COMMON, STIX_OPEN_VOCAB, SI])
     }
 }
 

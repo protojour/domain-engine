@@ -1,7 +1,10 @@
+/// Collection of stix interfaces that only uses the primitives from stix_common.
+domain stix_interface ()
+
 use 'stix_common' as common
 
 /// Type providing the `spec_version` property
-def spec_version_object (
+def spec_version (
     /// The version of the STIX specification used to represent this object.
     ///
     /// The value of this property **MUST** be `2.1` for STIX Objects defined according to this specification.
@@ -11,8 +14,8 @@ def spec_version_object (
     rel* 'spec_version': common.spec_version
 )
 
-/// Type providing the `created` and `modified` properties
-def created_object (
+/// Type providing the `created` property
+def created (
     /// The **created** property represents the time at which the object was originally created.
     ///
     /// The object creator can use the time it deems most appropriate as the time the object was created. The minimum precision **MUST** be milliseconds (three digits after the decimal place in seconds), but **MAY** be more precise.
@@ -23,8 +26,8 @@ def created_object (
     rel* 'created': common.timestamp
 )
 
-/// Type providing the `created` and `modified` properties
-def modified_object (
+/// Type providing the `modified` property
+def modified (
     /// The **modified** property is only used by STIX Objects that support versioning and represents the time that this particular version of the object was last modified.
     ///
     /// The object creator can use the time it deems most appropriate as the time this version of the object was modified.
@@ -40,7 +43,7 @@ def modified_object (
 
 
 /// Type providing the `confidence` property
-def confidence_object (
+def confidence (
     /// The **confidence** property identifies the confidence that the creator has in the correctness of their data.
     /// The confidence value **MUST** be a number in the range of 0-100.
     ///
@@ -51,7 +54,7 @@ def confidence_object (
 )
 
 /// Type providing the `revoked` property
-def revoked_object (
+def revoked (
     /// The **revoked** property is only used by STIX Objects that support versioning and indicates whether the object has been revoked.
     ///
     /// Revoked objects are no longer considered valid by the object creator.
@@ -65,7 +68,7 @@ def revoked_object (
 )
 
 /// Type providing the `labels` property
-def labels_object (
+def labels (
     /// The **labels** property specifies a set of terms used to describe this object.
     /// The terms are user-defined or trust-group defined and their meaning is outside the scope of this specification and **MAY** be ignored.
     ///
@@ -76,7 +79,7 @@ def labels_object (
 )
 
 /// Type providing the `lang` property
-def lang_object (
+def lang (
     /// The **lang** property identifies the language of the text content in this object.
     /// When present, it **MUST** be a language code conformant to [RFC5646](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.1js008hntuzu).
     /// If the property is not present, then the language of the content is en (English).
@@ -88,14 +91,14 @@ def lang_object (
 )
 
 /// Type providing the `external_references` property
-def external_references_object (
+def external_references (
     /// The **external_references** property specifies a list of external references which refers to non-STIX information.
     /// This property is used to provide one or more URLs, descriptions, or IDs to records in other systems.
     rel* 'external_references'?: {common.external-reference}
 )
 
 /// Type providing the `defanged` property
-def defanged_object (
+def defanged (
     /// This property defines whether or not the data contained within the object has been defanged.
     /// The default value for this property is false.
     /// This property MUST NOT be used on any STIX Objects other than SCOs.
