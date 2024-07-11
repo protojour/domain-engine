@@ -3,7 +3,7 @@ use std::{fmt::Display, ops::Deref};
 use ::serde::{Deserialize, Serialize};
 use fnv::FnvHashMap;
 use serde::de::{value::StrDeserializer, DeserializeSeed};
-use tracing::{debug, error};
+use tracing::{error, trace};
 
 use crate::{
     attr::Attr,
@@ -87,7 +87,7 @@ impl TextPattern {
                     TextPatternConstantPart::Literal(_) => {}
                     TextPatternConstantPart::Property(property) => {
                         let capture_group = property.capture_group;
-                        debug!("fetching capture group {}", capture_group);
+                        trace!("fetching capture group {}", capture_group);
 
                         let text = captures
                             .get_group(capture_group)

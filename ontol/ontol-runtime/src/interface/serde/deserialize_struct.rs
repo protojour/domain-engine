@@ -211,7 +211,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         {
             IdOrStruct::Id(id_struct) => Ok(id_struct),
             IdOrStruct::Struct(mut output) => {
-                debug!("not a dynamic id");
+                trace!("not a dynamic id");
 
                 self.generate_missing_attributes(&mut output)
                     .map_err(serde::de::Error::custom)?;
@@ -377,7 +377,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                             map.next_value_seed(property_processor)?,
                         );
 
-                        debug!(
+                        trace!(
                             "observe required prop {prop_idx} {:?}",
                             serde_property.rel_id
                         );
@@ -535,7 +535,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             _ => None,
         };
         output.resolved_to_id = true;
-        debug!("  made a dynamic entity id: {:?}", output.id);
+        trace!("  made a dynamic entity id: {:?}", output.id);
 
         Ok(IdOrStruct::Id(output))
     }

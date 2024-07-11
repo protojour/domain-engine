@@ -5,7 +5,7 @@ use serde::{
     Deserializer,
 };
 use smallvec::{smallvec, SmallVec};
-use tracing::{debug, trace, trace_span, warn};
+use tracing::{trace, trace_span, warn};
 
 use crate::{
     attr::{Attr, AttrMatrix},
@@ -239,7 +239,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 Ok(typed_attribute)
             }
             (SerdeOperator::Union(union_op), _) => {
-                debug!("deserialize union {:?}", union_op.union_def().def_id);
+                trace!("deserialize union {:?}", union_op.union_def().def_id);
                 match union_op.applied_deserialize_variants(self.mode, self.level) {
                     AppliedVariants::Unambiguous(addr) => {
                         self.narrow(addr).deserialize(deserializer)

@@ -25,7 +25,6 @@ use std::{
     ops::Deref,
     sync::Arc,
 };
-use tracing::info;
 
 use crate::{
     def::{
@@ -492,8 +491,6 @@ impl<'m> Compiler<'m> {
             }
             _ => return,
         };
-
-        info!("collect prop `{}`", &str_ctx[name]);
 
         let edge_params = match meta.relationship.rel_params {
             RelParams::Type(def_id) => Some(def_id),

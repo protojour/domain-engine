@@ -23,7 +23,7 @@ use ontol_runtime::{
     RelationshipId,
 };
 use serde::Serialize;
-use tracing::{debug, trace_span, warn};
+use tracing::{trace, trace_span, warn};
 
 use crate::{
     context::{SchemaCtx, SchemaType},
@@ -230,7 +230,7 @@ impl<'v> AttributeType<'v> {
                             kind: ObjectKind::Node(node_data),
                             ..
                         }) => {
-                            debug!("union attr: {:#?}", self.attr);
+                            trace!("union attr: {:#?}", self.attr);
 
                             let unit = self.attr.coerce_to_unit().as_unit().unwrap();
 
