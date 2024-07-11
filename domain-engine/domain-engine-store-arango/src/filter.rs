@@ -65,7 +65,7 @@ impl<'a> MetaQuery<'a> {
 
         for order in order_vec {
             for field_path in order.tuple.iter() {
-                let mut path = vec![self.var.clone()];
+                let mut path = vec![self.var.to_string()];
 
                 for rel_id in field_path.0.iter() {
                     if let Some(rel_info) = def.data_relationships.get(rel_id) {
@@ -113,7 +113,10 @@ impl<'a> MetaQuery<'a> {
                         .expect("collection should exist");
 
                     self.ops.push(Operation::Filter(Filter {
-                        var: format!("IS_SAME_COLLECTION({}, {})", collection, self.var),
+                        var: Expr::Complex(format!(
+                            "IS_SAME_COLLECTION({}, {})",
+                            collection, self.var
+                        )),
                         ..Default::default()
                     }));
                 }
@@ -156,7 +159,7 @@ impl<'a> MetaQuery<'a> {
                     match rel_info.kind {
                         DataRelationshipKind::Id | DataRelationshipKind::Tree => {
                             self.ops.push(Operation::Filter(Filter {
-                                var: format!("{}.{}", self.var, filter.prop),
+                                var: Expr::complex(format!("{}.{}", self.var, filter.prop)),
                                 comp: filter.comp.clone(),
                                 val,
                             }));
@@ -167,7 +170,7 @@ impl<'a> MetaQuery<'a> {
 
                             if !self.ops.iter().any(|op| {
                                 if let Operation::Let(Let { var, .. }) = op {
-                                    var == &var_name
+                                    var.raw_str() == &var_name
                                 } else {
                                     false
                                 }
@@ -184,7 +187,7 @@ impl<'a> MetaQuery<'a> {
                             }
 
                             self.ops.push(Operation::Filter(Filter {
-                                var: format!("LENGTH({})", var_name),
+                                var: Expr::complex(format!("LENGTH({})", var_name)),
                                 ..Default::default()
                             }));
 
@@ -194,12 +197,15 @@ impl<'a> MetaQuery<'a> {
 
                             for op in self.ops.iter_mut() {
                                 if let Operation::Let(Let { var, query }) = op {
-                                    if var != &var_name {
+                                    if var.raw_str() != &var_name {
                                         continue;
                                     }
                                     if let Some(sub_ops) = query.operations.as_mut() {
                                         sub_ops.push(Operation::Filter(Filter {
-                                            var: format!("{}.{}", query.returns.var, filter.prop),
+                                            var: Expr::complex(format!(
+                                                "{}.{}",
+                                                query.returns.var, filter.prop
+                                            )),
                                             comp: filter.comp.clone(),
                                             val: val.clone(),
                                         }));

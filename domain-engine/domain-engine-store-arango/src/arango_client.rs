@@ -28,6 +28,8 @@ use std::{
 };
 use tracing::{debug, info, warn};
 
+use crate::aql::Ident;
+
 use super::aql::Query;
 
 // TODO: typed parameters and integrated format coercion
@@ -48,7 +50,7 @@ pub struct ArangoDatabase {
     /// Database name
     pub db_name: String,
     /// Collections by DefId
-    pub collections: HashMap<DefId, String>,
+    pub collections: HashMap<DefId, Ident>,
     /// Edge collections by Edge id
     pub edge_collections: HashMap<EdgeId, EdgeCollection>,
     /// Reverse lookup DefId for ProcessorProfileApi
@@ -58,7 +60,7 @@ pub struct ArangoDatabase {
 }
 
 pub struct EdgeCollection {
-    pub name: String,
+    pub name: Ident,
 
     pub rel_params: Option<DefId>,
 }
@@ -285,7 +287,7 @@ impl ArangoClient {
 }
 
 /// Get a canonical ArangoDB collection name from ONTOL def
-fn get_collection_name(def: &Def, ontology: &Ontology) -> String {
+fn get_collection_name(def: &Def, ontology: &Ontology) -> Ident {
     let text_constant = match def.store_key {
         Some(store_key) => store_key,
         None => def.name().expect("type should have a name"),
@@ -295,7 +297,7 @@ fn get_collection_name(def: &Def, ontology: &Ontology) -> String {
         .replace("[?]", "_")
         .to_string();
     name.truncate(256);
-    name
+    Ident::new(name)
 }
 
 impl ArangoDatabase {
@@ -316,16 +318,16 @@ impl ArangoDatabase {
             .context("client init")?;
 
         for collection in self.collections.values() {
-            if !self.has_collection(collection.as_str()).await? {
-                self.create_collection(collection.as_str(), CollectionKind::Collection)
+            if !self.has_collection(collection.raw_str()).await? {
+                self.create_collection(collection.raw_str(), CollectionKind::Collection)
                     .await?;
             }
         }
 
         for edge_collection in self.edge_collections.values() {
-            if !self.has_collection(edge_collection.name.as_str()).await? {
+            if !self.has_collection(edge_collection.name.raw_str()).await? {
                 self.create_collection(
-                    edge_collection.name.as_str(),
+                    edge_collection.name.raw_str(),
                     CollectionKind::EdgeCollection,
                 )
                 .await?;
@@ -334,7 +336,7 @@ impl ArangoDatabase {
 
         for (def_id, collection) in &self.collections {
             self.collection_lookup
-                .insert(collection.to_string(), *def_id);
+                .insert(collection.raw_str().to_string(), *def_id);
         }
         for (edge_id, collection) in &self.edge_collections {
             self.collection_lookup
@@ -397,9 +399,9 @@ impl ArangoDatabase {
         edge_id: EdgeId,
         edge_info: &EdgeInfo,
         subject_names_by_edge_id: &HashMap<EdgeId, TextConstant>,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<Ident> {
         if let Some(store_key) = edge_info.store_key {
-            return Ok(self.ontology[store_key].to_string());
+            return Ok(Ident::new(self.ontology[store_key].to_string()));
         }
 
         if let Some(name) = subject_names_by_edge_id.get(&edge_id).copied() {
@@ -409,23 +411,23 @@ impl ArangoDatabase {
                 .to_string();
 
             for other_edge_collection in self.edge_collections.values() {
-                if name == other_edge_collection.name {
+                if name == other_edge_collection.name.raw_str() {
                     // return Err(anyhow!("duplicate edge name: {name}"));
 
                     if let Some(type_disambiguation) = edge_info.cardinals[0].target.iter().next() {
-                        let prefix =
+                        let collection =
                             self.collections.get(type_disambiguation).ok_or_else(|| {
                                 anyhow!(
                                     "cannot disambiguate for `{name}` {edge_id:?}: {type_disambiguation:?}"
                                 )
                             })?;
 
-                        name = format!("{prefix}_{name}");
+                        name = format!("{prefix}_{name}", prefix = collection.raw_str());
                     }
                 }
             }
 
-            return Ok(name);
+            return Ok(Ident::new(name));
         }
 
         // find non-union type in the cardinals
@@ -443,7 +445,7 @@ impl ArangoDatabase {
                         }
                     }
 
-                    return Ok(concat);
+                    return Ok(Ident::new(concat));
                 }
             }
         }

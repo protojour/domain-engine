@@ -13,9 +13,9 @@ use crate::{data_store::EdgeWriteMode, ArangoDatabase};
 /// Helper struct to build AqlQuery
 pub struct MetaQuery<'a> {
     /// Set of values for the WITH clause
-    pub with: IndexSet<String>,
+    pub with: IndexSet<Ident>,
     /// LET or FOR loop variable name for this (sub)query
-    pub var: String,
+    pub var: Expr,
     /// Optional main selection; DOCUMENT or FOR loop
     pub selection: Option<Selection>,
     /// Array of DOCUMENT operations, always first in a query
@@ -23,11 +23,11 @@ pub struct MetaQuery<'a> {
     /// Array of main operations
     pub ops: Vec<Operation>,
     /// Map of data for INSERT and UPDATE by prop name, after main operations
-    pub upserts: HashMap<String, MetaQueryData>,
+    pub upserts: HashMap<Ident, MetaQueryData>,
     /// Map of data for edges by prop name, after upserts
-    pub rels: HashMap<String, MetaQueryData>,
+    pub rels: HashMap<Ident, MetaQueryData>,
     /// RETURN expression
-    pub return_var: String,
+    pub return_var: Expr,
     /// Additional RETURN expression values for MERGE
     pub return_vars: PropMap,
     /// AQL bindVars passed along with query
@@ -44,7 +44,7 @@ pub struct MetaQueryData {
     /// Optional EdgeWriteMode for this data
     pub mode: Option<EdgeWriteMode>,
     /// Variable name for this data array
-    pub var: String,
+    pub var: Expr,
     /// Optional main selection; DOCUMENT or FOR loop
     pub selection: Option<Selection>,
     /// Optional FILTER _key
@@ -61,16 +61,16 @@ pub struct MetaQueryData {
 
 impl<'a> MetaQuery<'a> {
     /// Initializer from &str
-    pub fn from(var: &str, ontology: &'a Ontology, database: &'a ArangoDatabase) -> Self {
+    pub fn from(var: Expr, ontology: &'a Ontology, database: &'a ArangoDatabase) -> Self {
         Self {
             with: IndexSet::default(),
-            var: var.to_string(),
+            var: var.clone(),
             selection: None,
             docs: vec![],
             ops: vec![],
             upserts: HashMap::new(),
             rels: HashMap::new(),
-            return_var: var.to_string(),
+            return_var: var,
             return_vars: PropMap::default(),
             bind_vars: HashMap::new(),
             ontology,
@@ -82,7 +82,7 @@ impl<'a> MetaQuery<'a> {
 /// AQL Query
 #[derive(Clone, Default, Debug)]
 pub struct Query {
-    pub with: Option<Vec<String>>,
+    pub with: Option<Vec<Ident>>,
     pub selection: Option<Selection>,
     pub operations: Option<Vec<Operation>>,
     pub returns: Return,
@@ -92,7 +92,7 @@ pub struct Query {
 /// AQL Query selection
 #[derive(Clone, Debug)]
 pub enum Selection {
-    Document(String, String),
+    Document(Expr, String),
     Loop(For),
 }
 
@@ -115,26 +115,26 @@ pub enum Operation {
 /// AQL LET statement
 #[derive(Clone, Default, Debug)]
 pub struct Let {
-    pub var: String,
+    pub var: Expr,
     pub query: Query,
 }
 
 /// AQL LET data array statement
 #[derive(Clone, Default, Debug)]
 pub struct LetData {
-    pub var: String,
+    pub var: Expr,
     pub data: Vec<String>,
 }
 
 /// AQL FOR loop
 #[derive(Clone, Default, Debug)]
 pub struct For {
-    pub var: String,
-    pub edge: Option<String>,
+    pub var: Expr,
+    pub edge: Option<Expr>,
     pub depth: Option<Range<usize>>,
     pub direction: Option<Direction>,
-    pub object: String,
-    pub edges: Option<Vec<String>>,
+    pub object: Expr,
+    pub edges: Option<Vec<Ident>>,
 }
 
 /// AQL edge traversal direction
@@ -148,7 +148,7 @@ pub enum Direction {
 /// AQL FILTER statement
 #[derive(Clone, Default, Debug)]
 pub struct Filter {
-    pub var: String,
+    pub var: Expr,
     pub comp: Option<Comparison>,
     pub val: Option<String>,
 }
@@ -214,7 +214,7 @@ pub struct Upsert {
     pub search: String,
     pub insert: Insert,
     pub update: Update,
-    pub collection: String,
+    pub collection: Ident,
     pub options: Option<String>,
 }
 
@@ -222,7 +222,7 @@ pub struct Upsert {
 #[derive(Clone, Default, Debug)]
 pub struct Insert {
     pub data: String,
-    pub collection: String,
+    pub collection: Ident,
     pub options: Option<String>,
 }
 
@@ -231,7 +231,7 @@ pub struct Insert {
 pub struct Update {
     pub var: Option<String>,
     pub data: String,
-    pub collection: String,
+    pub collection: Ident,
     pub options: Option<String>,
 }
 
@@ -239,7 +239,7 @@ pub struct Update {
 #[derive(Clone, Default, Debug)]
 pub struct Remove {
     pub key: String,
-    pub collection: String,
+    pub collection: Ident,
     pub options: Option<String>,
 }
 
@@ -247,7 +247,7 @@ pub struct Remove {
 #[derive(Clone, Default, Debug)]
 pub struct Return {
     pub distinct: bool,
-    pub var: String,
+    pub var: Expr,
     pub merge: Option<String>,
     pub pre_merge: Option<String>,
     pub post_merge: Option<String>,
@@ -255,10 +255,10 @@ pub struct Return {
 
 /// Newtype for e.g. MERGE properties, with Display implementation
 #[derive(Default, Debug)]
-pub struct PropMap(HashMap<String, Vec<String>>);
+pub struct PropMap(HashMap<String, Vec<Expr>>);
 
 impl PropMap {
-    pub fn entry(&mut self, key: String) -> Entry<String, Vec<String>> {
+    pub fn entry(&mut self, key: String) -> Entry<String, Vec<Expr>> {
         self.0.entry(key)
     }
 
@@ -279,7 +279,15 @@ impl Display for Query {
         let mut indent = str::repeat("    ", self.indent);
 
         if let Some(with) = &self.with {
-            writeln!(f, "WITH {}", with.join(", "))?;
+            write!(f, "WITH ")?;
+            let mut iter = with.iter().peekable();
+            while let Some(next) = iter.next() {
+                write!(f, "{next}")?;
+                if iter.peek().is_some() {
+                    write!(f, ", ")?;
+                }
+            }
+            writeln!(f, "")?;
         }
         if let Some(selection) = &self.selection {
             writeln!(f, "{indent}{}", selection)?;
@@ -391,7 +399,14 @@ impl Display for For {
         }
         write!(f, " {}", self.object)?;
         if let Some(edges) = &self.edges {
-            write!(f, " {}", edges.join(", "))?;
+            write!(f, " ")?;
+            let mut iter = edges.iter().peekable();
+            while let Some(next) = iter.next() {
+                write!(f, "{next}")?;
+                if iter.peek().is_some() {
+                    write!(f, ", ")?;
+                }
+            }
         }
         Ok(())
     }
@@ -562,10 +577,130 @@ impl Display for PropMap {
             match vars.len() {
                 0 => write!(f, "{}", prop)?,
                 1 => write!(f, "{}: {}", prop, vars.first().unwrap())?,
-                _ => write!(f, "{}: FLATTEN([{}])", prop, vars.join(", "))?,
+                _ => {
+                    write!(f, "{prop}: FLATTEN([")?;
+                    let mut iter = vars.iter().peekable();
+                    while let Some(next) = iter.next() {
+                        write!(f, "{next}")?;
+                        if iter.peek().is_some() {
+                            write!(f, ", ")?;
+                        }
+                    }
+                    write!(f, "])")?;
+                }
             };
         }
         Ok(())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Expr {
+    Var(Ident),
+    Const(&'static str),
+    Complex(String),
+}
+
+impl Expr {
+    /// Construct a new variable by escaping the input string
+    pub fn var(identifier: Ident) -> Self {
+        Self::Var(identifier)
+    }
+
+    pub fn complex(input: impl Into<String>) -> Self {
+        Self::Complex(input.into())
+    }
+
+    pub fn as_var(&self) -> Option<&Ident> {
+        if let Self::Var(ident) = self {
+            Some(ident)
+        } else {
+            None
+        }
+    }
+
+    pub fn raw_str(&self) -> &str {
+        match self {
+            Self::Var(ident) => ident.raw_str(),
+            Self::Const(v) => v,
+            Self::Complex(v) => &v,
+        }
+    }
+}
+
+impl From<&'static str> for Expr {
+    fn from(value: &'static str) -> Self {
+        Self::Const(value)
+    }
+}
+
+impl Default for Expr {
+    fn default() -> Self {
+        Self::Var("".into())
+    }
+}
+
+impl Display for Expr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self {
+            Expr::Var(Ident::Const(var)) => write!(f, "{var}"),
+            Expr::Var(Ident::Dynamic(var)) => write!(f, "`{var}`"),
+            Expr::Const(expr) => write!(f, "{expr}"),
+            Expr::Complex(expr) => write!(f, "{expr}"),
+        }
+    }
+}
+
+/// An AQL ident which will get properly escaped when displayed
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Ident {
+    Const(&'static str),
+    Dynamic(String),
+}
+
+impl Ident {
+    pub fn new(identifier: impl Into<String>) -> Self {
+        Self::Dynamic(identifier.into())
+    }
+
+    pub fn append(&self, str: &str) -> Self {
+        Self::new(format!("{}{}", self.raw_str(), str))
+    }
+
+    pub fn raw_str(&self) -> &str {
+        match self {
+            Self::Const(s) => s,
+            Self::Dynamic(s) => &s,
+        }
+    }
+
+    pub fn to_var(self) -> Expr {
+        Expr::Var(self)
+    }
+
+    pub fn format_id(&self, key: &str) -> String {
+        format!(r#""{collection}/{key}""#, collection = self.raw_str())
+    }
+}
+
+impl Default for Ident {
+    fn default() -> Self {
+        Self::Const("")
+    }
+}
+
+impl From<&'static str> for Ident {
+    fn from(value: &'static str) -> Self {
+        Self::Const(value)
+    }
+}
+
+impl Display for Ident {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self {
+            Ident::Const(i) => write!(f, "{i}"),
+            Ident::Dynamic(i) => write!(f, "`{i}`"),
+        }
     }
 }
 
@@ -580,9 +715,9 @@ mod tests {
     #[test]
     fn test_document() {
         let aql = Query {
-            selection: Some(Selection::Document("doc".to_string(), "@_id".to_string())),
+            selection: Some(Selection::Document("doc".into(), "@_id".to_string())),
             returns: Return {
-                var: "doc".to_string(),
+                var: "doc".into(),
                 ..Default::default()
             },
             ..Default::default()
@@ -601,12 +736,12 @@ mod tests {
     fn test_simple_forloop() {
         let aql = Query {
             selection: Some(Selection::Loop(For {
-                var: "obj".to_string(),
-                object: "@@collection".to_string(),
+                var: "obj".into(),
+                object: "@@collection".into(),
                 ..Default::default()
             })),
             returns: Return {
-                var: "obj".to_string(),
+                var: "obj".into(),
                 ..Default::default()
             },
             ..Default::default()
@@ -624,20 +759,20 @@ mod tests {
     #[test]
     fn test_full_forloop() {
         let aql = Query {
-            with: Some(vec!["foos".to_string()]),
+            with: Some(vec!["foos".into()]),
             selection: Some(Selection::Loop(For {
-                var: "obj".to_string(),
-                object: "foos".to_string(),
+                var: "obj".into(),
+                object: "foos".into(),
                 ..Default::default()
             })),
             operations: Some(vec![
                 Operation::Filter(Filter {
-                    var: "obj._class".to_string(),
+                    var: "obj._class".into(),
                     comp: Some(Comparison::Like),
                     val: Some(r#""foos/%""#.to_string()),
                 }),
                 Operation::Filter(Filter {
-                    var: "obj.thing".to_string(),
+                    var: "obj.thing".into(),
                     comp: Some(Comparison::Lt),
                     val: Some(r#""thong""#.to_string()),
                 }),
@@ -659,7 +794,7 @@ mod tests {
                 }),
             ]),
             returns: Return {
-                var: "obj".to_string(),
+                var: "obj".into(),
                 ..Default::default()
             },
             ..Default::default()
@@ -682,40 +817,36 @@ mod tests {
     #[test]
     fn test_with_subquery() {
         let aql = Query {
-            with: Some(vec![
-                "foos".to_string(),
-                "has_bars".to_string(),
-                "bars".to_string(),
-            ]),
+            with: Some(vec!["foos".into(), "has_bars".into(), "bars".into()]),
             selection: Some(Selection::Loop(For {
-                var: "obj".to_string(),
-                object: "foos".to_string(),
+                var: "obj".into(),
+                object: "foos".into(),
                 ..Default::default()
             })),
             operations: Some(vec![
                 Operation::Filter(Filter {
-                    var: "obj._class".to_string(),
+                    var: "obj._class".into(),
                     comp: Some(Comparison::Like),
                     val: Some(r#""foos/%""#.to_string()),
                 }),
                 Operation::Let(Let {
-                    var: "subobj_relation".to_string(),
+                    var: "subobj_relation".into(),
                     query: Query {
                         selection: Some(Selection::Loop(For {
-                            var: "subobj".to_string(),
-                            edge: Some("subobj_edge".to_string()),
+                            var: "subobj".into(),
+                            edge: Some("subobj_edge".into()),
                             depth: Some(1..2),
                             direction: Some(Direction::Outbound),
-                            object: "obj".to_string(),
-                            edges: Some(vec!["has_bars".to_string()]),
+                            object: "obj".into(),
+                            edges: Some(vec!["has_bars".into()]),
                         })),
                         operations: Some(vec![Operation::Filter(Filter {
-                            var: "subobj.index".to_string(),
+                            var: "subobj.index".into(),
                             comp: Some(Comparison::In),
                             val: Some("[1, 2, 3]".to_string()),
                         })]),
                         returns: Return {
-                            var: "subobj".to_string(),
+                            var: "subobj".into(),
                             distinct: true,
                             ..Default::default()
                         },
@@ -723,7 +854,7 @@ mod tests {
                     },
                 }),
                 Operation::Filter(Filter {
-                    var: "LENGTH(subobj_relation)".to_string(),
+                    var: Expr::complex("LENGTH(subobj_relation)"),
                     ..Default::default()
                 }),
                 Operation::Limit(Limit {
@@ -732,7 +863,7 @@ mod tests {
                 }),
             ]),
             returns: Return {
-                var: "obj".to_string(),
+                var: "obj".into(),
                 ..Default::default()
             },
             ..Default::default()
@@ -764,11 +895,11 @@ mod tests {
                     "some_field": "some_value"
                 })
                 .to_string(),
-                collection: "foos".to_string(),
+                collection: "foos".into(),
                 ..Default::default()
             })]),
             returns: Return {
-                var: "obj".to_string(),
+                var: "obj".into(),
                 ..Default::default()
             },
             ..Default::default()
@@ -787,7 +918,7 @@ mod tests {
     fn test_let_upsert() {
         let aql = Query {
             operations: Some(vec![Operation::Let(Let {
-                var: "test".to_string(),
+                var: "test".into(),
                 query: Query {
                     selection: None,
                     operations: Some(vec![Operation::Upsert(Upsert {
@@ -797,27 +928,27 @@ mod tests {
                         .to_string(),
                         insert: Insert {
                             data: json!({ "_key": "lolsoft" }).to_string(),
-                            collection: "Organization".to_string(),
+                            collection: "Organization".into(),
                             options: None,
                         },
                         update: Update {
                             var: None,
                             data: "{}".to_string(),
-                            collection: "Organization".to_string(),
+                            collection: "Organization".into(),
                             options: None,
                         },
-                        collection: "Organization".to_string(),
+                        collection: "Organization".into(),
                         options: None,
                     })]),
                     returns: Return {
-                        var: "NEW".to_string(),
+                        var: "NEW".into(),
                         ..Default::default()
                     },
                     ..Default::default()
                 },
             })]),
             returns: Return {
-                var: "test".to_string(),
+                var: "test".into(),
                 ..Default::default()
             },
             ..Default::default()
@@ -843,7 +974,7 @@ mod tests {
         let aql = Query {
             operations: Some(vec![
                 Operation::LetData(LetData {
-                    var: "test_data".to_string(),
+                    var: "test_data".into(),
                     data: vec![
                         r#"{"a": "test 1"}"#.to_string(),
                         r#"{"a": "test 2"}"#.to_string(),
@@ -851,20 +982,20 @@ mod tests {
                     ],
                 }),
                 Operation::Let(Let {
-                    var: "test".to_string(),
+                    var: "test".into(),
                     query: Query {
                         selection: Some(Selection::Loop(For {
-                            var: "item".to_string(),
-                            object: "test_data".to_string(),
+                            var: "item".into(),
+                            object: "test_data".into(),
                             ..Default::default()
                         })),
                         operations: Some(vec![Operation::Insert(Insert {
                             data: "item".to_string(),
-                            collection: "collection".to_string(),
+                            collection: "collection".into(),
                             options: Some(r#"{overwriteMode: "ignore"}"#.to_string()),
                         })]),
                         returns: Return {
-                            var: "NEW".to_string(),
+                            var: "NEW".into(),
                             ..Default::default()
                         },
                         ..Default::default()
@@ -872,7 +1003,7 @@ mod tests {
                 }),
             ]),
             returns: Return {
-                var: "test".to_string(),
+                var: "test".into(),
                 ..Default::default()
             },
             ..Default::default()
@@ -899,22 +1030,22 @@ mod tests {
     #[test]
     fn test_insert_relation() {
         let aql = Query {
-            with: Some(vec!["members".to_string(), "Organization".to_string()]),
+            with: Some(vec!["members".into(), "Organization".into()]),
             operations: Some(vec![
                 Operation::Selection(Selection::Document(
-                    "Organization".to_string(),
+                    "Organization".into(),
                     r#""Organization/lolsoft""#.to_string(),
                 )),
                 Operation::Let(Let {
-                    var: "Organization_members_User_rel".to_string(),
+                    var: "Organization_members_User_rel".into(),
                     query: Query {
                         operations: Some(vec![Operation::Insert(Insert {
                             data: r#"{ _from: Organization._id, _to: "User/bob", "role":"contributor" }"#.to_string(),
-                            collection: "members".to_string(),
+                            collection: "members".into(),
                             ..Default::default()
                         })]),
                         returns: Return {
-                            var: "NEW".to_string(),
+                            var: "NEW".into(),
                             ..Default::default()
                         },
                         ..Default::default()
@@ -922,7 +1053,7 @@ mod tests {
                 }),
             ]),
             returns: Return {
-                var: "Organization".to_string(),
+                var: "Organization".into(),
                 ..Default::default()
             },
             ..Default::default()
@@ -945,44 +1076,40 @@ mod tests {
     #[test]
     fn test_update_relation() {
         let aql = Query {
-            with: Some(vec![
-                "members".to_string(),
-                "Organization".to_string(),
-                "User".to_string(),
-            ]),
+            with: Some(vec!["members".into(), "Organization".into(), "User".into()]),
             operations: Some(vec![
                 Operation::Selection(Selection::Document(
-                    "Organization".to_string(),
+                    "Organization".into(),
                     r#""Organization/lolsoft""#.to_string(),
                 )),
                 Operation::Let(Let {
-                    var: "Organization_members_User".to_string(),
+                    var: "Organization_members_User".into(),
                     query: Query {
                         selection: Some(Selection::Loop(For {
-                            var: "obj".to_string(),
-                            edge: Some("obj_edge".to_string()),
+                            var: "obj".into(),
+                            edge: Some("obj_edge".into()),
                             direction: Some(Direction::Outbound),
-                            object: "Organization".to_string(),
-                            edges: Some(vec!["members".to_string()]),
+                            object: "Organization".into(),
+                            edges: Some(vec!["members".into()]),
                             ..Default::default()
                         })),
                         operations: Some(vec![
                             Operation::Filter(Filter {
-                                var: "obj._key".to_string(),
+                                var: "obj._key".into(),
                                 comp: Some(Comparison::Eq),
                                 val: Some(r#""bob""#.to_string()),
                             }),
                             Operation::Let(Let {
-                                var: "_edge".to_string(),
+                                var: "_edge".into(),
                                 query: Query {
                                     operations: Some(vec![Operation::Update(Update {
                                         var: Some("obj_edge".to_string()),
                                         data: r#"{ "role":"admin" }"#.to_string(),
-                                        collection: "members".to_string(),
+                                        collection: "members".into(),
                                         ..Default::default()
                                     })]),
                                     returns: Return {
-                                        var: "NEW".to_string(),
+                                        var: "NEW".into(),
                                         ..Default::default()
                                     },
                                     ..Default::default()
@@ -990,7 +1117,7 @@ mod tests {
                             }),
                         ]),
                         returns: Return {
-                            var: "obj".to_string(),
+                            var: "obj".into(),
                             merge: Some("_edge".to_string()),
                             ..Default::default()
                         },
@@ -999,7 +1126,7 @@ mod tests {
                 }),
             ]),
             returns: Return {
-                var: "Organization".to_string(),
+                var: "Organization".into(),
                 merge: Some("members: Organization_members_User".to_string()),
                 ..Default::default()
             },
@@ -1028,43 +1155,39 @@ mod tests {
     #[test]
     fn test_delete_relation() {
         let aql = Query {
-            with: Some(vec![
-                "members".to_string(),
-                "Organization".to_string(),
-                "User".to_string(),
-            ]),
+            with: Some(vec!["members".into(), "Organization".into(), "User".into()]),
             operations: Some(vec![
                 Operation::Selection(Selection::Document(
-                    "Organization".to_string(),
+                    "Organization".into(),
                     r#""Organization/lolsoft""#.to_string(),
                 )),
                 Operation::Let(Let {
-                    var: "Organization_members_User".to_string(),
+                    var: "Organization_members_User".into(),
                     query: Query {
                         selection: Some(Selection::Loop(For {
-                            var: "obj".to_string(),
-                            edge: Some("obj_edge".to_string()),
+                            var: "obj".into(),
+                            edge: Some("obj_edge".into()),
                             direction: Some(Direction::Outbound),
-                            object: "Organization".to_string(),
-                            edges: Some(vec!["members".to_string()]),
+                            object: "Organization".into(),
+                            edges: Some(vec!["members".into()]),
                             ..Default::default()
                         })),
                         operations: Some(vec![
                             Operation::Filter(Filter {
-                                var: "obj._key".to_string(),
+                                var: "obj._key".into(),
                                 comp: Some(Comparison::Eq),
                                 val: Some(r#""bob""#.to_string()),
                             }),
                             Operation::Let(Let {
-                                var: "_edge".to_string(),
+                                var: "_edge".into(),
                                 query: Query {
                                     operations: Some(vec![Operation::Remove(Remove {
                                         key: r#"obj_edge"#.to_string(),
-                                        collection: "members".to_string(),
+                                        collection: "members".into(),
                                         ..Default::default()
                                     })]),
                                     returns: Return {
-                                        var: "OLD".to_string(),
+                                        var: "OLD".into(),
                                         ..Default::default()
                                     },
                                     ..Default::default()
@@ -1072,7 +1195,7 @@ mod tests {
                             }),
                         ]),
                         returns: Return {
-                            var: "obj".to_string(),
+                            var: "obj".into(),
                             merge: Some("_edge".to_string()),
                             ..Default::default()
                         },
@@ -1081,7 +1204,7 @@ mod tests {
                 }),
             ]),
             returns: Return {
-                var: "Organization".to_string(),
+                var: "Organization".into(),
                 merge: Some("members: Organization_members_User".to_string()),
                 ..Default::default()
             },
@@ -1111,49 +1234,49 @@ mod tests {
     fn test_overwrite_relation() {
         let aql = Query {
             with: Some(vec![
-                "owner".to_string(),
-                "Organization".to_string(),
-                "User".to_string(),
-                "Repository".to_string(),
+                "owner".into(),
+                "Organization".into(),
+                "User".into(),
+                "Repository".into(),
             ]),
             operations: Some(vec![
                 Operation::Selection(Selection::Document(
-                    "User".to_string(),
+                    "User".into(),
                     r#""User/bob""#.to_string(),
                 )),
                 Operation::Selection(Selection::Document(
-                    "Repository".to_string(),
+                    "Repository".into(),
                     r#""Repository/018df9b2-a4c1-7947-913b-3023e318517e""#.to_string(),
                 )),
                 Operation::Let(Let {
-                    var: "Repository_owner".to_string(),
+                    var: "Repository_owner".into(),
                     query: Query {
                         selection: Some(Selection::Loop(For {
-                            var: "obj".to_string(),
-                            edge: Some("obj_edge".to_string()),
+                            var: "obj".into(),
+                            edge: Some("obj_edge".into()),
                             direction: Some(Direction::Outbound),
-                            object: "Repository".to_string(),
-                            edges: Some(vec!["owner".to_string()]),
+                            object: "Repository".into(),
+                            edges: Some(vec!["owner".into()]),
                             ..Default::default()
                         })),
                         operations: Some(vec![Operation::Let(Let {
-                            var: "_edge".to_string(),
+                            var: "_edge".into(),
                             query: Query {
                                 operations: Some(vec![Operation::Update(Update {
                                     var: Some("obj_edge".to_string()),
                                     data: r#"{ _to: User._id }"#.to_string(),
-                                    collection: "owner".to_string(),
+                                    collection: "owner".into(),
                                     ..Default::default()
                                 })]),
                                 returns: Return {
-                                    var: "NEW".to_string(),
+                                    var: "NEW".into(),
                                     ..Default::default()
                                 },
                                 ..Default::default()
                             },
                         })]),
                         returns: Return {
-                            var: "obj".to_string(),
+                            var: "obj".into(),
                             merge: Some("_edge".to_string()),
                             ..Default::default()
                         },
@@ -1162,7 +1285,7 @@ mod tests {
                 }),
             ]),
             returns: Return {
-                var: "User".to_string(),
+                var: "User".into(),
                 ..Default::default()
             },
             ..Default::default()

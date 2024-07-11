@@ -477,13 +477,13 @@ mod tests {
 
         expect_eq!(
             expected = indoc! {r#"
-            WITH artist, plays, instrument
-            FOR obj IN artist
-                LET obj_plays = (
-                    FOR sub_obj, sub_obj_edge IN OUTBOUND obj plays
-                        RETURN MERGE({ _key: sub_obj._key }, { _edge: { how_much: sub_obj_edge.how_much } })
+            WITH `artist`, `plays`, `instrument`
+            FOR obj IN `artist`
+                LET `obj_plays` = (
+                    FOR `sub_obj`, `sub_obj_edge` IN OUTBOUND obj `plays`
+                        RETURN MERGE({ _key: `sub_obj`._key }, { _edge: { how_much: `sub_obj_edge`.how_much } })
                 )
-                RETURN MERGE(obj, { plays: obj_plays })
+                RETURN MERGE(obj, { plays: `obj_plays` })
             "#},
             actual = aql.query.to_string()
         );
@@ -511,12 +511,12 @@ mod tests {
 
         expect_eq!(
             expected = indoc! {r#"
-            WITH artist
-            LET artist = (
-                INSERT {"_key":"4ddd8824-2827-4f81-966e-f4147cee1edd","name":"Igor Stravinskij"} INTO artist
+            WITH `artist`
+            LET `artist` = (
+                INSERT {"_key":"4ddd8824-2827-4f81-966e-f4147cee1edd","name":"Igor Stravinskij"} INTO `artist`
                 RETURN NEW
             )
-            RETURN artist[0]
+            RETURN `artist`[0]
             "#},
             actual = aql[0].query.to_string(),
         );
@@ -544,12 +544,12 @@ mod tests {
 
         expect_eq!(
             expected = indoc! {r#"
-            WITH artist
-            LET artist = (
-                UPDATE {"_key":"4ddd8824-2827-4f81-966e-f4147cee1edd","name":"Igor Stravinskij"} IN artist
+            WITH `artist`
+            LET `artist` = (
+                UPDATE {"_key":"4ddd8824-2827-4f81-966e-f4147cee1edd","name":"Igor Stravinskij"} IN `artist`
                 RETURN NEW
             )
-            RETURN artist[0]
+            RETURN `artist`[0]
             "#},
             actual = aql[0].query.to_string(),
         );
@@ -577,12 +577,12 @@ mod tests {
 
         expect_eq!(
             expected = indoc! {r#"
-            WITH artist
-            LET artist = (
-                REMOVE {"_key":"4ddd8824-2827-4f81-966e-f4147cee1edd"} IN artist
+            WITH `artist`
+            LET `artist` = (
+                REMOVE {"_key":"4ddd8824-2827-4f81-966e-f4147cee1edd"} IN `artist`
                 RETURN OLD
             )
-            RETURN artist[0]
+            RETURN `artist`[0]
             "#},
             actual = aql[0].query.to_string(),
         );

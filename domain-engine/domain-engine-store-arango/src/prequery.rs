@@ -25,7 +25,8 @@ impl AqlQuery {
 
         debug!("AqlQuery::prequery_from_entity {}", &ontology[def_name]);
 
-        let mut meta = MetaQuery::from(&ontology[def_name], ontology, database);
+        let mut meta =
+            MetaQuery::from(Ident::new(&ontology[def_name]).to_var(), ontology, database);
 
         match &entity {
             Value::Struct(struct_map, _) => {
@@ -48,7 +49,7 @@ impl AqlQuery {
                 with: (!meta.with.is_empty()).then_some(meta.with.into_iter().collect()),
                 operations: (!meta.ops.is_empty()).then_some(meta.ops.clone()),
                 returns: Return {
-                    var: format!("{{ {} }}", meta.return_vars),
+                    var: Expr::complex(format!("{{ {} }}", meta.return_vars)),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -143,9 +144,9 @@ impl<'a> MetaQuery<'a> {
                             .as_str()
                             .expect("entity id should serialize to str")
                             .to_owned();
-                        let id = format!(r#""{collection}/{key}""#);
+                        let id = collection.format_id(&key);
 
-                        self.with.insert(collection.to_string());
+                        self.with.insert(collection.clone());
 
                         // ignore if duplicate
                         for op in &self.ops {
@@ -157,7 +158,12 @@ impl<'a> MetaQuery<'a> {
                         }
 
                         let rel_name = rel_info.name;
-                        let var_name = format!("{}_{}", self.var, &self.ontology[rel_name]);
+                        let var_name = Ident::new(format!(
+                            "{}_{}",
+                            self.var.raw_str(),
+                            &self.ontology[rel_name]
+                        ))
+                        .to_var();
 
                         self.ops.push(Operation::Selection(Selection::Document(
                             var_name.clone(),

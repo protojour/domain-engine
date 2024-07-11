@@ -40,7 +40,7 @@ impl AqlQuery {
         let def_name = def.name().expect("entity should have a name");
         debug!("AqlQuery::build_query for {}", &ontology[def_name]);
 
-        let mut meta = MetaQuery::from("obj", ontology, database);
+        let mut meta = MetaQuery::from("obj".into(), ontology, database);
         meta.query_select(select)?;
 
         let query = AqlQuery {
@@ -68,10 +68,10 @@ impl<'a> MetaQuery<'a> {
     pub fn query_select(&mut self, select: Select) -> DomainResult<()> {
         match select {
             Select::EntityId => {
-                self.return_var = format!("{}[0]", self.var);
+                self.return_var = Expr::complex(&format!("{}[0]", self.var));
             }
             Select::Leaf => {
-                self.return_var = format!("{{ _key: {}._key }}", self.var);
+                self.return_var = Expr::complex(&format!("{{ _key: {}._key }}", self.var));
             }
             Select::Struct(struct_select) => {
                 let def = self.ontology.def(struct_select.def_id);
@@ -81,10 +81,10 @@ impl<'a> MetaQuery<'a> {
                     .get(&struct_select.def_id)
                     .expect("collection should exist");
 
-                self.with.insert(collection.to_string());
+                self.with.insert(collection.clone());
                 self.selection = Some(Selection::Loop(For {
-                    var: self.var.to_string(),
-                    object: collection.to_string(),
+                    var: self.var.clone(),
+                    object: collection.clone().to_var(),
                     ..Default::default()
                 }));
 
@@ -163,20 +163,28 @@ impl<'a> MetaQuery<'a> {
             panic!();
         };
 
-        let sub_var = format!("sub_{}", self.var);
-        let sub_var_edge = format!("{sub_var}_edge");
-        let mut sub_meta = MetaQuery::from(&sub_var, self.ontology, self.database);
+        let sub_var = Ident::new(format!("sub_{}", self.var.raw_str())).to_var();
+        let sub_var_edge = Ident::new(&format!("{}_edge", sub_var.raw_str())).to_var();
+        let mut sub_meta = MetaQuery::from(sub_var.clone(), self.ontology, self.database);
         sub_meta.query_select(select)?;
 
         let rel_name = rel_info.name;
-        let var_name = format!("{}_{}", self.var, &self.ontology[rel_name]);
+        let var_name = Ident::new(&format!(
+            "{}_{}",
+            self.var.raw_str(),
+            &self.ontology[rel_name]
+        ));
 
         let return_many = match rel_info.cardinality {
             (_, ValueCardinality::Unit) => false,
             (_, ValueCardinality::IndexSet | ValueCardinality::List) => true,
         };
 
-        let return_var = format!("{var_name}{}", if return_many { "" } else { "[0]" });
+        let return_var = if return_many {
+            var_name.clone().to_var()
+        } else {
+            Expr::complex(format!("{var_name}[0]"))
+        };
         self.return_vars
             .entry(self.ontology[rel_name].to_string())
             .and_modify(|vars| vars.push(return_var.clone()))
@@ -202,14 +210,14 @@ impl<'a> MetaQuery<'a> {
                 }
             }
         }
-        let rel_props_map = format!(
+        let rel_props_map = Expr::complex(format!(
             r#"{{ {} }}"#,
             rel_props
                 .iter()
                 .map(|prop| format!("{prop}: {sub_var_edge}.{prop}"))
                 .collect::<Vec<String>>()
                 .join(", ")
-        );
+        ));
         if !rel_props.is_empty() {
             sub_meta
                 .return_vars
@@ -230,8 +238,8 @@ impl<'a> MetaQuery<'a> {
             .expect("collection should exist");
 
         self.with.extend(sub_meta.with);
-        self.with.insert(edge_collection.name.to_string());
-        self.with.insert(collection.to_string());
+        self.with.insert(edge_collection.name.clone());
+        self.with.insert(collection.clone());
 
         match &rel_info.target {
             DataRelationshipTarget::Unambiguous(_) => {}
@@ -242,16 +250,16 @@ impl<'a> MetaQuery<'a> {
                         .collections
                         .get(def_id)
                         .expect("collection should exist");
-                    self.with.insert(collection.to_string());
+                    self.with.insert(collection.clone());
                 }
             }
         }
 
         self.ops.push(Operation::Let(Let {
-            var: var_name.clone(),
+            var: var_name.to_var(),
             query: Query {
                 selection: Some(Selection::Loop(For {
-                    var: format!("{sub_var}, {sub_var_edge}"),
+                    var: Expr::complex(format!("{sub_var}, {sub_var_edge}")),
                     direction: match edge_projection.proj() {
                         (0, 1) => Some(Direction::Outbound),
                         (1, 0) => Some(Direction::Inbound),
@@ -261,8 +269,8 @@ impl<'a> MetaQuery<'a> {
                             )))
                         }
                     },
-                    object: self.var.to_string(),
-                    edges: Some(vec![edge_collection.name.to_string()]),
+                    object: self.var.clone(),
+                    edges: Some(vec![edge_collection.name.clone()]),
                     ..Default::default()
                 })),
                 operations: Some(sub_meta.ops.clone()),

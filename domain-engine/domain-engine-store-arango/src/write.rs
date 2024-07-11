@@ -54,7 +54,8 @@ impl AqlQuery {
             generate_id(&mut entity, ontology, database.system.as_ref())?;
         }
 
-        let mut meta = MetaQuery::from(&ontology[def_name], ontology, database);
+        let mut meta =
+            MetaQuery::from(Ident::new(&ontology[def_name]).to_var(), ontology, database);
 
         // debug!("entity {:#?}", entity);
 
@@ -112,9 +113,9 @@ impl AqlQuery {
             }
         };
 
-        let mut return_var = match mode {
-            WriteMode::Insert | WriteMode::Update => "NEW".to_string(),
-            WriteMode::Delete => "OLD".to_string(),
+        let mut return_var: Expr = match mode {
+            WriteMode::Insert | WriteMode::Update => Expr::complex("NEW"),
+            WriteMode::Delete => Expr::complex("OLD"),
         };
 
         if matches!(mode, WriteMode::Update)
@@ -127,12 +128,12 @@ impl AqlQuery {
                 .as_str()
                 .expect("entity id should serialize to str")
                 .to_owned();
-            let id = format!(r#""{collection}/{key}""#);
+            let id = collection.format_id(&key);
 
-            meta.selection = Some(Selection::Document(meta.var.clone(), id.to_string()));
+            meta.selection = Some(Selection::Document(meta.var.clone(), id));
         } else {
             meta.ops.push(Operation::Let(Let {
-                var: meta.var.to_string(),
+                var: meta.var.clone(),
                 query: Query {
                     operations: Some(vec![operation.clone()]),
                     returns: Return {
@@ -157,7 +158,7 @@ impl AqlQuery {
                     Some(mode) => match mode {
                         EdgeWriteMode::Insert => vec![Operation::Insert(Insert {
                             data,
-                            collection: collection.to_string(),
+                            collection: collection.clone(),
                             options: metadata.options.clone(),
                         })],
                         EdgeWriteMode::UpsertSelfIdentifying => {
@@ -165,16 +166,16 @@ impl AqlQuery {
                                 search: data.clone(),
                                 insert: Insert {
                                     data: data.clone(),
-                                    collection: collection.to_string(),
+                                    collection: collection.clone(),
                                     options: None,
                                 },
                                 update: Update {
                                     var: None,
                                     data: "{}".to_string(),
-                                    collection: collection.to_string(),
+                                    collection: collection.clone(),
                                     options: None,
                                 },
-                                collection: collection.to_string(),
+                                collection: collection.clone(),
                                 options: Some(
                                     json!({ "ignoreErrors": true, "exclusive": true }).to_string(),
                                 ),
@@ -182,8 +183,8 @@ impl AqlQuery {
                         }
                         EdgeWriteMode::Overwrite | EdgeWriteMode::OverwriteInverse => {
                             metadata.selection = Some(Selection::Loop(For {
-                                var: "obj".to_string(),
-                                edge: Some("obj_edge".to_string()),
+                                var: "obj".into(),
+                                edge: Some("obj_edge".into()),
                                 direction: metadata.direction.clone(),
                                 object: match meta.docs.first() {
                                     Some(Operation::Selection(Selection::Document(var, _))) => {
@@ -191,11 +192,11 @@ impl AqlQuery {
                                     }
                                     _ => meta.return_var.clone(),
                                 },
-                                edges: Some(vec![collection.to_string()]),
+                                edges: Some(vec![collection.clone()]),
                                 ..Default::default()
                             }));
                             metadata.return_vars.entry("_edge".to_string()).or_default();
-                            return_var = "obj".to_string();
+                            return_var = "obj".into();
 
                             vec![
                                 // Operation::Filter(Filter {
@@ -204,16 +205,16 @@ impl AqlQuery {
                                 //     val: metadata.filter_key.clone(),
                                 // }),
                                 Operation::Let(Let {
-                                    var: "_edge".to_string(),
+                                    var: "_edge".into(),
                                     query: Query {
                                         operations: Some(vec![Operation::Update(Update {
                                             var: Some("obj_edge".to_string()),
                                             data,
-                                            collection: collection.to_string(),
+                                            collection: collection.clone(),
                                             ..Default::default()
                                         })]),
                                         returns: Return {
-                                            var: "NEW".to_string(),
+                                            var: "NEW".into(),
                                             ..Default::default()
                                         },
                                         ..Default::default()
@@ -223,33 +224,33 @@ impl AqlQuery {
                         }
                         EdgeWriteMode::UpdateExisting => {
                             metadata.selection = Some(Selection::Loop(For {
-                                var: "obj".to_string(),
-                                edge: Some("obj_edge".to_string()),
+                                var: "obj".into(),
+                                edge: Some("obj_edge".into()),
                                 direction: metadata.direction.clone(),
                                 object: meta.return_var.clone(),
-                                edges: Some(vec![collection.to_string()]),
+                                edges: Some(vec![collection.clone()]),
                                 ..Default::default()
                             }));
                             metadata.return_vars.entry("_edge".to_string()).or_default();
-                            return_var = "obj".to_string();
+                            return_var = "obj".into();
 
                             vec![
                                 Operation::Filter(Filter {
-                                    var: "obj._key".to_string(),
+                                    var: "obj._key".into(),
                                     comp: Some(Comparison::Eq),
                                     val: metadata.filter_key.clone(),
                                 }),
                                 Operation::Let(Let {
-                                    var: "_edge".to_string(),
+                                    var: "_edge".into(),
                                     query: Query {
                                         operations: Some(vec![Operation::Update(Update {
                                             var: Some("obj_edge".to_string()),
                                             data,
-                                            collection: collection.to_string(),
+                                            collection: collection.clone(),
                                             ..Default::default()
                                         })]),
                                         returns: Return {
-                                            var: "NEW".to_string(),
+                                            var: "NEW".into(),
                                             ..Default::default()
                                         },
                                         ..Default::default()
@@ -259,31 +260,31 @@ impl AqlQuery {
                         }
                         EdgeWriteMode::Delete => {
                             metadata.selection = Some(Selection::Loop(For {
-                                var: "obj".to_string(),
-                                edge: Some("obj_edge".to_string()),
+                                var: "obj".into(),
+                                edge: Some("obj_edge".into()),
                                 direction: metadata.direction.clone(),
                                 object: meta.return_var.clone(),
-                                edges: Some(vec![collection.to_string()]),
+                                edges: Some(vec![collection.clone()]),
                                 ..Default::default()
                             }));
-                            return_var = "null".to_string();
+                            return_var = "null".into();
 
                             vec![
                                 Operation::Filter(Filter {
-                                    var: "obj._key".to_string(),
+                                    var: "obj._key".into(),
                                     comp: Some(Comparison::Eq),
                                     val: metadata.filter_key.clone(),
                                 }),
                                 Operation::Let(Let {
-                                    var: "_edge".to_string(),
+                                    var: "_edge".into(),
                                     query: Query {
                                         operations: Some(vec![Operation::Remove(Remove {
                                             key: "obj_edge".to_string(),
-                                            collection: collection.to_string(),
+                                            collection: collection.clone(),
                                             ..Default::default()
                                         })]),
                                         returns: Return {
-                                            var: "null".to_string(),
+                                            var: "null".into(),
                                             ..Default::default()
                                         },
                                         ..Default::default()
@@ -295,18 +296,18 @@ impl AqlQuery {
                     None => match mode {
                         WriteMode::Insert => vec![Operation::Insert(Insert {
                             data,
-                            collection: collection.to_string(),
+                            collection: collection.clone(),
                             options: metadata.options.clone(),
                         })],
                         WriteMode::Update => vec![Operation::Update(Update {
                             data,
-                            collection: collection.to_string(),
+                            collection: collection.clone(),
                             options: metadata.options.clone(),
                             ..Default::default()
                         })],
                         WriteMode::Delete => vec![Operation::Remove(Remove {
                             key: data,
-                            collection: collection.to_string(),
+                            collection: collection.clone(),
                             ..Default::default()
                         })],
                     },
@@ -328,15 +329,15 @@ impl AqlQuery {
                     })),
                     _ => {
                         meta.ops.push(Operation::LetData(LetData {
-                            var: format!("{}_data", metadata.var),
+                            var: metadata.var.as_var().unwrap().append("_data").to_var(),
                             data: metadata.data.to_vec(),
                         }));
                         meta.ops.push(Operation::Let(Let {
-                            var: metadata.var.to_string(),
+                            var: metadata.var.clone(),
                             query: Query {
                                 selection: Some(Selection::Loop(For {
-                                    var: "item".to_string(),
-                                    object: format!("{}_data", metadata.var),
+                                    var: "item".into(),
+                                    object: metadata.var.as_var().unwrap().append("_data").to_var(),
                                     ..Default::default()
                                 })),
                                 operations: Some(operations),
@@ -495,9 +496,9 @@ impl<'a> MetaQuery<'a> {
         }
 
         let rel_name = rel_info.name;
-        let var_name = format!(
+        let var_name = Ident::new(format!(
             "{}_{}{}",
-            self.var,
+            self.var.raw_str(),
             &self.ontology[rel_name],
             match rel_info.target {
                 DataRelationshipTarget::Unambiguous(def_id) => {
@@ -507,7 +508,7 @@ impl<'a> MetaQuery<'a> {
                 }
                 DataRelationshipTarget::Union { .. } => "".to_string(), // TODO: validate
             }
-        );
+        ));
 
         debug!(
             "MetaQuery::write_relation {:?} {} {}",
@@ -572,7 +573,7 @@ impl<'a> MetaQuery<'a> {
                         .as_str()
                         .expect("entity id should serialize to str")
                         .to_owned();
-                    let id = format!(r#""{collection}/{key}""#);
+                    let id = collection.format_id(&key);
 
                     self.with.insert(collection.clone());
 
@@ -580,13 +581,14 @@ impl<'a> MetaQuery<'a> {
                         mode,
                         id_val.tag(),
                         rel_params,
-                        var_name,
+                        &var_name,
                         id,
                         rel_info,
                     );
                 };
 
-                let mut sub_meta = MetaQuery::from(&var_name, self.ontology, self.database);
+                let mut sub_meta =
+                    MetaQuery::from(var_name.clone().to_var(), self.ontology, self.database);
                 for (rel_id, attr) in struct_map.clone().iter() {
                     let rel_info = def
                         .data_relationships
@@ -639,7 +641,7 @@ impl<'a> MetaQuery<'a> {
                     entry.mode = Some(EdgeWriteMode::UpsertSelfIdentifying);
                 }
 
-                entry.var.clone_from(&var_name);
+                entry.var = var_name.clone().to_var();
                 entry.data.push(data.to_string());
                 entry.return_vars = sub_meta.return_vars;
 
@@ -656,18 +658,22 @@ impl<'a> MetaQuery<'a> {
                     }
                 }
 
-                let return_var = format!("{var_name}{}", if return_many { "" } else { "[0]" });
+                let return_var = if return_many {
+                    var_name.clone().to_var()
+                } else {
+                    Expr::complex(format!("{var_name}[0]"))
+                };
                 self.return_vars
                     .entry(self.ontology[rel_name].to_string())
                     .and_modify(|vars| {
-                        if !vars.contains(&var_name) {
+                        if !vars.iter().any(|v| v.raw_str() == var_name.raw_str()) {
                             vars.push(return_var.clone());
                         }
                     })
                     .or_insert(vec![return_var.clone()]);
 
                 let id = format!("{var_name}[{index}]._id");
-                self.write_relation_edge(mode, val.tag(), rel_params, var_name, id, rel_info)?;
+                self.write_relation_edge(mode, val.tag(), rel_params, &var_name, id, rel_info)?;
             }
             Value::Sequence(..) => {
                 // TODO: use subsequence data
@@ -709,45 +715,49 @@ impl<'a> MetaQuery<'a> {
                     .is_some_and(|entity_info| entity_info.is_self_identifying)
                 {
                     let entry = self.upserts.entry(collection.clone()).or_default();
-                    entry.var.clone_from(&var_name);
+                    entry.var = var_name.clone().to_var();
                     entry.data.push(format!(r#"{{ "_key": {data} }}"#));
                     // cannot disambiguate lookup or insert for self identifying type
                     // INSERT with overwriteMode: "ignore" option is functionally equivalent
                     entry.options = Some(r#"{ overwriteMode: "ignore" }"#.to_string());
 
-                    let return_var = format!("{var_name}{}", if return_many { "" } else { "[0]" });
+                    let return_var = if return_many {
+                        var_name.clone().to_var()
+                    } else {
+                        Expr::complex(format!("{var_name}[0]"))
+                    };
                     self.return_vars
                         .entry(self.ontology[rel_name].to_string())
                         .and_modify(|vars| vars.push(return_var.clone()))
-                        .or_insert(vec![return_var.clone()]);
+                        .or_insert(vec![return_var]);
 
                     let id = format!("{var_name}[{index}]._id");
-                    self.write_relation_edge(mode, val.tag(), rel_params, var_name, id, rel_info)?;
+                    self.write_relation_edge(mode, val.tag(), rel_params, &var_name, id, rel_info)?;
                 } else {
                     let key = data
                         .as_str()
                         .expect("entity id should serialize to str")
                         .to_owned();
-                    let id = format!(r#""{collection}/{key}""#);
+                    let id = collection.format_id(&key);
 
                     // target is represented as a DOCUMENT
                     self.docs.push(Operation::Selection(Selection::Document(
-                        var_name.clone(),
+                        var_name.clone().to_var(),
                         id,
                     )));
 
-                    let return_var = if return_many {
-                        format!("[{var_name}]")
+                    let return_var: Expr = if return_many {
+                        Expr::complex(format!("[{var_name}]"))
                     } else {
-                        var_name.to_string()
+                        var_name.clone().to_var()
                     };
                     self.return_vars
                         .entry(self.ontology[rel_name].to_string())
                         .and_modify(|vars| vars.push(return_var.clone()))
-                        .or_insert(vec![return_var.clone()]);
+                        .or_insert(vec![return_var]);
 
                     let id = format!("{var_name}._id");
-                    self.write_relation_edge(mode, val.tag(), rel_params, var_name, id, rel_info)?;
+                    self.write_relation_edge(mode, val.tag(), rel_params, &var_name, id, rel_info)?;
                 }
             }
         }
@@ -761,7 +771,7 @@ impl<'a> MetaQuery<'a> {
         mode: WriteMode,
         val_tag: ValueTag,
         rel_params: Value,
-        var_name: String,
+        var_name: &Ident,
         id: String,
         rel_info: &DataRelationshipInfo,
     ) -> DomainResult<()> {
@@ -884,7 +894,7 @@ impl<'a> MetaQuery<'a> {
                                 .collections
                                 .get(def_id)
                                 .expect("collection should exist");
-                            self.with.insert(collection.to_string());
+                            self.with.insert(collection.clone());
                         }
                     }
                 }
@@ -905,7 +915,7 @@ impl<'a> MetaQuery<'a> {
 
         self.with.insert(edge_collection.name.clone());
 
-        let var_name = format!("{}_rel", var_name);
+        let var_name = var_name.append("_rel").to_var();
         entry.var.clone_from(&var_name);
         entry.mode = edge_write_mode;
         entry.direction = dir;
@@ -923,11 +933,11 @@ impl<'a> MetaQuery<'a> {
             Select::EntityId => {
                 self.return_var = match self.selection {
                     Some(_) => self.var.clone(),
-                    None => format!("{}[0]", self.var),
+                    None => Expr::complex(format!("{}[0]", self.var)),
                 }
             }
             Select::Leaf => {
-                self.return_var = format!("{{ _key: {}._key }}", self.var);
+                self.return_var = Expr::complex(format!("{{ _key: {}._key }}", self.var));
             }
             Select::Struct(ref struct_select) => {
                 let def = self.ontology.def(struct_select.def_id);
@@ -935,7 +945,7 @@ impl<'a> MetaQuery<'a> {
 
                 self.return_var = match self.selection {
                     Some(_) => self.var.clone(),
-                    None => format!("{}[0]", self.var),
+                    None => Expr::complex(format!("{}[0]", self.var)),
                 };
 
                 for (rel_id, sub_select) in &selection {
@@ -945,9 +955,9 @@ impl<'a> MetaQuery<'a> {
                         .expect("property not found in type info");
                     if let DataRelationshipKind::Edge(_) = rel_info.kind {
                         let rel_name = rel_info.name;
-                        let var_name = format!(
+                        let var_name = Ident::new(format!(
                             "{}_{}{}",
-                            self.var,
+                            self.var.raw_str(),
                             &self.ontology[rel_name].to_string(),
                             match rel_info.target {
                                 DataRelationshipTarget::Unambiguous(def_id) => {
@@ -957,17 +967,21 @@ impl<'a> MetaQuery<'a> {
                                 }
                                 DataRelationshipTarget::Union { .. } => "".to_string(),
                             }
-                        );
+                        ));
 
                         // find items covered by write operation
                         let mut let_match = false;
                         for ops in [&self.docs, &self.ops] {
                             for op in ops {
                                 match op {
-                                    Operation::Selection(Selection::Document(var, _))
-                                    | Operation::Let(Let { var, .. })
+                                    Operation::Selection(Selection::Document(var, _)) => {
+                                        if var.raw_str() == var_name.raw_str() {
+                                            let_match = true;
+                                        }
+                                    }
+                                    Operation::Let(Let { var, .. })
                                     | Operation::LetData(LetData { var, .. }) => {
-                                        if var == &var_name {
+                                        if var.raw_str() == var_name.raw_str() {
                                             let_match = true;
                                         }
                                     }
@@ -984,10 +998,10 @@ impl<'a> MetaQuery<'a> {
                                 (_, ValueCardinality::IndexSet | ValueCardinality::List) => true,
                             };
 
-                            let return_var = match (&self.selection, return_many) {
-                                (Some(_), true) => format!("[{var_name}]"),
-                                (None, true) => format!("{var_name}[0]"),
-                                (_, false) => var_name.clone(),
+                            let return_var: Expr = match (&self.selection, return_many) {
+                                (Some(_), true) => Expr::Complex(format!("[{var_name}]")),
+                                (None, true) => Expr::Complex(format!("{var_name}[0]")),
+                                (_, false) => var_name.clone().to_var(),
                             };
 
                             self.return_vars
