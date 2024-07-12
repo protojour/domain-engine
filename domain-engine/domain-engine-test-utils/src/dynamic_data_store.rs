@@ -113,14 +113,34 @@ mod arango {
 }
 
 mod pg {
-    use domain_engine_core::Session;
+    use std::sync::{Arc, OnceLock};
+
+    use domain_engine_core::data_store::{DataStoreAPI, Request, Response};
+    use domain_engine_core::{DomainResult, Session};
     use domain_engine_store_pg::migrate::connect_and_migrate;
     use domain_engine_store_pg::recreate_database;
     use domain_engine_store_pg::{deadpool_postgres, tokio_postgres, PostgresDataStore};
     use ontol_runtime::ontology::Ontology;
+    use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+
+    /// Make sure not to overwhelm the test postgres instance.
+    /// This number can be tweaked, it's about finding a sweet spot.
+    /// A small number of concurrent tests should be fine,
+    /// since the intention is for each test to run in a separate database (this is best effort though).
+    const MAX_CONCURRENT_PG_TESTS: usize = 6;
+
+    /// this global semaphore limits the number of PgTestDatastores that can exist at the same time.
+    static PG_TEST_SEMAPHORE: OnceLock<Arc<Semaphore>> = OnceLock::new();
 
     #[derive(Default)]
     pub struct PgTestDatastoreFactory;
+
+    struct PgTestDatastore {
+        inner: PostgresDataStore,
+        /// As long as this datastore still lives, it will hold this permit
+        #[allow(unused)]
+        permit: OwnedSemaphorePermit,
+    }
 
     #[async_trait::async_trait]
     impl domain_engine_core::data_store::DataStoreFactory for PgTestDatastoreFactory {
@@ -137,6 +157,17 @@ mod pg {
         }
     }
 
+    #[async_trait::async_trait]
+    impl DataStoreAPI for PgTestDatastore {
+        async fn execute(
+            &self,
+            request: Request,
+            session: domain_engine_core::Session,
+        ) -> DomainResult<Response> {
+            self.inner.execute(request, session).await
+        }
+    }
+
     async fn test_pg_api(
         package_id: ontol_runtime::PackageId,
         _config: ontol_runtime::ontology::config::DataStoreConfig,
@@ -144,6 +175,12 @@ mod pg {
         ontology: std::sync::Arc<Ontology>,
         system: domain_engine_core::system::ArcSystemApi,
     ) -> anyhow::Result<Box<dyn domain_engine_core::data_store::DataStoreAPI + Send + Sync>> {
+        let semaphore = PG_TEST_SEMAPHORE
+            .get_or_init(|| Arc::new(Semaphore::new(MAX_CONCURRENT_PG_TESTS)))
+            .clone();
+        // The test will wait here until the semaphore is ready to hand out a permit
+        let permit = semaphore.acquire_owned().await?;
+
         let test_name = format!("testdb_{}", super::detect_test_name("::ds_pg"));
 
         {
@@ -163,11 +200,14 @@ mod pg {
             },
         );
 
-        Ok(Box::new(PostgresDataStore {
-            pool: deadpool_postgres::Pool::builder(deadpool_manager)
-                .max_size(1)
-                .build()?,
-            system,
+        Ok(Box::new(PgTestDatastore {
+            inner: PostgresDataStore {
+                pool: deadpool_postgres::Pool::builder(deadpool_manager)
+                    .max_size(1)
+                    .build()?,
+                system,
+            },
+            permit,
         }))
     }
 
