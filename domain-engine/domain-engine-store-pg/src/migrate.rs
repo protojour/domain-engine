@@ -7,7 +7,7 @@ mod registry {
     embed_migrations!("./registry_migrations");
 }
 
-const MIGRATIONS_TABLE_NAME: &str = "memoriam_registry_schema_history";
+const MIGRATIONS_TABLE_NAME: &str = "public.m6m_registry_schema_history";
 
 pub async fn connect_and_migrate(
     persistent_domains: &[PackageId],
@@ -39,23 +39,14 @@ async fn migrate(
 ) -> anyhow::Result<()> {
     info!("migrating database");
 
-    migrate_registry(pg_client).await?;
-
-    for package_id in persistent_domains {
-        migrate_domain(*package_id, ontology, pg_client).await?;
-    }
-
-    Ok(())
-}
-
-async fn migrate_registry(pg_client: &mut Client) -> anyhow::Result<()> {
-    // ensure the migrations table is stored in the default "public" schema
-    pg_client.query("SET search_path TO public", &[]).await?;
-
     registry::migrations::runner()
         .set_migration_table_name(MIGRATIONS_TABLE_NAME)
         .run_async(pg_client)
         .await?;
+
+    for package_id in persistent_domains {
+        migrate_domain(*package_id, ontology, pg_client).await?;
+    }
 
     Ok(())
 }
