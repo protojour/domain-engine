@@ -959,6 +959,7 @@ dependencies = [
  "ontol-macros",
  "ontol-runtime",
  "ontol-test-utils",
+ "postgres-protocol",
  "pretty_assertions",
  "refinery",
  "serde",

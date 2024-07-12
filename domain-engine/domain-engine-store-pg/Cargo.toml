@@ -33,3 +33,4 @@ domain-engine-test-utils.path = "../domain-engine-test-utils"
 tracing-subscriber.workspace = true
 uuid.workspace = true
 pretty_assertions = "1"
+postgres-protocol = "0.6"

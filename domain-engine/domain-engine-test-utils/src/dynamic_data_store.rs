@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use anyhow::anyhow;
 use domain_engine_core::{
     data_store::{DataStoreAPI, DataStoreFactory, DataStoreFactorySync},
     system::ArcSystemApi,
@@ -10,6 +11,7 @@ use ontol_runtime::{
     ontology::{config::DataStoreConfig, Ontology},
     PackageId,
 };
+use tracing::error;
 
 pub struct DynamicDataStoreFactory {
     name: String,
@@ -31,7 +33,7 @@ impl DataStoreFactory for DynamicDataStoreFactory {
         ontology: Arc<Ontology>,
         system: ArcSystemApi,
     ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
-        match self.name.as_str() {
+        let result = match self.name.as_str() {
             "arango" => {
                 arango::ArangoTestDatastoreFactory
                     .new_api(package_id, config, session, ontology, system)
@@ -47,8 +49,13 @@ impl DataStoreFactory for DynamicDataStoreFactory {
                     .new_api(package_id, config, session, ontology, system)
                     .await
             }
-            _ => panic!(),
-        }
+            other => Err(anyhow!("unknown data store: `{other}`")),
+        };
+
+        result.map_err(|err| {
+            error!("datastore not created: {err:?}");
+            err
+        })
     }
 }
 

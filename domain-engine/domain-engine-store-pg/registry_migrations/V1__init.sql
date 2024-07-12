@@ -4,6 +4,6 @@ CREATE SCHEMA m6m_reg;
 
 CREATE TABLE m6m_reg.domain
 (
-    id uuid PRIMARY KEY,
-    unique_name text NOT NULL
+    unique_name text PRIMARY KEY,
+    schema_name text NOT NULL
 );
