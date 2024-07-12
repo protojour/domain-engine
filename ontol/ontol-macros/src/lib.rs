@@ -78,6 +78,10 @@ pub fn datastore_test(attr: TokenStream, item: TokenStream) -> TokenStream {
             identifier: "arango",
             skip_env_var: "DOMAIN_ENGINE_SKIP_ARANGO_TESTS",
         },
+        DataStore {
+            identifier: "pg",
+            skip_env_var: "DOMAIN_ENGINE_SKIP_PG_TESTS",
+        },
     ];
 
     let data_store_attrs = parse_macro_input!(attr as DatastoreAttrs);

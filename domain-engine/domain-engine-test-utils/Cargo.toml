@@ -3,13 +3,17 @@ name = "domain-engine-test-utils"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+doctest = false
+
 [dependencies]
 ontol-runtime.path = "../../ontol/ontol-runtime"
 ontol-test-utils.path = "../../ontol/ontol-test-utils"
 domain-engine-core.path = "../domain-engine-core"
 domain-engine-graphql.path = "../domain-engine-graphql"
-domain-engine-store-inmemory.path = "../domain-engine-store-inmemory"
 domain-engine-store-arango.path = "../domain-engine-store-arango"
+domain-engine-store-inmemory.path = "../domain-engine-store-inmemory"
+domain-engine-store-pg.path = "../domain-engine-store-pg"
 serde.workspace = true
 serde_json.workspace = true
 fnv.workspace = true

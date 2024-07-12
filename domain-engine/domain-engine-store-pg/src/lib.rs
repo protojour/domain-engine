@@ -1,40 +1,57 @@
-use deadpool_postgres::{Config, ManagerConfig, RecyclingMethod};
+use anyhow::anyhow;
+use domain_engine_core::{
+    data_store::{DataStoreAPI, Request, Response},
+    system::ArcSystemApi,
+    DomainError, DomainResult,
+};
+use tokio_postgres::NoTls;
 
-#[allow(unused)]
-fn test_config() -> deadpool_postgres::Config {
-    let mut config = Config::new();
-    config.host = Some("localhost".to_string());
-    config.port = Some(5432);
-    config.dbname = Some("memoriam".to_string());
-    config.user = Some("memoriam".to_string());
-    config.password = Some("memoriam".to_string());
-    config.manager = Some(ManagerConfig {
-        recycling_method: RecyclingMethod::Fast,
-    });
+pub mod migrate;
 
-    config
+pub use deadpool_postgres;
+pub use tokio_postgres;
+
+pub struct PostgresDataStore {
+    pub pool: deadpool_postgres::Pool,
+    pub system: ArcSystemApi,
 }
 
-#[tokio::test]
-async fn pg_test() {
-    if ::std::env::var("DOMAIN_ENGINE_SKIP_PG_TESTS").is_ok() {
-        return;
+#[async_trait::async_trait]
+impl DataStoreAPI for PostgresDataStore {
+    async fn execute(
+        &self,
+        _request: Request,
+        _session: domain_engine_core::Session,
+    ) -> DomainResult<Response> {
+        Err(DomainError::DataStore(anyhow!(
+            "not implemented for Postgres"
+        )))
     }
+}
 
-    let config = test_config();
-    let pool = config
-        .create_pool(
-            Some(deadpool_postgres::Runtime::Tokio1),
-            tokio_postgres::NoTls,
-        )
-        .unwrap();
+pub async fn recreate_database(
+    dbname: &str,
+    master_config: &tokio_postgres::Config,
+) -> anyhow::Result<()> {
+    let (client, connection) = master_config.connect(NoTls).await.unwrap();
 
-    let client = pool.get().await.unwrap();
-    let stmt = client.prepare_cached("SELECT 1 + $1").await.unwrap();
+    // The connection object performs the actual communication with the database,
+    // so spawn it off to run on its own.
+    let join_handle = tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("connection error: {}", e);
+        }
+    });
 
-    let param: i32 = 41;
-    let rows = client.query(&stmt, &[&param]).await.unwrap();
-    let value: i32 = rows[0].get(0);
+    client
+        .query(&format!("DROP DATABASE IF EXISTS \"{dbname}\""), &[])
+        .await?;
+    client
+        .query(&format!("CREATE DATABASE \"{dbname}\""), &[])
+        .await?;
 
-    assert_eq!(42, value);
+    drop(client);
+    join_handle.await.unwrap();
+
+    Ok(())
 }

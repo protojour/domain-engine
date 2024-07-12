@@ -5,9 +5,9 @@ services:
     # set shared memory limit when using docker-compose
     shm_size: 128mb
     environment:
-      POSTGRES_DB: memoriam
-      POSTGRES_USER: memoriam
-      POSTGRES_PASSWORD: memoriam
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       - 5432:5432
 
