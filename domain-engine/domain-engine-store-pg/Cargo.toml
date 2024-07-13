@@ -25,6 +25,7 @@ serde_json.workspace = true
 anyhow = "1"
 bincode = "1"
 refinery = { version = "0.8", default-features = false, features = ["tokio-postgres"] }
+ulid = { version = "1", features = ["postgres"] }
 
 [dev-dependencies]
 ontol-test-utils.path = "../../ontol/ontol-test-utils"

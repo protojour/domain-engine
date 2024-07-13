@@ -969,6 +969,7 @@ dependencies = [
  "tokio-postgres",
  "tracing",
  "tracing-subscriber",
+ "ulid",
  "uuid",
 ]
 
@@ -3724,7 +3725,9 @@ version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34778c17965aa2a08913b57e1f34db9b4a63f5de31768b55bf20d2795f921259"
 dependencies = [
+ "bytes",
  "getrandom",
+ "postgres-types",
  "rand",
  "serde",
  "web-time",

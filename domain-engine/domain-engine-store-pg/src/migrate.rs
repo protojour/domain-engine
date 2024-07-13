@@ -76,15 +76,20 @@ async fn migrate_domain<'a>(
         .ok_or_else(|| anyhow!("domain does not exist"))?;
     let unique_name = &ontology[domain.unique_name()];
     let schema_name = format!("m6m_domain_{unique_name}");
+    let domain_id = ulid::Ulid::new();
 
-    debug!("migrate domain {package_id:?}: `{unique_name}`");
+    debug!("migrate domain {package_id:?}: `{unique_name}` ({domain_id})");
 
     txn.query(
         "
-        INSERT INTO m6m_reg.domain VALUES($1, $2)
+        INSERT INTO m6m_reg.persistent_domain (
+            domain_id,
+            unique_name,
+            schema_name
+        ) VALUES($1, $2, $3)
         ON CONFLICT DO NOTHING
         ",
-        &[&unique_name, &schema_name],
+        &[&domain_id, &unique_name, &schema_name],
     )
     .await?;
 
