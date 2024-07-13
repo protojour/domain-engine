@@ -10,7 +10,7 @@ use std::fmt::Write;
 use tracing::debug;
 
 use crate::{
-    regex_util::{self, set_of_all_strings, unsigned_integer_with_radix},
+    regex_util::{self, unsigned_integer_with_radix},
     relation::Constructor,
     strings::StringCtx,
     Compiler,
@@ -108,13 +108,13 @@ impl TextPatternSegment {
 
     fn to_regex_hir(&self, capture_cursor: &mut CaptureCursor) -> Hir {
         match self {
-            Self::EmptyString => regex_util::empty_string(),
+            Self::EmptyString => regex_util::well_known::empty_string(),
             Self::AnyString => {
                 let index = capture_cursor.increment();
                 Hir::capture(Capture {
                     index,
                     name: None,
-                    sub: Box::new(set_of_all_strings()),
+                    sub: Box::new(regex_util::well_known::set_of_all_strings()),
                 })
             }
             Self::Literal(string) => Hir::literal(string.as_bytes()),

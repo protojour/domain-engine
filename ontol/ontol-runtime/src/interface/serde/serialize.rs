@@ -212,7 +212,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 ontology: self.ontology
             }
         )
-        .map_err(|_| S::Error::custom("Conversion to text failed"))?;
+        .map_err(|_| S::Error::custom("conversion to text failed"))?;
 
         serializer.serialize_str(&buf)
     }

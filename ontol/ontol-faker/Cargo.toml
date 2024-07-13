@@ -16,6 +16,7 @@ ontol-runtime.path = "../ontol-runtime"
 tracing.workspace = true
 smallvec.workspace = true
 uuid = { workspace = true, features = ["fast-rng"] }
+ulid.workspace = true
 fake = { version = "2", features = ["chrono"] }
 rand = { version = "0.8", features = ["std_rng"] }
 regex_generate = "0.2"

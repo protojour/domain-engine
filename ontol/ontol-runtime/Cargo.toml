@@ -15,6 +15,7 @@ serde = { workspace = true, features = ["derive", "rc"] }
 serde_json.workspace = true
 fnv.workspace = true
 uuid.workspace = true
+ulid.workspace = true
 chrono.workspace = true
 bitflags.workspace = true
 bit-set.workspace = true

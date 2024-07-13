@@ -5,7 +5,6 @@ use ontol_runtime::DefId;
 use regex_syntax::{
     ast::{Ast, GroupKind},
     hir::{Class, ClassUnicode, ClassUnicodeRange, Hir, HirKind, Literal, Look, Repetition},
-    Parser,
 };
 
 use crate::{
@@ -15,15 +14,72 @@ use crate::{
     SourceId, SourceSpan,
 };
 
-pub fn uuid() -> Hir {
-    let hex = Hir::class(Class::Unicode(ClassUnicode::new([
-        ClassUnicodeRange::new('0', '9'),
-        ClassUnicodeRange::new('a', 'f'),
-        ClassUnicodeRange::new('A', 'F'),
-    ])));
-    let dash = Hir::literal("-".as_bytes());
+pub mod well_known {
+    use regex_syntax::{
+        hir::{Class, ClassUnicode, ClassUnicodeRange, Hir, Look, Repetition},
+        Parser,
+    };
 
-    fn repeat_exact(hir: Hir, n: u32) -> Hir {
+    pub fn empty_string() -> Hir {
+        Hir::concat(vec![Hir::look(Look::Start), Hir::look(Look::End)])
+    }
+
+    pub fn set_of_all_strings() -> Hir {
+        Parser::new().parse(r#".*"#).unwrap()
+    }
+
+    pub fn uuid() -> Hir {
+        let hex = Hir::class(Class::Unicode(ClassUnicode::new([
+            ClassUnicodeRange::new('0', '9'),
+            ClassUnicodeRange::new('a', 'f'),
+            ClassUnicodeRange::new('A', 'F'),
+        ])));
+        let dash = Hir::literal("-".as_bytes());
+
+        Hir::alternation(vec![
+            repeat_exact_greedy(hex.clone(), 32),
+            Hir::concat(vec![
+                repeat_exact_greedy(hex.clone(), 8),
+                dash.clone(),
+                repeat_exact_greedy(hex.clone(), 4),
+                dash.clone(),
+                repeat_exact_greedy(hex.clone(), 4),
+                dash.clone(),
+                repeat_exact_greedy(hex.clone(), 4),
+                dash,
+                repeat_exact_greedy(hex, 12),
+            ]),
+        ])
+    }
+
+    /// source: https://regex101.com/library/ik6xZx
+    /// [0-7][0-9A-HJKMNP-TV-Z]{25}
+    pub fn ulid() -> Hir {
+        Hir::concat(vec![
+            Hir::class(Class::Unicode(ClassUnicode::new([ClassUnicodeRange::new(
+                '0', '7',
+            )]))),
+            repeat_exact_greedy(
+                Hir::class(Class::Unicode(ClassUnicode::new([
+                    ClassUnicodeRange::new('0', '9'),
+                    ClassUnicodeRange::new('A', 'H'),
+                    ClassUnicodeRange::new('J', 'K'),
+                    ClassUnicodeRange::new('M', 'N'),
+                    ClassUnicodeRange::new('P', 'T'),
+                    ClassUnicodeRange::new('V', 'Z'),
+                ]))),
+                25,
+            ),
+        ])
+    }
+
+    pub fn datetime_rfc3339() -> Hir {
+        Parser::new()
+            .parse(r"((?:([0-9]{4}-[0-9]{2}-[0-9]{2})T([0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?))(Z|[\+-][0-9]{2}:[0-9]{2})?)")
+            .unwrap()
+    }
+
+    fn repeat_exact_greedy(hir: Hir, n: u32) -> Hir {
         Hir::repetition(Repetition {
             min: n,
             max: Some(n),
@@ -31,35 +87,6 @@ pub fn uuid() -> Hir {
             sub: Box::new(hir),
         })
     }
-
-    Hir::alternation(vec![
-        repeat_exact(hex.clone(), 32),
-        Hir::concat(vec![
-            repeat_exact(hex.clone(), 8),
-            dash.clone(),
-            repeat_exact(hex.clone(), 4),
-            dash.clone(),
-            repeat_exact(hex.clone(), 4),
-            dash.clone(),
-            repeat_exact(hex.clone(), 4),
-            dash,
-            repeat_exact(hex, 12),
-        ]),
-    ])
-}
-
-pub fn datetime_rfc3339() -> Hir {
-    Parser::new()
-        .parse(r"((?:([0-9]{4}-[0-9]{2}-[0-9]{2})T([0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?))(Z|[\+-][0-9]{2}:[0-9]{2})?)")
-        .unwrap()
-}
-
-pub fn empty_string() -> Hir {
-    Hir::concat(vec![Hir::look(Look::Start), Hir::look(Look::End)])
-}
-
-pub fn set_of_all_strings() -> Hir {
-    Parser::new().parse(r#".*"#).unwrap()
 }
 
 pub fn unsigned_integer_with_radix(radix: u8) -> Hir {

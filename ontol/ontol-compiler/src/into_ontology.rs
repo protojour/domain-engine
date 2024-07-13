@@ -86,7 +86,7 @@ impl<'m> Compiler<'m> {
                                 ident = ident
                             ),
                         );
-                    } else if let Some(slt) = self.defs.string_like_types.get(&def_id) {
+                    } else if let Some(slt) = self.defs.text_like_types.get(&def_id) {
                         if let Some(field_docs) = TextLikeType::get_field_rustdoc(slt) {
                             docs_table.insert(def_id, field_docs.to_string());
                         }
@@ -381,7 +381,7 @@ impl<'m> Compiler<'m> {
             .serde_operators(serde_operators)
             .dynamic_sequence_operator_addr(dynamic_sequence_operator_addr)
             .property_flows(property_flows)
-            .string_like_types(self.defs.string_like_types)
+            .text_like_types(self.defs.text_like_types)
             .text_patterns(self.text_patterns.text_patterns)
             .externs(self.def_ty_ctx.ontology_externs)
             .value_generators(self.rel_ctx.value_generators)

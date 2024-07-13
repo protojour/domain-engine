@@ -116,6 +116,7 @@ impl<'m> Compiler<'m> {
         self.def_proc("append", DefKind::Fn(OverloadFunc::Append), binary_text);
 
         self.def_uuid();
+        self.def_ulid();
         self.def_datetime();
 
         self.register_named_type(
@@ -237,17 +238,27 @@ impl<'m> Compiler<'m> {
         let (uuid, _) = self.define_concrete_domain_type("uuid", |def_id| {
             Type::TextLike(def_id, TextLikeType::Uuid)
         });
-        let segment = TextPatternSegment::Regex(regex_util::uuid());
+        let segment = TextPatternSegment::Regex(regex_util::well_known::uuid());
         store_text_pattern_segment(uuid, &segment, &mut self.text_patterns, &mut self.str_ctx);
         self.rel_ctx.properties_by_def_id_mut(uuid).constructor = Constructor::TextFmt(segment);
-        self.defs.string_like_types.insert(uuid, TextLikeType::Uuid);
+        self.defs.text_like_types.insert(uuid, TextLikeType::Uuid);
+    }
+
+    fn def_ulid(&mut self) {
+        let (ulid, _) = self.define_concrete_domain_type("ulid", |def_id| {
+            Type::TextLike(def_id, TextLikeType::Ulid)
+        });
+        let segment = TextPatternSegment::Regex(regex_util::well_known::ulid());
+        store_text_pattern_segment(ulid, &segment, &mut self.text_patterns, &mut self.str_ctx);
+        self.rel_ctx.properties_by_def_id_mut(ulid).constructor = Constructor::TextFmt(segment);
+        self.defs.text_like_types.insert(ulid, TextLikeType::Ulid);
     }
 
     fn def_datetime(&mut self) {
         let (datetime, _) = self.define_concrete_domain_type("datetime", |def_id| {
             Type::TextLike(def_id, TextLikeType::DateTime)
         });
-        let segment = TextPatternSegment::Regex(regex_util::datetime_rfc3339());
+        let segment = TextPatternSegment::Regex(regex_util::well_known::datetime_rfc3339());
         store_text_pattern_segment(
             datetime,
             &segment,
@@ -257,7 +268,7 @@ impl<'m> Compiler<'m> {
         self.rel_ctx.properties_by_def_id_mut(datetime).constructor =
             Constructor::TextFmt(segment.clone());
         self.defs
-            .string_like_types
+            .text_like_types
             .insert(datetime, TextLikeType::DateTime);
     }
 

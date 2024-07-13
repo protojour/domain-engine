@@ -325,6 +325,43 @@ fn test_serde_uuid() {
 }
 
 #[test]
+fn test_serde_ulid() {
+    "
+    def my_id ( rel* is: ulid )
+    def prefix_id ( fmt '' => 'prefix/' => ulid => .)
+    "
+    .compile_then(|test| {
+        let [my_id, prefix_id] = test.bind(["my_id", "prefix_id"]);
+        assert_matches!(
+            serde_create(&my_id).to_value(json!("01ARZ3NDEKTSV4RRFFQ69G5FAV")),
+            Ok(Value::OctetSequence(..))
+        );
+        assert_json_io_matches!(serde_create(&my_id), "01ARZ3NDEKTSV4RRFFQ69G5FAV");
+        assert_error_msg!(
+            serde_create(&my_id).to_value(json!(42)),
+            "invalid type: integer `42`, expected `ulid` at line 1 column 2"
+        );
+        assert_error_msg!(
+            serde_create(&my_id).to_value(json!("foobar")),
+            r#"invalid type: string "foobar", expected `ulid` at line 1 column 8"#
+        );
+
+        assert_matches!(
+            serde_create(&prefix_id).to_value(json!("prefix/01ARZ3NDEKTSV4RRFFQ69G5FAV")),
+            Ok(Value::Struct(..))
+        );
+        assert_json_io_matches!(
+            serde_create(&prefix_id),
+            "prefix/01ARZ3NDEKTSV4RRFFQ69G5FAV"
+        );
+        assert_error_msg!(
+            serde_create(&prefix_id).to_value(json!(42)),
+            r#"invalid type: integer `42`, expected string matching /(?:\A(?:prefix/)((?:[0-7][0-9A-HJKMNP-TV-Z]{25}))\z)/ at line 1 column 2"#
+        );
+    });
+}
+
+#[test]
 fn test_serde_datetime() {
     "
     def my_dt ( rel* is: datetime )

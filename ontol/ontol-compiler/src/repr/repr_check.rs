@@ -342,7 +342,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 }
                 DefKind::Type(type_def) => {
                     // Some `ontol` types are "domain types" but still scalars
-                    if self.defs.string_like_types.contains_key(&def_id) {
+                    if self.defs.text_like_types.contains_key(&def_id) {
                         self.merge_repr(
                             &mut builder,
                             leaf_def_id,

@@ -118,7 +118,7 @@ impl OntologyBuilder {
         self
     }
 
-    pub fn string_like_types(mut self, types: FnvHashMap<DefId, TextLikeType>) -> Self {
+    pub fn text_like_types(mut self, types: FnvHashMap<DefId, TextLikeType>) -> Self {
         self.data().text_like_types = types;
         self
     }

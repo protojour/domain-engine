@@ -257,7 +257,7 @@ pub struct Defs<'m> {
     pub(crate) text_literals: HashMap<&'m str, DefId>,
     pub(crate) regex_strings: HashMap<&'m str, DefId>,
     pub(crate) literal_regex_meta_table: FnvHashMap<DefId, RegexMeta<'m>>,
-    pub(crate) string_like_types: FnvHashMap<DefId, TextLikeType>,
+    pub(crate) text_like_types: FnvHashMap<DefId, TextLikeType>,
 }
 
 impl<'m> Default for Defs<'m> {
@@ -281,7 +281,7 @@ impl<'m> Defs<'m> {
             text_literals: Default::default(),
             regex_strings: Default::default(),
             literal_regex_meta_table: Default::default(),
-            string_like_types: Default::default(),
+            text_like_types: Default::default(),
         }
     }
 

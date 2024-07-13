@@ -334,6 +334,7 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
                 write!(f, "/{lit}/")
             }
             Type::TextLike(_, TextLikeType::Uuid) => write!(f, "{tick}ontol.uuid{tick}"),
+            Type::TextLike(_, TextLikeType::Ulid) => write!(f, "{tick}ontol.ulid{tick}"),
             Type::TextLike(_, TextLikeType::DateTime) => write!(f, "{tick}ontol.datetime{tick}"),
             Type::Seq(item) => {
                 write!(f, "{{{}}}", self.child(item))

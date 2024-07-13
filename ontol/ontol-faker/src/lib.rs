@@ -1,6 +1,10 @@
 #![forbid(unsafe_code)]
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Add,
+    time::{Duration, SystemTime},
+};
 
 use fake::{Fake, Faker};
 use ontol_runtime::{
@@ -23,6 +27,7 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 use regex_generate::Generator;
 use smallvec::smallvec;
 use tracing::debug;
+use ulid::Ulid;
 
 const MAX_REPEAT: u32 = 128;
 
@@ -149,6 +154,16 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
 
                             Value::OctetSequence(
                                 builder.into_uuid().as_bytes().iter().cloned().collect(),
+                                (*def_id).into(),
+                            )
+                        }
+                        TextLikeType::Ulid => {
+                            let time = SystemTime::UNIX_EPOCH
+                                .add(Duration::from_secs(self.rng.gen_range(0..1_800_000_000)));
+                            let ulid = Ulid::from_datetime_with_source(time, self.rng);
+
+                            Value::OctetSequence(
+                                ulid.to_bytes().into_iter().collect(),
                                 (*def_id).into(),
                             )
                         }

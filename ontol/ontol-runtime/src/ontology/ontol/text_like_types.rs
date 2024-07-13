@@ -1,6 +1,9 @@
+use std::str::FromStr;
+
 use ::serde::{Deserialize, Serialize};
 use ontol_macros::RustDoc;
 use tracing::error;
+use ulid::Ulid;
 use uuid::Uuid;
 
 use crate::{
@@ -19,6 +22,8 @@ pub enum TextLikeType {
     /// rel* is: uuid
     /// ```
     Uuid,
+    /// A [Universally Unique Lexicographically Sortable Identifier](https://github.com/ulid/spec).
+    Ulid,
     /// An [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339)-formatted
     /// datetime string, e.g. `'1970-01-01T00:00:00.000Z'`.
     ///
@@ -41,7 +46,14 @@ impl TextLikeType {
                 let uuid =
                     Uuid::parse_str(str).map_err(|error| ParseError(format!("{}", error)))?;
                 Ok(Value::OctetSequence(
-                    uuid.as_bytes().iter().cloned().collect(),
+                    uuid.into_bytes().into_iter().collect(),
+                    def_id.into(),
+                ))
+            }
+            Self::Ulid => {
+                let ulid = Ulid::from_str(str).map_err(|error| ParseError(format!("{}", error)))?;
+                Ok(Value::OctetSequence(
+                    ulid.to_bytes().into_iter().collect(),
                     def_id.into(),
                 ))
             }
@@ -55,6 +67,7 @@ impl TextLikeType {
     pub fn type_name(&self) -> &'static str {
         match self {
             Self::Uuid => "uuid",
+            Self::Ulid => "ulid",
             Self::DateTime => "datetime",
         }
     }
@@ -67,6 +80,17 @@ impl TextLikeType {
                 })?;
 
                 write!(f, "{uuid}")
+            }
+            (Self::Ulid, Value::OctetSequence(octets, _)) => {
+                if octets.len() != 16 {
+                    return Err(std::fmt::Error);
+                }
+
+                let mut bytes = [0u8; 16];
+                bytes.clone_from_slice(octets);
+                let ulid = Ulid::from_bytes(bytes);
+
+                write!(f, "{ulid}")
             }
             (Self::DateTime, Value::ChronoDate(naive_date, _)) => {
                 write!(f, "{naive_date}")
