@@ -1,4 +1,4 @@
-domain 01J2QCRD7KFJRFFHAWSRDE7APJ ()
+domain 01GXBEHB9G0PGFM7JY9Q5S2QJK ()
 
 def guitar_id (
     fmt '' => 'guitar/' => uuid => .

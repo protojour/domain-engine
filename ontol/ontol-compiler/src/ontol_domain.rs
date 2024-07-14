@@ -22,7 +22,10 @@ use crate::{
     Compiler, NO_SPAN,
 };
 
-const ONTOL_DOMAIN_ID: &str = "01J2Q5Y0PBPBBG4NXJ4GZNEMBW";
+/// `ontol` is the original domain.
+///
+/// No other domain should have a timestamp earlier than what's encoded inside this ULID (2023-01-04)
+const ONTOL_DOMAIN_ID: &str = "01GNYFZP30ED0EZ1579TH0D55P";
 
 impl<'m> Compiler<'m> {
     pub fn register_ontol_domain(&mut self) {
