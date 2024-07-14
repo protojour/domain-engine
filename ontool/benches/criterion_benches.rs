@@ -33,6 +33,7 @@ use tokio::runtime::Runtime;
 const TINY: (SrcName, &str) = (
     src_name("tiny"),
     indoc! {r#"
+        domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
         def created (
             rel* 'created'[rel* gen: create_time]?: datetime
         )
