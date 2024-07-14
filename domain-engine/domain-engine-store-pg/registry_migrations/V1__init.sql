@@ -9,7 +9,7 @@ CREATE TABLE m6m_reg.domain
     schema text NOT NULL
 );
 
-CREATE TABLE m6m_reg.vertice
+CREATE TABLE m6m_reg.vertex
 (
     domain_id uuid REFERENCES m6m_reg.domain(domain_id),
     def_tag integer NOT NULL,

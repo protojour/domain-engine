@@ -88,7 +88,7 @@ async fn migrate(
 #[derive(Default)]
 struct MigrationCtx {
     domains: FnvHashMap<DomainId, PgDomain>,
-    vertices: FnvHashMap<(DomainId, DefId), PgVertice>,
+    vertices: FnvHashMap<(DomainId, DefId), PgVertex>,
     steps: Vec<(DomainId, MigrationStep)>,
 }
 
@@ -121,7 +121,7 @@ struct PgDomain {
 
 #[derive(Clone)]
 #[allow(unused)]
-struct PgVertice {
+struct PgVertex {
     table: Box<str>,
 }
 
@@ -210,7 +210,7 @@ async fn migrate_vertex_steps<'t>(
     let row = txn
         .query_opt(
             indoc! { "
-                SELECT \"table\" FROM m6m_reg.vertice
+                SELECT \"table\" FROM m6m_reg.vertex
                 WHERE
                     domain_id = $1
                 AND
@@ -221,20 +221,20 @@ async fn migrate_vertex_steps<'t>(
         .await?;
 
     if let Some(row) = row {
-        let pg_vertice = PgVertice { table: row.get(0) };
+        let pg_vertex = PgVertex { table: row.get(0) };
 
-        if pg_vertice.table != table {
+        if pg_vertex.table != table {
             ctx.steps.push((
                 domain_id,
                 MigrationStep::RenameVertexTable {
                     def_id,
-                    old: pg_vertice.table.clone(),
+                    old: pg_vertex.table.clone(),
                     new: table.clone(),
                 },
             ));
         }
 
-        ctx.vertices.insert((domain_id, def_id), pg_vertice);
+        ctx.vertices.insert((domain_id, def_id), pg_vertex);
     } else {
         ctx.steps.push((
             domain_id,
@@ -243,8 +243,7 @@ async fn migrate_vertex_steps<'t>(
                 table: table.clone(),
             },
         ));
-        ctx.vertices
-            .insert((domain_id, def_id), PgVertice { table });
+        ctx.vertices.insert((domain_id, def_id), PgVertex { table });
     }
 
     Ok(())
@@ -307,7 +306,7 @@ async fn execute_migration_step<'t>(
 
             txn.query(
                 indoc! { "
-                    INSERT INTO m6m_reg.vertice (
+                    INSERT INTO m6m_reg.vertex (
                         domain_id,
                         def_tag,
                         \"table\"
@@ -316,7 +315,7 @@ async fn execute_migration_step<'t>(
                 &[&domain_id, &def_tag, &table],
             )
             .await
-            .context("insert vertice")?;
+            .context("insert vertex")?;
         }
         MigrationStep::RenameDomainSchema { old, new } => {
             txn.query(
@@ -344,7 +343,7 @@ async fn execute_migration_step<'t>(
         } => {
             let def_tag = def_id.1 as i32;
             let pg_domain = ctx.domains.get_mut(&domain_id).unwrap();
-            let pg_vertice = ctx.vertices.get_mut(&(domain_id, def_id)).unwrap();
+            let pg_vertex = ctx.vertices.get_mut(&(domain_id, def_id)).unwrap();
 
             txn.query(
                 &format!(
@@ -363,7 +362,7 @@ async fn execute_migration_step<'t>(
             )
             .await?;
 
-            pg_vertice.table = new_table;
+            pg_vertex.table = new_table;
         }
     }
 
