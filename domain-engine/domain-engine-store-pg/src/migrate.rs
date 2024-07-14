@@ -1,15 +1,12 @@
 use anyhow::{anyhow, Context};
+use fnv::FnvHashMap;
 use indoc::indoc;
 use ontol_runtime::{
-    ontology::{
-        domain::{Domain, Entity},
-        Ontology,
-    },
+    ontology::{domain::Entity, Ontology},
     DefId, PackageId,
 };
 use tokio_postgres::{Client, NoTls, Transaction};
-use tracing::{debug, debug_span, info, Instrument};
-use ulid::Ulid;
+use tracing::{debug_span, info, info_span, Instrument};
 
 use crate::sql::EscapeIdent;
 
@@ -18,7 +15,10 @@ mod registry {
     embed_migrations!("./registry_migrations");
 }
 
+/// NB: Changing this is likely a bad idea.
 const MIGRATIONS_TABLE_NAME: &str = "public.m6m_registry_schema_history";
+
+type DomainId = ulid::Ulid;
 
 pub async fn connect_and_migrate(
     persistent_domains: &[PackageId],
@@ -65,58 +65,78 @@ async fn migrate(
         .start()
         .await?;
 
+    let mut ctx = MigrationCtx::default();
+
+    // collect migration steps
+    // this improves separation of concerns while also enabling dry run simulations
     for package_id in persistent_domains {
-        migrate_domain(*package_id, ontology, &txn)
+        migrate_domain_steps(*package_id, ontology, &mut ctx, &txn)
             .instrument(debug_span!("migrate", pkg = package_id.id()))
-            .await?;
+            .await
+            .context("domain migration steps")?;
     }
+
+    execute_domain_migration(&txn, &mut ctx)
+        .await
+        .context("perform migration")?;
 
     txn.commit().await?;
 
     Ok(())
 }
 
-struct PgDomain {
-    domain_id: Ulid,
-    schema: String,
+#[derive(Default)]
+struct MigrationCtx {
+    domains: FnvHashMap<DomainId, PgDomain>,
+    vertices: FnvHashMap<(DomainId, DefId), PgVertice>,
+    steps: Vec<(DomainId, MigrationStep)>,
 }
 
+/// The descructive steps that may be performed by the domain migration
+#[derive(Debug)]
+enum MigrationStep {
+    DeployDomain {
+        name: Box<str>,
+        schema: Box<str>,
+    },
+    DeployVertex {
+        def_id: DefId,
+        table: Box<str>,
+    },
+    RenameDomainSchema {
+        old: Box<str>,
+        new: Box<str>,
+    },
+    RenameVertexTable {
+        def_id: DefId,
+        old: Box<str>,
+        new: Box<str>,
+    },
+}
+
+#[derive(Clone)]
+struct PgDomain {
+    schema: Box<str>,
+}
+
+#[derive(Clone)]
 #[allow(unused)]
 struct PgVertice {
-    domain_id: Ulid,
-    def_id: DefId,
-    table: String,
+    table: Box<str>,
 }
 
-async fn migrate_domain<'t>(
+async fn migrate_domain_steps<'t>(
     package_id: PackageId,
     ontology: &Ontology,
+    ctx: &mut MigrationCtx,
     txn: &Transaction<'t>,
 ) -> anyhow::Result<()> {
     let domain = ontology
         .find_domain(package_id)
         .ok_or_else(|| anyhow!("domain does not exist"))?;
 
-    let pg_domain = migrate_domain_meta(domain, ontology, txn).await?;
-
-    for def in domain.defs() {
-        let Some(entity) = def.entity() else {
-            continue;
-        };
-
-        migrate_vertex_meta(def.id, entity, &pg_domain, ontology, txn).await?;
-    }
-
-    Ok(())
-}
-
-async fn migrate_domain_meta<'t>(
-    domain: &Domain,
-    ontology: &Ontology,
-    txn: &Transaction<'t>,
-) -> anyhow::Result<PgDomain> {
     let unique_name = &ontology[domain.unique_name()];
-    let schema = format!("m6m_d_{unique_name}");
+    let schema = format!("m6m_d_{unique_name}").into_boxed_str();
 
     let row = txn
         .query_opt(
@@ -125,71 +145,67 @@ async fn migrate_domain_meta<'t>(
         )
         .await?;
 
-    if let Some(row) = row {
-        debug!("domain already installed");
+    let domain_id = if let Some(row) = row {
+        info!("domain already deployed");
 
-        let mut pg_domain = PgDomain {
-            domain_id: row.get(0),
-            schema: row.get(1),
-        };
+        let domain_id: DomainId = row.get(0);
+
+        let pg_domain = PgDomain { schema: row.get(1) };
+        ctx.domains.insert(domain_id, pg_domain.clone());
 
         if pg_domain.schema != schema {
-            debug!("rename schema");
-            txn.query(
-                &format!(
-                    "ALTER SCHEMA {old} RENAME TO {new}",
-                    old = EscapeIdent(&pg_domain.schema),
-                    new = EscapeIdent(&schema),
-                ),
-                &[],
-            )
-            .await?;
-
-            txn.query(
-                "UPDATE m6m_reg.domain SET(schema = $1) WHERE (domain_id = $2)",
-                &[&pg_domain.domain_id],
-            )
-            .await?;
-            pg_domain.schema = schema;
+            ctx.steps.push((
+                domain_id,
+                MigrationStep::RenameDomainSchema {
+                    old: pg_domain.schema.clone(),
+                    new: schema,
+                },
+            ));
         }
 
-        Ok(pg_domain)
+        domain_id
     } else {
-        let domain_id = Ulid::new();
+        let domain_id = DomainId::new();
+        ctx.domains.insert(
+            domain_id,
+            PgDomain {
+                schema: schema.clone(),
+            },
+        );
 
-        debug!("install domain `{schema}`");
+        ctx.steps.push((
+            domain_id,
+            MigrationStep::DeployDomain {
+                name: ontology[domain.unique_name()].into(),
+                schema,
+            },
+        ));
 
-        // All the things owned by the domain will be isolated inside this schema.
-        txn.query(&format!("CREATE SCHEMA {}", EscapeIdent(&schema)), &[])
-            .await
-            .context("create schema")?;
+        domain_id
+    };
 
-        txn.query(
-            indoc! { "
-                INSERT INTO m6m_reg.domain (
-                    domain_id,
-                    name,
-                    schema
-                ) VALUES($1, $2, $3)
-            "},
-            &[&domain_id, &unique_name, &schema],
-        )
-        .await?;
+    for def in domain.defs() {
+        let Some(entity) = def.entity() else {
+            continue;
+        };
 
-        Ok(PgDomain { domain_id, schema })
+        migrate_vertex_steps(domain_id, def.id, entity, ontology, txn, ctx).await?;
     }
+
+    Ok(())
 }
 
-async fn migrate_vertex_meta<'t>(
+async fn migrate_vertex_steps<'t>(
+    domain_id: DomainId,
     def_id: DefId,
     entity: &Entity,
-    pg_domain: &PgDomain,
     ontology: &Ontology,
     txn: &Transaction<'t>,
-) -> anyhow::Result<PgVertice> {
+    ctx: &mut MigrationCtx,
+) -> anyhow::Result<()> {
     let name = &ontology[entity.name];
     let def_tag = def_id.1 as i32;
-    let table = format!("v_{}", name);
+    let table = format!("v_{}", name).into_boxed_str();
 
     let row = txn
         .query_opt(
@@ -200,25 +216,142 @@ async fn migrate_vertex_meta<'t>(
                 AND
                     def_tag = $2
             "},
-            &[&pg_domain.domain_id, &(def_id.1 as i32)],
+            &[&domain_id, &def_tag],
         )
         .await?;
 
     if let Some(row) = row {
-        let mut vertice = PgVertice {
-            domain_id: pg_domain.domain_id,
-            def_id,
-            table: row.get(0),
-        };
+        let pg_vertice = PgVertice { table: row.get(0) };
 
-        if vertice.table != table {
-            debug!("rename table");
+        if pg_vertice.table != table {
+            ctx.steps.push((
+                domain_id,
+                MigrationStep::RenameVertexTable {
+                    def_id,
+                    old: pg_vertice.table.clone(),
+                    new: table.clone(),
+                },
+            ));
+        }
+
+        ctx.vertices.insert((domain_id, def_id), pg_vertice);
+    } else {
+        ctx.steps.push((
+            domain_id,
+            MigrationStep::DeployVertex {
+                def_id,
+                table: table.clone(),
+            },
+        ));
+        ctx.vertices
+            .insert((domain_id, def_id), PgVertice { table });
+    }
+
+    Ok(())
+}
+
+async fn execute_domain_migration<'t>(
+    txn: &Transaction<'t>,
+    ctx: &mut MigrationCtx,
+) -> anyhow::Result<()> {
+    for (domain_id, step) in std::mem::take(&mut ctx.steps) {
+        execute_migration_step(domain_id, step, txn, ctx)
+            .instrument(info_span!("migrate", domain_id = %domain_id))
+            .await?;
+    }
+
+    Ok(())
+}
+
+async fn execute_migration_step<'t>(
+    domain_id: DomainId,
+    step: MigrationStep,
+    txn: &Transaction<'t>,
+    ctx: &mut MigrationCtx,
+) -> anyhow::Result<()> {
+    info!("{step:?}");
+
+    match step {
+        MigrationStep::DeployDomain { name, schema } => {
+            // All the things owned by the domain will be isolated inside this schema.
+            txn.query(&format!("CREATE SCHEMA {}", EscapeIdent(&schema)), &[])
+                .await
+                .context("create schema")?;
+
+            txn.query(
+                indoc! { "
+                    INSERT INTO m6m_reg.domain (
+                        domain_id,
+                        name,
+                        schema
+                    ) VALUES($1, $2, $3)
+                "},
+                &[&domain_id, &name, &schema],
+            )
+            .await?;
+        }
+        MigrationStep::DeployVertex { def_id, table } => {
+            let def_tag = def_id.1 as i32;
+            let pg_domain = ctx.domains.get(&domain_id).unwrap();
+
+            txn.query(
+                &format!(
+                    "CREATE TABLE {}.{} ()",
+                    EscapeIdent(&pg_domain.schema),
+                    EscapeIdent(&table)
+                ),
+                &[],
+            )
+            .await
+            .context("create vertex table")?;
+
+            txn.query(
+                indoc! { "
+                    INSERT INTO m6m_reg.vertice (
+                        domain_id,
+                        def_tag,
+                        \"table\"
+                    ) VALUES($1, $2, $3)
+                "},
+                &[&domain_id, &def_tag, &table],
+            )
+            .await
+            .context("insert vertice")?;
+        }
+        MigrationStep::RenameDomainSchema { old, new } => {
+            txn.query(
+                &format!(
+                    "ALTER SCHEMA {old} RENAME TO {new}",
+                    old = EscapeIdent(&old),
+                    new = EscapeIdent(&new),
+                ),
+                &[],
+            )
+            .await?;
+
+            txn.query(
+                "UPDATE m6m_reg.domain SET(schema = $1) WHERE (domain_id = $2)",
+                &[&new, &domain_id],
+            )
+            .await?;
+
+            ctx.domains.get_mut(&domain_id).unwrap().schema = new;
+        }
+        MigrationStep::RenameVertexTable {
+            def_id,
+            old: old_table,
+            new: new_table,
+        } => {
+            let def_tag = def_id.1 as i32;
+            let pg_domain = ctx.domains.get_mut(&domain_id).unwrap();
+            let pg_vertice = ctx.vertices.get_mut(&(domain_id, def_id)).unwrap();
+
             txn.query(
                 &format!(
                     "ALTER TABLE {schema}.{old} RENAME TO {schema}.{new}",
                     schema = EscapeIdent(&pg_domain.schema),
-                    old = EscapeIdent(&vertice.table),
-                    new = EscapeIdent(&table),
+                    old = EscapeIdent(&old_table),
+                    new = EscapeIdent(&new_table),
                 ),
                 &[],
             )
@@ -226,43 +359,13 @@ async fn migrate_vertex_meta<'t>(
 
             txn.query(
                 "UPDATE m6m_reg.vertice SET(table = $1) WHERE domain_id = $2 AND def_tag = $3",
-                &[&table, &pg_domain.domain_id, &def_tag],
+                &[&new_table, &domain_id, &def_tag],
             )
             .await?;
 
-            vertice.table = table;
+            pg_vertice.table = new_table;
         }
-
-        Ok(vertice)
-    } else {
-        txn.query(
-            &format!(
-                "CREATE TABLE {}.{} ()",
-                EscapeIdent(&pg_domain.schema),
-                EscapeIdent(&table)
-            ),
-            &[],
-        )
-        .await
-        .context("create vertex table")?;
-
-        txn.query(
-            indoc! { "
-                INSERT INTO m6m_reg.vertice (
-                    domain_id,
-                    def_tag,
-                    \"table\"
-                ) VALUES($1, $2, $3)
-            "},
-            &[&pg_domain.domain_id, &def_tag, &table],
-        )
-        .await
-        .context("create vertice")?;
-
-        Ok(PgVertice {
-            domain_id: pg_domain.domain_id,
-            def_id,
-            table,
-        })
     }
+
+    Ok(())
 }
