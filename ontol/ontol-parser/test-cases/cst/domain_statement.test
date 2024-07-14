@@ -1,0 +1,38 @@
+domain 01J2Q7R8J928WPH8BA80SDB6GY (
+    rel. version: '0.0.1'
+)
+
+//@ grammar=ontol
+Ontol
+    DomainStatement
+        KwDomain `domain`
+        Whitespace
+        Ulid
+            Number `01`
+            Symbol `J2Q7R8J928WPH8BA80SDB6GY`
+        Whitespace
+        DefBody
+            ParenOpen `(`
+            Whitespace
+            RelStatement
+                KwRel `rel`
+                RelSubject
+                    TypeQuantUnit
+                        ThisUnit
+                            Dot `.`
+                Whitespace
+                RelFwdSet
+                    Relation
+                        TypeQuantUnit
+                            IdentPath
+                                Symbol `version`
+                        PropCardinality
+                Colon `:`
+                Whitespace
+                RelObject
+                    TypeQuantUnit
+                        Literal
+                            SingleQuoteText `'0.0.1'`
+            Whitespace
+            ParenClose `)`
+    Whitespace

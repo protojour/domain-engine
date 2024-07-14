@@ -8,6 +8,7 @@ use serde_json::json;
 #[test]
 fn json_schema_from_simple_entity() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def some_id (fmt '' => text => .)
 
     /// This is type entity

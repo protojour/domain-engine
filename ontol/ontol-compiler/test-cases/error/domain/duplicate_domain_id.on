@@ -1,0 +1,5 @@
+domain 01J2QBDMMM7SSTKBC45KCBDJ4K () // ERROR TODO: domain has already been compiled
+use 'dep' as dep
+
+//@ src_name=dep
+domain 01J2QBDMMM7SSTKBC45KCBDJ4K ()

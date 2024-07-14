@@ -44,6 +44,7 @@ fn test_graphql_schema_for_entityless_domain_should_not_be_generated() {
 #[test(tokio::test)]
 async fn version() {
     let (test, schema) = "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'id': (rel* is: text)
     )
@@ -63,6 +64,7 @@ async fn version() {
 #[test]
 fn field_order() {
     let (_test, schema) = "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def ent1 (
         rel. 'id': (rel* is: text)
         rel* 'subjects'::'obj_1' {subject}
@@ -116,6 +118,7 @@ fn field_order() {
 #[test(tokio::test)]
 async fn int_scalars() {
     let (test, schema) = "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo_id (fmt '' => text => .)
     def smallint (
         rel* is: integer
@@ -224,6 +227,7 @@ async fn int_scalars() {
 #[test(tokio::test)]
 async fn non_entity_set_mutation() {
     let (test, schema) = "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'id': (rel* is: text)
         rel* 'bars': {bar}
@@ -288,6 +292,7 @@ async fn non_entity_set_mutation() {
 #[test(tokio::test)]
 async fn basic_inherent_auto_id_anonymous_type() {
     let (test, schema) = "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'id'[rel* gen: auto]: (rel* is: text)
     )
@@ -325,6 +330,7 @@ async fn basic_inherent_auto_id_anonymous_type() {
 #[test(tokio::test)]
 async fn basic_pagination() {
     let (test, schema) = "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'id'[rel* gen: auto]: (rel* is: text)
     )
@@ -454,6 +460,7 @@ async fn basic_pagination() {
 #[test(tokio::test)]
 async fn nodes() {
     let (test, schema) = "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'id'[rel* gen: auto]: (rel* is: text)
     )
@@ -500,6 +507,7 @@ async fn nodes() {
 #[test]
 fn value_type_as_field() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (rel* is: text)
     def bar (
         rel. 'id'[rel* gen: auto]: (rel* is: text)
@@ -512,6 +520,7 @@ fn value_type_as_field() {
 #[test]
 fn value_type_in_array() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (rel* is: text)
     def bar (
         rel. 'id'[rel* gen: auto]: (rel* is: text)
@@ -524,6 +533,7 @@ fn value_type_in_array() {
 #[test(tokio::test)]
 async fn inner_struct() {
     let (test, schema) = "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo_id (fmt '' => text => .)
     def inner (
         rel* 'prop': text
@@ -610,6 +620,7 @@ async fn inner_struct() {
 #[test(tokio::test)]
 async fn docs_introspection() {
     let (test, schema) = "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def Key (
         rel* is: text
     )
@@ -1407,6 +1418,7 @@ fn municipalities_geojson_union() {
 #[test(tokio::test)]
 async fn open_data() {
     let (test, schema) = "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def @open foo (
         rel. 'id'[rel* gen: auto]: (rel* is: text)
     )
@@ -1456,6 +1468,7 @@ async fn open_data() {
 #[test(tokio::test)]
 async fn open_data_disabled() {
     let (test, schema) = "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def @open foo (
         rel. 'id'[rel* gen: auto]: (rel* is: text)
     )
@@ -1508,6 +1521,7 @@ async fn test_extension_and_member_from_foreign_domain() {
         (
             src_name("entry"),
             "
+            domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
             use 'helper' as helper
 
             def foo (
@@ -1532,6 +1546,7 @@ async fn test_extension_and_member_from_foreign_domain() {
 #[test(tokio::test)]
 async fn test_const_in_union_bug() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def union (
         rel* is?: member
         rel* 'targets'::'unions' {target}
@@ -1583,6 +1598,7 @@ async fn test_constant_index_panic() {
         (
             src_name("events_db"),
             "
+            domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
             def event (
                 rel. '_id'[rel* gen: auto]: (rel* is: serial)
                 rel* '_class': 'event'
@@ -1616,6 +1632,7 @@ async fn flattened_union_entity() {
     let (test, [schema]) = TestPackages::with_static_sources([(
         SrcName::default(),
         "
+        domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
         def kind ()
 
         def foo (
@@ -1724,6 +1741,7 @@ async fn schema_bug1() {
     let (_test, [_schema]) = TestPackages::with_static_sources([(
         SrcName::default(),
         "
+        domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
         def foo (rel. 'id': (rel* is: text))
         def bar (rel. 'id': (rel* is: text))
         rel {bar} 'foo': foo

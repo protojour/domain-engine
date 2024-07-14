@@ -137,7 +137,11 @@ impl<'m> Compiler<'m> {
             let domain_name = *unique_domain_names
                 .get(&package_id)
                 .expect("Anonymous domain");
-            let mut domain = Domain::new(domain_def_id, domain_name);
+            let mut domain = Domain::new(
+                self.domain_ids.get(&package_id).cloned().unwrap(),
+                domain_def_id,
+                domain_name,
+            );
 
             let namespace = namespaces.remove(&package_id).unwrap();
             let type_namespace = namespace.types;

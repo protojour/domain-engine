@@ -106,6 +106,7 @@ fn test_serde_symbolic_relation() {
 #[test]
 fn test_serde_domain_symbol_union() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     sym { a, b, const }
     def ab (
         rel* is?: a
@@ -596,6 +597,7 @@ fn test_serde_with_raw_id_overridde_profile() {
     };
 
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'prefix_id': (
             fmt '' => 'prefix/' => uuid => .
@@ -662,6 +664,7 @@ fn test_serde_with_raw_prefix_text_id_overridde_profile() {
     };
 
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def baz (
         rel. 'prefix_id': (
             fmt '' => 'prefix/' => text => .
@@ -705,6 +708,7 @@ fn test_serde_with_raw_prefix_int_id_overridde_profile() {
     };
 
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def baz (
         rel. 'prefix_id': (
             fmt '' => 'prefix/' => serial => .
@@ -747,6 +751,7 @@ mod serde_raw_dynamic_entity_in_union {
 
     /// This tests an entity union without data-based discriminators (only id-based)
     const ONTOL: &str = "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo_id (fmt '' => 'foo/' => text => .)
     def foo (
         rel. 'id': foo_id
@@ -951,6 +956,7 @@ fn test_serde_recursion_limit() {
 #[test]
 fn test_serialize_raw_tree_only() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def bar (
         rel. 'key': ( rel* is: text )
         rel* 'bar_field': text
@@ -1026,6 +1032,7 @@ fn test_serde_gitmesh_id_union() {
 #[test]
 fn test_flattened_union1() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def @private anonymous ()
 
     def @open foo (

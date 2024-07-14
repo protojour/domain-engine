@@ -1,6 +1,7 @@
 use std::{
     collections::{hash_map::Entry, BTreeMap, HashMap},
     marker::PhantomData,
+    str::FromStr,
 };
 
 use fnv::FnvHashMap;
@@ -11,8 +12,9 @@ use ontol_parser::{
     },
     U32Span,
 };
-use ontol_runtime::{tuple::CardinalIdx, DefId, EdgeId};
+use ontol_runtime::{ontology::domain::DomainId, tuple::CardinalIdx, DefId, EdgeId};
 use tracing::debug_span;
+use ulid::Ulid;
 
 use crate::{
     def::DefKind,
@@ -93,7 +95,40 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     ) -> Option<RootDefs> {
         match statement {
             insp::Statement::DomainStatement(stmt) => {
-                self.append_documentation(self.ctx.pkg_def_id, stmt.0);
+                self.append_documentation(self.ctx.pkg_def_id, stmt.0.clone());
+
+                let domain_id = stmt.domain_id()?;
+
+                let Some(domain_ulid) = domain_id
+                    .try_concat_ulid()
+                    .ok()
+                    .and_then(|ulid| Ulid::from_str(&ulid).ok())
+                else {
+                    CompileError::TODO("misformatted domain id")
+                        .span_report(domain_id.view().span(), &mut self.ctx);
+                    return None;
+                };
+
+                if self
+                    .ctx
+                    .compiler
+                    .domain_ids
+                    .values()
+                    .any(|domain_id| domain_id.ulid == domain_ulid)
+                {
+                    CompileError::TODO("domain has already been compiled")
+                        .span_report(domain_id.view().span(), &mut self.ctx);
+                    return None;
+                }
+
+                self.ctx.compiler.domain_ids.insert(
+                    self.ctx.package_id,
+                    DomainId {
+                        ulid: domain_ulid,
+                        stable: true,
+                    },
+                );
+
                 None
             }
             insp::Statement::UseStatement(_use_stmt) => None,

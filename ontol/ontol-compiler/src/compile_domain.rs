@@ -1,6 +1,10 @@
 use fnv::FnvHashSet;
-use ontol_runtime::{ontology::ontol::TextConstant, DefId, PackageId};
-use tracing::{debug, debug_span};
+use ontol_runtime::{
+    ontology::{domain::DomainId, ontol::TextConstant},
+    DefId, PackageId,
+};
+use tracing::{debug, debug_span, info};
+use ulid::Ulid;
 
 use crate::{
     def::{DefKind, RelParams},
@@ -48,6 +52,17 @@ impl<'m> Compiler<'m> {
             .insert(package.package_id, package.config);
 
         let root_defs = package.syntax.lower(pkg_def_id, src.clone(), Session(self));
+
+        self.domain_ids
+            .entry(package.package_id)
+            .or_insert_with(|| {
+                let domain_id = Ulid::new();
+                info!("autogenerating unstable domain id `{domain_id}`");
+                DomainId {
+                    ulid: domain_id,
+                    stable: false,
+                }
+            });
 
         for def_id in root_defs {
             self.type_check().check_def(def_id);

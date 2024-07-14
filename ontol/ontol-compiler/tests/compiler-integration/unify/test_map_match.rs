@@ -10,6 +10,7 @@ use unimock::{matching, MockFn};
 #[test]
 fn test_map_match_scalar_key() {
     r#"
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def key (rel* is: text)
     def foo (
         rel. 'key': key
@@ -53,6 +54,7 @@ fn test_map_match_scalar_key() {
 #[test]
 fn test_map_match_parameterless_query() {
     r#"
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def key (rel* is: text)
     def foo (
         rel. 'key': key
@@ -96,6 +98,7 @@ fn test_map_match_parameterless_query() {
 #[test]
 fn test_map_match_query_mandatory_properties() {
     r#"
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def key (rel* is: text)
     def foo (
         rel. 'key': key
@@ -145,6 +148,7 @@ fn test_map_match_query_mandatory_properties() {
 #[test]
 fn test_map_match_query_optional_property() {
     r#"
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def key (rel* is: text)
     def foo (
         rel. 'key': key
@@ -217,6 +221,7 @@ fn test_map_match_query_optional_property() {
 #[test]
 fn test_map_match_anonymous_with_translation() {
     r#"
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def key (rel* is: text)
     def foo (
         rel. 'key': key
@@ -262,6 +267,7 @@ fn test_map_match_anonymous_with_translation() {
 #[test]
 fn test_map_match_sequence_filter_in_set() {
     r#"
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def key (rel* is: text)
     def foo (
         rel. 'key': key
@@ -314,6 +320,7 @@ mod match_contains_all {
     use ontol_macros::test;
 
     const TEST_DOMAIN: &str = r#"
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'key': (rel* is: text)
         rel* 'tags': {text}
@@ -397,6 +404,7 @@ mod match_contains_all {
 #[test]
 fn test_map_match_in_sub_multi_edge() {
     r#"
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'key': (rel* is: text)
         rel* 'bars': {bar}
@@ -451,6 +459,7 @@ fn test_map_match_in_sub_multi_edge() {
 #[test]
 fn test_map_with_order_constant() {
     r#"
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'key': (rel* is: text)
         rel* 'field': text
@@ -498,6 +507,7 @@ fn test_map_with_order_constant() {
 #[test]
 fn test_map_with_order_variable() {
     r#"
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'key': (rel* is: text)
         rel* 'field': text
@@ -557,6 +567,7 @@ fn test_map_with_order_variable() {
 #[test]
 fn test_map_with_order_indexset() {
     r#"
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'key': (rel* is: text)
         rel* 'a': text

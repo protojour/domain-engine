@@ -2,7 +2,7 @@
 /// waiting for https://gitlab.com/protojour/memoriam/domain-engine/-/issues/47.
 ///
 /// Also not sure wheter to use singular or plural names for units.
-domain SI (
+domain 01J2QAXF49K0ZDVRAQQNNCVTAK (
     rel. version: '0.1.0'
 )
 

@@ -1,3 +1,5 @@
+domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
+
 def a(rel. 'id'[rel* gen: auto]: (rel* is: text))
 def b(rel. 'id'[rel* gen: auto]: (rel* is: text))
 map(

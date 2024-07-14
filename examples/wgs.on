@@ -1,5 +1,5 @@
 /// World Geodetic System 84
-domain wgs (
+domain 01J2QAQGKZTYTHPBEH14ZQTCPP (
     rel. version: '0.1.0'
 )
 

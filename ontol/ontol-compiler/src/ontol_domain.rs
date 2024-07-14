@@ -1,9 +1,13 @@
 //! The ontol (builtin-in) domain
 
-use std::ops::Range;
+use std::{ops::Range, str::FromStr};
 
 use ontol_hir::OverloadFunc;
-use ontol_runtime::{ontology::ontol::TextLikeType, DefId};
+use ontol_runtime::{
+    ontology::{domain::DomainId, ontol::TextLikeType},
+    DefId, PackageId,
+};
+use ulid::Ulid;
 
 use crate::{
     def::{BuiltinRelationKind, DefKind, TypeDef, TypeDefFlags},
@@ -18,10 +22,21 @@ use crate::{
     Compiler, NO_SPAN,
 };
 
+const ONTOL_DOMAIN_ID: &str = "01J2Q5Y0PBPBBG4NXJ4GZNEMBW";
+
 impl<'m> Compiler<'m> {
     pub fn register_ontol_domain(&mut self) {
         self.str_ctx.intern_constant("ontol");
-        self.define_package(self.primitives.ontol_domain);
+        let def_id = self.define_package(self.primitives.ontol_domain);
+
+        assert_eq!(def_id.package_id(), PackageId::first());
+        self.domain_ids.insert(
+            def_id.package_id(),
+            DomainId {
+                ulid: Ulid::from_str(ONTOL_DOMAIN_ID).unwrap(),
+                stable: true,
+            },
+        );
 
         // fundamental types
         self.register_type(self.primitives.empty_sequence, Type::EmptySequence);

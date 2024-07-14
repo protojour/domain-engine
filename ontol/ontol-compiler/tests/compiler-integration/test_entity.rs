@@ -12,6 +12,7 @@ use serde_json::json;
 #[ignore = "non-inherent ID in this way is no longer possible"]
 fn entity_without_inherent_id() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def some_id (fmt '' => text => .)
     def entity (
         rel. id: some_id
@@ -27,6 +28,7 @@ fn entity_without_inherent_id() {
 #[test]
 fn inherent_id_no_autogen() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo_id (rel* is: text)
     def foo (
         rel. 'key': foo_id
@@ -48,6 +50,7 @@ fn inherent_id_no_autogen() {
 #[test]
 fn inherent_id_autogen() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo_id (rel* is: text)
     def foo (
         rel. 'key'[rel* gen: auto]: foo_id
@@ -69,6 +72,7 @@ fn inherent_id_autogen() {
 #[test]
 fn id_and_inherent_property_inline_type() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'key': (rel* is: text)
         rel* 'children': {foo}
@@ -93,6 +97,7 @@ fn id_and_inherent_property_inline_type() {
 #[test]
 fn entity_id_inline_fmt_uuid() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'key': ( fmt '' => 'foo/' => uuid => . )
     )
@@ -103,6 +108,7 @@ fn entity_id_inline_fmt_uuid() {
 #[test]
 fn entity_id_inline_fmt_serial() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'key': ( fmt '' => 'foo/' => serial => . )
     )
@@ -244,6 +250,7 @@ fn artist_and_instrument_id_as_relation_object_invalid_id_format() {
 #[test]
 fn test_entity_self_relationship_optional_object_sym() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     sym {
         (p) children: (c),
         (c) parent: (p),
@@ -292,6 +299,7 @@ fn test_entity_self_relationship_optional_object_sym() {
 #[test]
 fn test_entity_self_relationship_optional_object() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     sym { (p) children: (c), (c) parent: (p) }
 
     def node_id (fmt '' => serial => .)
@@ -329,6 +337,7 @@ fn test_entity_self_relationship_optional_object() {
 #[test]
 fn test_entity_self_relationship_mandatory_object() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     sym { (p) children: (c), (c) parent: (p) }
 
     def node_id (fmt '' => serial => .)
@@ -371,6 +380,7 @@ fn entity_union_simple() {
 #[test]
 fn entity_union_with_union_def_id_larger_than_id() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def Repository (
         rel. 'id'[rel* gen: auto]: (rel* is: uuid)
         rel* 'owner'::'repositories' RepositoryOwner
@@ -454,6 +464,7 @@ fn entity_union_in_relation_with_ids() {
 #[test]
 fn entity_relationship_without_reverse() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def lang_id (fmt '' => text => .)
     def prog_id (fmt '' => serial => .)
     def language (
@@ -478,6 +489,7 @@ fn entity_relationship_without_reverse() {
 #[test]
 fn recursive_entity_union() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def animal_id (fmt '' => 'animal/' => serial => .)
     def plant_id (fmt '' => 'plant/' => serial => .)
     def owner_id (fmt '' => text => .)
@@ -516,6 +528,7 @@ fn recursive_entity_union() {
 #[test]
 fn serial_gen_auto() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'id'[rel* gen: auto]: (fmt '' => 'prefix/' => serial => .)
     )
@@ -526,6 +539,7 @@ fn serial_gen_auto() {
 #[test]
 fn entity_order_ok() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'id': (rel* is: text)
         rel* 'name': text
@@ -542,6 +556,7 @@ fn entity_order_ok() {
 #[test]
 fn store_key_in_def_info() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foobar_edge (
         rel* store_key: 'fubar'
     )

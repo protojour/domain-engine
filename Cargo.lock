@@ -2135,6 +2135,7 @@ dependencies = [
  "thin-vec",
  "tracing",
  "tracing-subscriber",
+ "ulid",
  "unimock",
 ]
 
@@ -2321,6 +2322,7 @@ dependencies = [
  "tower-service",
  "tracing",
  "tracing-subscriber",
+ "ulid",
 ]
 
 [[package]]
@@ -3664,6 +3666,7 @@ checksum = "34778c17965aa2a08913b57e1f34db9b4a63f5de31768b55bf20d2795f921259"
 dependencies = [
  "getrandom",
  "rand",
+ "serde",
  "web-time",
 ]
 

@@ -190,6 +190,8 @@ pub enum Kind {
     Name,
     /// `foo`, `foo.bar`
     IdentPath,
+    /// `01J2QFQ12SZYMMVYJBWXG45T2Y`
+    Ulid,
 
     // patterns
     /// `struct(..)`
@@ -221,6 +223,22 @@ pub enum Kind {
 
     /// The root node. This should be the last entry in the enum.
     Ontol,
+}
+
+pub trait KindFilter {
+    fn filter(&self, kind: Kind) -> bool;
+}
+
+impl KindFilter for Kind {
+    fn filter(&self, kind: Kind) -> bool {
+        kind == *self
+    }
+}
+
+impl<F: Fn(Kind) -> bool> KindFilter for F {
+    fn filter(&self, kind: Kind) -> bool {
+        (*self)(kind)
+    }
 }
 
 fn lex_double_quote_text(lexer: &mut Lexer<Kind>) -> Option<()> {
@@ -341,6 +359,7 @@ impl Display for Kind {
             Kind::RangeEnd => write!(f, "end of range"),
             Kind::Name => write!(f, "name"),
             Kind::IdentPath => write!(f, "ident path"),
+            Kind::Ulid => write!(f, "unique identifier"),
             Kind::PatStruct => write!(f, "struct pattern"),
             Kind::PatSet => write!(f, "set pattern"),
             Kind::PatAtom => write!(f, "atom patterm"),
@@ -447,14 +466,16 @@ mod tests {
     use super::Kind::*;
     use super::*;
 
-    fn lex(input: &str) -> Result<Vec<Kind>, usize> {
+    fn lex(input: &str) -> Result<Vec<(Kind, String)>, usize> {
         let mut tokens = vec![];
         let mut error_count = 0;
 
-        for result in Kind::lexer(input) {
+        let mut lexer = Kind::lexer(input);
+
+        while let Some(result) = lexer.next() {
             match result {
                 Ok(kind) => {
-                    tokens.push(kind);
+                    tokens.push((kind, input[lexer.span()].to_string()));
                 }
                 Err(_error) => {
                     error_count += 1;
@@ -471,7 +492,8 @@ mod tests {
 
     #[track_caller]
     fn lex_ok(input: &str) -> Vec<Kind> {
-        lex(input).unwrap()
+        let tokens = lex(input).unwrap();
+        tokens.into_iter().map(|(kind, _)| kind).collect()
     }
 
     #[test]
@@ -558,5 +580,16 @@ mod tests {
         assert_eq!(&lex_ok("'abc'"), &[SingleQuoteText]);
         assert_eq!(&lex_ok("'abc' "), &[SingleQuoteText, Whitespace]);
         assert_eq!(&lex_ok("'abc'? "), &[SingleQuoteText, Question, Whitespace]);
+    }
+
+    #[test]
+    fn test_ulid_hack() {
+        assert_eq!(
+            lex("01J2Q7R8J928WPH8BA80SDB6GY").unwrap(),
+            vec![
+                (Number, "01".to_string()),
+                (Symbol, "J2Q7R8J928WPH8BA80SDB6GY".to_string())
+            ]
+        );
     }
 }

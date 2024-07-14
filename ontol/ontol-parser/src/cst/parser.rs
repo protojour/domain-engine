@@ -1,7 +1,10 @@
 use std::ops::Range;
 
 use crate::{
-    lexer::{kind::Kind, Lex},
+    lexer::{
+        kind::{Kind, KindFilter},
+        Lex,
+    },
     ToUsizeRange, U32Span,
 };
 
@@ -188,13 +191,12 @@ impl<'a> CstParser<'a> {
         }
     }
 
-    pub fn eat_while(&mut self, mut f: impl FnMut(Kind) -> bool) {
+    pub fn eat_while(&mut self, filter: impl KindFilter) {
         loop {
             let kind = self.at_exact();
-            if f(kind) {
+            if filter.filter(kind) {
                 self.push_current_token(kind);
                 self.cursor.advance();
-                self.eat_trivia();
             } else {
                 return;
             }

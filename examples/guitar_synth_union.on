@@ -1,3 +1,5 @@
+domain 01J2QCRD7KFJRFFHAWSRDE7APJ ()
+
 def guitar_id (
     fmt '' => 'guitar/' => uuid => .
 )

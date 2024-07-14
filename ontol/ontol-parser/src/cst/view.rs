@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::{
     lexer::{
-        kind::Kind,
+        kind::{Kind, KindFilter},
         unescape::{unescape_text_literal, UnescapeTextResult},
     },
     U32Span,
@@ -42,9 +42,9 @@ pub trait NodeViewExt: NodeView {
         })
     }
 
-    fn local_tokens_filter(self, kind: Kind) -> impl Iterator<Item = Self::Token> {
+    fn local_tokens_filter(self, filter: impl KindFilter) -> impl Iterator<Item = Self::Token> {
         self.local_tokens()
-            .filter(move |token| token.kind() == kind)
+            .filter(move |token| filter.filter(token.kind()))
     }
 
     fn display(self) -> NodeDisplay<Self> {

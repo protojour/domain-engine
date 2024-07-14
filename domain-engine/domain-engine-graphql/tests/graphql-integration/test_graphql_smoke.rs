@@ -52,6 +52,7 @@ async fn test_default_mapping_error() {
         (
             src_name("events_db"),
             "
+            domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
             def event (
                 rel. '_id'[rel* gen: auto]: (rel* is: serial)
                 rel* 'level'[rel* default := 1]: i64

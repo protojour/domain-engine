@@ -7,6 +7,7 @@ fn test_repr_valid_mesh1() {
         (
             src_name("entry"),
             "
+            domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
             use 'si' as si
 
             def length (

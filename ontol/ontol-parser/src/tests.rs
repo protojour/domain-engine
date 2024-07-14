@@ -49,9 +49,9 @@ fn cst(#[files("test-cases/cst/*.test")] path: PathBuf) {
     let mut parser = CstParser::from_lexed_source(&ontol_src, lexed);
     parse_fn(&mut parser);
 
-    let (tree, _errors) = parser.finish();
+    let (tree, errors) = parser.finish();
 
-    if test_token_count {
+    if errors.is_empty() && test_token_count {
         let token_marker_count = tree
             .markers()
             .iter()

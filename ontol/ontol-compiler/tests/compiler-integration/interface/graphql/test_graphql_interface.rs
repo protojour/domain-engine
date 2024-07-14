@@ -26,7 +26,7 @@ use super::schema_test;
 fn test_domain_docs_as_query_docs() {
     "
     /// Domain docs
-    domain foo ()
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
 
     def foo (
         rel. 'id': (fmt '' => text => .)
@@ -49,6 +49,7 @@ fn test_domain_docs_as_query_docs() {
 #[test]
 fn test_graphql_small_range_number_becomes_int() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def myint (
         rel* is: integer
         rel* min: 0
@@ -75,6 +76,7 @@ fn test_graphql_small_range_number_becomes_int() {
 #[test]
 fn test_graphql_i64_custom_scalar() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'id': (fmt '' => text => .)
         rel* 'prop': i64
@@ -102,6 +104,7 @@ fn test_graphql_i64_custom_scalar() {
 #[test]
 fn test_graphql_default_scalar() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'id': (fmt '' => text => .)
         rel* 'default'[rel* default := '']: text
@@ -123,6 +126,7 @@ fn test_graphql_default_scalar() {
 #[test]
 fn test_graphql_scalar_array() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'id': (fmt '' => text => .)
         rel* 'tags': {text}
@@ -149,6 +153,7 @@ fn test_graphql_scalar_array() {
 #[test]
 fn test_graphql_serde_renaming() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'id': (fmt '' => text => .)
         rel* 'must-rewrite': text
@@ -179,6 +184,7 @@ fn test_graphql_serde_renaming() {
 #[test]
 fn test_query_map_empty_input_becomes_hidden_arg() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def entity (
         rel. 'id': (rel* is: text)
     )
@@ -265,6 +271,7 @@ fn test_imperfect_mapping_mutation() {
         (
             src_name("lower"),
             "
+            domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
             def lower (
                 rel. 'id': (rel* is: text)
                 rel* 'a': text
@@ -291,6 +298,7 @@ fn test_imperfect_mapping_mutation() {
 #[test]
 fn incompatible_edge_types_are_distinct() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def edge_type (
         rel* 'edge_field': text
     )
@@ -372,6 +380,7 @@ fn incompatible_edge_types_are_distinct() {
 #[test]
 fn graphql_flattened_union() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def kind ()
 
     def foo (
@@ -424,6 +433,7 @@ fn graphql_flattened_union() {
 #[test]
 fn graphql_flattened_union_pascal_casing() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def Kind ()
 
     def Foo (

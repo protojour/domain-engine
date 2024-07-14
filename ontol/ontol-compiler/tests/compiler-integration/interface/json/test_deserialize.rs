@@ -173,6 +173,7 @@ fn deserialize_nested() {
 #[test]
 fn deserialize_recursive() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo ()
     def bar ()
     rel foo 'b': bar

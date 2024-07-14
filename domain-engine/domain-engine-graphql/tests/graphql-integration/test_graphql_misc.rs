@@ -200,6 +200,7 @@ async fn sym_edge_simple(ds: &str) {
     let (test, [schema]) = TestPackages::with_static_sources([(
         SrcName::default(),
         "
+        domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
         sym {
             (a) prop: (b),
             (b) reverse_prop: (a),

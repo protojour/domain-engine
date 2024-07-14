@@ -5,6 +5,7 @@ use std::{collections::BTreeMap, fmt::Debug};
 use fnv::FnvHashMap;
 use ontol_macros::OntolDebug;
 use serde::{Deserialize, Serialize};
+use ulid::Ulid;
 
 use crate::{
     impl_ontol_debug, interface::serde::operator::SerdeOperatorAddr, property::Cardinality,
@@ -16,9 +17,16 @@ use super::{
     Ontology,
 };
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct DomainId {
+    pub ulid: Ulid,
+    pub stable: bool,
+}
+
 /// A domain in the ONTOL ontology.
 #[derive(Serialize, Deserialize)]
 pub struct Domain {
+    domain_id: DomainId,
     def_id: DefId,
 
     unique_name: TextConstant,
@@ -30,13 +38,18 @@ pub struct Domain {
 }
 
 impl Domain {
-    pub fn new(def_id: DefId, unique_name: TextConstant) -> Self {
+    pub fn new(domain_id: DomainId, def_id: DefId, unique_name: TextConstant) -> Self {
         Self {
+            domain_id,
             def_id,
             unique_name,
             types: Default::default(),
             edges: Default::default(),
         }
+    }
+
+    pub fn domain_id(&self) -> &DomainId {
+        &self.domain_id
     }
 
     pub fn def_id(&self) -> DefId {

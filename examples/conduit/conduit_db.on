@@ -1,5 +1,5 @@
 /// The conduit persistence layer
-domain conduit_db ()
+domain 01J2QAMNJQ6VFXWAR3E8BEHEFA ()
 
 def user_id (rel* is: uuid)
 def slug (rel* is: text)

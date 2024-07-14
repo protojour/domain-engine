@@ -11,6 +11,7 @@ fn root() -> SrcName {
 #[test(tokio::test)]
 async fn test_graphql_input_deserialization_error() {
     let (test, schema) = "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'id': (fmt '' => serial => .)
         rel* 'prop': 'const'
@@ -41,6 +42,7 @@ async fn test_graphql_input_deserialization_error() {
 #[should_panic = "No mock implementation found"]
 async fn test_graphql_input_constructor_sequence_as_json_scalar() {
     let (test, schema) = "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def tuple (
         rel* 0: i64
         rel* 1: text

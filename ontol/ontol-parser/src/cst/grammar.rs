@@ -65,7 +65,11 @@ fn statement(p: &mut CstParser) {
 
     let kind = match p.at() {
         K![domain] => {
-            def_like_statement(K![domain], p);
+            def_like_statement(K![domain], p, |p| {
+                let ident = p.start(Kind::Ulid);
+                p.eat_while(|kind| matches!(kind, Kind::Number | Kind::Symbol));
+                p.end(ident);
+            });
             Kind::DomainStatement
         }
         K![use] => {
@@ -73,7 +77,11 @@ fn statement(p: &mut CstParser) {
             Kind::UseStatement
         }
         K![def] => {
-            def_like_statement(K![def], p);
+            def_like_statement(K![def], p, |p| {
+                let ident = p.start(Kind::IdentPath);
+                p.eat(Kind::Symbol);
+                p.end(ident);
+            });
             Kind::DefStatement
         }
         K![rel] => {
@@ -118,15 +126,13 @@ fn use_statement(p: &mut CstParser) {
     p.end(path);
 }
 
-fn def_like_statement(keyword: Kind, p: &mut CstParser) {
+fn def_like_statement(keyword: Kind, p: &mut CstParser, parse_ident: fn(&mut CstParser)) {
     p.eat(keyword);
 
     p.eat_modifiers();
     p.eat_trivia();
 
-    let ident = p.start(Kind::IdentPath);
-    p.eat(Kind::Symbol);
-    p.end(ident);
+    parse_ident(p);
 
     p.eat_trivia();
 

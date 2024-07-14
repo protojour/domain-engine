@@ -5,6 +5,7 @@ use serde_json::json;
 #[test]
 fn should_map_inherent_capturing_pattern_id() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'id': (fmt '' => 'foo/' => uuid => .)
     )
@@ -29,6 +30,7 @@ fn should_map_inherent_capturing_pattern_id() {
 #[test]
 fn test_extract_rel_params() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     sym { id }
 
     def a1_id(fmt '' => 'a1/' => uuid => .)
@@ -124,6 +126,7 @@ fn test_extract_rel_params() {
 #[test]
 fn test_rel_params_implicit_map() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def a_id (fmt '' => 'a/' => serial => .)
     def b_id (fmt '' => 'b/' => serial => .)
     def a_inner_id (fmt '' => 'a_inner/' => serial => .)
@@ -193,6 +196,7 @@ fn test_rel_params_implicit_map() {
 #[test]
 fn test_map_relation_sequence_default_fallback() {
     "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo_inner (rel. 'foo_id': (rel* is: text))
     def bar_inner (rel. 'bar_id': (rel* is: text))
     rel {foo_inner} 'bars'::'foos'? {bar_inner}
@@ -266,6 +270,7 @@ fn test_map_generate_edge() {
         (
             src_name("inner"),
             "
+            domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
             def foo (
                 rel. 'id': (rel* is: text)
                 rel* 'bars': {bar}

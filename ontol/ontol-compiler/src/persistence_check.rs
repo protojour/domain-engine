@@ -1,9 +1,10 @@
 use fnv::{FnvHashMap, FnvHashSet};
+use ontol_parser::U32Span;
 use ontol_runtime::{
     ontology::map::MapLossiness, resolve_path::ResolverGraph, DefId, MapDirection, PackageId,
 };
 
-use crate::{CompileError, Compiler};
+use crate::{CompileError, Compiler, SourceSpan};
 
 impl<'m> Compiler<'m> {
     pub(super) fn persistence_check(&mut self) {
@@ -44,8 +45,25 @@ impl<'m> Compiler<'m> {
         match non_mapped_entities_by_pkd_id.len() {
             0 => {}
             1 => {
-                self.persistent_domain =
-                    Some(non_mapped_entities_by_pkd_id.into_iter().next().unwrap().0);
+                let persistent_domain = non_mapped_entities_by_pkd_id.into_iter().next().unwrap().0;
+                let domain_id = self.domain_ids.get(&persistent_domain).unwrap();
+
+                if !domain_id.stable {
+                    let span = SourceSpan {
+                        source_id: self
+                            .sources
+                            .source_id_for_package(persistent_domain)
+                            .unwrap(),
+                        span: U32Span { start: 0, end: 0 },
+                    };
+
+                    CompileError::TODO("persisted domain is missing domain header")
+                        .span(span)
+                        .report(self);
+                    return;
+                }
+
+                self.persistent_domain = Some(persistent_domain);
             }
             _ => {
                 for (_pkg_id, entity_def_ids) in non_mapped_entities_by_pkd_id {

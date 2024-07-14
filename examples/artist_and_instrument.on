@@ -1,3 +1,5 @@
+domain 01J2QCQNBG2WW0YB5P2HRGE13B ()
+
 def artist (
     rel. 'ID'[rel* gen: auto]: ( fmt '' => 'artist/' => uuid => . )
     rel* 'name': text

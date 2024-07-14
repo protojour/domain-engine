@@ -3,7 +3,8 @@
 /// It defines several types of JSON objects and the manner in which they are combined to represent data about geographic features,
 /// their properties, and their spatial extents.
 /// GeoJSON uses a geographic coordinate reference system, World Geodetic System 1984, and units of decimal degrees.
-domain geojson (
+domain 01J2Q7FC1GMGC0KK3M9SRS18PM (
+    rel. name: 'geojson'
     rel. version: '0.1.0'
 )
 

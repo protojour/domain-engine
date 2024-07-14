@@ -69,6 +69,7 @@ fn test_municipalities() {
         (
             src_name("entry"),
             "
+            domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
             use 'geojson' as geojson
 
             def kommunenummer(

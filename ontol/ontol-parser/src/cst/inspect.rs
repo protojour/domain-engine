@@ -4,6 +4,7 @@ use super::view::{NodeView, NodeViewExt, TokenViewExt};
 use crate::{
     cst::view::TokenView,
     lexer::{kind::Kind, unescape::UnescapeTextResult},
+    K,
 };
 
 /// Does two things:
@@ -130,6 +131,7 @@ nodes!(Node {
     RangeEnd,
     Name,
     IdentPath,
+    Ulid,
     PatStruct,
     PatSet,
     PatAtom,
@@ -194,8 +196,8 @@ impl<V: NodeView> Ontol<V> {
 }
 
 impl<V: NodeView> DomainStatement<V> {
-    pub fn ident_path(&self) -> Option<IdentPath<V>> {
-        self.view().sub_nodes().find_map(IdentPath::from_view)
+    pub fn domain_id(&self) -> Option<Ulid<V>> {
+        self.view().sub_nodes().find_map(Ulid::from_view)
     }
 
     pub fn body(&self) -> Option<DefBody<V>> {
@@ -475,12 +477,9 @@ impl<V: NodeView> PatBinary<V> {
     }
 
     pub fn infix_token(&self) -> Option<V::Token> {
-        self.view().local_tokens().find(|token| {
-            matches!(
-                token.kind(),
-                Kind::Plus | Kind::Minus | Kind::Star | Kind::Div
-            )
-        })
+        self.view()
+            .local_tokens_filter(|kind| matches!(kind, K![+] | K![-] | K![*] | K![/]))
+            .next()
     }
 }
 
@@ -493,6 +492,28 @@ impl<V: NodeView> Name<V> {
 impl<V: NodeView> IdentPath<V> {
     pub fn symbols(&self) -> impl Iterator<Item = V::Token> {
         self.view().local_tokens_filter(Kind::Symbol)
+    }
+}
+
+impl<V: NodeView> Ulid<V> {
+    pub fn try_concat_ulid(&self) -> Result<String, ()> {
+        const ULID_LEN: usize = 26;
+
+        if self
+            .view()
+            .local_tokens()
+            .fold(0, |sum, token| sum + token.slice().len())
+            != ULID_LEN
+        {
+            return Err(());
+        }
+
+        let mut string = String::with_capacity(ULID_LEN);
+        for token in self.view().local_tokens() {
+            string.push_str(token.slice());
+        }
+
+        Ok(string)
     }
 }
 

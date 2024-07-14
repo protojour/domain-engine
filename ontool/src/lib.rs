@@ -52,6 +52,7 @@ use tower_http::cors::CorsLayer;
 use tower_lsp::{LspService, Server};
 use tracing::{info, level_filters::LevelFilter};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use ulid::Ulid;
 
 use crate::service::Detach;
 
@@ -86,6 +87,8 @@ enum Commands {
     Generate(Generate),
     /// Run ontool in development server mode
     Serve(Serve),
+    /// Auto-generate a new domain id
+    GenDomainId,
     /// Run ontool in language server mode
     Lsp,
 }
@@ -222,6 +225,12 @@ pub async fn run() -> Result<(), OntoolError> {
             init_tracing();
 
             serve(args.dir, args.files, args.port).await?;
+
+            Ok(())
+        }
+        Some(Commands::GenDomainId) => {
+            let ulid = Ulid::new();
+            println!("{ulid}");
 
             Ok(())
         }

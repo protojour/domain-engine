@@ -1,3 +1,5 @@
+domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
+
 def created (
     rel* 'created'[rel* gen: create_time]?: datetime
 )
