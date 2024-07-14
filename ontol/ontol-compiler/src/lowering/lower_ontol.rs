@@ -101,7 +101,6 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
                 let Some(domain_ulid) = domain_id
                     .try_concat_ulid()
-                    .ok()
                     .and_then(|ulid| Ulid::from_str(&ulid).ok())
                 else {
                     CompileError::TODO("misformatted domain id")

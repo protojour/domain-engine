@@ -496,7 +496,7 @@ impl<V: NodeView> IdentPath<V> {
 }
 
 impl<V: NodeView> Ulid<V> {
-    pub fn try_concat_ulid(&self) -> Result<String, ()> {
+    pub fn try_concat_ulid(&self) -> Option<String> {
         const ULID_LEN: usize = 26;
 
         if self
@@ -505,7 +505,7 @@ impl<V: NodeView> Ulid<V> {
             .fold(0, |sum, token| sum + token.slice().len())
             != ULID_LEN
         {
-            return Err(());
+            return None;
         }
 
         let mut string = String::with_capacity(ULID_LEN);
@@ -513,7 +513,7 @@ impl<V: NodeView> Ulid<V> {
             string.push_str(token.slice());
         }
 
-        Ok(string)
+        Some(string)
     }
 }
 
