@@ -2,16 +2,18 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE SCHEMA m6m_reg;
 
-CREATE TABLE m6m_reg.persistent_domain
+CREATE TABLE m6m_reg.domain
 (
     domain_id uuid UNIQUE NOT NULL,
-    m6m_id serial UNIQUE,
-    unique_name text NOT NULL,
-    schema_name text NOT NULL
+    name text NOT NULL,
+    schema text NOT NULL
 );
 
 CREATE TABLE m6m_reg.vertice
 (
-    id serial UNIQUE NOT NULL,
-    m6m_domain integer REFERENCES m6m_reg.persistent_domain(m6m_id)
+    domain_id uuid REFERENCES m6m_reg.domain(domain_id),
+    def_tag integer NOT NULL,
+    "table" text NOT NULL,
+
+    PRIMARY KEY (domain_id, def_tag)
 );

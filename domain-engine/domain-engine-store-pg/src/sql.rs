@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
-pub struct EscapeIdentifier<T>(pub T);
+pub struct EscapeIdent<T>(pub T);
 
-impl<T: AsRef<str>> Display for EscapeIdentifier<T> {
+impl<T: AsRef<str>> Display for EscapeIdent<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "\"")?;
 
@@ -25,13 +25,13 @@ impl<T: AsRef<str>> Display for EscapeIdentifier<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::sql::EscapeIdentifier;
+    use crate::sql::EscapeIdent;
 
     #[track_caller]
     fn test_escape_identifier(input: &str, expected: &str) {
         assert_eq!(
             expected,
-            format!("{}", EscapeIdentifier(input)),
+            format!("{}", EscapeIdent(input)),
             "fmt implementation should equal expected"
         );
         assert_eq!(

@@ -4,7 +4,7 @@ use domain_engine_core::{
     system::ArcSystemApi,
     DomainError, DomainResult,
 };
-use sql::EscapeIdentifier;
+use sql::EscapeIdent;
 use tokio_postgres::NoTls;
 
 pub mod migrate;
@@ -12,7 +12,7 @@ mod sql;
 
 pub use deadpool_postgres;
 pub use tokio_postgres;
-use tracing::{debug, error};
+use tracing::{error, info};
 
 pub struct PostgresDataStore {
     pub pool: deadpool_postgres::Pool,
@@ -36,7 +36,7 @@ pub async fn recreate_database(
     db_name: &str,
     master_config: &tokio_postgres::Config,
 ) -> anyhow::Result<()> {
-    debug!(
+    info!(
         "recreate database `{db_name}` (will hang if there are open connections to this database)"
     );
 
@@ -52,15 +52,12 @@ pub async fn recreate_database(
 
     client
         .query(
-            &format!("DROP DATABASE IF EXISTS {}", EscapeIdentifier(db_name)),
+            &format!("DROP DATABASE IF EXISTS {}", EscapeIdent(db_name)),
             &[],
         )
         .await?;
     client
-        .query(
-            &format!("CREATE DATABASE {}", EscapeIdentifier(db_name)),
-            &[],
-        )
+        .query(&format!("CREATE DATABASE {}", EscapeIdent(db_name)), &[])
         .await?;
 
     drop(client);

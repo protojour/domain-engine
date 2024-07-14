@@ -955,6 +955,7 @@ dependencies = [
  "domain-engine-test-utils",
  "fnv",
  "indexmap",
+ "indoc",
  "itertools 0.12.1",
  "ontol-macros",
  "ontol-runtime",

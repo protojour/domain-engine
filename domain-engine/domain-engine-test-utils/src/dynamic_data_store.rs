@@ -15,11 +15,20 @@ use tracing::error;
 
 pub struct DynamicDataStoreFactory {
     name: String,
+    recreate_db: bool,
 }
 
 impl DynamicDataStoreFactory {
     pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into() }
+        Self {
+            name: name.into(),
+            recreate_db: true,
+        }
+    }
+
+    pub fn reuse_db(mut self) -> Self {
+        self.recreate_db = false;
+        self
     }
 }
 
@@ -35,9 +44,11 @@ impl DataStoreFactory for DynamicDataStoreFactory {
     ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
         let result = match self.name.as_str() {
             "arango" => {
-                arango::ArangoTestDatastoreFactory
-                    .new_api(package_id, config, session, ontology, system)
-                    .await
+                arango::ArangoTestDatastoreFactory {
+                    recreate_db: self.recreate_db,
+                }
+                .new_api(package_id, config, session, ontology, system)
+                .await
             }
             "inmemory" => {
                 InMemoryDataStoreFactory
@@ -45,9 +56,11 @@ impl DataStoreFactory for DynamicDataStoreFactory {
                     .await
             }
             "pg" => {
-                pg::PgTestDatastoreFactory
-                    .new_api(package_id, config, session, ontology, system)
-                    .await
+                pg::PgTestDatastoreFactory {
+                    recreate_db: self.recreate_db,
+                }
+                .new_api(package_id, config, session, ontology, system)
+                .await
             }
             other => Err(anyhow!("unknown data store: `{other}`")),
         };
@@ -82,7 +95,9 @@ mod arango {
     use ontol_runtime::ontology::Ontology;
 
     #[derive(Default)]
-    pub struct ArangoTestDatastoreFactory;
+    pub struct ArangoTestDatastoreFactory {
+        pub recreate_db: bool,
+    }
 
     #[async_trait::async_trait]
     impl domain_engine_core::data_store::DataStoreFactory for ArangoTestDatastoreFactory {
@@ -104,7 +119,9 @@ mod arango {
             if db_name.len() >= 64 {
                 db_name = &db_name[0..63];
             }
-            let _ = client.drop_database(db_name).await;
+            if self.recreate_db {
+                let _ = client.drop_database(db_name).await;
+            }
             let mut db = client.db(db_name, ontology, system);
             db.init(package_id, true).await.unwrap();
             Ok(Box::new(db))
@@ -133,7 +150,9 @@ mod pg {
     static PG_TEST_SEMAPHORE: OnceLock<Arc<Semaphore>> = OnceLock::new();
 
     #[derive(Default)]
-    pub struct PgTestDatastoreFactory;
+    pub struct PgTestDatastoreFactory {
+        pub recreate_db: bool,
+    }
 
     struct PgTestDatastore {
         inner: PostgresDataStore,
@@ -153,7 +172,15 @@ mod pg {
             system: domain_engine_core::system::ArcSystemApi,
         ) -> anyhow::Result<Box<dyn domain_engine_core::data_store::DataStoreAPI + Send + Sync>>
         {
-            test_pg_api(package_id, config, session, ontology, system).await
+            test_pg_api(
+                package_id,
+                config,
+                session,
+                ontology,
+                system,
+                self.recreate_db,
+            )
+            .await
         }
     }
 
@@ -174,6 +201,7 @@ mod pg {
         _session: Session,
         ontology: std::sync::Arc<Ontology>,
         system: domain_engine_core::system::ArcSystemApi,
+        recreate_db: bool,
     ) -> anyhow::Result<Box<dyn domain_engine_core::data_store::DataStoreAPI + Send + Sync>> {
         let semaphore = PG_TEST_SEMAPHORE
             .get_or_init(|| Arc::new(Semaphore::new(MAX_CONCURRENT_PG_TESTS)))
@@ -183,7 +211,7 @@ mod pg {
 
         let test_name = format!("testdb_{}", super::detect_test_name("::ds_pg"));
 
-        {
+        if recreate_db {
             let master_config = test_pg_config("postgres");
             recreate_database(&test_name, &master_config).await?;
         }

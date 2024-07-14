@@ -44,6 +44,29 @@ async fn make_domain_engine(
 }
 
 #[ontol_macros::datastore_test(tokio::test)]
+async fn test_db_remigrate_noop(ds: &str) {
+    let test = conduit_db().compile();
+    let domain_engine = DomainEngine::builder(test.ontology_owned())
+        .system(Box::new(unimock::Unimock::new(())))
+        .build(DynamicDataStoreFactory::new(ds), Session::default())
+        .await
+        .unwrap();
+
+    drop(domain_engine);
+
+    let domain_engine = DomainEngine::builder(test.ontology_owned())
+        .system(Box::new(unimock::Unimock::new(())))
+        .build(
+            DynamicDataStoreFactory::new(ds).reuse_db(),
+            Session::default(),
+        )
+        .await
+        .unwrap();
+
+    drop(domain_engine);
+}
+
+#[ontol_macros::datastore_test(tokio::test)]
 async fn test_conduit_db_id_generation(ds: &str) {
     let test = conduit_db().compile();
     let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds).await;
