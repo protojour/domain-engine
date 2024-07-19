@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use domain_engine_core::{
-    data_store::{DataStoreAPI, Request, Response},
+    data_store::{BatchWriteRequest, DataStoreAPI, Request, Response},
     system::ArcSystemApi,
     DomainError, DomainResult,
 };
@@ -12,7 +12,7 @@ mod sql;
 
 pub use deadpool_postgres;
 pub use tokio_postgres;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 pub struct PostgresDataStore {
     pub pool: deadpool_postgres::Pool,
@@ -23,12 +23,39 @@ pub struct PostgresDataStore {
 impl DataStoreAPI for PostgresDataStore {
     async fn execute(
         &self,
-        _request: Request,
+        request: Request,
         _session: domain_engine_core::Session,
     ) -> DomainResult<Response> {
-        Err(DomainError::DataStore(anyhow!(
-            "not implemented for Postgres"
-        )))
+        match request {
+            Request::Query(_) => Err(DomainError::DataStore(anyhow!(
+                "Query not implemented for Postgres"
+            ))),
+            Request::BatchWrite(write_requests) => {
+                for write_request in write_requests {
+                    match write_request {
+                        BatchWriteRequest::Insert(values, _) => {
+                            for value in values {
+                                debug!("insert {value:?}");
+                            }
+                        }
+                        BatchWriteRequest::Update(values, _) => {
+                            for value in values {
+                                debug!("update {value:?}");
+                            }
+                        }
+                        BatchWriteRequest::Delete(values, _) => {
+                            for value in values {
+                                debug!("delete {value:?}");
+                            }
+                        }
+                    }
+                }
+
+                Err(DomainError::DataStore(anyhow!(
+                    "BatchWrite not implemented for Postgres"
+                )))
+            }
+        }
     }
 }
 
