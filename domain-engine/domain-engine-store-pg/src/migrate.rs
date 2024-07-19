@@ -2,7 +2,10 @@ use anyhow::{anyhow, Context};
 use fnv::FnvHashMap;
 use indoc::indoc;
 use ontol_runtime::{
-    ontology::{domain::Entity, Ontology},
+    ontology::{
+        domain::{Domain, Entity},
+        Ontology,
+    },
     DefId, PackageId,
 };
 use tokio_postgres::{Client, NoTls, Transaction};
@@ -11,12 +14,34 @@ use tracing::{debug_span, info, info_span, Instrument};
 use crate::sql::EscapeIdent;
 
 mod registry {
-    use refinery::embed_migrations;
-    embed_migrations!("./registry_migrations");
+    refinery::embed_migrations!("./registry_migrations");
 }
 
 /// NB: Changing this is likely a bad idea.
 const MIGRATIONS_TABLE_NAME: &str = "public.m6m_registry_schema_history";
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+#[repr(i32)]
+enum RegVersion {
+    Init = 1,
+}
+
+impl RegVersion {
+    const fn current() -> Self {
+        Self::Init
+    }
+}
+
+impl TryFrom<i32> for RegVersion {
+    type Error = ();
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(Self::Init),
+            _ => Err(()),
+        }
+    }
+}
 
 type DomainId = ulid::Ulid;
 
@@ -52,10 +77,26 @@ async fn migrate(
 ) -> anyhow::Result<()> {
     info!("migrating database `{db_name}`");
 
-    registry::migrations::runner()
-        .set_migration_table_name(MIGRATIONS_TABLE_NAME)
-        .run_async(pg_client)
-        .await?;
+    // Migrate the registry
+    let mut ctx = {
+        let mut runner = registry::migrations::runner();
+        runner.set_migration_table_name(MIGRATIONS_TABLE_NAME);
+        let current_version =
+            RegVersion::try_from(runner.get_migrations().last().unwrap().version() as i32)
+                .map_err(|_| anyhow!("applied version not representable"))?;
+
+        runner.run_async(pg_client).await?;
+
+        let ctx = MigrationCtx {
+            current_version,
+            deployed_version: current_version,
+            domains: Default::default(),
+            vertices: Default::default(),
+            steps: Default::default(),
+        };
+        assert_eq!(RegVersion::current(), ctx.current_version);
+        ctx
+    };
 
     // Migrate all the domains in a single transaction
     let txn = pg_client
@@ -65,13 +106,17 @@ async fn migrate(
         .start()
         .await?;
 
-    let mut ctx = MigrationCtx::default();
+    ctx.deployed_version = query_domain_migration_version(&txn).await?;
 
     // collect migration steps
     // this improves separation of concerns while also enabling dry run simulations
     for package_id in persistent_domains {
-        migrate_domain_steps(*package_id, ontology, &mut ctx, &txn)
-            .instrument(debug_span!("migrate", pkg = package_id.id()))
+        let domain = ontology
+            .find_domain(*package_id)
+            .ok_or_else(|| anyhow!("domain does not exist"))?;
+
+        migrate_domain_steps(domain, ontology, &mut ctx, &txn)
+            .instrument(debug_span!("migrate", id = %domain.domain_id().ulid))
             .await
             .context("domain migration steps")?;
     }
@@ -80,13 +125,32 @@ async fn migrate(
         .await
         .context("perform migration")?;
 
+    // sanity check
+    {
+        assert_eq!(ctx.current_version, ctx.deployed_version);
+        assert_eq!(
+            ctx.current_version,
+            query_domain_migration_version(&txn).await?
+        );
+    }
+
     txn.commit().await?;
 
     Ok(())
 }
 
-#[derive(Default)]
+async fn query_domain_migration_version<'t>(txn: &Transaction<'t>) -> anyhow::Result<RegVersion> {
+    RegVersion::try_from(
+        txn.query_one("SELECT version FROM m6m_reg.domain_migration", &[])
+            .await?
+            .get::<_, i32>(0),
+    )
+    .map_err(|_| anyhow!("deployed version not representable"))
+}
+
 struct MigrationCtx {
+    current_version: RegVersion,
+    deployed_version: RegVersion,
     domains: FnvHashMap<DomainId, PgDomain>,
     vertices: FnvHashMap<(DomainId, DefId), PgVertex>,
     steps: Vec<(DomainId, MigrationStep)>,
@@ -128,15 +192,11 @@ struct PgVertex {
 }
 
 async fn migrate_domain_steps<'t>(
-    package_id: PackageId,
+    domain: &Domain,
     ontology: &Ontology,
     ctx: &mut MigrationCtx,
     txn: &Transaction<'t>,
 ) -> anyhow::Result<()> {
-    let domain = ontology
-        .find_domain(package_id)
-        .ok_or_else(|| anyhow!("domain does not exist"))?;
-
     let unique_name = &ontology[domain.unique_name()];
     let schema = format!("m6m_d_{unique_name}").into_boxed_str();
 
@@ -285,7 +345,7 @@ async fn execute_domain_migration<'t>(
 ) -> anyhow::Result<()> {
     for (domain_id, step) in std::mem::take(&mut ctx.steps) {
         execute_migration_step(domain_id, step, txn, ctx)
-            .instrument(info_span!("migrate", domain_id = %domain_id))
+            .instrument(info_span!("migrate", id = %domain_id))
             .await?;
     }
 
