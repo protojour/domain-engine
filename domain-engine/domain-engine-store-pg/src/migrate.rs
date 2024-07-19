@@ -411,7 +411,7 @@ async fn execute_migration_step<'t>(
             .await?;
 
             txn.query(
-                "UPDATE m6m_reg.vertice SET(table = $1) WHERE domain_id = $2 AND def_tag = $3",
+                "UPDATE m6m_reg.vertex SET(table = $1) WHERE domain_id = $2 AND def_tag = $3",
                 &[&new_table, &domain_id, &def_tag],
             )
             .await?;
