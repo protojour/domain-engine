@@ -167,7 +167,7 @@ async fn migrate_domain_steps<'t>(
 
         domain_id
     } else {
-        let domain_id = DomainId::new();
+        let domain_id = domain.domain_id().ulid;
         ctx.domains.insert(
             domain_id,
             PgDomain {
