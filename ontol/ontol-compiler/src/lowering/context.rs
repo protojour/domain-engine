@@ -54,7 +54,6 @@ pub struct LoweringOutcome {
 
 impl LoweringOutcome {
     pub fn predefine_rel(&mut self, rel_id: RelId, relationship: Relationship, span: SourceSpan) {
-        debug!("predefine rel {rel_id:?}");
         self.rels
             .entry(rel_id.0.package_id())
             .or_default()

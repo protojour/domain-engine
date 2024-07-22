@@ -35,6 +35,14 @@ impl OntologyBuilder {
         self.ontology.data.domain_table.insert(package_id, domain);
     }
 
+    pub fn domain_mut(&mut self, package_id: PackageId) -> &mut Domain {
+        self.ontology
+            .data
+            .domain_table
+            .get_mut(&package_id)
+            .unwrap()
+    }
+
     pub fn add_package_config(&mut self, package_id: PackageId, config: PackageConfig) {
         self.ontology
             .data
@@ -138,10 +146,7 @@ impl OntologyBuilder {
         self
     }
 
-    pub fn value_generators(
-        mut self,
-        generators: FnvHashMap<RelId, ValueGenerator>,
-    ) -> Self {
+    pub fn value_generators(mut self, generators: FnvHashMap<RelId, ValueGenerator>) -> Self {
         self.data().value_generators = generators;
         self
     }

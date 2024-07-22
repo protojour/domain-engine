@@ -90,12 +90,9 @@ fn stix_ontology_smoke(test: &OntolTest) {
     assert_eq!(creator_edge_projection.subject, CardinalIdx(0));
     assert_eq!(creator_edge_projection.object, CardinalIdx(1));
 
-    let (_, reg_key_user_account_edge_info) = test
+    let reg_key_user_account_edge_info = test
         .ontology()
-        .find_domain(test.root_package())
-        .unwrap()
-        .edges()
-        .find(|(edge_id, _)| *edge_id == &creator_edge_projection.id)
+        .find_edge(creator_edge_projection.id)
         .unwrap();
 
     assert_eq!(

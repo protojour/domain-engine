@@ -27,6 +27,7 @@ pub struct EdgeCtx {
 
     // pub edge_participants: FnvHashMap<DefId, FnvHashMap<EdgeId, EdgeParticipant>>,
     pub store_keys: FnvHashMap<DefId, TextConstant>,
+    pub edge_store_keys: FnvHashMap<EdgeId, TextConstant>,
 }
 
 impl EdgeCtx {

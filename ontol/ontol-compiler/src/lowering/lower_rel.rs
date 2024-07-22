@@ -14,7 +14,6 @@ use ontol_runtime::{
 use crate::{
     def::{DefKind, TypeDef, TypeDefFlags},
     namespace::DocId,
-    package::ONTOL_PKG,
     relation::{RelParams, Relationship},
     CompileError,
 };
@@ -253,7 +252,11 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         };
 
         // Fake edge id
-        let edge_id = self.ctx.compiler.edge_ctx.alloc_edge_id(ONTOL_PKG);
+        let edge_id = self
+            .ctx
+            .compiler
+            .edge_ctx
+            .alloc_edge_id(self.ctx.package_id);
 
         let object_prop = backward_relation
             .clone()

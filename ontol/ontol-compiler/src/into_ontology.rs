@@ -129,6 +129,8 @@ impl<'m> Compiler<'m> {
             })
             .collect();
 
+        let mut edges: FnvHashMap<PackageId, FnvHashMap<EdgeId, EdgeInfo>> = Default::default();
+
         // For now, create serde operators for every domain
         for package_id in package_ids.iter().cloned() {
             let domain_def_id = self.package_def_ids.get(&package_id).cloned().unwrap();
@@ -147,8 +149,6 @@ impl<'m> Compiler<'m> {
             if let Some(package_config) = package_config_table.remove(&package_id) {
                 builder.add_package_config(package_id, package_config);
             }
-
-            let mut edges: FnvHashMap<EdgeId, EdgeInfo> = Default::default();
 
             for type_def_id in self.defs.iter_package_def_ids(package_id) {
                 if let Some(ReprKind::Union(members) | ReprKind::StructUnion(members)) =
@@ -275,12 +275,19 @@ impl<'m> Compiler<'m> {
                     });
                 }
 
-                let old_edge = edges.insert(*edge_id, edge_info);
+                let old_edge = edges
+                    .entry(edge_id.0)
+                    .or_default()
+                    .insert(*edge_id, edge_info);
                 assert!(old_edge.is_none());
             }
 
-            domain.set_edges(edges.into_iter());
+            // domain.set_edges(edges.into_iter());
             builder.add_domain(package_id, domain);
+        }
+
+        for (package_id, edges) in edges {
+            builder.domain_mut(package_id).set_edges(edges);
         }
 
         // interface handling
@@ -405,7 +412,7 @@ impl<'m> Compiler<'m> {
         &self,
         type_def_id: DefId,
         union_member_cache: &UnionMemberCache,
-        edges: &mut FnvHashMap<EdgeId, EdgeInfo>,
+        edges: &mut FnvHashMap<PackageId, FnvHashMap<EdgeId, EdgeInfo>>,
         str_ctx: &mut StringCtx<'m>,
     ) -> FnvHashMap<RelId, DataRelationshipInfo> {
         let mut relationships = FnvHashMap::default();
@@ -457,7 +464,7 @@ impl<'m> Compiler<'m> {
         &self,
         type_def_id: DefId,
         relationships: &mut FnvHashMap<RelId, DataRelationshipInfo>,
-        edges: &mut FnvHashMap<EdgeId, EdgeInfo>,
+        edges: &mut FnvHashMap<PackageId, FnvHashMap<EdgeId, EdgeInfo>>,
         str_ctx: &mut StringCtx<'m>,
     ) {
         let Some(properties) = self.prop_ctx.properties_by_def_id(type_def_id) else {
@@ -481,7 +488,7 @@ impl<'m> Compiler<'m> {
         rel_id: RelId,
         source: DataRelationshipSource,
         relationships: &mut FnvHashMap<RelId, DataRelationshipInfo>,
-        edges: &mut FnvHashMap<EdgeId, EdgeInfo>,
+        edges: &mut FnvHashMap<PackageId, FnvHashMap<EdgeId, EdgeInfo>>,
         str_ctx: &mut StringCtx<'m>,
     ) {
         let meta = rel_repr_meta(rel_id, &self.rel_ctx, &self.defs, &self.repr_ctx);
@@ -551,11 +558,14 @@ impl<'m> Compiler<'m> {
         if let DataRelationshipKind::Edge(_) = &data_relationship_kind {
             if !self.edge_ctx.symbolic_edges.contains_key(&edge_id) {
                 // fallback/legacy mode:
-                let edge_info = edges.entry(edge_id).or_insert_with(|| EdgeInfo {
-                    cardinals: vec![],
-                    // store_key: self.edge_ctx.store_keys.get(&edge_id.0).copied(),
-                    store_key: None,
-                });
+                let edge_info = edges
+                    .entry(edge_id.0)
+                    .or_default()
+                    .entry(edge_id)
+                    .or_insert_with(|| EdgeInfo {
+                        cardinals: vec![],
+                        store_key: self.edge_ctx.edge_store_keys.get(&edge_id).copied(),
+                    });
 
                 if edge_info.cardinals.is_empty() {
                     // initialize edge cardinals first

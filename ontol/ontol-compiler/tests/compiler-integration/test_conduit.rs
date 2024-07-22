@@ -37,12 +37,9 @@ fn test_conduit_db_ontology_smoke() {
     assert_eq!(author_edge_projection.subject, CardinalIdx(0));
     assert_eq!(author_edge_projection.object, CardinalIdx(1));
 
-    let (_, author_edge_info) = test
+    let author_edge_info = test
         .ontology()
-        .find_domain(test.root_package())
-        .unwrap()
-        .edges()
-        .find(|(edge_id, _)| *edge_id == &author_edge_projection.id)
+        .find_edge(author_edge_projection.id)
         .unwrap();
 
     assert_eq!(

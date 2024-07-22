@@ -1,7 +1,7 @@
 use fnv::FnvHashSet;
 use ontol_runtime::{
     ontology::{domain::DomainId, ontol::TextConstant},
-    DefId, PackageId,
+    DefId, EdgeId, PackageId,
 };
 use tracing::{debug, debug_span, info};
 use ulid::Ulid;
@@ -206,8 +206,8 @@ impl<'m> Compiler<'m> {
                 // This simplifies later compiler stages, that can trust RelParams::Type is a type with real data in it.
                 if let RelParams::Type(rel_params_def_id) = &relationship.rel_params {
                     copy_relationship_store_key(
+                        relationship.projection.id,
                         *rel_params_def_id,
-                        def_id,
                         &mut self.edge_ctx,
                         &self.thesaurus,
                     );
@@ -301,8 +301,8 @@ impl<'m> Compiler<'m> {
 /// which may be reset to RelParams::Unit if no named parameters are present,
 /// and makes the store key available via a RelationshipId (DefId) instead.
 fn copy_relationship_store_key(
+    edge_id: EdgeId,
     rel_params_def_id: DefId,
-    rel_def_id: DefId,
     edge_ctx: &mut EdgeCtx,
     thesaurus: &Thesaurus,
 ) {
@@ -340,6 +340,7 @@ fn copy_relationship_store_key(
     );
 
     if let Some(store_key) = store_key {
-        edge_ctx.store_keys.insert(rel_def_id, store_key);
+        edge_ctx.store_keys.insert(rel_params_def_id, store_key);
+        edge_ctx.edge_store_keys.insert(edge_id, store_key);
     }
 }
