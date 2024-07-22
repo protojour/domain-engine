@@ -23,7 +23,6 @@ use ontol_runtime::{
     resolve_path::ResolverGraph,
     DefId, PackageId,
 };
-use ontology_graph::OntologyGraph;
 use package::{PackageTopology, Packages};
 use pattern::Patterns;
 use primitive::Primitives;
@@ -42,7 +41,6 @@ use crate::lowering::context::CstLowering;
 pub mod error;
 pub mod mem;
 pub mod ontol_syntax;
-pub mod ontology_graph;
 pub mod package;
 pub mod primitive;
 pub mod source;
@@ -150,11 +148,6 @@ impl<'m> Compiled<'m> {
                 pkg_config.data_store = Some(config.clone());
             }
         }
-    }
-
-    /// Get the current ontology graph (which is serde-serializable)
-    pub fn ontology_graph(&self) -> OntologyGraph<'_, 'm> {
-        OntologyGraph::from(&self.compiler)
     }
 }
 
