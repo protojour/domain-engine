@@ -3,7 +3,7 @@ use ontol_hir::{
 };
 use ontol_runtime::{
     var::{Var, VarSet},
-    DefId, RelationshipId,
+    DefId, RelId,
 };
 use thin_vec::ThinVec;
 use tracing::{debug, warn};
@@ -18,10 +18,10 @@ use super::{ssa_unifier::SsaUnifier, UnifierResult};
 
 #[derive(Clone)]
 pub enum Let<'m> {
-    Prop(Pack<Binding<'m, TypedHir>>, (Var, RelationshipId)),
+    Prop(Pack<Binding<'m, TypedHir>>, (Var, RelId)),
     PropDefault(
         Pack<Binding<'m, TypedHir>>,
-        (Var, RelationshipId),
+        (Var, RelId),
         ThinVec<Node>,
     ),
     Narrow(TypedHirData<'m, Var>),

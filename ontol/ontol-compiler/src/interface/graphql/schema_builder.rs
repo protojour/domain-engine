@@ -25,15 +25,17 @@ use ontol_runtime::{
     },
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolverGraph},
     var::Var,
-    DefId, MapDefFlags, MapKey, PackageId, RelationshipId,
+    DefId, MapDefFlags, MapKey, PackageId, RelId,
 };
 use thin_vec::thin_vec;
 
 use crate::{
     def::{DefKind, Defs},
     interface::serde::{serde_generator::SerdeGenerator, SerdeKey},
+    misc::MiscCtx,
     phf_build::build_phf_index_map,
     primitive::Primitives,
+    properties::PropCtx,
     relation::{RelCtx, UnionMemberCache},
     repr::{repr_ctx::ReprCtx, repr_model::ReprKind},
 };
@@ -52,7 +54,11 @@ pub(super) struct SchemaBuilder<'a, 's, 'c, 'm> {
     /// Serde generator for generating new serialization operators
     pub serde_gen: &'a mut SerdeGenerator<'c, 'm>,
     /// The compiler's relations
-    pub relations: &'c RelCtx,
+    pub rel_ctx: &'c RelCtx,
+    /// The compiler's properties
+    pub prop_ctx: &'c PropCtx,
+    /// Other data
+    pub misc_ctx: &'c MiscCtx,
     /// The compiler's defs
     pub defs: &'c Defs<'m>,
     /// The compiler's primitives
@@ -78,12 +84,12 @@ pub(super) enum LazyTask {
 #[derive(Clone, Copy)]
 pub(super) enum PropertyFieldProducer {
     Property,
-    FlattenedProperty(RelationshipId),
+    FlattenedProperty(RelId),
     EdgeProperty,
 }
 
 impl PropertyFieldProducer {
-    pub fn make_property(&self, rel_id: RelationshipId, addr: SerdeOperatorAddr) -> FieldKind {
+    pub fn make_property(&self, rel_id: RelId, addr: SerdeOperatorAddr) -> FieldKind {
         match self {
             Self::Property => FieldKind::Property { id: rel_id, addr },
             Self::FlattenedProperty(proxy_id) => FieldKind::FlattenedProperty {
@@ -347,7 +353,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         let input_operator_addr = self.serde_gen.gen_addr_greedy(input_serde_key).unwrap();
 
-        let queries: FnvHashMap<RelationshipId, Var> = prop_flow
+        let queries: FnvHashMap<RelId, Var> = prop_flow
             .iter()
             .filter_map(|prop_flow| {
                 if let PropertyFlowData::Match(var) = &prop_flow.data {

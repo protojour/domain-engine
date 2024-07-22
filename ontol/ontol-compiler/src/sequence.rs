@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 
-use ontol_runtime::RelationshipId;
+use ontol_runtime::RelId;
 use tracing::debug;
 
-use crate::{def::RelParams, error::CompileError};
+use crate::{error::CompileError, relation::RelParams};
 
 /// A sequence represents both finite tuples and infinite arrays,
 /// where elements may be of different types.
@@ -14,7 +14,7 @@ pub struct Sequence {
     ///
     /// TODO: Map should instead contain contiguous regions, i.e. Range as key,
     /// which are continuously merged together in define_relationship
-    elements: BTreeMap<u16, RelationshipId>,
+    elements: BTreeMap<u16, RelId>,
 
     /// Whether the last element continues to be accepted ad infinitum.
     /// If the sequence is infinite, the last element is accepted zero or more times.
@@ -22,7 +22,7 @@ pub struct Sequence {
 }
 
 impl Sequence {
-    pub fn elements(&self) -> impl Iterator<Item = (u16, Option<RelationshipId>)> + '_ {
+    pub fn elements(&self) -> impl Iterator<Item = (u16, Option<RelId>)> + '_ {
         let mut next_index: u16 = 0;
         let mut iterator = self.elements.iter().peekable();
 
@@ -50,7 +50,7 @@ impl Sequence {
     pub fn define_relationship(
         &mut self,
         rel_params: &RelParams,
-        relationship_id: RelationshipId,
+        relationship_id: RelId,
     ) -> Result<(), CompileError> {
         let range = match rel_params {
             RelParams::IndexRange(range) => range,
@@ -80,7 +80,7 @@ impl Sequence {
     fn define_element(
         &mut self,
         index: u16,
-        relationship_id: RelationshipId,
+        relationship_id: RelId,
     ) -> Result<(), CompileError> {
         match self.elements.insert(index, relationship_id) {
             Some(_) => Err(CompileError::OverlappingSequenceIndexes),

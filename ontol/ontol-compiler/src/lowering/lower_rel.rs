@@ -8,11 +8,14 @@ use ontol_runtime::{
     ontology::domain::EdgeCardinalProjection,
     property::{PropertyCardinality, ValueCardinality},
     tuple::CardinalIdx,
-    DefId, EdgeId, RelationshipId,
+    DefId, EdgeId,
 };
 
 use crate::{
-    def::{DefKind, RelParams, Relationship, TypeDef, TypeDefFlags},
+    def::{DefKind, TypeDef, TypeDefFlags},
+    namespace::DocId,
+    package::ONTOL_PKG,
+    relation::{RelParams, Relationship},
     CompileError,
 };
 
@@ -78,8 +81,11 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         if subject_ty.cardinality == ValueCardinality::Unit
             && object_ty.cardinality == ValueCardinality::Unit
         {
-            let relationship_id = self.ctx.compiler.defs.alloc_def_id(self.ctx.package_id);
-            let edge_id = EdgeId(relationship_id);
+            let edge_id = self
+                .ctx
+                .compiler
+                .edge_ctx
+                .alloc_edge_id(subject_ty.def_id.package_id());
             let identifies_relationship = Relationship {
                 relation_def_id: self.ctx.compiler.primitives.relations.identifies,
                 projection: EdgeCardinalProjection {
@@ -96,12 +102,12 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 rel_params: RelParams::Unit,
             };
 
-            self.ctx.set_def_kind(
-                relationship_id,
-                DefKind::Relationship(identifies_relationship),
-                stmt.view().span(),
+            let rel_id = self.ctx.compiler.rel_ctx.alloc_rel_id(subject_ty.def_id);
+            self.ctx.outcome.predefine_rel(
+                rel_id,
+                identifies_relationship,
+                self.ctx.source_span(stmt.view().span()),
             );
-            root_defs.push(relationship_id);
         }
 
         Some(root_defs)
@@ -203,8 +209,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         // This syntax just defines the relation the first time it's used
         let relation_def_id = self.ctx.define_relation_if_undefined(key, ident_span);
 
-        let relationship_id = self.ctx.compiler.defs.alloc_def_id(self.ctx.package_id);
-        self.append_documentation(relationship_id, rel_stmt.0.clone());
+        let rel_id = self.ctx.compiler.rel_ctx.alloc_rel_id(subject_ty.def_id);
+        self.append_documentation(DocId::Rel(rel_id), rel_stmt.0.clone());
 
         let rel_params = if let Some(index_range_rel_params) = index_range_rel_params {
             if let Some(rp) = relation.rel_params() {
@@ -218,7 +224,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             let rel_def_id = self.ctx.define_anonymous_type(
                 TypeDef {
                     ident: None,
-                    rel_type_for: Some(RelationshipId(relationship_id)),
+                    rel_type_for: Some(rel_id),
                     flags: TypeDefFlags::CONCRETE,
                 },
                 rp.0.span(),
@@ -246,8 +252,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             RelParams::Unit
         };
 
-        // Just reuse relationship id as the edge id
-        let edge_id = EdgeId(relationship_id);
+        // Fake edge id
+        let edge_id = self.ctx.compiler.edge_ctx.alloc_edge_id(ONTOL_PKG);
 
         let object_prop = backward_relation
             .clone()
@@ -300,8 +306,6 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
         if let Some((name, prop)) = object_prop {
             let relation1_def_id = self.unescaped_text_literal_def_id(prop);
-            let relationship_id1 = self.ctx.compiler.defs.alloc_def_id(self.ctx.package_id);
-
             let relationship1 = Relationship {
                 relation_def_id: relation1_def_id,
                 projection: EdgeCardinalProjection {
@@ -318,12 +322,12 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 rel_params,
             };
 
-            self.ctx.set_def_kind(
-                relationship_id1,
-                DefKind::Relationship(relationship1),
-                rel_stmt.0.span(),
+            let rel_id = self.ctx.compiler.rel_ctx.alloc_rel_id(object_ty.def_id);
+            self.ctx.outcome.predefine_rel(
+                rel_id,
+                relationship1,
+                self.ctx.source_span(rel_stmt.0.span()),
             );
-            root_defs.push(relationship_id1);
         }
 
         // HACK(for now): invert id relationship
@@ -345,12 +349,11 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             };
         }
 
-        self.ctx.set_def_kind(
-            relationship_id,
-            DefKind::Relationship(relationship0),
-            rel_stmt.0.span(),
+        self.ctx.outcome.predefine_rel(
+            rel_id,
+            relationship0,
+            self.ctx.source_span(rel_stmt.0.span()),
         );
-        root_defs.push(relationship_id);
 
         Some(root_defs)
     }
@@ -372,7 +375,6 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             .symbolic_edges
             .get_mut(&edge_id)
             .unwrap();
-        let relationship_id = self.ctx.compiler.defs.alloc_def_id(self.ctx.package_id);
 
         let relationship = {
             let subject_cardinality = (
@@ -418,13 +420,14 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             }
         };
 
-        self.ctx.set_def_kind(
-            relationship_id,
-            DefKind::Relationship(relationship),
-            rel_stmt.0.span(),
+        let rel_id = self.ctx.compiler.rel_ctx.alloc_rel_id(subject_ty.def_id);
+        self.ctx.outcome.predefine_rel(
+            rel_id,
+            relationship,
+            self.ctx.source_span(rel_stmt.0.span()),
         );
 
-        Some(vec![relationship_id])
+        Some(vec![])
     }
 }
 

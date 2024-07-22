@@ -25,7 +25,7 @@ use ontol_runtime::{
     },
     ontology::domain::{DataRelationshipKind, Def},
     tuple::CardinalIdx,
-    RelationshipId,
+    RelId,
 };
 use tracing::{debug, trace, trace_span};
 
@@ -103,7 +103,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         FieldKind::Property { id: rel_id, .. } => self
                             .schema_ctx
                             .ontology
-                            .get_docs(rel_id.0)
+                            .get_def_docs(rel_id.0)
                             .map(|docs_constant| self.schema_ctx.ontology[docs_constant].into()),
                         _ => None,
                     },
@@ -220,7 +220,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     };
 
                     if let Some(docs_constant) =
-                        self.schema_ctx.ontology.get_docs(property.rel_id.0)
+                        self.schema_ctx.ontology.get_def_docs(property.rel_id.0)
                     {
                         argument = argument.description(&self.schema_ctx.ontology[docs_constant]);
                     }
@@ -323,7 +323,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         &self,
         subject_info: &Def,
         name: &str,
-        rel_id: Option<RelationshipId>,
+        rel_id: Option<RelId>,
         filter: &ArgumentFilter,
         control_flow: &mut ControlFlow<(), CardinalIdx>,
         output: &Vec<juniper::meta::Argument<GqlScalar>>,

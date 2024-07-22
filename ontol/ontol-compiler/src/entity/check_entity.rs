@@ -1,7 +1,8 @@
 use ontol_runtime::{ontology::domain::ExtendedEntityInfo, DefId};
 
 use crate::{
-    def::{rel_def_meta, DefKind, TypeDef, TypeDefFlags},
+    def::{DefKind, TypeDef, TypeDefFlags},
+    relation::rel_def_meta,
     CompileError, Compiler,
 };
 
@@ -10,7 +11,7 @@ impl<'m> Compiler<'m> {
     /// This is also run for non-entities.
     pub fn check_entity(&mut self, def_id: DefId) {
         let identified_by = self
-            .rel_ctx
+            .prop_ctx
             .properties_by_def_id
             .get(&def_id)
             .and_then(|properties| properties.identified_by);
@@ -19,10 +20,10 @@ impl<'m> Compiler<'m> {
 
         let mut info = ExtendedEntityInfo::default();
 
-        if let Some(order_rels) = self.rel_ctx.order_relationships.remove(&def_id) {
+        if let Some(order_rels) = self.misc_ctx.order_relationships.remove(&def_id) {
             if !is_entity {
                 for order_rel in &order_rels {
-                    let meta = rel_def_meta(*order_rel, &self.defs);
+                    let meta = rel_def_meta(*order_rel, &self.rel_ctx, &self.defs);
                     CompileError::RelationSubjectMustBeEntity
                         .span(meta.relationship.subject.1)
                         .report(self);

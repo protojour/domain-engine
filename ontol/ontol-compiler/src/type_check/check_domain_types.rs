@@ -2,15 +2,16 @@ use fnv::FnvHashSet;
 use ontol_runtime::{
     ontology::ontol::{TextLikeType, ValueGenerator},
     property::{PropertyCardinality, ValueCardinality},
-    DefId, RelationshipId,
+    DefId, RelId,
 };
 use tracing::{debug, instrument, trace};
 
 use crate::{
-    def::{rel_def_meta, Def, DefKind},
+    def::{Def, DefKind},
     error::CompileError,
     primitive::PrimitiveKind,
-    relation::{Constructor, Property},
+    properties::{Constructor, Property},
+    relation::rel_def_meta,
     repr::repr_model::{ReprKind, ReprScalarKind},
     text_patterns::TextPatternSegment,
     types::{FormatType, Type},
@@ -22,14 +23,14 @@ use super::TypeCheck;
 #[derive(Debug)]
 enum Action {
     /// Many(*) value cardinality between two entities are always considered optional
-    AdjustEntityPropertyCardinality(DefId, RelationshipId),
+    AdjustEntityPropertyCardinality(DefId, RelId),
     RedefineAsPrimaryId {
         def_id: DefId,
-        inherent_property_id: RelationshipId,
-        identifies_relationship_id: RelationshipId,
+        inherent_property_id: RelId,
+        identifies_relationship_id: RelId,
     },
     CheckValueGenerator {
-        relationship_id: RelationshipId,
+        relationship_id: RelId,
         generator_def_id: DefId,
         object_def_id: DefId,
         span: SourceSpan,
@@ -38,7 +39,7 @@ enum Action {
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_domain_type_pre_repr(&mut self, def_id: DefId, _def: &Def) {
-        let Some(table) = self.rel_ctx.properties_table_by_def_id(def_id) else {
+        let Some(table) = self.prop_ctx.properties_table_by_def_id(def_id) else {
             return;
         };
 
@@ -47,16 +48,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         for (rel_id, property) in table {
             trace!("check pre-repr {def_id:?} {rel_id:?} {property:?}");
 
-            let meta = rel_def_meta(*rel_id, self.defs);
+            let meta = rel_def_meta(*rel_id, self.rel_ctx, self.defs);
 
             let object_properties = self
-                .rel_ctx
+                .prop_ctx
                 .properties_by_def_id(meta.relationship.object.0)
                 .unwrap();
 
             // Check if the property is the primary id
             if let Some(id_relationship_id) = object_properties.identifies {
-                let id_meta = rel_def_meta(id_relationship_id, self.defs);
+                let id_meta = rel_def_meta(id_relationship_id, self.rel_ctx, self.defs);
 
                 if id_meta.relationship.object.0 == def_id {
                     debug!(
@@ -77,7 +78,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     pub fn check_domain_type_post_repr(&mut self, def_id: DefId, _def: &Def) {
-        let Some(properties) = self.rel_ctx.properties_by_def_id.get(&def_id) else {
+        let Some(properties) = self.prop_ctx.properties_by_def_id.get(&def_id) else {
             return;
         };
         let Some(table) = properties.table.as_ref() else {
@@ -90,23 +91,23 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         for (rel_id, property) in table {
             trace!("check post-repr {def_id:?} {rel_id:?} {property:?}");
 
-            let meta = rel_def_meta(*rel_id, self.defs);
+            let meta = rel_def_meta(*rel_id, self.rel_ctx, self.defs);
 
             // Check that the same relation_def_id is not reused for subject properties
             if !subject_relation_set.insert(meta.relationship.relation_def_id) {
                 CompileError::UnionInNamedRelationshipNotSupported
-                    .span(self.defs.def_span(meta.rel_id.0))
+                    .span(self.rel_ctx.span(meta.rel_id))
                     .report(&mut self.errors);
             }
 
             let object_properties = self
-                .rel_ctx
+                .prop_ctx
                 .properties_by_def_id(meta.relationship.object.0)
                 .unwrap();
 
             if properties.identified_by.is_some() && object_properties.identified_by.is_some() {
                 if matches!(property.cardinality.1, ValueCardinality::List) {
-                    let span = self.defs.def_span(meta.rel_id.0);
+                    let span = self.rel_ctx.span(meta.rel_id);
                     CompileError::EntityRelationshipCannotBeAList
                         .span(span)
                         .report(&mut self.errors);
@@ -116,7 +117,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
 
             if let Some((generator_def_id, gen_span)) =
-                self.rel_ctx.value_generators_unchecked.remove(rel_id)
+                self.misc_ctx.value_generators_unchecked.remove(rel_id)
             {
                 actions.push(Action::CheckValueGenerator {
                     relationship_id: *rel_id,
@@ -161,7 +162,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             trace!("perform action {action:?}");
             match action {
                 Action::AdjustEntityPropertyCardinality(def_id, property_id) => {
-                    let properties = self.rel_ctx.properties_by_def_id_mut(def_id);
+                    let properties = self.prop_ctx.properties_by_def_id_mut(def_id);
                     if let Some(table) = &mut properties.table {
                         let cardinality = table.get_mut(&property_id).unwrap();
                         adjust_entity_prop_cardinality(cardinality);
@@ -172,10 +173,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     inherent_property_id,
                     identifies_relationship_id,
                 } => {
-                    self.rel_ctx
+                    self.misc_ctx
                         .inherent_id_map
                         .insert(identifies_relationship_id, inherent_property_id);
-                    let properties = self.rel_ctx.properties_by_def_id_mut(def_id);
+                    let properties = self.prop_ctx.properties_by_def_id_mut(def_id);
 
                     if let Some(table) = &mut properties.table {
                         table.insert(
@@ -198,7 +199,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     span,
                 } => match self.determine_value_generator(generator_def_id, object_def_id) {
                     Ok(value_generator) => {
-                        self.rel_ctx
+                        self.misc_ctx
                             .value_generators
                             .insert(relationship_id, value_generator);
                     }
@@ -222,7 +223,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         generator_def_id: DefId,
         object_def_id: DefId,
     ) -> Result<ValueGenerator, ()> {
-        let properties = self.rel_ctx.properties_by_def_id.get(&object_def_id);
+        let properties = self.prop_ctx.properties_by_def_id.get(&object_def_id);
         let repr = self
             .repr_ctx
             .repr_table

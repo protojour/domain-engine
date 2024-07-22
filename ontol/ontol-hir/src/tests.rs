@@ -64,13 +64,13 @@ fn test_fn_call() {
 fn test_struct() {
     let src = indoc! {"
         (struct ($a)
-            (prop- $a R:0:0 #u)
-            (prop- $a R:0:0
+            (prop- $a rel@0:0 #u)
+            (prop- $a rel@0:0
                 [#u
                     (struct ($b))
                 ]
             )
-            (prop- $a R:0:0
+            (prop- $a rel@0:0
                 [
                     (struct ($c))
                     #u
@@ -105,7 +105,7 @@ fn test_matrix() {
 fn test_matrix_in_prop() {
     let src = indoc! {"
         (struct ($a)
-            (prop- $a R:0:0
+            (prop- $a rel@0:0
                 (matrix
                     (.. @c #u $b)
                 )
@@ -119,10 +119,10 @@ fn test_matrix_in_prop() {
 fn test_map_seq() {
     let src = indoc! {"
         (block
-            (let-prop $c ($b R:0:0))
-            (let-prop [$f $g] ($b R:0:0))
+            (let-prop $c ($b rel@0:0))
+            (let-prop [$f $g] ($b rel@0:0))
             (struct ($a)
-                (prop- $a R:0:0
+                (prop- $a rel@0:0
                     [#u
                         (make-seq ($d)
                             (for-each $c ($e) $d)
@@ -139,7 +139,7 @@ fn test_map_seq() {
 fn test_with() {
     let src = indoc! {"
         (with ($a (+ 1 2))
-            (prop- $b R:0:0
+            (prop- $b rel@0:0
                 [$a #u]
             )
         )"

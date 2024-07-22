@@ -17,7 +17,7 @@ use ontol_runtime::{
     query::{filter::Filter, select::Select},
     tuple::{CardinalIdx, EndoTuple},
     value::{Serial, Value, ValueDebug},
-    DefId, EdgeId, RelationshipId,
+    DefId, EdgeId, RelId,
 };
 use tracing::{debug, debug_span, warn};
 
@@ -80,7 +80,7 @@ impl InMemoryStore {
             return Err(DomainError::EntityNotFound);
         }
 
-        let mut raw_props_update: BTreeMap<RelationshipId, Attr> = Default::default();
+        let mut raw_props_update: BTreeMap<RelId, Attr> = Default::default();
 
         let Value::Struct(data_struct, _) = value else {
             return Err(DomainError::BadInput(anyhow!("Expected a struct")));
@@ -259,7 +259,7 @@ impl InMemoryStore {
             struct_map.insert(entity.id_relationship_id, id.clone().into());
         }
 
-        let mut raw_props: FnvHashMap<RelationshipId, Attr> = Default::default();
+        let mut raw_props: FnvHashMap<RelId, Attr> = Default::default();
 
         let vertex_key = VertexKey {
             type_def_id: def.id,

@@ -1,21 +1,21 @@
 (struct ($b)
-    (prop? $b R:1:0
+    (prop? $b rel@1:0:0
         (map $a)
     )
 )
 
 (struct ($c)
-    (prop? $c R:2:1
+    (prop? $c rel@2:0:1
         (map $a)
     )
 )
 
 |$b| (block
-    (let-prop $a ($b R:1:0))
+    (let-prop $a ($b rel@1:0:0))
     (struct ($c)
         (catch (@d)
             (try? @d $a)
-            (prop?- $c R:2:1 (map $a))
+            (prop?- $c rel@2:0:1 (map $a))
         )
         (move-rest-attrs $c $b)
     )

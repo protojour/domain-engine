@@ -4,20 +4,21 @@ use ontol_runtime::{
     property::{Cardinality, PropertyCardinality, ValueCardinality},
     query::condition::SetOperator,
     var::Var,
-    DefId, RelationshipId,
+    DefId, DefRelTag, RelId,
 };
 use smallvec::smallvec;
 use tracing::{debug, info};
 
 use crate::{
-    def::{rel_def_meta, DefKind, RelParams},
+    def::DefKind,
     mem::Intern,
     pattern::{
         CompoundPatternAttr, CompoundPatternAttrKind, CompoundPatternModifier, Pattern,
         PatternKind, SetBinaryOperator,
     },
     primitive::PrimitiveKind,
-    relation::Property,
+    properties::Property,
+    relation::{rel_def_meta, RelParams},
     repr::repr_model::{ReprKind, ReprScalarKind},
     thesaurus::TypeRelation,
     type_check::{ena_inference::Strength, hir_build::NodeInfo, TypeError},
@@ -37,7 +38,7 @@ pub(super) struct UnpackerInfo<'m> {
 }
 
 struct MatchAttribute {
-    rel_id: RelationshipId,
+    rel_id: RelId,
     cardinality: Cardinality,
     rel_params_def: Option<DefId>,
     value_def: DefId,
@@ -65,7 +66,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
     ) -> ontol_hir::Node {
-        let property_set = self.rel_ctx.properties_table_by_def_id(type_def_id);
+        let property_set = self.prop_ctx.properties_table_by_def_id(type_def_id);
 
         let actual_struct_flags = match modifier {
             Some(CompoundPatternModifier::Match) => ontol_hir::StructFlags::MATCH,
@@ -135,7 +136,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 for (member_def_id, _) in members {
                     if let Some(property_set) =
-                        self.rel_ctx.properties_table_by_def_id(*member_def_id)
+                        self.prop_ctx.properties_table_by_def_id(*member_def_id)
                     {
                         self.collect_named_match_attributes(property_set, &mut match_attributes);
                     }
@@ -211,7 +212,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     /// the relations defined on the type. Compute `MatchAttributes`:
     fn collect_named_match_attributes(
         &self,
-        property_set: &IndexMap<RelationshipId, Property>,
+        property_set: &IndexMap<RelId, Property>,
         match_attributes: &mut IndexMap<MatchAttributeKey<'m>, MatchAttribute>,
     ) {
         for (rel_id, _property) in property_set {
@@ -235,7 +236,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             };
 
             if matches!(is.rel, TypeRelation::SubVariant) {
-                if let Some(property_set) = self.rel_ctx.properties_table_by_def_id(*mem_def_id) {
+                if let Some(property_set) = self.prop_ctx.properties_table_by_def_id(*mem_def_id) {
                     self.collect_named_match_attributes(property_set, match_attributes);
                 }
             }
@@ -244,10 +245,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn collect_match_attribute(
         &self,
-        rel_id: RelationshipId,
+        rel_id: RelId,
         match_attributes: &mut IndexMap<MatchAttributeKey<'m>, MatchAttribute>,
     ) {
-        let meta = rel_def_meta(rel_id, self.defs);
+        let meta = rel_def_meta(rel_id, self.rel_ctx, self.defs);
         let match_key = match meta.relation_def_kind.value {
             DefKind::TextLiteral(lit) => Some(MatchAttributeKey::Named(lit)),
             _ => Some(MatchAttributeKey::Def(meta.relationship.relation_def_id)),
@@ -286,12 +287,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let mut hir_props = Vec::with_capacity(pattern_attrs.len());
 
-        if self.rel_ctx.identified_by(type_def_id).is_some() {
+        if self.prop_ctx.identified_by(type_def_id).is_some() {
             if let Some(order_union_def_id) = self.entity_ctx.order_union(&type_def_id) {
                 match_attributes.insert(
                     MatchAttributeKey::Def(self.primitives.relations.order),
                     MatchAttribute {
-                        rel_id: RelationshipId(self.primitives.relations.order),
+                        rel_id: RelId(self.primitives.relations.order, DefRelTag::order()),
                         cardinality: (PropertyCardinality::Optional, ValueCardinality::IndexSet),
                         rel_params_def: None,
                         value_def: order_union_def_id,
@@ -303,7 +304,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             match_attributes.insert(
                 MatchAttributeKey::Def(self.primitives.relations.direction),
                 MatchAttribute {
-                    rel_id: RelationshipId(self.primitives.relations.direction),
+                    rel_id: RelId(
+                        self.primitives.relations.direction,
+                        DefRelTag::direction(),
+                    ),
                     cardinality: (PropertyCardinality::Optional, ValueCardinality::Unit),
                     rel_params_def: None,
                     value_def: self.primitives.direction_union,
@@ -519,7 +523,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
 
                 if self
-                    .rel_ctx
+                    .misc_ctx
                     .value_generators
                     .contains_key(&match_attribute.rel_id)
                 {
@@ -660,7 +664,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 ctx,
             )),
             (ty @ Type::Anonymous(def_id), None) => {
-                match self.rel_ctx.properties_by_def_id(*def_id) {
+                match self.prop_ctx.properties_by_def_id(*def_id) {
                     Some(_) => {
                         if actual_struct_flags.contains(StructFlags::MATCH) {
                             Some(ctx.mk_node(
@@ -702,7 +706,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             let relationship_id = match_attr.rel_id;
 
             if let Some(const_def_id) = self
-                .rel_ctx
+                .misc_ctx
                 .default_const_objects
                 .get(&relationship_id)
                 .cloned()
@@ -732,14 +736,18 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 continue;
             }
 
-            if self.rel_ctx.value_generators.contains_key(&relationship_id) {
+            if self
+                .misc_ctx
+                .value_generators
+                .contains_key(&relationship_id)
+            {
                 // Value generators should be handled in data storage,
                 // so leave these fields out when not mentioned.
                 continue;
             }
 
             {
-                let meta = rel_def_meta(relationship_id, self.defs);
+                let meta = rel_def_meta(relationship_id, self.rel_ctx, self.defs);
                 let (target_def_id, cardinality, _span) = meta.relationship.object();
 
                 // Here we check that if the missing property refers to variably sized edges
@@ -747,7 +755,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 // to be valid. This is because an entity can always "stand on its own"
                 // and be complete without looking at other entities.
                 // FIXME: Does this work with unions?
-                if let Some(target_properties) = self.rel_ctx.properties_by_def_id(target_def_id) {
+                if let Some(target_properties) = self.prop_ctx.properties_by_def_id(target_def_id) {
                     if target_properties.identified_by.is_some()
                         && matches!(
                             cardinality,
@@ -813,7 +821,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     fn check_relations_can_construct_default(&self, def_id: DefId) -> bool {
-        if let Some(property_set) = self.rel_ctx.properties_table_by_def_id(def_id) {
+        if let Some(property_set) = self.prop_ctx.properties_table_by_def_id(def_id) {
             let mut match_attributes = Default::default();
             self.collect_named_match_attributes(property_set, &mut match_attributes);
 

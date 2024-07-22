@@ -16,7 +16,7 @@ use ontol_runtime::{
     query::select::{Select, StructSelect},
     tuple::EndoTuple,
     value::Value,
-    DefId, PackageId, RelationshipId,
+    DefId, PackageId, RelId,
 };
 use serde::de::DeserializeSeed;
 use tracing::{debug, trace, warn};
@@ -145,7 +145,7 @@ impl<'on> DefBinding<'on> {
         self.def.operator_addr.expect("No serde operator addr")
     }
 
-    pub fn find_property(&self, prop: &str) -> Option<RelationshipId> {
+    pub fn find_property(&self, prop: &str) -> Option<RelId> {
         self.ontology
             .new_serde_processor(self.serde_operator_addr(), ProcessorMode::Create)
             .find_property(prop)
@@ -260,7 +260,7 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
         self.merge_attribute(rel_id, value.into())
     }
 
-    fn merge_attribute(mut self, rel_id: RelationshipId, attr: Attr) -> Self {
+    fn merge_attribute(mut self, rel_id: RelId, attr: Attr) -> Self {
         match &mut self.value {
             Value::Struct(attrs, _) => {
                 attrs.insert(rel_id, attr);

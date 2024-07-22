@@ -1,14 +1,14 @@
 (struct ($e)
-    (prop! $e R:1:0
+    (prop! $e rel@1:0:0
         (matrix
             (.. @f
                 (struct ($g)
-                    (prop! $g R:2:0 $a)
-                    (prop! $g R:2:1 $b)
+                    (prop! $g rel@2:0:0 $a)
+                    (prop! $g rel@2:0:1 $b)
                 )
                 (struct ($h)
-                    (prop! $h R:3:0 $c)
-                    (prop! $h R:3:1 $d)
+                    (prop! $h rel@3:0:0 $c)
+                    (prop! $h rel@3:0:1 $d)
                 )
             )
         )
@@ -16,16 +16,16 @@
 )
 
 (struct ($i)
-    (prop! $i R:4:0
+    (prop! $i rel@4:0:0
         (matrix
             (.. @f
                 (struct ($j)
-                    (prop! $j R:5:0 $a)
-                    (prop! $j R:5:1 $c)
+                    (prop! $j rel@5:0:0 $a)
+                    (prop! $j rel@5:0:1 $c)
                 )
                 (struct ($k)
-                    (prop! $k R:6:0 $b)
-                    (prop! $k R:6:1 $d)
+                    (prop! $k rel@6:0:0 $b)
+                    (prop! $k rel@6:0:1 $d)
                 )
             )
         )
@@ -33,25 +33,25 @@
 )
 
 |$e| (block
-    (let-prop [$f $l] ($e R:1:0))
+    (let-prop [$f $l] ($e rel@1:0:0))
     (struct ($i)
-        (prop! $i R:4:0
+        (prop! $i rel@4:0:0
             (make-matrix ($m $n)
                 (for-each $f $l ($g $h)
-                    (let-prop $a ($g R:2:0))
-                    (let-prop $b ($g R:2:1))
-                    (let-prop $c ($h R:3:0))
-                    (let-prop $d ($h R:3:1))
+                    (let-prop $a ($g rel@2:0:0))
+                    (let-prop $b ($g rel@2:0:1))
+                    (let-prop $c ($h rel@3:0:0))
+                    (let-prop $d ($h rel@3:0:1))
                     (insert $m
                         (struct ($j)
-                            (prop! $j R:5:0 $a)
-                            (prop! $j R:5:1 $c)
+                            (prop! $j rel@5:0:0 $a)
+                            (prop! $j rel@5:0:1 $c)
                         )
                     )
                     (insert $n
                         (struct ($k)
-                            (prop! $k R:6:0 $b)
-                            (prop! $k R:6:1 $d)
+                            (prop! $k rel@6:0:0 $b)
+                            (prop! $k rel@6:0:1 $d)
                         )
                     )
                 )

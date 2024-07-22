@@ -1,16 +1,16 @@
 (struct ($d)
-    (prop! $d R:1:0
+    (prop! $d rel@1:0:0
         (regex-seq (@c) def@0:0 ((1 $a) (2 $b)))
     )
 )
 
 (struct ($e)
-    (prop! $e R:2:0
+    (prop! $e rel@2:0:0
         (matrix
             (.. @c
                 (struct ($f)
-                    (prop! $f R:2:1 $a)
-                    (prop! $f R:2:2 $b)
+                    (prop! $f rel@2:0:1 $a)
+                    (prop! $f rel@2:0:2 $b)
                 )
             )
         )
@@ -18,18 +18,18 @@
 )
 
 |$d| (block
-    (let-prop $g ($d R:1:0))
+    (let-prop $g ($d rel@1:0:0))
     (let-regex-iter $c ((1 $a) (2 $b)) def@0:0 $g)
     (struct ($e)
-        (prop! $e R:2:0
+        (prop! $e rel@2:0:0
             (make-matrix ($h)
                 (for-each $c ($i)
                     (catch (@j)
                         (let-tup? @j ($a $b) $i)
                         (insert $h
                             (struct ($f)
-                                (prop! $f R:2:1 $a)
-                                (prop! $f R:2:2 $b)
+                                (prop! $f rel@2:0:1 $a)
+                                (prop! $f rel@2:0:2 $b)
                             )
                         )
                     )

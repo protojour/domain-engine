@@ -1,24 +1,24 @@
 (match-struct ($d)
-    (prop! $d R:1:2
+    (prop! $d rel@1:0:2
         (regex-seq (@c) def@0:43 ((1 $a)) ((2 $b)))
     )
 )
 
 (struct ($e)
-    (prop! $e R:1:6
+    (prop! $e rel@1:0:6
         (matrix
             (.. @c
                 (struct ($f)
-                    (prop! $f R:1:4 $a)
+                    (prop! $f rel@1:0:4 $a)
                 )
             )
         )
     )
-    (prop! $e R:1:7
+    (prop! $e rel@1:0:7
         (matrix
             (.. @c
                 (struct ($g)
-                    (prop! $g R:1:4 $b)
+                    (prop! $g rel@1:0:4 $b)
                 )
             )
         )
@@ -26,31 +26,31 @@
 )
 
 |$d| (block
-    (let-prop $h ($d R:1:2))
+    (let-prop $h ($d rel@1:0:2))
     (let-regex-iter $c ((1 $a)) ((2 $b)) def@0:43 $h)
     (struct ($e)
-        (prop! $e R:1:6
+        (prop! $e rel@1:0:6
             (make-matrix ($i)
                 (for-each $c ($j)
                     (catch (@k)
                         (let-tup? @k ($a $_) $j)
                         (insert $i
                             (struct ($f)
-                                (prop! $f R:1:4 $a)
+                                (prop! $f rel@1:0:4 $a)
                             )
                         )
                     )
                 )
             )
         )
-        (prop! $e R:1:7
+        (prop! $e rel@1:0:7
             (make-matrix ($l)
                 (for-each $c ($m)
                     (catch (@n)
                         (let-tup? @n ($_ $b) $m)
                         (insert $l
                             (struct ($g)
-                                (prop! $g R:1:4 $b)
+                                (prop! $g rel@1:0:4 $b)
                             )
                         )
                     )

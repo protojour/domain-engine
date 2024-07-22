@@ -12,7 +12,7 @@ use ontol_runtime::{
     },
     sequence::{Sequence, SubSequence},
     value::Value,
-    DefId, RelationshipId,
+    DefId, RelId,
 };
 use tracing::{debug, debug_span, error};
 
@@ -164,9 +164,9 @@ impl InMemoryStore {
         &self,
         def: &Def,
         vertex_key: VertexKey<&DynamicKey>,
-        mut properties: FnvHashMap<RelationshipId, Attr>,
+        mut properties: FnvHashMap<RelId, Attr>,
         struct_def_id: DefId,
-        select_properties: &FnvHashMap<RelationshipId, Select>,
+        select_properties: &FnvHashMap<RelId, Select>,
         ctx: &DbContext,
     ) -> DomainResult<Value> {
         let _entered = debug_span!("struct_sel", id = ?struct_def_id).entered();

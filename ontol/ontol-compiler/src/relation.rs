@@ -1,169 +1,119 @@
-use std::collections::BTreeSet;
+//! context and data types for raw relationships (`rel`)
 
-use fnv::{FnvHashMap, FnvHashSet};
-use indexmap::IndexMap;
+use std::{collections::BTreeSet, ops::Range};
+
+use fnv::FnvHashMap;
 use ontol_runtime::{
-    interface::discriminator::Discriminant, ontology::ontol::ValueGenerator, property::Cardinality,
-    DefId, PackageId, RelationshipId,
+    ontology::domain::EdgeCardinalProjection, property::Cardinality, DefId, DefRelTag, RelId,
 };
-use tracing::warn;
+use tracing::trace;
 
 use crate::{
-    repr::{repr_ctx::ReprCtx, repr_model::ReprKind},
-    sequence::Sequence,
-    text_patterns::TextPatternSegment,
-    SourceSpan,
+    def::{DefKind, Defs},
+    repr::{
+        repr_ctx::ReprCtx,
+        repr_model::{ReprKind, ReprScalarKind},
+    },
+    OwnedOrRef, SourceSpan, SpannedBorrow, NO_SPAN,
 };
 
 /// Context that tracks relation and relationship information
 #[derive(Default)]
 pub struct RelCtx {
-    pub properties_by_def_id: FnvHashMap<DefId, Properties>,
-    /// A map from "idenfities" relationship to named relationship:
-    pub inherent_id_map: FnvHashMap<RelationshipId, RelationshipId>,
-
-    pub text_pattern_constructors: FnvHashSet<DefId>,
-    pub union_discriminators: FnvHashMap<DefId, UnionDiscriminator>,
-
-    /// `default` relationships:
-    pub default_const_objects: FnvHashMap<RelationshipId, DefId>,
-    /// `gen` relations, what the user wrote directly:
-    pub value_generators_unchecked: FnvHashMap<RelationshipId, (DefId, SourceSpan)>,
-    /// `gen` relations after proper type check:
-    pub value_generators: FnvHashMap<RelationshipId, ValueGenerator>,
-    /// `order` relations
-    pub order_relationships: FnvHashMap<DefId, Vec<RelationshipId>>,
-    /// `direction` relations
-    pub direction_relationships: FnvHashMap<DefId, (RelationshipId, DefId)>,
-
-    /// `rel type` parameters (instantiated) for various types
-    pub type_params: FnvHashMap<DefId, IndexMap<DefId, TypeParam>>,
-
-    pub rel_type_constraints: FnvHashMap<DefId, RelTypeConstraints>,
+    allocators: FnvHashMap<DefId, DefRelTag>,
+    table: FnvHashMap<RelId, (Relationship, SourceSpan)>,
 }
 
 impl RelCtx {
-    pub fn properties_by_def_id(&self, domain_type_id: DefId) -> Option<&Properties> {
-        self.properties_by_def_id.get(&domain_type_id)
+    pub fn alloc_rel_id(&mut self, def_id: DefId) -> RelId {
+        let tag_mut = self.allocators.entry(def_id).or_insert(DefRelTag(0));
+        let tag = *tag_mut;
+        tag_mut.0 += 1;
+
+        let rel_id = RelId(def_id, tag);
+        trace!("new {rel_id:?}");
+
+        rel_id
     }
 
-    pub fn properties_table_by_def_id(
-        &self,
-        domain_type_id: DefId,
-    ) -> Option<&IndexMap<RelationshipId, Property>> {
-        self.properties_by_def_id
-            .get(&domain_type_id)
-            .and_then(|properties| properties.table.as_ref())
+    pub fn commit_rel(&mut self, rel_id: RelId, relationship: Relationship, span: SourceSpan) {
+        self.table.insert(rel_id, (relationship, span));
     }
 
-    pub fn properties_by_def_id_mut(&mut self, domain_type_id: DefId) -> &mut Properties {
-        self.properties_by_def_id.entry(domain_type_id).or_default()
+    pub fn span(&self, rel_id: RelId) -> SourceSpan {
+        self.table.get(&rel_id).unwrap().1
     }
 
-    pub fn identified_by(&self, domain_type_id: DefId) -> Option<RelationshipId> {
-        let properties = self.properties_by_def_id(domain_type_id)?;
-        properties.identified_by
+    pub fn relationship_by_id(&self, rel_id: RelId) -> &Relationship {
+        &self.table.get(&rel_id).unwrap().0
     }
 
-    /// Stable-sort property tables such that all Subject property roles appear before Object roles.
-    pub fn sort_property_tables(&mut self) {
-        for properties in &mut self.properties_by_def_id.values_mut() {
-            if let Some(_table) = &mut properties.table {
-                warn!("TODO: sort by cardinal idx");
+    pub fn spanned_relationship_by_id(&self, rel_id: RelId) -> SpannedBorrow<Relationship> {
+        let (value, span) = &self.table.get(&rel_id).unwrap();
+        SpannedBorrow { value, span }
+    }
 
-                // let mut table_vec: Vec<_> = std::mem::take(table).into_iter().collect();
-                // table_vec.sort_by(|(id_a, _), (id_b, _)| id_a.role.cmp(&id_b.role));
-                // *table = table_vec.into_iter().collect();
-            }
-        }
+    pub fn relationship_by_id_mut(&mut self, rel_id: RelId) -> Option<&mut Relationship> {
+        self.table.get_mut(&rel_id).map(|(rel, _)| rel)
+    }
+
+    pub fn iter_rel_ids(&self, def_id: DefId) -> impl Iterator<Item = RelId> {
+        let max_tag = self
+            .allocators
+            .get(&def_id)
+            .cloned()
+            .unwrap_or(DefRelTag(0));
+
+        (0..max_tag.0).map(move |tag| RelId(def_id, DefRelTag(tag)))
     }
 }
 
+/// This definition expresses that a relation is a relationship between a subject and an object
 #[derive(Debug)]
-pub struct UnionDiscriminator {
-    pub variants: Vec<UnionDiscriminatorVariant>,
+pub struct Relationship {
+    pub relation_def_id: DefId,
+    pub projection: EdgeCardinalProjection,
+    pub relation_span: SourceSpan,
+
+    pub subject: (DefId, SourceSpan),
+    /// The cardinality of the relationship, i.e. how many objects are related to the subject
+    pub subject_cardinality: Cardinality,
+
+    pub object: (DefId, SourceSpan),
+    /// How many subjects are related to the object
+    pub object_cardinality: Cardinality,
+
+    pub rel_params: RelParams,
 }
 
-#[derive(Debug)]
-pub struct UnionDiscriminatorVariant {
-    pub discriminant: Discriminant,
-    pub role: UnionDiscriminatorRole,
-    pub def_id: DefId,
-}
-
-#[derive(Debug)]
-pub enum UnionDiscriminatorRole {
-    Data,
-    IdentifierOf(DefId),
-}
-
-#[derive(Default, Debug)]
-pub struct Properties {
-    pub constructor: Constructor,
-    pub table: Option<IndexMap<RelationshipId, Property>>,
-    pub identifies: Option<RelationshipId>,
-    pub identified_by: Option<RelationshipId>,
-}
-
-impl Properties {
-    pub fn constructor(&self) -> &Constructor {
-        &self.constructor
+impl Relationship {
+    pub fn subject(&self) -> (DefId, Cardinality, SourceSpan) {
+        (self.subject.0, self.subject_cardinality, self.subject.1)
     }
 
-    /// Get the property table, create it if None
-    pub fn table_mut(&mut self) -> &mut IndexMap<RelationshipId, Property> {
-        self.table.get_or_insert_with(Default::default)
+    pub fn object(&self) -> (DefId, Cardinality, SourceSpan) {
+        (self.object.0, self.object_cardinality, self.object.1)
     }
-}
-
-#[derive(Debug)]
-pub struct Property {
-    pub cardinality: Cardinality,
-    pub is_entity_id: bool,
-    /// supplies only partial information to an edge,
-    /// therefore cannot be an input property
-    pub is_edge_partial: bool,
-}
-
-/// The "Constructor" represents different (exclusive) ways
-/// a type may be represented.
-/// Not sure about the naming of this type.
-///
-/// TODO: Replace this with ReprKind..
-/// A "constructor" concept may still nice to have, e.g. in relation to deserialization.
-#[derive(Default, Debug)]
-pub enum Constructor {
-    /// There is nothing special about this type, it is just a "struct" consisting of relations to other types.
-    #[default]
-    Transparent,
-    /// The type is a tuple-like sequence of other types
-    Sequence(Sequence),
-    /// The type is a text pattern
-    TextFmt(TextPatternSegment),
-}
-
-#[derive(Default, Debug)]
-pub struct RelTypeConstraints {
-    /// Constraints for the subject type
-    pub subject_set: BTreeSet<DefId>,
-
-    /// Constraints for the object type
-    pub object: Vec<RelObjectConstraint>,
-}
-
-#[derive(Debug)]
-pub enum RelObjectConstraint {
-    /// The object type must be a constant of the subject type
-    ConstantOfSubjectType,
-    #[allow(unused)]
-    Generator,
 }
 
 #[derive(Clone, Debug)]
-pub struct TypeParam {
-    pub object: DefId,
-    pub definition_site: PackageId,
-    pub span: SourceSpan,
+pub enum RelParams {
+    Unit,
+    Type(DefId),
+    IndexRange(Range<Option<u16>>),
+}
+
+#[derive(Clone)]
+pub struct RelDefMeta<'d, 'm> {
+    pub rel_id: RelId,
+    pub relationship: SpannedBorrow<'d, Relationship>,
+    pub relation_def_kind: SpannedBorrow<'d, DefKind<'m>>,
+}
+
+pub struct RelReprMeta<'a> {
+    pub rel_id: RelId,
+    pub relationship: SpannedBorrow<'a, Relationship>,
+    pub relation_repr_kind: OwnedOrRef<'a, ReprKind>,
 }
 
 /// Cache of which DefId is a member of which unions
@@ -171,14 +121,60 @@ pub struct UnionMemberCache {
     pub(crate) cache: FnvHashMap<DefId, BTreeSet<DefId>>,
 }
 
-/// Check if a def identifies any entities/vertices
-pub fn identifies_any(def_id: DefId, rel_ctx: &RelCtx, repr_ctx: &ReprCtx) -> bool {
-    match repr_ctx.get_repr_kind(&def_id) {
-        Some(ReprKind::Union(members) | ReprKind::StructUnion(members)) => members
-            .iter()
-            .any(|(def_id, _span)| identifies_any(*def_id, rel_ctx, repr_ctx)),
-        _ => rel_ctx
-            .properties_by_def_id(def_id)
-            .is_some_and(|p| p.identifies.is_some()),
+pub fn rel_def_meta<'c, 'm>(
+    rel_id: RelId,
+    rel_ctx: &'c RelCtx,
+    defs: &'c Defs<'m>,
+) -> RelDefMeta<'c, 'm> {
+    let (relationship, span) = rel_ctx.table.get(&rel_id).unwrap();
+    let relationship = SpannedBorrow {
+        value: relationship,
+        span,
+    };
+
+    let relation_def_kind = defs
+        .get_spanned_def_kind(relationship.relation_def_id)
+        .expect("no def for relation id");
+
+    RelDefMeta {
+        rel_id,
+        relationship,
+        relation_def_kind,
+    }
+}
+
+pub fn rel_repr_meta<'c>(
+    rel_id: RelId,
+    rel_ctx: &'c RelCtx,
+    defs: &'c Defs,
+    repr_ctx: &'c ReprCtx,
+) -> RelReprMeta<'c> {
+    let (relationship, span) = rel_ctx.table.get(&rel_id).unwrap();
+    let relationship = SpannedBorrow {
+        value: relationship,
+        span,
+    };
+    let relation_def_id = relationship.relation_def_id;
+
+    let relation_repr_kind = repr_ctx
+        .get_repr_kind(&relation_def_id)
+        .map(OwnedOrRef::Borrowed)
+        .unwrap_or_else(|| match defs.def_kind(relation_def_id) {
+            DefKind::TextLiteral(_) => OwnedOrRef::Owned(ReprKind::Scalar(
+                relation_def_id,
+                ReprScalarKind::TextConstant(relation_def_id),
+                NO_SPAN,
+            )),
+            _ => panic!(
+                "no repr for {:?}: {:?}",
+                relationship.relation_def_id,
+                defs.def_kind(relationship.relation_def_id)
+            ),
+        });
+
+    RelReprMeta {
+        rel_id,
+        relationship,
+        relation_repr_kind,
     }
 }

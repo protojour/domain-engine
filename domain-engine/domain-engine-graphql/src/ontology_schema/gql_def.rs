@@ -2,7 +2,7 @@
 
 use ontol_runtime::{
     ontology::{domain, map::MapMeta, ontol::TextConstant},
-    DefId, MapKey, RelationshipId,
+    DefId, MapKey, RelId,
 };
 
 use super::{gql_rel, Ctx};
@@ -20,7 +20,7 @@ pub struct Entity {
 pub enum DefKind {
     Entity,
     Data,
-    Relationship,
+    Relation,
     Function,
     Domain,
     Generator,
@@ -36,8 +36,8 @@ pub struct NamedMap {
 }
 
 struct PropertyFlow {
-    source: RelationshipId,
-    target: RelationshipId,
+    source: RelId,
+    target: RelId,
     kind: PropertyFlowKind,
 }
 
@@ -57,7 +57,7 @@ impl Def {
         ctx.def(self.id).name().map(|name| ctx[name].into())
     }
     fn doc_string(&self, ctx: &Ctx) -> Option<String> {
-        ctx.get_docs(self.id)
+        ctx.get_def_docs(self.id)
             .map(|docs_constant| ctx[docs_constant].into())
     }
     fn entity(&self, ctx: &Ctx) -> Option<Entity> {
@@ -74,7 +74,7 @@ impl Def {
         match ctx.def(self.id).kind {
             domain::DefKind::Entity(_) => DefKind::Entity,
             domain::DefKind::Data(_) => DefKind::Data,
-            domain::DefKind::Relationship(_) => DefKind::Relationship,
+            domain::DefKind::Relation(_) => DefKind::Relation,
             domain::DefKind::Function(_) => DefKind::Function,
             domain::DefKind::Domain(_) => DefKind::Domain,
             domain::DefKind::Generator(_) => DefKind::Generator,

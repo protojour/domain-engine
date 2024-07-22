@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
-use ontol_runtime::DefId;
+use ontol_runtime::{DefId, RelId};
 
 use crate::PackageId;
 
@@ -37,10 +37,16 @@ impl<'m> Namespace<'m> {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum DocId {
+    Def(DefId),
+    Rel(RelId),
+}
+
 #[derive(Default)]
 pub struct Namespaces<'m> {
     pub(crate) namespaces: FnvHashMap<PackageId, Namespace<'m>>,
-    pub(crate) docs: FnvHashMap<DefId, std::string::String>,
+    pub(crate) docs: FnvHashMap<DocId, String>,
 }
 
 impl<'m> Namespaces<'m> {

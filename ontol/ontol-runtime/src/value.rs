@@ -17,7 +17,7 @@ use crate::{
     query::filter::Filter,
     sequence::Sequence,
     tuple::EndoTupleElements,
-    DefId, PackageId, RelationshipId,
+    DefId, PackageId, RelId,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -37,7 +37,7 @@ pub enum Value {
     ChronoTime(chrono::NaiveTime, ValueTag),
 
     /// A collection of attributes keyed by property.
-    Struct(Box<FnvHashMap<RelationshipId, Attr>>, ValueTag),
+    Struct(Box<FnvHashMap<RelId, Attr>>, ValueTag),
 
     /// A collection of arbitrary values keyed by strings.
     Dict(Box<BTreeMap<String, Value>>, ValueTag),
@@ -61,7 +61,7 @@ pub enum Value {
 
 impl Value {
     pub fn new_struct(
-        props: impl IntoIterator<Item = (RelationshipId, Attr)>,
+        props: impl IntoIterator<Item = (RelId, Attr)>,
         tag: ValueTag,
     ) -> Self {
         Self::Struct(Box::new(FnvHashMap::from_iter(props)), tag)
@@ -147,14 +147,14 @@ impl Value {
         }
     }
 
-    pub fn get_attribute(&self, rel_id: RelationshipId) -> Option<&Attr> {
+    pub fn get_attribute(&self, rel_id: RelId) -> Option<&Attr> {
         match self {
             Self::Struct(map, _) => map.get(&rel_id),
             _ => None,
         }
     }
 
-    pub fn get_attribute_value(&self, rel_id: RelationshipId) -> Option<&Value> {
+    pub fn get_attribute_value(&self, rel_id: RelId) -> Option<&Value> {
         match self.get_attribute(rel_id)? {
             Attr::Unit(value) => Some(value),
             _ => None,
@@ -452,7 +452,7 @@ impl<'a> Display for ValueDebug<'a, AttrMatrix> {
 mod tests {
     use std::collections::{BTreeMap, HashMap};
 
-    use crate::RelationshipId;
+    use crate::RelId;
 
     use super::*;
     use num::rational::BigRational;
@@ -471,9 +471,9 @@ mod tests {
     fn value_size() {
         assert_eq!(32, std::mem::size_of::<Value>());
 
-        assert_eq!(24, std::mem::size_of::<BTreeMap<RelationshipId, Value>>());
+        assert_eq!(24, std::mem::size_of::<BTreeMap<RelId, Value>>());
         assert_eq!(24, std::mem::size_of::<Vec<Value>>());
-        assert_eq!(48, std::mem::size_of::<HashMap<RelationshipId, Value>>());
+        assert_eq!(48, std::mem::size_of::<HashMap<RelId, Value>>());
 
         assert_eq!(32, std::mem::size_of::<Attr>());
     }

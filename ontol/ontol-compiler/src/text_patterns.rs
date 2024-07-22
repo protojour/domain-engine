@@ -3,15 +3,15 @@ use ontol_runtime::{
     ontology::ontol::text_pattern::{
         Regex, TextPattern, TextPatternConstantPart, TextPatternProperty,
     },
-    DefId, RelationshipId,
+    DefId, RelId,
 };
 use regex_syntax::hir::{Capture, Hir, Look};
 use std::fmt::Write;
 use tracing::debug;
 
 use crate::{
+    properties::Constructor,
     regex_util::{self, unsigned_integer_with_radix},
-    relation::Constructor,
     strings::StringCtx,
     Compiler,
 };
@@ -33,7 +33,7 @@ pub enum TextPatternSegment {
     },
     Regex(Hir),
     Property {
-        rel_id: RelationshipId,
+        rel_id: RelId,
         type_def_id: DefId,
         segment: Box<TextPatternSegment>,
     },
@@ -221,11 +221,11 @@ fn compile_regex_literals(compiler: &mut Compiler) {
 }
 
 fn compile_text_pattern_constructors(compiler: &mut Compiler) {
-    let text_patterns = std::mem::take(&mut compiler.rel_ctx.text_pattern_constructors);
+    let text_patterns = std::mem::take(&mut compiler.misc_ctx.text_pattern_constructors);
 
     for def_id in text_patterns {
         let segment = match compiler
-            .rel_ctx
+            .prop_ctx
             .properties_by_def_id(def_id)
             .map(|p| &p.constructor)
         {

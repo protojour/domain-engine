@@ -1,15 +1,15 @@
 (struct ($b)
-    (prop! $b R:1:0 $a)
+    (prop! $b rel@1:0:0 $a)
 )
 
 (matrix (.. @d
     (match-struct ($c)
-        (prop! $c R:2:0 $a)
+        (prop! $c rel@2:0:0 $a)
     )
 ))
 
 |$b| (block
-    (let-prop $a ($b R:1:0))
+    (let-prop $a ($b rel@1:0:0))
     (match-struct ($e)
         (let-cond-var $c $e)
         (push-cond-clauses $e
@@ -17,7 +17,7 @@
         )
         (let-cond-var $f $e)
         (push-cond-clauses $e
-            (match-prop '$c R:2:0 element-in '$f)
+            (match-prop '$c rel@2:0:0 element-in '$f)
             (member '$f (_ $a))
         )
     )

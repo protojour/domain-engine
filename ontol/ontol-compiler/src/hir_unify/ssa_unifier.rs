@@ -7,7 +7,7 @@ use ontol_hir::{
 use ontol_runtime::{
     query::condition::{Clause, ClausePair, SetOperator},
     var::{Var, VarAllocator, VarSet},
-    MapDirection, MapFlags, RelationshipId,
+    MapDirection, MapFlags, RelId,
 };
 use smallvec::{smallvec, SmallVec};
 use thin_vec::thin_vec;
@@ -18,6 +18,7 @@ use crate::{
     hir_unify::{regex_interpolation::RegexStringInterpolator, ssa_util::NodesExt},
     mem::Intern,
     primitive::Primitives,
+    properties::PropCtx,
     relation::RelCtx,
     repr::{
         repr_ctx::ReprCtx,
@@ -41,7 +42,8 @@ pub struct SsaUnifier<'c, 'm> {
     #[allow(unused)]
     pub(super) types: &'c mut TypeCtx<'m>,
     #[allow(unused)]
-    pub(super) relations: &'c RelCtx,
+    pub(super) rel_ctx: &'c RelCtx,
+    pub(super) prop_ctx: &'c PropCtx,
     pub(super) repr_ctx: &'c ReprCtx,
     pub(super) defs: &'c Defs<'m>,
     pub(super) errors: &'c mut CompileErrors,
@@ -71,7 +73,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
     ) -> Self {
         Self {
             types: &mut compiler.ty_ctx,
-            relations: &compiler.rel_ctx,
+            rel_ctx: &compiler.rel_ctx,
+            prop_ctx: &compiler.prop_ctx,
             repr_ctx: &compiler.repr_ctx,
             defs: &compiler.defs,
             primitives: &compiler.primitives,
@@ -409,7 +412,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
     fn write_prop_expr(
         &mut self,
-        (flags, struct_var, rel_id): (PropFlags, Var, RelationshipId),
+        (flags, struct_var, rel_id): (PropFlags, Var, RelId),
         variant: &PropVariant,
         meta: &Meta<'m>,
         mode: ExprMode,
@@ -872,7 +875,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     .get_single_def_id()
                     .ok_or(UnifierError::NonEntityQuery)?;
                 let _ = self
-                    .relations
+                    .prop_ctx
                     .identified_by(def_id)
                     .ok_or(UnifierError::NonEntityQuery)?;
             }
@@ -881,7 +884,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         }
 
         if let Some(type_def_id) = def_ty.get_single_def_id() {
-            if let Some(properties) = self.relations.properties_by_def_id(type_def_id) {
+            if let Some(properties) = self.prop_ctx.properties_by_def_id(type_def_id) {
                 if properties.identified_by.is_some() {
                     base_clauses.push(ClausePair(binder.hir().var, Clause::IsEntity(type_def_id)));
                 }

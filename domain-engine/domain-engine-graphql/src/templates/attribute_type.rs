@@ -20,7 +20,7 @@ use ontol_runtime::{
     },
     sequence::{Sequence, SubSequence},
     value::{Value, ValueTag},
-    RelationshipId,
+    RelId,
 };
 use serde::Serialize;
 use tracing::{trace, trace_span, warn};
@@ -485,8 +485,8 @@ impl<'v> AttributeType<'v> {
 }
 
 fn resolve_property(
-    map: &FnvHashMap<RelationshipId, Attr>,
-    rel_id: RelationshipId,
+    map: &FnvHashMap<RelId, Attr>,
+    rel_id: RelId,
     type_ref: TypeRef,
     schema_ctx: &Arc<SchemaCtx>,
     executor: &juniper::Executor<ServiceCtx, crate::gql_scalar::GqlScalar>,

@@ -17,14 +17,15 @@ use tracing::debug_span;
 use ulid::Ulid;
 
 use crate::{
-    def::DefKind,
     edge::{Slot, SymbolicEdge, SymbolicEdgeVariable},
-    namespace::Space,
+    namespace::{DocId, Space},
     package::PackageReference,
     CompileError, Compiler, Src,
 };
 
-use super::context::{BlockContext, CstLowering, Extern, LoweringCtx, Open, Private, RootDefs};
+use super::context::{
+    BlockContext, CstLowering, Extern, LoweringCtx, LoweringOutcome, Open, Private, RootDefs,
+};
 
 enum PreDefinedStmt<V> {
     Domain(insp::DomainStatement<V>),
@@ -51,14 +52,14 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 package_id: src.package_id,
                 source_id: src.id,
                 anonymous_unions: Default::default(),
-                root_defs: Default::default(),
+                outcome: Default::default(),
             },
             _phantom: PhantomData,
         }
     }
 
-    pub fn finish(self) -> Vec<DefId> {
-        self.ctx.root_defs
+    pub fn finish(self) -> LoweringOutcome {
+        self.ctx.outcome
     }
 
     /// Entry point for lowering a top-level ONTOL domain syntax node
@@ -81,7 +82,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         // second pass: Handle inner bodies, etc
         for stmt in pre_defined_statements {
             if let Some(mut defs) = self.lower_pre_defined(stmt, BlockContext::NoContext) {
-                self.ctx.root_defs.append(&mut defs);
+                self.ctx.outcome.root_defs.append(&mut defs);
             }
         }
 
@@ -95,7 +96,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     ) -> Option<RootDefs> {
         match statement {
             insp::Statement::DomainStatement(stmt) => {
-                self.append_documentation(self.ctx.pkg_def_id, stmt.0.clone());
+                self.append_documentation(DocId::Def(self.ctx.pkg_def_id), stmt.0.clone());
 
                 let domain_id = stmt.domain_id()?;
 
@@ -163,7 +164,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     }
 
     fn lower_def_body(&mut self, def_id: DefId, stmt: insp::DefStatement<V>) -> Option<RootDefs> {
-        self.append_documentation(def_id, stmt.0.clone());
+        self.append_documentation(DocId::Def(def_id), stmt.0.clone());
 
         let mut root_defs: RootDefs = [def_id].into();
 
@@ -315,10 +316,11 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 Some(insp::SymItem::SymVar(sym_var)) => {
                     let edge_builder = match &mut opt_edge_builder {
                         None => {
-                            let edge_id =
-                                EdgeId(self.ctx.compiler.defs.alloc_def_id(self.ctx.package_id));
-                            self.ctx
-                                .set_def_kind(edge_id.0, DefKind::Edge, sym_stmt.view().span());
+                            let edge_id = self
+                                .ctx
+                                .compiler
+                                .edge_ctx
+                                .alloc_edge_id(self.ctx.package_id);
 
                             opt_edge_builder = Some(Some(EdgeBuilder {
                                 edge_id,

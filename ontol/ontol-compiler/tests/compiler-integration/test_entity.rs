@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ontol_macros::test;
 use ontol_runtime::{
     attr::AttrRef, ontology::domain::DataRelationshipTarget, tuple::CardinalIdx, value::Value,
@@ -637,9 +638,10 @@ fn edge_entity_simple() {
     }
 
     {
-        let mut link_relationships = link.def.edge_relationships();
-        let (_, from, from_proj) = link_relationships.next().unwrap();
-        let (_, to, to_proj) = link_relationships.next().unwrap();
+        let mut link_relationships = link.def.edge_relationships().collect_vec();
+        link_relationships.sort_by_key(|(rel_id, _, _)| *rel_id);
+        let (_, from, from_proj) = link_relationships.get(0).unwrap();
+        let (_, to, to_proj) = link_relationships.get(1).unwrap();
 
         let DataRelationshipTarget::Unambiguous(from_target) = from.target else {
             panic!()

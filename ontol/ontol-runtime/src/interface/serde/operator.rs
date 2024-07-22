@@ -16,7 +16,7 @@ use crate::{
         OntologyInit,
     },
     phf::{PhfIndexMap, PhfKey},
-    DefId, RelationshipId,
+    DefId, RelId,
 };
 
 use super::{
@@ -352,7 +352,7 @@ impl StructOperator {
     pub fn filter_properties(
         &self,
         mode: ProcessorMode,
-        parent_property_id: Option<RelationshipId>,
+        parent_property_id: Option<RelId>,
         profile_flags: ProcessorProfileFlags,
     ) -> impl Iterator<Item = (&PhfKey, &SerdeProperty)> {
         self.properties.iter().filter(move |(_, property)| {
@@ -365,7 +365,7 @@ impl StructOperator {
     pub fn required_count(
         &self,
         mode: ProcessorMode,
-        parent_property_id: Option<RelationshipId>,
+        parent_property_id: Option<RelId>,
         profile_flags: ProcessorProfileFlags,
     ) -> usize {
         if profile_flags.contains(ProcessorProfileFlags::ALL_PROPS_OPTIONAL) {
@@ -382,7 +382,7 @@ impl StructOperator {
     pub fn required_props_bitset(
         &self,
         mode: ProcessorMode,
-        parent_property_id: Option<RelationshipId>,
+        parent_property_id: Option<RelId>,
         profile_flags: ProcessorProfileFlags,
     ) -> BitSet {
         if profile_flags.contains(ProcessorProfileFlags::ALL_PROPS_OPTIONAL) {
@@ -410,7 +410,7 @@ impl StructOperator {
 #[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub struct SerdeProperty {
     /// The ID of this property
-    pub rel_id: RelationshipId,
+    pub rel_id: RelId,
 
     /// The operator addr for the value of this property
     pub value_addr: SerdeOperatorAddr,
@@ -468,7 +468,7 @@ impl SerdeProperty {
     pub fn filter(
         &self,
         mode: ProcessorMode,
-        parent_property_id: Option<RelationshipId>,
+        parent_property_id: Option<RelId>,
         profile_flags: ProcessorProfileFlags,
     ) -> Option<&Self> {
         match mode {

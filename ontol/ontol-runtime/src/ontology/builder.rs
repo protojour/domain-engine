@@ -8,7 +8,7 @@ use crate::{
     },
     query::condition::Condition,
     vm::proc::{Lib, Procedure},
-    DefId, DefIdSet, MapKey, PackageId, RelationshipId,
+    DefId, DefIdSet, MapKey, PackageId, RelId,
 };
 
 use super::{
@@ -70,8 +70,13 @@ impl OntologyBuilder {
         self
     }
 
-    pub fn docs(mut self, docs: FnvHashMap<DefId, TextConstant>) -> Self {
-        self.data().docs = docs;
+    pub fn def_docs(mut self, docs: FnvHashMap<DefId, TextConstant>) -> Self {
+        self.data().def_docs = docs;
+        self
+    }
+
+    pub fn rel_docs(mut self, docs: FnvHashMap<RelId, TextConstant>) -> Self {
+        self.data().rel_docs = docs;
         self
     }
 
@@ -135,7 +140,7 @@ impl OntologyBuilder {
 
     pub fn value_generators(
         mut self,
-        generators: FnvHashMap<RelationshipId, ValueGenerator>,
+        generators: FnvHashMap<RelId, ValueGenerator>,
     ) -> Self {
         self.data().value_generators = generators;
         self
@@ -168,7 +173,8 @@ pub(super) fn new_builder() -> OntologyBuilder {
                 union_variants: Default::default(),
                 domain_interfaces: Default::default(),
                 package_config_table: Default::default(),
-                docs: Default::default(),
+                def_docs: Default::default(),
+                rel_docs: Default::default(),
                 lib: Lib::default(),
                 serde_operators: Default::default(),
                 dynamic_sequence_operator_addr: SerdeOperatorAddr(u32::MAX),

@@ -1,12 +1,8 @@
 use fnv::FnvHashMap;
-use ontol_runtime::{DefId, RelationshipId};
+use ontol_runtime::{DefId, RelId};
 use serde::ser::{SerializeMap, SerializeSeq};
 
-use crate::{
-    def::{rel_def_meta, DefKind},
-    package::ONTOL_PKG,
-    Compiler,
-};
+use crate::{def::DefKind, package::ONTOL_PKG, relation::rel_def_meta, Compiler};
 
 pub struct OntologyGraph<'cmp, 'm> {
     state: State<'m>,
@@ -42,7 +38,7 @@ struct EdgeMeta {
 }
 
 enum EdgeKind {
-    Relationship(RelationshipId),
+    Relationship(RelId),
     Map,
 }
 
@@ -81,7 +77,9 @@ impl<'m> State<'m> {
             }
         }
 
-        for (def_id, def) in &compiler.defs.table {
+        for (_def_id, _def) in &compiler.defs.table {
+            todo!()
+            /*
             if let DefKind::Relationship(relationship) = &def.kind {
                 let subject = relationship.subject.0;
                 let object = relationship.object.0;
@@ -96,9 +94,11 @@ impl<'m> State<'m> {
                 edge_meta_vec.push(EdgeMeta {
                     source: subject,
                     target: object,
-                    kind: EdgeKind::Relationship(RelationshipId(*def_id)),
+                    // FIXME:
+                    kind: EdgeKind::Relationship(RelationshipId(*def_id, DefRelTag(0))),
                 });
             }
+            */
         }
 
         for key in compiler.code_ctx.result_map_proc_table.keys() {
@@ -204,7 +204,8 @@ impl<'graph, 'm> serde::Serialize for Edges<'graph, 'm> {
             if let (Some(source_meta), Some(target_meta)) = (source_meta, target_meta) {
                 match &edge_meta.kind {
                     EdgeKind::Relationship(relationship_id) => {
-                        let meta = rel_def_meta(*relationship_id, &compiler.defs);
+                        let meta =
+                            rel_def_meta(*relationship_id, &compiler.rel_ctx, &compiler.defs);
                         list.serialize_element(&Edge {
                             source_meta,
                             target_meta,

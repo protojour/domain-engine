@@ -10,7 +10,7 @@ use tracing::debug;
 use crate::{
     def::DefKind,
     map::UndirectedMapKey,
-    relation::Constructor,
+    properties::Constructor,
     repr::repr_model::ReprKind,
     text_patterns::TextPatternSegment,
     thesaurus::TypeRelation,
@@ -30,8 +30,8 @@ pub fn autogenerate_mapping<'m>(
     let first_def_id = key_pair[0].def_id;
     let second_def_id = key_pair[1].def_id;
 
-    let first_properties = compiler.rel_ctx.properties_by_def_id(first_def_id)?;
-    let second_properties = compiler.rel_ctx.properties_by_def_id(second_def_id)?;
+    let first_properties = compiler.prop_ctx.properties_by_def_id(first_def_id)?;
+    let second_properties = compiler.prop_ctx.properties_by_def_id(second_def_id)?;
 
     match (
         &first_properties.constructor,

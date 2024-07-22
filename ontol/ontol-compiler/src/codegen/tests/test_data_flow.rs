@@ -6,14 +6,16 @@ use ontol_runtime::{
     },
     property::{PropertyCardinality, ValueCardinality},
     tuple::CardinalIdx,
-    DefId, EdgeId, RelationshipId,
+    DefId, DefRelTag, EdgeId, RelId,
 };
 use ontol_test_utils::expect_eq;
 use tracing::debug;
 
 use crate::{
     codegen::data_flow_analyzer::DataFlowAnalyzer,
-    def::{DefKind, Defs, RelDefMeta, RelParams, Relationship},
+    def::{DefKind, Defs},
+    package::ONTOL_PKG,
+    relation::{RelCtx, RelDefMeta, RelParams, Relationship},
     typed_hir::TypedHir,
     SpannedBorrow, NO_SPAN,
 };
@@ -21,7 +23,7 @@ use crate::{
 const MOCK_RELATIONSHIP: Relationship = Relationship {
     relation_def_id: DefId::unit(),
     projection: EdgeCardinalProjection {
-        id: EdgeId(DefId::unit()),
+        id: EdgeId(ONTOL_PKG, 0),
         object: CardinalIdx(1),
         subject: CardinalIdx(0),
         one_to_one: false,
@@ -42,8 +44,9 @@ fn analyze(arg: &str, hir: &str) -> Vec<PropertyFlow> {
         .unwrap()
         .0;
     let defs = Defs::default();
-    let rel_def_meta = |_, _| RelDefMeta {
-        rel_id: RelationshipId(DefId::unit()),
+    let rel_ctx = RelCtx::default();
+    let rel_def_meta = |_, _, _| RelDefMeta {
+        rel_id: RelId(DefId::unit(), DefRelTag(0)),
         relationship: SpannedBorrow {
             value: &MOCK_RELATIONSHIP,
             span: &NO_SPAN,
@@ -53,7 +56,7 @@ fn analyze(arg: &str, hir: &str) -> Vec<PropertyFlow> {
             span: &NO_SPAN,
         },
     };
-    let mut analyzer = DataFlowAnalyzer::new(&defs, &rel_def_meta);
+    let mut analyzer = DataFlowAnalyzer::new(&defs, &rel_ctx, &rel_def_meta);
     let flow = analyzer
         .analyze(arg.parse().unwrap(), node.as_ref())
         .unwrap();
@@ -88,12 +91,12 @@ fn test_analyze_ssa1() {
         "$b",
         "
         (block
-            (let-prop $c ($b R:1:0))
-            (let-prop $d ($b R:1:1))
-            (let-prop $e ($d R:1:2))
+            (let-prop $c ($b rel@1:0:0))
+            (let-prop $d ($b rel@1:0:1))
+            (let-prop $e ($d rel@1:0:2))
             (struct ($a)
-                (prop $a R:2:0 [(map $c) #u])
-                (prop $a R:2:1 [$e #u])
+                (prop $a rel@2:0:0 [(map $c) #u])
+                (prop $a rel@2:0:1 [$e #u])
             )
         )
         ",
@@ -103,12 +106,12 @@ fn test_analyze_ssa1() {
         actual = data_flow,
         // note: type information is not included in ontol-hir tests:
         expected = vec![
-            prop_flow("R:1:0", default_cardinality()),
-            prop_flow("R:1:1", default_cardinality()),
-            prop_flow("R:1:2", default_cardinality()),
-            prop_flow("R:1:2", child_of("R:1:1")),
-            prop_flow("R:2:0", dependent_on("R:1:0")),
-            prop_flow("R:2:1", dependent_on("R:1:2")),
+            prop_flow("rel@1:0:0", default_cardinality()),
+            prop_flow("rel@1:0:1", default_cardinality()),
+            prop_flow("rel@1:0:2", default_cardinality()),
+            prop_flow("rel@1:0:2", child_of("rel@1:0:1")),
+            prop_flow("rel@2:0:0", dependent_on("rel@1:0:0")),
+            prop_flow("rel@2:0:1", dependent_on("rel@1:0:2")),
         ]
     );
 }
@@ -119,28 +122,28 @@ fn test_analyze_ssa2() {
         "$f",
         "
         (block
-            (let-prop $a ($f R:2:26))
-            (let-prop $b ($f R:2:33))
-            (let-prop $g ($f R:2:55))
-            (let-prop $c ($g R:2:15))
-            (let-prop-default $e ($f R:2:57) (make-seq))
+            (let-prop $a ($f rel@2:0:26))
+            (let-prop $b ($f rel@2:0:33))
+            (let-prop $g ($f rel@2:0:55))
+            (let-prop $c ($g rel@2:0:15))
+            (let-prop-default $e ($f rel@2:0:57) (make-seq))
             (struct ($i)
                 (catch (@k)
                     (try? @k $a)
-                    (prop?! $i R:1:4
+                    (prop?! $i rel@1:0:4
                         [(map $a) #u]
                     )
                 )
-                (prop! $i R:1:6
+                (prop! $i rel@1:0:6
                     [$b #u]
                 )
-                (prop! $i R:1:7
+                (prop! $i rel@1:0:7
                     [$c #u]
                 )
-                (prop! $i R:1:8
+                (prop! $i rel@1:0:8
                     (make-seq ($l)
                         (for-each $e ($h)
-                            (let-prop $d ($h R:2:53))
+                            (let-prop $d ($h rel@2:0:53))
                             (insert $l (map $d))
                         )
                     )
@@ -153,18 +156,18 @@ fn test_analyze_ssa2() {
     expect_eq!(
         actual = data_flow,
         expected = vec![
-            prop_flow("R:1:4", dependent_on("R:2:26")),
-            prop_flow("R:1:6", dependent_on("R:2:33")),
-            prop_flow("R:1:7", dependent_on("R:2:15")),
-            prop_flow("R:1:8", dependent_on("R:2:53")),
-            prop_flow("R:2:15", default_cardinality()),
-            prop_flow("R:2:15", child_of("R:2:55")),
-            prop_flow("R:2:26", default_cardinality()),
-            prop_flow("R:2:33", default_cardinality()),
-            prop_flow("R:2:53", default_cardinality()),
-            prop_flow("R:2:53", child_of("R:2:57")),
-            prop_flow("R:2:55", default_cardinality()),
-            prop_flow("R:2:57", default_cardinality()),
+            prop_flow("rel@1:0:4", dependent_on("rel@2:0:26")),
+            prop_flow("rel@1:0:6", dependent_on("rel@2:0:33")),
+            prop_flow("rel@1:0:7", dependent_on("rel@2:0:15")),
+            prop_flow("rel@1:0:8", dependent_on("rel@2:0:53")),
+            prop_flow("rel@2:0:15", default_cardinality()),
+            prop_flow("rel@2:0:15", child_of("rel@2:0:55")),
+            prop_flow("rel@2:0:26", default_cardinality()),
+            prop_flow("rel@2:0:33", default_cardinality()),
+            prop_flow("rel@2:0:53", default_cardinality()),
+            prop_flow("rel@2:0:53", child_of("rel@2:0:57")),
+            prop_flow("rel@2:0:55", default_cardinality()),
+            prop_flow("rel@2:0:57", default_cardinality()),
         ]
     );
 }
@@ -175,12 +178,12 @@ fn test_analyze_seq1() {
         "$b",
         "
         (block
-            (let-prop-default $c ($b R:1:0) (make-seq ($s)))
+            (let-prop-default $c ($b rel@1:0:0) (make-seq ($s)))
             (struct ($a)
-                (prop $a R:2:0
+                (prop $a rel@2:0:0
                     (make-seq ($d)
                         (for-each $c ($e)
-                            (let-prop $f ($e R:2:1))
+                            (let-prop $f ($e rel@2:0:1))
                             (insert $d $f)
                         )
                     )
@@ -193,10 +196,10 @@ fn test_analyze_seq1() {
     expect_eq!(
         actual = data_flow,
         expected = vec![
-            prop_flow("R:1:0", default_cardinality()),
-            prop_flow("R:2:0", dependent_on("R:2:1")),
-            prop_flow("R:2:1", default_cardinality()),
-            prop_flow("R:2:1", child_of("R:1:0")),
+            prop_flow("rel@1:0:0", default_cardinality()),
+            prop_flow("rel@2:0:0", dependent_on("rel@2:0:1")),
+            prop_flow("rel@2:0:1", default_cardinality()),
+            prop_flow("rel@2:0:1", child_of("rel@1:0:0")),
         ]
     );
 }
@@ -207,18 +210,18 @@ fn test_analyze_regex_match1() {
         "$b",
         "
         (block
-            (let-prop $c ($b R:1:0))
+            (let-prop $c ($b rel@1:0:0))
             (let-regex ((1 $d)) ((2 $e)) def@0:0 $c)
             (struct ($a)
                 (catch (@f)
                     (try? @f $d)
-                    (prop $a R:2:0
+                    (prop $a rel@2:0:0
                         $d
                     )
                 )
                 (catch (@g)
                     (try? @g $e)
-                    (prop $a R:2:1
+                    (prop $a rel@2:0:1
                         $e
                     )
                 )
@@ -230,9 +233,9 @@ fn test_analyze_regex_match1() {
     expect_eq!(
         actual = data_flow,
         expected = vec![
-            prop_flow("R:1:0", default_cardinality()),
-            prop_flow("R:2:0", dependent_on("R:1:0")),
-            prop_flow("R:2:1", dependent_on("R:1:0")),
+            prop_flow("rel@1:0:0", default_cardinality()),
+            prop_flow("rel@2:0:0", dependent_on("rel@1:0:0")),
+            prop_flow("rel@2:0:1", dependent_on("rel@1:0:0")),
         ]
     );
 }

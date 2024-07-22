@@ -1,27 +1,27 @@
 (struct ($c)
-    (prop? $c R:1:0
+    (prop? $c rel@1:0:0
         [
-            (struct ($d) (prop! $d R:1:1 $a))
-            (struct ($e) (prop! $e R:1:2 $b))
+            (struct ($d) (prop! $d rel@1:0:1 $a))
+            (struct ($e) (prop! $e rel@1:0:2 $b))
         ]
     )
 )
 
 (struct ($f)
-    (prop? $f R:2:0
+    (prop? $f rel@2:0:0
         (+ $a $b)
     )
 )
 
 |$c| (block
-    (let-prop [$d $e] ($c R:1:0))
+    (let-prop [$d $e] ($c rel@1:0:0))
     (struct ($f)
         (catch (@g)
             (try? @g $d)
-            (let-prop? @g $a ($d R:1:1))
+            (let-prop? @g $a ($d rel@1:0:1))
             (try? @g $e)
-            (let-prop? @g $b ($e R:1:2))
-            (prop?- $f R:2:0 (+ $a $b))
+            (let-prop? @g $b ($e rel@1:0:2))
+            (prop?- $f rel@2:0:0 (+ $a $b))
         )
         (move-rest-attrs $f $c)
     )

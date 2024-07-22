@@ -18,7 +18,7 @@ use ontol_runtime::{
     },
     property::ValueCardinality,
     rustdoc::RustDoc,
-    DefId, DefIdSet, EdgeId, PackageId, RelationshipId,
+    DefId, DefIdSet, EdgeId, PackageId, RelId,
 };
 use std::{
     collections::{BTreeSet, HashMap},
@@ -27,18 +27,16 @@ use std::{
 };
 
 use crate::{
-    def::{
-        rel_def_meta, rel_repr_meta, BuiltinRelationKind, DefKind, RelDefMeta, RelParams, TypeDef,
-        TypeDefFlags,
-    },
+    def::{BuiltinRelationKind, DefKind, TypeDef, TypeDefFlags},
     interface::{
         graphql::generate_schema::generate_graphql_schema,
         serde::{serde_generator::SerdeGenerator, SerdeKey, EDGE_PROPERTY},
     },
-    namespace::Space,
+    namespace::{DocId, Space},
     package::ONTOL_PKG,
     primitive::PrimitiveKind,
-    relation::{Properties, UnionMemberCache},
+    properties::Properties,
+    relation::{rel_def_meta, rel_repr_meta, RelDefMeta, RelParams, UnionMemberCache},
     repr::repr_model::{ReprKind, ReprScalarKind},
     strings::StringCtx,
     Compiler,
@@ -58,12 +56,12 @@ impl<'m> Compiler<'m> {
             match self.defs.def_kind(def_id) {
                 DefKind::Primitive(kind, _ident) => {
                     if let Some(field_docs) = PrimitiveKind::get_field_rustdoc(kind) {
-                        docs_table.insert(def_id, field_docs.to_string());
+                        docs_table.insert(DocId::Def(def_id), field_docs.to_string());
                     }
                 }
                 DefKind::BuiltinRelType(kind, _ident) => {
                     if let Some(field_docs) = BuiltinRelationKind::get_field_rustdoc(kind) {
-                        docs_table.insert(def_id, field_docs.to_string());
+                        docs_table.insert(DocId::Def(def_id), field_docs.to_string());
                     }
                 }
                 DefKind::Type(type_def) => {
@@ -73,7 +71,7 @@ impl<'m> Compiler<'m> {
                         // TODO: Structured documentation of `is`-relations.
                         // Then a prose-based documentation string will probably be superfluous?
                         docs_table.insert(
-                            def_id,
+                            DocId::Def(def_id),
                             format!(
                                 indoc! {"
                                     The [symbol](def.md#symbol) `'{ident}'`.
@@ -88,7 +86,7 @@ impl<'m> Compiler<'m> {
                         );
                     } else if let Some(slt) = self.defs.text_like_types.get(&def_id) {
                         if let Some(field_docs) = TextLikeType::get_field_rustdoc(slt) {
-                            docs_table.insert(def_id, field_docs.to_string());
+                            docs_table.insert(DocId::Def(def_id), field_docs.to_string());
                         }
                     }
                 }
@@ -243,7 +241,7 @@ impl<'m> Compiler<'m> {
             }
 
             for (edge_id, edge) in &self.edge_ctx.symbolic_edges {
-                if edge_id.0.package_id() != package_id {
+                if edge_id.0 != package_id {
                     continue;
                 }
 
@@ -350,10 +348,19 @@ impl<'m> Compiler<'m> {
             })
             .collect();
 
-        let docs = docs_table
-            .into_iter()
-            .map(|(def_id, docs)| (def_id, str_ctx.intern_constant(&docs)))
-            .collect();
+        let mut def_docs = FnvHashMap::default();
+        let mut rel_docs = FnvHashMap::default();
+
+        for (doc_id, docs) in docs_table {
+            match doc_id {
+                DocId::Def(def_id) => {
+                    def_docs.insert(def_id, str_ctx.intern_constant(&docs));
+                }
+                DocId::Rel(rel_id) => {
+                    rel_docs.insert(rel_id, str_ctx.intern_constant(&docs));
+                }
+            }
+        }
 
         builder
             .text_constants(str_ctx.into_arcstr_vec())
@@ -377,7 +384,8 @@ impl<'m> Compiler<'m> {
             )
             .extended_entity_info(self.entity_ctx.entities)
             .lib(self.code_ctx.result_lib)
-            .docs(docs)
+            .def_docs(def_docs)
+            .rel_docs(rel_docs)
             .const_procs(self.code_ctx.result_const_procs)
             .map_meta_table(map_meta_table)
             .static_conditions(self.code_ctx.result_static_conditions)
@@ -388,7 +396,7 @@ impl<'m> Compiler<'m> {
             .text_like_types(self.defs.text_like_types)
             .text_patterns(self.text_patterns.text_patterns)
             .externs(self.def_ty_ctx.ontology_externs)
-            .value_generators(self.rel_ctx.value_generators)
+            .value_generators(self.misc_ctx.value_generators)
             .domain_interfaces(domain_interfaces)
             .build()
     }
@@ -399,7 +407,7 @@ impl<'m> Compiler<'m> {
         union_member_cache: &UnionMemberCache,
         edges: &mut FnvHashMap<EdgeId, EdgeInfo>,
         str_ctx: &mut StringCtx<'m>,
-    ) -> FnvHashMap<RelationshipId, DataRelationshipInfo> {
+    ) -> FnvHashMap<RelId, DataRelationshipInfo> {
         let mut relationships = FnvHashMap::default();
         self.collect_inherent_relationships_and_edges(
             type_def_id,
@@ -423,7 +431,7 @@ impl<'m> Compiler<'m> {
 
         if let Some(union_memberships) = union_member_cache.cache.get(&type_def_id) {
             for union_def_id in union_memberships {
-                let Some(properties) = self.rel_ctx.properties_by_def_id(*union_def_id) else {
+                let Some(properties) = self.prop_ctx.properties_by_def_id(*union_def_id) else {
                     continue;
                 };
                 let Some(table) = &properties.table else {
@@ -448,11 +456,11 @@ impl<'m> Compiler<'m> {
     fn collect_inherent_relationships_and_edges(
         &self,
         type_def_id: DefId,
-        relationships: &mut FnvHashMap<RelationshipId, DataRelationshipInfo>,
+        relationships: &mut FnvHashMap<RelId, DataRelationshipInfo>,
         edges: &mut FnvHashMap<EdgeId, EdgeInfo>,
         str_ctx: &mut StringCtx<'m>,
     ) {
-        let Some(properties) = self.rel_ctx.properties_by_def_id(type_def_id) else {
+        let Some(properties) = self.prop_ctx.properties_by_def_id(type_def_id) else {
             return;
         };
         if let Some(table) = &properties.table {
@@ -470,13 +478,13 @@ impl<'m> Compiler<'m> {
 
     fn collect_prop_relationship_and_edge(
         &self,
-        rel_id: RelationshipId,
+        rel_id: RelId,
         source: DataRelationshipSource,
-        relationships: &mut FnvHashMap<RelationshipId, DataRelationshipInfo>,
+        relationships: &mut FnvHashMap<RelId, DataRelationshipInfo>,
         edges: &mut FnvHashMap<EdgeId, EdgeInfo>,
         str_ctx: &mut StringCtx<'m>,
     ) {
-        let meta = rel_repr_meta(rel_id, &self.defs, &self.repr_ctx);
+        let meta = rel_repr_meta(rel_id, &self.rel_ctx, &self.defs, &self.repr_ctx);
 
         let (source_def_id, _, _) = meta.relationship.subject();
         let (target_def_id, _, _) = meta.relationship.object();
@@ -545,7 +553,8 @@ impl<'m> Compiler<'m> {
                 // fallback/legacy mode:
                 let edge_info = edges.entry(edge_id).or_insert_with(|| EdgeInfo {
                     cardinals: vec![],
-                    store_key: self.edge_ctx.store_keys.get(&edge_id.0).copied(),
+                    // store_key: self.edge_ctx.store_keys.get(&edge_id.0).copied(),
+                    store_key: None,
                 });
 
                 if edge_info.cardinals.is_empty() {
@@ -627,22 +636,22 @@ impl<'m> Compiler<'m> {
 
     fn data_relationship_kind_and_target(
         &self,
-        rel_id: RelationshipId,
+        rel_id: RelId,
         edge_projection: EdgeCardinalProjection,
         source_def_id: DefId,
         target_def_id: DefId,
     ) -> (DataRelationshipKind, DataRelationshipTarget) {
-        let target_properties = self.rel_ctx.properties_by_def_id(target_def_id);
+        let target_properties = self.prop_ctx.properties_by_def_id(target_def_id);
 
         if let Some(identifies) = target_properties.and_then(|p| p.identifies) {
-            let meta = rel_def_meta(identifies, &self.defs);
+            let meta = rel_def_meta(identifies, &self.rel_ctx, &self.defs);
             if meta.relationship.object.0 == source_def_id {
                 (
                     DataRelationshipKind::Id,
                     DataRelationshipTarget::Unambiguous(target_def_id),
                 )
             } else if self
-                .rel_ctx
+                .prop_ctx
                 .properties_by_def_id(source_def_id)
                 // It can be an edge (for now) only the the source (subject) is an entity.
                 // i.e. there is no support for "indirect" edge properties
@@ -665,7 +674,7 @@ impl<'m> Compiler<'m> {
                 DataRelationshipTarget::Unambiguous(target_def_id),
             )
         } else {
-            let source_properties = self.rel_ctx.properties_by_def_id(source_def_id);
+            let source_properties = self.prop_ctx.properties_by_def_id(source_def_id);
             let is_entity_id = source_properties
                 .map(|properties| properties.identified_by == Some(rel_id))
                 .unwrap_or(false);
@@ -685,12 +694,12 @@ impl<'m> Compiler<'m> {
         type_def_id: DefId,
         name: TextConstant,
         serde_generator: &mut SerdeGenerator,
-        data_relationships: &FnvHashMap<RelationshipId, DataRelationshipInfo>,
+        data_relationships: &FnvHashMap<RelId, DataRelationshipInfo>,
     ) -> Option<Entity> {
-        let properties = self.rel_ctx.properties_by_def_id(type_def_id)?;
+        let properties = self.prop_ctx.properties_by_def_id(type_def_id)?;
         let id_relationship_id = properties.identified_by?;
 
-        let identifies_meta = rel_def_meta(id_relationship_id, &self.defs);
+        let identifies_meta = rel_def_meta(id_relationship_id, &self.rel_ctx, &self.defs);
 
         // inherent properties are the properties that are _not_ entity relationships:
         let mut inherent_property_count = 0;
@@ -707,7 +716,7 @@ impl<'m> Compiler<'m> {
         let inherent_primary_id_meta = self.find_inherent_primary_id(type_def_id, properties);
 
         let id_value_generator = if let Some(inherent_primary_id_meta) = &inherent_primary_id_meta {
-            self.rel_ctx
+            self.misc_ctx
                 .value_generators
                 .get(&inherent_primary_id_meta.rel_id)
                 .cloned()
@@ -736,9 +745,9 @@ impl<'m> Compiler<'m> {
     }
 
     fn identifier_to_vertex_def_id(&self, def_id: DefId) -> DefId {
-        if let Some(properties) = self.rel_ctx.properties_by_def_id(def_id) {
+        if let Some(properties) = self.prop_ctx.properties_by_def_id(def_id) {
             if let Some(identifies_rel) = properties.identifies {
-                let meta = rel_def_meta(identifies_rel, &self.defs);
+                let meta = rel_def_meta(identifies_rel, &self.rel_ctx, &self.defs);
                 return meta.relationship.object.0;
             }
         }
@@ -753,14 +762,14 @@ impl<'m> Compiler<'m> {
     ) -> Option<RelDefMeta<'_, 'm>> {
         let id_relationship_id = properties.identified_by?;
         let inherent_id = self
-            .rel_ctx
+            .misc_ctx
             .inherent_id_map
             .get(&id_relationship_id)
             .cloned()?;
         let map = properties.table.as_ref()?;
         let _property = map.get(&inherent_id)?;
 
-        Some(rel_def_meta(inherent_id, &self.defs))
+        Some(rel_def_meta(inherent_id, &self.rel_ctx, &self.defs))
     }
 
     fn unique_domain_names(&self) -> FnvHashMap<PackageId, TextConstant> {

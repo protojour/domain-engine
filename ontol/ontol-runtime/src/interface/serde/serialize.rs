@@ -16,7 +16,7 @@ use crate::{
     },
     ontology::ontol::text_pattern::{FormatPattern, TextPatternConstantPart},
     value::{FormatValueAsText, Value},
-    DefId, RelationshipId,
+    DefId, RelId,
 };
 
 use super::{
@@ -501,7 +501,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         &self,
         struct_op: &StructOperator,
         value: &Value,
-        attrs: &FnvHashMap<RelationshipId, Attr>,
+        attrs: &FnvHashMap<RelId, Attr>,
         rel_params: Option<&Value>,
         overridden_id_property_key: Option<&str>,
         map: &mut S::SerializeMap,

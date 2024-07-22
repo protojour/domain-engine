@@ -46,7 +46,7 @@ fn get_ontol_docs_md(ontology: &Ontology, predicate: &dyn Fn(&Def) -> bool) -> S
         if !predicate(t) {
             continue;
         }
-        let doc = ontology.get_docs(t.id);
+        let doc = ontology.get_def_docs(t.id);
         if let Some(name) = t.name() {
             let name = &ontology[name];
             docs.push((
@@ -85,9 +85,8 @@ impl Preprocessor for OntolDocumentationPreprocessor {
                     c.content = new_string;
                 }
                 if c.content.contains("{{#ontol-relation-types}}") {
-                    let ontol_docs = get_ontol_docs_md(&ontology, &|t| {
-                        matches!(t.kind, DefKind::Relationship(_))
-                    });
+                    let ontol_docs =
+                        get_ontol_docs_md(&ontology, &|t| matches!(t.kind, DefKind::Relation(_)));
                     let new_string = c.content.replace("{{#ontol-relation-types}}", &ontol_docs);
                     c.content = new_string;
                 }

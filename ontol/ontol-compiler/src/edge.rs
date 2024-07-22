@@ -6,14 +6,18 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::{
-    ontology::ontol::TextConstant, tuple::CardinalIdx, DefId, EdgeId, RelationshipId,
+    ontology::ontol::TextConstant, tuple::CardinalIdx, DefId, EdgeId, PackageId, RelId,
 };
 use tracing::{debug, error};
 
-use crate::{def::rel_def_meta, repr::repr_model::ReprKind, CompileError, Compiler, SourceSpan};
+use crate::{
+    relation::rel_def_meta, repr::repr_model::ReprKind, CompileError, Compiler, SourceSpan,
+};
 
 #[derive(Default)]
 pub struct EdgeCtx {
+    pub ids: FnvHashMap<PackageId, u16>,
+
     /// Entrypoints into the edges are the relation symbols defined by the edge.
     ///
     /// This table maps from a symbol definition to an edge definition.
@@ -26,6 +30,13 @@ pub struct EdgeCtx {
 }
 
 impl EdgeCtx {
+    pub fn alloc_edge_id(&mut self, package_id: PackageId) -> EdgeId {
+        let next = self.ids.entry(package_id).or_default();
+        let tag = *next;
+        *next += 1;
+        EdgeId(package_id, tag)
+    }
+
     #[allow(unused)]
     pub fn edge_id_by_symbol(&self, symbol: DefId) -> Option<EdgeId> {
         self.symbols.get(&symbol).copied()
@@ -65,7 +76,7 @@ pub struct Slot {
 pub struct SymbolicEdgeVariable {
     pub span: SourceSpan,
     /// Defs participating in this variable.
-    pub members: FnvHashMap<DefId, BTreeSet<RelationshipId>>,
+    pub members: FnvHashMap<DefId, BTreeSet<RelId>>,
     pub one_to_one_count: usize,
 }
 
@@ -114,9 +125,9 @@ impl<'m> Compiler<'m> {
 
                 // step 2: resolve identifier types
                 for (def_id, rel_set) in std::mem::take(&mut var.members) {
-                    if let Some(properties) = self.rel_ctx.properties_by_def_id(def_id) {
+                    if let Some(properties) = self.prop_ctx.properties_by_def_id(def_id) {
                         if let Some(identifies_rel_id) = properties.identifies {
-                            let meta = rel_def_meta(identifies_rel_id, &self.defs);
+                            let meta = rel_def_meta(identifies_rel_id, &self.rel_ctx, &self.defs);
 
                             var.members.insert(meta.relationship.object.0, rel_set);
                         } else {
@@ -130,7 +141,7 @@ impl<'m> Compiler<'m> {
                     if !self.entity_ctx.entities.contains_key(def_id) {
                         let rel_id = rel_set.first().unwrap();
                         CompileError::TODO("must be entity to participate in edge")
-                            .span(self.defs.def_span(rel_id.0))
+                            .span(self.rel_ctx.span(*rel_id))
                             .report(&mut self.errors);
                     }
                 }
@@ -150,7 +161,7 @@ impl<'m> Compiler<'m> {
             for var in edge.variables.values() {
                 for (member_id, rel_ids) in &var.members {
                     for rel_id in rel_ids {
-                        let meta = rel_def_meta(*rel_id, &self.defs);
+                        let meta = rel_def_meta(*rel_id, &self.rel_ctx, &self.defs);
 
                         if &meta.relationship.subject.0 == member_id {
                             let slot_set = slot_set_per_member.entry(*member_id).or_default();
@@ -173,7 +184,7 @@ impl<'m> Compiler<'m> {
 
                 debug!("{member_id:?} has partial participation: {slot_set:?}");
 
-                let properties = self.rel_ctx.properties_by_def_id_mut(member_id);
+                let properties = self.prop_ctx.properties_by_def_id_mut(member_id);
                 let Some(table) = &mut properties.table else {
                     continue;
                 };
@@ -182,7 +193,7 @@ impl<'m> Compiler<'m> {
                 for var in edge.variables.values() {
                     for rel_ids in var.members.values() {
                         for rel_id in rel_ids {
-                            let meta = rel_def_meta(*rel_id, &self.defs);
+                            let meta = rel_def_meta(*rel_id, &self.rel_ctx, &self.defs);
 
                             if meta.relationship.subject.0 == member_id {
                                 if let Some(property) = table.get_mut(rel_id) {

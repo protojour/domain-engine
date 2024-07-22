@@ -182,51 +182,94 @@ impl From<DefId> for MapDef {
     }
 }
 
-/// The ID of some relationship between ONTOL types.
+/// The tag of a relationship belonging to a specific Def.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub struct RelationshipId(pub DefId);
+pub struct DefRelTag(pub u16);
 
-/// This forces single-line output even when pretty-printed
-impl ::std::fmt::Debug for RelationshipId {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "R:{}:{}", self.0 .0 .0, self.0 .1)
+impl DefRelTag {
+    pub const fn order() -> Self {
+        DefRelTag(65535)
+    }
+
+    pub const fn direction() -> Self {
+        DefRelTag(65534)
+    }
+
+    pub const fn open_data() -> Self {
+        DefRelTag(65533)
+    }
+
+    pub const fn flat_union() -> Self {
+        DefRelTag(65532)
     }
 }
 
-impl ::std::fmt::Display for RelationshipId {
+impl ::std::fmt::Debug for DefRelTag {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "R:{}:{}", self.0 .0 .0, self.0 .1)
+        write!(f, "rel@{}", self.0)
     }
 }
 
-impl_ontol_debug!(RelationshipId);
+impl_ontol_debug!(DefRelTag);
 
-impl FromStr for RelationshipId {
+impl FromStr for DefRelTag {
     type Err = ();
 
     fn from_str(mut s: &str) -> Result<Self, Self::Err> {
-        s = s.strip_prefix("R:").ok_or(())?;
+        s = s.strip_prefix("rel@").ok_or(())?;
+
+        let def_rel_tag: u16 = s.parse().map_err(|_| ())?;
+
+        Ok(DefRelTag(def_rel_tag))
+    }
+}
+
+/// The ID of some relationship between ONTOL types.
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+pub struct RelId(pub DefId, pub DefRelTag);
+
+/// This forces single-line output even when pretty-printed
+impl ::std::fmt::Debug for RelId {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "rel@{}:{}:{}", self.0 .0 .0, self.0 .1, self.1 .0)
+    }
+}
+
+impl ::std::fmt::Display for RelId {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "rel@{}:{}:{}", self.0 .0 .0, self.0 .1, self.1 .0)
+    }
+}
+
+impl_ontol_debug!(RelId);
+
+impl FromStr for RelId {
+    type Err = ();
+
+    fn from_str(mut s: &str) -> Result<Self, Self::Err> {
+        s = s.strip_prefix("rel@").ok_or(())?;
 
         let mut iterator = s.split(':');
         let package_id = PackageId(iterator.next().ok_or(())?.parse().map_err(|_| ())?);
         let def_idx: u16 = iterator.next().ok_or(())?.parse().map_err(|_| ())?;
+        let def_rel_tag: u16 = iterator.next().ok_or(())?.parse().map_err(|_| ())?;
 
         if iterator.next().is_some() {
             return Err(());
         }
 
-        Ok(RelationshipId(DefId(package_id, def_idx)))
+        Ok(RelId(DefId(package_id, def_idx), DefRelTag(def_rel_tag)))
     }
 }
 
 /// The ID of some relationship between ONTOL types.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub struct EdgeId(pub DefId);
+pub struct EdgeId(pub PackageId, pub u16);
 
 /// This forces single-line output even when pretty-printed
 impl ::std::fmt::Debug for EdgeId {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "edge@{}:{}", self.0 .0 .0, self.0 .1)
+        write!(f, "edge@{}:{}", self.0 .0, self.1)
     }
 }
 

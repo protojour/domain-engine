@@ -3,6 +3,7 @@ use ontol_runtime::{DefId, EdgeId};
 
 use crate::{
     def::{BuiltinRelationKind, DefKind, Defs, TypeDef, TypeDefFlags},
+    edge::EdgeCtx,
     package::ONTOL_PKG,
     NO_SPAN,
 };
@@ -164,7 +165,7 @@ pub struct Generators {
 }
 
 impl Primitives {
-    pub fn new(defs: &mut Defs) -> Self {
+    pub fn new(defs: &mut Defs, edge_ctx: &mut EdgeCtx) -> Self {
         let primitives = Self {
             unit: defs.add_primitive(PrimitiveKind::Unit, None),
 
@@ -210,8 +211,8 @@ impl Primitives {
                     .add_builtin_relation(BuiltinRelationKind::Direction, Some("direction")),
             },
             edges: OntolEdges {
-                is: EdgeId(defs.add_def(DefKind::Edge, ONTOL_PKG, NO_SPAN)),
-                identifies: EdgeId(defs.add_def(DefKind::Edge, ONTOL_PKG, NO_SPAN)),
+                is: edge_ctx.alloc_edge_id(ONTOL_PKG),
+                identifies: edge_ctx.alloc_edge_id(ONTOL_PKG),
             },
 
             generators: Generators {

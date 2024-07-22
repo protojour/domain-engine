@@ -1,45 +1,45 @@
 (struct ($c)
-    (prop? $c R:1:0
+    (prop? $c rel@1:0:0
         (struct ($d)
-            (prop? $d R:1:1 $a)
+            (prop? $d rel@1:0:1 $a)
         )
     )
-    (prop? $c R:1:2
+    (prop? $c rel@1:0:2
         (struct ($e)
-            (prop? $e R:1:3 $b)
+            (prop? $e rel@1:0:3 $b)
         )
     )
-    (prop! $c R:1:4 $h)
+    (prop! $c rel@1:0:4 $h)
 )
 
 (struct ($f)
-    (prop? $f R:2:0
+    (prop? $f rel@2:0:0
         (struct ($g)
-            (prop? $g R:2:1 $a)
-            (prop? $g R:2:2 $b)
-            (prop! $g R:2:3 $h)
+            (prop? $g rel@2:0:1 $a)
+            (prop? $g rel@2:0:2 $b)
+            (prop! $g rel@2:0:3 $h)
         )
     )
 )
 
 |$c| (block
-    (let-prop $d ($c R:1:0))
-    (let-prop $e ($c R:1:2))
-    (let-prop $h ($c R:1:4))
+    (let-prop $d ($c rel@1:0:0))
+    (let-prop $e ($c rel@1:0:2))
+    (let-prop $h ($c rel@1:0:4))
     (struct ($f)
-        (prop?- $f R:2:0
+        (prop?- $f rel@2:0:0
             (struct ($g)
                 (catch (@i)
                     (try? @i $d)
-                    (let-prop? @i $a ($d R:1:1))
-                    (prop?- $g R:2:1 $a)
+                    (let-prop? @i $a ($d rel@1:0:1))
+                    (prop?- $g rel@2:0:1 $a)
                 )
                 (catch (@j)
                     (try? @j $e)
-                    (let-prop? @j $b ($e R:1:3))
-                    (prop?- $g R:2:2 $b)
+                    (let-prop? @j $b ($e rel@1:0:3))
+                    (prop?- $g rel@2:0:2 $b)
                 )
-                (prop! $g R:2:3 $h)
+                (prop! $g rel@2:0:3 $h)
             )
         )
         (move-rest-attrs $f $c)

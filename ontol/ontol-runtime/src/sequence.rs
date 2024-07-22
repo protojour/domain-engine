@@ -322,7 +322,7 @@ mod tests {
     use crate::{
         attr::Attr,
         value::{Value, ValueTag},
-        DefId, PackageId, RelationshipId,
+        DefId, DefRelTag, PackageId, RelId,
     };
 
     use super::*;
@@ -415,9 +415,12 @@ mod tests {
     }
 
     fn struct_value(iter: impl IntoIterator<Item = (u16, Value)>) -> Value {
-        let attrs = iter
-            .into_iter()
-            .map(|(p, val)| (RelationshipId(DefId(PackageId(42), p)), Attr::Unit(val)));
+        let attrs = iter.into_iter().map(|(tag, val)| {
+            (
+                RelId(DefId(PackageId(42), 42), DefRelTag(tag)),
+                Attr::Unit(val),
+            )
+        });
 
         Value::Struct(Box::new(FnvHashMap::from_iter(attrs)), def(2))
     }
@@ -428,10 +431,13 @@ mod tests {
         for n in 100..1000 {
             let attributes: Vec<_> = (0..n)
                 .map(|i| {
-                    let key = i as u16;
+                    let tag = i as u16;
                     let value = Value::I64(i as i64, def(42));
 
-                    (RelationshipId(DefId(PackageId(42), key)), Attr::Unit(value))
+                    (
+                        RelId(DefId(PackageId(42), 42), DefRelTag(tag)),
+                        Attr::Unit(value),
+                    )
                 })
                 .collect();
 

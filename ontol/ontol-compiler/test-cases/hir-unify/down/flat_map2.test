@@ -1,11 +1,11 @@
 // The difference with `flat_map1` is that the non-seq-prop appears _first_ here:
 (struct ($d)
-    (prop! $d R:1:2 $a)
-    (prop! $d R:1:5
+    (prop! $d rel@1:0:2 $a)
+    (prop! $d rel@1:0:5
         (matrix
             (.. @c
                 (struct ($e)
-                    (prop! $e R:1:4
+                    (prop! $e rel@1:0:4
                         [$b #u]
                     )
                 )
@@ -17,22 +17,22 @@
 (matrix
     (.. @c
         (struct ($f)
-            (prop! $f R:1:7 $a)
-            (prop! $f R:1:8 $b)
+            (prop! $f rel@1:0:7 $a)
+            (prop! $f rel@1:0:8 $b)
         )
     )
 )
 
 |$d| (block
-    (let-prop $a ($d R:1:2))
-    (let-prop [$c] ($d R:1:5))
+    (let-prop $a ($d rel@1:0:2))
+    (let-prop [$c] ($d rel@1:0:5))
     (make-matrix ($g)
         (for-each $c ($e)
-            (let-prop [$b $_] ($e R:1:4))
+            (let-prop [$b $_] ($e rel@1:0:4))
             (insert $g
                 (struct ($f)
-                    (prop! $f R:1:7 $a)
-                    (prop! $f R:1:8 $b)
+                    (prop! $f rel@1:0:7 $a)
+                    (prop! $f rel@1:0:8 $b)
                 )
             )
         )

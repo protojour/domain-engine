@@ -339,8 +339,8 @@ impl ArangoDatabase {
                 .insert(collection.raw_str().to_string(), *def_id);
         }
         for (edge_id, collection) in &self.edge_collections {
-            self.collection_lookup
-                .insert(collection.name.to_string(), edge_id.0);
+            // self.collection_lookup
+            //     .insert(collection.name.to_string(), edge_id.0);
         }
 
         Ok(())

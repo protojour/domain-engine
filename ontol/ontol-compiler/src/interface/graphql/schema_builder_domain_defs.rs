@@ -27,16 +27,18 @@ use ontol_runtime::{
     ontology::ontol::TextConstant,
     phf::PhfIndexMap,
     property::{PropertyCardinality, ValueCardinality},
-    DefId, RelationshipId,
+    DefId, RelId,
 };
 use thin_vec::thin_vec;
 use tracing::{trace, trace_span, warn};
 
 use crate::{
-    def::{rel_def_meta, rel_repr_meta, DefKind, RelParams, RelReprMeta, TypeDefFlags},
+    def::{DefKind, TypeDefFlags},
     interface::serde::{serde_generator::SerdeGenerator, SerdeKey},
+    misc::UnionDiscriminatorVariant,
     phf_build::build_phf_index_map,
-    relation::{identifies_any, Property, UnionDiscriminatorVariant},
+    properties::{identifies_any, Property},
+    relation::{rel_def_meta, rel_repr_meta, RelParams, RelReprMeta},
     repr::repr_model::{ReprKind, ReprScalarKind},
 };
 
@@ -236,7 +238,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
     }
 
     fn make_node_type(&mut self, def_id: DefId) -> NewType {
-        if self.relations.properties_by_def_id(def_id).is_none() {
+        if self.prop_ctx.properties_by_def_id(def_id).is_none() {
             return NewType::NativeScalar(NativeScalarRef {
                 operator_addr: self
                     .serde_gen
@@ -403,20 +405,20 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         property_field_producer: PropertyFieldProducer,
     ) {
         let mut interface_variants: Vec<(
-            RelationshipId,
+            RelId,
             RelationId,
             &[UnionDiscriminatorVariant],
         )> = Default::default();
 
         // See if it should be an interface of flattened unions
-        if let Some(table) = self.relations.properties_table_by_def_id(def_id) {
+        if let Some(table) = self.prop_ctx.properties_table_by_def_id(def_id) {
             for rel_id in table.keys().copied() {
-                let meta = rel_repr_meta(rel_id, self.defs, self.repr_ctx);
+                let meta = rel_repr_meta(rel_id, self.rel_ctx, self.defs, self.repr_ctx);
                 let object = meta.relationship.object;
 
                 if let ReprKind::Unit = meta.relation_repr_kind.deref() {
                     let union_discriminator =
-                        self.relations.union_discriminators.get(&object.0).unwrap();
+                        self.misc_ctx.union_discriminators.get(&object.0).unwrap();
 
                     interface_variants.push((
                         rel_id,
@@ -465,9 +467,9 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         interface_addr: TypeAddr,
         interface_def_id: DefId,
         property_field_producer: PropertyFieldProducer,
-        interface_variants: &[(RelationshipId, RelationId, &'c [UnionDiscriminatorVariant])],
+        interface_variants: &[(RelId, RelationId, &'c [UnionDiscriminatorVariant])],
         interface_variant_index: usize,
-        permutations: &mut Vec<(RelationshipId, RelationId, &'c UnionDiscriminatorVariant)>,
+        permutations: &mut Vec<(RelId, RelationId, &'c UnionDiscriminatorVariant)>,
     ) {
         if interface_variant_index < interface_variants.len() {
             let (relationship_id, relation_id, discriminators) =
@@ -597,7 +599,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         let repr_kind = self.repr_ctx.get_repr_kind(&def_id).expect("NO REPR KIND");
 
-        if let Some(properties) = self.relations.properties_by_def_id(def_id) {
+        if let Some(properties) = self.prop_ctx.properties_by_def_id(def_id) {
             if let Some(table) = &properties.table {
                 for (rel_id, property) in table {
                     self.harvest_struct_field(
@@ -614,7 +616,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         if let ReprKind::StructIntersection(members) = repr_kind {
             for (member_def_id, _) in members {
-                let Some(properties) = self.relations.properties_by_def_id(*member_def_id) else {
+                let Some(properties) = self.prop_ctx.properties_by_def_id(*member_def_id) else {
                     continue;
                 };
 
@@ -637,7 +639,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             for union_def_id in union_memberships {
                 let _entered = trace_span!("membership", id = ?union_def_id).entered();
 
-                let Some(properties) = self.relations.properties_by_def_id(*union_def_id) else {
+                let Some(properties) = self.prop_ctx.properties_by_def_id(*union_def_id) else {
                     continue;
                 };
                 let Some(table) = &properties.table else {
@@ -645,7 +647,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 };
 
                 for (rel_id, property) in table {
-                    let meta = rel_def_meta(*rel_id, self.defs);
+                    let meta = rel_def_meta(*rel_id, self.rel_ctx, self.defs);
 
                     if meta.relationship.subject.0 == *union_def_id {
                         self.harvest_struct_field(
@@ -711,7 +713,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         match field_kind {
             FieldKind::Property { .. } => 0,
             FieldKind::EdgeProperty { id: rel_id, .. } => {
-                rel_def_meta(*rel_id, self.defs)
+                rel_def_meta(*rel_id, self.rel_ctx, self.defs)
                     .relationship
                     .projection
                     .subject
@@ -719,7 +721,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             }
             // Connections are placed after "plain" fields
             FieldKind::ConnectionProperty(field) => {
-                100 + rel_def_meta(field.rel_id, self.defs)
+                100 + rel_def_meta(field.rel_id, self.rel_ctx, self.defs)
                     .relationship
                     .projection
                     .subject
@@ -731,14 +733,14 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
     fn harvest_struct_field(
         &mut self,
-        rel_id: RelationshipId,
+        rel_id: RelId,
         property: &Property,
         property_field_producer: PropertyFieldProducer,
         field_namespace: &mut GraphqlNamespace,
         harvest_variant: &HarvestVariant,
         output: &mut IndexMap<String, FieldData>,
     ) {
-        let meta = rel_repr_meta(rel_id, self.defs, self.repr_ctx);
+        let meta = rel_repr_meta(rel_id, self.rel_ctx, self.defs, self.repr_ctx);
         match (meta.relation_repr_kind.deref(), harvest_variant) {
             (ReprKind::Scalar(_, ReprScalarKind::TextConstant(lit_def_id), _), _) => {
                 let literal = self.defs.text_literal(*lit_def_id).unwrap();
@@ -781,7 +783,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
                     let prop_key = &self.serde_gen.str_ctx[prop_keys.into_iter().next().unwrap()];
 
-                    let resolvers: FnvHashMap<DefId, RelationshipId> = variants
+                    let resolvers: FnvHashMap<DefId, RelId> = variants
                         .iter()
                         .filter_map(|variant| match &variant.discriminant {
                             Discriminant::HasAttribute(relationship_id, ..) => {
@@ -811,7 +813,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 let union_discriminator = discriminator_table.get(&rel_id).unwrap();
 
                 let Some(table) = self
-                    .relations
+                    .prop_ctx
                     .properties_table_by_def_id(union_discriminator.def_id)
                 else {
                     return;
@@ -838,7 +840,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
     fn harvest_data_struct_field(
         &mut self,
-        (rel_id, prop_key, _property): (RelationshipId, &str, &Property),
+        (rel_id, prop_key, _property): (RelId, &str, &Property),
         meta: RelReprMeta,
         property_field_producer: PropertyFieldProducer,
         field_namespace: &mut GraphqlNamespace,
@@ -848,7 +850,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         let (value_def_id, ..) = meta.relationship.object();
         trace!("    harvest data struct field `{prop_key}`: {rel_id} ({value_def_id:?}) ({prop_cardinality:?}, {value_cardinality:?})");
 
-        let value_properties = self.relations.properties_by_def_id(value_def_id);
+        let value_properties = self.prop_ctx.properties_by_def_id(value_def_id);
 
         let is_entity_value = {
             let repr_kind = self.repr_ctx.get_repr_kind(&value_def_id);
@@ -856,7 +858,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 Some(ReprKind::StructUnion(variants)) => {
                     variants.iter().all(|(variant_def_id, _)| {
                         let variant_properties =
-                            self.relations.properties_by_def_id(*variant_def_id);
+                            self.prop_ctx.properties_by_def_id(*variant_def_id);
                         variant_properties
                             .map(|properties| properties.identified_by.is_some())
                             .unwrap_or(false)
@@ -879,7 +881,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 .gen_addr_lazy(gql_serde_key(value_def_id))
                 .unwrap();
 
-            let field_type = if identifies_any(value_def_id, self.relations, self.repr_ctx) {
+            let field_type = if identifies_any(value_def_id, self.prop_ctx, self.repr_ctx) {
                 TypeRef {
                     modifier,
                     unit: UnitTypeRef::NativeScalar(NativeScalarRef {
@@ -1009,8 +1011,8 @@ pub(super) fn get_native_scalar_kind(
 
 enum HarvestVariant<'c> {
     Object,
-    FlattenedUnionInterface(FnvHashMap<RelationshipId, &'c [UnionDiscriminatorVariant]>),
-    FlattenedUnionPermutation(FnvHashMap<RelationshipId, &'c UnionDiscriminatorVariant>),
+    FlattenedUnionInterface(FnvHashMap<RelId, &'c [UnionDiscriminatorVariant]>),
+    FlattenedUnionPermutation(FnvHashMap<RelId, &'c UnionDiscriminatorVariant>),
 }
 
 #[derive(Clone, Copy)]

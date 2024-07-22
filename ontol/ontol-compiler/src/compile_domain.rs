@@ -7,9 +7,10 @@ use tracing::{debug, debug_span, info};
 use ulid::Ulid;
 
 use crate::{
-    def::{DefKind, RelParams},
+    def::DefKind,
     edge::EdgeCtx,
     package::ParsedPackage,
+    relation::RelParams,
     repr::repr_model::ReprKind,
     thesaurus::{Thesaurus, TypeRelation},
     type_check::MapArmsKind,
@@ -51,7 +52,7 @@ impl<'m> Compiler<'m> {
         self.package_config_table
             .insert(package.package_id, package.config);
 
-        let root_defs = package.syntax.lower(pkg_def_id, src.clone(), Session(self));
+        let outcome = package.syntax.lower(pkg_def_id, src.clone(), Session(self));
 
         self.domain_ids
             .entry(package.package_id)
@@ -64,8 +65,30 @@ impl<'m> Compiler<'m> {
                 }
             });
 
-        for def_id in root_defs {
+        for def_id in outcome.root_defs {
             self.type_check().check_def(def_id);
+        }
+
+        // commit relationships from outcome
+        {
+            let mut rel_ids = Vec::with_capacity(
+                outcome
+                    .rels
+                    .iter()
+                    .fold(0, |sum, (_, rels)| sum + rels.len()),
+            );
+
+            for (_pkg_id, rels) in outcome.rels.into_iter().rev() {
+                for (rel_id, relationship, span) in rels {
+                    self.rel_ctx.commit_rel(rel_id, relationship, span);
+                    rel_ids.push(rel_id);
+                }
+            }
+
+            let mut type_check = self.type_check();
+            for rel_id in rel_ids {
+                type_check.check_rel(rel_id);
+            }
         }
 
         self.seal_domain(package.package_id);
@@ -136,7 +159,7 @@ impl<'m> Compiler<'m> {
             for (is, span) in is_table {
                 if matches!(&is.rel, TypeRelation::Super) {
                     let identified_by = self
-                        .rel_ctx
+                        .prop_ctx
                         .properties_by_def_id
                         .get(&is.def_id)
                         .and_then(|properties| properties.identified_by);
@@ -173,12 +196,12 @@ impl<'m> Compiler<'m> {
     /// Various cleanup/normalization
     fn domain_rel_normalization(&mut self, package_id: PackageId) {
         for def_id in self.defs.iter_package_def_ids(package_id) {
-            let Some(def) = self.defs.table.get_mut(&def_id) else {
-                // Can happen in error cases
-                continue;
-            };
+            for rel_id in self.rel_ctx.iter_rel_ids(def_id) {
+                let Some(relationship) = self.rel_ctx.relationship_by_id_mut(rel_id) else {
+                    // can happen in error cases
+                    continue;
+                };
 
-            if let DefKind::Relationship(relationship) = &mut def.kind {
                 // Reset RelParams::Type back to RelParams::Unit if its representation is ReprKind::Unit.
                 // This simplifies later compiler stages, that can trust RelParams::Type is a type with real data in it.
                 if let RelParams::Type(rel_params_def_id) = &relationship.rel_params {
@@ -219,12 +242,18 @@ impl<'m> Compiler<'m> {
             // Infer anonymous types at root of named maps
             if let Some(inference_info) = self.check_map_arm_def_inference(def_id) {
                 self.type_check().check_def(inference_info.source.1);
-                let new_defs = self
+                let outcome = self
                     .map_arm_def_inferencer(def_id)
                     .infer_map_arm_type(inference_info);
 
-                for def_id in new_defs {
-                    self.type_check().check_def(def_id);
+                {
+                    let mut type_check = self.type_check();
+                    for def_id in outcome.new_defs {
+                        type_check.check_def(def_id);
+                    }
+                    for rel_id in outcome.new_rels {
+                        type_check.check_rel(rel_id);
+                    }
                 }
 
                 self.type_check().check_def(inference_info.target.1);

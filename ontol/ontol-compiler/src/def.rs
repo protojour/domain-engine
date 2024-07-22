@@ -1,36 +1,23 @@
 use std::{
     borrow::Cow,
     collections::{BTreeSet, HashMap},
-    ops::Range,
 };
 
 use fnv::FnvHashMap;
 use ontol_macros::RustDoc;
 use ontol_runtime::{
     ontology::{
-        domain::{self, BasicDef, EdgeCardinalProjection},
+        domain::{self, BasicDef},
         ontol::TextLikeType,
     },
-    property::Cardinality,
     var::VarAllocator,
-    DefId, PackageId, RelationshipId,
+    DefId, PackageId, RelId,
 };
 
 use crate::{
-    mem::Intern,
-    namespace::Space,
-    package::ONTOL_PKG,
-    pattern::PatId,
-    primitive::PrimitiveKind,
-    regex_util::parse_literal_regex,
-    repr::{
-        repr_ctx::ReprCtx,
-        repr_model::{ReprKind, ReprScalarKind},
-    },
-    source::SourceSpan,
-    strings::StringCtx,
-    types::Type,
-    Compiler, OwnedOrRef, SpannedBorrow, NO_SPAN,
+    mem::Intern, namespace::Space, package::ONTOL_PKG, pattern::PatId, primitive::PrimitiveKind,
+    regex_util::parse_literal_regex, source::SourceSpan, strings::StringCtx, types::Type, Compiler,
+    SpannedBorrow, NO_SPAN,
 };
 use ontol_parser::U32Span;
 
@@ -57,7 +44,7 @@ pub enum DefKind<'m> {
     InlineUnion(BTreeSet<DefId>),
     BuiltinRelType(BuiltinRelationKind, Option<&'static str>),
     Edge,
-    Relationship(Relationship),
+    // TODO: Find another way to represent this:
     FmtTransition(DefId, FmtFinalState),
     // FIXME: This should not be builtin proc directly.
     // we may find the _actual_ builtin proc to call during type check,
@@ -89,7 +76,7 @@ impl<'m> DefKind<'m> {
             Self::InlineUnion(_) => None,
             Self::BuiltinRelType(_, ident) => ident.map(|ident| ident.into()),
             Self::Edge => None,
-            Self::Relationship(_) => None,
+            // Self::Relationship(_) => None,
             Self::FmtTransition(..) => None,
             Self::Constant(_) => None,
             Self::Mapping { ident, .. } => ident.map(|ident| ident.into()),
@@ -100,7 +87,7 @@ impl<'m> DefKind<'m> {
 
     pub fn as_ontology_type_kind(&self, info: BasicDef) -> domain::DefKind {
         match self {
-            DefKind::BuiltinRelType(..) => domain::DefKind::Relationship(info),
+            DefKind::BuiltinRelType(..) => domain::DefKind::Relation(info),
             DefKind::Fn(_) => domain::DefKind::Function(info),
             DefKind::EmptySequence => domain::DefKind::Generator(info),
             DefKind::Package(_) => domain::DefKind::Domain(info),
@@ -112,7 +99,7 @@ impl<'m> DefKind<'m> {
 #[derive(Debug)]
 pub struct TypeDef<'m> {
     pub ident: Option<&'m str>,
-    pub rel_type_for: Option<RelationshipId>,
+    pub rel_type_for: Option<RelId>,
     pub flags: TypeDefFlags,
 }
 
@@ -201,54 +188,7 @@ pub enum BuiltinRelationKind {
     /// rel* example: 'Carlos'
     /// ```
     Example,
-}
-
-/// This definition expresses that a relation is a relationship between a subject and an object
-#[derive(Debug)]
-pub struct Relationship {
-    pub relation_def_id: DefId,
-    pub projection: EdgeCardinalProjection,
-    pub relation_span: SourceSpan,
-
-    pub subject: (DefId, SourceSpan),
-    /// The cardinality of the relationship, i.e. how many objects are related to the subject
-    pub subject_cardinality: Cardinality,
-
-    pub object: (DefId, SourceSpan),
-    /// How many subjects are related to the object
-    pub object_cardinality: Cardinality,
-
-    pub rel_params: RelParams,
-}
-
-impl Relationship {
-    pub fn subject(&self) -> (DefId, Cardinality, SourceSpan) {
-        (self.subject.0, self.subject_cardinality, self.subject.1)
-    }
-
-    pub fn object(&self) -> (DefId, Cardinality, SourceSpan) {
-        (self.object.0, self.object_cardinality, self.object.1)
-    }
-}
-
-#[derive(Clone, Debug)]
-pub enum RelParams {
-    Unit,
-    Type(DefId),
-    IndexRange(Range<Option<u16>>),
-}
-
-#[derive(Clone)]
-pub struct RelDefMeta<'d, 'm> {
-    pub rel_id: RelationshipId,
-    pub relationship: SpannedBorrow<'d, Relationship>,
-    pub relation_def_kind: SpannedBorrow<'d, DefKind<'m>>,
-}
-
-pub struct RelReprMeta<'a> {
-    pub rel_id: RelationshipId,
-    pub relationship: SpannedBorrow<'a, Relationship>,
-    pub relation_repr_kind: OwnedOrRef<'a, ReprKind>,
+    FmtTransition,
 }
 
 pub struct Defs<'m> {
@@ -413,66 +353,6 @@ impl<'m> Defs<'m> {
 
     pub fn add_primitive(&mut self, kind: PrimitiveKind, ident: Option<&'static str>) -> DefId {
         self.add_def(DefKind::Primitive(kind, ident), ONTOL_PKG, NO_SPAN)
-    }
-}
-
-pub fn rel_def_meta<'c, 'm>(rel_id: RelationshipId, defs: &'c Defs<'m>) -> RelDefMeta<'c, 'm> {
-    let relationship = defs
-        .get_spanned_def_kind(rel_id.0)
-        .unwrap()
-        .filter(|kind| match kind {
-            DefKind::Relationship(relationship) => Some(relationship),
-            _ => None,
-        })
-        .unwrap();
-
-    let relation_def_kind = defs
-        .get_spanned_def_kind(relationship.relation_def_id)
-        .expect("no def for relation id");
-
-    RelDefMeta {
-        rel_id,
-        relationship,
-        relation_def_kind,
-    }
-}
-
-pub fn rel_repr_meta<'c>(
-    rel_id: RelationshipId,
-    defs: &'c Defs,
-    repr_ctx: &'c ReprCtx,
-) -> RelReprMeta<'c> {
-    let relationship = defs
-        .get_spanned_def_kind(rel_id.0)
-        .unwrap()
-        .filter(|kind| match kind {
-            DefKind::Relationship(relationship) => Some(relationship),
-            _ => None,
-        })
-        .unwrap();
-
-    let relation_def_id = relationship.relation_def_id;
-
-    let relation_repr_kind = repr_ctx
-        .get_repr_kind(&relation_def_id)
-        .map(OwnedOrRef::Borrowed)
-        .unwrap_or_else(|| match defs.def_kind(relation_def_id) {
-            DefKind::TextLiteral(_) => OwnedOrRef::Owned(ReprKind::Scalar(
-                relation_def_id,
-                ReprScalarKind::TextConstant(relation_def_id),
-                NO_SPAN,
-            )),
-            _ => panic!(
-                "no repr for {:?}: {:?}",
-                relationship.relation_def_id,
-                defs.def_kind(relationship.relation_def_id)
-            ),
-        });
-
-    RelReprMeta {
-        rel_id,
-        relationship,
-        relation_repr_kind,
     }
 }
 

@@ -10,7 +10,7 @@ use crate::{
     interface::serde::processor::ProcessorMode,
     ontology::Ontology,
     value::{FormatValueAsText, Value},
-    DefId, RelationshipId,
+    DefId, DefRelTag, RelId,
 };
 
 use super::{text_like_types::ParseError, TextConstant};
@@ -80,7 +80,7 @@ impl TextPattern {
                         let text_def_id = ontology.ontol_domain_meta().text;
 
                         attrs.insert(
-                            RelationshipId(text_def_id),
+                            RelId(text_def_id, DefRelTag(0)),
                             Attr::Unit(Value::Text(text.into(), text_def_id.into())),
                         );
                     }
@@ -128,7 +128,7 @@ pub enum TextPatternConstantPart {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TextPatternProperty {
-    pub rel_id: RelationshipId,
+    pub rel_id: RelId,
     pub type_def_id: DefId,
     pub capture_group: usize,
 }
@@ -144,7 +144,8 @@ impl<'d, 'o> Display for FormatPattern<'d, 'o> {
         for constant_part in &self.pattern.constant_parts {
             match (constant_part, self.value) {
                 (TextPatternConstantPart::AnyString { .. }, Value::Struct(attrs, _)) => {
-                    let rel_id = RelationshipId(self.ontology.ontol_domain_meta().text);
+                    let rel_id =
+                        RelId(self.ontology.ontol_domain_meta().text, DefRelTag(0));
                     let Some(attribute) = attrs.get(&rel_id) else {
                         error!("Attribute {rel_id} missing when formatting capturing text pattern");
                         return Err(std::fmt::Error);

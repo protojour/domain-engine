@@ -12,10 +12,11 @@ use ulid::Ulid;
 use crate::{
     def::{BuiltinRelationKind, DefKind, TypeDef, TypeDefFlags},
     mem::Intern,
+    misc::{RelObjectConstraint, RelTypeConstraints, TypeParam},
     namespace::Space,
     package::ONTOL_PKG,
+    properties::Constructor,
     regex_util,
-    relation::{Constructor, RelObjectConstraint, RelTypeConstraints, TypeParam},
     text_patterns::{store_text_pattern_segment, TextPatternSegment},
     thesaurus::TypeRelation,
     types::{FunctionType, Type, TypeRef},
@@ -72,7 +73,7 @@ impl<'m> Compiler<'m> {
                         _ => RelTypeConstraints::default(),
                     };
 
-                    self.rel_ctx
+                    self.misc_ctx
                         .rel_type_constraints
                         .insert(def_id, constraints);
                 }
@@ -242,14 +243,18 @@ impl<'m> Compiler<'m> {
         let literal = self
             .defs
             .add_def(DefKind::NumberLiteral(literal), ONTOL_PKG, NO_SPAN);
-        self.rel_ctx.type_params.entry(subject).or_default().insert(
-            param,
-            TypeParam {
-                definition_site: ONTOL_PKG,
-                object: literal,
-                span: NO_SPAN,
-            },
-        );
+        self.misc_ctx
+            .type_params
+            .entry(subject)
+            .or_default()
+            .insert(
+                param,
+                TypeParam {
+                    definition_site: ONTOL_PKG,
+                    object: literal,
+                    span: NO_SPAN,
+                },
+            );
     }
 
     fn def_uuid(&mut self) {
@@ -258,7 +263,7 @@ impl<'m> Compiler<'m> {
         });
         let segment = TextPatternSegment::Regex(regex_util::well_known::uuid());
         store_text_pattern_segment(uuid, &segment, &mut self.text_patterns, &mut self.str_ctx);
-        self.rel_ctx.properties_by_def_id_mut(uuid).constructor = Constructor::TextFmt(segment);
+        self.prop_ctx.properties_by_def_id_mut(uuid).constructor = Constructor::TextFmt(segment);
         self.defs.text_like_types.insert(uuid, TextLikeType::Uuid);
     }
 
@@ -268,7 +273,7 @@ impl<'m> Compiler<'m> {
         });
         let segment = TextPatternSegment::Regex(regex_util::well_known::ulid());
         store_text_pattern_segment(ulid, &segment, &mut self.text_patterns, &mut self.str_ctx);
-        self.rel_ctx.properties_by_def_id_mut(ulid).constructor = Constructor::TextFmt(segment);
+        self.prop_ctx.properties_by_def_id_mut(ulid).constructor = Constructor::TextFmt(segment);
         self.defs.text_like_types.insert(ulid, TextLikeType::Ulid);
     }
 
@@ -283,7 +288,7 @@ impl<'m> Compiler<'m> {
             &mut self.text_patterns,
             &mut self.str_ctx,
         );
-        self.rel_ctx.properties_by_def_id_mut(datetime).constructor =
+        self.prop_ctx.properties_by_def_id_mut(datetime).constructor =
             Constructor::TextFmt(segment.clone());
         self.defs
             .text_like_types

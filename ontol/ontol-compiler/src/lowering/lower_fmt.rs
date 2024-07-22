@@ -9,13 +9,15 @@ use ontol_runtime::{
     ontology::domain::EdgeCardinalProjection,
     property::{PropertyCardinality, ValueCardinality},
     tuple::CardinalIdx,
-    DefId, EdgeId,
+    DefId,
 };
 use tracing::debug;
 
 use crate::{
-    def::{DefKind, FmtFinalState, RelParams, Relationship, TypeDef, TypeDefFlags},
+    def::{FmtFinalState, TypeDef, TypeDefFlags},
     lowering::context::RelationKey,
+    package::ONTOL_PKG,
+    relation::{RelParams, Relationship},
     CompileError,
 };
 
@@ -120,13 +122,17 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         // This syntax just defines the relation the first time it's used
         let relation_def_id = self.ctx.define_relation_if_undefined(relation_key, from.1);
 
+        let edge_id = self.ctx.compiler.edge_ctx.alloc_edge_id(ONTOL_PKG);
+
         debug!("{:?}: <transition>", relation_def_id);
 
-        Some(self.ctx.define_anonymous(
-            DefKind::Relationship(Relationship {
+        let rel_id = self.ctx.compiler.rel_ctx.alloc_rel_id(self.ctx.pkg_def_id);
+        self.ctx.outcome.predefine_rel(
+            rel_id,
+            Relationship {
                 relation_def_id,
                 projection: EdgeCardinalProjection {
-                    id: EdgeId(relation_def_id),
+                    id: edge_id,
                     subject: CardinalIdx(0),
                     object: CardinalIdx(1),
                     one_to_one: false,
@@ -137,8 +143,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 object: (to.0, self.ctx.source_span(to.1)),
                 object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::IndexSet),
                 rel_params: RelParams::Unit,
-            }),
-            to.1,
-        ))
+            },
+            self.ctx.source_span(to.1),
+        );
+
+        Some(relation_def_id)
     }
 }

@@ -1,7 +1,7 @@
 //! utilities for lowering ontol-parser output
 
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     marker::PhantomData,
 };
 
@@ -16,15 +16,16 @@ use ontol_runtime::{
     property::{PropertyCardinality, ValueCardinality},
     tuple::CardinalIdx,
     var::{Var, VarAllocator},
-    DefId, PackageId,
+    DefId, PackageId, RelId,
 };
 use tracing::debug;
 
 use crate::{
-    def::{Def, DefKind, FmtFinalState, RelParams, Relationship, TypeDef, TypeDefFlags},
+    def::{Def, DefKind, FmtFinalState, TypeDef, TypeDefFlags},
     namespace::Space,
     package::ONTOL_PKG,
     pattern::{Pattern, PatternKind},
+    relation::{RelParams, Relationship},
     CompileError, Compiler, SourceId, SourceSpan,
 };
 
@@ -34,7 +35,7 @@ pub struct LoweringCtx<'c, 'm> {
     pub package_id: PackageId,
     pub source_id: SourceId,
     pub anonymous_unions: FnvHashMap<BTreeSet<DefId>, DefId>,
-    pub root_defs: Vec<DefId>,
+    pub outcome: LoweringOutcome,
 }
 
 pub struct CstLowering<'c, 'm, V: NodeView> {
@@ -44,6 +45,22 @@ pub struct CstLowering<'c, 'm, V: NodeView> {
 
 pub type LoweringError = (CompileError, U32Span);
 pub type Res<T> = Result<T, LoweringError>;
+
+#[derive(Default)]
+pub struct LoweringOutcome {
+    pub root_defs: Vec<DefId>,
+    pub rels: BTreeMap<PackageId, Vec<(RelId, Relationship, SourceSpan)>>,
+}
+
+impl LoweringOutcome {
+    pub fn predefine_rel(&mut self, rel_id: RelId, relationship: Relationship, span: SourceSpan) {
+        debug!("predefine rel {rel_id:?}");
+        self.rels
+            .entry(rel_id.0.package_id())
+            .or_default()
+            .push((rel_id, relationship, span));
+    }
+}
 
 pub type RootDefs = Vec<DefId>;
 
@@ -247,11 +264,10 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                 .defs
                 .def_text_literal(ident, &mut self.compiler.str_ctx);
 
-            let relationship_id = self.compiler.defs.alloc_def_id(self.package_id);
-
-            self.set_def_kind(
-                relationship_id,
-                DefKind::Relationship(Relationship {
+            let rel_id = self.compiler.rel_ctx.alloc_rel_id(def_id);
+            self.outcome.predefine_rel(
+                rel_id,
+                Relationship {
                     relation_def_id: self.compiler.primitives.relations.is,
                     projection: EdgeCardinalProjection {
                         id: self.compiler.primitives.edges.is,
@@ -265,11 +281,9 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                     object: (ident_literal, span),
                     object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),
                     rel_params: RelParams::Unit,
-                }),
-                ident_span,
+                },
+                self.source_span(ident_span),
             );
-
-            self.root_defs.push(relationship_id);
         }
 
         Ok(def_id)

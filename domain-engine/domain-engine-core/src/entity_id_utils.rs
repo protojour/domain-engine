@@ -9,7 +9,7 @@ use ontol_runtime::{
         Ontology,
     },
     value::Value,
-    DefId, RelationshipId,
+    DefId, RelId,
 };
 
 use crate::{system::SystemAPI, DomainError, DomainResult};
@@ -40,7 +40,7 @@ pub enum GeneratedId {
 
 pub enum GeneratedIdContainer {
     Raw,
-    SingletonStruct(DefId, RelationshipId),
+    SingletonStruct(DefId, RelId),
 }
 
 impl GeneratedIdContainer {

@@ -10,7 +10,7 @@ use ontol_runtime::{
     },
     property::{PropertyCardinality, ValueCardinality},
     query::select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
-    DefId, MapKey, PackageId, RelationshipId,
+    DefId, MapKey, PackageId, RelId,
 };
 use tracing::{debug, trace};
 
@@ -96,7 +96,7 @@ impl<'on> SelectFlowProcessor<'on> {
     fn autoselect_output_properties(
         &self,
         output_package_id: PackageId,
-        target: &mut FnvHashMap<RelationshipId, Select>,
+        target: &mut FnvHashMap<RelId, Select>,
     ) {
         for (rel_id, flows) in &self.prop_flow_slice.iter().group_by(|flow| flow.id) {
             // Only consider output properties:
@@ -129,10 +129,10 @@ impl<'on> SelectFlowProcessor<'on> {
 
     fn translate_property(
         &self,
-        rel_id: RelationshipId,
+        rel_id: RelId,
         select: Select,
         is_dep: IsDep,
-        target: &mut FnvHashMap<RelationshipId, Select>,
+        target: &mut FnvHashMap<RelId, Select>,
     ) {
         let mut has_parent = false;
 
@@ -185,17 +185,17 @@ impl<'on> SelectFlowProcessor<'on> {
 
     fn with_parent_select(
         &self,
-        rel_id: RelationshipId,
-        target: &mut FnvHashMap<RelationshipId, Select>,
-        parent_predicate: &dyn Fn(RelationshipId) -> bool,
-        child_func: &dyn Fn(&mut FnvHashMap<RelationshipId, Select>),
+        rel_id: RelId,
+        target: &mut FnvHashMap<RelId, Select>,
+        parent_predicate: &dyn Fn(RelId) -> bool,
+        child_func: &dyn Fn(&mut FnvHashMap<RelId, Select>),
     ) {
         fn handle_child_select(
-            target: &mut FnvHashMap<RelationshipId, Select>,
-            rel_id: RelationshipId,
+            target: &mut FnvHashMap<RelId, Select>,
+            rel_id: RelId,
             parent_def_id: DefId,
-            parent_predicate: impl Fn(RelationshipId) -> bool,
-            child_func: impl Fn(&mut FnvHashMap<RelationshipId, Select>),
+            parent_predicate: impl Fn(RelId) -> bool,
+            child_func: impl Fn(&mut FnvHashMap<RelId, Select>),
         ) {
             if !parent_predicate(rel_id) {
                 return;
@@ -241,7 +241,7 @@ impl<'on> SelectFlowProcessor<'on> {
         }
     }
 
-    fn depends_on_mandatory_entity(&self, rel_id: RelationshipId, is_dep: IsDep) -> bool {
+    fn depends_on_mandatory_entity(&self, rel_id: RelId, is_dep: IsDep) -> bool {
         let mut is_entity = false;
         let mut is_required = false;
 
@@ -276,7 +276,7 @@ impl<'on> SelectFlowProcessor<'on> {
         is_entity && is_required
     }
 
-    fn find_def_id(&self, rel_id: RelationshipId) -> Option<DefId> {
+    fn find_def_id(&self, rel_id: RelId) -> Option<DefId> {
         self.property_flows_for(rel_id)
             .find_map(|property_flow| match &property_flow.data {
                 PropertyFlowData::UnitType(def_id) => Some(*def_id),
@@ -285,7 +285,7 @@ impl<'on> SelectFlowProcessor<'on> {
             })
     }
 
-    fn property_flows_for(&self, rel_id: RelationshipId) -> impl Iterator<Item = &PropertyFlow> {
+    fn property_flows_for(&self, rel_id: RelId) -> impl Iterator<Item = &PropertyFlow> {
         // "fast forward" to the first property flow for the given property_id:
         let lower_bound = self
             .prop_flow_slice

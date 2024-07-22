@@ -22,7 +22,7 @@ use crate::{
         ontol_vm::OntolVm,
         proc::{Lib, Procedure},
     },
-    DefId, DefIdSet, EdgeId, MapKey, PackageId, RelationshipId,
+    DefId, DefIdSet, EdgeId, MapKey, PackageId, RelId,
 };
 
 use self::{
@@ -68,10 +68,11 @@ pub struct Data {
     union_variants: FnvHashMap<DefId, DefIdSet>,
     domain_interfaces: FnvHashMap<PackageId, Vec<DomainInterface>>,
     package_config_table: FnvHashMap<PackageId, PackageConfig>,
-    docs: FnvHashMap<DefId, TextConstant>,
+    def_docs: FnvHashMap<DefId, TextConstant>,
+    rel_docs: FnvHashMap<RelId, TextConstant>,
     serde_operators: Vec<SerdeOperator>,
     dynamic_sequence_operator_addr: SerdeOperatorAddr,
-    value_generators: FnvHashMap<RelationshipId, ValueGenerator>,
+    value_generators: FnvHashMap<RelId, ValueGenerator>,
     property_flows: Vec<PropertyFlow>,
 }
 
@@ -128,8 +129,12 @@ impl Ontology {
         }
     }
 
-    pub fn get_docs(&self, def_id: DefId) -> Option<TextConstant> {
-        self.data.docs.get(&def_id).copied()
+    pub fn get_def_docs(&self, def_id: DefId) -> Option<TextConstant> {
+        self.data.def_docs.get(&def_id).copied()
+    }
+
+    pub fn get_rel_docs(&self, rel_id: RelId) -> Option<TextConstant> {
+        self.data.rel_docs.get(&rel_id).copied()
     }
 
     pub fn get_text_pattern(&self, def_id: DefId) -> Option<&TextPattern> {
@@ -163,7 +168,7 @@ impl Ontology {
     }
 
     pub fn find_edge(&self, id: EdgeId) -> Option<&EdgeInfo> {
-        let domain = self.data.domain_table.get(&id.0.package_id())?;
+        let domain = self.data.domain_table.get(&id.0)?;
         domain.find_edge(id)
     }
 
@@ -246,7 +251,7 @@ impl Ontology {
         self.data.dynamic_sequence_operator_addr
     }
 
-    pub fn get_value_generator(&self, relationship_id: RelationshipId) -> Option<&ValueGenerator> {
+    pub fn get_value_generator(&self, relationship_id: RelId) -> Option<&ValueGenerator> {
         self.data.value_generators.get(&relationship_id)
     }
 

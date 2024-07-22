@@ -7,7 +7,7 @@ use ontol_runtime::{
     },
     ontology::{domain::Def, ontol::ValueGenerator, Ontology},
     value::{Value, ValueTag},
-    DefId, RelationshipId,
+    DefId, RelId,
 };
 
 use crate::system::SystemAPI;
@@ -74,7 +74,7 @@ impl<'e> ObjectGenerator<'e> {
 
     fn generate_struct_relationships(
         &self,
-        struct_map: &mut FnvHashMap<RelationshipId, Attr>,
+        struct_map: &mut FnvHashMap<RelId, Attr>,
         def: &Def,
         addr: SerdeOperatorAddr,
     ) {

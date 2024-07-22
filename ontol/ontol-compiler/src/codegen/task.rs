@@ -540,7 +540,7 @@ fn generate_ontol_map_procs<'m>(
             .meta()
             .ty
             .get_single_def_id()
-            .and_then(|def_id| compiler.rel_ctx.properties_by_def_id(def_id))
+            .and_then(|def_id| compiler.prop_ctx.properties_by_def_id(def_id))
             .map(|properties| properties.identified_by.is_some())
             .unwrap_or(false),
         _ => false,

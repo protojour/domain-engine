@@ -1,13 +1,14 @@
 use ontol_runtime::{
     ontology::domain::{EntityOrder, FieldPath},
     query::order::Direction,
-    DefId, RelationshipId,
+    DefId, RelId,
 };
 use tracing::{debug, info};
 
 use crate::{
-    def::{rel_def_meta, DefKind, RelParams},
-    relation::Constructor,
+    def::DefKind,
+    properties::Constructor,
+    relation::{rel_def_meta, RelParams},
     repr::repr_model::{ReprKind, ReprScalarKind},
     thesaurus::TypeRelation,
     CompileError, CompileErrors, Compiler, SourceSpan,
@@ -19,11 +20,11 @@ impl<'m> Compiler<'m> {
     pub(super) fn check_order(
         &mut self,
         entity_def_id: DefId,
-        order_relationship: RelationshipId,
+        order_relationship: RelId,
         order_union: DefId,
     ) -> Option<(DefId, EntityOrder)> {
         let package_id = entity_def_id.package_id();
-        let meta = rel_def_meta(order_relationship, &self.defs);
+        let meta = rel_def_meta(order_relationship, &self.rel_ctx, &self.defs);
         let object = meta.relationship.object;
         let rel_span = *meta.relationship.span;
 
@@ -70,7 +71,7 @@ impl<'m> Compiler<'m> {
         params_def_id: DefId,
         rel_span: SourceSpan,
     ) -> Option<EntityOrder> {
-        let Some(properties) = self.rel_ctx.properties_by_def_id(params_def_id) else {
+        let Some(properties) = self.prop_ctx.properties_by_def_id(params_def_id) else {
             CompileError::EntityOrderMustSpecifyParameters
                 .span(rel_span)
                 .report(self);
@@ -100,7 +101,7 @@ impl<'m> Compiler<'m> {
                 continue;
             };
 
-            let meta = rel_def_meta(relationship_id, &self.defs);
+            let meta = rel_def_meta(relationship_id, &self.rel_ctx, &self.defs);
             match self.defs.def_kind(meta.relationship.object.0) {
                 DefKind::TextLiteral(literal) => {
                     match self.parse_order_field(
@@ -125,16 +126,15 @@ impl<'m> Compiler<'m> {
             }
         }
 
-        let direction = match self.rel_ctx.direction_relationships.get(&params_def_id) {
+        let direction = match self.misc_ctx.direction_relationships.get(&params_def_id) {
             Some((rel_id, dir_def_id)) => {
                 if dir_def_id == &self.primitives.symbols.ascending {
                     Direction::Ascending
                 } else if dir_def_id == &self.primitives.symbols.descending {
                     Direction::Descending
                 } else {
-                    let span = self.defs.def_span(rel_id.0);
                     CompileError::TODO("invalid direction")
-                        .span(span)
+                        .span(self.rel_ctx.span(*rel_id))
                         .report(self);
                     return None;
                 }
@@ -156,7 +156,7 @@ impl<'m> Compiler<'m> {
         field_span: SourceSpan,
         mut def_id: DefId,
     ) -> Result<FieldPath, CompileErrors> {
-        let mut output: Vec<RelationshipId> = vec![];
+        let mut output: Vec<RelId> = vec![];
         let mut errors = CompileErrors::default();
 
         for field_segment in field.split('.') {
@@ -182,19 +182,19 @@ impl<'m> Compiler<'m> {
         &self,
         parent_def_id: DefId,
         field_name: &str,
-    ) -> Result<(RelationshipId, DefId), ()> {
+    ) -> Result<(RelId, DefId), ()> {
         let Some(literal_def_id) = self.defs.text_literals.get(field_name) else {
             debug!("order field: no text literal for {field_name}");
             return Err(());
         };
 
-        let Some(table) = self.rel_ctx.properties_table_by_def_id(parent_def_id) else {
+        let Some(table) = self.prop_ctx.properties_table_by_def_id(parent_def_id) else {
             debug!("order field: no properties table for {parent_def_id:?}");
             return Err(());
         };
 
         for (rel_id, _) in table {
-            let meta = rel_def_meta(*rel_id, &self.defs);
+            let meta = rel_def_meta(*rel_id, &self.rel_ctx, &self.defs);
 
             if meta.relationship.relation_def_id == *literal_def_id {
                 return Ok((*rel_id, meta.relationship.object.0));

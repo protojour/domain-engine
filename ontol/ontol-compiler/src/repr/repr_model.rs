@@ -6,7 +6,7 @@ use ontol_runtime::DefId;
 use ordered_float::NotNan;
 use smallvec::SmallVec;
 
-use crate::{primitive::Primitives, relation::TypeParam, SourceSpan};
+use crate::{misc::TypeParam, primitive::Primitives, SourceSpan};
 
 #[derive(Debug)]
 pub struct Repr {

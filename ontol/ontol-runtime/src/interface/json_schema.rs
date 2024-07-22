@@ -117,7 +117,7 @@ impl<'e> Serialize for StandaloneJsonSchema<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let docs = self
             .ontology
-            .get_docs(self.def_id)
+            .get_def_docs(self.def_id)
             .map(|constant| &self.ontology[constant]);
         let ctx = SchemaCtx {
             link_anchor: LinkAnchor::Defs,
@@ -653,7 +653,7 @@ impl<'e> Serialize for MapProperties<'e> {
             let docs = self
                 .ctx
                 .ontology
-                .get_docs(property.rel_id.0)
+                .get_rel_docs(property.rel_id)
                 .map(|constant| &self.ctx.ontology[constant]);
 
             match &property.kind {

@@ -4,6 +4,9 @@ use edge::EdgeCtx;
 use entity::entity_ctx::EntityCtx;
 pub use error::*;
 use fnv::FnvHashMap;
+use lowering::context::LoweringOutcome;
+use misc::MiscCtx;
+use properties::PropCtx;
 use std::ops::{Deref, Index};
 
 use codegen::task::{execute_codegen_tasks, CodeCtx};
@@ -56,11 +59,13 @@ mod into_ontology;
 mod lowering;
 mod map;
 mod map_arm_def_inference;
+mod misc;
 mod namespace;
 mod ontol_domain;
 mod pattern;
 mod persistence_check;
 mod phf_build;
+mod properties;
 mod regex_util;
 mod relation;
 mod repr;
@@ -109,7 +114,7 @@ pub fn compile(
 
     execute_codegen_tasks(&mut compiler);
     compile_all_text_patterns(&mut compiler);
-    compiler.rel_ctx.sort_property_tables();
+    compiler.prop_ctx.sort_property_tables();
     compiler.persistence_check();
     compiler.check_error()?;
 
@@ -177,7 +182,9 @@ struct Compiler<'m> {
     ty_ctx: TypeCtx<'m>,
     def_ty_ctx: DefTypeCtx<'m>,
     rel_ctx: RelCtx,
+    prop_ctx: PropCtx,
     edge_ctx: EdgeCtx,
+    misc_ctx: MiscCtx,
     thesaurus: Thesaurus,
     repr_ctx: ReprCtx,
     seal_ctx: SealCtx,
@@ -197,7 +204,8 @@ struct Compiler<'m> {
 impl<'m> Compiler<'m> {
     fn new(mem: &'m Mem, sources: Sources) -> Self {
         let mut defs = Defs::default();
-        let primitives = Primitives::new(&mut defs);
+        let mut edge_ctx = EdgeCtx::default();
+        let primitives = Primitives::new(&mut defs, &mut edge_ctx);
 
         let thesaurus = Thesaurus::new(&primitives);
 
@@ -216,7 +224,9 @@ impl<'m> Compiler<'m> {
             ty_ctx: TypeCtx::new(mem),
             def_ty_ctx: Default::default(),
             rel_ctx: RelCtx::default(),
-            edge_ctx: EdgeCtx::default(),
+            prop_ctx: PropCtx::default(),
+            misc_ctx: MiscCtx::default(),
+            edge_ctx,
             thesaurus,
             repr_ctx: ReprCtx::default(),
             seal_ctx: Default::default(),
@@ -277,7 +287,7 @@ pub fn lower_ontol_syntax<V: ontol_parser::cst::view::NodeView>(
     pkg_def_id: DefId,
     src: Src,
     session: Session,
-) -> Vec<DefId> {
+) -> LoweringOutcome {
     use ontol_parser::cst::view::NodeViewExt;
 
     CstLowering::new(pkg_def_id, src, session.0)

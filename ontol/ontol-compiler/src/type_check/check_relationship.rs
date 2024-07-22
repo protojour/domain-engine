@@ -1,13 +1,15 @@
-use ontol_runtime::{property::PropertyCardinality, DefId, EdgeId, RelationshipId};
+use ontol_runtime::{property::PropertyCardinality, DefId, EdgeId, RelId};
 use tracing::debug;
 
 use crate::{
-    def::{BuiltinRelationKind, DefKind, FmtFinalState, Relationship, TypeDef},
+    def::{BuiltinRelationKind, DefKind, FmtFinalState, TypeDef},
     error::CompileError,
     mem::Intern,
+    misc::TypeParam,
     package::ONTOL_PKG,
     primitive::PrimitiveKind,
-    relation::{Constructor, Properties, Property, TypeParam},
+    properties::{Constructor, Properties, Property},
+    relation::Relationship,
     sequence::Sequence,
     text_patterns::TextPatternSegment,
     thesaurus::TypeRelation,
@@ -18,32 +20,36 @@ use crate::{
 use super::TypeCheck;
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    pub fn check_relationship(
+    pub fn check_rel(&mut self, rel_id: RelId) {
+        let spanned = self.rel_ctx.spanned_relationship_by_id(rel_id);
+        self.check_relationship(rel_id, spanned.value, spanned.span);
+    }
+
+    fn check_relationship(
         &mut self,
-        def_id: DefId,
+        rel_id: RelId,
         relationship: &Relationship,
         span: &SourceSpan,
     ) -> TypeRef<'m> {
-        let relationship_id = RelationshipId(def_id);
         let relation_def_kind = &self.defs.def_kind(relationship.relation_def_id);
 
         match relation_def_kind {
             DefKind::TextLiteral(_) => {
-                self.check_named_relation(relationship_id, None, relationship);
+                self.check_named_relation(rel_id, None, relationship);
             }
             DefKind::Type(_) => {
                 let edge_id = self
                     .edge_ctx
                     .edge_id_by_symbol(relationship.relation_def_id);
 
-                self.check_named_relation(relationship_id, edge_id, relationship);
+                self.check_named_relation(rel_id, edge_id, relationship);
             }
             DefKind::BuiltinRelType(kind, _) => {
-                self.check_builtin_relation(relationship_id, relationship, kind, span);
+                self.check_builtin_relation(rel_id, relationship, kind, span);
             }
             DefKind::FmtTransition(def_id, final_state) => {
                 self.check_def(*def_id);
-                self.check_fmt_relation(relationship_id, relationship, *def_id, final_state, span);
+                self.check_fmt_relation(rel_id, relationship, *def_id, final_state, span);
             }
             _ => {
                 panic!()
@@ -59,7 +65,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     /// 2. a domain-defined unit type, which defines a "flattened" property
     fn check_named_relation(
         &mut self,
-        rel_id: RelationshipId,
+        rel_id: RelId,
         edge_id: Option<EdgeId>,
         relationship: &Relationship,
     ) -> TypeRef<'m> {
@@ -79,7 +85,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         self.check_subject_data_type(subject_ty, &subject.1);
         self.check_object_data_type(object_ty, &object.1);
 
-        self.rel_ctx
+        self.prop_ctx
             .properties_by_def_id_mut(subject.0)
             .table_mut()
             .insert(
@@ -92,7 +98,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             );
 
         // Ensure properties in object
-        self.rel_ctx.properties_by_def_id_mut(object.0);
+        self.prop_ctx.properties_by_def_id_mut(object.0);
 
         if let Some(edge_id) = edge_id {
             let edge = self.edge_ctx.symbolic_edges.get_mut(&edge_id).unwrap();
@@ -119,7 +125,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn check_builtin_relation(
         &mut self,
-        relationship_id: RelationshipId,
+        relationship_id: RelId,
         relationship: &Relationship,
         relation: &BuiltinRelationKind,
         span: &SourceSpan,
@@ -138,7 +144,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_object_data_type(object_ty, &object.1);
 
                 // Ensure properties
-                self.rel_ctx.properties_by_def_id_mut(subject.0);
+                self.prop_ctx.properties_by_def_id_mut(subject.0);
 
                 if !self.thesaurus.insert_domain_is(
                     subject.0,
@@ -162,7 +168,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
-                let properties = self.rel_ctx.properties_by_def_id_mut(subject.0);
+                let properties = self.prop_ctx.properties_by_def_id_mut(subject.0);
 
                 if properties.identifies.is_some() {
                     return CompileError::AlreadyIdentifiesAType
@@ -176,7 +182,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
 
                 properties.identifies = Some(relationship_id);
-                let object_properties = self.rel_ctx.properties_by_def_id_mut(object.0);
+                let object_properties = self.prop_ctx.properties_by_def_id_mut(object.0);
                 match object_properties.identified_by {
                     Some(id) => {
                         debug!(
@@ -225,7 +231,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
-                let properties = self.rel_ctx.properties_by_def_id_mut(subject.0);
+                let properties = self.prop_ctx.properties_by_def_id_mut(subject.0);
                 match (&properties.table, &mut properties.constructor) {
                     (None, Constructor::Transparent) => {
                         let mut sequence = Sequence::default();
@@ -259,7 +265,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let subject_def_kind = self.defs.def_kind(subject.0);
 
                 let DefKind::Type(TypeDef {
-                    rel_type_for: Some(RelationshipId(outer_relationship_id)),
+                    rel_type_for: Some(outer_relationship_id),
                     ..
                 }) = subject_def_kind
                 else {
@@ -270,13 +276,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .report_ty(self);
                 };
 
-                let DefKind::Relationship(Relationship {
+                let Relationship {
                     object: outer_object,
                     ..
-                }) = self.defs.def_kind(*outer_relationship_id)
-                else {
-                    unreachable!();
-                };
+                } = self.rel_ctx.relationship_by_id(*outer_relationship_id);
 
                 let Some(object_ty) = self.def_ty_ctx.def_table.get(&outer_object.0).cloned()
                 else {
@@ -292,9 +295,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 let _object_ty = self.check_def(object.0);
 
-                self.rel_ctx
+                self.misc_ctx
                     .default_const_objects
-                    .insert(RelationshipId(*outer_relationship_id), object.0);
+                    .insert(*outer_relationship_id, object.0);
 
                 object_ty
             }
@@ -310,7 +313,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         .report_ty(self);
                 };
                 let DefKind::Type(TypeDef {
-                    rel_type_for: Some(RelationshipId(outer_relationship_id)),
+                    rel_type_for: Some(outer_relationship_id),
                     ..
                 }) = subject_def_kind
                 else {
@@ -320,13 +323,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .span(*span)
                     .report_ty(self);
                 };
-                let DefKind::Relationship(Relationship {
+                let Relationship {
                     object: outer_object,
                     ..
-                }) = self.defs.def_kind(*outer_relationship_id)
-                else {
-                    unreachable!();
-                };
+                } = self.rel_ctx.relationship_by_id(*outer_relationship_id);
 
                 let Some(_) = self.def_ty_ctx.def_table.get(&outer_object.0) else {
                     return CompileError::TODO("the type of the gen relation has not been checked")
@@ -334,17 +334,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         .report_ty(self);
                 };
 
-                self.rel_ctx.value_generators_unchecked.insert(
-                    RelationshipId(*outer_relationship_id),
-                    (*value_generator_def_id, *span),
-                );
+                self.misc_ctx
+                    .value_generators_unchecked
+                    .insert(*outer_relationship_id, (*value_generator_def_id, *span));
                 object_ty
             }
             BuiltinRelationKind::Min | BuiltinRelationKind::Max | BuiltinRelationKind::Example => {
                 let subject_ty = self.check_def(subject.0);
                 let _ = self.check_def(object.0);
 
-                self.rel_ctx
+                self.misc_ctx
                     .type_params
                     .entry(subject.0)
                     .or_default()
@@ -367,7 +366,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_object_data_type(object_ty, &object.1);
 
                 // This will be checked post-seal in check_entity.rs
-                self.rel_ctx
+                self.misc_ctx
                     .order_relationships
                     .entry(subject.0)
                     .or_default()
@@ -380,7 +379,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let object_ty = self.check_def(object.0);
 
                 if self
-                    .rel_ctx
+                    .misc_ctx
                     .direction_relationships
                     .insert(subject.0, (relationship_id, object.0))
                     .is_some()
@@ -392,12 +391,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 object_ty
             }
+            BuiltinRelationKind::FmtTransition => &Type::Tautology,
         }
     }
 
     fn check_fmt_relation(
         &mut self,
-        relationship_id: RelationshipId,
+        relationship_id: RelId,
         relationship: &Relationship,
         relation_def_id: DefId,
         final_state: &FmtFinalState,
@@ -426,7 +426,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Type::Anonymous(_) => {
                 debug!("Fmt subject anonymous object: {:?}", subject.0);
                 let subject_constructor = self
-                    .rel_ctx
+                    .prop_ctx
                     .properties_by_def_id(subject.0)
                     .map(|props| &props.constructor);
 
@@ -505,7 +505,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn extend_text_pattern_fmt_constructor(
         &mut self,
         relation_def_id: DefId,
-        relationship: (RelationshipId, &Relationship),
+        relationship: (RelId, &Relationship),
         object_def: DefId,
         object_ty: TypeRef<'m>,
         origin: TextPatternSegment,
@@ -530,7 +530,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             },
             _ => {
                 let constructor = self
-                    .rel_ctx
+                    .prop_ctx
                     .properties_by_def_id(relation_def_id)
                     .map(Properties::constructor);
 
@@ -549,7 +549,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
         };
 
-        let object_properties = self.rel_ctx.properties_by_def_id_mut(object_def);
+        let object_properties = self.prop_ctx.properties_by_def_id_mut(object_def);
 
         if !matches!(&object_properties.constructor, Constructor::Transparent) {
             return Err(CompileError::ConstructorMismatch
@@ -563,7 +563,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         if final_state.0 || !object_ty.is_anonymous() {
             // constructors of unnamable types do not need to be processed..
             // Register pattern processing for later:
-            self.rel_ctx.text_pattern_constructors.insert(object_def);
+            self.misc_ctx.text_pattern_constructors.insert(object_def);
         }
 
         Ok(())

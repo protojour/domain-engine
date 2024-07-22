@@ -452,9 +452,9 @@ impl<'a, L: Lang> Parser<'a, L> {
     }
 }
 
-fn parse_rel_id(next: &str) -> ParseResult<RelationshipId> {
+fn parse_rel_id(next: &str) -> ParseResult<RelId> {
     let (sym, next) = parse_symbol(next)?;
-    let rel_id: RelationshipId = sym
+    let rel_id: RelId = sym
         .parse()
         .map_err(|_| Error::Expected(Class::Property, Found(Token::Symbol(sym))))?;
     Ok((rel_id, next))

@@ -17,7 +17,7 @@ use crate::{
     phf::PhfIndexMap,
     value::{Value, ValueTag},
     vm::proc::{NParams, Procedure},
-    DefId, RelationshipId,
+    DefId, RelId,
 };
 
 use super::{
@@ -37,7 +37,7 @@ use super::{
 /// The output of the struct deserializer.
 /// Requires some post-processing before it can become an Attribute.
 pub struct Struct {
-    pub attributes: FnvHashMap<RelationshipId, Attr>,
+    pub attributes: FnvHashMap<RelId, Attr>,
     pub id: Option<Value>,
     pub rel_params: Value,
 
@@ -47,7 +47,7 @@ pub struct Struct {
     observed_props_bitset: BitSet,
 
     /// Pre-discriminated flattened unions
-    flattened_union_ops: FnvHashMap<RelationshipId, SerdeOperatorAddr>,
+    flattened_union_ops: FnvHashMap<RelId, SerdeOperatorAddr>,
 
     /// serde properties that may later be deserialized by the flattened unions above
     flattened_union_tmp_data: HashMap<Box<str>, serde_value::Value>,

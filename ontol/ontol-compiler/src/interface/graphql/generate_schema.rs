@@ -73,19 +73,23 @@ pub fn generate_graphql_schema<'c>(
     });
 
     let mut builder = {
-        let relations = serde_gen.rel_ctx;
+        let rel_ctx = serde_gen.rel_ctx;
         let defs = serde_gen.defs;
+        let prop_ctx = serde_gen.prop_ctx;
         let repr_ctx = serde_gen.repr_ctx;
+        let misc_ctx = serde_gen.misc_ctx;
         SchemaBuilder {
             lazy_tasks: vec![],
             schema: &mut schema,
             type_namespace: &mut namespace,
             partial_ontology,
             serde_gen,
-            relations,
+            rel_ctx,
+            misc_ctx,
             defs,
             primitives,
             repr_ctx,
+            prop_ctx,
             resolver_graph,
             union_member_cache,
             builtin_scalars: Default::default(),

@@ -9,9 +9,10 @@ use crate::{
         task::{ExternMap, MapCodegenRequest},
         type_mapper::TypeMapper,
     },
-    def::{rel_def_meta, Def, DefKind},
+    def::{Def, DefKind},
     mem::Intern,
     pattern::{PatId, PatternKind, TypePath},
+    relation::rel_def_meta,
     types::{Type, TypeRef},
     CompileError, SourceSpan,
 };
@@ -26,7 +27,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_extern(&mut self, def_id: DefId, span: SourceSpan) {
         warn!("check extern");
 
-        let Some(table) = self.rel_ctx.properties_table_by_def_id(def_id) else {
+        let Some(table) = self.prop_ctx.properties_table_by_def_id(def_id) else {
             CompileError::TODO("extern has no properties")
                 .span(span)
                 .report(self);
@@ -36,7 +37,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let mut extern_builder = ExternBuilder { url: None };
 
         for rel_id in table.keys() {
-            let meta = rel_def_meta(*rel_id, self.defs);
+            let meta = rel_def_meta(*rel_id, self.rel_ctx, self.defs);
             let (value_type_def_id, ..) = meta.relationship.object();
 
             match meta.relation_def_kind.value {

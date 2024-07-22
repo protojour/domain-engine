@@ -9,15 +9,17 @@ use std::collections::{hash_map::Entry, HashMap};
 
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
-use ontol_runtime::{DefId, RelationshipId};
+use ontol_runtime::{DefId, RelId};
 use tracing::{debug_span, trace};
 
 use crate::{
-    def::{rel_def_meta, Def, DefKind, Defs, RelParams, TypeDefFlags},
+    def::{Def, DefKind, Defs, TypeDefFlags},
     error::CompileError,
+    misc::MiscCtx,
     package::ONTOL_PKG,
     primitive::{PrimitiveKind, Primitives},
-    relation::{Constructor, Properties, RelCtx},
+    properties::{Constructor, PropCtx, Properties},
+    relation::{rel_def_meta, RelCtx, RelParams},
     thesaurus::{Is, Thesaurus, TypeRelation},
     types::{DefTypeCtx, Type},
     CompileErrors, Note, SourceId, SourceSpan, SpannedNote, NATIVE_SOURCE, NO_SPAN,
@@ -36,7 +38,9 @@ pub struct ReprCheck<'c, 'm> {
     pub root_def_id: DefId,
     pub defs: &'c Defs<'m>,
     pub def_types: &'c DefTypeCtx<'m>,
-    pub relations: &'c RelCtx,
+    pub rel_ctx: &'c RelCtx,
+    pub prop_ctx: &'c PropCtx,
+    pub misc_ctx: &'c MiscCtx,
     pub thesaurus: &'c Thesaurus,
     pub repr_ctx: &'c mut ReprCtx,
     pub primitives: &'c Primitives,
@@ -101,7 +105,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         self.check_def_repr(
             self.root_def_id,
             def,
-            self.relations.properties_by_def_id(self.root_def_id),
+            self.prop_ctx.properties_by_def_id(self.root_def_id),
         );
 
         if self.state.do_emit_diagnostics && !self.state.abstract_notes.is_empty() {
@@ -207,8 +211,8 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         }
     }
 
-    fn traverse_property(&mut self, rel_id: RelationshipId) {
-        let meta = rel_def_meta(rel_id, self.defs);
+    fn traverse_property(&mut self, rel_id: RelId) {
+        let meta = rel_def_meta(rel_id, self.rel_ctx, self.defs);
 
         let (value_def_id, ..) = meta.relationship.object();
         let value_def = self.defs.table.get(&value_def_id).unwrap();
@@ -226,7 +230,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         self.check_def_repr(
             value_def_id,
             value_def,
-            self.relations.properties_by_def_id(value_def_id),
+            self.prop_ctx.properties_by_def_id(value_def_id),
         );
         self.state.span_stack.pop();
 
@@ -240,7 +244,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             self.check_def_repr(
                 *def_id,
                 value_def,
-                self.relations.properties_by_def_id(*def_id),
+                self.prop_ctx.properties_by_def_id(*def_id),
             );
             self.state.span_stack.pop();
         }
@@ -351,7 +355,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                             data,
                         )
                     } else if type_def.flags.contains(TypeDefFlags::CONCRETE) {
-                        if let Some(properties) = self.relations.properties_by_def_id(def_id) {
+                        if let Some(properties) = self.prop_ctx.properties_by_def_id(def_id) {
                             let mut has_table = false;
                             if properties.table.is_some() {
                                 if self.state.do_trace {
@@ -437,7 +441,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             }
 
             if matches!(data.rel, IsRelation::Origin | IsRelation::Super) {
-                if let Some(type_params) = self.relations.type_params.get(&def_id) {
+                if let Some(type_params) = self.misc_ctx.type_params.get(&def_id) {
                     for (relation_def_id, type_param) in type_params {
                         match builder.type_params.entry(*relation_def_id) {
                             Entry::Vacant(vacant) => {

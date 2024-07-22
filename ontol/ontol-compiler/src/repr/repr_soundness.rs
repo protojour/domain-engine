@@ -8,7 +8,7 @@ use ordered_float::NotNan;
 use crate::{
     def::{BuiltinRelationKind, DefKind},
     error::CompileError,
-    relation::RelObjectConstraint,
+    misc::RelObjectConstraint,
     thesaurus::TypeRelation,
     types::FormatType,
     Note,
@@ -155,7 +155,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         output: &mut CheckedTypeParams<'m>,
     ) -> Option<()> {
         for (relation_def_id, type_param) in &repr.type_params {
-            if let Some(constraints) = self.relations.rel_type_constraints.get(relation_def_id) {
+            if let Some(constraints) = self.misc_ctx.rel_type_constraints.get(relation_def_id) {
                 if !constraints.subject_set.is_empty()
                     && !constraints.subject_set.contains(&base_def_id)
                 {

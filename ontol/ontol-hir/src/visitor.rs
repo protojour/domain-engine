@@ -1,4 +1,4 @@
-use ontol_runtime::RelationshipId;
+use ontol_runtime::RelId;
 
 use crate::{
     arena::{Arena, NodeRef},
@@ -16,7 +16,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
         &mut self,
         flags: PropFlags,
         struct_var: Var,
-        rel_id: RelationshipId,
+        rel_id: RelId,
         variant: &PropVariant,
         arena: &'h Arena<'a, L>,
     ) {
@@ -39,7 +39,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
     }
 
     #[allow(unused_variables)]
-    fn visit_property_id(&mut self, rel_id: RelationshipId) {}
+    fn visit_property_id(&mut self, rel_id: RelId) {}
 
     #[allow(unused_variables)]
     fn visit_binder(&mut self, var: Var) {}
@@ -224,7 +224,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
     fn traverse_prop(
         &mut self,
         struct_var: Var,
-        rel_id: RelationshipId,
+        rel_id: RelId,
         variant: &PropVariant,
         arena: &'h Arena<'a, L>,
     ) {

@@ -5,19 +5,18 @@ use indexmap::{IndexMap, IndexSet};
 use ontol_runtime::{
     interface::discriminator::{Discriminant, LeafDiscriminant},
     ontology::ontol::TextConstant,
-    DefId, RelationshipId,
+    DefId, RelId,
 };
 use patricia_tree::PatriciaMap;
 use tracing::{debug, debug_span};
 
 use crate::{
-    def::{rel_def_meta, Def, DefKind},
+    def::{Def, DefKind},
     error::CompileError,
+    misc::{UnionDiscriminator, UnionDiscriminatorRole, UnionDiscriminatorVariant},
     primitive::PrimitiveKind,
-    relation::{
-        Constructor, Property, UnionDiscriminator, UnionDiscriminatorRole,
-        UnionDiscriminatorVariant,
-    },
+    properties::{Constructor, Property},
+    relation::rel_def_meta,
     repr::repr_model::{ReprKind, ReprScalarKind},
     sequence::Sequence,
     strings::StringCtx,
@@ -67,9 +66,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 &mut strings,
             );
 
-            if let Some(properties) = self.rel_ctx.properties_by_def_id(variant_def_id) {
+            if let Some(properties) = self.prop_ctx.properties_by_def_id(variant_def_id) {
                 if let Some(id_relationship_id) = &properties.identified_by {
-                    let identifies_meta = rel_def_meta(*id_relationship_id, self.defs);
+                    let identifies_meta =
+                        rel_def_meta(*id_relationship_id, self.rel_ctx, self.defs);
 
                     let name = match identifies_meta.relation_def_kind.value {
                         DefKind::TextLiteral(lit) => String::from(*lit),
@@ -160,7 +160,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
         }
 
-        self.rel_ctx
+        self.misc_ctx
             .union_discriminators
             .insert(value_union_def_id, union_discriminator);
 
@@ -284,7 +284,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         debug!("find domain type match data {def_id:?}: {repr_kind:?}");
 
-        if let Some(properties) = self.rel_ctx.properties_by_def_id(def_id) {
+        if let Some(properties) = self.prop_ctx.properties_by_def_id(def_id) {
             match &properties.constructor {
                 Constructor::Transparent => {
                     debug!("was Transparent: {properties:?}");
@@ -321,7 +321,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &self,
         discriminator_builder: &mut DiscriminatorBuilder,
         variant_def: DefId,
-        property_set: &IndexMap<RelationshipId, Property>,
+        property_set: &IndexMap<RelId, Property>,
         span: &SourceSpan,
         error_set: &mut ErrorSet,
         strings: &mut StringCtx<'m>,
@@ -332,7 +332,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         for (rel_id, _cardinality) in property_set {
-            let meta = rel_def_meta(*rel_id, self.defs);
+            let meta = rel_def_meta(*rel_id, self.rel_ctx, self.defs);
 
             let (object_def_id, _) = meta.relationship.object;
             let object_ty = self.def_ty_ctx.def_table.get(&object_def_id).unwrap();
@@ -662,7 +662,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 }
 
 enum DomainTypeMatchData<'a> {
-    Struct(&'a IndexMap<RelationshipId, Property>),
+    Struct(&'a IndexMap<RelId, Property>),
     #[allow(dead_code)]
     Sequence(&'a Sequence),
     ConstructorStringPattern(&'a TextPatternSegment),
@@ -742,7 +742,7 @@ enum VariantKey {
     IdProperty {
         entity_id: DefId,
         name: TextConstant,
-        rel_id: RelationshipId,
+        rel_id: RelId,
     },
 }
 

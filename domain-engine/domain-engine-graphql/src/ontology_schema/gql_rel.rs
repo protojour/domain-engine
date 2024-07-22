@@ -4,7 +4,7 @@ use crate::juniper;
 
 use ontol_runtime::{
     ontology::domain::{self, EdgeCardinalProjection},
-    property, DefId, EdgeId, RelationshipId,
+    property, DefId, EdgeId, RelId,
 };
 
 use super::{gql_def, Ctx};
@@ -12,7 +12,7 @@ use super::{gql_def, Ctx};
 pub struct DataRelationshipInfo {
     pub def_id: DefId,
     pub kind: RelationshipKind,
-    pub rel_id: RelationshipId,
+    pub rel_id: RelId,
     pub edge_projection: Option<EdgeCardinalProjection>,
 }
 
@@ -133,9 +133,9 @@ impl DataRelationshipEdgeProjection {
 #[juniper::graphql_object]
 #[graphql(context = Ctx)]
 impl Edge {
-    fn def(&self) -> gql_def::Def {
-        gql_def::Def { id: self.id.0 }
-    }
+    // fn def(&self) -> gql_def::Def {
+    //     gql_def::Def { id: self.id.0 }
+    // }
 
     fn cardinals(&self, ctx: &Ctx) -> Vec<EdgeCardinal> {
         let edge = ctx.find_edge(self.id).unwrap();

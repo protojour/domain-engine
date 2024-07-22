@@ -41,7 +41,7 @@ fn test_domain_docs_as_query_docs() {
             panic!();
         };
 
-        let docs = &ontology[ontology.get_docs(*domain_def_id).unwrap()];
+        let docs = &ontology[ontology.get_def_docs(*domain_def_id).unwrap()];
         assert_eq!(docs, "Domain docs");
     });
 }
@@ -357,7 +357,7 @@ fn incompatible_edge_types_are_distinct() {
             let targets_connection = schema.type_data(targets_field.field_type.unit.addr());
             assert_eq!(
                 &ontology[targets_connection.typename],
-                "_anon1_10targetConnection"
+                "_anon1_5targetConnection"
             );
 
             let targets_edge = schema.type_data(
@@ -371,7 +371,7 @@ fn incompatible_edge_types_are_distinct() {
                     .addr(),
             );
 
-            assert_eq!(&ontology[targets_edge.typename], "_anon1_10targetEdge");
+            assert_eq!(&ontology[targets_edge.typename], "_anon1_5targetEdge");
             assert!(targets_edge.fields().unwrap().contains_key("edge_field"));
         }
     });

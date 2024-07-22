@@ -1,34 +1,34 @@
 (struct ($f)
-    (prop! $f R:1:9 $a)
-    (prop! $f R:1:10 $b)
-    (prop! $f R:1:11
+    (prop! $f rel@1:0:9 $a)
+    (prop! $f rel@1:0:10 $b)
+    (prop! $f rel@1:0:11
         (struct ($g)
-            (prop! $g R:1:12 $c)
+            (prop! $g rel@1:0:12 $c)
         )
     )
 )
 
 (struct ($d)
-    (prop! $d R:1:2 $a)
-    (prop! $d R:1:6
+    (prop! $d rel@1:0:2 $a)
+    (prop! $d rel@1:0:6
         (struct ($e)
-            (prop! $e R:1:4 $b)
-            (prop! $e R:1:5 $c)
+            (prop! $e rel@1:0:4 $b)
+            (prop! $e rel@1:0:5 $c)
         )
     )
 )
 
 |$f| (block
-    (let-prop $a ($f R:1:9))
-    (let-prop $b ($f R:1:10))
-    (let-prop $g ($f R:1:11))
-    (let-prop $c ($g R:1:12))
+    (let-prop $a ($f rel@1:0:9))
+    (let-prop $b ($f rel@1:0:10))
+    (let-prop $g ($f rel@1:0:11))
+    (let-prop $c ($g rel@1:0:12))
     (struct ($d)
-        (prop! $d R:1:2 $a)
-        (prop! $d R:1:6
+        (prop! $d rel@1:0:2 $a)
+        (prop! $d rel@1:0:6
             (struct ($e)
-                (prop! $e R:1:4 $b)
-                (prop! $e R:1:5 $c)
+                (prop! $e rel@1:0:4 $b)
+                (prop! $e rel@1:0:5 $c)
             )
         )
         (move-rest-attrs $d $f)

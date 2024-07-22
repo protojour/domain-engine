@@ -2,7 +2,7 @@ use fnv::FnvHashMap;
 use ontol_hir::{visitor::HirVisitor, Node, PropFlags, PropVariant};
 use ontol_runtime::{
     var::{Var, VarAllocator, VarSet},
-    MapFlags, RelationshipId,
+    MapFlags, RelId,
 };
 use thin_vec::ThinVec;
 
@@ -223,7 +223,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 &mut self,
                 flags: PropFlags,
                 struct_var: Var,
-                rel_id: RelationshipId,
+                rel_id: RelId,
                 variant: &PropVariant,
                 arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
             ) {

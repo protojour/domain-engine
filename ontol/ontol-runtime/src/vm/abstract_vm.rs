@@ -12,7 +12,7 @@ use crate::{
     query::condition::ClausePair,
     var::Var,
     vm::proc::{BuiltinProc, Local, OpCode, Predicate, Procedure},
-    DefId, RelationshipId,
+    DefId, RelId,
 };
 
 /// Abstract virtual machine for executing ONTOL procedures.
@@ -59,13 +59,13 @@ pub trait Processor {
     fn get_attr(
         &mut self,
         source: Local,
-        key: RelationshipId,
+        key: RelId,
         arity: u8,
         flags: GetAttrFlags,
     ) -> VmResult<()>;
-    fn put_attr_unit(&mut self, target: Local, key: RelationshipId) -> VmResult<()>;
-    fn put_attr_tuple(&mut self, target: Local, arity: u8, key: RelationshipId) -> VmResult<()>;
-    fn put_attr_matrix(&mut self, target: Local, arity: u8, key: RelationshipId) -> VmResult<()>;
+    fn put_attr_unit(&mut self, target: Local, key: RelId) -> VmResult<()>;
+    fn put_attr_tuple(&mut self, target: Local, arity: u8, key: RelId) -> VmResult<()>;
+    fn put_attr_matrix(&mut self, target: Local, arity: u8, key: RelId) -> VmResult<()>;
     fn move_rest_attrs(&mut self, target: Local, source: Local) -> VmResult<()>;
     fn push_i64(&mut self, k: i64, result_type: DefId) -> VmResult<()>;
     fn push_f64(&mut self, k: f64, result_type: DefId) -> VmResult<()>;

@@ -16,6 +16,7 @@ use tracing::debug;
 
 use crate::{
     def::{DefKind, TypeDef, TypeDefFlags},
+    namespace::DocId,
     package::ONTOL_PKG,
     CompileError,
 };
@@ -269,7 +270,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         }
     }
 
-    pub(super) fn append_documentation(&mut self, def_id: DefId, node_view: V) {
+    pub(super) fn append_documentation(&mut self, doc_id: DocId, node_view: V) {
         let doc_comments = node_view
             .local_tokens_filter(Kind::DocComment)
             .map(|token| token.slice().strip_prefix("///").unwrap().to_string());
@@ -278,7 +279,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             return;
         };
 
-        match self.ctx.compiler.namespaces.docs.entry(def_id) {
+        match self.ctx.compiler.namespaces.docs.entry(doc_id) {
             Entry::Vacant(vacant) => {
                 vacant.insert(docs);
             }

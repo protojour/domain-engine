@@ -17,14 +17,15 @@ use ontol_runtime::{
     },
     ontology::ontol::{TextConstant, ValueGenerator},
     phf::PhfKey,
-    DefId, RelationshipId,
+    DefId, DefRelTag, RelId,
 };
 use tracing::{debug, debug_span, warn};
 
 use crate::{
-    def::{rel_def_meta, rel_repr_meta, RelParams, RelReprMeta},
+    misc::UnionDiscriminatorRole,
     phf_build::build_phf_index_map,
-    relation::{identifies_any, Properties, Property, UnionDiscriminatorRole},
+    properties::{identifies_any, Properties, Property},
+    relation::{rel_def_meta, rel_repr_meta, RelParams, RelReprMeta},
     repr::repr_model::{ReprKind, ReprScalarKind},
 };
 
@@ -60,7 +61,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         if let Some(union_memberships) = self.union_member_cache.cache.get(&def.def_id) {
             for union_def_id in union_memberships {
-                let Some(properties) = self.rel_ctx.properties_by_def_id(*union_def_id) else {
+                let Some(properties) = self.prop_ctx.properties_by_def_id(*union_def_id) else {
                     continue;
                 };
                 let Some(table) = &properties.table else {
@@ -68,7 +69,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 };
 
                 for (rel_id, property) in table {
-                    let meta = rel_def_meta(*rel_id, self.defs);
+                    let meta = rel_def_meta(*rel_id, self.rel_ctx, self.defs);
 
                     if meta.relationship.subject.0 == *union_def_id {
                         self.add_struct_op_property(
@@ -95,7 +96,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             (
                 self.str_ctx.make_phf_key(EDGE_PROPERTY),
                 SerdeProperty {
-                    rel_id: RelationshipId(DefId::unit()),
+                    rel_id: RelId(DefId::unit(), DefRelTag(0)),
                     flags: SerdePropertyFlags::REL_PARAMS | SerdePropertyFlags::OPTIONAL,
                     value_addr: SerdeOperatorAddr(0),
                     value_generator: None,
@@ -136,14 +137,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
     fn add_struct_op_property(
         &mut self,
-        rel_id: RelationshipId,
+        rel_id: RelId,
         property: &Property,
         modifier: SerdeModifier,
         struct_flags: &mut SerdeStructFlags,
         output: &mut IndexMap<String, (PhfKey, SerdeProperty)>,
         must_flatten_unions: &mut bool,
     ) {
-        let meta = rel_repr_meta(rel_id, self.defs, self.repr_ctx);
+        let meta = rel_repr_meta(rel_id, self.rel_ctx, self.defs, self.repr_ctx);
         let (value_type_def_id, ..) = meta.relationship.object();
 
         let (property_cardinality, value_addr) = self.get_property_operator(
@@ -182,7 +183,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let mut value_generator: Option<ValueGenerator> = None;
         let mut flags = SerdePropertyFlags::default();
 
-        if let Some(default_const_def) = self.rel_ctx.default_const_objects.get(&meta.rel_id) {
+        if let Some(default_const_def) = self.misc_ctx.default_const_objects.get(&meta.rel_id) {
             let proc = self
                 .code_ctx
                 .result_const_procs
@@ -192,7 +193,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             value_generator = Some(ValueGenerator::DefaultProc(proc.address));
         }
 
-        if let Some(explicit_value_generator) = self.rel_ctx.value_generators.get(&rel_id) {
+        if let Some(explicit_value_generator) = self.misc_ctx.value_generators.get(&rel_id) {
             flags |= SerdePropertyFlags::READ_ONLY | SerdePropertyFlags::GENERATOR;
             if value_generator.is_some() {
                 panic!("BUG: Cannot have both a default value and a generator. Solve this in type check.");
@@ -212,7 +213,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             flags |= SerdePropertyFlags::READ_ONLY;
         }
 
-        if identifies_any(value_type_def_id, self.rel_ctx, self.repr_ctx) {
+        if identifies_any(value_type_def_id, self.prop_ctx, self.repr_ctx) {
             flags |= SerdePropertyFlags::ANY_ID;
         }
 
@@ -220,7 +221,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             struct_flags.insert(SerdeStructFlags::ENTITY_ID_OPTIONAL);
         }
 
-        if let Some(target_properties) = self.rel_ctx.properties_by_def_id(value_type_def_id) {
+        if let Some(target_properties) = self.prop_ctx.properties_by_def_id(value_type_def_id) {
             if target_properties.identified_by.is_some() && !property.is_entity_id {
                 flags |= SerdePropertyFlags::IN_ENTITY_GRAPH;
             }
@@ -243,7 +244,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
     fn add_flattened_union_properties(
         &mut self,
-        rel_id: RelationshipId,
+        rel_id: RelId,
         modifier: SerdeModifier,
         meta: RelReprMeta,
         output: &mut IndexMap<String, (PhfKey, SerdeProperty)>,
@@ -347,7 +348,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     (
                         self.str_ctx.make_phf_key(&key),
                         SerdeProperty {
-                            rel_id: RelationshipId(DefId::unit()),
+                            rel_id: RelId(DefId::unit(), DefRelTag::flat_union()),
                             value_addr,
                             flags: SerdePropertyFlags::OPTIONAL,
                             value_generator: None,
@@ -394,7 +395,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         // avoid duplicated properties, since some properties may already be "imported" from unions in which
         // the types are members,
-        let mut dedup: FnvHashSet<RelationshipId> = Default::default();
+        let mut dedup: FnvHashSet<RelId> = Default::default();
 
         for (_, serde_property) in new_operator.properties.iter() {
             dedup.insert(serde_property.rel_id);
@@ -450,7 +451,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let _entered = debug_span!("lazy_union", addr=?addr.0, def=?def.def_id).entered();
 
         let union_discriminator = self
-            .rel_ctx
+            .misc_ctx
             .union_discriminators
             .get(&def.def_id)
             .expect("no union discriminator available. Should fail earlier");
@@ -520,7 +521,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         struct_addr: SerdeOperatorAddr,
         serde_variants: &mut Vec<SerdeUnionVariant>,
     ) -> Result<(), &str> {
-        let Some(properties) = self.rel_ctx.properties_by_def_id(type_def_id) else {
+        let Some(properties) = self.prop_ctx.properties_by_def_id(type_def_id) else {
             return Err("no properties");
         };
 
@@ -535,7 +536,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             return Err("no address for ID");
         };
 
-        let identifies_meta = rel_def_meta(identifies_relationship_id, self.defs);
+        let identifies_meta = rel_def_meta(identifies_relationship_id, self.rel_ctx, self.defs);
 
         let (id_property_name, id_leaf_discriminant) =
             match self.operators_by_addr.get(id_addr.0 as usize).unwrap() {

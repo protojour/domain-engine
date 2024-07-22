@@ -1,19 +1,19 @@
 (struct ($b)
-    (prop! $b R:1:0
+    (prop! $b rel@1:0:0
         (matrix (.. @d #u $a))
     )
 )
 
 (struct ($c)
-    (prop! $c R:2:1
+    (prop! $c rel@2:0:1
         (matrix (.. @d #u $a))
     )
 )
 
 |$b| (block
-    (let-prop [$d $e] ($b R:1:0))
+    (let-prop [$d $e] ($b rel@1:0:0))
     (struct ($c)
-        (prop! $c R:2:1
+        (prop! $c rel@2:0:1
             (make-matrix ($f $g)
                 (for-each $d $e ($_ $a)
                     (insert $f #u)

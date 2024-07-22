@@ -9,7 +9,7 @@ use ulid::Ulid;
 
 use crate::{
     impl_ontol_debug, interface::serde::operator::SerdeOperatorAddr, property::Cardinality,
-    query::order::Direction, tuple::CardinalIdx, DefId, DefIdSet, EdgeId, RelationshipId,
+    query::order::Direction, tuple::CardinalIdx, DefId, DefIdSet, EdgeId, RelId,
 };
 
 use super::{
@@ -124,7 +124,7 @@ pub struct Def {
     /// FIXME: This should really be connected to a DomainInterface.
     pub operator_addr: Option<SerdeOperatorAddr>,
     pub store_key: Option<TextConstant>,
-    pub data_relationships: FnvHashMap<RelationshipId, DataRelationshipInfo>,
+    pub data_relationships: FnvHashMap<RelId, DataRelationshipInfo>,
 }
 
 impl Def {
@@ -132,7 +132,7 @@ impl Def {
         match &self.kind {
             DefKind::Entity(info) => Some(info.name),
             DefKind::Data(info)
-            | DefKind::Relationship(info)
+            | DefKind::Relation(info)
             | DefKind::Function(info)
             | DefKind::Domain(info)
             | DefKind::Generator(info) => info.name,
@@ -149,13 +149,7 @@ impl Def {
 
     pub fn edge_relationships(
         &self,
-    ) -> impl Iterator<
-        Item = (
-            &RelationshipId,
-            &DataRelationshipInfo,
-            EdgeCardinalProjection,
-        ),
-    > {
+    ) -> impl Iterator<Item = (&RelId, &DataRelationshipInfo, EdgeCardinalProjection)> {
         self.data_relationships
             .iter()
             .filter_map(|(rel_id, info)| match info.kind {
@@ -168,7 +162,7 @@ impl Def {
         &self,
         name: &str,
         ontology: &Ontology,
-    ) -> Option<(RelationshipId, &DataRelationshipInfo)> {
+    ) -> Option<(RelId, &DataRelationshipInfo)> {
         self.data_relationships
             .iter()
             .find(|(_, rel)| &ontology[rel.name] == name)
@@ -180,7 +174,7 @@ impl Def {
 pub enum DefKind {
     Entity(Entity),
     Data(BasicDef),
-    Relationship(BasicDef),
+    Relation(BasicDef),
     Function(BasicDef),
     Domain(BasicDef),
     Generator(BasicDef),
@@ -194,7 +188,7 @@ pub struct BasicDef {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Entity {
     pub name: TextConstant,
-    pub id_relationship_id: RelationshipId,
+    pub id_relationship_id: RelId,
     pub id_value_def_id: DefId,
     pub id_operator_addr: SerdeOperatorAddr,
     /// Whether all inherent fields are part of the primary id of this entity.
@@ -273,7 +267,7 @@ pub struct EntityOrder {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct FieldPath(pub Box<[RelationshipId]>);
+pub struct FieldPath(pub Box<[RelId]>);
 
 #[derive(Serialize, Deserialize)]
 pub struct EdgeInfo {
@@ -344,7 +338,7 @@ impl Debug for EdgeCardinalProjection {
         write!(
             f,
             "{}:{}:{}<-{}",
-            self.id.0 .0 .0, self.id.0 .1, self.object, self.subject,
+            self.id.0 .0, self.id.1, self.object, self.subject,
         )
     }
 }

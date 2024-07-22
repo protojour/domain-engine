@@ -29,10 +29,12 @@ use super::{sequence_range_builder::SequenceRangeBuilder, SerdeIntersection, Ser
 use crate::{
     codegen::task::CodeCtx,
     compiler_queries::GetDefType,
-    def::{rel_def_meta, DefKind, Defs, TypeDef, TypeDefFlags},
+    def::{DefKind, Defs, TypeDef, TypeDefFlags},
     interface::graphql::graphql_namespace::{adapt_graphql_identifier, GqlAdaptedIdent},
+    misc::MiscCtx,
     primitive::PrimitiveKind,
-    relation::{Constructor, Properties, RelCtx, UnionMemberCache},
+    properties::{Constructor, PropCtx, Properties},
+    relation::{rel_def_meta, RelCtx, UnionMemberCache},
     repr::{
         repr_ctx::ReprCtx,
         repr_model::{ReprKind, ReprScalarKind},
@@ -48,6 +50,8 @@ pub struct SerdeGenerator<'c, 'm> {
     pub defs: &'c Defs<'m>,
     pub def_ty_ctx: &'c DefTypeCtx<'m>,
     pub rel_ctx: &'c RelCtx,
+    pub prop_ctx: &'c PropCtx,
+    pub misc_ctx: &'c MiscCtx,
     pub repr_ctx: &'c ReprCtx,
     pub patterns: &'c TextPatterns,
     pub code_ctx: &'c CodeCtx<'m>,
@@ -277,7 +281,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 trace!("Gen primary id: {def:?}");
 
                 let table = self
-                    .rel_ctx
+                    .prop_ctx
                     .properties_by_def_id
                     .get(&def.def_id)?
                     .table
@@ -285,7 +289,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 let (rel_id, _) = table.iter().find(|(_, property)| property.is_entity_id)?;
 
-                let meta = rel_def_meta(*rel_id, self.defs);
+                let meta = rel_def_meta(*rel_id, self.rel_ctx, self.defs);
 
                 let DefKind::TextLiteral(property_name) = *meta.relation_def_kind.value else {
                     return None;
@@ -350,7 +354,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         // FIXME: What about unions?
         let to_entity = self
-            .rel_ctx
+            .prop_ctx
             .properties_by_def_id(def.def_id)
             .map(|properties| properties.identified_by.is_some())
             .unwrap_or(false);
@@ -371,7 +375,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     fn alloc_def_type_operator(&mut self, def: SerdeDef) -> Option<OperatorAllocation> {
         match self.get_def_type(def.def_id) {
             Some(Type::Domain(def_id) | Type::Anonymous(def_id)) => {
-                let properties = self.rel_ctx.properties_by_def_id.get(def_id);
+                let properties = self.prop_ctx.properties_by_def_id.get(def_id);
                 let typename = self.str_ctx.intern_constant(self.get_typename(*def_id));
                 self.alloc_domain_type_serde_operator(def.with_def(*def_id), typename, properties)
             }
@@ -644,7 +648,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                                 )))
                                 .unwrap(),
                             Some(relationship_id) => {
-                                let meta = rel_def_meta(relationship_id, self.defs);
+                                let meta = rel_def_meta(relationship_id, self.rel_ctx, self.defs);
 
                                 self.gen_addr_lazy(SerdeKey::Def(
                                     def.with_def(meta.relationship.object.0),
@@ -801,7 +805,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     ) -> OperatorAllocation {
         let addr = self.alloc_addr(&def);
         let union_discriminator = self
-            .rel_ctx
+            .misc_ctx
             .union_discriminators
             .get(&def.def_id)
             .expect("no union discriminator available. Should fail earlier");
@@ -876,7 +880,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     }
 
     fn estimate_proper_entity_flag(&self, def_id: DefId, flags: &mut SerdeStructFlags) {
-        let Some(properties) = self.rel_ctx.properties_by_def_id(def_id) else {
+        let Some(properties) = self.prop_ctx.properties_by_def_id(def_id) else {
             return;
         };
         if properties.identified_by.is_none() {

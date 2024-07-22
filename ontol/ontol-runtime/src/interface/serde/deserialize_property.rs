@@ -3,7 +3,7 @@ use serde::{
     Deserializer,
 };
 
-use crate::{ontology::domain::DefKind, phf::PhfIndexMap, RelationshipId};
+use crate::{ontology::domain::DefKind, phf::PhfIndexMap, RelId};
 
 use super::{
     deserialize_struct::StructDeserializer,
@@ -20,7 +20,7 @@ pub enum PropKind<'on> {
     Property(usize, &'on SerdeProperty, RelParamsAddr),
     RelParams(SerdeOperatorAddr),
     SingletonId(SerdeOperatorAddr),
-    OverriddenId(RelationshipId, SerdeOperatorAddr),
+    OverriddenId(RelId, SerdeOperatorAddr),
     FlatUnionDiscriminator(usize, Box<str>, &'on SerdeProperty, SerdeOperatorAddr),
     FlatUnionData(Box<str>),
     Open(smartstring::alias::String),

@@ -1,29 +1,29 @@
 (struct ($e)
-    (prop! $e R:1:0
+    (prop! $e rel@1:0:0
         (struct ($f)
-            (prop! $f R:2:0
+            (prop! $f rel@2:0:0
                 (matrix (.. @a #u $b))
             )
         )
     )
-    (prop! $e R:1:1
+    (prop! $e rel@1:0:1
         (matrix (.. @c #u $d))
     )
 )
 
-// Note: The expr prop R:3:0 itself does not depend on anything in scope.
+// Note: The expr prop rel@3:0 itself does not depend on anything in scope.
 // So it's constant in this sense, but each _child_ need to _clone_ the original scope.
 (struct ($g)
-    (prop! $g R:3:0
+    (prop! $g rel@3:0:0
         (struct ($h)
-            (prop! $h R:4:0
+            (prop! $h rel@4:0:0
                 (struct ($i)
-                    (prop! $i R:5:0
+                    (prop! $i rel@5:0:0
                         (matrix (.. @a #u $b))
                     )
                 )
             )
-            (prop! $h R:4:1
+            (prop! $h rel@4:0:1
                 (matrix (.. @c #u $d))
             )
         )
@@ -31,15 +31,15 @@
 )
 
 |$e| (block
-    (let-prop $f ($e R:1:0))
-    (let-prop [$a $j] ($f R:2:0))
-    (let-prop [$c $k] ($e R:1:1))
+    (let-prop $f ($e rel@1:0:0))
+    (let-prop [$a $j] ($f rel@2:0:0))
+    (let-prop [$c $k] ($e rel@1:0:1))
     (struct ($g)
-        (prop! $g R:3:0
+        (prop! $g rel@3:0:0
             (struct ($h)
-                (prop! $h R:4:0
+                (prop! $h rel@4:0:0
                     (struct ($i)
-                        (prop! $i R:5:0
+                        (prop! $i rel@5:0:0
                             (make-matrix ($l $m)
                                 (for-each $a $j ($_ $b)
                                     (insert $l #u)
@@ -49,7 +49,7 @@
                         )
                     )
                 )
-                (prop! $h R:4:1
+                (prop! $h rel@4:0:1
                     (make-matrix ($n $o)
                         (for-each $c $k ($_ $d)
                             (insert $n #u)

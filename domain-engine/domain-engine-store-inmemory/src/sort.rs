@@ -6,15 +6,15 @@ use fnv::FnvHashMap;
 use itertools::Itertools;
 use ontol_runtime::{
     attr::Attr, ontology::domain::EntityOrder, query::filter::Filter, value::Value, DefId,
-    RelationshipId,
+    RelId,
 };
 
 use crate::core::{DbContext, DynamicKey};
 
-type Attrs = FnvHashMap<RelationshipId, Attr>;
+type Attrs = FnvHashMap<RelId, Attr>;
 
 pub(super) fn sort_props_vec(
-    raw_props_slice: &mut [(&DynamicKey, FnvHashMap<RelationshipId, Attr>)],
+    raw_props_slice: &mut [(&DynamicKey, FnvHashMap<RelId, Attr>)],
     def_id: DefId,
     filter: &Filter,
     ctx: &DbContext,
@@ -83,7 +83,7 @@ fn compare_entity_order(a: &Attrs, b: &Attrs, order: &EntityOrder) -> DomainResu
     Ok(Ordering::Equal)
 }
 
-fn attr_by_path<'v>(attrs: &'v Attrs, path: &[RelationshipId]) -> DomainResult<&'v Attr> {
+fn attr_by_path<'v>(attrs: &'v Attrs, path: &[RelId]) -> DomainResult<&'v Attr> {
     let property_id = path.first().unwrap();
 
     let attr = attrs

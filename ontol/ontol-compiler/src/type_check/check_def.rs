@@ -54,9 +54,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             DefKind::TextLiteral(_) => self.type_ctx.intern(Type::TextConstant(def_id)),
             DefKind::Regex(_) => self.type_ctx.intern(Type::Regex(def_id)),
-            DefKind::Relationship(relationship) => {
-                self.check_relationship(def_id, relationship, &def.span)
-            }
             DefKind::Edge => self.type_ctx.intern(Type::Tautology),
             DefKind::Primitive(kind, _ident) => {
                 self.type_ctx.intern(Type::Primitive(*kind, def_id))
@@ -101,6 +98,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             DefKind::Extern(_) => self.type_ctx.intern(Type::Extern(def_id)),
             DefKind::BuiltinRelType(..) => self.type_ctx.intern(Type::Tautology),
+            DefKind::FmtTransition(..) => self.type_ctx.intern(Type::Tautology),
             other => {
                 panic!("failed def typecheck: {other:?}");
             }

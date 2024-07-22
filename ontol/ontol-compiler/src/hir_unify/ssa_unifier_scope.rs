@@ -5,7 +5,7 @@ use ontol_hir::{
 };
 use ontol_runtime::{
     var::{Var, VarSet},
-    MapDirection, RelationshipId,
+    MapDirection, RelId,
 };
 use smallvec::smallvec;
 use thin_vec::{thin_vec, ThinVec};
@@ -452,7 +452,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
     fn traverse_prop(
         &mut self,
-        (flags, var, rel_id): (PropFlags, Var, RelationshipId),
+        (flags, var, rel_id): (PropFlags, Var, RelId),
         variant: &ontol_hir::PropVariant,
         span: SourceSpan,
         scoped: Scoped,

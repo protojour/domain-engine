@@ -23,7 +23,7 @@ use ontol_runtime::{
         config::{DataStoreConfig, PackageConfig},
         Ontology,
     },
-    PackageId, RelationshipId,
+    PackageId, RelId,
 };
 use tracing::info;
 
@@ -135,7 +135,7 @@ impl OntolTest {
         type_names.map(|type_name| DefBinding::new(self, type_name))
     }
 
-    pub fn prop_ids<const N: usize>(&self, props: [(&DefBinding, &str); N]) -> [RelationshipId; N] {
+    pub fn prop_ids<const N: usize>(&self, props: [(&DefBinding, &str); N]) -> [RelId; N] {
         props.map(|(binding, prop_name)| {
             let rel_id = binding.find_property(prop_name).unwrap();
 

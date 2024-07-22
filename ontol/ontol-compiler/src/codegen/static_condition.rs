@@ -118,7 +118,7 @@ impl<'c, 'm> ConditionBuilder<'c, 'm> {
 
                 let discr = self
                     .compiler
-                    .rel_ctx
+                    .misc_ctx
                     .union_discriminators
                     .get(&pre_narrowed_def_id)
                     .expect("narrowing must be union-based");

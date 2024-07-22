@@ -15,7 +15,7 @@ use ontol_runtime::{
     },
     tuple::CardinalIdx,
     value::{Serial, Value},
-    DefId, EdgeId, RelationshipId,
+    DefId, EdgeId, RelId,
 };
 use smallvec::SmallVec;
 use tracing::{debug, warn};
@@ -46,7 +46,7 @@ impl AsRef<DynamicKey> for DynamicKey {
     }
 }
 
-pub type VertexTable<K> = IndexMap<K, FnvHashMap<RelationshipId, Attr>>;
+pub type VertexTable<K> = IndexMap<K, FnvHashMap<RelId, Attr>>;
 
 #[derive(Debug)]
 pub(super) struct HyperEdgeTable {
@@ -200,14 +200,14 @@ impl InMemoryStore {
         &self,
         def_id: DefId,
         dynamic_key: &DynamicKey,
-    ) -> Option<&FnvHashMap<RelationshipId, Attr>> {
+    ) -> Option<&FnvHashMap<RelId, Attr>> {
         self.vertices.get(&def_id)?.get(dynamic_key)
     }
 }
 
 pub(crate) fn find_data_relationship<'a>(
     def: &'a Def,
-    rel_id: &RelationshipId,
+    rel_id: &RelId,
 ) -> DomainResult<&'a DataRelationshipInfo> {
     def.data_relationships.get(rel_id).ok_or_else(|| {
         warn!(

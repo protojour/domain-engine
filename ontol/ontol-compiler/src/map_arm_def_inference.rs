@@ -5,16 +5,18 @@ use ontol_runtime::{
     property::{PropertyCardinality, ValueCardinality},
     tuple::CardinalIdx,
     var::Var,
-    DefId, EdgeId, RelationshipId,
+    DefId, RelId,
 };
 use tracing::{debug, info};
 
 use crate::{
-    def::{rel_def_meta, Def, DefKind, Defs, RelParams, Relationship},
+    def::{DefKind, Defs},
+    edge::EdgeCtx,
     entity::entity_ctx::EntityCtx,
     pattern::{CompoundPatternAttrKind, PatId, Pattern, PatternKind, Patterns, TypePath},
     primitive::Primitives,
-    relation::{Property, RelCtx},
+    properties::{PropCtx, Property},
+    relation::{rel_def_meta, RelCtx, RelParams, Relationship},
     CompileError, CompileErrors, Compiler, SourceSpan,
 };
 
@@ -38,23 +40,31 @@ struct VarFlags {
     is_iter: bool,
 }
 
+#[derive(Default)]
+pub struct Outcome {
+    pub new_defs: Vec<DefId>,
+    pub new_rels: Vec<RelId>,
+}
+
 pub struct MapArmDefInferencer<'c, 'm> {
     map_def_id: DefId,
-    new_defs: Vec<DefId>,
+    outcome: Outcome,
     patterns: &'c Patterns,
-    relations: &'c mut RelCtx,
+    rel_ctx: &'c mut RelCtx,
+    prop_ctx: &'c mut PropCtx,
     defs: &'c mut Defs<'m>,
+    edge_ctx: &'c mut EdgeCtx,
     entity_ctx: &'c EntityCtx,
     primitives: &'c Primitives,
     errors: &'c mut CompileErrors,
 }
 
 impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
-    pub fn infer_map_arm_type(&mut self, info: MapArmTypeInferred) -> Vec<DefId> {
+    pub fn infer_map_arm_type(&mut self, info: MapArmTypeInferred) -> Outcome {
         let target_pattern = self.patterns.table.get(&info.target.0).unwrap();
 
         // Force creation of properties and table:
-        self.relations
+        self.prop_ctx
             .properties_by_def_id_mut(info.target.1)
             .table_mut();
 
@@ -66,7 +76,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
         );
 
         self.traverse_pattern(target_pattern, info.target.1, &source_variables);
-        std::mem::take(&mut self.new_defs)
+        std::mem::take(&mut self.outcome)
     }
 
     fn traverse_pattern(
@@ -154,12 +164,12 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                         ValueCardinality::Unit
                     };
 
-                    let relationship_id = self.defs.alloc_def_id(self.map_def_id.package_id());
+                    let edge_id = self.edge_ctx.alloc_edge_id(self.map_def_id.package_id());
 
                     let relationship = Relationship {
                         relation_def_id,
                         projection: EdgeCardinalProjection {
-                            id: EdgeId(relationship_id),
+                            id: edge_id,
                             object: CardinalIdx(0),
                             subject: CardinalIdx(0),
                             one_to_one: false,
@@ -179,17 +189,12 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                         rel_params: RelParams::Unit,
                     };
 
-                    self.defs.table.insert(
-                        relationship_id,
-                        Def {
-                            id: relationship_id,
-                            package: self.map_def_id.package_id(),
-                            kind: DefKind::Relationship(relationship),
-                            span: pattern.span,
-                        },
-                    );
+                    debug!("new rel for {parent_def_id:?}");
 
-                    self.new_defs.push(relationship_id);
+                    let rel_id = self.rel_ctx.alloc_rel_id(parent_def_id);
+                    self.rel_ctx.commit_rel(rel_id, relationship, pattern.span);
+
+                    self.outcome.new_rels.push(rel_id);
                 }
             }
             PatternKind::Compound { .. } => {
@@ -263,7 +268,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                 let TypePath::Specified { def_id, .. } = type_path else {
                     return;
                 };
-                let Some(properties) = self.relations.properties_by_def_id(*def_id) else {
+                let Some(properties) = self.prop_ctx.properties_by_def_id(*def_id) else {
                     return;
                 };
                 let Some(table) = properties.table.as_ref() else {
@@ -347,7 +352,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
         pattern: &Pattern,
         attr_relation_id: DefId,
         flags: VarFlags,
-        (parent_def_id, parent_table): (DefId, &IndexMap<RelationshipId, Property>),
+        (parent_def_id, parent_table): (DefId, &IndexMap<RelId, Property>),
         output: &mut FnvHashMap<Var, Vec<VarRelationship>>,
     ) {
         if attr_relation_id == self.primitives.relations.order {
@@ -398,7 +403,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                 }
                 PatternKind::Variable(pat_var) => {
                     let found = parent_table.iter().find_map(|(rel_id, _property)| {
-                        let meta = rel_def_meta(*rel_id, self.defs);
+                        let meta = rel_def_meta(*rel_id, self.rel_ctx, self.defs);
                         if meta.relationship.relation_def_id == attr_relation_id {
                             Some((*rel_id, meta))
                         } else {
@@ -486,10 +491,12 @@ impl<'m> Compiler<'m> {
     pub fn map_arm_def_inferencer(&mut self, map_def_id: DefId) -> MapArmDefInferencer<'_, 'm> {
         MapArmDefInferencer {
             map_def_id,
-            new_defs: vec![],
+            outcome: Outcome::default(),
             patterns: &self.patterns,
             defs: &mut self.defs,
-            relations: &mut self.rel_ctx,
+            edge_ctx: &mut self.edge_ctx,
+            rel_ctx: &mut self.rel_ctx,
+            prop_ctx: &mut self.prop_ctx,
             entity_ctx: &self.entity_ctx,
             primitives: &self.primitives,
             errors: &mut self.errors,

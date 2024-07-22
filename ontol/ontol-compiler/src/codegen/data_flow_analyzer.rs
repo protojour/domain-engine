@@ -7,24 +7,26 @@ use ontol_hir::{Pack, PropVariant, StructFlags};
 use ontol_runtime::{
     ontology::map::{PropertyFlow, PropertyFlowData},
     var::{Var, VarSet},
-    DefId, RelationshipId,
+    DefId, DefRelTag, RelId,
 };
 use tracing::warn;
 
 use crate::{
-    def::{Defs, RelDefMeta},
+    def::Defs,
+    relation::{RelCtx, RelDefMeta},
     typed_hir::TypedNodeRef,
     types::Type,
 };
 
 pub struct DataFlowAnalyzer<'c, 'm> {
     defs: &'c Defs<'m>,
-    rel_def_meta: &'c dyn Fn(RelationshipId, &'c Defs<'m>) -> RelDefMeta<'c, 'm>,
-    prop_origins: FnvHashMap<RelationshipId, Var>,
+    rel_ctx: &'c RelCtx,
+    rel_def_meta: &'c dyn Fn(RelId, &'c RelCtx, &'c Defs<'m>) -> RelDefMeta<'c, 'm>,
+    prop_origins: FnvHashMap<RelId, Var>,
     /// A table of which variable produce which properties
-    prop_origins_inverted: FnvHashMap<Var, FnvHashSet<RelationshipId>>,
+    prop_origins_inverted: FnvHashMap<Var, FnvHashSet<RelId>>,
     /// A mapping from a variable to its origin property
-    var_origins: FnvHashMap<Var, RelationshipId>,
+    var_origins: FnvHashMap<Var, RelId>,
     /// A mapping from variable to its dependencies
     var_dependencies: FnvHashMap<Var, VarSet>,
     property_flow: BTreeSet<PropertyFlow>,
@@ -44,10 +46,12 @@ impl<'c, 'm> Debug for DataFlowAnalyzer<'c, 'm> {
 impl<'c, 'm> DataFlowAnalyzer<'c, 'm> {
     pub fn new(
         defs: &'c Defs<'m>,
-        rel_def_meta: &'c dyn Fn(RelationshipId, &'c Defs<'m>) -> RelDefMeta<'c, 'm>,
+        rel_ctx: &'c RelCtx,
+        rel_def_meta: &'c dyn Fn(RelId, &'c RelCtx, &'c Defs<'m>) -> RelDefMeta<'c, 'm>,
     ) -> Self {
         Self {
             defs,
+            rel_ctx,
             rel_def_meta,
             prop_origins: FnvHashMap::default(),
             prop_origins_inverted: FnvHashMap::default(),
@@ -60,7 +64,7 @@ impl<'c, 'm> DataFlowAnalyzer<'c, 'm> {
     pub fn analyze(&mut self, arg: Var, body: TypedNodeRef<'_, 'm>) -> Option<Vec<PropertyFlow>> {
         self.var_dependencies.insert(arg, VarSet::default());
 
-        let unit_rel_id = RelationshipId(DefId::unit());
+        let unit_rel_id = RelId(DefId::unit(), DefRelTag(0));
 
         match body.kind() {
             ontol_hir::Kind::Struct(binder, flags, nodes) => {
@@ -100,7 +104,7 @@ impl<'c, 'm> DataFlowAnalyzer<'c, 'm> {
     fn analyze_node(
         &mut self,
         node_ref: TypedNodeRef<'_, 'm>,
-        parent_prop: RelationshipId,
+        parent_prop: RelId,
     ) -> VarSet {
         // debug!("{node_ref}");
 
@@ -307,7 +311,7 @@ impl<'c, 'm> DataFlowAnalyzer<'c, 'm> {
     fn reg_output_prop(
         &mut self,
         _struct_var: Var,
-        rel_id: RelationshipId,
+        rel_id: RelId,
         mut var_dependencies: VarSet,
     ) {
         while !var_dependencies.0.is_empty() {
@@ -345,8 +349,8 @@ impl<'c, 'm> DataFlowAnalyzer<'c, 'm> {
     /// The purpose of the value_def_id is for the query engine
     /// to understand which entity must be looked up.
     /// rel_params is ignored here.
-    fn reg_scope_prop(&mut self, struct_var: Var, rel_id: RelationshipId, ty: &Type) {
-        let meta = (*self.rel_def_meta)(rel_id, self.defs);
+    fn reg_scope_prop(&mut self, struct_var: Var, rel_id: RelId, ty: &Type) {
+        let meta = (*self.rel_def_meta)(rel_id, self.rel_ctx, self.defs);
         let (_, cardinality, _) = meta.relationship.subject();
 
         match ty {
@@ -401,10 +405,10 @@ impl<'c, 'm> DataFlowAnalyzer<'c, 'm> {
 
 fn register_children_recursive(
     var: Var,
-    rel_id: RelationshipId,
+    rel_id: RelId,
     var_dependencies: &FnvHashMap<Var, VarSet>,
     // var_to_prop: &FnvHashMap<Var, FnvHashSet<PropertyId>>,
-    var_origins: &FnvHashMap<Var, RelationshipId>,
+    var_origins: &FnvHashMap<Var, RelId>,
     output: &mut BTreeSet<PropertyFlow>,
 ) {
     if let Some(dependencies) = var_dependencies.get(&var) {
