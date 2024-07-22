@@ -4,9 +4,7 @@ use ahash::AHasher;
 use fnv::FnvHashMap;
 use ordered_float::NotNan;
 
-use crate::{
-    attr::Attr, sequence::Sequence, tuple::EndoTupleElements, value::Value, RelId,
-};
+use crate::{attr::Attr, sequence::Sequence, tuple::EndoTupleElements, value::Value, RelId};
 
 /// Determine ONTOL equality.
 ///

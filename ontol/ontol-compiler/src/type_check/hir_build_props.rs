@@ -304,10 +304,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             match_attributes.insert(
                 MatchAttributeKey::Def(self.primitives.relations.direction),
                 MatchAttribute {
-                    rel_id: RelId(
-                        self.primitives.relations.direction,
-                        DefRelTag::direction(),
-                    ),
+                    rel_id: RelId(self.primitives.relations.direction, DefRelTag::direction()),
                     cardinality: (PropertyCardinality::Optional, ValueCardinality::Unit),
                     rel_params_def: None,
                     value_def: self.primitives.direction_union,

@@ -101,11 +101,7 @@ impl<'c, 'm> DataFlowAnalyzer<'c, 'm> {
         )
     }
 
-    fn analyze_node(
-        &mut self,
-        node_ref: TypedNodeRef<'_, 'm>,
-        parent_prop: RelId,
-    ) -> VarSet {
+    fn analyze_node(&mut self, node_ref: TypedNodeRef<'_, 'm>, parent_prop: RelId) -> VarSet {
         // debug!("{node_ref}");
 
         let arena = node_ref.arena();
@@ -308,12 +304,7 @@ impl<'c, 'm> DataFlowAnalyzer<'c, 'm> {
         self.var_dependencies.entry(var).or_default().insert(dep);
     }
 
-    fn reg_output_prop(
-        &mut self,
-        _struct_var: Var,
-        rel_id: RelId,
-        mut var_dependencies: VarSet,
-    ) {
+    fn reg_output_prop(&mut self, _struct_var: Var, rel_id: RelId, mut var_dependencies: VarSet) {
         while !var_dependencies.0.is_empty() {
             let mut next_deps = VarSet::default();
 

@@ -60,10 +60,7 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn new_struct(
-        props: impl IntoIterator<Item = (RelId, Attr)>,
-        tag: ValueTag,
-    ) -> Self {
+    pub fn new_struct(props: impl IntoIterator<Item = (RelId, Attr)>, tag: ValueTag) -> Self {
         Self::Struct(Box::new(FnvHashMap::from_iter(props)), tag)
     }
 

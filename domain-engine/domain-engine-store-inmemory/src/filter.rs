@@ -38,10 +38,7 @@ pub(super) enum FilterAttr<'d> {
 }
 
 impl<'d> FilterVal<'d> {
-    fn from_entity(
-        entity_key: &'d VertexKey,
-        prop_tree: &'d FnvHashMap<RelId, Attr>,
-    ) -> Self {
+    fn from_entity(entity_key: &'d VertexKey, prop_tree: &'d FnvHashMap<RelId, Attr>) -> Self {
         Self::Struct {
             type_def_id: entity_key.type_def_id,
             dynamic_key: Some(&entity_key.dynamic_key),

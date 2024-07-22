@@ -144,8 +144,7 @@ impl<'d, 'o> Display for FormatPattern<'d, 'o> {
         for constant_part in &self.pattern.constant_parts {
             match (constant_part, self.value) {
                 (TextPatternConstantPart::AnyString { .. }, Value::Struct(attrs, _)) => {
-                    let rel_id =
-                        RelId(self.ontology.ontol_domain_meta().text, DefRelTag(0));
+                    let rel_id = RelId(self.ontology.ontol_domain_meta().text, DefRelTag(0));
                     let Some(attribute) = attrs.get(&rel_id) else {
                         error!("Attribute {rel_id} missing when formatting capturing text pattern");
                         return Err(std::fmt::Error);

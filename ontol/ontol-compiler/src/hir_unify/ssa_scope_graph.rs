@@ -19,11 +19,7 @@ use super::{ssa_unifier::SsaUnifier, UnifierResult};
 #[derive(Clone)]
 pub enum Let<'m> {
     Prop(Pack<Binding<'m, TypedHir>>, (Var, RelId)),
-    PropDefault(
-        Pack<Binding<'m, TypedHir>>,
-        (Var, RelId),
-        ThinVec<Node>,
-    ),
+    PropDefault(Pack<Binding<'m, TypedHir>>, (Var, RelId), ThinVec<Node>),
     Narrow(TypedHirData<'m, Var>),
     Regex(ThinVec<ThinVec<CaptureGroup<'m, TypedHir>>>, DefId, Var),
     RegexIter(

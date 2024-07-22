@@ -404,11 +404,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         def_id: DefId,
         property_field_producer: PropertyFieldProducer,
     ) {
-        let mut interface_variants: Vec<(
-            RelId,
-            RelationId,
-            &[UnionDiscriminatorVariant],
-        )> = Default::default();
+        let mut interface_variants: Vec<(RelId, RelationId, &[UnionDiscriminatorVariant])> =
+            Default::default();
 
         // See if it should be an interface of flattened unions
         if let Some(table) = self.prop_ctx.properties_table_by_def_id(def_id) {

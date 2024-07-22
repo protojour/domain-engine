@@ -77,11 +77,7 @@ impl Sequence {
         }
     }
 
-    fn define_element(
-        &mut self,
-        index: u16,
-        relationship_id: RelId,
-    ) -> Result<(), CompileError> {
+    fn define_element(&mut self, index: u16, relationship_id: RelId) -> Result<(), CompileError> {
         match self.elements.insert(index, relationship_id) {
             Some(_) => Err(CompileError::OverlappingSequenceIndexes),
             None => Ok(()),

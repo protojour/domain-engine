@@ -5,9 +5,7 @@ use std::ops::Range;
 use ontol_macros::OntolDebug;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    property::Cardinality, var::Var, vm::proc::Procedure, DefId, MapDirection, RelId,
-};
+use crate::{property::Cardinality, var::Var, vm::proc::Procedure, DefId, MapDirection, RelId};
 
 use super::ontol::TextConstant;
 

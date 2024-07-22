@@ -578,10 +578,7 @@ impl<'o> OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn struct_local_mut(
-        &mut self,
-        local: Local,
-    ) -> VmResult<&mut FnvHashMap<RelId, Attr>> {
+    fn struct_local_mut(&mut self, local: Local) -> VmResult<&mut FnvHashMap<RelId, Attr>> {
         match self.local_mut(local) {
             Value::Struct(attrs, _) => Ok(attrs.as_mut()),
             _ => Err(VmError::InvalidType(local)),
