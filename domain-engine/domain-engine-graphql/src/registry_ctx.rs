@@ -103,7 +103,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         FieldKind::Property { id: rel_id, .. } => self
                             .schema_ctx
                             .ontology
-                            .get_def_docs(rel_id.0)
+                            .get_rel_docs(*rel_id)
                             .map(|docs_constant| self.schema_ctx.ontology[docs_constant].into()),
                         _ => None,
                     },
@@ -220,7 +220,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     };
 
                     if let Some(docs_constant) =
-                        self.schema_ctx.ontology.get_def_docs(property.rel_id.0)
+                        self.schema_ctx.ontology.get_rel_docs(property.rel_id)
                     {
                         argument = argument.description(&self.schema_ctx.ontology[docs_constant]);
                     }
