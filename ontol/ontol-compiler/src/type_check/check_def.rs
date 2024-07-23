@@ -98,7 +98,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             DefKind::Extern(_) => self.type_ctx.intern(Type::Extern(def_id)),
             DefKind::BuiltinRelType(..) => self.type_ctx.intern(Type::Tautology),
-            DefKind::FmtTransition(..) => self.type_ctx.intern(Type::Tautology),
             other => {
                 panic!("failed def typecheck: {other:?}");
             }

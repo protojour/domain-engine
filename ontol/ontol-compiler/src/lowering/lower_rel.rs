@@ -206,7 +206,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         let has_object_prop = backward_relation.is_some();
 
         // This syntax just defines the relation the first time it's used
-        let relation_def_id = self.ctx.define_relation_if_undefined(key, ident_span);
+        let relation_def_id = self.ctx.define_relation_if_undefined(key);
 
         let rel_id = self.ctx.compiler.rel_ctx.alloc_rel_id(subject_ty.def_id);
         self.append_documentation(DocId::Rel(rel_id), rel_stmt.0.clone());

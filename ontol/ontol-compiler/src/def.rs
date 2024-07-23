@@ -44,8 +44,6 @@ pub enum DefKind<'m> {
     InlineUnion(BTreeSet<DefId>),
     BuiltinRelType(BuiltinRelationKind, Option<&'static str>),
     Edge,
-    // TODO: Find another way to represent this:
-    FmtTransition(DefId, FmtFinalState),
     // FIXME: This should not be builtin proc directly.
     // we may find the _actual_ builtin proc to call during type check,
     // if there are different variants per type.
@@ -76,8 +74,6 @@ impl<'m> DefKind<'m> {
             Self::InlineUnion(_) => None,
             Self::BuiltinRelType(_, ident) => ident.map(|ident| ident.into()),
             Self::Edge => None,
-            // Self::Relationship(_) => None,
-            Self::FmtTransition(..) => None,
             Self::Constant(_) => None,
             Self::Mapping { ident, .. } => ident.map(|ident| ident.into()),
             Self::AutoMapping => None,
@@ -116,9 +112,6 @@ bitflags::bitflags! {
         const BUILTIN_SYMBOL = 0b00001000;
     }
 }
-
-#[derive(Clone, Copy, Debug)]
-pub struct FmtFinalState(pub bool);
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug, RustDoc)]
 pub enum BuiltinRelationKind {

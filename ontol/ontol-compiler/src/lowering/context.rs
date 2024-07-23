@@ -21,7 +21,8 @@ use ontol_runtime::{
 use tracing::debug;
 
 use crate::{
-    def::{Def, DefKind, FmtFinalState, TypeDef, TypeDefFlags},
+    def::{Def, DefKind, TypeDef, TypeDefFlags},
+    fmt::FmtChain,
     namespace::Space,
     package::ONTOL_PKG,
     pattern::{Pattern, PatternKind},
@@ -50,6 +51,7 @@ pub type Res<T> = Result<T, LoweringError>;
 pub struct LoweringOutcome {
     pub root_defs: Vec<DefId>,
     pub rels: BTreeMap<PackageId, Vec<(RelId, Relationship, SourceSpan)>>,
+    pub fmt_chains: Vec<(DefId, FmtChain)>,
 }
 
 impl LoweringOutcome {
@@ -76,7 +78,6 @@ pub struct Extern(pub Option<U32Span>);
 pub enum RelationKey {
     Named(DefId),
     Builtin(DefId),
-    FmtTransition(DefId, FmtFinalState),
     Indexed,
 }
 
@@ -288,19 +289,9 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
         Ok(def_id)
     }
 
-    pub fn define_relation_if_undefined(&mut self, key: RelationKey, span: U32Span) -> DefId {
+    pub fn define_relation_if_undefined(&mut self, key: RelationKey) -> DefId {
         match key {
             RelationKey::Named(def_id) => def_id,
-            RelationKey::FmtTransition(def_ref, final_state) => {
-                let relation_def_id = self.compiler.defs.alloc_def_id(self.package_id);
-                self.set_def_kind(
-                    relation_def_id,
-                    DefKind::FmtTransition(def_ref, final_state),
-                    span,
-                );
-
-                relation_def_id
-            }
             RelationKey::Builtin(def_id) => def_id,
             RelationKey::Indexed => self.compiler.primitives.relations.indexed,
         }

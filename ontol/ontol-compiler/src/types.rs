@@ -86,10 +86,6 @@ impl<'m> Type<'m> {
         matches!(self, Self::Primitive(PrimitiveKind::Unit, _))
     }
 
-    pub fn is_anonymous(&self) -> bool {
-        matches!(self, Self::Anonymous(_))
-    }
-
     pub fn is_domain_specific(&self) -> bool {
         matches!(self, Self::Domain(_) | Self::Anonymous(_))
     }

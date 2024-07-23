@@ -1,17 +1,15 @@
-use ontol_runtime::{property::PropertyCardinality, DefId, EdgeId, RelId};
+use ontol_runtime::{property::PropertyCardinality, EdgeId, RelId};
 use tracing::debug;
 
 use crate::{
-    def::{BuiltinRelationKind, DefKind, FmtFinalState, TypeDef},
+    def::{BuiltinRelationKind, DefKind, TypeDef},
     error::CompileError,
     mem::Intern,
     misc::TypeParam,
     package::ONTOL_PKG,
-    primitive::PrimitiveKind,
-    properties::{Constructor, Properties, Property},
+    properties::{Constructor, Property},
     relation::Relationship,
     sequence::Sequence,
-    text_patterns::TextPatternSegment,
     thesaurus::TypeRelation,
     types::{FormatType, Type, TypeRef},
     SourceSpan,
@@ -46,10 +44,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             DefKind::BuiltinRelType(kind, _) => {
                 self.check_builtin_relation(rel_id, relationship, kind, span);
-            }
-            DefKind::FmtTransition(def_id, final_state) => {
-                self.check_def(*def_id);
-                self.check_fmt_relation(rel_id, relationship, *def_id, final_state, span);
             }
             _ => {
                 panic!()
@@ -395,69 +389,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
     }
 
-    fn check_fmt_relation(
-        &mut self,
-        relationship_id: RelId,
-        relationship: &Relationship,
-        relation_def_id: DefId,
-        final_state: &FmtFinalState,
-        span: &SourceSpan,
-    ) -> TypeRef<'m> {
-        let subject = &relationship.subject;
-        let object = &relationship.object;
-
-        let subject_ty = self.check_def(subject.0);
-        let object_ty = self.check_def(object.0);
-
-        match subject_ty {
-            Type::TextConstant(subject_def_id) if *subject_def_id == self.primitives.empty_text => {
-                if let Err(err) = self.extend_text_pattern_fmt_constructor(
-                    relation_def_id,
-                    (relationship_id, relationship),
-                    object.0,
-                    object_ty,
-                    TextPatternSegment::EmptyString,
-                    *final_state,
-                    span,
-                ) {
-                    return err;
-                }
-            }
-            Type::Anonymous(_) => {
-                debug!("Fmt subject anonymous object: {:?}", subject.0);
-                let subject_constructor = self
-                    .prop_ctx
-                    .properties_by_def_id(subject.0)
-                    .map(|props| &props.constructor);
-
-                let Some(Constructor::TextFmt(subject_pattern)) = subject_constructor else {
-                    return CompileError::ConstructorMismatch
-                        .span(*span)
-                        .report_ty(self);
-                };
-
-                if let Err(err) = self.extend_text_pattern_fmt_constructor(
-                    relation_def_id,
-                    (relationship_id, relationship),
-                    object.0,
-                    object_ty,
-                    subject_pattern.clone(),
-                    *final_state,
-                    span,
-                ) {
-                    return err;
-                }
-            }
-            _ => {
-                return CompileError::ConstructorMismatch
-                    .span(*span)
-                    .report_ty(self);
-            }
-        }
-
-        subject_ty
-    }
-
     fn check_subject_data_type(&mut self, ty: TypeRef<'m>, span: &SourceSpan) {
         let Some(def_id) = ty.get_single_def_id() else {
             CompileError::SubjectMustBeDomainType
@@ -499,73 +430,5 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 CompileError::MutationOfSealedDef.span(*span).report(self);
             }
         }
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn extend_text_pattern_fmt_constructor(
-        &mut self,
-        relation_def_id: DefId,
-        relationship: (RelId, &Relationship),
-        object_def: DefId,
-        object_ty: TypeRef<'m>,
-        origin: TextPatternSegment,
-        final_state: FmtFinalState,
-        span: &SourceSpan,
-    ) -> Result<(), TypeRef<'m>> {
-        let appendee = match self.defs.def_kind(relation_def_id) {
-            DefKind::Primitive(PrimitiveKind::Text, _) => TextPatternSegment::AnyString,
-            DefKind::TextLiteral(str) => TextPatternSegment::new_literal(str),
-            DefKind::Regex(_) => TextPatternSegment::Regex(
-                self.defs
-                    .literal_regex_meta_table
-                    .get(&relation_def_id)
-                    .expect("regex hir not found for literal regex")
-                    .hir
-                    .clone(),
-            ),
-            DefKind::Primitive(PrimitiveKind::Serial, _) => TextPatternSegment::Property {
-                rel_id: relationship.0,
-                type_def_id: relation_def_id,
-                segment: Box::new(TextPatternSegment::Serial { radix: 10 }),
-            },
-            _ => {
-                let constructor = self
-                    .prop_ctx
-                    .properties_by_def_id(relation_def_id)
-                    .map(Properties::constructor);
-
-                match constructor {
-                    Some(Constructor::TextFmt(rel_segment)) => TextPatternSegment::Property {
-                        rel_id: relationship.0,
-                        type_def_id: relation_def_id,
-                        segment: Box::new(rel_segment.clone()),
-                    },
-                    _ => {
-                        return Err(CompileError::CannotConcatenateStringPattern
-                            .span(*span)
-                            .report_ty(self))
-                    }
-                }
-            }
-        };
-
-        let object_properties = self.prop_ctx.properties_by_def_id_mut(object_def);
-
-        if !matches!(&object_properties.constructor, Constructor::Transparent) {
-            return Err(CompileError::ConstructorMismatch
-                .span(*span)
-                .report_ty(self));
-        }
-
-        object_properties.constructor =
-            Constructor::TextFmt(TextPatternSegment::concat([origin, appendee]));
-
-        if final_state.0 || !object_ty.is_anonymous() {
-            // constructors of unnamable types do not need to be processed..
-            // Register pattern processing for later:
-            self.misc_ctx.text_pattern_constructors.insert(object_def);
-        }
-
-        Ok(())
     }
 }

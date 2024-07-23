@@ -51,6 +51,7 @@ mod compiler_queries;
 mod def;
 mod edge;
 mod entity;
+mod fmt;
 mod hir_unify;
 mod interface;
 mod into_ontology;

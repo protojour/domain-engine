@@ -9,6 +9,7 @@ use ulid::Ulid;
 use crate::{
     def::DefKind,
     edge::EdgeCtx,
+    lowering::context::LoweringOutcome,
     package::ParsedPackage,
     relation::RelParams,
     repr::repr_model::ReprKind,
@@ -65,8 +66,26 @@ impl<'m> Compiler<'m> {
                 }
             });
 
+        self.handle_lowering_outcome(outcome);
+        self.seal_domain(package.package_id);
+
+        self.package_names
+            .push((package.package_id, self.str_ctx.intern_constant(&src.name)));
+
+        self.check_error()
+    }
+
+    fn handle_lowering_outcome(&mut self, outcome: LoweringOutcome) {
         for def_id in outcome.root_defs {
             self.type_check().check_def(def_id);
+        }
+
+        {
+            for (def_id, chain) in outcome.fmt_chains {
+                self.type_check().check_def(def_id);
+
+                self.check_fmt_chain(def_id, chain);
+            }
         }
 
         // commit relationships from outcome
@@ -90,13 +109,6 @@ impl<'m> Compiler<'m> {
                 type_check.check_rel(rel_id);
             }
         }
-
-        self.seal_domain(package.package_id);
-
-        self.package_names
-            .push((package.package_id, self.str_ctx.intern_constant(&src.name)));
-
-        self.check_error()
     }
 
     /// Do all the (remaining) checks and generations for the package/domain and seal it
