@@ -24,6 +24,9 @@ use tokio_stream::StreamExt;
 const JSON: &[u8] = b"application/json";
 const JSONLINES: &[u8] = b"application/jsonlines";
 
+pub type SessionFromRequest =
+    fn(&axum::http::Request<axum::body::Body>) -> Result<Session, (StatusCode, String)>;
+
 #[derive(Serialize)]
 pub struct ErrorJson {
     message: String,
@@ -33,11 +36,13 @@ pub struct ErrorJson {
 struct Endpoint {
     domain_engine: Arc<DomainEngine>,
     operator_addr: SerdeOperatorAddr,
+    session_from_request: SessionFromRequest,
 }
 
 pub fn create_httpjson_router(
     engine: Arc<DomainEngine>,
     package_id: PackageId,
+    session_from_request: SessionFromRequest,
 ) -> Option<axum::Router> {
     let httpjson = engine
         .ontology()
@@ -61,6 +66,7 @@ pub fn create_httpjson_router(
         let method_router: MethodRouter<(), Infallible> = method_router.with_state(Endpoint {
             domain_engine: engine.clone(),
             operator_addr: resource.operator_addr,
+            session_from_request,
         });
 
         let route_name = format!("/{}", &engine.ontology()[resource.name]);
@@ -74,6 +80,11 @@ async fn put_resource(
     State(endpoint): State<Endpoint>,
     request: axum::http::Request<axum::body::Body>,
 ) -> axum::response::Response {
+    let session = match (endpoint.session_from_request)(&request) {
+        Ok(session) => session,
+        Err((status, msg)) => return (status, json_error(msg)).into_response(),
+    };
+
     let content_type = request
         .headers()
         .get(CONTENT_TYPE)
@@ -82,8 +93,7 @@ async fn put_resource(
     let serde_processor = endpoint
         .domain_engine
         .ontology()
-        // FIXME: Need a new mode for put/"upsert" semantics?
-        .new_serde_processor(endpoint.operator_addr, ProcessorMode::Create);
+        .new_serde_processor(endpoint.operator_addr, ProcessorMode::Update);
 
     match content_type {
         Some(JSON) | None => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
@@ -121,7 +131,7 @@ async fn put_resource(
 
                 let result = endpoint
                     .domain_engine
-                    .store_new_entity(ontol_value, Select::Leaf, Session::default())
+                    .store_new_entity(ontol_value, Select::Leaf, session.clone())
                     .await;
 
                 if let Err(error) = result {

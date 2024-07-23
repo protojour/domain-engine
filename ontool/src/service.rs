@@ -178,7 +178,9 @@ fn domain_router(
     };
 
     if let Some(httpjson_router) =
-        domain_engine_httpjson::create_httpjson_router(engine, package_id)
+        domain_engine_httpjson::create_httpjson_router(engine, package_id, |_req| {
+            Ok(Session::default())
+        })
     {
         router = router.nest("/api", httpjson_router);
     }
