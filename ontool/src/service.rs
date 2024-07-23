@@ -172,10 +172,16 @@ fn domain_router(
                 )
                 .layer(Extension(Arc::new(GraphqlService {
                     schema,
-                    domain_engine: engine,
+                    domain_engine: engine.clone(),
                 })));
         }
     };
+
+    if let Some(httpjson_router) =
+        domain_engine_httpjson::create_httpjson_router(engine, package_id)
+    {
+        router = router.nest("/api", httpjson_router);
+    }
 
     Ok(router)
 }

@@ -878,6 +878,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "domain-engine-httpjson"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "domain-engine-core",
+ "domain-engine-test-utils",
+ "ontol-macros",
+ "ontol-runtime",
+ "ontol-test-utils",
+ "pretty_assertions",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "domain-engine-store-arango"
 version = "0.1.0"
 dependencies = [
@@ -2297,6 +2313,7 @@ dependencies = [
  "crossterm",
  "domain-engine-core",
  "domain-engine-graphql",
+ "domain-engine-httpjson",
  "domain-engine-store-inmemory",
  "domain-engine-test-utils",
  "futures",
