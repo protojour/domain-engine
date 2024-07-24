@@ -21,8 +21,7 @@ use tracing::{debug, error, trace};
 
 use crate::{
     data_store::{
-        self, BatchWriteRequest, WriteResponse, DataStore, DataStoreFactory,
-        DataStoreFactorySync,
+        self, BatchWriteRequest, DataStore, DataStoreFactory, DataStoreFactorySync, WriteResponse,
     },
     domain_error::DomainResult,
     select_data_flow::{translate_entity_select, translate_select},
@@ -277,8 +276,7 @@ impl DomainEngine {
 
         for (response, resolve_path) in responses.iter_mut().zip(ordered_resolve_paths) {
             match response {
-                WriteResponse::Inserted(mut_value)
-                | WriteResponse::Updated(mut_value) => {
+                WriteResponse::Inserted(mut_value) | WriteResponse::Updated(mut_value) => {
                     if let Some(resolve_path) = resolve_path {
                         for map_key in resolve_path.iter().rev() {
                             trace!("post-mutation translation {map_key:?}");
