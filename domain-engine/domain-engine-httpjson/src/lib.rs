@@ -4,10 +4,11 @@ use std::{convert::Infallible, sync::Arc};
 
 use axum::{
     body::Body,
-    extract::{FromRequest, State},
+    extract::{FromRequest, FromRequestParts},
     http::StatusCode,
     response::IntoResponse,
     routing::{MethodFilter, MethodRouter},
+    Extension,
 };
 use axum_extra::extract::JsonLines;
 use bytes::Bytes;
@@ -33,8 +34,6 @@ use tracing::error;
 
 mod content_type;
 
-pub type SessionFromRequest = fn(&http::Request<Body>) -> Result<Session, (StatusCode, String)>;
-
 #[derive(Serialize)]
 pub struct ErrorJson {
     message: String,
@@ -42,16 +41,18 @@ pub struct ErrorJson {
 
 #[derive(Clone)]
 struct Endpoint {
-    domain_engine: Arc<DomainEngine>,
+    engine: Arc<DomainEngine>,
     operator_addr: SerdeOperatorAddr,
-    session_from_request: SessionFromRequest,
 }
 
-pub fn create_httpjson_router(
+pub fn create_httpjson_router<State, Auth>(
     engine: Arc<DomainEngine>,
     package_id: PackageId,
-    session_from_request: SessionFromRequest,
-) -> Option<axum::Router> {
+) -> Option<axum::Router<State>>
+where
+    State: Send + Sync + Clone + 'static,
+    Auth: FromRequestParts<State> + Send + Into<Session> + 'static,
+{
     let httpjson = engine
         .ontology()
         .domain_interfaces(package_id)
@@ -62,36 +63,38 @@ pub fn create_httpjson_router(
         })
         .next()?;
 
-    let mut domain_router: axum::Router = axum::Router::new();
+    let mut domain_router: axum::Router<State> = axum::Router::new();
 
     for resource in &httpjson.resources {
-        let mut method_router: MethodRouter<Endpoint, Infallible> = MethodRouter::default();
+        let mut method_router: MethodRouter<State, Infallible> = MethodRouter::default();
 
         if resource.put.is_some() {
-            method_router = method_router.on(MethodFilter::PUT, put_resource);
+            method_router = method_router.on(MethodFilter::PUT, put_resource::<State, Auth>);
         }
 
-        let method_router: MethodRouter<(), Infallible> = method_router.with_state(Endpoint {
-            domain_engine: engine.clone(),
-            operator_addr: resource.operator_addr,
-            session_from_request,
-        });
-
         let route_name = format!("/{}", &engine.ontology()[resource.name]);
-        domain_router = domain_router.route(&route_name, method_router);
+        domain_router = domain_router.route(
+            &route_name,
+            method_router.layer(Extension(Endpoint {
+                engine: engine.clone(),
+                operator_addr: resource.operator_addr,
+            })),
+        );
     }
 
     Some(domain_router)
 }
 
-async fn put_resource(
-    State(endpoint): State<Endpoint>,
+async fn put_resource<State, Auth>(
+    Extension(endpoint): Extension<Endpoint>,
+    auth: Auth,
     req: axum::http::Request<Body>,
-) -> axum::response::Response {
-    let session = match (endpoint.session_from_request)(&req) {
-        Ok(session) => session,
-        Err((status, msg)) => return (status, json_error(msg)).into_response(),
-    };
+) -> axum::response::Response
+where
+    State: Send + Sync + Clone + 'static,
+    Auth: FromRequestParts<State> + Into<Session> + 'static,
+{
+    let session = auth.into();
 
     let json_content_type = match JsonContentType::parse(&req) {
         Ok(ct) => ct,
@@ -99,7 +102,7 @@ async fn put_resource(
     };
 
     let serde_processor = endpoint
-        .domain_engine
+        .engine
         .ontology()
         .new_serde_processor(endpoint.operator_addr, ProcessorMode::Update);
 
@@ -145,7 +148,7 @@ async fn put_resource(
     };
 
     let result = endpoint
-        .domain_engine
+        .engine
         .execute_writes(
             vec![BatchWriteRequest::Upsert(values, Select::EntityId)],
             session.clone(),

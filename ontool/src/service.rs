@@ -8,7 +8,7 @@ use std::{
 
 use crate::graphql::{domain_graphql_handler, graphiql_handler, GraphqlService};
 
-use axum::{routing::post, Extension};
+use axum::{extract::FromRequestParts, routing::post, Extension};
 use domain_engine_core::{DomainEngine, DomainError, DomainResult, Session};
 use domain_engine_graphql::{
     juniper,
@@ -178,9 +178,7 @@ fn domain_router(
     };
 
     if let Some(httpjson_router) =
-        domain_engine_httpjson::create_httpjson_router(engine, package_id, |_req| {
-            Ok(Session::default())
-        })
+        domain_engine_httpjson::create_httpjson_router::<(), DummyAuth>(engine, package_id)
     {
         router = router.nest("/api", httpjson_router);
     }
@@ -226,5 +224,25 @@ where
         };
 
         router.call(req)
+    }
+}
+
+struct DummyAuth;
+
+#[async_trait::async_trait]
+impl FromRequestParts<()> for DummyAuth {
+    type Rejection = Infallible;
+
+    async fn from_request_parts(
+        _req: &mut axum::http::request::Parts,
+        _state: &(),
+    ) -> Result<Self, Self::Rejection> {
+        Ok(Self)
+    }
+}
+
+impl From<DummyAuth> for Session {
+    fn from(_value: DummyAuth) -> Self {
+        Session::default()
     }
 }
