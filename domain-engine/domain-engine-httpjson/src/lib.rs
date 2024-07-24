@@ -14,6 +14,7 @@ use axum_extra::extract::JsonLines;
 use bytes::Bytes;
 use content_type::JsonContentType;
 use domain_engine_core::{data_store::BatchWriteRequest, DomainEngine, Session};
+use http_error::{domain_error_to_response, json_error, ErrorJson};
 use ontol_runtime::{
     attr::Attr,
     interface::{
@@ -27,17 +28,12 @@ use ontol_runtime::{
     value::Value,
     PackageId,
 };
-use serde::Serialize;
 use serde::{de::DeserializeSeed, Deserializer};
 use tokio_stream::StreamExt;
-use tracing::error;
+use tracing::{debug, error};
 
 mod content_type;
-
-#[derive(Serialize)]
-pub struct ErrorJson {
-    message: String,
-}
+mod http_error;
 
 #[derive(Clone)]
 struct Endpoint {
@@ -73,6 +69,8 @@ where
         }
 
         let route_name = format!("/{}", &engine.ontology()[resource.name]);
+        debug!("add route `{route_name}`");
+
         domain_router = domain_router.route(
             &route_name,
             method_router.layer(Extension(Endpoint {
@@ -156,14 +154,10 @@ where
         .await;
 
     if let Err(error) = result {
-        return (StatusCode::BAD_REQUEST, json_error(format!("{error}"))).into_response();
+        return domain_error_to_response(error);
     }
 
     StatusCode::OK.into_response()
-}
-
-fn json_error(message: String) -> axum::Json<ErrorJson> {
-    axum::Json(ErrorJson { message })
 }
 
 async fn read_next_json_line(

@@ -913,6 +913,7 @@ dependencies = [
  "domain-engine-core",
  "domain-engine-test-utils",
  "http",
+ "http-body-util",
  "mime",
  "ontol-macros",
  "ontol-runtime",
@@ -922,6 +923,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-stream",
+ "tower",
  "tracing",
  "tracing-subscriber",
 ]
@@ -1023,6 +1025,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "axum",
  "chrono",
  "domain-engine-core",
  "domain-engine-graphql",

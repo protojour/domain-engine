@@ -28,3 +28,5 @@ domain-engine-test-utils.path = "../domain-engine-test-utils"
 tracing-subscriber.workspace = true
 tokio.workspace = true
 pretty_assertions = "1"
+tower = "0.4"
+http-body-util = "0.1"

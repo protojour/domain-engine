@@ -30,6 +30,7 @@ use crate::{
     def::{BuiltinRelationKind, DefKind, TypeDef, TypeDefFlags},
     interface::{
         graphql::generate_schema::generate_graphql_schema,
+        httpjson::generate_httpjson_interface,
         serde::{serde_generator::SerdeGenerator, SerdeKey, EDGE_PROPERTY},
     },
     namespace::{DocId, Space},
@@ -296,6 +297,17 @@ impl<'m> Compiler<'m> {
             for package_id in package_ids.iter().cloned() {
                 if package_id == ONTOL_PKG {
                     continue;
+                }
+
+                if let Some(httpjson) = generate_httpjson_interface(
+                    package_id,
+                    builder.partial_ontology(),
+                    &mut serde_gen,
+                ) {
+                    interfaces
+                        .entry(package_id)
+                        .or_default()
+                        .push(DomainInterface::HttpJson(httpjson));
                 }
 
                 if let Some(schema) = generate_graphql_schema(

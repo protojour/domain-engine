@@ -2,6 +2,7 @@ use axum::body::Body;
 use axum::response::IntoResponse;
 use http::{header::CONTENT_TYPE, StatusCode};
 
+#[derive(Debug)]
 pub enum JsonContentType {
     Json,
     JsonLines,
