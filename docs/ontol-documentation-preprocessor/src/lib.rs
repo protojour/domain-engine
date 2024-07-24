@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use mdbook::errors::Error;
 use mdbook::{
     book::Book,

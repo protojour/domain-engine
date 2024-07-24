@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use anyhow::anyhow;
 use domain_engine_core::{
     data_store::{BatchWriteRequest, DataStoreAPI, Request, Response},

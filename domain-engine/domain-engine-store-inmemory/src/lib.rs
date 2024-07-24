@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use core::{DbContext, EdgeColumn, EdgeVectorData};
 use std::sync::Arc;
 

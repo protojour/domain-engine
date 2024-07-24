@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use std::{convert::Infallible, sync::Arc};
 
 use axum::{

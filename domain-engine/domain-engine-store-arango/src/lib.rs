@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 pub mod aql;
 mod arango_client;
 mod data_store;
