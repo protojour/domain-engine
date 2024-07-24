@@ -54,10 +54,10 @@ pub struct MissingJsonContentType;
 
 impl MissingJsonContentType {
     pub fn into_response(self) -> axum::response::Response {
-        return (
+        (
             StatusCode::UNSUPPORTED_MEDIA_TYPE,
             "Expected a json content type",
         )
-            .into_response();
+            .into_response()
     }
 }
