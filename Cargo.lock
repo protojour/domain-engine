@@ -909,8 +909,11 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "axum-extra",
+ "bytes",
  "domain-engine-core",
  "domain-engine-test-utils",
+ "http",
+ "mime",
  "ontol-macros",
  "ontol-runtime",
  "ontol-test-utils",
