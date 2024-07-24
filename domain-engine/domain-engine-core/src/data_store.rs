@@ -51,6 +51,7 @@ pub enum Request {
 pub enum BatchWriteRequest {
     Insert(Vec<Value>, Select),
     Update(Vec<Value>, Select),
+    Upsert(Vec<Value>, Select),
     Delete(Vec<Value>, DefId),
 }
 
@@ -60,26 +61,26 @@ pub enum BatchWriteRequest {
 #[derive(Serialize, Deserialize)]
 pub enum Response {
     Query(Sequence<Value>),
-    BatchWrite(Vec<BatchWriteResponse>),
+    BatchWrite(Vec<WriteResponse>),
 }
 
-impl From<Vec<BatchWriteResponse>> for Response {
-    fn from(value: Vec<BatchWriteResponse>) -> Self {
+impl From<Vec<WriteResponse>> for Response {
+    fn from(value: Vec<WriteResponse>) -> Self {
         Self::BatchWrite(value)
     }
 }
 
 impl Response {
     pub fn one_inserted(value: Value) -> Self {
-        Self::BatchWrite(vec![BatchWriteResponse::Inserted(vec![value])])
+        Self::BatchWrite(vec![WriteResponse::Inserted(value)])
     }
 }
 
 #[derive(Serialize, Deserialize)]
-pub enum BatchWriteResponse {
-    Inserted(Vec<Value>),
-    Updated(Vec<Value>),
-    Deleted(Vec<bool>),
+pub enum WriteResponse {
+    Inserted(Value),
+    Updated(Value),
+    Deleted(bool),
 }
 
 /// Trait for creating data store APIs

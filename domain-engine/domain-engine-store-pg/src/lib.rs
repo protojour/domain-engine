@@ -43,6 +43,11 @@ impl DataStoreAPI for PostgresDataStore {
                                 debug!("update {value:?}");
                             }
                         }
+                        BatchWriteRequest::Upsert(values, _) => {
+                            for value in values {
+                                debug!("upsert {value:?}");
+                            }
+                        }
                         BatchWriteRequest::Delete(values, _) => {
                             for value in values {
                                 debug!("delete {value:?}");

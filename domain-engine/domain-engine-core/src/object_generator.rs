@@ -114,6 +114,7 @@ impl<'e> ObjectGenerator<'e> {
                             panic!("Cannot auto increment value here");
                         }
                         Some(ValueGenerator::CreatedAtTime) => {
+                            // FIXME: upsert semantics!
                             if matches!(self.mode, ProcessorMode::Create) {
                                 struct_map.insert(
                                     property.rel_id,

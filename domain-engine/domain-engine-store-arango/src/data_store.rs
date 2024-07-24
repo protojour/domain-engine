@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, marker::PhantomData};
 
 use anyhow::anyhow;
 use domain_engine_core::{
-    data_store::{BatchWriteRequest, BatchWriteResponse, DataStoreAPI, Request, Response},
+    data_store::{BatchWriteRequest, DataStoreAPI, Request, Response, WriteResponse},
     object_generator::ObjectGenerator,
     DomainError, DomainResult, Session,
 };
@@ -185,32 +185,35 @@ impl ArangoDatabase {
     async fn batch_write(
         &self,
         requests: Vec<BatchWriteRequest>,
-    ) -> DomainResult<Vec<BatchWriteResponse>> {
+    ) -> DomainResult<Vec<WriteResponse>> {
         // TODO: set a threshold for bulk handling
         // TODO: sort requests if needed
-        let mut responses = vec![];
+        let mut all_responses = vec![];
         for request in requests {
-            let response = match request {
+            let responses = match request {
                 BatchWriteRequest::Insert(entities, select) => {
                     self.insert(entities, select).await?
                 }
                 BatchWriteRequest::Update(entities, select) => {
                     self.update(entities, select).await?
                 }
+                BatchWriteRequest::Upsert(..) => {
+                    return Err(DomainError::DataStore(anyhow!("upsert not supported yet")));
+                }
                 BatchWriteRequest::Delete(entities, def_id) => {
                     self.delete(entities, def_id).await?
                 }
             };
-            responses.push(response);
+            all_responses.extend(responses);
         }
-        Ok(responses)
+        Ok(all_responses)
     }
 
     async fn insert(
         &self,
         mut entities: Vec<Value>,
         select: Select,
-    ) -> DomainResult<BatchWriteResponse> {
+    ) -> DomainResult<Vec<WriteResponse>> {
         let seed: PhantomData<serde_json::Value> = PhantomData;
         let mut results = vec![];
 
@@ -287,14 +290,14 @@ impl ArangoDatabase {
             results.push(attr.into_unit().expect("not a unit"));
         }
 
-        Ok(BatchWriteResponse::Inserted(results))
+        Ok(results.into_iter().map(WriteResponse::Inserted).collect())
     }
 
     async fn update(
         &self,
         mut entities: Vec<Value>,
         select: Select,
-    ) -> DomainResult<BatchWriteResponse> {
+    ) -> DomainResult<Vec<WriteResponse>> {
         let seed: PhantomData<serde_json::Value> = PhantomData;
         let mut results = vec![];
 
@@ -370,10 +373,10 @@ impl ArangoDatabase {
             results.push(attr.into_unit().expect("not a unit"));
         }
 
-        Ok(BatchWriteResponse::Updated(results))
+        Ok(results.into_iter().map(WriteResponse::Updated).collect())
     }
 
-    async fn delete(&self, values: Vec<Value>, def_id: DefId) -> DomainResult<BatchWriteResponse> {
+    async fn delete(&self, values: Vec<Value>, def_id: DefId) -> DomainResult<Vec<WriteResponse>> {
         let mut results = vec![];
 
         for value in values {
@@ -419,7 +422,7 @@ impl ArangoDatabase {
             }
         }
 
-        Ok(BatchWriteResponse::Deleted(results))
+        Ok(results.into_iter().map(WriteResponse::Deleted).collect())
     }
 }
 

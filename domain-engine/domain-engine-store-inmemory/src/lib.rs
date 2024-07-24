@@ -13,7 +13,7 @@ use ontol_runtime::{DefId, EdgeId, PackageId};
 use tokio::sync::RwLock;
 
 use domain_engine_core::{
-    data_store::{BatchWriteRequest, BatchWriteResponse, DataStoreAPI, Request, Response},
+    data_store::{BatchWriteRequest, DataStoreAPI, Request, Response, WriteResponse},
     DomainResult,
 };
 use tracing::debug;
@@ -127,14 +127,13 @@ impl InMemoryDb {
                                 .generate_objects(value);
                             }
 
-                            responses.push(BatchWriteResponse::Inserted(
-                                entities
-                                    .into_iter()
-                                    .map(|entity| {
-                                        store.write_new_entity(entity, &select, &self.context)
-                                    })
-                                    .collect::<DomainResult<_>>()?,
-                            ));
+                            for value in entities {
+                                responses.push(WriteResponse::Inserted(store.write_new_entity(
+                                    value,
+                                    &select,
+                                    &self.context,
+                                )?))
+                            }
                         }
                         BatchWriteRequest::Update(mut entities, select) => {
                             for value in entities.iter_mut() {
@@ -146,19 +145,36 @@ impl InMemoryDb {
                                 .generate_objects(value);
                             }
 
-                            responses.push(BatchWriteResponse::Updated(
-                                entities
-                                    .into_iter()
-                                    .map(|entity| {
-                                        store.update_entity(entity, &select, &self.context)
-                                    })
-                                    .collect::<DomainResult<_>>()?,
-                            ));
+                            for value in entities {
+                                responses.push(WriteResponse::Inserted(store.update_entity(
+                                    value,
+                                    &select,
+                                    &self.context,
+                                )?))
+                            }
+                        }
+                        BatchWriteRequest::Upsert(mut entities, select) => {
+                            for value in entities.iter_mut() {
+                                ObjectGenerator::new(
+                                    ProcessorMode::Create,
+                                    &self.context.ontology,
+                                    self.context.system.as_ref(),
+                                )
+                                .generate_objects(value);
+                            }
+
+                            for value in entities {
+                                responses.push(store.upsert_entity(
+                                    value,
+                                    &select,
+                                    &self.context,
+                                )?);
+                            }
                         }
                         BatchWriteRequest::Delete(ids, def_id) => {
-                            responses.push(BatchWriteResponse::Deleted(
-                                store.delete_entities(ids, def_id)?,
-                            ));
+                            let deleted = store.delete_entities(ids, def_id)?;
+
+                            responses.extend(deleted.into_iter().map(WriteResponse::Deleted));
                         }
                     }
                 }

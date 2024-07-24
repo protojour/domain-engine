@@ -22,6 +22,7 @@ use ontol_runtime::{
 use tracing::{debug, debug_span, warn};
 
 use domain_engine_core::{
+    data_store::WriteResponse,
     entity_id_utils::{find_inherent_entity_id, try_generate_entity_id, GeneratedId},
     DomainError, DomainResult,
 };
@@ -43,13 +44,40 @@ enum EdgeWriteMode {
 }
 
 impl InMemoryStore {
+    pub fn upsert_entity(
+        &mut self,
+        value: Value,
+        select: &Select,
+        ctx: &DbContext,
+    ) -> DomainResult<WriteResponse> {
+        let entity_id = find_inherent_entity_id(&value, &ctx.ontology)?
+            .ok_or_else(|| DomainError::EntityNotFound)?;
+        let def = ctx.ontology.def(value.type_def_id());
+        let dynamic_key = Self::extract_dynamic_key(&entity_id)?;
+
+        if self
+            .vertices
+            .get(&def.id)
+            .unwrap()
+            .contains_key(&dynamic_key)
+        {
+            Ok(WriteResponse::Updated(
+                self.update_entity(value, select, ctx)?,
+            ))
+        } else {
+            Ok(WriteResponse::Inserted(
+                self.write_new_entity(value, select, ctx)?,
+            ))
+        }
+    }
+
     pub fn write_new_entity(
         &mut self,
-        entity: Value,
+        value: Value,
         select: &Select,
         ctx: &DbContext,
     ) -> DomainResult<Value> {
-        let entity_id = self.write_new_vertex_inner(entity, ctx)?;
+        let entity_id = self.write_new_vertex_inner(value, ctx)?;
         self.post_write_select(entity_id, select, ctx)
     }
 

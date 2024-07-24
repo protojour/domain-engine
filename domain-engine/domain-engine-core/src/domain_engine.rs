@@ -21,7 +21,7 @@ use tracing::{debug, error, trace};
 
 use crate::{
     data_store::{
-        self, BatchWriteRequest, BatchWriteResponse, DataStore, DataStoreFactory,
+        self, BatchWriteRequest, WriteResponse, DataStore, DataStoreFactory,
         DataStoreFactorySync,
     },
     domain_error::DomainResult,
@@ -134,7 +134,7 @@ impl DomainEngine {
         &self,
         mut requests: Vec<data_store::BatchWriteRequest>,
         session: Session,
-    ) -> DomainResult<Vec<data_store::BatchWriteResponse>> {
+    ) -> DomainResult<Vec<data_store::WriteResponse>> {
         let data_store = self.get_data_store()?;
         let ontology = self.ontology();
 
@@ -144,7 +144,8 @@ impl DomainEngine {
 
         for request in &mut requests {
             match request {
-                BatchWriteRequest::Insert(mut_values, select) => {
+                BatchWriteRequest::Insert(mut_values, select)
+                | BatchWriteRequest::Upsert(mut_values, select) => {
                     let down_path = self
                         .resolver_graph
                         .probe_path_for_select(
@@ -276,8 +277,8 @@ impl DomainEngine {
 
         for (response, resolve_path) in responses.iter_mut().zip(ordered_resolve_paths) {
             match response {
-                BatchWriteResponse::Inserted(mut_values)
-                | BatchWriteResponse::Updated(mut_values) => {
+                WriteResponse::Inserted(mut_value)
+                | WriteResponse::Updated(mut_value) => {
                     if let Some(resolve_path) = resolve_path {
                         for map_key in resolve_path.iter().rev() {
                             trace!("post-mutation translation {map_key:?}");
@@ -286,22 +287,20 @@ impl DomainEngine {
                                 .get_mapper_proc(&map_key)
                                 .expect("No mapping procedure for query output");
 
-                            for value in mut_values.iter_mut() {
-                                let mut vm = ontology.new_vm(procedure);
+                            let mut vm = ontology.new_vm(procedure);
 
-                                *value = self
-                                    .run_vm_to_completion(
-                                        &mut vm,
-                                        value.take(),
-                                        &mut None,
-                                        session.clone(),
-                                    )
-                                    .await?;
-                            }
+                            *mut_value = self
+                                .run_vm_to_completion(
+                                    &mut vm,
+                                    mut_value.take(),
+                                    &mut None,
+                                    session.clone(),
+                                )
+                                .await?;
                         }
                     }
                 }
-                BatchWriteResponse::Deleted(..) => {}
+                WriteResponse::Deleted(..) => {}
             }
         }
 
@@ -322,7 +321,7 @@ impl DomainEngine {
             )
             .await?;
 
-        let BatchWriteResponse::Inserted(entities) = write_responses
+        let WriteResponse::Inserted(value) = write_responses
             .into_iter()
             .next()
             .ok_or_else(|| DomainError::DataStore(anyhow!("Nothing got inserted")))?
@@ -332,10 +331,7 @@ impl DomainEngine {
             )));
         };
 
-        entities
-            .into_iter()
-            .next()
-            .ok_or_else(|| DomainError::DataStore(anyhow!("No entity inserted")))
+        Ok(value)
     }
 
     async fn run_vm_to_completion(

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use context::{SchemaCtx, SchemaType, ServiceCtx};
 use domain_engine_core::{
-    data_store::{BatchWriteRequest, BatchWriteResponse},
+    data_store::{BatchWriteRequest, WriteResponse},
     DomainError,
 };
 use gql_scalar::GqlScalar;
@@ -221,17 +221,13 @@ async fn mutation(
 
             for batch_write_response in batch_write_responses {
                 match batch_write_response {
-                    BatchWriteResponse::Inserted(values) | BatchWriteResponse::Updated(values) => {
-                        output_sequence.extend(values.into_iter().map(Into::into));
+                    WriteResponse::Inserted(value) | WriteResponse::Updated(value) => {
+                        output_sequence.push(value);
                     }
-                    BatchWriteResponse::Deleted(bools) => {
+                    WriteResponse::Deleted(bool) => {
                         let bool_type = schema_ctx.ontology.ontol_domain_meta().bool;
 
-                        output_sequence.extend(
-                            bools
-                                .into_iter()
-                                .map(|bool| Value::I64(if bool { 1 } else { 0 }, bool_type.into())),
-                        )
+                        output_sequence.push(Value::I64(if bool { 1 } else { 0 }, bool_type.into()))
                     }
                 }
             }
