@@ -13,11 +13,13 @@ map(foo ('_id': id), p0.db ('_id': id))
 map(bar ('_id': id), p1.db ('_id': id))
 
 //@ src_name=p0
-def db ( // ERROR multi-domain persistence detected
+domain 00000000000000000000000000 ()
+def db (
     rel. '_id'[rel* gen: auto]: (rel* is: serial)
 )
 
 //@ src_name=p1
-def db ( // ERROR multi-domain persistence detected
+domain 11111111111111111111111111 ()
+def db (
     rel. '_id'[rel* gen: auto]: (rel* is: serial)
 )

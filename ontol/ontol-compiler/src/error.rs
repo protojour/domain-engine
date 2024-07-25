@@ -217,8 +217,6 @@ pub enum CompileError {
     SpreadLabelMustBeLastArgument,
     /// modifier not recognized in this context
     InvalidModifier,
-    /// multi-domain persistence detected
-    MultiDomainPersistenceNotAllowed,
     /// cannot mix standalone symbol and symbolic edge in the same `sym` statement
     SymCannotMixStandaloneSymbolsAndSymbolicEdge,
     /// no trailing item expected

@@ -7,7 +7,10 @@ use fnv::FnvHashMap;
 use lowering::context::LoweringOutcome;
 use misc::MiscCtx;
 use properties::PropCtx;
-use std::ops::{Deref, Index};
+use std::{
+    collections::BTreeSet,
+    ops::{Deref, Index},
+};
 
 use codegen::task::{execute_codegen_tasks, CodeCtx};
 use def::Defs;
@@ -119,9 +122,9 @@ pub fn compile(
 
     compiler.package_config_table.clear();
 
-    if let Some(persistent_domain) = compiler.persistent_domain {
+    for persistent_pkg_id in &compiler.persistent_domains {
         compiler.package_config_table.insert(
-            persistent_domain,
+            *persistent_pkg_id,
             PackageConfig {
                 data_store: Some(DataStoreConfig::Default),
             },
@@ -188,9 +191,7 @@ struct Compiler<'m> {
     code_ctx: CodeCtx<'m>,
     resolver_graph: ResolverGraph,
 
-    /// The persistent domain, which is inferred at the end of compilation
-    /// TODO: Support multiple
-    persistent_domain: Option<PackageId>,
+    persistent_domains: BTreeSet<PackageId>,
 
     errors: CompileErrors,
 }
@@ -228,7 +229,7 @@ impl<'m> Compiler<'m> {
             text_patterns: TextPatterns::default(),
             code_ctx: Default::default(),
             resolver_graph: Default::default(),
-            persistent_domain: None,
+            persistent_domains: Default::default(),
             errors: Default::default(),
         }
     }

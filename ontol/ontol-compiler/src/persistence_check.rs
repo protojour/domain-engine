@@ -26,7 +26,7 @@ impl<'m> Compiler<'m> {
                 .push(*def_id);
         }
 
-        let mut non_mapped_entities_by_pkd_id: FnvHashMap<PackageId, FnvHashSet<DefId>> =
+        let mut non_mapped_entities_by_pkg_id: FnvHashMap<PackageId, FnvHashSet<DefId>> =
             Default::default();
 
         for (pkg_id, entities) in &entities_by_pkg_id {
@@ -34,7 +34,7 @@ impl<'m> Compiler<'m> {
                 if !self.resolver_graph.is_mapped_down(entity_def_id)
                     || !self.resolver_graph.is_mapped_up(entity_def_id)
                 {
-                    non_mapped_entities_by_pkd_id
+                    non_mapped_entities_by_pkg_id
                         .entry(*pkg_id)
                         .or_default()
                         .insert(*entity_def_id);
@@ -42,38 +42,24 @@ impl<'m> Compiler<'m> {
             }
         }
 
-        match non_mapped_entities_by_pkd_id.len() {
-            0 => {}
-            1 => {
-                let persistent_domain = non_mapped_entities_by_pkd_id.into_iter().next().unwrap().0;
-                let domain_id = self.domain_ids.get(&persistent_domain).unwrap();
+        for persistent_pkg_id in non_mapped_entities_by_pkg_id.keys() {
+            let domain_id = self.domain_ids.get(&persistent_pkg_id).unwrap();
 
-                if !domain_id.stable {
-                    let span = SourceSpan {
-                        source_id: self
-                            .sources
-                            .source_id_for_package(persistent_domain)
-                            .unwrap(),
-                        span: U32Span { start: 0, end: 0 },
-                    };
+            if !domain_id.stable {
+                let span = SourceSpan {
+                    source_id: self
+                        .sources
+                        .source_id_for_package(*persistent_pkg_id)
+                        .unwrap(),
+                    span: U32Span { start: 0, end: 0 },
+                };
 
-                    CompileError::TODO("persisted domain is missing domain header")
-                        .span(span)
-                        .report(self);
-                    return;
-                }
-
-                self.persistent_domain = Some(persistent_domain);
+                CompileError::TODO("persisted domain is missing domain header")
+                    .span(span)
+                    .report(self);
             }
-            _ => {
-                for (_pkg_id, entity_def_ids) in non_mapped_entities_by_pkd_id {
-                    for entity_def_id in entity_def_ids {
-                        CompileError::MultiDomainPersistenceNotAllowed
-                            .span(self.defs.def_span(entity_def_id))
-                            .report(self);
-                    }
-                }
-            }
+
+            self.persistent_domains.insert(*persistent_pkg_id);
         }
     }
 }
