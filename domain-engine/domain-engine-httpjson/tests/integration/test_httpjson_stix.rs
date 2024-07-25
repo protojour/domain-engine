@@ -36,7 +36,7 @@ async fn test_httpjson_stix(ds: &str) {
     let put_jsonlines_response = router
         .oneshot(
             Request::put("/stix-object")
-                .header(CONTENT_TYPE, "application/jsonlines")
+                .header(CONTENT_TYPE, "application/json-lines")
                 .body(jsonlines_body(vec![
                     testdata::course_of_action(),
                     testdata::url(),

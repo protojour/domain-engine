@@ -45,7 +45,7 @@ impl JsonContentType {
     fn from_subtype(subtype: &str) -> Result<Self, MissingJsonContentType> {
         match subtype {
             "json" => Ok(Self::Json),
-            "jsonlines" => Ok(Self::JsonLines),
+            "json-lines" => Ok(Self::JsonLines),
             _ => Err(MissingJsonContentType),
         }
     }
