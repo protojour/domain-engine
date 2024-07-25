@@ -1,4 +1,8 @@
-use domain_engine_core::{DomainEngine, Session};
+use anyhow::anyhow;
+use domain_engine_core::{
+    data_store::{BatchWriteRequest, WriteResponse},
+    DomainEngine, DomainError, DomainResult, Session,
+};
 use domain_engine_test_utils::{
     dynamic_data_store::DynamicDataStoreFactory, system::mock_current_time_monotonic, unimock,
     DomainEngineTestExt, TestFindQuery,
@@ -8,7 +12,7 @@ use ontol_runtime::{
     interface::serde::processor::{ProcessorProfile, ProcessorProfileFlags},
     ontology::Ontology,
     query::select::Select,
-    value::Serial,
+    value::{Serial, Value},
 };
 use ontol_test_utils::{
     assert_error_msg,
@@ -43,6 +47,32 @@ async fn make_domain_engine(
         .unwrap()
 }
 
+pub async fn insert_entity(
+    domain_engine: &DomainEngine,
+    entity: Value,
+    select: Select,
+    session: Session,
+) -> DomainResult<Value> {
+    let write_responses = domain_engine
+        .execute_writes(
+            vec![BatchWriteRequest::Insert(vec![entity], select)],
+            session,
+        )
+        .await?;
+
+    let WriteResponse::Inserted(value) = write_responses
+        .into_iter()
+        .next()
+        .ok_or_else(|| DomainError::DataStore(anyhow!("Nothing got inserted")))?
+    else {
+        return Err(DomainError::DataStore(anyhow!(
+            "Expected inserted entities"
+        )));
+    };
+
+    Ok(value)
+}
+
 #[ontol_macros::datastore_test(tokio::test)]
 async fn test_db_remigrate_noop(ds: &str) {
     let test = conduit_db().compile();
@@ -74,33 +104,33 @@ async fn test_db_multiple_persistent_domains(ds: &str) {
     let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds).await;
     let [conduit_user, ai_artist] = test.bind(["conduit_db.User", "artist_and_instrument.artist"]);
 
-    engine
-        .store_new_entity(
-            serde_create(&conduit_user)
-                .to_value(json!({
-                    "username": "u1",
-                    "email": "a@b",
-                    "password_hash": "s3cr3t",
-                }))
-                .unwrap(),
-            Select::EntityId,
-            Session::default(),
-        )
-        .await
-        .unwrap();
+    insert_entity(
+        &engine,
+        serde_create(&conduit_user)
+            .to_value(json!({
+                "username": "u1",
+                "email": "a@b",
+                "password_hash": "s3cr3t",
+            }))
+            .unwrap(),
+        Select::EntityId,
+        Session::default(),
+    )
+    .await
+    .unwrap();
 
-    engine
-        .store_new_entity(
-            serde_create(&ai_artist)
-                .to_value(json!({
-                    "name": "Some Artist"
-                }))
-                .unwrap(),
-            Select::EntityId,
-            Session::default(),
-        )
-        .await
-        .unwrap();
+    insert_entity(
+        &engine,
+        serde_create(&ai_artist)
+            .to_value(json!({
+                "name": "Some Artist"
+            }))
+            .unwrap(),
+        Select::EntityId,
+        Session::default(),
+    )
+    .await
+    .unwrap();
 }
 
 #[ontol_macros::datastore_test(tokio::test)]
@@ -110,92 +140,92 @@ async fn test_conduit_db_id_generation(ds: &str) {
     let [user, article, comment, tag_entity] =
         test.bind(["User", "Article", "Comment", "TagEntity"]);
 
-    engine
-        .store_new_entity(
-            serde_create(&user)
-                .to_value(json!({
-                    "username": "u1",
-                    "email": "a@b",
-                    "password_hash": "s3cr3t",
-                }))
-                .unwrap(),
-            Select::EntityId,
-            Session::default(),
-        )
-        .await
-        .unwrap();
+    insert_entity(
+        &engine,
+        serde_create(&user)
+            .to_value(json!({
+                "username": "u1",
+                "email": "a@b",
+                "password_hash": "s3cr3t",
+            }))
+            .unwrap(),
+        Select::EntityId,
+        Session::default(),
+    )
+    .await
+    .unwrap();
 
-    let explicit_user_id = engine
-        .store_new_entity(
-            // Store with the Read processor which supports specifying ID upfront
-            serde_read(&user)
-                .to_value(json!({
-                    "user_id": "67e55044-10b1-426f-9247-bb680e5fe0c8",
-                    "username": "u2",
-                    "email": "c@d",
-                    "password_hash": "s3cr3t",
-                }))
-                .unwrap(),
-            Select::EntityId,
-            Session::default(),
-        )
-        .await
-        .unwrap();
+    let explicit_user_id = insert_entity(
+        &engine,
+        // Store with the Read processor which supports specifying ID upfront
+        serde_read(&user)
+            .to_value(json!({
+                "user_id": "67e55044-10b1-426f-9247-bb680e5fe0c8",
+                "username": "u2",
+                "email": "c@d",
+                "password_hash": "s3cr3t",
+            }))
+            .unwrap(),
+        Select::EntityId,
+        Session::default(),
+    )
+    .await
+    .unwrap();
 
     expect_eq!(
         actual = format!("{:?}", explicit_user_id),
         expected = "OctetSequence([103, 229, 80, 68, 16, 177, 66, 111, 146, 71, 187, 104, 14, 95, 224, 200], tag(def@1:1, Some(TagFlags(0x0))))"
     );
 
-    let article_id: Uuid = engine
-        .store_new_entity(
-            serde_create(&article)
-                .to_value(json!({
-                    "slug": "foo",
-                    "title": "Foo",
-                    "description": "An article",
-                    "body": "The body",
-                    "author": {
-                        "user_id": "67e55044-10b1-426f-9247-bb680e5fe0c8",
-                    }
-                }))
-                .unwrap(),
-            Select::EntityId,
-            Session::default(),
-        )
-        .await
-        .unwrap()
-        .cast_into();
+    let article_id: Uuid = insert_entity(
+        &engine,
+        serde_create(&article)
+            .to_value(json!({
+                "slug": "foo",
+                "title": "Foo",
+                "description": "An article",
+                "body": "The body",
+                "author": {
+                    "user_id": "67e55044-10b1-426f-9247-bb680e5fe0c8",
+                }
+            }))
+            .unwrap(),
+        Select::EntityId,
+        Session::default(),
+    )
+    .await
+    .unwrap()
+    .cast_into();
 
-    engine
-        .store_new_entity(
-            serde_create(&comment)
-                .to_value(json!({
-                    "body": "Comment body",
-                    "author": {
-                        "user_id": "67e55044-10b1-426f-9247-bb680e5fe0c8",
-                    },
-                    "comment_on": {
-                        "article_id": article_id.to_string()
-                    }
-                }))
-                .unwrap(),
-            Select::EntityId,
-            Session::default(),
-        )
-        .await
-        .unwrap();
+    insert_entity(
+        &engine,
+        serde_create(&comment)
+            .to_value(json!({
+                "body": "Comment body",
+                "author": {
+                    "user_id": "67e55044-10b1-426f-9247-bb680e5fe0c8",
+                },
+                "comment_on": {
+                    "article_id": article_id.to_string()
+                }
+            }))
+            .unwrap(),
+        Select::EntityId,
+        Session::default(),
+    )
+    .await
+    .unwrap();
 
-    engine
-        .store_new_entity(
-            serde_create(&tag_entity)
-                .to_value(json!({ "tag": "foo" }))
-                .unwrap(),
-            Select::EntityId,
-            Session::default(),
-        )
-        .await
-        .unwrap();
+    insert_entity(
+        &engine,
+        serde_create(&tag_entity)
+            .to_value(json!({ "tag": "foo" }))
+            .unwrap(),
+        Select::EntityId,
+        Session::default(),
+    )
+    .await
+    .unwrap();
 }
 
 #[ontol_macros::datastore_test(tokio::test)]
@@ -204,57 +234,57 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
     let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds).await;
     let [user_def, article_def, comment_def] = test.bind(["User", "Article", "Comment"]);
 
-    let pre_existing_user_id: Uuid = engine
-        .store_new_entity(
-            serde_create(&user_def)
-                .to_value(json!({
-                    "username": "pre-existing",
-                    "email": "pre@existing",
-                    "password_hash": "s3cr3t",
-                }))
-                .unwrap(),
-            Select::EntityId,
-            Session::default(),
-        )
-        .await
-        .unwrap()
-        .cast_into();
+    let pre_existing_user_id: Uuid = insert_entity(
+        &engine,
+        serde_create(&user_def)
+            .to_value(json!({
+                "username": "pre-existing",
+                "email": "pre@existing",
+                "password_hash": "s3cr3t",
+            }))
+            .unwrap(),
+        Select::EntityId,
+        Session::default(),
+    )
+    .await
+    .unwrap()
+    .cast_into();
 
-    let article_id: Uuid = engine
-        .store_new_entity(
-            serde_create(&article_def)
-                .to_value(json!({
-                    "slug": "foo",
-                    "title": "Foo",
-                    "description": "An article",
-                    "body": "The body",
-                    "author": {
-                        "username": "new_user",
-                        "email": "new@user",
-                        "password_hash": "s3cr3t",
-                        "bio": "New bio",
-                        "following": [
-                            {
-                                "user_id": pre_existing_user_id.to_string(),
-                            }
-                        ]
-                    },
-                    "comments": [
+    let article_id: Uuid = insert_entity(
+        &engine,
+        serde_create(&article_def)
+            .to_value(json!({
+                "slug": "foo",
+                "title": "Foo",
+                "description": "An article",
+                "body": "The body",
+                "author": {
+                    "username": "new_user",
+                    "email": "new@user",
+                    "password_hash": "s3cr3t",
+                    "bio": "New bio",
+                    "following": [
                         {
-                            "body": "First post!",
-                            "author": {
-                                "user_id": pre_existing_user_id.to_string()
-                            }
-                        },
+                            "user_id": pre_existing_user_id.to_string(),
+                        }
                     ]
-                }))
-                .unwrap(),
-            Select::EntityId,
-            Session::default(),
-        )
-        .await
-        .unwrap()
-        .cast_into();
+                },
+                "comments": [
+                    {
+                        "body": "First post!",
+                        "author": {
+                            "user_id": pre_existing_user_id.to_string()
+                        }
+                    },
+                ]
+            }))
+            .unwrap(),
+        Select::EntityId,
+        Session::default(),
+    )
+    .await
+    .unwrap()
+    .cast_into();
 
     let users = engine
         .query_entities(user_def.struct_select([]).into(), Session::default())
@@ -371,23 +401,23 @@ async fn test_conduit_db_unresolved_foreign_key(ds: &str) {
     let [article] = test.bind(["Article"]);
 
     assert_error_msg!(
-        engine
-            .store_new_entity(
-                serde_create(&article)
-                    .to_value(json!({
-                        "slug": "foo",
-                        "title": "Foo",
-                        "description": "An article",
-                        "body": "The body",
-                        "author": {
-                            "user_id": "67e55044-10b1-426f-9247-bb680e5fe0c8",
-                        }
-                    }))
-                    .unwrap(),
-                Select::EntityId,
-                Session::default(),
-            )
-            .await,
+        insert_entity(
+            &engine,
+            serde_create(&article)
+                .to_value(json!({
+                    "slug": "foo",
+                    "title": "Foo",
+                    "description": "An article",
+                    "body": "The body",
+                    "author": {
+                        "user_id": "67e55044-10b1-426f-9247-bb680e5fe0c8",
+                    }
+                }))
+                .unwrap(),
+            Select::EntityId,
+            Session::default(),
+        )
+        .await,
         r#"unresolved foreign key: "67e55044-10b1-426f-9247-bb680e5fe0c8""#
     );
 }
@@ -402,33 +432,33 @@ async fn test_artist_and_instrument_fmt_id_generation(ds: &str) {
         test.ontology(),
     );
 
-    let generated_id = engine
-        .store_new_entity(
-            serde_create(&artist)
-                .to_value(json!({"name": "Igor Stravinskij" }))
-                .unwrap(),
-            Select::EntityId,
-            Session::default(),
-        )
-        .await
-        .unwrap();
+    let generated_id = insert_entity(
+        &engine,
+        serde_create(&artist)
+            .to_value(json!({"name": "Igor Stravinskij" }))
+            .unwrap(),
+        Select::EntityId,
+        Session::default(),
+    )
+    .await
+    .unwrap();
 
     let generated_id_json = serde_read(&artist_id).as_json(AttrRef::Unit(&generated_id));
     assert!(generated_id_json.as_str().unwrap().starts_with("artist/"));
 
-    let explicit_id = engine
-        .store_new_entity(
-            serde_read(&artist)
-                .to_value(json!({
-                    "ID": "artist/67e55044-10b1-426f-9247-bb680e5fe0c8",
-                    "name": "Karlheinz Stockhausen"
-                }))
-                .unwrap(),
-            Select::EntityId,
-            Session::default(),
-        )
-        .await
-        .unwrap();
+    let explicit_id = insert_entity(
+        &engine,
+        serde_read(&artist)
+            .to_value(json!({
+                "ID": "artist/67e55044-10b1-426f-9247-bb680e5fe0c8",
+                "name": "Karlheinz Stockhausen"
+            }))
+            .unwrap(),
+        Select::EntityId,
+        Session::default(),
+    )
+    .await
+    .unwrap();
 
     expect_eq!(
         actual = serde_read(&artist_id).as_json(AttrRef::Unit(&explicit_id)),
@@ -449,14 +479,14 @@ async fn test_artist_and_instrument_pagination(ds: &str) {
     ];
 
     for json in &entities {
-        engine
-            .store_new_entity(
-                serde_create(&artist).to_value(json.clone()).unwrap(),
-                Select::EntityId,
-                Session::default(),
-            )
-            .await
-            .unwrap();
+        insert_entity(
+            &engine,
+            serde_create(&artist).to_value(json.clone()).unwrap(),
+            Select::EntityId,
+            Session::default(),
+        )
+        .await
+        .unwrap();
     }
 
     fn extract_names(value: serde_json::Value) -> serde_json::Value {
@@ -488,14 +518,14 @@ async fn test_artist_and_instrument_filter_condition(ds: &str) {
     ];
 
     for json in &entities {
-        engine
-            .store_new_entity(
-                serde_create(&artist).to_value(json.clone()).unwrap(),
-                Select::EntityId,
-                Session::default(),
-            )
-            .await
-            .unwrap();
+        insert_entity(
+            &engine,
+            serde_create(&artist).to_value(json.clone()).unwrap(),
+            Select::EntityId,
+            Session::default(),
+        )
+        .await
+        .unwrap();
     }
 
     fn extract_names(value: serde_json::Value) -> serde_json::Value {

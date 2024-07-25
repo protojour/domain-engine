@@ -43,7 +43,7 @@ impl<'m> Compiler<'m> {
         }
 
         for persistent_pkg_id in non_mapped_entities_by_pkg_id.keys() {
-            let domain_id = self.domain_ids.get(&persistent_pkg_id).unwrap();
+            let domain_id = self.domain_ids.get(persistent_pkg_id).unwrap();
 
             if !domain_id.stable {
                 let span = SourceSpan {

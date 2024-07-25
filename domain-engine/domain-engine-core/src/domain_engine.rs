@@ -8,7 +8,7 @@ use ontol_runtime::{
     property::ValueCardinality,
     query::{
         condition::Condition,
-        select::{EntitySelect, Select, StructOrUnionSelect},
+        select::{EntitySelect, StructOrUnionSelect},
     },
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolvePath, ResolverGraph},
     sequence::Sequence,
@@ -303,33 +303,6 @@ impl DomainEngine {
         }
 
         Ok(responses)
-    }
-
-    /// Shorthand for storing one entity
-    pub async fn store_new_entity(
-        &self,
-        entity: Value,
-        select: Select,
-        session: Session,
-    ) -> DomainResult<Value> {
-        let write_responses = self
-            .execute_writes(
-                vec![BatchWriteRequest::Insert(vec![entity], select)],
-                session,
-            )
-            .await?;
-
-        let WriteResponse::Inserted(value) = write_responses
-            .into_iter()
-            .next()
-            .ok_or_else(|| DomainError::DataStore(anyhow!("Nothing got inserted")))?
-        else {
-            return Err(DomainError::DataStore(anyhow!(
-                "Expected inserted entities"
-            )));
-        };
-
-        Ok(value)
     }
 
     async fn run_vm_to_completion(
