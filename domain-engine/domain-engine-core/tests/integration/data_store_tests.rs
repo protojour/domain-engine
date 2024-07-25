@@ -67,6 +67,43 @@ async fn test_db_remigrate_noop(ds: &str) {
 }
 
 #[ontol_macros::datastore_test(tokio::test)]
+async fn test_db_multiple_persistent_domains(ds: &str) {
+    let test = TestPackages::with_static_sources([CONDUIT_DB, ARTIST_AND_INSTRUMENT])
+        .with_roots([CONDUIT_DB.0, ARTIST_AND_INSTRUMENT.0])
+        .compile();
+    let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds).await;
+    let [conduit_user, ai_artist] = test.bind(["conduit_db.User", "artist_and_instrument.artist"]);
+
+    engine
+        .store_new_entity(
+            serde_create(&conduit_user)
+                .to_value(json!({
+                    "username": "u1",
+                    "email": "a@b",
+                    "password_hash": "s3cr3t",
+                }))
+                .unwrap(),
+            Select::EntityId,
+            Session::default(),
+        )
+        .await
+        .unwrap();
+
+    engine
+        .store_new_entity(
+            serde_create(&ai_artist)
+                .to_value(json!({
+                    "name": "Some Artist"
+                }))
+                .unwrap(),
+            Select::EntityId,
+            Session::default(),
+        )
+        .await
+        .unwrap();
+}
+
+#[ontol_macros::datastore_test(tokio::test)]
 async fn test_conduit_db_id_generation(ds: &str) {
     let test = conduit_db().compile();
     let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds).await;

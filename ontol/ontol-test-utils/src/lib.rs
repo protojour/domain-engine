@@ -125,7 +125,13 @@ impl OntolTest {
         self.packages_by_source_name
             .get(source_name)
             .cloned()
-            .unwrap_or_else(|| panic!("PackageId for `{}` not found", source_name))
+            .unwrap_or_else(|| {
+                panic!(
+                    "PackageId for `{}` not found in {:?}",
+                    source_name,
+                    self.packages_by_source_name.keys()
+                )
+            })
     }
 
     /// Make new type bindings with the given type names.
