@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 
 use ontol_runtime::{
     ontology::{config::DataStoreConfig, Ontology},
@@ -19,17 +19,17 @@ pub trait DataStoreAPI {
 }
 
 pub struct DataStore {
-    package_id: PackageId,
+    package_ids: BTreeSet<PackageId>,
     api: Box<dyn DataStoreAPI + Send + Sync>,
 }
 
 impl DataStore {
-    pub fn new(package_id: PackageId, api: Box<dyn DataStoreAPI + Send + Sync>) -> Self {
-        Self { package_id, api }
+    pub fn new(package_ids: BTreeSet<PackageId>, api: Box<dyn DataStoreAPI + Send + Sync>) -> Self {
+        Self { package_ids, api }
     }
 
-    pub fn package_id(&self) -> PackageId {
-        self.package_id
+    pub fn package_ids(&self) -> &BTreeSet<PackageId> {
+        &self.package_ids
     }
 
     pub fn api(&self) -> &(dyn DataStoreAPI + Send + Sync) {
@@ -88,7 +88,7 @@ pub enum WriteResponse {
 pub trait DataStoreFactory {
     async fn new_api(
         &self,
-        package_id: PackageId,
+        persisted: &BTreeSet<PackageId>,
         config: DataStoreConfig,
         session: Session,
         ontology: Arc<Ontology>,
@@ -99,7 +99,7 @@ pub trait DataStoreFactory {
 pub trait DataStoreFactorySync {
     fn new_api_sync(
         &self,
-        package_id: PackageId,
+        persisted: &BTreeSet<PackageId>,
         config: DataStoreConfig,
         session: Session,
         ontology: Arc<Ontology>,

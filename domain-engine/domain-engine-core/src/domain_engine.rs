@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 
 use anyhow::{anyhow, Context};
 use ontol_runtime::{
@@ -243,7 +243,7 @@ impl DomainEngine {
                     ordered_resolve_paths.push(Some(up_path));
                 }
                 BatchWriteRequest::Delete(_ids, def_id) => {
-                    if def_id.package_id() != data_store.package_id() {
+                    if !data_store.package_ids().contains(&def_id.package_id()) {
                         // TODO: Do ids need to be translated?
                         let up_path = self
                             .resolver_graph
@@ -545,7 +545,7 @@ impl Builder {
 
     pub fn mock_data_store(mut self, package_id: PackageId, setup: impl unimock::Clause) -> Self {
         self.data_store = Some(DataStore::new(
-            package_id,
+            BTreeSet::from_iter([package_id]),
             Box::new(unimock::Unimock::new(setup)),
         ));
         self
@@ -563,10 +563,10 @@ impl Builder {
             None => {
                 let mut data_store: Option<DataStore> = None;
 
-                for (package_id, config) in data_store_backed_domains(&self.ontology) {
+                for (config, package_ids) in data_store_backed_domains(&self.ontology) {
                     let api = factory
                         .new_api(
-                            package_id,
+                            &package_ids,
                             config.clone(),
                             session.clone(),
                             self.ontology.clone(),
@@ -575,7 +575,7 @@ impl Builder {
                         .await
                         .with_context(|| format!("Failed to initialize data store {config:?}"))
                         .map_err(DomainError::DataStore)?;
-                    data_store = Some(DataStore::new(package_id, api));
+                    data_store = Some(DataStore::new(package_ids, api));
                 }
 
                 data_store
@@ -604,10 +604,10 @@ impl Builder {
             None => {
                 let mut data_store: Option<DataStore> = None;
 
-                for (package_id, config) in data_store_backed_domains(&self.ontology) {
+                for (config, package_ids) in data_store_backed_domains(&self.ontology) {
                     let api = factory
                         .new_api_sync(
-                            package_id,
+                            &package_ids,
                             config.clone(),
                             session.clone(),
                             self.ontology.clone(),
@@ -615,7 +615,7 @@ impl Builder {
                         )
                         .with_context(|| format!("Failed to initialize data store {config:?}"))
                         .map_err(DomainError::DataStore)?;
-                    data_store = Some(DataStore::new(package_id, api));
+                    data_store = Some(DataStore::new(package_ids, api));
                 }
 
                 data_store

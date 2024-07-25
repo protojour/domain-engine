@@ -52,7 +52,7 @@ async fn gitmesh_id_error() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(&test, SrcName::default(), ())
+            &gql_ctx_mock_data_store(&test, &[SrcName::default()], ())
         )
         .await
         .unwrap_first_exec_error_msg(),

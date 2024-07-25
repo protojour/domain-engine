@@ -19,7 +19,7 @@ async fn test_graphql_input_deserialization_error() {
     "
     .compile_single_schema();
 
-    let ctx = gql_ctx_mock_data_store(&test, root(), ());
+    let ctx = gql_ctx_mock_data_store(&test, &[root()], ());
     assert_error_msg!(
         r#"mutation {
             foo(create: [{
@@ -63,7 +63,7 @@ async fn test_graphql_input_constructor_sequence_as_json_scalar() {
             node { prop }
         }
     }"#
-    .exec([], &schema, &gql_ctx_mock_data_store(&test, root(), ()))
+    .exec([], &schema, &gql_ctx_mock_data_store(&test, &[root()], ()))
     .await
     .unwrap();
 }

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 
 use anyhow::anyhow;
 use domain_engine_core::{
@@ -36,7 +36,7 @@ impl DynamicDataStoreFactory {
 impl DataStoreFactory for DynamicDataStoreFactory {
     async fn new_api(
         &self,
-        package_id: PackageId,
+        package_ids: &BTreeSet<PackageId>,
         config: DataStoreConfig,
         session: Session,
         ontology: Arc<Ontology>,
@@ -47,19 +47,19 @@ impl DataStoreFactory for DynamicDataStoreFactory {
                 arango::ArangoTestDatastoreFactory {
                     recreate_db: self.recreate_db,
                 }
-                .new_api(package_id, config, session, ontology, system)
+                .new_api(package_ids, config, session, ontology, system)
                 .await
             }
             "inmemory" => {
                 InMemoryDataStoreFactory
-                    .new_api(package_id, config, session, ontology, system)
+                    .new_api(package_ids, config, session, ontology, system)
                     .await
             }
             "pg" => {
                 pg::PgTestDatastoreFactory {
                     recreate_db: self.recreate_db,
                 }
-                .new_api(package_id, config, session, ontology, system)
+                .new_api(package_ids, config, session, ontology, system)
                 .await
             }
             other => Err(anyhow!("unknown data store: `{other}`")),
@@ -75,22 +75,28 @@ impl DataStoreFactory for DynamicDataStoreFactory {
 impl DataStoreFactorySync for DynamicDataStoreFactory {
     fn new_api_sync(
         &self,
-        package_id: PackageId,
+        package_ids: &BTreeSet<PackageId>,
         config: DataStoreConfig,
         session: Session,
         ontology: Arc<Ontology>,
         system: ArcSystemApi,
     ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
         match self.name.as_str() {
-            "inmemory" => {
-                InMemoryDataStoreFactory.new_api_sync(package_id, config, session, ontology, system)
-            }
+            "inmemory" => InMemoryDataStoreFactory.new_api_sync(
+                package_ids,
+                config,
+                session,
+                ontology,
+                system,
+            ),
             other => panic!("cannot synchronously create `{other}` factory"),
         }
     }
 }
 
 mod arango {
+    use std::collections::BTreeSet;
+
     use domain_engine_core::Session;
     use ontol_runtime::ontology::Ontology;
 
@@ -103,7 +109,7 @@ mod arango {
     impl domain_engine_core::data_store::DataStoreFactory for ArangoTestDatastoreFactory {
         async fn new_api(
             &self,
-            package_id: ontol_runtime::PackageId,
+            package_ids: &BTreeSet<ontol_runtime::PackageId>,
             _config: ontol_runtime::ontology::config::DataStoreConfig,
             _session: Session,
             ontology: std::sync::Arc<Ontology>,
@@ -123,13 +129,14 @@ mod arango {
                 let _ = client.drop_database(db_name).await;
             }
             let mut db = client.db(db_name, ontology, system);
-            db.init(package_id, true).await.unwrap();
+            db.init(package_ids, true).await.unwrap();
             Ok(Box::new(db))
         }
     }
 }
 
 mod pg {
+    use std::collections::BTreeSet;
     use std::sync::{Arc, OnceLock};
 
     use domain_engine_core::data_store::{DataStoreAPI, Request, Response};
@@ -165,7 +172,7 @@ mod pg {
     impl domain_engine_core::data_store::DataStoreFactory for PgTestDatastoreFactory {
         async fn new_api(
             &self,
-            package_id: ontol_runtime::PackageId,
+            package_ids: &BTreeSet<ontol_runtime::PackageId>,
             config: ontol_runtime::ontology::config::DataStoreConfig,
             session: Session,
             ontology: std::sync::Arc<Ontology>,
@@ -173,7 +180,7 @@ mod pg {
         ) -> anyhow::Result<Box<dyn domain_engine_core::data_store::DataStoreAPI + Send + Sync>>
         {
             test_pg_api(
-                package_id,
+                package_ids,
                 config,
                 session,
                 ontology,
@@ -196,7 +203,7 @@ mod pg {
     }
 
     async fn test_pg_api(
-        package_id: ontol_runtime::PackageId,
+        package_ids: &BTreeSet<ontol_runtime::PackageId>,
         _config: ontol_runtime::ontology::config::DataStoreConfig,
         _session: Session,
         ontology: std::sync::Arc<Ontology>,
@@ -218,7 +225,7 @@ mod pg {
 
         let test_config = test_pg_config(&test_name);
 
-        connect_and_migrate(&[package_id], ontology.as_ref(), &test_config).await?;
+        connect_and_migrate(package_ids, ontology.as_ref(), &test_config).await?;
 
         let deadpool_manager = deadpool_postgres::Manager::from_config(
             test_config,

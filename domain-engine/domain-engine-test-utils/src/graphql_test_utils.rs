@@ -109,13 +109,16 @@ pub fn mock_data_store_query_entities_empty() -> impl unimock::Clause {
 
 pub fn gql_ctx_mock_data_store(
     ontol_test: &OntolTest,
-    data_store_package: SrcName,
+    data_store_packages: &[SrcName],
     setup: impl unimock::Clause,
 ) -> ServiceCtx {
     let unimock = Unimock::new(setup);
     let domain_engine = DomainEngine::builder(ontol_test.ontology_owned())
         .data_store(DataStore::new(
-            ontol_test.get_package_id(&data_store_package.0),
+            data_store_packages
+                .iter()
+                .map(|src_name| ontol_test.get_package_id(src_name.0.as_ref()))
+                .collect(),
             Box::new(unimock.clone()),
         ))
         .system(Box::new(unimock))

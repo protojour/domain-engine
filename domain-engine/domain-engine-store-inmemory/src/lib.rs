@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 use core::{DbContext, EdgeColumn, EdgeVectorData};
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use domain_engine_core::data_store::{DataStoreFactory, DataStoreFactorySync};
@@ -46,48 +47,54 @@ impl DataStoreAPI for InMemoryDb {
 }
 
 impl InMemoryDb {
-    fn new(package_id: PackageId, ontology: Arc<Ontology>, system: ArcSystemApi) -> Self {
-        let domain = ontology.find_domain(package_id).unwrap();
-
+    fn new(
+        package_ids: &BTreeSet<PackageId>,
+        ontology: Arc<Ontology>,
+        system: ArcSystemApi,
+    ) -> Self {
         let mut collections: FnvHashMap<DefId, VertexTable<DynamicKey>> = Default::default();
         let mut hyper_edges: FnvHashMap<EdgeId, HyperEdgeTable> = Default::default();
 
-        for def in domain.defs() {
-            if let Some(entity) = def.entity() {
-                debug!("new collection {:?} (`{}`)", def.id, &ontology[entity.name]);
+        for package_id in package_ids {
+            let domain = ontology.find_domain(*package_id).unwrap();
 
-                collections.insert(def.id, Default::default());
+            for def in domain.defs() {
+                if let Some(entity) = def.entity() {
+                    debug!("new collection {:?} (`{}`)", def.id, &ontology[entity.name]);
+
+                    collections.insert(def.id, Default::default());
+                }
             }
-        }
 
-        for (edge_id, edge_info) in domain.edges() {
-            let columns = edge_info
-                .cardinals
-                .iter()
-                .map(|cardinal| {
-                    let vector = if cardinal.flags.contains(EdgeCardinalFlags::ENTITY) {
-                        EdgeVectorData::Keys(vec![])
-                    } else {
-                        EdgeVectorData::Values(vec![])
-                    };
+            for (edge_id, edge_info) in domain.edges() {
+                let columns = edge_info
+                    .cardinals
+                    .iter()
+                    .map(|cardinal| {
+                        let vector = if cardinal.flags.contains(EdgeCardinalFlags::ENTITY) {
+                            EdgeVectorData::Keys(vec![])
+                        } else {
+                            EdgeVectorData::Values(vec![])
+                        };
 
-                    let mut vertex_union = FnvHashSet::default();
+                        let mut vertex_union = FnvHashSet::default();
 
-                    for def_id in cardinal.target.iter() {
-                        vertex_union.insert(*def_id);
-                    }
+                        for def_id in cardinal.target.iter() {
+                            vertex_union.insert(*def_id);
+                        }
 
-                    EdgeColumn {
-                        data: vector,
-                        vertex_union,
-                        unique: cardinal.flags.contains(EdgeCardinalFlags::UNIQUE),
-                    }
-                })
-                .collect();
+                        EdgeColumn {
+                            data: vector,
+                            vertex_union,
+                            unique: cardinal.flags.contains(EdgeCardinalFlags::UNIQUE),
+                        }
+                    })
+                    .collect();
 
-            hyper_edges
-                .entry(*edge_id)
-                .or_insert_with(|| HyperEdgeTable { columns });
+                hyper_edges
+                    .entry(*edge_id)
+                    .or_insert_with(|| HyperEdgeTable { columns });
+            }
         }
 
         Self {
@@ -194,25 +201,25 @@ pub struct InMemoryDataStoreFactory;
 impl DataStoreFactory for InMemoryDataStoreFactory {
     async fn new_api(
         &self,
-        package_id: PackageId,
+        package_ids: &BTreeSet<PackageId>,
         config: DataStoreConfig,
         session: Session,
         ontology: Arc<Ontology>,
         system: ArcSystemApi,
     ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
-        self.new_api_sync(package_id, config, session, ontology, system)
+        self.new_api_sync(package_ids, config, session, ontology, system)
     }
 }
 
 impl DataStoreFactorySync for InMemoryDataStoreFactory {
     fn new_api_sync(
         &self,
-        package_id: PackageId,
+        package_ids: &BTreeSet<PackageId>,
         _config: DataStoreConfig,
         _session: Session,
         ontology: Arc<Ontology>,
         system: ArcSystemApi,
     ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
-        Ok(Box::new(InMemoryDb::new(package_id, ontology, system)))
+        Ok(Box::new(InMemoryDb::new(package_ids, ontology, system)))
     }
 }

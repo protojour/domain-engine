@@ -53,7 +53,7 @@ async fn version() {
 
     expect_eq!(
         actual = "{_version}"
-            .exec([], &schema, &gql_ctx_mock_data_store(&test, root(), ()),)
+            .exec([], &schema, &gql_ctx_mock_data_store(&test, &[root()], ()),)
             .await,
         expected = Ok(graphql_value!({
             "_version": "0.0.0",
@@ -174,7 +174,7 @@ async fn int_scalars() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(&test, root(), mock_data_store_query_entities_empty()),
+            &gql_ctx_mock_data_store(&test, &[root()], mock_data_store_query_entities_empty()),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -210,7 +210,7 @@ async fn int_scalars() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(&test, root(), store_entity_mock),
+            &gql_ctx_mock_data_store(&test, &[root()], store_entity_mock),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -268,7 +268,7 @@ async fn non_entity_set_mutation() {
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
-                root(),
+                &[root()],
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::BatchWrite(_), _session))
                     .returns(Ok(Response::one_inserted(
@@ -316,7 +316,7 @@ async fn basic_inherent_auto_id_anonymous_type() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(&test, root(), mock_data_store_query_entities_empty()),
+            &gql_ctx_mock_data_store(&test, &[root()], mock_data_store_query_entities_empty()),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -353,7 +353,7 @@ async fn basic_pagination() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(&test, root(), mock_data_store_query_entities_empty()),
+            &gql_ctx_mock_data_store(&test, &[root()], mock_data_store_query_entities_empty()),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -380,7 +380,7 @@ async fn basic_pagination() {
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
-                root(),
+                &[root()],
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::Query(_), _session))
                     .answers(&|_, request, _| {
@@ -425,7 +425,7 @@ async fn basic_pagination() {
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
-                root(),
+                &[root()],
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::Query(_), _session))
                     .answers(&|_, request, _| {
@@ -488,7 +488,7 @@ async fn nodes() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(&test, root(), query_mock),
+            &gql_ctx_mock_data_store(&test, &[root()], query_mock),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -564,7 +564,7 @@ async fn inner_struct() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(&test, root(), mock_data_store_query_entities_empty()),
+            &gql_ctx_mock_data_store(&test, &[root()], mock_data_store_query_entities_empty()),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -602,7 +602,7 @@ async fn inner_struct() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(&test, root(), store_entity_mock),
+            &gql_ctx_mock_data_store(&test, &[root()], store_entity_mock),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -645,7 +645,7 @@ async fn docs_introspection() {
                 }
             }
         }"#
-        .exec([], &schema, &gql_ctx_mock_data_store(&test, root(), ()))
+        .exec([], &schema, &gql_ctx_mock_data_store(&test, &[root()], ()))
         .await,
         expected = Ok(graphql_value!({
             "__type": {
@@ -721,7 +721,7 @@ async fn artist_and_instrument_connections() {
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
-                root(),
+                &[root()],
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::Query(_), _session))
                     .returns(Ok(Response::Query(Sequence::from_iter([ziggy.clone()]))))
@@ -772,7 +772,7 @@ async fn artist_and_instrument_connections() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(&test, root(), mock_data_store_query_entities_empty()),
+            &gql_ctx_mock_data_store(&test, &[root()], mock_data_store_query_entities_empty()),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -814,7 +814,7 @@ async fn artist_and_instrument_connections() {
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
-                root(),
+                &[root()],
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::BatchWrite(..), _session))
                     .returns(Ok(Response::one_inserted(ziggy)))
@@ -838,7 +838,7 @@ async fn unified_mutation_error_on_unrecognized_arg() {
 
     expect_eq!(
         actual = "mutation { artist(bogus: null) { deleted } }"
-            .exec([], &schema, &gql_ctx_mock_data_store(&test, root(), ()))
+            .exec([], &schema, &gql_ctx_mock_data_store(&test, &[root()], ()))
             .await
             .unwrap_first_graphql_error_msg(),
         expected = "Unknown argument \"bogus\" on field \"artist\" of type \"Mutation\". At 0:18\n"
@@ -892,7 +892,7 @@ async fn unified_mutation_create() {
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
-                root(),
+                &[root()],
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::BatchWrite(..), _session))
                     .returns(Ok(Response::one_inserted(ziggy)))
@@ -963,7 +963,7 @@ async fn create_through_mapped_domain() {
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
-                ARTIST_AND_INSTRUMENT.0,
+                &[ARTIST_AND_INSTRUMENT.0],
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::BatchWrite(..), _session))
                     .returns(Ok(Response::one_inserted(ziggy)))
@@ -1044,7 +1044,7 @@ async fn create_through_three_domains() {
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
-                ARTIST_AND_INSTRUMENT.0,
+                &[ARTIST_AND_INSTRUMENT.0],
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::BatchWrite(..), _session))
                     .returns(Ok(Response::one_inserted(ziggy)))
@@ -1112,7 +1112,7 @@ async fn guitar_synth_union_selection() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(&test, root(), query_mock)
+            &gql_ctx_mock_data_store(&test, &[root()], query_mock)
         )
         .await,
         expected = Ok(graphql_value!({
@@ -1213,7 +1213,7 @@ async fn graphql_guitar_synth_union_input_exec() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(&test, root(), store_entity_mock)
+            &gql_ctx_mock_data_store(&test, &[root()], store_entity_mock)
         )
         .await,
         expected = Ok(graphql_value!({
@@ -1247,7 +1247,7 @@ async fn guitar_synth_union_input_error_span() {
                 }
             }
         }"#
-        .exec([], &schema, &gql_ctx_mock_data_store(&test, root(), ()))
+        .exec([], &schema, &gql_ctx_mock_data_store(&test, &[root()], ()))
         .await
         .unwrap_first_exec_error_msg(),
         expected = "invalid type, expected `instrument` (`guitar` or `synth`) in input at line 4 column 20"
@@ -1287,7 +1287,7 @@ async fn municipalities() {
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
-                MUNICIPALITIES.0,
+                &[MUNICIPALITIES.0],
                 mock_data_store_query_entities_empty()
             )
         )
@@ -1346,7 +1346,7 @@ async fn municipalities_named_query() {
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
-                MUNICIPALITIES.0,
+                &[MUNICIPALITIES.0],
                 mock_data_store_query_entities_empty()
             )
         )
@@ -1374,7 +1374,7 @@ async fn municipalities_named_query() {
     expect_eq!(
         actual = fetch_osl(
             &schema,
-            &gql_ctx_mock_data_store(&test, MUNICIPALITIES.0, query_mock)
+            &gql_ctx_mock_data_store(&test, &[MUNICIPALITIES.0], query_mock)
         )
         .await,
         expected = Ok(graphql_value!({
@@ -1445,7 +1445,7 @@ async fn open_data() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(&test, root(), store_entity_mock)
+            &gql_ctx_mock_data_store(&test, &[root()], store_entity_mock)
                 .with_serde_processor_profile_flags(
                     ProcessorProfileFlags::DESERIALIZE_OPEN_DATA
                         | ProcessorProfileFlags::SERIALIZE_OPEN_DATA
@@ -1482,7 +1482,7 @@ async fn open_data_disabled() {
                 node { id }
             }
         }"#
-        .exec([], &schema, &gql_ctx_mock_data_store(&test, root(), ()))
+        .exec([], &schema, &gql_ctx_mock_data_store(&test, &[root()], ()))
         .await
         .unwrap_first_exec_error_msg(),
         expected = "unknown property `open_prop` in input at line 1 column 25"
@@ -1506,7 +1506,7 @@ async fn open_data_disabled() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(&test, root(), store_entity_mock)
+            &gql_ctx_mock_data_store(&test, &[root()], store_entity_mock)
         )
         .await
         .unwrap_first_exec_error_msg(),
@@ -1622,7 +1622,7 @@ async fn test_constant_index_panic() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(&test, src_name("events"), store_entity_mock),
+            &gql_ctx_mock_data_store(&test, &[src_name("events")], store_entity_mock),
         )
         .await;
 }
@@ -1720,7 +1720,7 @@ async fn flattened_union_entity() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(&test, root(), store_entity_mock)
+            &gql_ctx_mock_data_store(&test, &[root()], store_entity_mock)
         )
         .await,
         expected = Ok(graphql_value!({

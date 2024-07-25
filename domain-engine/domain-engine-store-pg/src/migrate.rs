@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use anyhow::{anyhow, Context};
 use fnv::FnvHashMap;
 use indoc::indoc;
@@ -46,7 +48,7 @@ impl TryFrom<i32> for RegVersion {
 type DomainId = ulid::Ulid;
 
 pub async fn connect_and_migrate(
-    persistent_domains: &[PackageId],
+    persistent_domains: &BTreeSet<PackageId>,
     ontology: &Ontology,
     pg_config: &tokio_postgres::Config,
 ) -> anyhow::Result<()> {
@@ -70,7 +72,7 @@ pub async fn connect_and_migrate(
 }
 
 async fn migrate(
-    persistent_domains: &[PackageId],
+    persistent_domains: &BTreeSet<PackageId>,
     ontology: &Ontology,
     db_name: &str,
     pg_client: &mut Client,

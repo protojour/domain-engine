@@ -22,7 +22,7 @@ use serde::{
 use serde_json::{json, Value};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::{
-    collections::HashMap,
+    collections::{BTreeSet, HashMap},
     fmt::{Display, Formatter},
     sync::Arc,
 };
@@ -287,24 +287,28 @@ impl ArangoClient {
 }
 
 /// Get a canonical ArangoDB collection name from ONTOL def
+/// FIXME: There is no namespacing going on in ArangoDB (yet).
 fn get_collection_name(def: &Def, ontology: &Ontology) -> Ident {
     let text_constant = match def.store_key {
         Some(store_key) => store_key,
         None => def.name().expect("type should have a name"),
     };
-    let mut name = ontology[text_constant]
-        .to_ascii_lossy()
-        .replace("[?]", "_")
-        .to_string();
+    let mut name = ontology[text_constant].to_ascii_lossy().replace("[?]", "_");
     name.truncate(256);
     Ident::new(name)
 }
 
 impl ArangoDatabase {
     /// Initialize collections and database from ontology
-    pub async fn init(&mut self, package_id: PackageId, provision_db: bool) -> anyhow::Result<()> {
+    pub async fn init(
+        &mut self,
+        package_ids: &BTreeSet<PackageId>,
+        provision_db: bool,
+    ) -> anyhow::Result<()> {
         if self.collections.is_empty() {
-            self.populate_collections(package_id)?;
+            for package_id in package_ids {
+                self.populate_collections(*package_id)?;
+            }
         }
 
         if !provision_db {
@@ -356,6 +360,7 @@ impl ArangoDatabase {
             .expect("package id should match a domain");
 
         let mut subject_names_by_edge_id: HashMap<EdgeId, TextConstant> = Default::default();
+        let mut collection_name_collisions: BTreeSet<String> = Default::default();
 
         // collections
         // TODO: handle rare collisions after ASCII/length coercion
@@ -365,7 +370,9 @@ impl ArangoDatabase {
             }
 
             let collection = get_collection_name(def, &self.ontology);
-            self.collections.insert(def.id, collection.clone());
+            if let Some(prev_collection) = self.collections.insert(def.id, collection.clone()) {
+                collection_name_collisions.insert(prev_collection.raw_str().to_string());
+            }
 
             for data_relationship in def.data_relationships.values() {
                 if let DataRelationshipKind::Edge(projection) = data_relationship.kind {
@@ -391,6 +398,12 @@ impl ArangoDatabase {
 
             self.edge_collections
                 .insert(*edge_id, EdgeCollection { name, rel_params });
+        }
+
+        if !collection_name_collisions.is_empty() {
+            return Err(anyhow!(
+                "collection name collisions: {collection_name_collisions:?}"
+            ));
         }
 
         Ok(())
