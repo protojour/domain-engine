@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{hash_map::Entry, BTreeMap, HashMap},
     fmt::{Display, Formatter, Result},
     ops::Range,
 };
@@ -56,7 +56,7 @@ pub struct MetaQueryData {
     /// Optional Direction for edges
     pub direction: Option<Direction>,
     /// Optional OPTIONS JSON object
-    pub options: Option<String>,
+    pub options: Options,
 }
 
 impl<'a> MetaQuery<'a> {
@@ -215,7 +215,7 @@ pub struct Upsert {
     pub insert: Insert,
     pub update: Update,
     pub collection: Ident,
-    pub options: Option<String>,
+    pub options: Options,
 }
 
 /// AQL INSERT statement
@@ -223,7 +223,7 @@ pub struct Upsert {
 pub struct Insert {
     pub data: String,
     pub collection: Ident,
-    pub options: Option<String>,
+    pub options: Options,
 }
 
 /// AQL UPDATE statement
@@ -232,7 +232,7 @@ pub struct Update {
     pub var: Option<String>,
     pub data: String,
     pub collection: Ident,
-    pub options: Option<String>,
+    pub options: Options,
 }
 
 /// AQL REMOVE statement
@@ -240,7 +240,7 @@ pub struct Update {
 pub struct Remove {
     pub key: String,
     pub collection: Ident,
-    pub options: Option<String>,
+    pub options: Options,
 }
 
 /// AQL RETURN statement
@@ -251,6 +251,47 @@ pub struct Return {
     pub merge: Option<String>,
     pub pre_merge: Option<String>,
     pub post_merge: Option<String>,
+}
+
+#[derive(Clone, Default, Debug)]
+pub struct Options {
+    pub map: BTreeMap<&'static str, serde_json::Value>,
+}
+
+impl Options {
+    pub fn new<const N: usize>(options: [(&'static str, serde_json::Value); N]) -> Self {
+        Self {
+            map: options.into_iter().collect(),
+        }
+    }
+
+    pub fn with(mut self, key: &'static str, value: serde_json::Value) -> Self {
+        self.map.insert(key, value);
+        self
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+}
+
+impl Display for Options {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{{")?;
+
+        let mut iterator = self.map.iter().peekable();
+
+        while let Some((key, value)) = iterator.next() {
+            write!(f, "{key}: ")?;
+            write!(f, "{}", serde_json::to_string(value).unwrap())?;
+
+            if iterator.peek().is_some() {
+                write!(f, ", ")?;
+            }
+        }
+
+        write!(f, "}}")
+    }
 }
 
 /// Newtype for e.g. MERGE properties, with Display implementation
@@ -325,8 +366,8 @@ impl Display for Query {
                         writeln!(f, "{indent}INSERT {}", op.insert.data)?;
                         writeln!(f, "{indent}UPDATE {}", op.update.data)?;
                         writeln!(f, "{indent}IN {}", op.collection)?;
-                        if let Some(options) = &op.options {
-                            write!(f, "{indent}OPTIONS {options}")?;
+                        if !op.options.is_empty() {
+                            write!(f, "{indent}OPTIONS {}", op.options)?;
                         }
                     }
                     _ => writeln!(f, "{indent}{op}")?,
@@ -503,8 +544,8 @@ impl Display for Upsert {
             "UPSERT {}\nINSERT {}\nUPDATE {}\nIN {}",
             self.search, self.insert.data, self.update.data, self.collection
         )?;
-        if let Some(options) = &self.options {
-            write!(f, " OPTIONS {options}")?;
+        if !self.options.is_empty() {
+            write!(f, " OPTIONS {}", self.options)?;
         }
         Ok(())
     }
@@ -513,8 +554,8 @@ impl Display for Upsert {
 impl Display for Insert {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "INSERT {} INTO {}", self.data, self.collection)?;
-        if let Some(options) = &self.options {
-            write!(f, " OPTIONS {options}")?;
+        if !self.options.is_empty() {
+            write!(f, " OPTIONS {}", self.options)?;
         }
         Ok(())
     }
@@ -527,8 +568,8 @@ impl Display for Update {
             write!(f, " {var} WITH")?;
         }
         write!(f, " {} IN {}", self.data, self.collection)?;
-        if let Some(options) = &self.options {
-            write!(f, " OPTIONS {options}")?;
+        if !self.options.is_empty() {
+            write!(f, " OPTIONS {}", self.options)?;
         }
         Ok(())
     }
@@ -537,8 +578,8 @@ impl Display for Update {
 impl Display for Remove {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "REMOVE {} IN {}", self.key, self.collection)?;
-        if let Some(options) = &self.options {
-            write!(f, " OPTIONS {options}")?;
+        if !self.options.is_empty() {
+            write!(f, " OPTIONS {}", self.options)?;
         }
         Ok(())
     }
@@ -929,16 +970,16 @@ mod tests {
                         insert: Insert {
                             data: json!({ "_key": "lolsoft" }).to_string(),
                             collection: "Organization".into(),
-                            options: None,
+                            options: Default::default(),
                         },
                         update: Update {
                             var: None,
                             data: "{}".to_string(),
                             collection: "Organization".into(),
-                            options: None,
+                            options: Default::default(),
                         },
                         collection: "Organization".into(),
-                        options: None,
+                        options: Default::default(),
                     })]),
                     returns: Return {
                         var: "NEW".into(),
@@ -992,7 +1033,7 @@ mod tests {
                         operations: Some(vec![Operation::Insert(Insert {
                             data: "item".to_string(),
                             collection: "collection".into(),
-                            options: Some(r#"{overwriteMode: "ignore"}"#.to_string()),
+                            options: Options::new([("overwriteMode", json!("ignore"))]),
                         })]),
                         returns: Return {
                             var: "NEW".into(),

@@ -103,6 +103,11 @@ impl AqlQuery {
                 collection: collection.clone(),
                 ..Default::default()
             }),
+            WriteMode::Upsert => Operation::Insert(Insert {
+                data: data.to_string(),
+                collection: collection.clone(),
+                options: Options::new([("overwriteMode", json!("replace"))]),
+            }),
             WriteMode::Delete => {
                 data.as_object_mut().unwrap().retain(|key, _| key == "_key");
                 Operation::Remove(Remove {
@@ -113,8 +118,8 @@ impl AqlQuery {
             }
         };
 
-        let mut return_var: Expr = match mode {
-            WriteMode::Insert | WriteMode::Update => Expr::complex("NEW"),
+        let return_var: Expr = match mode {
+            WriteMode::Insert | WriteMode::Update | WriteMode::Upsert => Expr::complex("NEW"),
             WriteMode::Delete => Expr::complex("OLD"),
         };
 
@@ -154,6 +159,8 @@ impl AqlQuery {
 
                 debug!("mode {mode:?}, metadata.mode {:?}", metadata.mode);
 
+                let mut return_var = return_var.clone();
+
                 let operations = match metadata.mode {
                     Some(mode) => match mode {
                         EdgeWriteMode::Insert => vec![Operation::Insert(Insert {
@@ -162,23 +169,14 @@ impl AqlQuery {
                             options: metadata.options.clone(),
                         })],
                         EdgeWriteMode::UpsertSelfIdentifying => {
-                            vec![Operation::Upsert(Upsert {
-                                search: data.clone(),
-                                insert: Insert {
-                                    data: data.clone(),
-                                    collection: collection.clone(),
-                                    options: None,
-                                },
-                                update: Update {
-                                    var: None,
-                                    data: "{}".to_string(),
-                                    collection: collection.clone(),
-                                    options: None,
-                                },
+                            vec![Operation::Insert(Insert {
+                                data,
                                 collection: collection.clone(),
-                                options: Some(
-                                    json!({ "ignoreErrors": true, "exclusive": true }).to_string(),
-                                ),
+                                options: Options::new([
+                                    ("overwriteMode", json!("update")),
+                                    ("exclusive", json!(true)),
+                                    ("ignoreErrors", json!(true)),
+                                ]),
                             })]
                         }
                         EdgeWriteMode::Overwrite | EdgeWriteMode::OverwriteInverse => {
@@ -305,6 +303,14 @@ impl AqlQuery {
                             options: metadata.options.clone(),
                             ..Default::default()
                         })],
+                        WriteMode::Upsert => vec![Operation::Insert(Insert {
+                            data,
+                            collection: collection.clone(),
+                            options: metadata
+                                .options
+                                .clone()
+                                .with("overwriteMode", json!("replace")),
+                        })],
                         WriteMode::Delete => vec![Operation::Remove(Remove {
                             key: data,
                             collection: collection.clone(),
@@ -320,7 +326,7 @@ impl AqlQuery {
                             selection: metadata.selection.clone(),
                             operations: Some(operations),
                             returns: Return {
-                                var: return_var.clone(),
+                                var: return_var,
                                 merge: metadata.return_vars.to_string_maybe(),
                                 ..Default::default()
                             },
@@ -342,7 +348,7 @@ impl AqlQuery {
                                 })),
                                 operations: Some(operations),
                                 returns: Return {
-                                    var: return_var.clone(),
+                                    var: return_var,
                                     merge: metadata.return_vars.to_string_maybe(),
                                     ..Default::default()
                                 },
@@ -721,7 +727,7 @@ impl<'a> MetaQuery<'a> {
                     entry.data.push(format!(r#"{{ "_key": {data} }}"#));
                     // cannot disambiguate lookup or insert for self identifying type
                     // INSERT with overwriteMode: "ignore" option is functionally equivalent
-                    entry.options = Some(r#"{ overwriteMode: "ignore" }"#.to_string());
+                    entry.options.map.insert("overwriteMode", json!("ignore"));
 
                     let return_var = if return_many {
                         var_name.clone().to_var()

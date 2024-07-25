@@ -39,6 +39,7 @@ pub fn serialize(value: &Value, processor: &SerdeProcessor) -> serde_json::Value
 pub enum WriteMode {
     Insert,
     Update,
+    Upsert,
     Delete,
 }
 
@@ -192,13 +193,35 @@ impl ArangoDatabase {
         for request in requests {
             let responses = match request {
                 BatchWriteRequest::Insert(entities, select) => {
-                    self.insert(entities, select).await?
+                    self.write(
+                        entities,
+                        select,
+                        WriteMode::Insert,
+                        ProcessorMode::Create,
+                        WriteResponse::Inserted,
+                    )
+                    .await?
                 }
                 BatchWriteRequest::Update(entities, select) => {
-                    self.update(entities, select).await?
+                    self.write(
+                        entities,
+                        select,
+                        WriteMode::Update,
+                        ProcessorMode::Update,
+                        WriteResponse::Updated,
+                    )
+                    .await?
                 }
-                BatchWriteRequest::Upsert(..) => {
-                    return Err(DomainError::DataStore(anyhow!("upsert not supported yet")));
+                BatchWriteRequest::Upsert(entities, select) => {
+                    self.write(
+                        entities,
+                        select,
+                        WriteMode::Upsert,
+                        ProcessorMode::Create,
+                        // FIXME: The write response is dynamically either Inserted/Updated for Upsert
+                        WriteResponse::Inserted,
+                    )
+                    .await?
                 }
                 BatchWriteRequest::Delete(entities, def_id) => {
                     self.delete(entities, def_id).await?
@@ -209,16 +232,19 @@ impl ArangoDatabase {
         Ok(all_responses)
     }
 
-    async fn insert(
+    async fn write(
         &self,
         mut entities: Vec<Value>,
         select: Select,
+        write_mode: WriteMode,
+        processor_mode: ProcessorMode,
+        to_response: fn(Value) -> WriteResponse,
     ) -> DomainResult<Vec<WriteResponse>> {
         let seed: PhantomData<serde_json::Value> = PhantomData;
         let mut results = vec![];
 
         for value in entities.iter_mut() {
-            ObjectGenerator::new(ProcessorMode::Create, &self.ontology, self.system.as_ref())
+            ObjectGenerator::new(processor_mode, &self.ontology, self.system.as_ref())
                 .generate_objects(value);
         }
 
@@ -252,13 +278,8 @@ impl ArangoDatabase {
                 debug!("No prequery required");
             }
 
-            let queries = AqlQuery::build_write(
-                WriteMode::Insert,
-                entity,
-                &select.clone(),
-                &self.ontology,
-                self,
-            )?;
+            let queries =
+                AqlQuery::build_write(write_mode, entity, &select.clone(), &self.ontology, self)?;
 
             let mut cursor = ArangoCursorResponse::default();
             for query in queries {
@@ -290,90 +311,7 @@ impl ArangoDatabase {
             results.push(attr.into_unit().expect("not a unit"));
         }
 
-        Ok(results.into_iter().map(WriteResponse::Inserted).collect())
-    }
-
-    async fn update(
-        &self,
-        mut entities: Vec<Value>,
-        select: Select,
-    ) -> DomainResult<Vec<WriteResponse>> {
-        let seed: PhantomData<serde_json::Value> = PhantomData;
-        let mut results = vec![];
-
-        for value in entities.iter_mut() {
-            ObjectGenerator::new(ProcessorMode::Update, &self.ontology, self.system.as_ref())
-                .generate_objects(value);
-        }
-
-        for entity in entities {
-            let pre_query = AqlQuery::prequery_from_entity(&entity, &self.ontology, self)?;
-
-            if pre_query.query.operations.is_some() {
-                debug!(
-                    "AQL:\n{}\nbindVars: {:#?}",
-                    pre_query.query.to_string(),
-                    pre_query.bind_vars
-                );
-                let cursor = self.aql(pre_query, false, false, None, seed).await;
-                match cursor {
-                    Ok(cursor) => {
-                        for data in cursor.result {
-                            for (key, value) in data.as_object().unwrap() {
-                                if value.is_null() {
-                                    return Err(DomainError::UnresolvedForeignKey(format!(
-                                        r#""{}""#,
-                                        key
-                                    )));
-                                }
-                            }
-                        }
-                        debug!("All prequeried entities exist");
-                    }
-                    Err(err) => return Err(DomainError::DataStore(err)),
-                };
-            } else {
-                debug!("No prequery required");
-            }
-
-            let queries = AqlQuery::build_write(
-                WriteMode::Update,
-                entity,
-                &select.clone(),
-                &self.ontology,
-                self,
-            )?;
-
-            let mut cursor = ArangoCursorResponse::default();
-            for query in queries {
-                let profile = self.profile();
-                let processor = self
-                    .ontology
-                    .new_serde_processor(query.operator_addr, ProcessorMode::Raw)
-                    .with_profile(&profile);
-                debug!(
-                    "AQL:\n{}\nbindVars: {:#?}",
-                    query.query.to_string(),
-                    query.bind_vars
-                );
-                cursor = self
-                    .aql(query, false, false, None, processor)
-                    .await
-                    .map_err(|err| {
-                        if err.to_string().starts_with("404") {
-                            return DomainError::EntityNotFound;
-                        }
-                        DomainError::DataStore(err)
-                    })?;
-            }
-
-            let mut select = select.clone();
-            let mut attr = cursor.result.first().unwrap().clone();
-            apply_select(AttrMut::from_attr(&mut attr), &mut select, &self.ontology)?;
-            results.push(attr.into_unit().expect("not a unit"));
-        }
-
-        Ok(results.into_iter().map(WriteResponse::Updated).collect())
+        Ok(results.into_iter().map(to_response).collect())
     }
 
     async fn delete(&self, values: Vec<Value>, def_id: DefId) -> DomainResult<Vec<WriteResponse>> {
