@@ -12,7 +12,7 @@ doctest = false
 ontol-runtime.path = "../../ontol/ontol-runtime"
 domain-engine-core.path = "../domain-engine-core"
 tracing.workspace = true
-prost = "0.12"
+prost = "0.13"
 
 [dev-dependencies]
 ontol-test-utils.path = "../../ontol/ontol-test-utils"

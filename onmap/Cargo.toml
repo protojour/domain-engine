@@ -14,7 +14,7 @@ thiserror.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
 anyhow = "1"
-clap-stdin = "0.4"
+clap-stdin = "0.5"
 
 [[bin]]
 name = "onmap"

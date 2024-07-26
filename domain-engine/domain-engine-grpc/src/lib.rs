@@ -2,17 +2,19 @@
 //!
 //! For now it's just an experiment
 
-use prost::encoding::{DecodeContext, WireType};
+use prost::{
+    bytes::{Buf, BufMut},
+    encoding::{DecodeContext, WireType},
+};
 
 #[derive(Debug)]
 pub struct TestMessage {
-    name: String,
+    pub name: String,
 }
 
 impl prost::Message for TestMessage {
-    fn encode_raw<B>(&self, buf: &mut B)
+    fn encode_raw(&self, buf: &mut impl BufMut)
     where
-        B: prost::bytes::BufMut,
         Self: Sized,
     {
         if !self.name.is_empty() {
@@ -20,15 +22,14 @@ impl prost::Message for TestMessage {
         }
     }
 
-    fn merge_field<B>(
+    fn merge_field(
         &mut self,
         tag: u32,
         wire_type: WireType,
-        buf: &mut B,
+        buf: &mut impl Buf,
         ctx: DecodeContext,
     ) -> Result<(), prost::DecodeError>
     where
-        B: prost::bytes::Buf,
         Self: Sized,
     {
         const STRUCT_NAME: &str = stringify!(TestMessage);
