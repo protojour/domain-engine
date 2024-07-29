@@ -1,6 +1,6 @@
 use domain_engine_core::{
     data_store::{DataStoreAPI, Request, Response},
-    transaction::{OpSequence, ReqMessage, RespMessage, ValueReason},
+    transact::{ReqMessage, RespMessage, ValueReason},
     DomainResult, Session,
 };
 use futures_util::{stream::BoxStream, StreamExt};
@@ -20,22 +20,16 @@ pub trait LinearTransact {
 
 pub fn mock_data_store_query_entities_empty() -> impl unimock::Clause {
     LinearTransactMock::transact
-        .next_call(matching!(
-            [Ok(ReqMessage::Query(OpSequence(0), _))],
-            _session
-        ))
-        .returns(Ok(vec![Ok(RespMessage::SequenceStart(
-            OpSequence(0),
-            None,
-        ))]))
+        .next_call(matching!([Ok(ReqMessage::Query(0, _))], _session))
+        .returns(Ok(vec![Ok(RespMessage::SequenceStart(0, None))]))
 }
 
 pub fn respond_inserted(
     values: impl IntoIterator<Item = Value>,
 ) -> DomainResult<Vec<DomainResult<RespMessage>>> {
-    let mut messages = vec![Ok(RespMessage::SequenceStart(OpSequence(0), None))];
+    let mut messages = vec![Ok(RespMessage::SequenceStart(0, None))];
     for value in values {
-        messages.push(Ok(RespMessage::NextValue(value, ValueReason::Inserted)));
+        messages.push(Ok(RespMessage::Element(value, ValueReason::Inserted)));
     }
 
     Ok(messages)
@@ -44,9 +38,9 @@ pub fn respond_inserted(
 pub fn respond_queried(
     values: impl IntoIterator<Item = Value>,
 ) -> DomainResult<Vec<DomainResult<RespMessage>>> {
-    let mut messages = vec![Ok(RespMessage::SequenceStart(OpSequence(0), None))];
+    let mut messages = vec![Ok(RespMessage::SequenceStart(0, None))];
     for value in values {
-        messages.push(Ok(RespMessage::NextValue(value, ValueReason::Queried)));
+        messages.push(Ok(RespMessage::Element(value, ValueReason::Queried)));
     }
 
     Ok(messages)

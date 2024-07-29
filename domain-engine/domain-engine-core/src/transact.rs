@@ -16,23 +16,32 @@ use crate::{
     DomainEngine, DomainError, DomainResult, Session,
 };
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Debug)]
-pub struct OpSequence(pub u32);
+/// Operation sequence number (within one transaction)
+pub type OpSequence = u32;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ReqMessage {
+    /// Query for output elements
+    /// Queries do not accept any arguments.
     Query(OpSequence, EntitySelect),
+    /// Insert the following arguments
     Insert(OpSequence, Select),
+    /// Update the following arguments
     Update(OpSequence, Select),
+    /// Upsert the following arguments
     Upsert(OpSequence, Select),
+    /// Delete the following arguments
     Delete(OpSequence, DefId),
-    NextValue(Value),
+    /// Argument to the previous mutation message
+    Argument(Value),
 }
 
 #[derive(Serialize, Deserialize)]
 pub enum RespMessage {
+    /// Marks the start of a new output sequence.
+    /// The subsequent Element messages are the elements of that sequence.
     SequenceStart(OpSequence, Option<Box<SubSequence>>),
-    NextValue(Value, ValueReason),
+    Element(Value, ValueReason),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -43,28 +52,51 @@ pub enum ValueReason {
     Deleted,
 }
 
+pub trait AccumulateSequences<'a> {
+    fn accumulate_sequences(self) -> impl Stream<Item = DomainResult<Sequence<Value>>> + 'a;
+}
+
+impl<'a> AccumulateSequences<'a> for BoxStream<'a, DomainResult<RespMessage>> {
+    fn accumulate_sequences(self) -> impl Stream<Item = DomainResult<Sequence<Value>>> + 'a {
+        async_stream::try_stream! {
+            let mut current: Option<Sequence<Value>> = None;
+
+            for await resp_message in self {
+                match resp_message? {
+                    RespMessage::SequenceStart(_, sub_seq) => {
+                        if let Some(current) = current {
+                            yield current;
+                        }
+
+                        let mut next = Sequence::default();
+                        if let Some(sub_seq) = sub_seq {
+                            next = next.with_sub(*sub_seq);
+                        }
+
+                        current = Some(next);
+                    }
+                    RespMessage::Element(value, _reason) => {
+                        if let Some(current) = &mut current {
+                            current.push(value);
+                        }
+                    }
+                }
+            }
+
+            if let Some(current) = current {
+                yield current;
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
-struct UpMap(OpSequence, ResolvePath);
+pub(crate) struct UpMap(OpSequence, ResolvePath);
 
 struct DownMap(ResolvePath);
 
 impl DomainEngine {
-    pub async fn transact<'a>(
-        &'a self,
-        messages: BoxStream<'a, ReqMessage>,
-        session: Session,
-    ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>> {
-        let data_store = self.get_data_store()?;
-        let (upmaps_tx, upmaps_rx) = tokio::sync::mpsc::channel::<UpMap>(1);
-
-        let messages = self.map_req_messages(messages, upmaps_tx, session.clone());
-
-        let responses = data_store.api().transact(messages, session.clone()).await?;
-
-        Ok(self.map_responses(responses, upmaps_rx, session.clone()))
-    }
-
-    fn map_req_messages<'a>(
+    pub(crate) fn map_req_messages<'a>(
         &'a self,
         messages: BoxStream<'a, ReqMessage>,
         upmaps_tx: tokio::sync::mpsc::Sender<UpMap>,
@@ -80,13 +112,13 @@ impl DomainEngine {
         }.boxed()
     }
 
-    fn map_responses<'a>(
+    pub(crate) fn map_responses<'a>(
         &'a self,
         responses: BoxStream<'a, DomainResult<RespMessage>>,
         mut upmaps_rx: tokio::sync::mpsc::Receiver<UpMap>,
         session: Session,
     ) -> BoxStream<'a, DomainResult<RespMessage>> {
-        let mut cur_upmap = UpMap(OpSequence(0), ResolvePath::default());
+        let mut cur_upmap = UpMap(0, ResolvePath::default());
 
         async_stream::try_stream! {
             for await resp_msg in responses {
@@ -95,8 +127,8 @@ impl DomainEngine {
                         self.recv_upmap(op_seq, &mut upmaps_rx, &mut cur_upmap).await?;
                         yield RespMessage::SequenceStart(op_seq, sub_seq);
                     }
-                    RespMessage::NextValue(value, reason) => {
-                        yield RespMessage::NextValue(
+                    RespMessage::Element(value, reason) => {
+                        yield RespMessage::Element(
                             self.upmap_value(value, &session, &cur_upmap).await.unwrap(),
                             reason
                         );
@@ -174,14 +206,14 @@ impl DomainEngine {
                 *cur_downmap = None;
                 Ok(ReqMessage::Delete(op_seq, def_id))
             }
-            ReqMessage::NextValue(value) => {
-                let mut value = self.downmap_value(value, session, &cur_downmap).await?;
+            ReqMessage::Argument(value) => {
+                let mut value = self.downmap_value(value, session, cur_downmap).await?;
 
                 if *updating {
                     sanitize_update(&mut value);
                 }
 
-                Ok(ReqMessage::NextValue(value))
+                Ok(ReqMessage::Argument(value))
             }
         }
     }
@@ -337,38 +369,4 @@ async fn send_upmap(
         .await
         .map_err(|_| DomainError::DataStore(anyhow!("upmap not sendable")))?;
     Ok(())
-}
-
-pub fn collect_sequences<'a>(
-    input: BoxStream<'a, DomainResult<RespMessage>>,
-) -> impl Stream<Item = DomainResult<Sequence<Value>>> + 'a {
-    async_stream::try_stream! {
-        let mut current: Option<Sequence<Value>> = None;
-
-        for await resp_message in input {
-            match resp_message? {
-                RespMessage::SequenceStart(_, sub_seq) => {
-                    if let Some(current) = current {
-                        yield current;
-                    }
-
-                    let mut next = Sequence::default();
-                    if let Some(sub_seq) = sub_seq {
-                        next = next.with_sub(*sub_seq);
-                    }
-
-                    current = Some(next);
-                }
-                RespMessage::NextValue(value, _reason) => {
-                    if let Some(current) = &mut current {
-                        current.push(value);
-                    }
-                }
-            }
-        }
-
-        if let Some(current) = current {
-            yield current;
-        }
-    }
 }

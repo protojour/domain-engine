@@ -1,6 +1,6 @@
 //! GraphQL "unit" tests, i.e. only mocked datastore
 
-use domain_engine_core::transaction::{OpSequence, ReqMessage, RespMessage, ValueReason};
+use domain_engine_core::transact::{ReqMessage, RespMessage, ValueReason};
 use domain_engine_graphql::{
     context::ServiceCtx,
     gql_scalar::GqlScalar,
@@ -385,8 +385,7 @@ async fn basic_pagination() {
                 LinearTransactMock::transact
                     .next_call(matching!([Ok(ReqMessage::Query(..))], _session))
                     .answers(&|_, req_messages, _| {
-                        let Ok(ReqMessage::Query(_, entity_select)) =
-                            req_messages.iter().next().unwrap()
+                        let Ok(ReqMessage::Query(_, entity_select)) = req_messages.first().unwrap()
                         else {
                             panic!();
                         };
@@ -395,7 +394,7 @@ async fn basic_pagination() {
                         assert_eq!(entity_select.after_cursor.as_deref().unwrap(), &[b'1']);
 
                         Ok(vec![Ok(RespMessage::SequenceStart(
-                            OpSequence(0),
+                            0,
                             Some(Box::new(SubSequence {
                                 end_cursor: Some(Box::new([b'2'])),
                                 has_next: true,
@@ -433,10 +432,9 @@ async fn basic_pagination() {
                 &test,
                 &[root()],
                 LinearTransactMock::transact
-                    .next_call(matching!([Ok(ReqMessage::Query(..))], _session))
+                    .next_call(matching!([Ok(ReqMessage::Query(0, _))], _session))
                     .answers(&|_, req_messages, _| {
-                        let Ok(ReqMessage::Query(_, entity_select)) =
-                            req_messages.iter().next().unwrap()
+                        let Ok(ReqMessage::Query(_, entity_select)) = req_messages.first().unwrap()
                         else {
                             panic!();
                         };
@@ -445,7 +443,7 @@ async fn basic_pagination() {
                         assert_eq!(entity_select.after_cursor, None);
 
                         Ok(vec![Ok(RespMessage::SequenceStart(
-                            OpSequence(0),
+                            0,
                             Some(Box::new(SubSequence {
                                 end_cursor: Some(Box::new([b'1'])),
                                 has_next: true,
@@ -733,7 +731,7 @@ async fn artist_and_instrument_connections() {
                 &test,
                 &[root()],
                 LinearTransactMock::transact
-                    .next_call(matching!([Ok(ReqMessage::Query(..))], _session))
+                    .next_call(matching!([Ok(ReqMessage::Query(0, _))], _session))
                     .returns(respond_queried([ziggy.clone()]))
             )
         )
@@ -826,7 +824,7 @@ async fn artist_and_instrument_connections() {
                 &test,
                 &[root()],
                 LinearTransactMock::transact
-                    .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+                    .next_call(matching!([Ok(ReqMessage::Insert(0, _)), ..], _session))
                     .returns(respond_inserted([ziggy]))
             )
         )
@@ -904,7 +902,7 @@ async fn unified_mutation_create() {
                 &test,
                 &[root()],
                 LinearTransactMock::transact
-                    .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+                    .next_call(matching!([Ok(ReqMessage::Insert(0, _)), ..], _session))
                     .returns(respond_inserted([ziggy]))
             )
         )
@@ -975,7 +973,7 @@ async fn create_through_mapped_domain() {
                 &test,
                 &[ARTIST_AND_INSTRUMENT.0],
                 LinearTransactMock::transact
-                    .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+                    .next_call(matching!([Ok(ReqMessage::Insert(0, _)), ..], _session))
                     .returns(respond_inserted([ziggy]))
             )
         )
@@ -1056,7 +1054,7 @@ async fn create_through_three_domains() {
                 &test,
                 &[ARTIST_AND_INSTRUMENT.0],
                 LinearTransactMock::transact
-                    .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+                    .next_call(matching!([Ok(ReqMessage::Insert(0, _)), ..], _session))
                     .returns(respond_inserted([ziggy]))
             )
         )
@@ -1081,10 +1079,10 @@ async fn guitar_synth_union_selection() {
     let [artist] = test.bind(["artist"]);
 
     let query_mock = LinearTransactMock::transact
-        .next_call(matching!([Ok(ReqMessage::Query(..))], _session))
+        .next_call(matching!([Ok(ReqMessage::Query(0, _))], _session))
         .returns(Ok(vec![
-            Ok(RespMessage::SequenceStart(OpSequence(0), None)),
-            Ok(RespMessage::NextValue(
+            Ok(RespMessage::SequenceStart(0, None)),
+            Ok(RespMessage::Element(
                 artist
                     .entity_builder(
                         json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
@@ -1373,8 +1371,8 @@ async fn municipalities_named_query() {
     let query_mock = LinearTransactMock::transact
         .next_call(matching!([Ok(ReqMessage::Query(..))], _session))
         .returns(Ok(vec![
-            Ok(RespMessage::SequenceStart(OpSequence(0), None)),
-            Ok(RespMessage::NextValue(
+            Ok(RespMessage::SequenceStart(0, None)),
+            Ok(RespMessage::Element(
                 municipality
                     .entity_builder(
                         json!("OSL"),

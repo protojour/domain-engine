@@ -13,10 +13,7 @@ use axum::{
 use axum_extra::extract::JsonLines;
 use bytes::Bytes;
 use content_type::JsonContentType;
-use domain_engine_core::{
-    transaction::{OpSequence, ReqMessage},
-    DomainEngine, DomainResult, Session,
-};
+use domain_engine_core::{transact::ReqMessage, DomainEngine, DomainResult, Session};
 use futures_util::{stream::StreamExt, TryStreamExt};
 use http_error::{domain_error_to_response, json_error, ErrorJson};
 use ontol_runtime::{
@@ -107,7 +104,7 @@ where
         .ontology()
         .new_serde_processor(endpoint.operator_addr, ProcessorMode::Update);
 
-    let mut messages = vec![ReqMessage::Upsert(OpSequence(0), Select::EntityId)];
+    let mut messages = vec![ReqMessage::Upsert(0, Select::EntityId)];
 
     match json_content_type {
         JsonContentType::Json => {
@@ -124,7 +121,7 @@ where
                 Err(response) => return response,
             };
 
-            messages.push(ReqMessage::NextValue(ontol_value));
+            messages.push(ReqMessage::Argument(ontol_value));
         }
         JsonContentType::JsonLines => {
             // TODO: transaction streaming
@@ -144,7 +141,7 @@ where
                     Ok(value) => value,
                     Err(response) => return response,
                 };
-                messages.push(ReqMessage::NextValue(ontol_value));
+                messages.push(ReqMessage::Argument(ontol_value));
             }
         }
     };

@@ -1,18 +1,15 @@
-use domain_engine_core::{
-    transaction::{OpSequence, ReqMessage, RespMessage},
-    DomainEngine, DomainResult, Session,
-};
+use crate::test_util;
+use domain_engine_core::{DomainEngine, Session};
 use domain_engine_test_utils::{
     dynamic_data_store::DynamicDataStoreFactory, system::mock_current_time_monotonic, unimock,
     DomainEngineTestExt, TestFindQuery,
 };
-use futures_util::{StreamExt, TryStreamExt};
 use ontol_runtime::{
     attr::AttrRef,
     interface::serde::processor::{ProcessorProfile, ProcessorProfileFlags},
     ontology::Ontology,
     query::select::Select,
-    value::{Serial, Value},
+    value::Serial,
 };
 use ontol_test_utils::{
     assert_error_msg,
@@ -47,32 +44,6 @@ async fn make_domain_engine(
         .unwrap()
 }
 
-pub async fn insert_entity_select_entityid(
-    domain_engine: &DomainEngine,
-    entity: Value,
-) -> DomainResult<Value> {
-    let response_messages: Vec<_> = domain_engine
-        .transact(
-            futures_util::stream::iter(vec![
-                ReqMessage::Insert(OpSequence(0), Select::EntityId),
-                ReqMessage::NextValue(entity),
-            ])
-            .boxed(),
-            Session::default(),
-        )
-        .await?
-        .try_collect()
-        .await?;
-
-    let mut iter = response_messages.into_iter();
-    let _sequence_start = iter.next().unwrap();
-    let RespMessage::NextValue(value, _) = iter.next().unwrap() else {
-        panic!()
-    };
-
-    Ok(value)
-}
-
 #[ontol_macros::datastore_test(tokio::test)]
 async fn test_db_remigrate_noop(ds: &str) {
     let test = conduit_db().compile();
@@ -104,7 +75,7 @@ async fn test_db_multiple_persistent_domains(ds: &str) {
     let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds).await;
     let [conduit_user, ai_artist] = test.bind(["conduit_db.User", "artist_and_instrument.artist"]);
 
-    insert_entity_select_entityid(
+    test_util::insert_entity_select_entityid(
         &engine,
         serde_create(&conduit_user)
             .to_value(json!({
@@ -117,7 +88,7 @@ async fn test_db_multiple_persistent_domains(ds: &str) {
     .await
     .unwrap();
 
-    insert_entity_select_entityid(
+    test_util::insert_entity_select_entityid(
         &engine,
         serde_create(&ai_artist)
             .to_value(json!({
@@ -136,7 +107,7 @@ async fn test_conduit_db_id_generation(ds: &str) {
     let [user, article, comment, tag_entity] =
         test.bind(["User", "Article", "Comment", "TagEntity"]);
 
-    insert_entity_select_entityid(
+    test_util::insert_entity_select_entityid(
         &engine,
         serde_create(&user)
             .to_value(json!({
@@ -149,7 +120,7 @@ async fn test_conduit_db_id_generation(ds: &str) {
     .await
     .unwrap();
 
-    let explicit_user_id = insert_entity_select_entityid(
+    let explicit_user_id = test_util::insert_entity_select_entityid(
         &engine,
         // Store with the Read processor which supports specifying ID upfront
         serde_read(&user)
@@ -169,7 +140,7 @@ async fn test_conduit_db_id_generation(ds: &str) {
         expected = "OctetSequence([103, 229, 80, 68, 16, 177, 66, 111, 146, 71, 187, 104, 14, 95, 224, 200], tag(def@1:1, Some(TagFlags(0x0))))"
     );
 
-    let article_id: Uuid = insert_entity_select_entityid(
+    let article_id: Uuid = test_util::insert_entity_select_entityid(
         &engine,
         serde_create(&article)
             .to_value(json!({
@@ -187,7 +158,7 @@ async fn test_conduit_db_id_generation(ds: &str) {
     .unwrap()
     .cast_into();
 
-    insert_entity_select_entityid(
+    test_util::insert_entity_select_entityid(
         &engine,
         serde_create(&comment)
             .to_value(json!({
@@ -204,7 +175,7 @@ async fn test_conduit_db_id_generation(ds: &str) {
     .await
     .unwrap();
 
-    insert_entity_select_entityid(
+    test_util::insert_entity_select_entityid(
         &engine,
         serde_create(&tag_entity)
             .to_value(json!({ "tag": "foo" }))
@@ -220,7 +191,7 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
     let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds).await;
     let [user_def, article_def, comment_def] = test.bind(["User", "Article", "Comment"]);
 
-    let pre_existing_user_id: Uuid = insert_entity_select_entityid(
+    let pre_existing_user_id: Uuid = test_util::insert_entity_select_entityid(
         &engine,
         serde_create(&user_def)
             .to_value(json!({
@@ -234,7 +205,7 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
     .unwrap()
     .cast_into();
 
-    let article_id: Uuid = insert_entity_select_entityid(
+    let article_id: Uuid = test_util::insert_entity_select_entityid(
         &engine,
         serde_create(&article_def)
             .to_value(json!({
@@ -268,8 +239,7 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
     .unwrap()
     .cast_into();
 
-    let users = engine
-        .query_entities(user_def.struct_select([]).into(), Session::default())
+    let users = test_util::query_entities(&engine, user_def.struct_select([]).into())
         .await
         .unwrap();
 
@@ -283,16 +253,15 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
 
     expect_eq!(
         actual = serde_read(&user_def).as_json(AttrRef::Unit(
-            &engine
-                .query_entities(
-                    user_def
-                        .struct_select([("authored_articles", Select::Leaf)])
-                        .into(),
-                    Session::default(),
-                )
-                .await
-                .unwrap()
-                .elements()[1]
+            &test_util::query_entities(
+                &engine,
+                user_def
+                    .struct_select([("authored_articles", Select::Leaf)])
+                    .into(),
+            )
+            .await
+            .unwrap()
+            .elements()[1]
         )),
         expected = json!({
             "user_id": new_user_id.to_string(),
@@ -306,8 +275,7 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
         })
     );
 
-    let comments = engine
-        .query_entities(comment_def.struct_select([]).into(), Session::default())
+    let comments = test_util::query_entities(&engine, comment_def.struct_select([]).into())
         .await
         .unwrap();
 
@@ -328,24 +296,20 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
                 ..Default::default()
             })
             .as_json(AttrRef::Unit(
-                &engine
-                    .query_entities(
-                        user_def
-                            .struct_select([(
-                                "authored_articles",
-                                article_def
-                                    .struct_select([(
-                                        "comments",
-                                        comment_def.struct_select([]).into()
-                                    )])
-                                    .into()
-                            )])
-                            .into(),
-                        Session::default(),
-                    )
-                    .await
-                    .unwrap()
-                    .elements()[1]
+                &test_util::query_entities(
+                    &engine,
+                    user_def
+                        .struct_select([(
+                            "authored_articles",
+                            article_def
+                                .struct_select([("comments", comment_def.struct_select([]).into())])
+                                .into()
+                        )])
+                        .into(),
+                )
+                .await
+                .unwrap()
+                .elements()[1]
             )),
         expected = json!({
             "user_id": new_user_id.to_string(),
@@ -383,7 +347,7 @@ async fn test_conduit_db_unresolved_foreign_key(ds: &str) {
     let [article] = test.bind(["Article"]);
 
     assert_error_msg!(
-        insert_entity_select_entityid(
+        test_util::insert_entity_select_entityid(
             &engine,
             serde_create(&article)
                 .to_value(json!({
@@ -412,7 +376,7 @@ async fn test_artist_and_instrument_fmt_id_generation(ds: &str) {
         test.ontology(),
     );
 
-    let generated_id = insert_entity_select_entityid(
+    let generated_id = test_util::insert_entity_select_entityid(
         &engine,
         serde_create(&artist)
             .to_value(json!({"name": "Igor Stravinskij" }))
@@ -424,7 +388,7 @@ async fn test_artist_and_instrument_fmt_id_generation(ds: &str) {
     let generated_id_json = serde_read(&artist_id).as_json(AttrRef::Unit(&generated_id));
     assert!(generated_id_json.as_str().unwrap().starts_with("artist/"));
 
-    let explicit_id = insert_entity_select_entityid(
+    let explicit_id = test_util::insert_entity_select_entityid(
         &engine,
         serde_read(&artist)
             .to_value(json!({
@@ -455,7 +419,7 @@ async fn test_artist_and_instrument_pagination(ds: &str) {
     ];
 
     for json in &entities {
-        insert_entity_select_entityid(
+        test_util::insert_entity_select_entityid(
             &engine,
             serde_create(&artist).to_value(json.clone()).unwrap(),
         )
@@ -492,7 +456,7 @@ async fn test_artist_and_instrument_filter_condition(ds: &str) {
     ];
 
     for json in &entities {
-        insert_entity_select_entityid(
+        test_util::insert_entity_select_entityid(
             &engine,
             serde_create(&artist).to_value(json.clone()).unwrap(),
         )

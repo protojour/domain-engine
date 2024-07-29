@@ -140,7 +140,7 @@ mod pg {
     use std::sync::{Arc, OnceLock};
 
     use domain_engine_core::data_store::{DataStoreAPI, Request, Response};
-    use domain_engine_core::transaction::{ReqMessage, RespMessage};
+    use domain_engine_core::transact::{ReqMessage, RespMessage};
     use domain_engine_core::{DomainError, DomainResult, Session};
     use domain_engine_store_pg::migrate::connect_and_migrate;
     use domain_engine_store_pg::recreate_database;

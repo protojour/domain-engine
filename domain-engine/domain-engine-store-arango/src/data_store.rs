@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use domain_engine_core::{
     data_store::{BatchWriteRequest, DataStoreAPI, Request, Response, WriteResponse},
     object_generator::ObjectGenerator,
-    transaction::{ReqMessage, RespMessage},
+    transact::{ReqMessage, RespMessage},
     DomainError, DomainResult, Session,
 };
 use futures_util::stream::BoxStream;

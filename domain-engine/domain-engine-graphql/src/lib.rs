@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use context::{SchemaCtx, SchemaType, ServiceCtx};
 use domain_engine_core::{
-    transaction::{collect_sequences, OpSequence, ReqMessage},
+    transact::{AccumulateSequences, ReqMessage},
     DomainError,
 };
 use futures_util::{StreamExt, TryStreamExt};
@@ -199,7 +199,7 @@ async fn mutation(
             // let mut batch_write_requests = Vec::with_capacity(entity_mutations.len());
 
             let mut req_messages: Vec<ReqMessage> = vec![];
-            let mut op_seq = OpSequence(0);
+            let mut op_seq = 0;
 
             for entity_mutation in entity_mutations {
                 let values: Vec<_> = entity_mutation
@@ -212,42 +212,41 @@ async fn mutation(
                 match entity_mutation.kind {
                     EntityMutationKind::Create => {
                         req_messages.push(ReqMessage::Insert(op_seq, select.clone()));
-                        op_seq.0 += 1;
+                        op_seq += 1;
 
                         for value in values {
-                            req_messages.push(ReqMessage::NextValue(value));
+                            req_messages.push(ReqMessage::Argument(value));
                         }
                     }
                     EntityMutationKind::Update => {
                         req_messages.push(ReqMessage::Update(op_seq, select.clone()));
-                        op_seq.0 += 1;
+                        op_seq += 1;
 
                         for value in values {
-                            req_messages.push(ReqMessage::NextValue(value));
+                            req_messages.push(ReqMessage::Argument(value));
                         }
                     }
                     EntityMutationKind::Delete => {
                         req_messages.push(ReqMessage::Delete(op_seq, *def_id));
-                        op_seq.0 += 1;
+                        op_seq += 1;
 
                         for value in values {
-                            req_messages.push(ReqMessage::NextValue(value));
+                            req_messages.push(ReqMessage::Argument(value));
                         }
                     }
                 }
             }
 
-            let response_sequences: Vec<_> = collect_sequences(
-                service_ctx
-                    .domain_engine
-                    .transact(
-                        futures_util::stream::iter(req_messages).boxed(),
-                        service_ctx.session.clone(),
-                    )
-                    .await?,
-            )
-            .try_collect()
-            .await?;
+            let response_sequences: Vec<_> = service_ctx
+                .domain_engine
+                .transact(
+                    futures_util::stream::iter(req_messages).boxed(),
+                    service_ctx.session.clone(),
+                )
+                .await?
+                .accumulate_sequences()
+                .try_collect()
+                .await?;
 
             let mut output_sequence = Sequence::default();
 

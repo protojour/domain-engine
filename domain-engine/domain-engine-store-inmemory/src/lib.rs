@@ -8,7 +8,7 @@ use anyhow::anyhow;
 use domain_engine_core::data_store::{DataStoreFactory, DataStoreFactorySync};
 use domain_engine_core::object_generator::ObjectGenerator;
 use domain_engine_core::system::ArcSystemApi;
-use domain_engine_core::transaction::{ReqMessage, RespMessage, ValueReason};
+use domain_engine_core::transact::{ReqMessage, RespMessage, ValueReason};
 use domain_engine_core::{DomainError, Session};
 use fnv::{FnvHashMap, FnvHashSet};
 use futures_util::stream::BoxStream;
@@ -229,7 +229,7 @@ impl InMemoryDb {
                         yield RespMessage::SequenceStart(op_seq, sequence.sub().map(|sub_seq| Box::new(sub_seq.clone())));
 
                         for item in sequence.into_elements() {
-                            yield RespMessage::NextValue(item, ValueReason::Queried);
+                            yield RespMessage::Element(item, ValueReason::Queried);
                         }
                     }
                     ReqMessage::Insert(op_seq, select) => {
@@ -248,7 +248,7 @@ impl InMemoryDb {
                         state = Some(State::Delete(def_id));
                         yield RespMessage::SequenceStart(op_seq, None);
                     }
-                    ReqMessage::NextValue(mut value) => {
+                    ReqMessage::Argument(mut value) => {
                         let mut store = self.store.write().await;
 
                         match state.as_ref() {
@@ -262,11 +262,11 @@ impl InMemoryDb {
 
                                 let value = store.write_new_entity(
                                     value,
-                                    &select,
+                                    select,
                                     &self.context,
                                 )?;
 
-                                yield RespMessage::NextValue(value, ValueReason::Inserted);
+                                yield RespMessage::Element(value, ValueReason::Inserted);
                             }
                             Some(State::Update(select)) => {
                                 ObjectGenerator::new(
@@ -278,11 +278,11 @@ impl InMemoryDb {
 
                                 let value = store.update_entity(
                                     value,
-                                    &select,
+                                    select,
                                     &self.context,
                                 )?;
 
-                                yield RespMessage::NextValue(value, ValueReason::Updated);
+                                yield RespMessage::Element(value, ValueReason::Updated);
                             }
                             Some(State::Upsert(select)) => {
                                 ObjectGenerator::new(
@@ -294,7 +294,7 @@ impl InMemoryDb {
 
                                 let response = store.upsert_entity(
                                     value,
-                                    &select,
+                                    select,
                                     &self.context,
                                 )?;
                                 let (value, reason) = match response {
@@ -303,13 +303,13 @@ impl InMemoryDb {
                                     WriteResponse::Deleted(_) => Err(DomainError::DataStore(anyhow!("unexpected delete")))?,
                                 };
 
-                                yield RespMessage::NextValue(value, reason);
+                                yield RespMessage::Element(value, reason);
                             }
                             Some(State::Delete(def_id)) => {
                                 let deleted = store.delete_entities(vec![value], *def_id)?;
 
                                 for deleted in deleted {
-                                    yield RespMessage::NextValue(self.context.ontology.bool_value(deleted), ValueReason::Deleted);
+                                    yield RespMessage::Element(self.context.ontology.bool_value(deleted), ValueReason::Deleted);
                                 }
                             }
                             None => {

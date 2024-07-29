@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
-use futures_util::{StreamExt, TryStreamExt};
+use futures_util::{stream::BoxStream, StreamExt, TryStreamExt};
 use ontol_runtime::{
     attr::AttrRef,
     interface::serde::processor::ProcessorMode,
@@ -21,11 +21,11 @@ use serde::de::DeserializeSeed;
 use tracing::{debug, error};
 
 use crate::{
-    data_store::{self, DataStore, DataStoreFactory, DataStoreFactorySync},
+    data_store::{DataStore, DataStoreFactory, DataStoreFactorySync},
     domain_error::DomainResult,
     select_data_flow::translate_entity_select,
     system::{ArcSystemApi, SystemAPI},
-    transaction::{collect_sequences, OpSequence, ReqMessage},
+    transact::{AccumulateSequences, ReqMessage, RespMessage, UpMap},
     DomainError, FindEntitySelect, MaybeSelect, Session,
 };
 
@@ -61,6 +61,21 @@ impl DomainEngine {
         self.data_store.as_ref().ok_or(DomainError::NoDataStore)
     }
 
+    pub async fn transact<'a>(
+        &'a self,
+        messages: BoxStream<'a, ReqMessage>,
+        session: Session,
+    ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>> {
+        let data_store = self.get_data_store()?;
+        let (upmaps_tx, upmaps_rx) = tokio::sync::mpsc::channel::<UpMap>(1);
+
+        let messages = self.map_req_messages(messages, upmaps_tx, session.clone());
+
+        let responses = data_store.api().transact(messages, session.clone()).await?;
+
+        Ok(self.map_responses(responses, upmaps_rx, session.clone()))
+    }
+
     pub async fn exec_map(
         &self,
         key: MapKey,
@@ -76,56 +91,6 @@ impl DomainEngine {
 
         self.run_vm_to_completion(&mut vm, input, &mut Some(selects), &session)
             .await
-    }
-
-    pub async fn query_entities(
-        &self,
-        mut select: EntitySelect,
-        session: Session,
-    ) -> DomainResult<Sequence<Value>> {
-        let data_store = self.get_data_store()?;
-        let ontology = self.ontology();
-
-        let resolve_path = self
-            .resolver_graph
-            .probe_path_for_entity_select(ontology, &select)
-            .ok_or(DomainError::NoResolvePathToDataStore)?;
-
-        // Transform select
-        for map_key in resolve_path.iter() {
-            translate_entity_select(&mut select, &map_key, ontology);
-        }
-
-        let data_store::Response::Query(mut edge_seq) = data_store
-            .api()
-            .execute(data_store::Request::Query(select), session.clone())
-            .await?
-        else {
-            return Err(DomainError::DataStore(anyhow!(
-                "data store returned invalid response"
-            )));
-        };
-
-        if resolve_path.is_empty() {
-            return Ok(edge_seq);
-        }
-
-        // Transform result
-        for map_key in resolve_path.reverse() {
-            let procedure = ontology
-                .get_mapper_proc(&map_key)
-                .expect("No mapping procedure for query output");
-
-            for value in edge_seq.elements_mut().iter_mut() {
-                let mut vm = ontology.new_vm(procedure);
-
-                *value = self
-                    .run_vm_to_completion(&mut vm, value.take(), &mut None, &session)
-                    .await?;
-            }
-        }
-
-        Ok(edge_seq)
     }
 
     pub(crate) async fn run_vm_to_completion(
@@ -297,19 +262,15 @@ impl DomainEngine {
             entity_select.filter.condition_mut().merge(static_condition);
         }
 
-        let sequences: Vec<_> = collect_sequences(
-            self.transact(
-                futures_util::stream::iter([ReqMessage::Query(
-                    OpSequence(0),
-                    entity_select.clone(),
-                )])
-                .boxed(),
+        let sequences: Vec<_> = self
+            .transact(
+                futures_util::stream::iter([ReqMessage::Query(0, entity_select.clone())]).boxed(),
                 session.clone(),
             )
-            .await?,
-        )
-        .try_collect()
-        .await?;
+            .await?
+            .accumulate_sequences()
+            .try_collect()
+            .await?;
 
         let Some(edge_seq) = sequences.into_iter().next() else {
             return Err(DomainError::DataStore(anyhow!(

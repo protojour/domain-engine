@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     domain_error::DomainResult,
     system::ArcSystemApi,
-    transaction::{ReqMessage, RespMessage},
+    transact::{ReqMessage, RespMessage},
     Session,
 };
 
