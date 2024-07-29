@@ -178,6 +178,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-stream"
+version = "0.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd56dd203fef61ac097dd65721a419ddccb106b2d2b70ba60a6b529f03961a51"
+dependencies = [
+ "async-stream-impl",
+ "futures-core",
+ "pin-project-lite",
+]
+
+[[package]]
+name = "async-stream-impl"
+version = "0.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16e62a023e7c117e27523144c5d2459f4397fcc3cab0085af8e2224f643a0193"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.81"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -843,10 +865,12 @@ name = "domain-engine-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-stream",
  "async-trait",
  "chrono",
  "domain-engine-test-utils",
  "fnv",
+ "futures-util",
  "itertools 0.12.1",
  "ontol-macros",
  "ontol-runtime",
@@ -872,6 +896,7 @@ dependencies = [
  "domain-engine-store-inmemory",
  "domain-engine-test-utils",
  "fnv",
+ "futures-util",
  "graphql-parser",
  "juniper",
  "ontol-macros",
@@ -941,6 +966,7 @@ dependencies = [
  "domain-engine-graphql",
  "domain-engine-test-utils",
  "fnv",
+ "futures-util",
  "indexmap",
  "indoc",
  "itertools 0.12.1",
@@ -969,11 +995,13 @@ name = "domain-engine-store-inmemory"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-stream",
  "async-trait",
  "bincode",
  "domain-engine-core",
  "domain-engine-test-utils",
  "fnv",
+ "futures-util",
  "indexmap",
  "itertools 0.12.1",
  "ontol-macros",
@@ -1000,6 +1028,7 @@ dependencies = [
  "domain-engine-core",
  "domain-engine-test-utils",
  "fnv",
+ "futures-util",
  "indexmap",
  "indoc",
  "itertools 0.12.1",
@@ -1034,6 +1063,7 @@ dependencies = [
  "domain-engine-store-inmemory",
  "domain-engine-store-pg",
  "fnv",
+ "futures-util",
  "graphql-parser",
  "juniper",
  "ontol-runtime",

@@ -21,11 +21,13 @@ unimock.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 anyhow = "1"
+futures-util = "0.3"
+tokio.workspace = true
+async-stream = "0.3"
 
 [dev-dependencies]
 ontol-macros.path = "../../ontol/ontol-macros"
 ontol-test-utils.path = "../../ontol/ontol-test-utils"
 domain-engine-test-utils.path = "../domain-engine-test-utils"
 tracing-subscriber.workspace = true
-tokio.workspace = true
 pretty_assertions = "1"

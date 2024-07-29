@@ -1,5 +1,6 @@
 use std::{collections::BTreeSet, sync::Arc};
 
+use futures_util::stream::BoxStream;
 use ontol_runtime::{
     ontology::{config::DataStoreConfig, Ontology},
     query::select::{EntitySelect, Select},
@@ -10,12 +11,27 @@ use ontol_runtime::{
 use serde::{Deserialize, Serialize};
 use unimock::unimock;
 
-use crate::{domain_error::DomainResult, system::ArcSystemApi, Session};
+use crate::{
+    domain_error::DomainResult,
+    system::ArcSystemApi,
+    transaction::{ReqMessage, RespMessage},
+    Session,
+};
 
 #[unimock(api = DataStoreAPIMock)]
 #[async_trait::async_trait]
 pub trait DataStoreAPI {
     async fn execute(&self, request: Request, session: Session) -> DomainResult<Response>;
+
+    /// Transact.
+    ///
+    /// This is a duplex operation, the input messages are transformed into output messages
+    /// as they are executed on the data store.
+    async fn transact<'a>(
+        &'a self,
+        messages: BoxStream<'a, DomainResult<ReqMessage>>,
+        session: Session,
+    ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>>;
 }
 
 pub struct DataStore {

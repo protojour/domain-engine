@@ -4,8 +4,10 @@ use anyhow::anyhow;
 use domain_engine_core::{
     data_store::{BatchWriteRequest, DataStoreAPI, Request, Response, WriteResponse},
     object_generator::ObjectGenerator,
+    transaction::{ReqMessage, RespMessage},
     DomainError, DomainResult, Session,
 };
+use futures_util::stream::BoxStream;
 use ontol_runtime::{
     attr::{Attr, AttrRef},
     interface::serde::processor::{
@@ -373,6 +375,14 @@ impl DataStoreAPI for ArangoDatabase {
                 Ok(Response::BatchWrite(self.batch_write(requests).await?))
             }
         }
+    }
+
+    async fn transact<'a>(
+        &'a self,
+        _messages: BoxStream<'a, DomainResult<ReqMessage>>,
+        _session: Session,
+    ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>> {
+        todo!()
     }
 }
 

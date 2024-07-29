@@ -140,10 +140,12 @@ mod pg {
     use std::sync::{Arc, OnceLock};
 
     use domain_engine_core::data_store::{DataStoreAPI, Request, Response};
-    use domain_engine_core::{DomainResult, Session};
+    use domain_engine_core::transaction::{ReqMessage, RespMessage};
+    use domain_engine_core::{DomainError, DomainResult, Session};
     use domain_engine_store_pg::migrate::connect_and_migrate;
     use domain_engine_store_pg::recreate_database;
     use domain_engine_store_pg::{deadpool_postgres, tokio_postgres, PostgresDataStore};
+    use futures_util::stream::BoxStream;
     use ontol_runtime::ontology::Ontology;
     use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
@@ -199,6 +201,14 @@ mod pg {
             session: domain_engine_core::Session,
         ) -> DomainResult<Response> {
             self.inner.execute(request, session).await
+        }
+
+        async fn transact<'a>(
+            &'a self,
+            messages: BoxStream<'a, Result<ReqMessage, DomainError>>,
+            session: Session,
+        ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>> {
+            self.inner.transact(messages, session).await
         }
     }
 

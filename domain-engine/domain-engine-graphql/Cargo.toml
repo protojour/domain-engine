@@ -19,6 +19,7 @@ fnv.workspace = true
 thiserror.workspace = true
 smartstring = { version = "1", features = ["serde"] }
 base64 = "0.22"
+futures-util = "0.3"
 
 [dev-dependencies]
 ontol-test-utils.path = "../../ontol/ontol-test-utils"

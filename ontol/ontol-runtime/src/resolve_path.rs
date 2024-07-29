@@ -6,7 +6,7 @@ use crate::{
 use fnv::{FnvHashMap, FnvHashSet};
 use tracing::trace;
 
-#[derive(Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct ResolvePath {
     path: Vec<MapKey>,
 }

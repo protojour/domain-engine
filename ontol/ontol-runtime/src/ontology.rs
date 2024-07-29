@@ -18,6 +18,7 @@ use crate::{
         DomainInterface,
     },
     query::condition::Condition,
+    value::Value,
     vm::{
         ontol_vm::OntolVm,
         proc::{Lib, Procedure},
@@ -282,6 +283,11 @@ impl Ontology {
             .named_downmaps
             .get(&(package_id, text_constant))
             .cloned()
+    }
+
+    pub fn bool_value(&self, value: bool) -> Value {
+        let bool_def = self.data.ontol_domain_meta.bool;
+        Value::I64(if value { 1 } else { 0 }, bool_def.into())
     }
 }
 

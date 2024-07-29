@@ -4,9 +4,10 @@ use std::sync::Arc;
 
 use context::{SchemaCtx, SchemaType, ServiceCtx};
 use domain_engine_core::{
-    data_store::{BatchWriteRequest, WriteResponse},
+    transaction::{collect_sequences, OpSequence, ReqMessage},
     DomainError,
 };
+use futures_util::{StreamExt, TryStreamExt};
 use gql_scalar::GqlScalar;
 use look_ahead_utils::ArgsWrapper;
 use ontol_runtime::{
@@ -131,6 +132,20 @@ async fn query(
                 .exec_map(map_key, input, &mut selects, service_ctx.session.clone())
                 .await?;
 
+            {
+                let _sequences: Vec<Sequence<Value>> = collect_sequences(
+                    service_ctx
+                        .domain_engine
+                        .transact(
+                            futures_util::stream::empty().boxed(),
+                            service_ctx.session.clone(),
+                        )
+                        .await?,
+                )
+                .try_collect()
+                .await?;
+            }
+
             trace!("query result: {}", ValueDebug(&output));
 
             if output.is_unit()
@@ -195,40 +210,64 @@ async fn mutation(
                 ctx,
             )?;
             let select = select_analyzer.analyze_select(look_ahead, field_data)?;
-            let mut batch_write_requests = Vec::with_capacity(entity_mutations.len());
+            // let mut batch_write_requests = Vec::with_capacity(entity_mutations.len());
+
+            let mut req_messages: Vec<ReqMessage> = vec![];
+            let mut op_seq = OpSequence(0);
 
             for entity_mutation in entity_mutations {
-                let values = entity_mutation
+                let values: Vec<_> = entity_mutation
                     .inputs
                     .into_elements()
                     .into_iter()
                     // .map(|attr| attr.val)
                     .collect();
 
-                batch_write_requests.push(match entity_mutation.kind {
-                    EntityMutationKind::Create => BatchWriteRequest::Insert(values, select.clone()),
-                    EntityMutationKind::Update => BatchWriteRequest::Update(values, select.clone()),
-                    EntityMutationKind::Delete => BatchWriteRequest::Delete(values, *def_id),
-                });
+                match entity_mutation.kind {
+                    EntityMutationKind::Create => {
+                        req_messages.push(ReqMessage::Insert(op_seq, select.clone()));
+                        op_seq.0 += 1;
+
+                        for value in values {
+                            req_messages.push(ReqMessage::NextValue(value));
+                        }
+                    }
+                    EntityMutationKind::Update => {
+                        req_messages.push(ReqMessage::Update(op_seq, select.clone()));
+                        op_seq.0 += 1;
+
+                        for value in values {
+                            req_messages.push(ReqMessage::NextValue(value));
+                        }
+                    }
+                    EntityMutationKind::Delete => {
+                        req_messages.push(ReqMessage::Delete(op_seq, *def_id));
+                        op_seq.0 += 1;
+
+                        for value in values {
+                            req_messages.push(ReqMessage::NextValue(value));
+                        }
+                    }
+                }
             }
 
-            let batch_write_responses = service_ctx
-                .domain_engine
-                .execute_writes(batch_write_requests, service_ctx.session.clone())
-                .await?;
+            let response_sequences: Vec<_> = collect_sequences(
+                service_ctx
+                    .domain_engine
+                    .transact(
+                        futures_util::stream::iter(req_messages).boxed(),
+                        service_ctx.session.clone(),
+                    )
+                    .await?,
+            )
+            .try_collect()
+            .await?;
 
             let mut output_sequence = Sequence::default();
 
-            for batch_write_response in batch_write_responses {
-                match batch_write_response {
-                    WriteResponse::Inserted(value) | WriteResponse::Updated(value) => {
-                        output_sequence.push(value);
-                    }
-                    WriteResponse::Deleted(bool) => {
-                        let bool_type = schema_ctx.ontology.ontol_domain_meta().bool;
-
-                        output_sequence.push(Value::I64(if bool { 1 } else { 0 }, bool_type.into()))
-                    }
+            for response_sequence in response_sequences {
+                for value in response_sequence.into_elements() {
+                    output_sequence.push(value);
                 }
             }
 

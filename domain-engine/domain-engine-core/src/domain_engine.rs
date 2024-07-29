@@ -1,6 +1,7 @@
 use std::{collections::BTreeSet, sync::Arc};
 
 use anyhow::{anyhow, Context};
+use futures_util::{StreamExt, TryStreamExt};
 use ontol_runtime::{
     attr::AttrRef,
     interface::serde::processor::ProcessorMode,
@@ -26,13 +27,14 @@ use crate::{
     domain_error::DomainResult,
     select_data_flow::{translate_entity_select, translate_select},
     system::{ArcSystemApi, SystemAPI},
+    transaction::{collect_sequences, OpSequence, ReqMessage},
     update::sanitize_update,
     DomainError, FindEntitySelect, MaybeSelect, Session,
 };
 
 pub struct DomainEngine {
     ontology: Arc<Ontology>,
-    resolver_graph: ResolverGraph,
+    pub(crate) resolver_graph: ResolverGraph,
     data_store: Option<DataStore>,
     system: ArcSystemApi,
 }
@@ -75,7 +77,7 @@ impl DomainEngine {
             .ok_or(DomainError::MappingProcedureNotFound)?;
         let mut vm = self.ontology.new_vm(proc);
 
-        self.run_vm_to_completion(&mut vm, input, &mut Some(selects), session)
+        self.run_vm_to_completion(&mut vm, input, &mut Some(selects), &session)
             .await
     }
 
@@ -121,7 +123,7 @@ impl DomainEngine {
                 let mut vm = ontology.new_vm(procedure);
 
                 *value = self
-                    .run_vm_to_completion(&mut vm, value.take(), &mut None, session.clone())
+                    .run_vm_to_completion(&mut vm, value.take(), &mut None, &session)
                     .await?;
             }
         }
@@ -164,12 +166,7 @@ impl DomainEngine {
                             let mut vm = ontology.new_vm(procedure);
 
                             *value = self
-                                .run_vm_to_completion(
-                                    &mut vm,
-                                    value.take(),
-                                    &mut None,
-                                    session.clone(),
-                                )
+                                .run_vm_to_completion(&mut vm, value.take(), &mut None, &session)
                                 .await?;
                         }
                     }
@@ -212,12 +209,7 @@ impl DomainEngine {
                             let mut vm = ontology.new_vm(procedure);
 
                             *value = self
-                                .run_vm_to_completion(
-                                    &mut vm,
-                                    value.take(),
-                                    &mut None,
-                                    session.clone(),
-                                )
+                                .run_vm_to_completion(&mut vm, value.take(), &mut None, &session)
                                 .await?;
                         }
                     }
@@ -292,7 +284,7 @@ impl DomainEngine {
                                     &mut vm,
                                     mut_value.take(),
                                     &mut None,
-                                    session.clone(),
+                                    &session,
                                 )
                                 .await?;
                         }
@@ -305,18 +297,18 @@ impl DomainEngine {
         Ok(responses)
     }
 
-    async fn run_vm_to_completion(
+    pub(crate) async fn run_vm_to_completion(
         &self,
         vm: &mut OntolVm<'_>,
         mut param: Value,
         selects: &mut Option<&mut (dyn FindEntitySelect + Send)>,
-        session: Session,
+        session: &Session,
     ) -> DomainResult<Value> {
         loop {
             match vm.run([param])? {
                 VmState::Complete(value) => return Ok(value),
                 VmState::Yield(vm_yield) => {
-                    param = self.exec_yield(vm_yield, selects, session.clone()).await?;
+                    param = self.exec_yield(vm_yield, selects, session).await?;
                 }
             }
         }
@@ -326,7 +318,7 @@ impl DomainEngine {
         &self,
         vm_yield: Yield,
         selects: &mut Option<&mut (dyn FindEntitySelect + Send)>,
-        session: Session,
+        session: &Session,
     ) -> DomainResult<Value> {
         match vm_yield {
             Yield::Match(match_var, value_cardinality, filter) => {
@@ -384,7 +376,7 @@ impl DomainEngine {
 
                         let output_json = self
                             .system
-                            .call_http_json_hook(url, session, input_json)
+                            .call_http_json_hook(url, session.clone(), input_json)
                             .await?;
 
                         debug!("output json: `{output_json:?}`");
@@ -413,8 +405,6 @@ impl DomainEngine {
         mut entity_select: EntitySelect,
         session: Session,
     ) -> DomainResult<ontol_runtime::value::Value> {
-        let data_store = self.get_data_store()?;
-
         debug!("match filter:\n{:#?}", entity_select.filter);
 
         let mut static_conditions: Vec<Condition> = vec![];
@@ -476,13 +466,23 @@ impl DomainEngine {
             entity_select.filter.condition_mut().merge(static_condition);
         }
 
-        let data_store::Response::Query(edge_seq) = data_store
-            .api()
-            .execute(data_store::Request::Query(entity_select), session)
-            .await?
-        else {
+        let sequences: Vec<_> = collect_sequences(
+            self.transact(
+                futures_util::stream::iter([ReqMessage::Query(
+                    OpSequence(1),
+                    entity_select.clone(),
+                )])
+                .boxed(),
+                session.clone(),
+            )
+            .await?,
+        )
+        .try_collect()
+        .await?;
+
+        let Some(edge_seq) = sequences.into_iter().next() else {
             return Err(DomainError::DataStore(anyhow!(
-                "data store returned invalid response"
+                "nothing returned from data store"
             )));
         };
 

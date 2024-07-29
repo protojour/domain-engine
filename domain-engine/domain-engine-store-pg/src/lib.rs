@@ -4,8 +4,10 @@ use anyhow::anyhow;
 use domain_engine_core::{
     data_store::{BatchWriteRequest, DataStoreAPI, Request, Response},
     system::ArcSystemApi,
-    DomainError, DomainResult,
+    transaction::{ReqMessage, RespMessage},
+    DomainError, DomainResult, Session,
 };
+use futures_util::stream::BoxStream;
 use sql::EscapeIdent;
 use tokio_postgres::NoTls;
 
@@ -63,6 +65,14 @@ impl DataStoreAPI for PostgresDataStore {
                 )))
             }
         }
+    }
+
+    async fn transact<'a>(
+        &'a self,
+        _messages: BoxStream<'a, DomainResult<ReqMessage>>,
+        _session: Session,
+    ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>> {
+        todo!()
     }
 }
 
