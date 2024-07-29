@@ -1,6 +1,6 @@
 //! GraphQL "unit" tests, i.e. only mocked datastore
 
-use domain_engine_core::data_store::{DataStoreAPIMock, Request, Response};
+use domain_engine_core::transaction::{OpSequence, ReqMessage, RespMessage, ValueReason};
 use domain_engine_graphql::{
     context::ServiceCtx,
     gql_scalar::GqlScalar,
@@ -23,8 +23,11 @@ use unimock::*;
 
 use domain_engine_test_utils::{
     graphql_test_utils::{
-        gql_ctx_mock_data_store, mock_data_store_query_entities_empty, Exec, GraphqlTestResultExt,
-        TestCompileSchema, TestCompileSingletonSchema, TestError,
+        gql_ctx_mock_data_store, Exec, GraphqlTestResultExt, TestCompileSchema,
+        TestCompileSingletonSchema, TestError,
+    },
+    mock_datastore::{
+        mock_data_store_query_entities_empty, respond_inserted, respond_queried, LinearTransactMock,
     },
     parser_document_utils::{
         find_input_object_type, find_object_field, find_object_type, FieldInfo,
@@ -184,15 +187,14 @@ async fn int_scalars() {
         })),
     );
 
-    let store_entity_mock = DataStoreAPIMock::execute
-        .next_call(matching!(Request::BatchWrite(_), _session))
-        .returns(Ok(Response::one_inserted(
-            foo.entity_builder(
+    let store_entity_mock = LinearTransactMock::transact
+        .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+        .returns(respond_inserted([foo
+            .entity_builder(
                 json!("my_id"),
                 json!({ "id": "my_id", "small": 42, "big": 112233445566778899_i64 }),
             )
-            .into(),
-        )));
+            .into()]));
 
     expect_eq!(
         actual = "mutation {
@@ -269,15 +271,14 @@ async fn non_entity_set_mutation() {
             &gql_ctx_mock_data_store(
                 &test,
                 &[root()],
-                DataStoreAPIMock::execute
-                    .next_call(matching!(Request::BatchWrite(_), _session))
-                    .returns(Ok(Response::one_inserted(
-                        foo.entity_builder(
+                LinearTransactMock::transact
+                    .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+                    .returns(respond_inserted([foo
+                        .entity_builder(
                             json!("my_id"),
                             json!({ "id": "N/A", "bars": [{ "field": "text" }] })
                         )
-                        .into(),
-                    )))
+                        .into()]))
             ),
         )
         .await,
@@ -381,21 +382,26 @@ async fn basic_pagination() {
             &gql_ctx_mock_data_store(
                 &test,
                 &[root()],
-                DataStoreAPIMock::execute
-                    .next_call(matching!(Request::Query(_), _session))
-                    .answers(&|_, request, _| {
-                        let Request::Query(entity_select) = request else {
+                LinearTransactMock::transact
+                    .next_call(matching!([Ok(ReqMessage::Query(..))], _session))
+                    .answers(&|_, req_messages, _| {
+                        let Ok(ReqMessage::Query(_, entity_select)) =
+                            req_messages.iter().next().unwrap()
+                        else {
                             panic!();
                         };
                         assert!(!entity_select.include_total_len);
                         assert_eq!(entity_select.limit, 42);
                         assert_eq!(entity_select.after_cursor.as_deref().unwrap(), &[b'1']);
 
-                        Ok(Response::Query(Sequence::default().with_sub(SubSequence {
-                            end_cursor: Some(Box::new([b'2'])),
-                            has_next: true,
-                            total_len: Some(42),
-                        })))
+                        Ok(vec![Ok(RespMessage::SequenceStart(
+                            OpSequence(0),
+                            Some(Box::new(SubSequence {
+                                end_cursor: Some(Box::new([b'2'])),
+                                has_next: true,
+                                total_len: Some(42),
+                            })),
+                        ))])
                     })
             ),
         )
@@ -426,21 +432,26 @@ async fn basic_pagination() {
             &gql_ctx_mock_data_store(
                 &test,
                 &[root()],
-                DataStoreAPIMock::execute
-                    .next_call(matching!(Request::Query(_), _session))
-                    .answers(&|_, request, _| {
-                        let Request::Query(entity_select) = request else {
+                LinearTransactMock::transact
+                    .next_call(matching!([Ok(ReqMessage::Query(..))], _session))
+                    .answers(&|_, req_messages, _| {
+                        let Ok(ReqMessage::Query(_, entity_select)) =
+                            req_messages.iter().next().unwrap()
+                        else {
                             panic!();
                         };
                         assert!(entity_select.include_total_len);
                         assert_eq!(entity_select.limit, 1);
                         assert_eq!(entity_select.after_cursor, None);
 
-                        Ok(Response::Query(Sequence::default().with_sub(SubSequence {
-                            end_cursor: Some(vec![b'1'].into_boxed_slice()),
-                            has_next: true,
-                            total_len: Some(42),
-                        })))
+                        Ok(vec![Ok(RespMessage::SequenceStart(
+                            OpSequence(0),
+                            Some(Box::new(SubSequence {
+                                end_cursor: Some(Box::new([b'1'])),
+                                has_next: true,
+                                total_len: Some(42),
+                            })),
+                        ))])
                     })
             ),
         )
@@ -472,11 +483,11 @@ async fn nodes() {
     .compile_single_schema();
 
     let [foo] = test.bind(["foo"]);
-    let query_mock = DataStoreAPIMock::execute
-        .next_call(matching!(Request::Query(_), _))
-        .returns(Ok(Response::Query(Sequence::from_iter([foo
+    let query_mock = LinearTransactMock::transact
+        .next_call(matching!([Ok(ReqMessage::Query(..))], _))
+        .returns(respond_queried([foo
             .entity_builder(json!("id"), json!({}))
-            .into()]))));
+            .into()]));
 
     expect_eq!(
         actual = "{
@@ -574,15 +585,14 @@ async fn inner_struct() {
         })),
     );
 
-    let store_entity_mock = DataStoreAPIMock::execute
-        .next_call(matching!(Request::BatchWrite(_), _session))
-        .returns(Ok(Response::one_inserted(
-            foo.entity_builder(
+    let store_entity_mock = LinearTransactMock::transact
+        .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+        .returns(respond_inserted([foo
+            .entity_builder(
                 json!("my_id"),
                 json!({ "id": "my_id", "inner": { "prop": "yo" } }),
             )
-            .into(),
-        )));
+            .into()]));
 
     expect_eq!(
         actual = r#"mutation {
@@ -722,9 +732,9 @@ async fn artist_and_instrument_connections() {
             &gql_ctx_mock_data_store(
                 &test,
                 &[root()],
-                DataStoreAPIMock::execute
-                    .next_call(matching!(Request::Query(_), _session))
-                    .returns(Ok(Response::Query(Sequence::from_iter([ziggy.clone()]))))
+                LinearTransactMock::transact
+                    .next_call(matching!([Ok(ReqMessage::Query(..))], _session))
+                    .returns(respond_queried([ziggy.clone()]))
             )
         )
         .await,
@@ -815,9 +825,9 @@ async fn artist_and_instrument_connections() {
             &gql_ctx_mock_data_store(
                 &test,
                 &[root()],
-                DataStoreAPIMock::execute
-                    .next_call(matching!(Request::BatchWrite(..), _session))
-                    .returns(Ok(Response::one_inserted(ziggy)))
+                LinearTransactMock::transact
+                    .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+                    .returns(respond_inserted([ziggy]))
             )
         )
         .await,
@@ -893,9 +903,9 @@ async fn unified_mutation_create() {
             &gql_ctx_mock_data_store(
                 &test,
                 &[root()],
-                DataStoreAPIMock::execute
-                    .next_call(matching!(Request::BatchWrite(..), _session))
-                    .returns(Ok(Response::one_inserted(ziggy)))
+                LinearTransactMock::transact
+                    .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+                    .returns(respond_inserted([ziggy]))
             )
         )
         .await,
@@ -964,9 +974,9 @@ async fn create_through_mapped_domain() {
             &gql_ctx_mock_data_store(
                 &test,
                 &[ARTIST_AND_INSTRUMENT.0],
-                DataStoreAPIMock::execute
-                    .next_call(matching!(Request::BatchWrite(..), _session))
-                    .returns(Ok(Response::one_inserted(ziggy)))
+                LinearTransactMock::transact
+                    .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+                    .returns(respond_inserted([ziggy]))
             )
         )
         .await,
@@ -1045,9 +1055,9 @@ async fn create_through_three_domains() {
             &gql_ctx_mock_data_store(
                 &test,
                 &[ARTIST_AND_INSTRUMENT.0],
-                DataStoreAPIMock::execute
-                    .next_call(matching!(Request::BatchWrite(..), _session))
-                    .returns(Ok(Response::one_inserted(ziggy)))
+                LinearTransactMock::transact
+                    .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+                    .returns(respond_inserted([ziggy]))
             )
         )
         .await,
@@ -1070,26 +1080,32 @@ async fn guitar_synth_union_selection() {
     let (test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema();
     let [artist] = test.bind(["artist"]);
 
-    let query_mock = DataStoreAPIMock::execute
-        .next_call(matching!(Request::Query(_), _session))
-        .returns(Ok(Response::Query(Sequence::from_iter([artist
-            .entity_builder(
-                json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
-                json!({
-                    "name": "foobar",
-                    "plays": [
-                        {
-                            "type": "synth",
-                            "polyphony": 42,
-                        },
-                        {
-                            "type": "guitar",
-                            "string_count": 91,
-                        }
-                    ]
-                }),
-            )
-            .into()]))));
+    let query_mock = LinearTransactMock::transact
+        .next_call(matching!([Ok(ReqMessage::Query(..))], _session))
+        .returns(Ok(vec![
+            Ok(RespMessage::SequenceStart(OpSequence(0), None)),
+            Ok(RespMessage::NextValue(
+                artist
+                    .entity_builder(
+                        json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
+                        json!({
+                            "name": "foobar",
+                            "plays": [
+                                {
+                                    "type": "synth",
+                                    "polyphony": 42,
+                                },
+                                {
+                                    "type": "guitar",
+                                    "string_count": 91,
+                                }
+                            ]
+                        }),
+                    )
+                    .into(),
+                ValueReason::Queried,
+            )),
+        ]));
 
     expect_eq!(
         actual = "{
@@ -1172,19 +1188,17 @@ fn guitar_synth_union_input_union_field_list() {
 async fn graphql_guitar_synth_union_input_exec() {
     let (test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema();
     let [artist] = test.bind(["artist"]);
-    let store_entity_mock = DataStoreAPIMock::execute
-        .next_call(matching!(Request::BatchWrite(..), _session))
-        .returns(Ok(Response::one_inserted(
-            artist
-                .entity_builder(
-                    json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
-                    json!({
-                        "name": "Ziggy",
-                        "plays": []
-                    }),
-                )
-                .into(),
-        )));
+    let store_entity_mock = LinearTransactMock::transact
+        .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+        .returns(respond_inserted([artist
+            .entity_builder(
+                json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
+                json!({
+                    "name": "Ziggy",
+                    "plays": []
+                }),
+            )
+            .into()]));
 
     expect_eq!(
         actual = r#"mutation {
@@ -1356,20 +1370,26 @@ async fn municipalities_named_query() {
         }))
     );
 
-    let query_mock = DataStoreAPIMock::execute
-        .next_call(matching!(Request::Query(_), _session))
-        .returns(Ok(Response::Query(Sequence::from_iter([municipality
-            .entity_builder(
-                json!("OSL"),
-                json!({
-                    "code": "OSL",
-                    "geometry": {
-                        "type": "Point",
-                        "coordinates": [10.738889, 59.913333],
-                    }
-                }),
-            )
-            .into()]))));
+    let query_mock = LinearTransactMock::transact
+        .next_call(matching!([Ok(ReqMessage::Query(..))], _session))
+        .returns(Ok(vec![
+            Ok(RespMessage::SequenceStart(OpSequence(0), None)),
+            Ok(RespMessage::NextValue(
+                municipality
+                    .entity_builder(
+                        json!("OSL"),
+                        json!({
+                            "code": "OSL",
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [10.738889, 59.913333],
+                            }
+                        }),
+                    )
+                    .into(),
+                ValueReason::Queried,
+            )),
+        ]));
 
     expect_eq!(
         actual = fetch_osl(
@@ -1425,13 +1445,12 @@ async fn open_data() {
     "
     .compile_single_schema();
     let [foo] = test.bind(["foo"]);
-    let store_entity_mock = DataStoreAPIMock::execute
-        .next_call(matching!(Request::BatchWrite(..), _session))
-        .returns(Ok(Response::one_inserted(
-            foo.entity_builder(json!("the-id"), json!({}))
-                .with_open_data(json!({ "foo": "bar" }))
-                .into(),
-        )));
+    let store_entity_mock = LinearTransactMock::transact
+        .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+        .returns(respond_inserted([foo
+            .entity_builder(json!("the-id"), json!({}))
+            .with_open_data(json!({ "foo": "bar" }))
+            .into()]));
 
     expect_eq!(
         actual = r#"mutation {
@@ -1488,11 +1507,11 @@ async fn open_data_disabled() {
         expected = "unknown property `open_prop` in input at line 1 column 25"
     );
 
-    let store_entity_mock = DataStoreAPIMock::execute
-        .next_call(matching!(Request::BatchWrite(..), _session))
-        .returns(Ok(Response::one_inserted(
-            foo.entity_builder(json!("the-id"), json!({})).into(),
-        )));
+    let store_entity_mock = LinearTransactMock::transact
+        .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+        .returns(respond_inserted([foo
+            .entity_builder(json!("the-id"), json!({}))
+            .into()]));
 
     expect_eq!(
         actual = r#"mutation {
@@ -1610,13 +1629,11 @@ async fn test_constant_index_panic() {
 
     let [event] = test.bind(["events_db.event"]);
 
-    let store_entity_mock = DataStoreAPIMock::execute
-        .next_call(matching!(Request::Query(_), _session))
-        .returns(Ok(Response::one_inserted(
-            event
-                .entity_builder(json!("0"), json!({ "_class": "event" }))
-                .into(),
-        )));
+    let store_entity_mock = LinearTransactMock::transact
+        .next_call(matching!([Ok(ReqMessage::Query(..)), ..], _session))
+        .returns(respond_queried([event
+            .entity_builder(json!("0"), json!({ "_class": "event" }))
+            .into()]));
 
     let _ = "{ events { nodes { _id _class } } }"
         .exec(
@@ -1685,15 +1702,14 @@ async fn flattened_union_entity() {
 
     let [foo] = test.bind(["foo"]);
 
-    let store_entity_mock = DataStoreAPIMock::execute
-        .next_call(matching!(Request::BatchWrite(_), _session))
-        .returns(Ok(Response::one_inserted(
-            foo.entity_builder(
+    let store_entity_mock = LinearTransactMock::transact
+        .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+        .returns(respond_inserted([foo
+            .entity_builder(
                 json!("id"),
                 json!({ "id": "id", "kind": "bar", "data": "value", "bar": 1337 }),
             )
-            .into(),
-        )));
+            .into()]));
 
     expect_eq!(
         actual = r#"mutation {

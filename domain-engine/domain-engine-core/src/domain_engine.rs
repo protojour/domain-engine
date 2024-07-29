@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
 use futures_util::{StreamExt, TryStreamExt};
@@ -15,7 +15,7 @@ use ontol_runtime::{
     sequence::Sequence,
     value::{Value, ValueTag},
     vm::{ontol_vm::OntolVm, proc::Yield, VmState},
-    MapKey, PackageId,
+    MapKey,
 };
 use serde::de::DeserializeSeed;
 use tracing::{debug, error, trace};
@@ -469,7 +469,7 @@ impl DomainEngine {
         let sequences: Vec<_> = collect_sequences(
             self.transact(
                 futures_util::stream::iter([ReqMessage::Query(
-                    OpSequence(1),
+                    OpSequence(0),
                     entity_select.clone(),
                 )])
                 .boxed(),
@@ -513,14 +513,6 @@ impl Builder {
 
     pub fn system(mut self, system: Box<dyn SystemAPI + Send + Sync>) -> Self {
         self.system = Some(system.into());
-        self
-    }
-
-    pub fn mock_data_store(mut self, package_id: PackageId, setup: impl unimock::Clause) -> Self {
-        self.data_store = Some(DataStore::new(
-            BTreeSet::from_iter([package_id]),
-            Box::new(unimock::Unimock::new(setup)),
-        ));
         self
     }
 

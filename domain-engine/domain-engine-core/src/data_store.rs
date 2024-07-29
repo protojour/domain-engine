@@ -9,7 +9,6 @@ use ontol_runtime::{
     DefId, PackageId,
 };
 use serde::{Deserialize, Serialize};
-use unimock::unimock;
 
 use crate::{
     domain_error::DomainResult,
@@ -18,7 +17,6 @@ use crate::{
     Session,
 };
 
-#[unimock(api = DataStoreAPIMock)]
 #[async_trait::async_trait]
 pub trait DataStoreAPI {
     async fn execute(&self, request: Request, session: Session) -> DomainResult<Response>;
@@ -83,12 +81,6 @@ pub enum Response {
 impl From<Vec<WriteResponse>> for Response {
     fn from(value: Vec<WriteResponse>) -> Self {
         Self::BatchWrite(value)
-    }
-}
-
-impl Response {
-    pub fn one_inserted(value: Value) -> Self {
-        Self::BatchWrite(vec![WriteResponse::Inserted(value)])
     }
 }
 

@@ -21,7 +21,7 @@ use ontol_runtime::{
     },
     ontology::Ontology,
     sequence::Sequence,
-    value::{Value, ValueDebug},
+    value::ValueDebug,
     PackageId,
 };
 use templates::matrix_type::MatrixType;
@@ -131,20 +131,6 @@ async fn query(
                 .domain_engine
                 .exec_map(map_key, input, &mut selects, service_ctx.session.clone())
                 .await?;
-
-            {
-                let _sequences: Vec<Sequence<Value>> = collect_sequences(
-                    service_ctx
-                        .domain_engine
-                        .transact(
-                            futures_util::stream::empty().boxed(),
-                            service_ctx.session.clone(),
-                        )
-                        .await?,
-                )
-                .try_collect()
-                .await?;
-            }
 
             trace!("query result: {}", ValueDebug(&output));
 

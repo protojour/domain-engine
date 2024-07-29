@@ -17,6 +17,7 @@ use serde::de::DeserializeSeed;
 pub mod dummy_session;
 pub mod dynamic_data_store;
 pub mod graphql_test_utils;
+pub mod mock_datastore;
 pub mod parser_document_utils;
 
 pub use unimock;

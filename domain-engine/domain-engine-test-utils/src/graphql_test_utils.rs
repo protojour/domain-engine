@@ -4,19 +4,17 @@ use std::{
     sync::Arc,
 };
 
-use domain_engine_core::{
-    data_store::{DataStore, DataStoreAPIMock, Request, Response},
-    DomainEngine, Session,
-};
+use domain_engine_core::{data_store::DataStore, DomainEngine, Session};
 use domain_engine_graphql::{
     context::ServiceCtx, create_graphql_schema, gql_scalar::GqlScalar, Schema,
 };
 use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use juniper::ScalarValue;
-use ontol_runtime::sequence::Sequence;
 use ontol_test_utils::{OntolTest, SrcName, TestCompile, TestPackages};
 use ordered_float::NotNan;
 use unimock::*;
+
+use crate::mock_datastore::LinearDataStoreAdapter;
 
 pub trait TestCompileSchema {
     fn compile_schemas<const N: usize>(
@@ -101,12 +99,6 @@ impl Display for TestError {
     }
 }
 
-pub fn mock_data_store_query_entities_empty() -> impl unimock::Clause {
-    DataStoreAPIMock::execute
-        .next_call(matching!(Request::Query(_), _session))
-        .returns(Ok(Response::Query(Sequence::default())))
-}
-
 pub fn gql_ctx_mock_data_store(
     ontol_test: &OntolTest,
     data_store_packages: &[SrcName],
@@ -119,7 +111,7 @@ pub fn gql_ctx_mock_data_store(
                 .iter()
                 .map(|src_name| ontol_test.get_package_id(src_name.0.as_ref()))
                 .collect(),
-            Box::new(unimock.clone()),
+            Box::new(LinearDataStoreAdapter::new(unimock.clone())),
         ))
         .system(Box::new(unimock))
         .build_sync(InMemoryDataStoreFactory, Session::default())

@@ -18,7 +18,7 @@ use crate::{
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Debug)]
 pub struct OpSequence(pub u32);
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum ReqMessage {
     Query(OpSequence, EntitySelect),
     Insert(OpSequence, Select),
