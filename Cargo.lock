@@ -938,6 +938,7 @@ dependencies = [
  "bytes",
  "domain-engine-core",
  "domain-engine-test-utils",
+ "futures-util",
  "http",
  "http-body-util",
  "mime",

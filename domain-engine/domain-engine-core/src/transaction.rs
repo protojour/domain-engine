@@ -12,6 +12,7 @@ use tracing::trace;
 
 use crate::{
     select_data_flow::{translate_entity_select, translate_select},
+    update::sanitize_update,
     DomainEngine, DomainError, DomainResult, Session,
 };
 
@@ -71,9 +72,10 @@ impl DomainEngine {
     ) -> BoxStream<'a, DomainResult<ReqMessage>> {
         async_stream::stream! {
             let mut cur_downmap = None;
+            let mut updating = false;
 
             for await req_msg in messages {
-                yield self.process_req_message(req_msg, &mut cur_downmap, &upmaps_tx, &session).await;
+                yield self.process_req_message(req_msg, &mut cur_downmap, &upmaps_tx, &mut updating, &session).await;
             }
         }.boxed()
     }
@@ -110,10 +112,12 @@ impl DomainEngine {
         req_msg: ReqMessage,
         cur_downmap: &mut Option<DownMap>,
         upmaps_tx: &tokio::sync::mpsc::Sender<UpMap>,
+        updating: &mut bool,
         session: &Session,
     ) -> DomainResult<ReqMessage> {
         match req_msg {
             ReqMessage::Query(op_seq, mut select) => {
+                *updating = false;
                 let resolve_path = self
                     .resolver_graph
                     .probe_path_for_entity_select(self.ontology(), &select)
@@ -129,6 +133,7 @@ impl DomainEngine {
                 Ok(ReqMessage::Query(op_seq, select))
             }
             ReqMessage::Insert(op_seq, mut select) => {
+                *updating = false;
                 self.setup_duplex(
                     op_seq,
                     &mut select,
@@ -140,6 +145,7 @@ impl DomainEngine {
                 Ok(ReqMessage::Insert(op_seq, select))
             }
             ReqMessage::Update(op_seq, mut select) => {
+                *updating = true;
                 self.setup_duplex(
                     op_seq,
                     &mut select,
@@ -151,6 +157,7 @@ impl DomainEngine {
                 Ok(ReqMessage::Update(op_seq, select))
             }
             ReqMessage::Upsert(op_seq, mut select) => {
+                *updating = false;
                 self.setup_duplex(
                     op_seq,
                     &mut select,
@@ -162,13 +169,20 @@ impl DomainEngine {
                 Ok(ReqMessage::Upsert(op_seq, select))
             }
             ReqMessage::Delete(op_seq, mut def_id) => {
+                *updating = false;
                 self.setup_delete(op_seq, &mut def_id, upmaps_tx).await?;
                 *cur_downmap = None;
                 Ok(ReqMessage::Delete(op_seq, def_id))
             }
-            ReqMessage::NextValue(value) => Ok(ReqMessage::NextValue(
-                self.downmap_value(value, session, &cur_downmap).await?,
-            )),
+            ReqMessage::NextValue(value) => {
+                let mut value = self.downmap_value(value, session, &cur_downmap).await?;
+
+                if *updating {
+                    sanitize_update(&mut value);
+                }
+
+                Ok(ReqMessage::NextValue(value))
+            }
         }
     }
 

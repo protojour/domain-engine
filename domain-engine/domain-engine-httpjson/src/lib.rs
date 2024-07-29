@@ -13,7 +13,11 @@ use axum::{
 use axum_extra::extract::JsonLines;
 use bytes::Bytes;
 use content_type::JsonContentType;
-use domain_engine_core::{data_store::BatchWriteRequest, DomainEngine, Session};
+use domain_engine_core::{
+    transaction::{OpSequence, ReqMessage},
+    DomainEngine, DomainResult, Session,
+};
+use futures_util::{stream::StreamExt, TryStreamExt};
 use http_error::{domain_error_to_response, json_error, ErrorJson};
 use ontol_runtime::{
     attr::Attr,
@@ -29,7 +33,6 @@ use ontol_runtime::{
     PackageId,
 };
 use serde::{de::DeserializeSeed, Deserializer};
-use tokio_stream::StreamExt;
 use tracing::{debug, error};
 
 mod content_type;
@@ -104,7 +107,7 @@ where
         .ontology()
         .new_serde_processor(endpoint.operator_addr, ProcessorMode::Update);
 
-    let mut values = vec![];
+    let mut messages = vec![ReqMessage::Upsert(OpSequence(0), Select::EntityId)];
 
     match json_content_type {
         JsonContentType::Json => {
@@ -121,9 +124,10 @@ where
                 Err(response) => return response,
             };
 
-            values.push(ontol_value);
+            messages.push(ReqMessage::NextValue(ontol_value));
         }
         JsonContentType::JsonLines => {
+            // TODO: transaction streaming
             let mut lines = match JsonLines::<serde_json::Value>::from_request(req, &()).await {
                 Ok(lines) => lines,
                 Err(err) => return err.into_response(),
@@ -140,24 +144,29 @@ where
                     Ok(value) => value,
                     Err(response) => return response,
                 };
-                values.push(ontol_value);
+                messages.push(ReqMessage::NextValue(ontol_value));
             }
         }
     };
 
     let result = endpoint
         .engine
-        .execute_writes(
-            vec![BatchWriteRequest::Upsert(values, Select::EntityId)],
+        .transact(
+            futures_util::stream::iter(messages).boxed(),
             session.clone(),
         )
         .await;
 
-    if let Err(error) = result {
-        return domain_error_to_response(error);
-    }
+    let stream = match result {
+        Ok(stream) => stream,
+        Err(error) => return domain_error_to_response(error),
+    };
 
-    StatusCode::OK.into_response()
+    let collected: DomainResult<Vec<_>> = stream.try_collect().await;
+    match collected {
+        Ok(_) => StatusCode::OK.into_response(),
+        Err(error) => domain_error_to_response(error),
+    }
 }
 
 async fn read_next_json_line(

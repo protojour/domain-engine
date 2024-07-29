@@ -11,24 +11,21 @@ use ontol_runtime::{
         condition::Condition,
         select::{EntitySelect, StructOrUnionSelect},
     },
-    resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolvePath, ResolverGraph},
+    resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolverGraph},
     sequence::Sequence,
     value::{Value, ValueTag},
     vm::{ontol_vm::OntolVm, proc::Yield, VmState},
     MapKey,
 };
 use serde::de::DeserializeSeed;
-use tracing::{debug, error, trace};
+use tracing::{debug, error};
 
 use crate::{
-    data_store::{
-        self, BatchWriteRequest, DataStore, DataStoreFactory, DataStoreFactorySync, WriteResponse,
-    },
+    data_store::{self, DataStore, DataStoreFactory, DataStoreFactorySync},
     domain_error::DomainResult,
-    select_data_flow::{translate_entity_select, translate_select},
+    select_data_flow::translate_entity_select,
     system::{ArcSystemApi, SystemAPI},
     transaction::{collect_sequences, OpSequence, ReqMessage},
-    update::sanitize_update,
     DomainError, FindEntitySelect, MaybeSelect, Session,
 };
 
@@ -129,172 +126,6 @@ impl DomainEngine {
         }
 
         Ok(edge_seq)
-    }
-
-    pub async fn execute_writes(
-        &self,
-        mut requests: Vec<data_store::BatchWriteRequest>,
-        session: Session,
-    ) -> DomainResult<Vec<data_store::WriteResponse>> {
-        let data_store = self.get_data_store()?;
-        let ontology = self.ontology();
-
-        // resolve paths for post-data-store mapping
-        let mut ordered_resolve_paths: Vec<Option<ResolvePath>> =
-            Vec::with_capacity(requests.len());
-
-        for request in &mut requests {
-            match request {
-                BatchWriteRequest::Insert(mut_values, select)
-                | BatchWriteRequest::Upsert(mut_values, select) => {
-                    let down_path = self
-                        .resolver_graph
-                        .probe_path_for_select(
-                            ontology,
-                            select,
-                            ProbeDirection::Down,
-                            ProbeFilter::Complete,
-                        )
-                        .ok_or(DomainError::NoResolvePathToDataStore)?;
-
-                    for map_key in down_path.iter() {
-                        let procedure = ontology
-                            .get_mapper_proc(&map_key)
-                            .expect("No mapping procedure for query output");
-
-                        for value in mut_values.iter_mut() {
-                            let mut vm = ontology.new_vm(procedure);
-
-                            *value = self
-                                .run_vm_to_completion(&mut vm, value.take(), &mut None, &session)
-                                .await?;
-                        }
-                    }
-
-                    let up_path = self
-                        .resolver_graph
-                        .probe_path_for_select(
-                            ontology,
-                            select,
-                            ProbeDirection::Up,
-                            ProbeFilter::Complete,
-                        )
-                        .ok_or(DomainError::NoResolvePathToDataStore)?;
-
-                    for map_key in up_path.iter() {
-                        translate_select(select, &map_key, ontology);
-                    }
-
-                    ordered_resolve_paths.push(Some(up_path));
-                }
-                BatchWriteRequest::Update(mut_values, select) => {
-                    let down_path = self
-                        .resolver_graph
-                        .probe_path_for_select(
-                            ontology,
-                            select,
-                            ProbeDirection::Down,
-                            ProbeFilter::Pure,
-                        )
-                        .ok_or(DomainError::NoResolvePathToDataStore)?;
-
-                    debug!("UPDATE input downpath: {down_path:?}");
-
-                    for map_key in down_path.iter() {
-                        let procedure = ontology
-                            .get_mapper_proc(&map_key)
-                            .expect("No mapping procedure for query output");
-
-                        for value in mut_values.iter_mut() {
-                            let mut vm = ontology.new_vm(procedure);
-
-                            *value = self
-                                .run_vm_to_completion(&mut vm, value.take(), &mut None, &session)
-                                .await?;
-                        }
-                    }
-
-                    for value in mut_values.iter_mut() {
-                        sanitize_update(value);
-                    }
-
-                    let up_path = self
-                        .resolver_graph
-                        .probe_path_for_select(
-                            ontology,
-                            select,
-                            ProbeDirection::Up,
-                            ProbeFilter::Complete,
-                        )
-                        .ok_or(DomainError::NoResolvePathToDataStore)?;
-
-                    for map_key in up_path.iter() {
-                        translate_select(select, &map_key, ontology);
-                    }
-
-                    ordered_resolve_paths.push(Some(up_path));
-                }
-                BatchWriteRequest::Delete(_ids, def_id) => {
-                    if !data_store.package_ids().contains(&def_id.package_id()) {
-                        // TODO: Do ids need to be translated?
-                        let up_path = self
-                            .resolver_graph
-                            .probe_path(
-                                &self.ontology,
-                                *def_id,
-                                ProbeOptions {
-                                    must_be_entity: true,
-                                    direction: ProbeDirection::Up,
-                                    filter: ProbeFilter::Complete,
-                                },
-                            )
-                            .ok_or(DomainError::NoResolvePathToDataStore)?;
-                        *def_id = up_path.iter().last().unwrap().input.def_id;
-                    }
-                    ordered_resolve_paths.push(None);
-                }
-            }
-        }
-
-        let data_store::Response::BatchWrite(mut responses) = data_store
-            .api()
-            .execute(data_store::Request::BatchWrite(requests), session.clone())
-            .await?
-        else {
-            return Err(DomainError::DataStore(anyhow!(
-                "data store returned invalid response"
-            )));
-        };
-
-        for (response, resolve_path) in responses.iter_mut().zip(ordered_resolve_paths) {
-            match response {
-                WriteResponse::Inserted(mut_value) | WriteResponse::Updated(mut_value) => {
-                    if let Some(resolve_path) = resolve_path {
-                        for map_key in resolve_path.iter().rev() {
-                            trace!("post-mutation translation {map_key:?}");
-
-                            let procedure = ontology
-                                .get_mapper_proc(&map_key)
-                                .expect("No mapping procedure for query output");
-
-                            let mut vm = ontology.new_vm(procedure);
-
-                            *mut_value = self
-                                .run_vm_to_completion(
-                                    &mut vm,
-                                    mut_value.take(),
-                                    &mut None,
-                                    &session,
-                                )
-                                .await?;
-                        }
-                    }
-                }
-                WriteResponse::Deleted(..) => {}
-            }
-        }
-
-        Ok(responses)
     }
 
     pub(crate) async fn run_vm_to_completion(

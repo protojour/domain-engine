@@ -1,12 +1,12 @@
-use anyhow::anyhow;
 use domain_engine_core::{
-    data_store::{BatchWriteRequest, WriteResponse},
-    DomainEngine, DomainError, DomainResult, Session,
+    transaction::{OpSequence, ReqMessage, RespMessage},
+    DomainEngine, DomainResult, Session,
 };
 use domain_engine_test_utils::{
     dynamic_data_store::DynamicDataStoreFactory, system::mock_current_time_monotonic, unimock,
     DomainEngineTestExt, TestFindQuery,
 };
+use futures_util::{StreamExt, TryStreamExt};
 use ontol_runtime::{
     attr::AttrRef,
     interface::serde::processor::{ProcessorProfile, ProcessorProfileFlags},
@@ -51,21 +51,23 @@ pub async fn insert_entity_select_entityid(
     domain_engine: &DomainEngine,
     entity: Value,
 ) -> DomainResult<Value> {
-    let write_responses = domain_engine
-        .execute_writes(
-            vec![BatchWriteRequest::Insert(vec![entity], Select::EntityId)],
+    let response_messages: Vec<_> = domain_engine
+        .transact(
+            futures_util::stream::iter(vec![
+                ReqMessage::Insert(OpSequence(0), Select::EntityId),
+                ReqMessage::NextValue(entity),
+            ])
+            .boxed(),
             Session::default(),
         )
+        .await?
+        .try_collect()
         .await?;
 
-    let WriteResponse::Inserted(value) = write_responses
-        .into_iter()
-        .next()
-        .ok_or_else(|| DomainError::DataStore(anyhow!("Nothing got inserted")))?
-    else {
-        return Err(DomainError::DataStore(anyhow!(
-            "Expected inserted entities"
-        )));
+    let mut iter = response_messages.into_iter();
+    let _sequence_start = iter.next().unwrap();
+    let RespMessage::NextValue(value, _) = iter.next().unwrap() else {
+        panic!()
     };
 
     Ok(value)
