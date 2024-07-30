@@ -3,12 +3,8 @@ use std::{collections::BTreeSet, sync::Arc};
 use futures_util::stream::BoxStream;
 use ontol_runtime::{
     ontology::{config::DataStoreConfig, Ontology},
-    query::select::{EntitySelect, Select},
-    sequence::Sequence,
-    value::Value,
-    DefId, PackageId,
+    PackageId,
 };
-use serde::{Deserialize, Serialize};
 
 use crate::{
     domain_error::DomainResult,
@@ -19,8 +15,6 @@ use crate::{
 
 #[async_trait::async_trait]
 pub trait DataStoreAPI {
-    async fn execute(&self, request: Request, session: Session) -> DomainResult<Response>;
-
     /// Transact.
     ///
     /// This is a duplex operation, the input messages are transformed into output messages
@@ -49,46 +43,6 @@ impl DataStore {
     pub fn api(&self) -> &(dyn DataStoreAPI + Send + Sync) {
         self.api.as_ref()
     }
-}
-
-/// A request to the data store
-#[derive(Serialize, Deserialize)]
-pub enum Request {
-    /// A single query
-    Query(EntitySelect),
-    /// A sequence of batch writes.
-    /// The corresponding responses must retain the order of inputs.
-    BatchWrite(Vec<BatchWriteRequest>),
-}
-
-#[derive(Serialize, Deserialize)]
-pub enum BatchWriteRequest {
-    Insert(Vec<Value>, Select),
-    Update(Vec<Value>, Select),
-    Upsert(Vec<Value>, Select),
-    Delete(Vec<Value>, DefId),
-}
-
-/// A response from the data store.
-///
-/// Must match the corresponding Request.
-#[derive(Serialize, Deserialize)]
-pub enum Response {
-    Query(Sequence<Value>),
-    BatchWrite(Vec<WriteResponse>),
-}
-
-impl From<Vec<WriteResponse>> for Response {
-    fn from(value: Vec<WriteResponse>) -> Self {
-        Self::BatchWrite(value)
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub enum WriteResponse {
-    Inserted(Value),
-    Updated(Value),
-    Deleted(bool),
 }
 
 /// Trait for creating data store APIs

@@ -177,7 +177,7 @@ impl<'a> MetaQuery<'a> {
                             }) {
                                 // add relation query if not included in Select
                                 self.query_relation(
-                                    Select::Struct(StructSelect {
+                                    &Select::Struct(StructSelect {
                                         def_id: filter.def_id,
                                         properties: Default::default(),
                                     }),

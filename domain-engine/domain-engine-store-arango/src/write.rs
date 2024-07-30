@@ -360,7 +360,7 @@ impl AqlQuery {
             }
         }
 
-        let mut queries = meta.write_select(select.clone())?;
+        let mut queries = meta.write_select(select)?;
 
         let mut ops = vec![];
         ops.extend(meta.docs);
@@ -936,7 +936,7 @@ impl<'a> MetaQuery<'a> {
     }
 
     /// Add a Select to a write MetaQuery
-    pub fn write_select(&mut self, select: Select) -> DomainResult<Vec<AqlQuery>> {
+    pub fn write_select(&mut self, select: &Select) -> DomainResult<Vec<AqlQuery>> {
         match select {
             Select::EntityId => {
                 self.return_var = match self.selection {
@@ -1021,15 +1021,12 @@ impl<'a> MetaQuery<'a> {
                                 })
                                 .or_insert(vec![return_var.clone()]);
 
-                            self.write_select(sub_select.clone())?;
+                            self.write_select(sub_select)?;
                         } else {
                             // select contains items not covered by write operations
                             // generate a secondary read query
-                            let query = AqlQuery::build_query(
-                                select.clone(),
-                                self.ontology,
-                                self.database,
-                            )?;
+                            let query =
+                                AqlQuery::build_query(select, self.ontology, self.database)?;
                             return Ok(vec![query]);
                         }
                     }

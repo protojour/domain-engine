@@ -1,6 +1,6 @@
 //! GraphQL "unit" tests, i.e. only mocked datastore
 
-use domain_engine_core::transact::{ReqMessage, RespMessage, ValueReason};
+use domain_engine_core::transact::{DataOperation, ReqMessage, RespMessage};
 use domain_engine_graphql::{
     context::ServiceCtx,
     gql_scalar::GqlScalar,
@@ -1101,7 +1101,7 @@ async fn guitar_synth_union_selection() {
                         }),
                     )
                     .into(),
-                ValueReason::Queried,
+                DataOperation::Queried,
             )),
         ]));
 
@@ -1385,7 +1385,7 @@ async fn municipalities_named_query() {
                         }),
                     )
                     .into(),
-                ValueReason::Queried,
+                DataOperation::Queried,
             )),
         ]));
 

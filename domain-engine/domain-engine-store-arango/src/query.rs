@@ -21,7 +21,7 @@ use super::{aql::*, data_store::Cursor, AqlQuery, ArangoDatabase};
 impl AqlQuery {
     /// Build an AqlQuery from a Select
     pub fn build_query(
-        select: Select,
+        select: &Select,
         ontology: &Ontology,
         database: &ArangoDatabase,
     ) -> DomainResult<AqlQuery> {
@@ -65,7 +65,7 @@ impl AqlQuery {
 
 impl<'a> MetaQuery<'a> {
     /// Add a Select to MetaQuery
-    pub fn query_select(&mut self, select: Select) -> DomainResult<()> {
+    pub fn query_select(&mut self, select: &Select) -> DomainResult<()> {
         match select {
             Select::EntityId => {
                 self.return_var = Expr::complex(format!("{}[0]", self.var));
@@ -88,8 +88,8 @@ impl<'a> MetaQuery<'a> {
                     ..Default::default()
                 }));
 
-                for (rel_id, select) in struct_select.properties {
-                    if let Some(rel_info) = def.data_relationships.get(&rel_id) {
+                for (rel_id, select) in &struct_select.properties {
+                    if let Some(rel_info) = def.data_relationships.get(rel_id) {
                         if let DataRelationshipKind::Edge(_) = rel_info.kind {
                             self.query_relation(select, rel_info, &struct_select.def_id)?;
                         }
@@ -99,7 +99,7 @@ impl<'a> MetaQuery<'a> {
             Select::Entity(entity_select) => {
                 match &entity_select.source {
                     StructOrUnionSelect::Struct(struct_select) => {
-                        self.query_select(Select::Struct(struct_select.clone()))?;
+                        self.query_select(&Select::Struct(struct_select.clone()))?;
                     }
                     StructOrUnionSelect::Union(_, variants) => {
                         for struct_select in variants {
@@ -108,7 +108,7 @@ impl<'a> MetaQuery<'a> {
                                 if let Some(rel_info) = def.data_relationships.get(rel_id) {
                                     if let DataRelationshipKind::Edge(_) = rel_info.kind {
                                         self.query_relation(
-                                            select.clone(),
+                                            select,
                                             rel_info,
                                             &struct_select.def_id,
                                         )?;
@@ -139,8 +139,8 @@ impl<'a> MetaQuery<'a> {
             Select::StructUnion(_, selects) => {
                 for struct_select in selects {
                     let def = self.ontology.def(struct_select.def_id);
-                    for (rel_id, select) in struct_select.properties {
-                        if let Some(rel_info) = def.data_relationships.get(&rel_id) {
+                    for (rel_id, select) in &struct_select.properties {
+                        if let Some(rel_info) = def.data_relationships.get(rel_id) {
                             if let DataRelationshipKind::Edge(_) = rel_info.kind {
                                 self.query_relation(select, rel_info, &struct_select.def_id)?;
                             }
@@ -155,7 +155,7 @@ impl<'a> MetaQuery<'a> {
     /// Add query for relation through edge to MetaQuery
     pub fn query_relation(
         &mut self,
-        select: Select,
+        select: &Select,
         rel_info: &DataRelationshipInfo,
         parent_id: &DefId,
     ) -> DomainResult<()> {
@@ -313,7 +313,7 @@ impl<'a> AttrMut<'a> {
 }
 
 /// Apply Select to deserialized data from Arango
-pub fn apply_select(attr: AttrMut, select: &mut Select, ontology: &Ontology) -> DomainResult<()> {
+pub fn apply_select(attr: AttrMut, select: &Select, ontology: &Ontology) -> DomainResult<()> {
     // debug!("attr {attr:#?} select {select:#?}");
 
     match (attr, select) {
@@ -338,17 +338,16 @@ pub fn apply_select(attr: AttrMut, select: &mut Select, ontology: &Ontology) -> 
         }
         (AttrMut::Unit(Value::Struct(attr_map, _)), Select::Struct(struct_select)) => {
             let def = ontology.def(struct_select.def_id);
-            let selection = struct_select.properties.clone();
 
-            for (rel_id, select) in selection {
+            for (rel_id, select) in &struct_select.properties {
                 let rel_info = def
                     .data_relationships
-                    .get(&rel_id)
+                    .get(rel_id)
                     .expect("property not found in type info");
                 if let DataRelationshipKind::Edge(_) = rel_info.kind {
                     let def_id = match &rel_info.target {
                         DataRelationshipTarget::Unambiguous(def_id) => *def_id,
-                        DataRelationshipTarget::Union { .. } => match attr_map.get(&rel_id) {
+                        DataRelationshipTarget::Union { .. } => match attr_map.get(rel_id) {
                             Some(Attr::Unit(val)) => val.type_def_id(),
                             Some(Attr::Tuple(tuple)) => tuple.elements[0].type_def_id(),
                             Some(Attr::Matrix(matrix)) => matrix
@@ -362,16 +361,12 @@ pub fn apply_select(attr: AttrMut, select: &mut Select, ontology: &Ontology) -> 
                         Select::StructUnion(_, ref selects) => {
                             match selects.iter().any(|s| s.def_id == def_id) {
                                 true => {
-                                    if let Some(attr) = attr_map.get_mut(&rel_id) {
-                                        apply_select(
-                                            AttrMut::from_attr(attr),
-                                            &mut select.clone(),
-                                            ontology,
-                                        )?;
+                                    if let Some(attr) = attr_map.get_mut(rel_id) {
+                                        apply_select(AttrMut::from_attr(attr), select, ontology)?;
                                     }
                                 }
                                 false => {
-                                    if let Some(attr) = attr_map.get_mut(&rel_id) {
+                                    if let Some(attr) = attr_map.get_mut(rel_id) {
                                         if let Some(def) = ontology
                                             .find_domain(def_id.package_id())
                                             .unwrap()
@@ -399,12 +394,8 @@ pub fn apply_select(attr: AttrMut, select: &mut Select, ontology: &Ontology) -> 
                             }
                         }
                         _ => {
-                            if let Some(attr) = attr_map.get_mut(&rel_id) {
-                                apply_select(
-                                    AttrMut::from_attr(attr),
-                                    &mut select.clone(),
-                                    ontology,
-                                )?;
+                            if let Some(attr) = attr_map.get_mut(rel_id) {
+                                apply_select(AttrMut::from_attr(attr), select, ontology)?;
                             }
                         }
                     }
@@ -415,7 +406,7 @@ pub fn apply_select(attr: AttrMut, select: &mut Select, ontology: &Ontology) -> 
             StructOrUnionSelect::Struct(struct_select) => {
                 apply_select(
                     AttrMut::Unit(val),
-                    &mut Select::Struct(struct_select.clone()),
+                    &Select::Struct(struct_select.clone()),
                     ontology,
                 )?;
             }
@@ -426,7 +417,7 @@ pub fn apply_select(attr: AttrMut, select: &mut Select, ontology: &Ontology) -> 
                     .expect("union variant not found");
                 apply_select(
                     AttrMut::Unit(val),
-                    &mut Select::Struct(struct_select.clone()),
+                    &Select::Struct(struct_select.clone()),
                     ontology,
                 )?;
             }
@@ -435,7 +426,7 @@ pub fn apply_select(attr: AttrMut, select: &mut Select, ontology: &Ontology) -> 
             for struct_select in selects.iter() {
                 apply_select(
                     AttrMut::Unit(value),
-                    &mut Select::Struct(struct_select.clone()),
+                    &Select::Struct(struct_select.clone()),
                     ontology,
                 )?;
             }

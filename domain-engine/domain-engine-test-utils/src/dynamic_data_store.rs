@@ -139,7 +139,7 @@ mod pg {
     use std::collections::BTreeSet;
     use std::sync::{Arc, OnceLock};
 
-    use domain_engine_core::data_store::{DataStoreAPI, Request, Response};
+    use domain_engine_core::data_store::DataStoreAPI;
     use domain_engine_core::transact::{ReqMessage, RespMessage};
     use domain_engine_core::{DomainError, DomainResult, Session};
     use domain_engine_store_pg::migrate::connect_and_migrate;
@@ -195,14 +195,6 @@ mod pg {
 
     #[async_trait::async_trait]
     impl DataStoreAPI for PgTestDatastore {
-        async fn execute(
-            &self,
-            request: Request,
-            session: domain_engine_core::Session,
-        ) -> DomainResult<Response> {
-            self.inner.execute(request, session).await
-        }
-
         async fn transact<'a>(
             &'a self,
             messages: BoxStream<'a, Result<ReqMessage, DomainError>>,

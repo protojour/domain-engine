@@ -40,6 +40,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 ] }
 reqwest-middleware = { version = "0.3", features = ["json"] }
 futures-util = "0.3"
+async-stream = "0.3"
 
 [dev-dependencies]
 domain-engine-test-utils.path = "../domain-engine-test-utils"

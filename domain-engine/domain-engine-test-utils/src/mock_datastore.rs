@@ -1,6 +1,6 @@
 use domain_engine_core::{
-    data_store::{DataStoreAPI, Request, Response},
-    transact::{ReqMessage, RespMessage, ValueReason},
+    data_store::DataStoreAPI,
+    transact::{DataOperation, ReqMessage, RespMessage},
     DomainResult, Session,
 };
 use futures_util::{stream::BoxStream, StreamExt};
@@ -29,7 +29,7 @@ pub fn respond_inserted(
 ) -> DomainResult<Vec<DomainResult<RespMessage>>> {
     let mut messages = vec![Ok(RespMessage::SequenceStart(0, None))];
     for value in values {
-        messages.push(Ok(RespMessage::Element(value, ValueReason::Inserted)));
+        messages.push(Ok(RespMessage::Element(value, DataOperation::Inserted)));
     }
 
     Ok(messages)
@@ -40,7 +40,7 @@ pub fn respond_queried(
 ) -> DomainResult<Vec<DomainResult<RespMessage>>> {
     let mut messages = vec![Ok(RespMessage::SequenceStart(0, None))];
     for value in values {
-        messages.push(Ok(RespMessage::Element(value, ValueReason::Queried)));
+        messages.push(Ok(RespMessage::Element(value, DataOperation::Queried)));
     }
 
     Ok(messages)
@@ -56,14 +56,6 @@ impl LinearDataStoreAdapter {
 
 #[async_trait::async_trait]
 impl DataStoreAPI for LinearDataStoreAdapter {
-    async fn execute(
-        &self,
-        _request: Request,
-        _session: domain_engine_core::Session,
-    ) -> DomainResult<Response> {
-        unimplemented!()
-    }
-
     async fn transact<'a>(
         &'a self,
         messages: BoxStream<'a, DomainResult<ReqMessage>>,

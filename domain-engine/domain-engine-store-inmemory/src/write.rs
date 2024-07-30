@@ -22,8 +22,8 @@ use ontol_runtime::{
 use tracing::{debug, debug_span, warn};
 
 use domain_engine_core::{
-    data_store::WriteResponse,
     entity_id_utils::{find_inherent_entity_id, try_generate_entity_id, GeneratedId},
+    transact::DataOperation,
     DomainError, DomainResult,
 };
 
@@ -49,7 +49,7 @@ impl InMemoryStore {
         value: Value,
         select: &Select,
         ctx: &DbContext,
-    ) -> DomainResult<WriteResponse> {
+    ) -> DomainResult<(Value, DataOperation)> {
         let entity_id = find_inherent_entity_id(&value, &ctx.ontology)?
             .ok_or_else(|| DomainError::EntityNotFound)?;
         let def = ctx.ontology.def(value.type_def_id());
@@ -61,12 +61,14 @@ impl InMemoryStore {
             .unwrap()
             .contains_key(&dynamic_key)
         {
-            Ok(WriteResponse::Updated(
+            Ok((
                 self.update_entity(value, select, ctx)?,
+                DataOperation::Updated,
             ))
         } else {
-            Ok(WriteResponse::Inserted(
+            Ok((
                 self.write_new_entity(value, select, ctx)?,
+                DataOperation::Inserted,
             ))
         }
     }

@@ -8,7 +8,7 @@ use anyhow::anyhow;
 use domain_engine_core::data_store::{DataStoreFactory, DataStoreFactorySync};
 use domain_engine_core::object_generator::ObjectGenerator;
 use domain_engine_core::system::ArcSystemApi;
-use domain_engine_core::transact::{ReqMessage, RespMessage, ValueReason};
+use domain_engine_core::transact::{DataOperation, ReqMessage, RespMessage};
 use domain_engine_core::{DomainError, Session};
 use fnv::{FnvHashMap, FnvHashSet};
 use futures_util::stream::BoxStream;
@@ -20,10 +20,7 @@ use ontol_runtime::query::select::Select;
 use ontol_runtime::{DefId, EdgeId, PackageId};
 use tokio::sync::RwLock;
 
-use domain_engine_core::{
-    data_store::{BatchWriteRequest, DataStoreAPI, Request, Response, WriteResponse},
-    DomainResult,
-};
+use domain_engine_core::{data_store::DataStoreAPI, DomainResult};
 use tracing::debug;
 
 use crate::core::{DynamicKey, HyperEdgeTable, InMemoryStore, VertexTable};
@@ -41,20 +38,12 @@ pub struct InMemoryDb {
 
 #[async_trait::async_trait]
 impl DataStoreAPI for InMemoryDb {
-    async fn execute(
-        &self,
-        request: Request,
-        _session: domain_engine_core::Session,
-    ) -> DomainResult<Response> {
-        self.exec_inner(request).await
-    }
-
     async fn transact<'a>(
         &'a self,
         messages: BoxStream<'a, DomainResult<ReqMessage>>,
-        session: Session,
+        _session: Session,
     ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>> {
-        self.transact_inner(messages, session).await
+        self.transact_inner(messages).await
     }
 }
 
@@ -119,96 +108,9 @@ impl InMemoryDb {
         }
     }
 
-    async fn exec_inner(&self, request: Request) -> DomainResult<Response> {
-        match request {
-            Request::Query(select) => {
-                // debug!("{select:#?}");
-                Ok(Response::Query(
-                    self.store
-                        .read()
-                        .await
-                        .query_entities(&select, &self.context)?,
-                ))
-            }
-            Request::BatchWrite(write_requests) => {
-                // debug!("{write_requests:#?}");
-
-                let mut store = self.store.write().await;
-                let mut responses = vec![];
-
-                for write_request in write_requests {
-                    match write_request {
-                        BatchWriteRequest::Insert(mut entities, select) => {
-                            for value in entities.iter_mut() {
-                                ObjectGenerator::new(
-                                    ProcessorMode::Create,
-                                    &self.context.ontology,
-                                    self.context.system.as_ref(),
-                                )
-                                .generate_objects(value);
-                            }
-
-                            for value in entities {
-                                responses.push(WriteResponse::Inserted(store.write_new_entity(
-                                    value,
-                                    &select,
-                                    &self.context,
-                                )?))
-                            }
-                        }
-                        BatchWriteRequest::Update(mut entities, select) => {
-                            for value in entities.iter_mut() {
-                                ObjectGenerator::new(
-                                    ProcessorMode::Update,
-                                    &self.context.ontology,
-                                    self.context.system.as_ref(),
-                                )
-                                .generate_objects(value);
-                            }
-
-                            for value in entities {
-                                responses.push(WriteResponse::Inserted(store.update_entity(
-                                    value,
-                                    &select,
-                                    &self.context,
-                                )?))
-                            }
-                        }
-                        BatchWriteRequest::Upsert(mut entities, select) => {
-                            for value in entities.iter_mut() {
-                                ObjectGenerator::new(
-                                    ProcessorMode::Create,
-                                    &self.context.ontology,
-                                    self.context.system.as_ref(),
-                                )
-                                .generate_objects(value);
-                            }
-
-                            for value in entities {
-                                responses.push(store.upsert_entity(
-                                    value,
-                                    &select,
-                                    &self.context,
-                                )?);
-                            }
-                        }
-                        BatchWriteRequest::Delete(ids, def_id) => {
-                            let deleted = store.delete_entities(ids, def_id)?;
-
-                            responses.extend(deleted.into_iter().map(WriteResponse::Deleted));
-                        }
-                    }
-                }
-
-                Ok(Response::BatchWrite(responses))
-            }
-        }
-    }
-
     async fn transact_inner<'a>(
         &'a self,
         messages: BoxStream<'a, DomainResult<ReqMessage>>,
-        _session: Session,
     ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>> {
         enum State {
             Insert(Select),
@@ -229,7 +131,7 @@ impl InMemoryDb {
                         yield RespMessage::SequenceStart(op_seq, sequence.sub().map(|sub_seq| Box::new(sub_seq.clone())));
 
                         for item in sequence.into_elements() {
-                            yield RespMessage::Element(item, ValueReason::Queried);
+                            yield RespMessage::Element(item, DataOperation::Queried);
                         }
                     }
                     ReqMessage::Insert(op_seq, select) => {
@@ -266,7 +168,7 @@ impl InMemoryDb {
                                     &self.context,
                                 )?;
 
-                                yield RespMessage::Element(value, ValueReason::Inserted);
+                                yield RespMessage::Element(value, DataOperation::Inserted);
                             }
                             Some(State::Update(select)) => {
                                 ObjectGenerator::new(
@@ -282,7 +184,7 @@ impl InMemoryDb {
                                     &self.context,
                                 )?;
 
-                                yield RespMessage::Element(value, ValueReason::Updated);
+                                yield RespMessage::Element(value, DataOperation::Updated);
                             }
                             Some(State::Upsert(select)) => {
                                 ObjectGenerator::new(
@@ -292,24 +194,18 @@ impl InMemoryDb {
                                 )
                                 .generate_objects(&mut value);
 
-                                let response = store.upsert_entity(
+                                let (value, reason) = store.upsert_entity(
                                     value,
                                     select,
                                     &self.context,
                                 )?;
-                                let (value, reason) = match response {
-                                    WriteResponse::Inserted(value) => (value, ValueReason::Inserted),
-                                    WriteResponse::Updated(value) => (value, ValueReason::Updated),
-                                    WriteResponse::Deleted(_) => Err(DomainError::DataStore(anyhow!("unexpected delete")))?,
-                                };
-
                                 yield RespMessage::Element(value, reason);
                             }
                             Some(State::Delete(def_id)) => {
                                 let deleted = store.delete_entities(vec![value], *def_id)?;
 
                                 for deleted in deleted {
-                                    yield RespMessage::Element(self.context.ontology.bool_value(deleted), ValueReason::Deleted);
+                                    yield RespMessage::Element(self.context.ontology.bool_value(deleted), DataOperation::Deleted);
                                 }
                             }
                             None => {

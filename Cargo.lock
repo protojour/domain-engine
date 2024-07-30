@@ -960,6 +960,7 @@ name = "domain-engine-store-arango"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-stream",
  "async-trait",
  "bincode",
  "deunicode",
@@ -1023,6 +1024,7 @@ name = "domain-engine-store-pg"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-stream",
  "async-trait",
  "bincode",
  "deadpool-postgres",

@@ -41,11 +41,11 @@ pub enum RespMessage {
     /// Marks the start of a new output sequence.
     /// The subsequent Element messages are the elements of that sequence.
     SequenceStart(OpSequence, Option<Box<SubSequence>>),
-    Element(Value, ValueReason),
+    Element(Value, DataOperation),
 }
 
 #[derive(Serialize, Deserialize)]
-pub enum ValueReason {
+pub enum DataOperation {
     Queried,
     Inserted,
     Updated,

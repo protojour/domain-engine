@@ -2,12 +2,12 @@
 
 use anyhow::anyhow;
 use domain_engine_core::{
-    data_store::{BatchWriteRequest, DataStoreAPI, Request, Response},
+    data_store::DataStoreAPI,
     system::ArcSystemApi,
     transact::{ReqMessage, RespMessage},
     DomainError, DomainResult, Session,
 };
-use futures_util::stream::BoxStream;
+use futures_util::{stream::BoxStream, StreamExt};
 use sql::EscapeIdent;
 use tokio_postgres::NoTls;
 
@@ -16,7 +16,7 @@ mod sql;
 
 pub use deadpool_postgres;
 pub use tokio_postgres;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 pub struct PostgresDataStore {
     pub pool: deadpool_postgres::Pool,
@@ -25,54 +25,34 @@ pub struct PostgresDataStore {
 
 #[async_trait::async_trait]
 impl DataStoreAPI for PostgresDataStore {
-    async fn execute(
-        &self,
-        request: Request,
-        _session: domain_engine_core::Session,
-    ) -> DomainResult<Response> {
-        match request {
-            Request::Query(_) => Err(DomainError::DataStore(anyhow!(
-                "Query not implemented for Postgres"
-            ))),
-            Request::BatchWrite(write_requests) => {
-                for write_request in write_requests {
-                    match write_request {
-                        BatchWriteRequest::Insert(values, _) => {
-                            for value in values {
-                                debug!("insert {value:?}");
-                            }
-                        }
-                        BatchWriteRequest::Update(values, _) => {
-                            for value in values {
-                                debug!("update {value:?}");
-                            }
-                        }
-                        BatchWriteRequest::Upsert(values, _) => {
-                            for value in values {
-                                debug!("upsert {value:?}");
-                            }
-                        }
-                        BatchWriteRequest::Delete(values, _) => {
-                            for value in values {
-                                debug!("delete {value:?}");
-                            }
-                        }
-                    }
-                }
-
-                Err(DomainError::DataStore(anyhow!(
-                    "BatchWrite not implemented for Postgres"
-                )))
-            }
-        }
-    }
-
     async fn transact<'a>(
         &'a self,
-        _messages: BoxStream<'a, DomainResult<ReqMessage>>,
+        messages: BoxStream<'a, DomainResult<ReqMessage>>,
         _session: Session,
     ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>> {
-        todo!()
+        Ok(async_stream::stream! {
+            for await message in messages {
+                match message? {
+                    ReqMessage::Query(..) => {
+                        yield Err(DomainError::DataStore(anyhow!("Query not implemented for Postgres")))?;
+                    }
+                    ReqMessage::Insert(..) => {
+                        yield Err(DomainError::DataStore(anyhow!("Insert not implemented for Postgres")))?;
+                    }
+                    ReqMessage::Update(..) => {
+                        yield Err(DomainError::DataStore(anyhow!("Update not implemented for Postgres")))?;
+                    }
+                    ReqMessage::Upsert(..) => {
+                        yield Err(DomainError::DataStore(anyhow!("Upsert not implemented for Postgres")))?;
+                    }
+                    ReqMessage::Delete(..) => {
+                        yield Err(DomainError::DataStore(anyhow!("Delete not implemented for Postgres")))?;
+                    }
+                    ReqMessage::Argument(..) => {}
+                }
+            }
+        }
+        .boxed())
     }
 }
 

@@ -2,12 +2,12 @@ use std::{collections::BTreeMap, marker::PhantomData};
 
 use anyhow::anyhow;
 use domain_engine_core::{
-    data_store::{BatchWriteRequest, DataStoreAPI, Request, Response, WriteResponse},
+    data_store::DataStoreAPI,
     object_generator::ObjectGenerator,
-    transact::{ReqMessage, RespMessage},
+    transact::{DataOperation, ReqMessage, RespMessage},
     DomainError, DomainResult, Session,
 };
-use futures_util::stream::BoxStream;
+use futures_util::{stream::BoxStream, StreamExt};
 use ontol_runtime::{
     attr::{Attr, AttrRef},
     interface::serde::processor::{
@@ -94,7 +94,7 @@ impl ProcessorProfileApi for ArangoDatabase {
 
 impl ArangoDatabase {
     async fn query(&self, select: EntitySelect) -> DomainResult<Sequence<Value>> {
-        let query = AqlQuery::build_query(Select::Entity(select.clone()), &self.ontology, self)?;
+        let query = AqlQuery::build_query(&Select::Entity(select.clone()), &self.ontology, self)?;
         let profile = self.profile();
         let processor = self
             .ontology
@@ -127,7 +127,7 @@ impl ArangoDatabase {
                 for attr in &mut cursor.result {
                     apply_select(
                         AttrMut::from_attr(attr),
-                        &mut Select::Entity(select.clone()),
+                        &Select::Entity(select.clone()),
                         &self.ontology,
                     )?;
                 }
@@ -185,204 +185,238 @@ impl ArangoDatabase {
         }
     }
 
-    async fn batch_write(
-        &self,
-        requests: Vec<BatchWriteRequest>,
-    ) -> DomainResult<Vec<WriteResponse>> {
-        // TODO: set a threshold for bulk handling
-        // TODO: sort requests if needed
-        let mut all_responses = vec![];
-        for request in requests {
-            let responses = match request {
-                BatchWriteRequest::Insert(entities, select) => {
-                    self.write(
-                        entities,
-                        select,
-                        WriteMode::Insert,
-                        ProcessorMode::Create,
-                        WriteResponse::Inserted,
-                    )
-                    .await?
-                }
-                BatchWriteRequest::Update(entities, select) => {
-                    self.write(
-                        entities,
-                        select,
-                        WriteMode::Update,
-                        ProcessorMode::Update,
-                        WriteResponse::Updated,
-                    )
-                    .await?
-                }
-                BatchWriteRequest::Upsert(entities, select) => {
-                    self.write(
-                        entities,
-                        select,
-                        WriteMode::Upsert,
-                        ProcessorMode::Create,
-                        // FIXME: The write response is dynamically either Inserted/Updated for Upsert
-                        WriteResponse::Inserted,
-                    )
-                    .await?
-                }
-                BatchWriteRequest::Delete(entities, def_id) => {
-                    self.delete(entities, def_id).await?
-                }
-            };
-            all_responses.extend(responses);
+    // TODO: Implement actual transaction
+    async fn transact_inner<'a>(
+        &'a self,
+        messages: BoxStream<'a, DomainResult<ReqMessage>>,
+    ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>> {
+        enum State {
+            Insert(Select),
+            Update(Select),
+            Upsert(Select),
+            Delete(DefId),
         }
-        Ok(all_responses)
+
+        let mut state: Option<State> = None;
+
+        Ok(async_stream::try_stream! {
+            for await req in messages {
+                match req? {
+                    ReqMessage::Query(op_seq, select) => {
+                        state = None;
+                        let sequence = self.query(select).await?;
+
+                        yield RespMessage::SequenceStart(op_seq, sequence.sub().map(|sub_seq| Box::new(sub_seq.clone())));
+
+                        for item in sequence.into_elements() {
+                            yield RespMessage::Element(item, DataOperation::Queried);
+                        }
+                    }
+                    ReqMessage::Insert(op_seq, select) => {
+                        state = Some(State::Insert(select));
+                        yield RespMessage::SequenceStart(op_seq, None);
+                    }
+                    ReqMessage::Update(op_seq, select) => {
+                        state = Some(State::Update(select));
+                        yield RespMessage::SequenceStart(op_seq, None);
+                    }
+                    ReqMessage::Upsert(op_seq, select) => {
+                        state = Some(State::Upsert(select));
+                        yield RespMessage::SequenceStart(op_seq, None);
+                    }
+                    ReqMessage::Delete(op_seq, def_id) => {
+                        state = Some(State::Delete(def_id));
+                        yield RespMessage::SequenceStart(op_seq, None);
+                    }
+                    ReqMessage::Argument(value) => {
+                        match state.as_ref() {
+                            Some(State::Insert(select)) => {
+                                let (value, op) = self.write(
+                                    value,
+                                    select,
+                                    WriteMode::Insert,
+                                    ProcessorMode::Create,
+                                    DataOperation::Inserted,
+                                )
+                                .await?;
+
+                                yield RespMessage::Element(value, op);
+                            }
+                            Some(State::Update(select)) => {
+                                let (value, op) = self.write(
+                                    value,
+                                    select,
+                                    WriteMode::Update,
+                                    ProcessorMode::Update,
+                                    DataOperation::Updated,
+                                )
+                                .await?;
+
+                                yield RespMessage::Element(value, op);
+                            }
+                            Some(State::Upsert(select)) => {
+                                let (value, op) = self.write(
+                                    value,
+                                    select,
+                                    WriteMode::Upsert,
+                                    ProcessorMode::Create,
+                                    // FIXME: The write response is dynamically either Inserted/Updated for Upsert
+                                    DataOperation::Inserted
+                                )
+                                .await?;
+
+                                yield RespMessage::Element(value, op);
+                            }
+                            Some(State::Delete(def_id)) => {
+                                let value = self.delete(value, *def_id).await?;
+                                yield RespMessage::Element(value, DataOperation::Deleted);
+                            }
+                            None => {
+                                Err(DomainError::DataStore(anyhow!("invalid transaction state")))?
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .boxed())
     }
 
     async fn write(
         &self,
-        mut entities: Vec<Value>,
-        select: Select,
+        mut entity: Value,
+        select: &Select,
         write_mode: WriteMode,
         processor_mode: ProcessorMode,
-        to_response: fn(Value) -> WriteResponse,
-    ) -> DomainResult<Vec<WriteResponse>> {
+        data_operation: DataOperation,
+    ) -> DomainResult<(Value, DataOperation)> {
         let seed: PhantomData<serde_json::Value> = PhantomData;
-        let mut results = vec![];
 
-        for value in entities.iter_mut() {
-            ObjectGenerator::new(processor_mode, &self.ontology, self.system.as_ref())
-                .generate_objects(value);
-        }
+        ObjectGenerator::new(processor_mode, &self.ontology, self.system.as_ref())
+            .generate_objects(&mut entity);
 
-        for entity in entities {
-            let pre_query = AqlQuery::prequery_from_entity(&entity, &self.ontology, self)?;
+        let pre_query = AqlQuery::prequery_from_entity(&entity, &self.ontology, self)?;
 
-            if pre_query.query.operations.is_some() {
-                debug!(
-                    "AQL:\n{}\nbindVars: {:#?}",
-                    pre_query.query.to_string(),
-                    pre_query.bind_vars
-                );
-                let cursor = self.aql(pre_query, false, false, None, seed).await;
-                match cursor {
-                    Ok(cursor) => {
-                        for data in cursor.result {
-                            for (key, value) in data.as_object().unwrap() {
-                                if value.is_null() {
-                                    return Err(DomainError::UnresolvedForeignKey(format!(
-                                        r#""{}""#,
-                                        key
-                                    )));
-                                }
+        if pre_query.query.operations.is_some() {
+            debug!(
+                "AQL:\n{}\nbindVars: {:#?}",
+                pre_query.query.to_string(),
+                pre_query.bind_vars
+            );
+            let cursor = self.aql(pre_query, false, false, None, seed).await;
+            match cursor {
+                Ok(cursor) => {
+                    for data in cursor.result {
+                        for (key, value) in data.as_object().unwrap() {
+                            if value.is_null() {
+                                return Err(DomainError::UnresolvedForeignKey(format!(
+                                    r#""{}""#,
+                                    key
+                                )));
                             }
                         }
-                        debug!("All prequeried entities exist");
                     }
-                    Err(err) => return Err(DomainError::DataStore(err)),
-                };
-            } else {
-                debug!("No prequery required");
-            }
-
-            let queries =
-                AqlQuery::build_write(write_mode, entity, &select.clone(), &self.ontology, self)?;
-
-            let mut cursor = ArangoCursorResponse::default();
-            for query in queries {
-                let profile = self.profile();
-                let processor = self
-                    .ontology
-                    .new_serde_processor(query.operator_addr, ProcessorMode::Raw)
-                    .with_profile(&profile);
-                debug!(
-                    "AQL:\n{}\nbindVars: {:#?}",
-                    query.query.to_string(),
-                    query.bind_vars
-                );
-                cursor = self
-                    .aql(query, false, false, None, processor)
-                    .await
-                    .map_err(|err| {
-                        if err.to_string().starts_with("404") {
-                            return DomainError::EntityNotFound;
-                        }
-                        DomainError::DataStore(err)
-                    })?;
-            }
-
-            let mut select = select.clone();
-            let mut attr = cursor.result.first().unwrap().clone();
-            apply_select(AttrMut::from_attr(&mut attr), &mut select, &self.ontology)?;
-
-            results.push(attr.into_unit().expect("not a unit"));
+                    debug!("All prequeried entities exist");
+                }
+                Err(err) => return Err(DomainError::DataStore(err)),
+            };
+        } else {
+            debug!("No prequery required");
         }
 
-        Ok(results.into_iter().map(to_response).collect())
+        let queries =
+            AqlQuery::build_write(write_mode, entity, &select.clone(), &self.ontology, self)?;
+
+        let mut cursor = ArangoCursorResponse::default();
+        for query in queries {
+            let profile = self.profile();
+            let processor = self
+                .ontology
+                .new_serde_processor(query.operator_addr, ProcessorMode::Raw)
+                .with_profile(&profile);
+            debug!(
+                "AQL:\n{}\nbindVars: {:#?}",
+                query.query.to_string(),
+                query.bind_vars
+            );
+            cursor = self
+                .aql(query, false, false, None, processor)
+                .await
+                .map_err(|err| {
+                    if err.to_string().starts_with("404") {
+                        return DomainError::EntityNotFound;
+                    }
+                    DomainError::DataStore(err)
+                })?;
+        }
+
+        let mut attr = cursor.result.first().unwrap().clone();
+        apply_select(AttrMut::from_attr(&mut attr), select, &self.ontology)?;
+
+        Ok((attr.into_unit().expect("not a unit"), data_operation))
     }
 
-    async fn delete(&self, values: Vec<Value>, def_id: DefId) -> DomainResult<Vec<WriteResponse>> {
-        let mut results = vec![];
+    async fn delete(&self, value: Value, def_id: DefId) -> DomainResult<Value> {
+        let def = self.ontology.def(def_id);
+        let rel_id = def
+            .entity()
+            .expect("type should be an entity")
+            .id_relationship_id;
+        let mut struct_map = BTreeMap::new();
+        struct_map.insert(rel_id, Attr::Unit(value));
+        let entity = Value::new_struct(struct_map, def_id.into());
+        let select = Select::EntityId;
 
-        for value in values {
-            let def = self.ontology.def(def_id);
-            let rel_id = def
-                .entity()
-                .expect("type should be an entity")
-                .id_relationship_id;
-            let mut struct_map = BTreeMap::new();
-            struct_map.insert(rel_id, Attr::Unit(value));
-            let entity = Value::new_struct(struct_map, def_id.into());
-            let select = Select::EntityId;
+        let queries =
+            AqlQuery::build_write(WriteMode::Delete, entity, &select, &self.ontology, self)?;
 
-            let queries =
-                AqlQuery::build_write(WriteMode::Delete, entity, &select, &self.ontology, self)?;
-
-            let mut cursor = Ok(ArangoCursorResponse::default());
-            for query in queries {
-                let profile = self.profile();
-                let processor = self
-                    .ontology
-                    .new_serde_processor(query.operator_addr, ProcessorMode::Raw)
-                    .with_profile(&profile);
-                debug!(
-                    "AQL:\n{}\nbindVars: {:#?}",
-                    query.query.to_string(),
-                    query.bind_vars
-                );
-                cursor = self.aql(query, false, false, None, processor).await;
-            }
-
-            match cursor {
-                Ok(_) => {
-                    results.push(true);
-                }
-                Err(err) => {
-                    if err.to_string().starts_with("404") {
-                        results.push(false);
-                    } else {
-                        return Err(DomainError::DataStore(err));
-                    }
-                }
-            }
+        let mut cursor = Ok(ArangoCursorResponse::default());
+        for query in queries {
+            let profile = self.profile();
+            let processor = self
+                .ontology
+                .new_serde_processor(query.operator_addr, ProcessorMode::Raw)
+                .with_profile(&profile);
+            debug!(
+                "AQL:\n{}\nbindVars: {:#?}",
+                query.query.to_string(),
+                query.bind_vars
+            );
+            cursor = self.aql(query, false, false, None, processor).await;
         }
 
-        Ok(results.into_iter().map(WriteResponse::Deleted).collect())
+        let bool_value = match cursor {
+            Ok(_) => true,
+            Err(err) => {
+                if err.to_string().starts_with("404") {
+                    false
+                } else {
+                    return Err(DomainError::DataStore(err));
+                }
+            }
+        };
+
+        Ok(self.ontology.bool_value(bool_value))
     }
 }
 
 #[async_trait::async_trait]
 impl DataStoreAPI for ArangoDatabase {
-    async fn execute(&self, request: Request, _session: Session) -> DomainResult<Response> {
-        match request {
-            Request::Query(entity_select) => Ok(Response::Query(self.query(entity_select).await?)),
-            Request::BatchWrite(requests) => {
-                Ok(Response::BatchWrite(self.batch_write(requests).await?))
-            }
-        }
-    }
+    // async fn execute(&self, request: Request, _session: Session) -> DomainResult<Response> {
+    //     match request {
+    //         Request::Query(entity_select) => Ok(Response::Query(self.query(entity_select).await?)),
+    //         Request::BatchWrite(requests) => {
+    //             Ok(Response::BatchWrite(self.batch_write(requests).await?))
+    //         }
+    //     }
+    // }
 
     async fn transact<'a>(
         &'a self,
-        _messages: BoxStream<'a, DomainResult<ReqMessage>>,
+        messages: BoxStream<'a, DomainResult<ReqMessage>>,
         _session: Session,
     ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>> {
-        todo!()
+        self.transact_inner(messages).await
     }
 }
 
@@ -422,9 +456,9 @@ mod tests {
         database.populate_collections(test.root_package()).unwrap();
 
         let [artist] = test.bind(["artist"]);
-        let select = artist.struct_select([("plays", Select::Leaf)]).into();
+        let select: Select = artist.struct_select([("plays", Select::Leaf)]).into();
 
-        let aql = AqlQuery::build_query(select, test.ontology(), &database).unwrap();
+        let aql = AqlQuery::build_query(&select, test.ontology(), &database).unwrap();
 
         expect_eq!(
             expected = indoc! {r#"
