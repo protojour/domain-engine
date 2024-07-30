@@ -1,13 +1,16 @@
-use std::sync::Arc;
+use std::{convert::Infallible, sync::Arc, time::Duration};
 
 use axum::body::Body;
+use bytes::Bytes;
 use domain_engine_core::{DomainEngine, Session};
 use domain_engine_httpjson::create_httpjson_router;
 use domain_engine_test_utils::{
     dummy_session::DummySession, dynamic_data_store::DynamicDataStoreFactory,
     system::mock_current_time_monotonic, unimock,
 };
+use futures_util::StreamExt;
 use http::StatusCode;
+use http_body_util::StreamBody;
 use ontol_runtime::ontology::Ontology;
 use ontol_test_utils::{OntolTest, SrcName};
 
@@ -41,14 +44,17 @@ fn json_body(json: serde_json::Value) -> axum::body::Body {
 }
 
 fn jsonlines_body(documents: Vec<serde_json::Value>) -> axum::body::Body {
-    let mut buffer: Vec<u8> = vec![];
+    axum::body::Body::new(StreamBody::new(futures_util::stream::iter(documents).then(
+        |json| async move {
+            // simulate transmission
+            tokio::time::sleep(Duration::from_millis(1)).await;
 
-    for json in documents {
-        buffer.extend(serde_json::to_vec(&json).unwrap());
-        buffer.extend(b"\n");
-    }
+            let mut buffer = serde_json::to_vec(&json).unwrap();
+            buffer.extend(b"\n");
 
-    axum::body::Body::from(buffer)
+            Ok::<_, Infallible>(http_body::Frame::data(Bytes::from(buffer)))
+        },
+    )))
 }
 
 async fn assert_status(
@@ -58,7 +64,6 @@ async fn assert_status(
     let status = response.status();
 
     if status != expected {
-        // let body = response.into_body();
         use http_body_util::BodyExt;
 
         let binary_body = response

@@ -941,6 +941,7 @@ dependencies = [
  "domain-engine-test-utils",
  "futures-util",
  "http",
+ "http-body",
  "http-body-util",
  "mime",
  "ontol-macros",
