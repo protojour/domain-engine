@@ -5,7 +5,7 @@ use std::sync::Arc;
 use context::{SchemaCtx, SchemaType, ServiceCtx};
 use domain_engine_core::{
     transact::{AccumulateSequences, ReqMessage},
-    DomainError,
+    DomainError, DomainResult,
 };
 use futures_util::{StreamExt, TryStreamExt};
 use gql_scalar::GqlScalar;
@@ -198,7 +198,7 @@ async fn mutation(
             let select = select_analyzer.analyze_select(look_ahead, field_data)?;
             // let mut batch_write_requests = Vec::with_capacity(entity_mutations.len());
 
-            let mut req_messages: Vec<ReqMessage> = vec![];
+            let mut req_messages: Vec<DomainResult<ReqMessage>> = vec![];
             let mut op_seq = 0;
 
             for entity_mutation in entity_mutations {
@@ -211,27 +211,27 @@ async fn mutation(
 
                 match entity_mutation.kind {
                     EntityMutationKind::Create => {
-                        req_messages.push(ReqMessage::Insert(op_seq, select.clone()));
+                        req_messages.push(Ok(ReqMessage::Insert(op_seq, select.clone())));
                         op_seq += 1;
 
                         for value in values {
-                            req_messages.push(ReqMessage::Argument(value));
+                            req_messages.push(Ok(ReqMessage::Argument(value)));
                         }
                     }
                     EntityMutationKind::Update => {
-                        req_messages.push(ReqMessage::Update(op_seq, select.clone()));
+                        req_messages.push(Ok(ReqMessage::Update(op_seq, select.clone())));
                         op_seq += 1;
 
                         for value in values {
-                            req_messages.push(ReqMessage::Argument(value));
+                            req_messages.push(Ok(ReqMessage::Argument(value)));
                         }
                     }
                     EntityMutationKind::Delete => {
-                        req_messages.push(ReqMessage::Delete(op_seq, *def_id));
+                        req_messages.push(Ok(ReqMessage::Delete(op_seq, *def_id)));
                         op_seq += 1;
 
                         for value in values {
-                            req_messages.push(ReqMessage::Argument(value));
+                            req_messages.push(Ok(ReqMessage::Argument(value)));
                         }
                     }
                 }

@@ -68,8 +68,13 @@ pub fn domain_error_to_response(error: DomainError) -> http::Response<Body> {
             json_error("type cannot be used for id generation"),
         )
             .into_response(),
-        DomainError::BadInput(err) => (
+        DomainError::BadInputFormat(err) => (
             StatusCode::BAD_REQUEST,
+            json_error(format!("bad input format: {err:?}")),
+        )
+            .into_response(),
+        DomainError::BadInputData(err) => (
+            StatusCode::UNPROCESSABLE_ENTITY,
             json_error(format!("bad input: {err:?}")),
         )
             .into_response(),

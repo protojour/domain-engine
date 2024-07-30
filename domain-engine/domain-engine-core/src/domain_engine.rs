@@ -63,7 +63,7 @@ impl DomainEngine {
 
     pub async fn transact<'a>(
         &'a self,
-        messages: BoxStream<'a, ReqMessage>,
+        messages: BoxStream<'a, DomainResult<ReqMessage>>,
         session: Session,
     ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>> {
         let data_store = self.get_data_store()?;
@@ -264,7 +264,8 @@ impl DomainEngine {
 
         let sequences: Vec<_> = self
             .transact(
-                futures_util::stream::iter([ReqMessage::Query(0, entity_select.clone())]).boxed(),
+                futures_util::stream::iter([Ok(ReqMessage::Query(0, entity_select.clone()))])
+                    .boxed(),
                 session.clone(),
             )
             .await?

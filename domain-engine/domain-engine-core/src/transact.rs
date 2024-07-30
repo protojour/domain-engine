@@ -98,7 +98,7 @@ struct DownMap(ResolvePath);
 impl DomainEngine {
     pub(crate) fn map_req_messages<'a>(
         &'a self,
-        messages: BoxStream<'a, ReqMessage>,
+        messages: BoxStream<'a, DomainResult<ReqMessage>>,
         upmaps_tx: tokio::sync::mpsc::Sender<UpMap>,
         session: Session,
     ) -> BoxStream<'a, DomainResult<ReqMessage>> {
@@ -106,7 +106,8 @@ impl DomainEngine {
             let mut cur_downmap = None;
             let mut updating = false;
 
-            for await req_msg in messages {
+            for await result in messages {
+                let req_msg = result?;
                 yield self.process_req_message(req_msg, &mut cur_downmap, &upmaps_tx, &mut updating, &session).await;
             }
         }.boxed()

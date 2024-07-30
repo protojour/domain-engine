@@ -21,6 +21,7 @@ http = "1"
 bytes = "1"
 mime = "0.3"
 futures-util = "0.3"
+async-stream = "0.3"
 
 [dev-dependencies]
 ontol-test-utils.path = "../../ontol/ontol-test-utils"

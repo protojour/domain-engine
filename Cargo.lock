@@ -933,6 +933,7 @@ dependencies = [
 name = "domain-engine-httpjson"
 version = "0.1.0"
 dependencies = [
+ "async-stream",
  "axum",
  "axum-extra",
  "bytes",

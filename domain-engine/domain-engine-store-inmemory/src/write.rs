@@ -113,7 +113,7 @@ impl InMemoryStore {
         let mut raw_props_update: BTreeMap<RelId, Attr> = Default::default();
 
         let Value::Struct(data_struct, _) = value else {
-            return Err(DomainError::BadInput(anyhow!("Expected a struct")));
+            return Err(DomainError::BadInputData(anyhow!("Expected a struct")));
         };
 
         let mut edge_builders: FnvHashMap<

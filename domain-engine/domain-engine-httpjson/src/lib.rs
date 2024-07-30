@@ -13,9 +13,9 @@ use axum::{
 use axum_extra::extract::JsonLines;
 use bytes::Bytes;
 use content_type::JsonContentType;
-use domain_engine_core::{transact::ReqMessage, DomainEngine, DomainResult, Session};
+use domain_engine_core::{transact::ReqMessage, DomainEngine, DomainError, DomainResult, Session};
 use futures_util::{stream::StreamExt, TryStreamExt};
-use http_error::{domain_error_to_response, json_error, ErrorJson};
+use http_error::domain_error_to_response;
 use ontol_runtime::{
     attr::Attr,
     interface::{
@@ -104,9 +104,7 @@ where
         .ontology()
         .new_serde_processor(endpoint.operator_addr, ProcessorMode::Update);
 
-    let mut messages = vec![ReqMessage::Upsert(0, Select::EntityId)];
-
-    match json_content_type {
+    let transaction_msg_stream = match json_content_type {
         JsonContentType::Json => {
             let bytes = match Bytes::from_request(req, &()).await {
                 Ok(bytes) => bytes,
@@ -118,40 +116,38 @@ where
                 &mut serde_json::Deserializer::from_slice(&bytes),
             ) {
                 Ok(value) => value,
-                Err(response) => return response,
+                Err(error) => return domain_error_to_response(error),
             };
 
-            messages.push(ReqMessage::Argument(ontol_value));
+            futures_util::stream::iter([
+                Ok(ReqMessage::Upsert(0, Select::EntityId)),
+                Ok(ReqMessage::Argument(ontol_value)),
+            ])
+            .boxed()
         }
         JsonContentType::JsonLines => {
-            // TODO: transaction streaming
-            let mut lines = match JsonLines::<serde_json::Value>::from_request(req, &()).await {
+            let lines = match JsonLines::<serde_json::Value>::from_request(req, &()).await {
                 Ok(lines) => lines,
                 Err(err) => return err.into_response(),
             };
 
-            while let Some(result) = read_next_json_line(&mut lines).await {
-                let json_value = match result {
-                    Ok(value) => value,
-                    Err(err) => {
-                        return (StatusCode::BAD_REQUEST, axum::Json(err)).into_response();
-                    }
-                };
-                let ontol_value = match deserialize_ontol_value(&serde_processor, json_value) {
-                    Ok(value) => value,
-                    Err(response) => return response,
-                };
-                messages.push(ReqMessage::Argument(ontol_value));
+            async_stream::try_stream! {
+                yield ReqMessage::Upsert(0, Select::EntityId);
+
+                for await json_result in lines {
+                    let json = json_result.map_err(|e| DomainError::BadInputFormat(e.into()))?;
+                    let ontol_value = deserialize_ontol_value(&serde_processor, json)?;
+
+                    yield ReqMessage::Argument(ontol_value);
+                }
             }
+            .boxed()
         }
     };
 
     let result = endpoint
         .engine
-        .transact(
-            futures_util::stream::iter(messages).boxed(),
-            session.clone(),
-        )
+        .transact(transaction_msg_stream, session.clone())
         .await;
 
     let stream = match result {
@@ -166,30 +162,16 @@ where
     }
 }
 
-async fn read_next_json_line(
-    payload: &mut JsonLines<serde_json::Value>,
-) -> Option<Result<serde_json::Value, ErrorJson>> {
-    payload.next().await.map(|result| {
-        result.map_err(|err| ErrorJson {
-            message: format!("Failed to read JSON: {err}"),
-        })
-    })
-}
-
 fn deserialize_ontol_value<'d>(
     processor: &SerdeProcessor,
     deserializer: impl Deserializer<'d, Error = serde_json::Error>,
-) -> Result<Value, axum::response::Response> {
+) -> Result<Value, DomainError> {
     let ontol_attr = match processor.deserialize(deserializer) {
         Ok(value) => value,
         Err(error) => {
             return Err(match error.classify() {
-                serde_json::error::Category::Data => (
-                    StatusCode::UNPROCESSABLE_ENTITY,
-                    json_error(format!("{error}")),
-                )
-                    .into_response(),
-                _ => (StatusCode::BAD_REQUEST, json_error(format!("{error}"))).into_response(),
+                serde_json::error::Category::Data => DomainError::BadInputData(error.into()),
+                _ => DomainError::BadInputFormat(error.into()),
             })
         }
     };
@@ -197,11 +179,7 @@ fn deserialize_ontol_value<'d>(
         Attr::Unit(value) => value,
         _ => {
             error!("deserialized attribute was not a unit");
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                json_error("server error".to_string()),
-            )
-                .into_response());
+            return Err(DomainError::DeserializationFailed);
         }
     };
 
