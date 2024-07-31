@@ -8,4 +8,6 @@ mod prequery;
 mod query;
 mod write;
 
-pub use arango_client::{AqlQuery, ArangoClient, ArangoCursorResponse, ArangoDatabase, BulkData};
+pub use arango_client::{
+    AqlQuery, ArangoClient, ArangoCursorResponse, ArangoDatabase, ArangoDatabaseHandle, BulkData,
+};

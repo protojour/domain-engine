@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::anyhow;
 use futures_util::{stream::BoxStream, Stream, StreamExt};
 use ontol_runtime::{
@@ -96,12 +98,12 @@ pub(crate) struct UpMap(OpSequence, ResolvePath);
 struct DownMap(ResolvePath);
 
 impl DomainEngine {
-    pub(crate) fn map_req_messages<'a>(
-        &'a self,
-        messages: BoxStream<'a, DomainResult<ReqMessage>>,
+    pub(crate) fn map_req_messages(
+        self: Arc<Self>,
+        messages: BoxStream<'static, DomainResult<ReqMessage>>,
         upmaps_tx: tokio::sync::mpsc::Sender<UpMap>,
         session: Session,
-    ) -> BoxStream<'a, DomainResult<ReqMessage>> {
+    ) -> BoxStream<'static, DomainResult<ReqMessage>> {
         async_stream::stream! {
             let mut cur_downmap = None;
             let mut updating = false;
@@ -113,12 +115,12 @@ impl DomainEngine {
         }.boxed()
     }
 
-    pub(crate) fn map_responses<'a>(
-        &'a self,
-        responses: BoxStream<'a, DomainResult<RespMessage>>,
+    pub(crate) fn map_responses(
+        self: Arc<Self>,
+        responses: BoxStream<'static, DomainResult<RespMessage>>,
         mut upmaps_rx: tokio::sync::mpsc::Receiver<UpMap>,
         session: Session,
-    ) -> BoxStream<'a, DomainResult<RespMessage>> {
+    ) -> BoxStream<'static, DomainResult<RespMessage>> {
         let mut cur_upmap = UpMap(0, ResolvePath::default());
 
         async_stream::try_stream! {
@@ -141,7 +143,7 @@ impl DomainEngine {
     }
 
     async fn process_req_message(
-        &self,
+        self: &Arc<Self>,
         req_msg: ReqMessage,
         cur_downmap: &mut Option<DownMap>,
         upmaps_tx: &tokio::sync::mpsc::Sender<UpMap>,
@@ -282,7 +284,7 @@ impl DomainEngine {
     }
 
     async fn downmap_value(
-        &self,
+        self: &Arc<Self>,
         mut value: Value,
         session: &Session,
         cur_downmap: &Option<DownMap>,
@@ -334,7 +336,7 @@ impl DomainEngine {
     }
 
     async fn upmap_value(
-        &self,
+        self: &Arc<Self>,
         mut value: Value,
         session: &Session,
         current_upmap: &UpMap,

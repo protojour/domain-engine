@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, marker::PhantomData};
+use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
 
 use anyhow::anyhow;
 use domain_engine_core::{
@@ -21,7 +21,7 @@ use ontol_runtime::{
 use serde_json::Serializer;
 use tracing::debug;
 
-use crate::query::AttrMut;
+use crate::{arango_client::ArangoDatabaseHandle, query::AttrMut};
 
 use super::{
     query::apply_select,
@@ -93,103 +93,11 @@ impl ProcessorProfileApi for ArangoDatabase {
 }
 
 impl ArangoDatabase {
-    async fn query(&self, select: EntitySelect) -> DomainResult<Sequence<Value>> {
-        let query = AqlQuery::build_query(&Select::Entity(select.clone()), &self.ontology, self)?;
-        let profile = self.profile();
-        let processor = self
-            .ontology
-            .new_serde_processor(query.operator_addr, ProcessorMode::Raw)
-            .with_profile(&profile);
-
-        let select_cursor: Option<Cursor> = select
-            .after_cursor
-            .as_deref()
-            .map(bincode::deserialize)
-            .transpose()
-            .map_err(|_| DomainError::DataStore(anyhow!("Invalid cursor format")))?;
-        let include_total = match select_cursor {
-            Some(select_cursor) => match select_cursor.full_count {
-                Some(_) => false,
-                None => select.include_total_len,
-            },
-            None => select.include_total_len,
-        };
-
-        debug!(
-            "AQL:\n{}\nbindVars: {:#?}",
-            query.query.to_string(),
-            query.bind_vars
-        );
-        let cursor = self.aql(query, true, include_total, None, processor).await;
-
-        match cursor {
-            Ok(mut cursor) => {
-                for attr in &mut cursor.result {
-                    apply_select(
-                        AttrMut::from_attr(attr),
-                        &Select::Entity(select.clone()),
-                        &self.ontology,
-                    )?;
-                }
-
-                let full_count = match select_cursor {
-                    Some(select_cursor) => match select_cursor.full_count {
-                        Some(full_count) => full_count,
-                        None => match include_total {
-                            true => cursor.extra.unwrap().stats.full_count.unwrap(),
-                            false => cursor.count.unwrap(),
-                        },
-                    },
-                    None => match include_total {
-                        true => cursor.extra.unwrap().stats.full_count.unwrap(),
-                        false => cursor.count.unwrap(),
-                    },
-                };
-                let has_next = match select_cursor {
-                    Some(cursor) => (cursor.offset + select.limit) < full_count,
-                    None => select.limit < full_count,
-                };
-                let end_cursor = match select_cursor {
-                    Some(cursor) => Some(Cursor {
-                        offset: cursor.offset + select.limit,
-                        full_count: Some(full_count),
-                    }),
-                    None => Some(Cursor {
-                        offset: select.limit,
-                        full_count: Some(full_count),
-                    }),
-                };
-
-                let mut sequence = Sequence::with_capacity(cursor.result.len());
-
-                for attr in cursor.result {
-                    match attr {
-                        Attr::Unit(u) => {
-                            sequence.push(u);
-                        }
-                        _ => todo!("not a unit"),
-                    }
-                }
-
-                Ok(sequence.with_sub(SubSequence {
-                    end_cursor: end_cursor
-                        .map(|cursor| bincode::serialize(&cursor).unwrap().into()),
-                    has_next,
-                    total_len: match select.include_total_len {
-                        true => Some(full_count),
-                        false => None,
-                    },
-                }))
-            }
-            Err(err) => Err(DomainError::DataStore(err)),
-        }
-    }
-
     // TODO: Implement actual transaction
-    async fn transact_inner<'a>(
-        &'a self,
-        messages: BoxStream<'a, DomainResult<ReqMessage>>,
-    ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>> {
+    async fn transact_inner(
+        self: Arc<Self>,
+        messages: BoxStream<'static, DomainResult<ReqMessage>>,
+    ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
         enum State {
             Insert(Select),
             Update(Select),
@@ -280,6 +188,98 @@ impl ArangoDatabase {
             }
         }
         .boxed())
+    }
+
+    async fn query(&self, select: EntitySelect) -> DomainResult<Sequence<Value>> {
+        let query = AqlQuery::build_query(&Select::Entity(select.clone()), &self.ontology, self)?;
+        let profile = self.profile();
+        let processor = self
+            .ontology
+            .new_serde_processor(query.operator_addr, ProcessorMode::Raw)
+            .with_profile(&profile);
+
+        let select_cursor: Option<Cursor> = select
+            .after_cursor
+            .as_deref()
+            .map(bincode::deserialize)
+            .transpose()
+            .map_err(|_| DomainError::DataStore(anyhow!("Invalid cursor format")))?;
+        let include_total = match select_cursor {
+            Some(select_cursor) => match select_cursor.full_count {
+                Some(_) => false,
+                None => select.include_total_len,
+            },
+            None => select.include_total_len,
+        };
+
+        debug!(
+            "AQL:\n{}\nbindVars: {:#?}",
+            query.query.to_string(),
+            query.bind_vars
+        );
+        let cursor = self.aql(query, true, include_total, None, processor).await;
+
+        match cursor {
+            Ok(mut cursor) => {
+                for attr in &mut cursor.result {
+                    apply_select(
+                        AttrMut::from_attr(attr),
+                        &Select::Entity(select.clone()),
+                        &self.ontology,
+                    )?;
+                }
+
+                let full_count = match select_cursor {
+                    Some(select_cursor) => match select_cursor.full_count {
+                        Some(full_count) => full_count,
+                        None => match include_total {
+                            true => cursor.extra.unwrap().stats.full_count.unwrap(),
+                            false => cursor.count.unwrap(),
+                        },
+                    },
+                    None => match include_total {
+                        true => cursor.extra.unwrap().stats.full_count.unwrap(),
+                        false => cursor.count.unwrap(),
+                    },
+                };
+                let has_next = match select_cursor {
+                    Some(cursor) => (cursor.offset + select.limit) < full_count,
+                    None => select.limit < full_count,
+                };
+                let end_cursor = match select_cursor {
+                    Some(cursor) => Some(Cursor {
+                        offset: cursor.offset + select.limit,
+                        full_count: Some(full_count),
+                    }),
+                    None => Some(Cursor {
+                        offset: select.limit,
+                        full_count: Some(full_count),
+                    }),
+                };
+
+                let mut sequence = Sequence::with_capacity(cursor.result.len());
+
+                for attr in cursor.result {
+                    match attr {
+                        Attr::Unit(u) => {
+                            sequence.push(u);
+                        }
+                        _ => todo!("not a unit"),
+                    }
+                }
+
+                Ok(sequence.with_sub(SubSequence {
+                    end_cursor: end_cursor
+                        .map(|cursor| bincode::serialize(&cursor).unwrap().into()),
+                    has_next,
+                    total_len: match select.include_total_len {
+                        true => Some(full_count),
+                        false => None,
+                    },
+                }))
+            }
+            Err(err) => Err(DomainError::DataStore(err)),
+        }
     }
 
     async fn write(
@@ -401,7 +401,7 @@ impl ArangoDatabase {
 }
 
 #[async_trait::async_trait]
-impl DataStoreAPI for ArangoDatabase {
+impl DataStoreAPI for ArangoDatabaseHandle {
     // async fn execute(&self, request: Request, _session: Session) -> DomainResult<Response> {
     //     match request {
     //         Request::Query(entity_select) => Ok(Response::Query(self.query(entity_select).await?)),
@@ -411,12 +411,12 @@ impl DataStoreAPI for ArangoDatabase {
     //     }
     // }
 
-    async fn transact<'a>(
-        &'a self,
-        messages: BoxStream<'a, DomainResult<ReqMessage>>,
+    async fn transact(
+        &self,
+        messages: BoxStream<'static, DomainResult<ReqMessage>>,
         _session: Session,
-    ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>> {
-        self.transact_inner(messages).await
+    ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
+        self.database.clone().transact_inner(messages).await
     }
 }
 

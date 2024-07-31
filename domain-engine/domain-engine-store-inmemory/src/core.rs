@@ -28,6 +28,7 @@ pub(super) struct InMemoryStore {
     pub serial_counter: u64,
 }
 
+#[derive(Clone)]
 pub(super) struct DbContext {
     pub ontology: Arc<Ontology>,
     pub system: ArcSystemApi,

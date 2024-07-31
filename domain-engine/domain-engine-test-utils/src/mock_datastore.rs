@@ -56,11 +56,11 @@ impl LinearDataStoreAdapter {
 
 #[async_trait::async_trait]
 impl DataStoreAPI for LinearDataStoreAdapter {
-    async fn transact<'a>(
-        &'a self,
-        messages: BoxStream<'a, DomainResult<ReqMessage>>,
+    async fn transact(
+        &self,
+        messages: BoxStream<'static, DomainResult<ReqMessage>>,
         session: Session,
-    ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>> {
+    ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
         let messages: Vec<_> = messages.collect().await;
         let responses = <Unimock as LinearTransact>::transact(&self.0, messages, session).await?;
 

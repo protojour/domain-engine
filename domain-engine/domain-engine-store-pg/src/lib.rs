@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+use std::sync::Arc;
+
 use anyhow::anyhow;
 use domain_engine_core::{
     data_store::DataStoreAPI,
@@ -23,13 +25,25 @@ pub struct PostgresDataStore {
     pub system: ArcSystemApi,
 }
 
+pub struct PostgresHandle {
+    pub(crate) _database: Arc<PostgresDataStore>,
+}
+
+impl From<PostgresDataStore> for PostgresHandle {
+    fn from(value: PostgresDataStore) -> Self {
+        PostgresHandle {
+            _database: Arc::new(value),
+        }
+    }
+}
+
 #[async_trait::async_trait]
-impl DataStoreAPI for PostgresDataStore {
-    async fn transact<'a>(
-        &'a self,
-        messages: BoxStream<'a, DomainResult<ReqMessage>>,
+impl DataStoreAPI for PostgresHandle {
+    async fn transact(
+        &self,
+        messages: BoxStream<'static, DomainResult<ReqMessage>>,
         _session: Session,
-    ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>> {
+    ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
         Ok(async_stream::stream! {
             for await message in messages {
                 match message? {

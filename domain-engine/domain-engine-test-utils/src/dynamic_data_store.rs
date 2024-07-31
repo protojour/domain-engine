@@ -98,6 +98,7 @@ mod arango {
     use std::collections::BTreeSet;
 
     use domain_engine_core::Session;
+    use domain_engine_store_arango::ArangoDatabaseHandle;
     use ontol_runtime::ontology::Ontology;
 
     #[derive(Default)]
@@ -130,7 +131,7 @@ mod arango {
             }
             let mut db = client.db(db_name, ontology, system);
             db.init(package_ids, true).await.unwrap();
-            Ok(Box::new(db))
+            Ok(Box::new(ArangoDatabaseHandle::from(db)))
         }
     }
 }
@@ -143,8 +144,8 @@ mod pg {
     use domain_engine_core::transact::{ReqMessage, RespMessage};
     use domain_engine_core::{DomainError, DomainResult, Session};
     use domain_engine_store_pg::migrate::connect_and_migrate;
-    use domain_engine_store_pg::recreate_database;
     use domain_engine_store_pg::{deadpool_postgres, tokio_postgres, PostgresDataStore};
+    use domain_engine_store_pg::{recreate_database, PostgresHandle};
     use futures_util::stream::BoxStream;
     use ontol_runtime::ontology::Ontology;
     use tokio::sync::{OwnedSemaphorePermit, Semaphore};
@@ -164,7 +165,7 @@ mod pg {
     }
 
     struct PgTestDatastore {
-        inner: PostgresDataStore,
+        handle: PostgresHandle,
         /// As long as this datastore still lives, it will hold this permit
         #[allow(unused)]
         permit: OwnedSemaphorePermit,
@@ -195,12 +196,12 @@ mod pg {
 
     #[async_trait::async_trait]
     impl DataStoreAPI for PgTestDatastore {
-        async fn transact<'a>(
-            &'a self,
-            messages: BoxStream<'a, Result<ReqMessage, DomainError>>,
+        async fn transact(
+            &self,
+            messages: BoxStream<'static, Result<ReqMessage, DomainError>>,
             session: Session,
-        ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>> {
-            self.inner.transact(messages, session).await
+        ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
+            self.handle.transact(messages, session).await
         }
     }
 
@@ -238,12 +239,12 @@ mod pg {
         );
 
         Ok(Box::new(PgTestDatastore {
-            inner: PostgresDataStore {
+            handle: PostgresHandle::from(PostgresDataStore {
                 pool: deadpool_postgres::Pool::builder(deadpool_manager)
                     .max_size(1)
                     .build()?,
                 system,
-            },
+            }),
             permit,
         }))
     }

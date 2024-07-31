@@ -31,19 +31,20 @@ mod query;
 mod sort;
 mod write;
 
+#[derive(Clone)]
 pub struct InMemoryDb {
-    store: RwLock<InMemoryStore>,
+    store: Arc<RwLock<InMemoryStore>>,
     context: DbContext,
 }
 
 #[async_trait::async_trait]
 impl DataStoreAPI for InMemoryDb {
-    async fn transact<'a>(
-        &'a self,
-        messages: BoxStream<'a, DomainResult<ReqMessage>>,
+    async fn transact(
+        &self,
+        messages: BoxStream<'static, DomainResult<ReqMessage>>,
         _session: Session,
-    ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>> {
-        self.transact_inner(messages).await
+    ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
+        self.clone().transact_inner(messages).await
     }
 }
 
@@ -99,19 +100,19 @@ impl InMemoryDb {
         }
 
         Self {
-            store: RwLock::new(InMemoryStore {
+            store: Arc::new(RwLock::new(InMemoryStore {
                 vertices: collections,
                 edges: hyper_edges,
                 serial_counter: 0,
-            }),
+            })),
             context: DbContext { ontology, system },
         }
     }
 
-    async fn transact_inner<'a>(
-        &'a self,
-        messages: BoxStream<'a, DomainResult<ReqMessage>>,
-    ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>> {
+    async fn transact_inner(
+        self,
+        messages: BoxStream<'static, DomainResult<ReqMessage>>,
+    ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
         enum State {
             Insert(Select),
             Update(Select),

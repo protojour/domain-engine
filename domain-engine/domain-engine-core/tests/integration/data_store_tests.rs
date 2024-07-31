@@ -36,12 +36,14 @@ async fn make_domain_engine(
     ontology: Arc<Ontology>,
     mock_clause: impl unimock::Clause,
     data_store: &str,
-) -> DomainEngine {
-    DomainEngine::builder(ontology)
-        .system(Box::new(unimock::Unimock::new(mock_clause)))
-        .build(DynamicDataStoreFactory::new(data_store), Session::default())
-        .await
-        .unwrap()
+) -> Arc<DomainEngine> {
+    Arc::new(
+        DomainEngine::builder(ontology)
+            .system(Box::new(unimock::Unimock::new(mock_clause)))
+            .build(DynamicDataStoreFactory::new(data_store), Session::default())
+            .await
+            .unwrap(),
+    )
 }
 
 #[ontol_macros::datastore_test(tokio::test)]

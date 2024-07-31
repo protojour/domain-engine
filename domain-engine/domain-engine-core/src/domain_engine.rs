@@ -61,23 +61,27 @@ impl DomainEngine {
         self.data_store.as_ref().ok_or(DomainError::NoDataStore)
     }
 
-    pub async fn transact<'a>(
-        &'a self,
-        messages: BoxStream<'a, DomainResult<ReqMessage>>,
+    pub async fn transact(
+        self: &Arc<Self>,
+        messages: BoxStream<'static, DomainResult<ReqMessage>>,
         session: Session,
-    ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>> {
-        let data_store = self.get_data_store()?;
+    ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
         let (upmaps_tx, upmaps_rx) = tokio::sync::mpsc::channel::<UpMap>(1);
 
-        let messages = self.map_req_messages(messages, upmaps_tx, session.clone());
+        let messages = self
+            .clone()
+            .map_req_messages(messages, upmaps_tx, session.clone());
 
+        let data_store = self.get_data_store()?;
         let responses = data_store.api().transact(messages, session.clone()).await?;
 
-        Ok(self.map_responses(responses, upmaps_rx, session.clone()))
+        Ok(self
+            .clone()
+            .map_responses(responses, upmaps_rx, session.clone()))
     }
 
     pub async fn exec_map(
-        &self,
+        self: &Arc<Self>,
         key: MapKey,
         input: Value,
         selects: &mut (dyn FindEntitySelect + Send),
@@ -94,7 +98,7 @@ impl DomainEngine {
     }
 
     pub(crate) async fn run_vm_to_completion(
-        &self,
+        self: &Arc<Self>,
         vm: &mut OntolVm<'_>,
         mut param: Value,
         selects: &mut Option<&mut (dyn FindEntitySelect + Send)>,
@@ -111,7 +115,7 @@ impl DomainEngine {
     }
 
     async fn exec_yield(
-        &self,
+        self: &Arc<Self>,
         vm_yield: Yield,
         selects: &mut Option<&mut (dyn FindEntitySelect + Send)>,
         session: &Session,
@@ -196,7 +200,7 @@ impl DomainEngine {
     }
 
     async fn exec_map_query(
-        &self,
+        self: &Arc<Self>,
         value_cardinality: ValueCardinality,
         mut entity_select: EntitySelect,
         session: Session,
@@ -263,6 +267,7 @@ impl DomainEngine {
         }
 
         let sequences: Vec<_> = self
+            .clone()
             .transact(
                 futures_util::stream::iter([Ok(ReqMessage::Query(0, entity_select.clone()))])
                     .boxed(),

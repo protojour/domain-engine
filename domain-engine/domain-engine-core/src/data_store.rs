@@ -19,11 +19,11 @@ pub trait DataStoreAPI {
     ///
     /// This is a duplex operation, the input messages are transformed into output messages
     /// as they are executed on the data store.
-    async fn transact<'a>(
-        &'a self,
-        messages: BoxStream<'a, DomainResult<ReqMessage>>,
+    async fn transact(
+        &self,
+        messages: BoxStream<'static, DomainResult<ReqMessage>>,
         session: Session,
-    ) -> DomainResult<BoxStream<'_, DomainResult<RespMessage>>>;
+    ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>>;
 }
 
 pub struct DataStore {

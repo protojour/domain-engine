@@ -59,6 +59,18 @@ pub struct ArangoDatabase {
     pub system: ArcSystemApi,
 }
 
+pub struct ArangoDatabaseHandle {
+    pub(crate) database: Arc<ArangoDatabase>,
+}
+
+impl From<ArangoDatabase> for ArangoDatabaseHandle {
+    fn from(value: ArangoDatabase) -> Self {
+        Self {
+            database: Arc::new(value),
+        }
+    }
+}
+
 pub struct EdgeCollection {
     pub name: Ident,
 

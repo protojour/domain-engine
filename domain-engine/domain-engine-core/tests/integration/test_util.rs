@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use domain_engine_core::{
     transact::{AccumulateSequences, ReqMessage, RespMessage},
     DomainEngine, DomainResult, Session,
@@ -10,7 +12,7 @@ use ontol_runtime::{
 };
 
 pub async fn insert_entity_select_entityid(
-    engine: &DomainEngine,
+    engine: &Arc<DomainEngine>,
     entity: Value,
 ) -> DomainResult<Value> {
     let response_messages: Vec<_> = engine
@@ -36,7 +38,7 @@ pub async fn insert_entity_select_entityid(
 }
 
 pub async fn query_entities(
-    engine: &DomainEngine,
+    engine: &Arc<DomainEngine>,
     select: EntitySelect,
 ) -> DomainResult<Sequence<Value>> {
     let responses: Vec<_> = engine

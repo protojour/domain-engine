@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+use std::sync::Arc;
+
 use domain_engine_core::{DomainEngine, MaybeSelect, Session};
 use ontol_runtime::{
     attr::AttrRef,
@@ -25,7 +27,7 @@ pub use unimock;
 #[async_trait::async_trait]
 pub trait DomainEngineTestExt {
     async fn exec_named_map_json(
-        &self,
+        self: &Arc<Self>,
         key: (PackageId, &str),
         input_json: serde_json::Value,
         find_query: TestFindQuery,
@@ -35,7 +37,7 @@ pub trait DomainEngineTestExt {
 #[async_trait::async_trait]
 impl DomainEngineTestExt for DomainEngine {
     async fn exec_named_map_json(
-        &self,
+        self: &Arc<Self>,
         (package_id, name): (PackageId, &str),
         input_json: serde_json::Value,
         find_query: TestFindQuery,
@@ -71,7 +73,7 @@ impl DomainEngineTestExt for DomainEngine {
 }
 
 async fn test_exec_named_map(
-    engine: &DomainEngine,
+    engine: &Arc<DomainEngine>,
     (package_id, name): (PackageId, &str),
     input_json: serde_json::Value,
     mut find_query: TestFindQuery,

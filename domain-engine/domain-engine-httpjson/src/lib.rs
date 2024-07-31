@@ -99,11 +99,6 @@ where
         Err(err) => return err.into_response(),
     };
 
-    let serde_processor = endpoint
-        .engine
-        .ontology()
-        .new_serde_processor(endpoint.operator_addr, ProcessorMode::Update);
-
     let transaction_msg_stream = match json_content_type {
         JsonContentType::Json => {
             let bytes = match Bytes::from_request(req, &()).await {
@@ -112,7 +107,10 @@ where
             };
 
             let ontol_value = match deserialize_ontol_value(
-                &serde_processor,
+                &endpoint
+                    .engine
+                    .ontology()
+                    .new_serde_processor(endpoint.operator_addr, ProcessorMode::Update),
                 &mut serde_json::Deserializer::from_slice(&bytes),
             ) {
                 Ok(value) => value,
@@ -130,13 +128,17 @@ where
                 Ok(lines) => lines,
                 Err(err) => return err.into_response(),
             };
+            let endpoint = endpoint.clone();
 
             async_stream::try_stream! {
                 yield ReqMessage::Upsert(0, Select::EntityId);
 
                 for await json_result in lines {
                     let json = json_result.map_err(|e| DomainError::BadInputFormat(e.into()))?;
-                    let ontol_value = deserialize_ontol_value(&serde_processor, json)?;
+                    let ontol_value = deserialize_ontol_value(&endpoint
+                        .engine
+                        .ontology()
+                        .new_serde_processor(endpoint.operator_addr, ProcessorMode::Update), json)?;
 
                     yield ReqMessage::Argument(ontol_value);
                 }
