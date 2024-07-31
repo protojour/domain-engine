@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::anyhow;
-use domain_engine_core::{DomainError, DomainResult};
+use domain_engine_core::{domain_error::DomainErrorKind, DomainError, DomainResult};
 use ontol_runtime::{
     attr::Attr,
     ontology::{
@@ -29,13 +28,13 @@ impl AqlQuery {
             Select::Entity(entity_select) => match &entity_select.source {
                 StructOrUnionSelect::Struct(struct_select) => ontology.def(struct_select.def_id),
                 _ => {
-                    return Err(DomainError::DataStoreBadRequest(anyhow!(
-                        "Query entity union at root level not supported"
-                    )))
+                    return Err(DomainError::data_store_bad_request(
+                        "Query entity union at root level not supported",
+                    ))
                 }
             },
             Select::Struct(struct_select) => ontology.def(struct_select.def_id),
-            _ => return Err(DomainError::EntityMustBeStruct),
+            _ => return Err(DomainErrorKind::EntityMustBeStruct.into_error()),
         };
         let def_name = def.name().expect("entity should have a name");
         debug!("AqlQuery::build_query for {}", &ontology[def_name]);
@@ -126,7 +125,7 @@ impl<'a> MetaQuery<'a> {
                     .as_deref()
                     .map(bincode::deserialize)
                     .transpose()
-                    .map_err(|_| DomainError::DataStore(anyhow!("Invalid cursor format")))?;
+                    .map_err(|_| DomainError::data_store("invalid cursor format"))?;
 
                 self.ops.push(Operation::Limit(Limit {
                     skip: match cursor {
@@ -264,7 +263,7 @@ impl<'a> MetaQuery<'a> {
                         (0, 1) => Some(Direction::Outbound),
                         (1, 0) => Some(Direction::Inbound),
                         proj => {
-                            return Err(DomainError::DataStore(anyhow!(
+                            return Err(DomainError::data_store(format!(
                                 "unsupported edge projection {proj:?}"
                             )))
                         }
@@ -326,7 +325,9 @@ pub fn apply_select(attr: AttrMut, select: &Select, ontology: &Ontology) -> Doma
             let def_id = val.type_def_id();
             if let Value::Struct(ref mut attr_map, _) = val {
                 let def = ontology.def(def_id);
-                let entity_info = def.entity().ok_or(DomainError::NotAnEntity(def_id))?;
+                let entity_info = def
+                    .entity()
+                    .ok_or(DomainErrorKind::NotAnEntity(def_id).into_error())?;
                 let id_rel_id = entity_info.id_relationship_id;
                 *val = attr_map
                     .get(&id_rel_id)

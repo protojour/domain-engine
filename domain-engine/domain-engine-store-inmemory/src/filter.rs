@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     attr::{Attr, AttrMatrix},
@@ -177,9 +176,9 @@ impl InMemoryStore {
                         }
                         DataRelationshipKind::Edge(projection) => {
                             let Some(key) = dynamic_key else {
-                                return Err(ProofError::Domain(DomainError::DataStore(anyhow!(
-                                    "cannot filter edge without dynamic key"
-                                ))));
+                                return Err(ProofError::Domain(DomainError::data_store(
+                                    "cannot filter edge without dynamic key",
+                                )));
                             };
 
                             fn edge_lookup<'e>(
@@ -247,9 +246,9 @@ impl InMemoryStore {
                 (clause, filter_val) => {
                     error!("unhandled combination: {clause:?} on {filter_val:?}");
 
-                    return Err(ProofError::Domain(DomainError::DataStore(anyhow!(
-                        "unexpected clause"
-                    ))));
+                    return Err(ProofError::Domain(DomainError::data_store(
+                        "unexpected clause",
+                    )));
                 }
             }
         }

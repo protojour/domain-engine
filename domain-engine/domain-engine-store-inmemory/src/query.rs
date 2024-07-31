@@ -1,6 +1,5 @@
 use std::collections::BTreeSet;
 
-use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     attr::{Attr, AttrMatrix},
@@ -16,7 +15,7 @@ use ontol_runtime::{
 };
 use tracing::{debug, debug_span, error};
 
-use domain_engine_core::{DomainError, DomainResult};
+use domain_engine_core::{domain_error::DomainErrorKind, DomainError, DomainResult};
 
 use crate::{
     core::{find_data_relationship, DbContext, DynamicKey, EdgeData, EdgeVectorData},
@@ -51,13 +50,13 @@ impl InMemoryStore {
                     .as_deref()
                     .map(bincode::deserialize)
                     .transpose()
-                    .map_err(|_| DomainError::DataStore(anyhow!("Invalid cursor format")))?,
+                    .map_err(|_| DomainError::data_store("Invalid cursor format"))?,
                 IncludeTotalLen(select.include_total_len),
                 ctx,
             ),
-            StructOrUnionSelect::Union(..) => Err(DomainError::DataStoreBadRequest(anyhow!(
-                "Query entity union at root level not supported"
-            ))),
+            StructOrUnionSelect::Union(..) => Err(DomainError::data_store(
+                "Query entity union at root level not supported",
+            )),
         }
     }
 
@@ -74,12 +73,12 @@ impl InMemoryStore {
         let collection = self
             .vertices
             .get(&struct_select.def_id)
-            .ok_or(DomainError::InvalidEntityDefId)?;
+            .ok_or(DomainErrorKind::InvalidEntityDefId.into_error())?;
 
         let def = ctx.ontology.def(struct_select.def_id);
         let _entity = def
             .entity()
-            .ok_or(DomainError::NotAnEntity(struct_select.def_id))?;
+            .ok_or(DomainErrorKind::NotAnEntity(struct_select.def_id).into_error())?;
 
         // let filter_plan = compute_filter_plan(condition, &ctx.ontology).unwrap();
         debug!("eval filter: {filter}");
@@ -282,21 +281,21 @@ impl InMemoryStore {
                     "Store does not contain a collection for {:?}",
                     struct_select.def_id
                 );
-                return Err(DomainError::InvalidEntityDefId);
+                return Err(DomainErrorKind::InvalidEntityDefId.into_error());
             }
         }
 
         let properties = self
             .vertices
             .get(&vertex_key.type_def_id)
-            .ok_or(DomainError::InherentIdNotFound)?
+            .ok_or(DomainErrorKind::InherentIdNotFound.into_error())?
             .get(vertex_key.dynamic_key)
-            .ok_or(DomainError::InherentIdNotFound)?;
+            .ok_or(DomainErrorKind::InherentIdNotFound.into_error())?;
 
         let def = ctx.ontology.def(vertex_key.type_def_id);
         let entity = def
             .entity()
-            .ok_or(DomainError::NotAnEntity(vertex_key.type_def_id))?;
+            .ok_or(DomainErrorKind::NotAnEntity(vertex_key.type_def_id).into_error())?;
 
         match select {
             Select::Leaf => {
@@ -328,7 +327,7 @@ impl InMemoryStore {
 
                 Ok(Value::Struct(Box::new(properties.clone()), def.id.into()))
             }
-            Select::EntityId => Err(DomainError::DataStore(anyhow!("entity id"))),
+            Select::EntityId => Err(DomainError::data_store("entity id")),
             Select::Entity(entity_select) => match &entity_select.source {
                 StructOrUnionSelect::Struct(struct_select) => self.apply_struct_select(
                     def,

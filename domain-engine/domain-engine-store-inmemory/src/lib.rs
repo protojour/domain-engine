@@ -4,7 +4,6 @@ use core::{DbContext, EdgeColumn, EdgeVectorData};
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use anyhow::anyhow;
 use domain_engine_core::data_store::{DataStoreFactory, DataStoreFactorySync};
 use domain_engine_core::object_generator::ObjectGenerator;
 use domain_engine_core::system::ArcSystemApi;
@@ -210,7 +209,7 @@ impl InMemoryDb {
                                 }
                             }
                             None => {
-                                Err(DomainError::DataStore(anyhow!("invalid transaction state")))?
+                                Err(DomainError::data_store("invalid transaction state"))?
                             }
                         }
                     }
@@ -233,7 +232,7 @@ impl DataStoreFactory for InMemoryDataStoreFactory {
         session: Session,
         ontology: Arc<Ontology>,
         system: ArcSystemApi,
-    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
+    ) -> DomainResult<Box<dyn DataStoreAPI + Send + Sync>> {
         self.new_api_sync(package_ids, config, session, ontology, system)
     }
 }
@@ -246,7 +245,7 @@ impl DataStoreFactorySync for InMemoryDataStoreFactory {
         _session: Session,
         ontology: Arc<Ontology>,
         system: ArcSystemApi,
-    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
+    ) -> DomainResult<Box<dyn DataStoreAPI + Send + Sync>> {
         Ok(Box::new(InMemoryDb::new(package_ids, ontology, system)))
     }
 }

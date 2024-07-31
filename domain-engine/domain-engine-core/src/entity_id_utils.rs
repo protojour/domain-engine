@@ -12,7 +12,7 @@ use ontol_runtime::{
     DefId, RelId,
 };
 
-use crate::{system::SystemAPI, DomainError, DomainResult};
+use crate::{domain_error::DomainErrorKind, system::SystemAPI, DomainError, DomainResult};
 
 pub fn find_inherent_entity_id(
     entity_val: &Value,
@@ -20,11 +20,13 @@ pub fn find_inherent_entity_id(
 ) -> Result<Option<Value>, DomainError> {
     let def_id = entity_val.type_def_id();
     let def = ontology.def(def_id);
-    let entity = def.entity().ok_or(DomainError::NotAnEntity(def_id))?;
+    let entity = def
+        .entity()
+        .ok_or(DomainErrorKind::NotAnEntity(def_id).into_error())?;
 
     let struct_map = match entity_val {
         Value::Struct(struct_map, _) => struct_map,
-        _ => return Err(DomainError::EntityMustBeStruct),
+        _ => return Err(DomainErrorKind::EntityMustBeStruct.into_error()),
     };
 
     match struct_map.get(&entity.id_relationship_id) {
@@ -78,7 +80,7 @@ pub fn try_generate_entity_id(
                     )),
                     GeneratedIdContainer::Raw,
                 )),
-                _ => Err(DomainError::TypeCannotBeUsedForIdGeneration),
+                _ => Err(DomainErrorKind::TypeCannotBeUsedForIdGeneration.into_error()),
             }
         }
         (SerdeOperator::CapturingTextPattern(def_id), _) => {
@@ -98,7 +100,7 @@ pub fn try_generate_entity_id(
                     GeneratedIdContainer::SingletonStruct(*def_id, property.rel_id),
                 ))
             } else {
-                Err(DomainError::TypeCannotBeUsedForIdGeneration)
+                Err(DomainErrorKind::TypeCannotBeUsedForIdGeneration.into_error())
             }
         }
         (SerdeOperator::Serial(def_id), ValueGenerator::Autoincrement) => Ok((
@@ -117,7 +119,7 @@ pub fn try_generate_entity_id(
             }
             auto => Ok(auto),
         },
-        _ => Err(DomainError::TypeCannotBeUsedForIdGeneration),
+        _ => Err(DomainErrorKind::TypeCannotBeUsedForIdGeneration.into_error()),
     }
 }
 

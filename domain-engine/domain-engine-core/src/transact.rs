@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use anyhow::anyhow;
 use futures_util::{stream::BoxStream, Stream, StreamExt};
 use ontol_runtime::{
     query::select::{EntitySelect, Select},
@@ -13,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use tracing::trace;
 
 use crate::{
+    domain_error::DomainErrorKind,
     select_data_flow::{translate_entity_select, translate_select},
     update::sanitize_update,
     DomainEngine, DomainError, DomainResult, Session,
@@ -156,7 +156,7 @@ impl DomainEngine {
                 let resolve_path = self
                     .resolver_graph
                     .probe_path_for_entity_select(self.ontology(), &select)
-                    .ok_or(DomainError::NoResolvePathToDataStore)?;
+                    .ok_or(DomainErrorKind::NoResolvePathToDataStore.into_error())?;
 
                 for map_key in resolve_path.iter() {
                     translate_entity_select(&mut select, &map_key, self.ontology());
@@ -233,12 +233,12 @@ impl DomainEngine {
         let down_path = self
             .resolver_graph
             .probe_path_for_select(ontology, select, ProbeDirection::Down, down_filter)
-            .ok_or(DomainError::NoResolvePathToDataStore)?;
+            .ok_or(DomainErrorKind::NoResolvePathToDataStore.into_error())?;
 
         let up_path = self
             .resolver_graph
             .probe_path_for_select(ontology, select, ProbeDirection::Up, ProbeFilter::Complete)
-            .ok_or(DomainError::NoResolvePathToDataStore)?;
+            .ok_or(DomainErrorKind::NoResolvePathToDataStore.into_error())?;
 
         for map_key in up_path.iter() {
             translate_select(select, &map_key, ontology);
@@ -273,7 +273,7 @@ impl DomainEngine {
                         filter: ProbeFilter::Complete,
                     },
                 )
-                .ok_or(DomainError::NoResolvePathToDataStore)?;
+                .ok_or(DomainErrorKind::NoResolvePathToDataStore.into_error())?;
 
             *def_id = up_path.iter().last().unwrap().input.def_id;
         }
@@ -324,14 +324,14 @@ impl DomainEngine {
         match upmaps_rx.recv().await {
             Some(upmap) => {
                 if upmap.0 != op_seq {
-                    return Err(DomainError::DataStore(anyhow!("OpSequence out of sync")));
+                    return Err(DomainError::data_store("OpSequence out of sync"));
                 }
 
                 *cur_upmap = upmap;
 
                 Ok(())
             }
-            None => Err(DomainError::DataStore(anyhow!("upmap value not availabe"))),
+            None => Err(DomainError::data_store("upmap value not availabe")),
         }
     }
 
@@ -370,6 +370,6 @@ async fn send_upmap(
     upmaps_tx
         .send(UpMap(op_seq, resolve_path))
         .await
-        .map_err(|_| DomainError::DataStore(anyhow!("upmap not sendable")))?;
+        .map_err(|_| DomainError::data_store("upmap not sendable"))?;
     Ok(())
 }

@@ -1,10 +1,10 @@
 use std::{collections::BTreeSet, sync::Arc};
 
-use anyhow::anyhow;
 use domain_engine_core::{
     data_store::{DataStoreAPI, DataStoreFactory, DataStoreFactorySync},
+    domain_error::DomainErrorKind,
     system::ArcSystemApi,
-    Session,
+    DomainResult, Session,
 };
 use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use ontol_runtime::{
@@ -41,7 +41,7 @@ impl DataStoreFactory for DynamicDataStoreFactory {
         session: Session,
         ontology: Arc<Ontology>,
         system: ArcSystemApi,
-    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
+    ) -> DomainResult<Box<dyn DataStoreAPI + Send + Sync>> {
         let result = match self.name.as_str() {
             "arango" => {
                 arango::ArangoTestDatastoreFactory {
@@ -62,7 +62,7 @@ impl DataStoreFactory for DynamicDataStoreFactory {
                 .new_api(package_ids, config, session, ontology, system)
                 .await
             }
-            other => Err(anyhow!("unknown data store: `{other}`")),
+            other => Err(DomainErrorKind::UnknownDataStore(other.to_string()).into_error()),
         };
 
         result.map_err(|err| {
@@ -80,7 +80,7 @@ impl DataStoreFactorySync for DynamicDataStoreFactory {
         session: Session,
         ontology: Arc<Ontology>,
         system: ArcSystemApi,
-    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
+    ) -> DomainResult<Box<dyn DataStoreAPI + Send + Sync>> {
         match self.name.as_str() {
             "inmemory" => InMemoryDataStoreFactory.new_api_sync(
                 package_ids,
@@ -97,7 +97,7 @@ impl DataStoreFactorySync for DynamicDataStoreFactory {
 mod arango {
     use std::collections::BTreeSet;
 
-    use domain_engine_core::Session;
+    use domain_engine_core::{DomainResult, Session};
     use domain_engine_store_arango::ArangoDatabaseHandle;
     use ontol_runtime::ontology::Ontology;
 
@@ -115,7 +115,7 @@ mod arango {
             _session: Session,
             ontology: std::sync::Arc<Ontology>,
             system: domain_engine_core::system::ArcSystemApi,
-        ) -> anyhow::Result<Box<dyn domain_engine_core::data_store::DataStoreAPI + Send + Sync>>
+        ) -> DomainResult<Box<dyn domain_engine_core::data_store::DataStoreAPI + Send + Sync>>
         {
             let client = domain_engine_store_arango::ArangoClient::new(
                 "http://localhost:8529",
@@ -141,6 +141,7 @@ mod pg {
     use std::sync::{Arc, OnceLock};
 
     use domain_engine_core::data_store::DataStoreAPI;
+    use domain_engine_core::domain_error::DomainErrorContext;
     use domain_engine_core::transact::{ReqMessage, RespMessage};
     use domain_engine_core::{DomainError, DomainResult, Session};
     use domain_engine_store_pg::migrate::connect_and_migrate;
@@ -180,7 +181,7 @@ mod pg {
             session: Session,
             ontology: std::sync::Arc<Ontology>,
             system: domain_engine_core::system::ArcSystemApi,
-        ) -> anyhow::Result<Box<dyn domain_engine_core::data_store::DataStoreAPI + Send + Sync>>
+        ) -> DomainResult<Box<dyn domain_engine_core::data_store::DataStoreAPI + Send + Sync>>
         {
             test_pg_api(
                 package_ids,
@@ -212,23 +213,32 @@ mod pg {
         ontology: std::sync::Arc<Ontology>,
         system: domain_engine_core::system::ArcSystemApi,
         recreate_db: bool,
-    ) -> anyhow::Result<Box<dyn domain_engine_core::data_store::DataStoreAPI + Send + Sync>> {
+    ) -> DomainResult<Box<dyn domain_engine_core::data_store::DataStoreAPI + Send + Sync>> {
         let semaphore = PG_TEST_SEMAPHORE
             .get_or_init(|| Arc::new(Semaphore::new(MAX_CONCURRENT_PG_TESTS)))
             .clone();
         // The test will wait here until the semaphore is ready to hand out a permit
-        let permit = semaphore.acquire_owned().await?;
+        let permit = semaphore
+            .acquire_owned()
+            .await
+            .map_err(|_| DomainError::data_store("could not acquire semaphore permit"))?;
 
         let test_name = format!("testdb_{}", super::detect_test_name("::ds_pg"));
 
         if recreate_db {
             let master_config = test_pg_config("postgres");
-            recreate_database(&test_name, &master_config).await?;
+            recreate_database(&test_name, &master_config)
+                .await
+                .map_err(|err| DomainError::data_store(format!("{err}")))
+                .with_context(|| "recreate database")?;
         }
 
         let test_config = test_pg_config(&test_name);
 
-        connect_and_migrate(package_ids, ontology.as_ref(), &test_config).await?;
+        connect_and_migrate(package_ids, ontology.as_ref(), &test_config)
+            .await
+            .map_err(|err| DomainError::data_store(format!("{err}")))
+            .with_context(|| "connect and migrate")?;
 
         let deadpool_manager = deadpool_postgres::Manager::from_config(
             test_config,
@@ -242,7 +252,8 @@ mod pg {
             handle: PostgresHandle::from(PostgresDataStore {
                 pool: deadpool_postgres::Pool::builder(deadpool_manager)
                     .max_size(1)
-                    .build()?,
+                    .build()
+                    .map_err(|err| DomainError::data_store(format!("deadpool: {err}")))?,
                 system,
             }),
             permit,

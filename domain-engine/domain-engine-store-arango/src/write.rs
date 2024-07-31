@@ -1,7 +1,7 @@
 use std::vec;
 
-use anyhow::anyhow;
 use domain_engine_core::{
+    domain_error::DomainErrorKind,
     entity_id_utils::{find_inherent_entity_id, try_generate_entity_id, GeneratedId},
     system::SystemAPI,
     DomainError, DomainResult,
@@ -81,7 +81,7 @@ impl AqlQuery {
             }
             _ => match mode {
                 WriteMode::Delete => {}
-                _ => return Err(DomainError::EntityMustBeStruct),
+                _ => return Err(DomainErrorKind::EntityMustBeStruct.into_error()),
             },
         }
 
@@ -412,7 +412,7 @@ fn generate_id(
                 (GeneratedId::AutoIncrementSerial(_), _) => None,
             }
         }
-        (None, None) => return Err(DomainError::TypeCannotBeUsedForIdGeneration),
+        (None, None) => return Err(DomainErrorKind::TypeCannotBeUsedForIdGeneration.into_error()),
     };
 
     match &mut entity {
@@ -421,7 +421,7 @@ fn generate_id(
                 struct_map.insert(entity_info.id_relationship_id, id.clone().into());
             }
         }
-        _ => return Err(DomainError::EntityMustBeStruct),
+        _ => return Err(DomainErrorKind::EntityMustBeStruct.into_error()),
     }
 
     Ok(())
@@ -874,9 +874,7 @@ impl<'a> MetaQuery<'a> {
                     id, self.var, var_index, raw_spacer, raw_props
                 ),
                 _ => {
-                    return Err(DomainError::DataStore(anyhow!(
-                        "unsupported edge projection"
-                    )));
+                    return Err(DomainError::data_store("unsupported edge projection"));
                 }
             };
 
@@ -914,11 +912,7 @@ impl<'a> MetaQuery<'a> {
             (Some(EdgeWriteMode::OverwriteInverse), (1, 0)) => Some(Direction::Outbound),
             (_, (0, 1)) => Some(Direction::Outbound),
             (_, (1, 0)) => Some(Direction::Inbound),
-            _ => {
-                return Err(DomainError::DataStore(anyhow!(
-                    "unsupported edge projection"
-                )))
-            }
+            _ => return Err(DomainError::data_store("unsupported edge projection")),
         };
 
         self.with.insert(edge_collection.name.clone());

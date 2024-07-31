@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context};
 use futures_util::{stream::BoxStream, StreamExt, TryStreamExt};
 use ontol_runtime::{
     attr::AttrRef,
@@ -22,7 +21,7 @@ use tracing::{debug, error};
 
 use crate::{
     data_store::{DataStore, DataStoreFactory, DataStoreFactorySync},
-    domain_error::DomainResult,
+    domain_error::{DomainErrorContext, DomainErrorKind, DomainResult},
     select_data_flow::translate_entity_select,
     system::{ArcSystemApi, SystemAPI},
     transact::{AccumulateSequences, ReqMessage, RespMessage, UpMap},
@@ -58,7 +57,9 @@ impl DomainEngine {
     }
 
     pub fn get_data_store(&self) -> DomainResult<&DataStore> {
-        self.data_store.as_ref().ok_or(DomainError::NoDataStore)
+        self.data_store
+            .as_ref()
+            .ok_or(DomainErrorKind::NoDataStore.into())
     }
 
     pub async fn transact(
@@ -90,7 +91,7 @@ impl DomainEngine {
         let proc = self
             .ontology
             .get_mapper_proc(&key)
-            .ok_or(DomainError::MappingProcedureNotFound)?;
+            .ok_or(DomainErrorKind::MappingProcedureNotFound.into_error())?;
         let mut vm = self.ontology.new_vm(proc);
 
         self.run_vm_to_completion(&mut vm, input, &mut Some(selects), &session)
@@ -105,7 +106,10 @@ impl DomainEngine {
         session: &Session,
     ) -> DomainResult<Value> {
         loop {
-            match vm.run([param])? {
+            match vm
+                .run([param])
+                .map_err(|err| DomainErrorKind::OntolVm(err).into_error())?
+            {
                 VmState::Complete(value) => return Ok(value),
                 VmState::Yield(vm_yield) => {
                     param = self.exec_yield(vm_yield, selects, session).await?;
@@ -143,7 +147,7 @@ impl DomainEngine {
                         }
                     }
                 } else {
-                    Err(DomainError::ImpureMapping)
+                    Err(DomainErrorKind::ImpureMapping.into_error())
                 }
             }
             Yield::CallExtern(extern_def_id, input, output_def_id) => {
@@ -151,17 +155,17 @@ impl DomainEngine {
                 let input_operator_addr = ontology
                     .def(input.type_def_id())
                     .operator_addr
-                    .ok_or(DomainError::SerializationFailed)?;
+                    .ok_or(DomainErrorKind::SerializationFailed.into_error())?;
                 let output_operator_addr =
                     ontology.def(output_def_id).operator_addr.ok_or_else(|| {
                         error!("No deserialization operator");
-                        DomainError::DeserializationFailed
+                        DomainErrorKind::DeserializationFailed.into_error()
                     })?;
 
                 match self
                     .ontology
                     .get_extern(extern_def_id)
-                    .ok_or(DomainError::MappingProcedureNotFound)?
+                    .ok_or(DomainErrorKind::MappingProcedureNotFound.into_error())?
                 {
                     Extern::HttpJson { url } => {
                         let url = &self.ontology[*url];
@@ -172,7 +176,7 @@ impl DomainEngine {
                                 AttrRef::Unit(&input),
                                 &mut serde_json::Serializer::new(&mut input_json),
                             )
-                            .map_err(|_| DomainError::SerializationFailed)?;
+                            .map_err(|_| DomainErrorKind::SerializationFailed.into_error())?;
 
                         let output_json = self
                             .system
@@ -187,7 +191,7 @@ impl DomainEngine {
                             .deserialize(&mut serde_json::Deserializer::from_slice(&output_json))
                             .map_err(|error| {
                                 debug!("hook deserialization error: {error:?}");
-                                DomainError::DeserializationFailed
+                                DomainErrorKind::DeserializationFailed.into_error()
                             })?;
 
                         Ok(output_attr
@@ -235,7 +239,7 @@ impl DomainEngine {
                             filter: ProbeFilter::Complete,
                         },
                     )
-                    .ok_or(DomainError::NoResolvePathToDataStore)?;
+                    .ok_or(DomainErrorKind::NoResolvePathToDataStore.into_error())?;
 
                 if let Some(map_key) = up_path.iter().last() {
                     assert_eq!(map_key.input.def_id, inner_entity_def_id);
@@ -279,9 +283,7 @@ impl DomainEngine {
             .await?;
 
         let Some(edge_seq) = sequences.into_iter().next() else {
-            return Err(DomainError::DataStore(anyhow!(
-                "nothing returned from data store"
-            )));
+            return Err(DomainError::data_store("nothing returned from data store"));
         };
 
         match value_cardinality {
@@ -336,8 +338,7 @@ impl Builder {
                             system.clone(),
                         )
                         .await
-                        .with_context(|| format!("Failed to initialize data store {config:?}"))
-                        .map_err(DomainError::DataStore)?;
+                        .with_context(|| format!("Failed to initialize data store {config:?}"))?;
                     data_store = Some(DataStore::new(package_ids, api));
                 }
 
@@ -376,8 +377,7 @@ impl Builder {
                             self.ontology.clone(),
                             system.clone(),
                         )
-                        .with_context(|| format!("Failed to initialize data store {config:?}"))
-                        .map_err(DomainError::DataStore)?;
+                        .with_context(|| format!("Failed to initialize data store {config:?}"))?;
                     data_store = Some(DataStore::new(package_ids, api));
                 }
 

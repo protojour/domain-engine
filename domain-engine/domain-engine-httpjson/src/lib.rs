@@ -13,7 +13,10 @@ use axum::{
 use axum_extra::extract::JsonLines;
 use bytes::Bytes;
 use content_type::JsonContentType;
-use domain_engine_core::{transact::ReqMessage, DomainEngine, DomainError, DomainResult, Session};
+use domain_engine_core::{
+    domain_error::DomainErrorKind, transact::ReqMessage, DomainEngine, DomainError, DomainResult,
+    Session,
+};
 use futures_util::{stream::StreamExt, TryStreamExt};
 use http_error::domain_error_to_response;
 use ontol_runtime::{
@@ -134,7 +137,7 @@ where
                 yield ReqMessage::Upsert(0, Select::EntityId);
 
                 for await json_result in lines {
-                    let json = json_result.map_err(|e| DomainError::BadInputFormat(e.into()))?;
+                    let json = json_result.map_err(|e| DomainErrorKind::BadInputFormat(format!("{e}")).into_error())?;
                     let ontol_value = deserialize_ontol_value(&endpoint
                         .engine
                         .ontology()
@@ -172,8 +175,10 @@ fn deserialize_ontol_value<'d>(
         Ok(value) => value,
         Err(error) => {
             return Err(match error.classify() {
-                serde_json::error::Category::Data => DomainError::BadInputData(error.into()),
-                _ => DomainError::BadInputFormat(error.into()),
+                serde_json::error::Category::Data => {
+                    DomainErrorKind::BadInputData(format!("{error}")).into_error()
+                }
+                _ => DomainErrorKind::BadInputFormat(format!("{error}")).into_error(),
             })
         }
     };
@@ -181,7 +186,7 @@ fn deserialize_ontol_value<'d>(
         Attr::Unit(value) => value,
         _ => {
             error!("deserialized attribute was not a unit");
-            return Err(DomainError::DeserializationFailed);
+            return Err(DomainErrorKind::DeserializationFailed.into_error());
         }
     };
 

@@ -1,5 +1,5 @@
 use axum::{body::Body, response::IntoResponse};
-use domain_engine_core::DomainError;
+use domain_engine_core::{domain_error::DomainErrorKind, DomainError};
 use http::StatusCode;
 use serde::Serialize;
 use tracing::info;
@@ -18,98 +18,103 @@ pub fn json_error(message: impl Into<String>) -> axum::Json<ErrorJson> {
 pub fn domain_error_to_response(error: DomainError) -> http::Response<Body> {
     info!("{error:?}");
 
-    match error {
-        DomainError::Unauthorized => {
+    match error.kind() {
+        DomainErrorKind::Unauthorized => {
             (StatusCode::FORBIDDEN, json_error("operation not permitted")).into_response()
         }
-        DomainError::MappingProcedureNotFound => (
+        DomainErrorKind::MappingProcedureNotFound => (
             StatusCode::INTERNAL_SERVER_ERROR,
             json_error("mapping procedure not found"),
         )
             .into_response(),
-        DomainError::NoDataStore => (
+        DomainErrorKind::NoDataStore => (
             StatusCode::INTERNAL_SERVER_ERROR,
             json_error("no data store found"),
         )
             .into_response(),
-        DomainError::NoResolvePathToDataStore => (
+        DomainErrorKind::UnknownDataStore(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json_error("unknown data store"),
+        )
+            .into_response(),
+        DomainErrorKind::NoResolvePathToDataStore => (
             StatusCode::INTERNAL_SERVER_ERROR,
             json_error("no resolve path to data store"),
         )
             .into_response(),
-        DomainError::EntityNotFound => {
+        DomainErrorKind::EntityNotFound => {
             (StatusCode::NOT_FOUND, json_error("entity not found")).into_response()
         }
-        DomainError::NotAnEntity(_) => (
+        DomainErrorKind::NotAnEntity(_) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             json_error("not an entity"),
         )
             .into_response(),
-        DomainError::EntityMustBeStruct => (
+        DomainErrorKind::EntityMustBeStruct => (
             StatusCode::INTERNAL_SERVER_ERROR,
             json_error("entity must be struct"),
         )
             .into_response(),
-        DomainError::EntityAlreadyExists => {
+        DomainErrorKind::EntityAlreadyExists => {
             (StatusCode::CONFLICT, json_error("entity already exists")).into_response()
         }
-        DomainError::InherentIdNotFound => (
+        DomainErrorKind::InherentIdNotFound => (
             StatusCode::UNPROCESSABLE_ENTITY,
             json_error("inherent id not found"),
         )
             .into_response(),
-        DomainError::InvalidEntityDefId => (
+        DomainErrorKind::InvalidEntityDefId => (
             StatusCode::UNPROCESSABLE_ENTITY,
             json_error("invalid entity definition"),
         )
             .into_response(),
-        DomainError::TypeCannotBeUsedForIdGeneration => (
+        DomainErrorKind::TypeCannotBeUsedForIdGeneration => (
             StatusCode::UNPROCESSABLE_ENTITY,
             json_error("type cannot be used for id generation"),
         )
             .into_response(),
-        DomainError::BadInputFormat(err) => (
+        DomainErrorKind::BadInputFormat(err) => (
             StatusCode::BAD_REQUEST,
             json_error(format!("bad input format: {err:?}")),
         )
             .into_response(),
-        DomainError::BadInputData(err) => (
+        DomainErrorKind::BadInputData(err) => (
             StatusCode::UNPROCESSABLE_ENTITY,
             json_error(format!("bad input: {err:?}")),
         )
             .into_response(),
-        DomainError::UnresolvedForeignKey(key) => (
+        DomainErrorKind::UnresolvedForeignKey(key) => (
             StatusCode::UNPROCESSABLE_ENTITY,
             json_error(format!("unresolved foreign key: {key}")),
         )
             .into_response(),
-        DomainError::NotImplemented => (
+        DomainErrorKind::NotImplemented => (
             StatusCode::INTERNAL_SERVER_ERROR,
             json_error("not implemented"),
         )
             .into_response(),
-        DomainError::ImpureMapping => (
+        DomainErrorKind::ImpureMapping => (
             StatusCode::UNPROCESSABLE_ENTITY,
             json_error("impure mapping"),
         )
             .into_response(),
-        DomainError::DataStore(err) => (
+        DomainErrorKind::DataStore(err) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             json_error(format!("data store: {err:?}")),
         )
             .into_response(),
-        DomainError::DataStoreBadRequest(err) => {
+        DomainErrorKind::DataStoreBadRequest(err) => {
             (StatusCode::BAD_REQUEST, json_error(format!("{err:?}"))).into_response()
         }
-        DomainError::OntolVm(_) => {
+        DomainErrorKind::OntolVm(_) => {
             (StatusCode::INTERNAL_SERVER_ERROR, json_error("ONTOL error")).into_response()
         }
-        DomainError::SerializationFailed => (
+        DomainErrorKind::SerializationFailed => (
             StatusCode::UNPROCESSABLE_ENTITY,
             json_error("serialization failed"),
         )
             .into_response(),
-        DomainError::DeserializationFailed => (
+        DomainErrorKind::DeserializationFailed => (
             StatusCode::UNPROCESSABLE_ENTITY,
             json_error("deserialization failed"),
         )

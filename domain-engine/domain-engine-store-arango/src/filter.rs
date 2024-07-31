@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use domain_engine_core::{
     filter::walker::{ConditionWalker, Members},
     DomainError, DomainResult,
@@ -46,8 +45,7 @@ impl<'a> MetaQuery<'a> {
         let mut filter_query = FilterQuery::from_context(def_id);
         let walker = ConditionWalker::new(filter.condition());
 
-        self.eval_cond_var(&mut filter_query, Var(0), walker, false)
-            .map_err(DomainError::DataStore)?;
+        self.eval_cond_var(&mut filter_query, Var(0), walker, false)?;
 
         let order_symbols = filter.order();
         if order_symbols.is_empty() {
@@ -98,7 +96,7 @@ impl<'a> MetaQuery<'a> {
         cond_var: Var,
         walker: ConditionWalker,
         join: bool,
-    ) -> anyhow::Result<()> {
+    ) -> DomainResult<()> {
         for clause in walker.clauses(cond_var) {
             match clause {
                 Clause::IsEntity(var_def_id) => {
@@ -227,14 +225,14 @@ impl<'a> MetaQuery<'a> {
         set_op: SetOperator,
         set_var: Var,
         walker: ConditionWalker,
-    ) -> anyhow::Result<()> {
+    ) -> DomainResult<()> {
         let members = match walker.set_members(set_var) {
             Members::Empty => {
-                return Err(anyhow!("Not implemented"));
+                return Err(DomainError::data_store("not implemented"));
             }
             Members::Join(var) => {
                 debug!("members join {var:?}, not implemented");
-                return Err(anyhow!("Not implemented"));
+                return Err(DomainError::data_store("not implemented"));
             }
             Members::Members(members) => members,
         };
@@ -247,13 +245,13 @@ impl<'a> MetaQuery<'a> {
                 };
             }
             SetOperator::SubsetOf => {
-                return Err(anyhow!("Not implemented"));
+                return Err(DomainError::data_store("not implemented"));
             }
             SetOperator::SupersetOf => {
-                return Err(anyhow!("Not implemented"));
+                return Err(DomainError::data_store("not implemented"));
             }
             SetOperator::SetIntersects => {
-                return Err(anyhow!("Not implemented"));
+                return Err(DomainError::data_store("not implemented"));
             }
             SetOperator::SetEquals => {
                 filter.comp = Some(Comparison::Eq);
@@ -273,7 +271,7 @@ impl<'a> MetaQuery<'a> {
         filter: &mut FilterQuery,
         term: &CondTerm,
         walker: ConditionWalker,
-    ) -> anyhow::Result<()> {
+    ) -> DomainResult<()> {
         match term {
             CondTerm::Wildcard => {}
             CondTerm::Variable(cond_var) => {

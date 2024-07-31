@@ -1,8 +1,8 @@
 use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
 
-use anyhow::anyhow;
 use domain_engine_core::{
     data_store::DataStoreAPI,
+    domain_error::DomainErrorKind,
     object_generator::ObjectGenerator,
     transact::{DataOperation, ReqMessage, RespMessage},
     DomainError, DomainResult, Session,
@@ -180,7 +180,7 @@ impl ArangoDatabase {
                                 yield RespMessage::Element(value, DataOperation::Deleted);
                             }
                             None => {
-                                Err(DomainError::DataStore(anyhow!("invalid transaction state")))?
+                                Err(DomainError::data_store("invalid transaction state"))?
                             }
                         }
                     }
@@ -203,7 +203,7 @@ impl ArangoDatabase {
             .as_deref()
             .map(bincode::deserialize)
             .transpose()
-            .map_err(|_| DomainError::DataStore(anyhow!("Invalid cursor format")))?;
+            .map_err(|_| DomainError::data_store("Invalid cursor format"))?;
         let include_total = match select_cursor {
             Some(select_cursor) => match select_cursor.full_count {
                 Some(_) => false,
@@ -278,7 +278,7 @@ impl ArangoDatabase {
                     },
                 }))
             }
-            Err(err) => Err(DomainError::DataStore(err)),
+            Err(err) => Err(DomainError::data_store(format!("{err}"))),
         }
     }
 
@@ -309,16 +309,17 @@ impl ArangoDatabase {
                     for data in cursor.result {
                         for (key, value) in data.as_object().unwrap() {
                             if value.is_null() {
-                                return Err(DomainError::UnresolvedForeignKey(format!(
+                                return Err(DomainErrorKind::UnresolvedForeignKey(format!(
                                     r#""{}""#,
                                     key
-                                )));
+                                ))
+                                .into_error());
                             }
                         }
                     }
                     debug!("All prequeried entities exist");
                 }
-                Err(err) => return Err(DomainError::DataStore(err)),
+                Err(err) => return Err(DomainError::data_store(format!("{err}"))),
             };
         } else {
             debug!("No prequery required");
@@ -344,9 +345,9 @@ impl ArangoDatabase {
                 .await
                 .map_err(|err| {
                     if err.to_string().starts_with("404") {
-                        return DomainError::EntityNotFound;
+                        return DomainErrorKind::EntityNotFound.into_error();
                     }
-                    DomainError::DataStore(err)
+                    DomainError::data_store(format!("{err}"))
                 })?;
         }
 
@@ -391,7 +392,7 @@ impl ArangoDatabase {
                 if err.to_string().starts_with("404") {
                     false
                 } else {
-                    return Err(DomainError::DataStore(err));
+                    return Err(DomainError::data_store(format!("{err}")));
                 }
             }
         };

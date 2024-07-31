@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 
-use anyhow::anyhow;
 use domain_engine_core::{
     data_store::DataStoreAPI,
     system::ArcSystemApi,
@@ -48,19 +47,19 @@ impl DataStoreAPI for PostgresHandle {
             for await message in messages {
                 match message? {
                     ReqMessage::Query(..) => {
-                        yield Err(DomainError::DataStore(anyhow!("Query not implemented for Postgres")))?;
+                        yield Err(DomainError::data_store("Query not implemented for Postgres"))?;
                     }
                     ReqMessage::Insert(..) => {
-                        yield Err(DomainError::DataStore(anyhow!("Insert not implemented for Postgres")))?;
+                        yield Err(DomainError::data_store("Insert not implemented for Postgres"))?;
                     }
                     ReqMessage::Update(..) => {
-                        yield Err(DomainError::DataStore(anyhow!("Update not implemented for Postgres")))?;
+                        yield Err(DomainError::data_store("Update not implemented for Postgres"))?;
                     }
                     ReqMessage::Upsert(..) => {
-                        yield Err(DomainError::DataStore(anyhow!("Upsert not implemented for Postgres")))?;
+                        yield Err(DomainError::data_store("Upsert not implemented for Postgres"))?;
                     }
                     ReqMessage::Delete(..) => {
-                        yield Err(DomainError::DataStore(anyhow!("Delete not implemented for Postgres")))?;
+                        yield Err(DomainError::data_store("Delete not implemented for Postgres"))?;
                     }
                     ReqMessage::Argument(..) => {}
                 }

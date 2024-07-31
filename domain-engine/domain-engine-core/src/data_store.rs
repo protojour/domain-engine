@@ -55,7 +55,7 @@ pub trait DataStoreFactory {
         session: Session,
         ontology: Arc<Ontology>,
         system: ArcSystemApi,
-    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>>;
+    ) -> DomainResult<Box<dyn DataStoreAPI + Send + Sync>>;
 }
 
 pub trait DataStoreFactorySync {
@@ -66,5 +66,5 @@ pub trait DataStoreFactorySync {
         session: Session,
         ontology: Arc<Ontology>,
         system: ArcSystemApi,
-    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>>;
+    ) -> DomainResult<Box<dyn DataStoreAPI + Send + Sync>>;
 }

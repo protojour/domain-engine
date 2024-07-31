@@ -1,4 +1,4 @@
-use domain_engine_core::{DomainError, DomainResult};
+use domain_engine_core::{domain_error::DomainErrorKind, DomainResult};
 
 use ontol_runtime::{
     attr::AttrRef,
@@ -41,7 +41,7 @@ impl AqlQuery {
                     }
                 }
             }
-            _ => return Err(DomainError::EntityMustBeStruct),
+            _ => return Err(DomainErrorKind::EntityMustBeStruct.into_error()),
         };
 
         let query = AqlQuery {

@@ -1,50 +1,122 @@
-use ontol_runtime::{vm::VmError, DefId};
-use thiserror::Error;
+use std::fmt::Display;
 
-#[derive(Error, Debug)]
-pub enum DomainError {
-    #[error("unauthorized")]
+use ontol_runtime::{vm::VmError, DefId};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DomainError {
+    kind: DomainErrorKind,
+    stack: Vec<String>,
+}
+
+impl DomainError {
+    pub fn data_store(str: impl Into<String>) -> Self {
+        DomainErrorKind::DataStore(str.into()).into_error()
+    }
+
+    pub fn data_store_bad_request(str: impl Into<String>) -> Self {
+        DomainErrorKind::DataStoreBadRequest(str.into()).into_error()
+    }
+
+    pub fn kind(&self) -> &DomainErrorKind {
+        &self.kind
+    }
+}
+
+impl Display for DomainError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.kind)?;
+
+        if !self.stack.is_empty() {
+            writeln!(f)?;
+            writeln!(f, "caused by:")?;
+
+            for (idx, cause) in self.stack.iter().rev().enumerate() {
+                writeln!(f, "    {idx}: {cause}")?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+pub trait DomainErrorContext {
+    fn with_context<S: Into<String>>(self, context: impl FnOnce() -> S) -> Self;
+}
+
+impl<T> DomainErrorContext for DomainResult<T> {
+    fn with_context<S: Into<String>>(self, context: impl FnOnce() -> S) -> Self {
+        self.map_err(move |mut domain_error| {
+            domain_error.stack.push(context().into());
+            domain_error
+        })
+    }
+}
+
+impl From<DomainErrorKind> for DomainError {
+    fn from(value: DomainErrorKind) -> Self {
+        DomainError {
+            kind: value,
+            stack: vec![],
+        }
+    }
+}
+
+#[derive(displaydoc::Display, Debug, Serialize, Deserialize)]
+pub enum DomainErrorKind {
+    /// unauthorized
     Unauthorized,
-    #[error("mapping procedure not found")]
+    /// mapping procedure not found
     MappingProcedureNotFound,
-    #[error("no data store")]
+    /// no data store
     NoDataStore,
-    #[error("no resolve path to data store")]
+    /// unknown data store: {0}
+    UnknownDataStore(String),
+    /// no resolve path to data store
     NoResolvePathToDataStore,
-    #[error("entity not found")]
+    /// entity not found
     EntityNotFound,
-    #[error("not an entity")]
+    /// not an entity
     NotAnEntity(DefId),
-    #[error("entity must be a struct")]
+    /// entity must be a struct
     EntityMustBeStruct,
-    #[error("entity already exists")]
+    /// entity already exists
     EntityAlreadyExists,
-    #[error("inherent ID not found in structure")]
+    /// inherent ID not found in structure
     InherentIdNotFound,
-    #[error("BUG: Invalid entity DefId")]
+    /// BUG: Invalid entity DefId
     InvalidEntityDefId,
-    #[error("type cannot be used for id generation")]
+    /// type cannot be used for id generation
     TypeCannotBeUsedForIdGeneration,
-    #[error("bad input format: {0}")]
-    BadInputFormat(anyhow::Error),
-    #[error("bad input data: {0}")]
-    BadInputData(anyhow::Error),
-    #[error("unresolved foreign key: {0}")]
+    /// bad input format: {0}
+    BadInputFormat(String),
+    /// bad input data: {0}
+    BadInputData(String),
+    /// unresolved foreign key: {0}
     UnresolvedForeignKey(String),
-    #[error("not implemented")]
+    /// not implemented
     NotImplemented,
-    #[error("impure mapping where a pure mapping was expected")]
+    /// impure mapping where a pure mapping was expected
     ImpureMapping,
-    #[error("datastore error: {0}")]
-    DataStore(anyhow::Error),
-    #[error("datastore bad request: {0}")]
-    DataStoreBadRequest(anyhow::Error),
-    #[error("ontol data error: {0}")]
-    OntolVm(#[from] VmError),
-    #[error("serialization failed")]
+    /// datastore error: {0}
+    DataStore(String),
+    /// datastore bad request: {0}
+    DataStoreBadRequest(String),
+    /// ontol data error: {0}
+    OntolVm(VmError),
+    /// serialization failed
     SerializationFailed,
-    #[error("deserialization failed")]
+    /// deserialization failed
     DeserializationFailed,
+}
+
+impl DomainErrorKind {
+    pub fn into_error(self) -> DomainError {
+        DomainError {
+            kind: self,
+            stack: vec![],
+        }
+    }
 }
 
 pub type DomainResult<T> = Result<T, DomainError>;

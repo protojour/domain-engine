@@ -3,7 +3,6 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::anyhow;
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -20,7 +19,9 @@ use ontol_runtime::{
 use smallvec::SmallVec;
 use tracing::{debug, warn};
 
-use domain_engine_core::{system::ArcSystemApi, DomainError, DomainResult};
+use domain_engine_core::{
+    domain_error::DomainErrorKind, system::ArcSystemApi, DomainError, DomainResult,
+};
 
 pub(super) struct InMemoryStore {
     pub vertices: FnvHashMap<DefId, VertexTable<DynamicKey>>,
@@ -131,7 +132,7 @@ impl InMemoryStore {
         let collection = self
             .vertices
             .get_mut(&def_id)
-            .ok_or_else(|| DomainError::DataStore(anyhow!("Collection not found")))?;
+            .ok_or_else(|| DomainError::data_store("Collection not found"))?;
 
         for id in ids {
             let dynamic_key = Self::extract_dynamic_key(&id)?;
@@ -174,7 +175,7 @@ impl InMemoryStore {
             Value::Struct(struct_map, _) => {
                 if struct_map.len() != 1 {
                     warn!("struct map was not 1: {struct_map:?}");
-                    return Err(DomainError::InherentIdNotFound);
+                    return Err(DomainErrorKind::InherentIdNotFound.into_error());
                 }
 
                 let value = struct_map
@@ -182,7 +183,7 @@ impl InMemoryStore {
                     .next()
                     .unwrap()
                     .as_unit()
-                    .ok_or(DomainError::InherentIdNotFound)?;
+                    .ok_or(DomainErrorKind::InherentIdNotFound.into_error())?;
                 Self::extract_dynamic_key(value)
             }
             Value::Text(string, _) => Ok(DynamicKey::Text(string.as_str().into())),
@@ -192,7 +193,7 @@ impl InMemoryStore {
             Value::Serial(Serial(value), _) => Ok(DynamicKey::Serial(*value)),
             other => {
                 warn!("inherent id from {other:?}");
-                Err(DomainError::InherentIdNotFound)
+                Err(DomainErrorKind::InherentIdNotFound.into_error())
             }
         }
     }
@@ -216,7 +217,7 @@ pub(crate) fn find_data_relationship<'a>(
             keys = def.data_relationships.keys()
         );
 
-        DomainError::DataStoreBadRequest(anyhow!(
+        DomainError::data_store_bad_request(format!(
             "data relationship {def_id:?} -> {rel_id} does not exist",
             def_id = def.id
         ))

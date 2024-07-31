@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use proc::Local;
@@ -23,7 +24,7 @@ impl<C, Y> VmState<C, Y> {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Serialize, Deserialize)]
 pub enum VmError {
     #[error("invalid type at {0:?}")]
     InvalidType(Local),

@@ -9,7 +9,7 @@ use std::{
 use crate::graphql::{domain_graphql_handler, graphiql_handler, GraphqlService};
 
 use axum::{extract::FromRequestParts, routing::post, Extension};
-use domain_engine_core::{DomainEngine, DomainError, DomainResult, Session};
+use domain_engine_core::{domain_error::DomainErrorKind, DomainEngine, DomainResult, Session};
 use domain_engine_graphql::{
     juniper,
     ontology_schema::{Ctx, OntologySchema},
@@ -133,20 +133,20 @@ impl domain_engine_core::system::SystemAPI for System {
             .map_err(|err| {
                 info!("json hook network error: {err}");
 
-                DomainError::DeserializationFailed
+                DomainErrorKind::DeserializationFailed.into_error()
             })?
             .error_for_status()
             .map_err(|err| {
                 info!("json hook HTTP error: {err}");
 
-                DomainError::DeserializationFailed
+                DomainErrorKind::DeserializationFailed.into_error()
             })?
             .bytes()
             .await
             .map_err(|err| {
                 info!("json hook response error: {err}");
 
-                DomainError::DeserializationFailed
+                DomainErrorKind::DeserializationFailed.into_error()
             })?;
 
         Ok(output_bytes.into())

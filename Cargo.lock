@@ -864,10 +864,10 @@ dependencies = [
 name = "domain-engine-core"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "async-stream",
  "async-trait",
  "chrono",
+ "displaydoc",
  "domain-engine-test-utils",
  "fnv",
  "futures-util",
@@ -998,7 +998,6 @@ dependencies = [
 name = "domain-engine-store-inmemory"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "async-stream",
  "async-trait",
  "bincode",
@@ -1058,7 +1057,6 @@ dependencies = [
 name = "domain-engine-test-utils"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "async-trait",
  "axum",
  "chrono",

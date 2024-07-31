@@ -4,8 +4,9 @@ use std::sync::Arc;
 
 use context::{SchemaCtx, SchemaType, ServiceCtx};
 use domain_engine_core::{
+    domain_error::DomainErrorKind,
     transact::{AccumulateSequences, ReqMessage},
-    DomainError, DomainResult,
+    DomainResult,
 };
 use futures_util::{StreamExt, TryStreamExt};
 use gql_scalar::GqlScalar;
@@ -146,7 +147,7 @@ async fn query(
                     }
                 )
             {
-                return Err(DomainError::EntityNotFound.into());
+                return Err(DomainErrorKind::EntityNotFound.into());
             }
 
             resolve_schema_type_field(

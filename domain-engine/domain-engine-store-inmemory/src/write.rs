@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use anyhow::anyhow;
 use fnv::{FnvHashMap, FnvHashSet};
 use itertools::Itertools;
 use ontol_runtime::{
@@ -22,6 +21,7 @@ use ontol_runtime::{
 use tracing::{debug, debug_span, warn};
 
 use domain_engine_core::{
+    domain_error::DomainErrorKind,
     entity_id_utils::{find_inherent_entity_id, try_generate_entity_id, GeneratedId},
     transact::DataOperation,
     DomainError, DomainResult,
@@ -51,7 +51,7 @@ impl InMemoryStore {
         ctx: &DbContext,
     ) -> DomainResult<(Value, DataOperation)> {
         let entity_id = find_inherent_entity_id(&value, &ctx.ontology)?
-            .ok_or_else(|| DomainError::EntityNotFound)?;
+            .ok_or_else(|| DomainErrorKind::EntityNotFound.into_error())?;
         let def = ctx.ontology.def(value.type_def_id());
         let dynamic_key = Self::extract_dynamic_key(&entity_id)?;
 
@@ -94,7 +94,7 @@ impl InMemoryStore {
         debug!("update entity: {:#?}", value);
 
         let entity_id = find_inherent_entity_id(&value, &ctx.ontology)?
-            .ok_or_else(|| DomainError::EntityNotFound)?;
+            .ok_or_else(|| DomainErrorKind::EntityNotFound.into_error())?;
         let def = ctx.ontology.def(value.type_def_id());
         let vertex_key = VertexKey {
             type_def_id: def.id,
@@ -107,13 +107,15 @@ impl InMemoryStore {
             .unwrap()
             .contains_key(&vertex_key.dynamic_key)
         {
-            return Err(DomainError::EntityNotFound);
+            return Err(DomainErrorKind::EntityNotFound.into_error());
         }
 
         let mut raw_props_update: BTreeMap<RelId, Attr> = Default::default();
 
         let Value::Struct(data_struct, _) = value else {
-            return Err(DomainError::BadInputData(anyhow!("Expected a struct")));
+            return Err(
+                DomainErrorKind::BadInputData("expected a struct".to_string()).into_error(),
+            );
         };
 
         let mut edge_builders: FnvHashMap<
@@ -189,15 +191,14 @@ impl InMemoryStore {
                     Attr::Unit(_unit),
                     ValueCardinality::IndexSet | ValueCardinality::List,
                 ) => {
-                    return Err(DomainError::DataStoreBadRequest(anyhow!(
-                        "invalid input for multi-relation write"
-                    )));
-                    // }
+                    return Err(DomainError::data_store_bad_request(
+                        "invalid input for multi-relation write",
+                    ));
                 }
                 _ => {
-                    return Err(DomainError::DataStoreBadRequest(anyhow!(
-                        "invalid combination for edge update"
-                    )));
+                    return Err(DomainError::data_store_bad_request(
+                        "invalid combination for edge update",
+                    ));
                 }
             }
         }
@@ -246,13 +247,12 @@ impl InMemoryStore {
                     }
                 }
 
-                Err(DomainError::DataStore(anyhow!(
-                    "Entity did not get written"
-                )))
+                Err(DomainError::data_store("Entity did not get written"))
             }
-            _ => Err(DomainError::DataStoreBadRequest(anyhow!(
-                "post-write select kind not supported"
-            ))),
+            _ => Err(DomainErrorKind::DataStoreBadRequest(
+                "post-write select kind not supported".to_string(),
+            )
+            .into_error()),
         }
     }
 
@@ -265,13 +265,13 @@ impl InMemoryStore {
         let def = ctx.ontology.def(vertex.type_def_id());
         let entity = def
             .entity()
-            .ok_or(DomainError::NotAnEntity(vertex.type_def_id()))?;
+            .ok_or(DomainErrorKind::NotAnEntity(vertex.type_def_id()).into_error())?;
 
         let (id, id_generated) = match find_inherent_entity_id(&vertex, &ctx.ontology)? {
             Some(id) => (id, false),
             None => {
                 let value_generator = entity.id_value_generator.ok_or_else(|| {
-                    DomainError::DataStoreBadRequest(anyhow!("No id provided and no ID generator"))
+                    DomainError::data_store_bad_request("no id provided and no ID generator")
                 })?;
 
                 (
@@ -282,7 +282,7 @@ impl InMemoryStore {
         };
 
         let Value::Struct(mut struct_map, struct_tag) = vertex else {
-            return Err(DomainError::EntityMustBeStruct);
+            return Err(DomainErrorKind::EntityMustBeStruct.into_error());
         };
 
         if id_generated {
@@ -380,7 +380,7 @@ impl InMemoryStore {
 
         if collection.contains_key(&vertex_key.dynamic_key) {
             if !entity.is_self_identifying {
-                return Err(DomainError::EntityAlreadyExists);
+                return Err(DomainErrorKind::EntityAlreadyExists.into_error());
             } else {
                 // "upsert", not an error
             }
@@ -498,7 +498,7 @@ impl InMemoryStore {
             };
 
             if matching.is_empty() {
-                return Err(DomainError::EntityNotFound);
+                return Err(DomainErrorKind::EntityNotFound.into_error());
             }
 
             for (cardinal_idx, (write_mode, data)) in mapped_input {
@@ -613,7 +613,7 @@ impl InMemoryStore {
         if did_delete {
             Ok(())
         } else {
-            Err(DomainError::EntityNotFound)
+            Err(DomainErrorKind::EntityNotFound.into_error())
         }
     }
 
@@ -659,7 +659,7 @@ impl InMemoryStore {
                 "N/A".to_string()
             };
 
-            return Err(DomainError::UnresolvedForeignKey(repr));
+            return Err(DomainErrorKind::UnresolvedForeignKey(repr).into_error());
         }
 
         Ok(VertexKey {

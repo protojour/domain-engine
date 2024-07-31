@@ -1,6 +1,5 @@
 use std::cmp::Ordering;
 
-use anyhow::anyhow;
 use domain_engine_core::{DomainError, DomainResult};
 use fnv::FnvHashMap;
 use itertools::Itertools;
@@ -87,12 +86,12 @@ fn attr_by_path<'v>(attrs: &'v Attrs, path: &[RelId]) -> DomainResult<&'v Attr> 
 
     let attr = attrs
         .get(property_id)
-        .ok_or_else(|| DomainError::DataStore(anyhow!("property not found")))?;
+        .ok_or_else(|| DomainError::data_store("property not found"))?;
 
     if path.len() > 1 {
         match attr.as_unit() {
             Some(Value::Struct(sub_attrs, _)) => attr_by_path(sub_attrs, &path[1..]),
-            _ => Err(DomainError::DataStore(anyhow!("not a struct"))),
+            _ => Err(DomainError::data_store("not a struct")),
         }
     } else {
         Ok(attr)
