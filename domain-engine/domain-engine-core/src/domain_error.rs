@@ -64,6 +64,8 @@ impl From<DomainErrorKind> for DomainError {
 
 #[derive(displaydoc::Display, Debug, Serialize, Deserialize)]
 pub enum DomainErrorKind {
+    /// not authenticated
+    Unauthenticated,
     /// unauthorized
     Unauthorized,
     /// auth provisioning problem: {0}

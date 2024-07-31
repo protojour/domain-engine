@@ -19,6 +19,9 @@ pub fn domain_error_to_response(error: DomainError) -> http::Response<Body> {
     info!("{error:?}");
 
     match error.kind() {
+        DomainErrorKind::Unauthenticated => {
+            (StatusCode::UNAUTHORIZED, json_error("not authenticated")).into_response()
+        }
         DomainErrorKind::Unauthorized => {
             (StatusCode::FORBIDDEN, json_error("operation not permitted")).into_response()
         }
