@@ -22,6 +22,11 @@ pub fn domain_error_to_response(error: DomainError) -> http::Response<Body> {
         DomainErrorKind::Unauthorized => {
             (StatusCode::FORBIDDEN, json_error("operation not permitted")).into_response()
         }
+        DomainErrorKind::AuthProvision(_) => (
+            StatusCode::FORBIDDEN,
+            json_error("auth provisioning problem"),
+        )
+            .into_response(),
         DomainErrorKind::MappingProcedureNotFound => (
             StatusCode::INTERNAL_SERVER_ERROR,
             json_error("mapping procedure not found"),

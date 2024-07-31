@@ -66,6 +66,8 @@ impl From<DomainErrorKind> for DomainError {
 pub enum DomainErrorKind {
     /// unauthorized
     Unauthorized,
+    /// auth provisioning problem: {0}
+    AuthProvision(String),
     /// mapping procedure not found
     MappingProcedureNotFound,
     /// no data store
