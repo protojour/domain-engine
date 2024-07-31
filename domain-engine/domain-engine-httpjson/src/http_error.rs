@@ -127,5 +127,10 @@ pub fn domain_error_to_response(error: DomainError) -> http::Response<Body> {
             json_error("deserialization failed"),
         )
             .into_response(),
+        DomainErrorKind::Protocol(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json_error("server protocol error"),
+        )
+            .into_response(),
     }
 }

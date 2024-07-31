@@ -18,6 +18,10 @@ impl DomainError {
         DomainErrorKind::DataStoreBadRequest(str.into()).into_error()
     }
 
+    pub fn protocol(str: impl Into<String>) -> Self {
+        DomainErrorKind::Protocol(str.into()).into_error()
+    }
+
     pub fn kind(&self) -> &DomainErrorKind {
         &self.kind
     }
@@ -112,6 +116,8 @@ pub enum DomainErrorKind {
     SerializationFailed,
     /// deserialization failed
     DeserializationFailed,
+    /// protocol error: {0}
+    Protocol(String),
 }
 
 impl DomainErrorKind {
