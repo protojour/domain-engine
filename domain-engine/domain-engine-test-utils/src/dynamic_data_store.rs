@@ -144,9 +144,8 @@ mod pg {
     use domain_engine_core::domain_error::DomainErrorContext;
     use domain_engine_core::transact::{ReqMessage, RespMessage};
     use domain_engine_core::{DomainError, DomainResult, Session};
-    use domain_engine_store_pg::migrate::connect_and_migrate;
+    use domain_engine_store_pg::{connect_and_migrate, recreate_database, PostgresHandle};
     use domain_engine_store_pg::{deadpool_postgres, tokio_postgres, PostgresDataStore};
-    use domain_engine_store_pg::{recreate_database, PostgresHandle};
     use futures_util::stream::BoxStream;
     use ontol_runtime::ontology::Ontology;
     use tokio::sync::{OwnedSemaphorePermit, Semaphore};
@@ -235,7 +234,7 @@ mod pg {
 
         let test_config = test_pg_config(&test_name);
 
-        connect_and_migrate(package_ids, ontology.as_ref(), &test_config)
+        let pg_model = connect_and_migrate(package_ids, ontology.as_ref(), &test_config)
             .await
             .map_err(DomainError::data_store_from_anyhow)
             .with_context(|| "connect and migrate")?;
@@ -249,13 +248,15 @@ mod pg {
         );
 
         Ok(Box::new(PgTestDatastore {
-            handle: PostgresHandle::from(PostgresDataStore {
-                pool: deadpool_postgres::Pool::builder(deadpool_manager)
+            handle: PostgresDataStore::new(
+                pg_model,
+                deadpool_postgres::Pool::builder(deadpool_manager)
                     .max_size(1)
                     .build()
                     .map_err(|err| DomainError::data_store(format!("deadpool: {err}")))?,
                 system,
-            }),
+            )
+            .into(),
             permit,
         }))
     }

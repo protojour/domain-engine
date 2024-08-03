@@ -3,10 +3,13 @@ use std::collections::BTreeSet;
 use anyhow::{anyhow, Context};
 use fnv::FnvHashMap;
 use ontol_runtime::{ontology::Ontology, DefId, DefRelTag, PackageId};
-use tokio_postgres::{Client, NoTls, Transaction};
+use tokio_postgres::{Client, Transaction};
 use tracing::{debug_span, info, Instrument};
 
-use crate::pg_model::{DefUid, DomainUid, PgDomain, PgSerial, PgType, RegVersion};
+use crate::{
+    pg_model::{DefUid, DomainUid, PgDomain, PgSerial, PgType, RegVersion},
+    PgModel,
+};
 
 mod registry {
     refinery::embed_migrations!("./registry_migrations");
@@ -59,36 +62,12 @@ enum MigrationStep {
     },
 }
 
-pub async fn connect_and_migrate(
-    persistent_domains: &BTreeSet<PackageId>,
-    ontology: &Ontology,
-    pg_config: &tokio_postgres::Config,
-) -> anyhow::Result<()> {
-    let db_name = pg_config.get_dbname().unwrap();
-    let (mut client, connection) = pg_config.connect(NoTls).await.unwrap();
-
-    // The connection object performs the actual communication with the database,
-    // so spawn it off to run on its own.
-    let join_handle = tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("connection error: {}", e);
-        }
-    });
-
-    migrate(persistent_domains, ontology, db_name, &mut client).await?;
-    drop(client);
-
-    join_handle.await.unwrap();
-
-    Ok(())
-}
-
-async fn migrate(
+pub async fn migrate(
     persistent_domains: &BTreeSet<PackageId>,
     ontology: &Ontology,
     db_name: &str,
     pg_client: &mut Client,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<PgModel> {
     info!("migrating database `{db_name}`");
 
     // Migrate the registry
@@ -149,7 +128,9 @@ async fn migrate(
 
     txn.commit().await?;
 
-    Ok(())
+    Ok(PgModel {
+        domains: ctx.domains,
+    })
 }
 
 async fn query_domain_migration_version<'t>(txn: &Transaction<'t>) -> anyhow::Result<RegVersion> {
