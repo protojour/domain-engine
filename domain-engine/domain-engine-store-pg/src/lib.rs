@@ -58,6 +58,18 @@ where
     }
 }
 
+impl<'a, T0, T1, T2, T3> Unpack<'a, (T0, T1, T2, T3)> for Row
+where
+    T0: FromSql<'a>,
+    T1: FromSql<'a>,
+    T2: FromSql<'a>,
+    T3: FromSql<'a>,
+{
+    fn unpack(&'a self) -> (T0, T1, T2, T3) {
+        (self.get(0), self.get(1), self.get(2), self.get(3))
+    }
+}
+
 pub struct PostgresDataStore {
     pub pool: deadpool_postgres::Pool,
     pub system: ArcSystemApi,

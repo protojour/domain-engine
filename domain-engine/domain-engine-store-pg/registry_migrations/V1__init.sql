@@ -21,7 +21,7 @@ CREATE TABLE m6m_reg.domain
     schema_name text NOT NULL
 );
 
--- A data table
+-- A data table with actual data
 CREATE TABLE m6m_reg.datatable
 (
     key bigserial PRIMARY KEY,
@@ -32,15 +32,15 @@ CREATE TABLE m6m_reg.datatable
     -- the def tag within the def domain
     def_tag integer NOT NULL,
     -- a path of relationships in the case of child tables.
-    -- the root is always 'v'
-    relpath ltree NOT NULL DEFAULT 'Vertex',
+    -- the root is always 'vtx'
+    relpath ltree NOT NULL DEFAULT 'vtx',
     -- the name of the table within the owning domain's schema
     table_name text NOT NULL,
     -- the name of the key column
     key_column text NOT NULL
 );
 
--- The set of keys per persisted vertice
+-- The set of keys per datatable
 CREATE TABLE m6m_reg.datafield
 (
     key bigserial PRIMARY KEY,

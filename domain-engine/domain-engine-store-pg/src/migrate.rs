@@ -3,12 +3,13 @@ use std::collections::BTreeSet;
 use anyhow::{anyhow, Context};
 use fnv::FnvHashMap;
 use indoc::indoc;
+use itertools::Itertools;
 use ontol_runtime::{
     ontology::{
-        domain::{Domain, Entity},
+        domain::{DataRelationshipKind, Def, Domain, Entity},
         Ontology,
     },
-    DefId, PackageId, RelId,
+    DefId, DefRelTag, PackageId,
 };
 use tokio_postgres::{Client, NoTls, Transaction};
 use tracing::{debug_span, info, info_span, Instrument};
@@ -47,6 +48,9 @@ impl TryFrom<i32> for RegVersion {
 
 type PgSerial = i64;
 type DomainUid = ulid::Ulid;
+
+#[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
+struct DefUid(DomainUid, u16);
 
 pub async fn connect_and_migrate(
     persistent_domains: &BTreeSet<PackageId>,
@@ -175,15 +179,18 @@ enum MigrationStep {
     DeployVertex {
         vertex_def_id: DefId,
         table_name: Box<str>,
-        id_rel_id: RelId,
-        key_column_name: Box<str>,
+    },
+    DeployDataField {
+        datatable_def_id: DefId,
+        rel_tag: DefRelTag,
+        column_name: Box<str>,
     },
     RenameDomainSchema {
         old: Box<str>,
         new: Box<str>,
     },
     RenameDataTable {
-        def_id: DefId,
+        def_uid: DefUid,
         old: Box<str>,
         new: Box<str>,
     },
@@ -193,6 +200,19 @@ enum MigrationStep {
 struct PgDomain {
     key: Option<PgSerial>,
     schema_name: Box<str>,
+    datatables: FnvHashMap<DefUid, PgDataTable>,
+}
+
+#[derive(Clone)]
+struct PgDataTable {
+    key: PgSerial,
+    table_name: Box<str>,
+    data_fields: FnvHashMap<DefRelTag, PgDataField>,
+}
+
+#[derive(Clone)]
+struct PgDataField {
+    column_name: Box<str>,
 }
 
 #[derive(Clone)]
@@ -221,11 +241,43 @@ async fn migrate_domain_steps<'t>(
     if let Some(row) = row {
         info!("domain already deployed");
 
-        let (key, schema_name) = row.unpack();
+        let (domain_key, schema_name) = row.unpack();
+
+        let pg_datatables = txn
+            .query(
+                indoc! {"
+                    SELECT key, def_domain_key, def_tag, table_name
+                    FROM m6m_reg.datatable
+                    WHERE domain_key = $1
+                "},
+                &[&domain_key],
+            )
+            .await?
+            .into_iter()
+            .map(|row| -> anyhow::Result<_> {
+                let key: PgSerial = row.get(0);
+                let def_domain_key: PgSerial = row.get(1);
+                let def_tag: u16 = row.get::<_, i32>(2).try_into()?;
+                let table_name: Box<str> = row.get(3);
+
+                // for now
+                assert_eq!(def_domain_key, domain_key);
+
+                Ok((
+                    DefUid(domain_uid, def_tag),
+                    PgDataTable {
+                        key,
+                        table_name,
+                        data_fields: Default::default(),
+                    },
+                ))
+            })
+            .try_collect()?;
 
         let pg_domain = PgDomain {
-            key: Some(key),
+            key: Some(domain_key),
             schema_name,
+            datatables: pg_datatables,
         };
         ctx.domains.insert(domain_uid, pg_domain.clone());
 
@@ -244,6 +296,7 @@ async fn migrate_domain_steps<'t>(
             PgDomain {
                 key: None,
                 schema_name: schema.clone(),
+                datatables: Default::default(),
             },
         );
 
@@ -261,7 +314,7 @@ async fn migrate_domain_steps<'t>(
             continue;
         };
 
-        migrate_vertex_steps(domain_uid, def.id, entity, ontology, txn, ctx).await?;
+        migrate_vertex_steps(domain_uid, def.id, def, entity, ontology, txn, ctx).await?;
     }
 
     Ok(())
@@ -270,41 +323,48 @@ async fn migrate_domain_steps<'t>(
 async fn migrate_vertex_steps<'t>(
     domain_uid: DomainUid,
     vertex_def_id: DefId,
+    def: &Def,
     entity: &Entity,
     ontology: &Ontology,
     txn: &Transaction<'t>,
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
     let name = &ontology[entity.name];
-    let vertex_def_tag = vertex_def_id.1 as i32;
     let table_name = format!("v_{}", name).into_boxed_str();
-    let key_column_name = "key".to_string().into_boxed_str();
-    let domain_key = ctx.domain_key(&domain_uid);
+    let pg_domain = ctx.domains.get_mut(&domain_uid).unwrap();
+    let def_uid = DefUid(domain_uid, vertex_def_id.1);
 
-    let row = if let Some(domain_key) = domain_key {
-        txn.query_opt(
-            indoc! { "
-                SELECT key, table_name FROM m6m_reg.datatable
-                WHERE domain_key = $1 AND def_tag = $2
-            "},
-            &[&domain_key, &vertex_def_tag],
-        )
-        .await?
-    } else {
-        None
-    };
-
-    let datatable_key: Option<PgSerial> = if let Some(row) = row {
-        let (datatable_key, db_table_name) = row.unpack();
+    if let Some(datatable) = pg_domain.datatables.get_mut(&def_uid) {
         let pg_vertex = PgVertex {
-            table_name: db_table_name,
+            table_name: datatable.table_name.clone(),
         };
+
+        let pg_fields = txn
+            .query(
+                indoc! {"
+                        SELECT key, rel_tag, column_name
+                        FROM m6m_reg.datafield
+                        WHERE datatable_key = $1
+                    "},
+                &[&datatable.key],
+            )
+            .await
+            .context("read datatables")?
+            .into_iter()
+            .map(|row| -> anyhow::Result<_> {
+                let _key: PgSerial = row.get(0);
+                let rel_tag = DefRelTag(row.get::<_, i32>(1).try_into()?);
+                let column_name: Box<str> = row.get(2);
+
+                Ok((rel_tag, PgDataField { column_name }))
+            })
+            .try_collect()?;
 
         if pg_vertex.table_name != table_name {
             ctx.steps.push((
                 domain_uid,
                 MigrationStep::RenameDataTable {
-                    def_id: vertex_def_id,
+                    def_uid,
                     old: pg_vertex.table_name.clone(),
                     new: table_name.clone(),
                 },
@@ -312,47 +372,52 @@ async fn migrate_vertex_steps<'t>(
         }
 
         ctx.vertices.insert((domain_uid, vertex_def_id), pg_vertex);
-        Some(datatable_key)
+        datatable.data_fields = pg_fields;
     } else {
         ctx.steps.push((
             domain_uid,
             MigrationStep::DeployVertex {
                 vertex_def_id,
                 table_name: table_name.clone(),
-                id_rel_id: entity.id_relationship_id,
-                key_column_name: key_column_name.clone(),
             },
         ));
         ctx.vertices
             .insert((domain_uid, vertex_def_id), PgVertex { table_name });
-        None
-    };
+    }
 
-    if let Some(datatable_key) = datatable_key {
-        // let id_rel_tag = entity.id_relationship_id.tag().0 as i32;
+    let mut tree_relationships: Vec<_> = def
+        .data_relationships
+        .iter()
+        .filter_map(|(rel_id, rel)| match &rel.kind {
+            DataRelationshipKind::Id | DataRelationshipKind::Tree => Some((rel_id.tag(), rel)),
+            DataRelationshipKind::Edge(_) => None,
+        })
+        .collect_vec();
 
-        let row = txn
-            .query_opt(
-                indoc! {"
-                    SELECT key, column_name, rel_tag FROM m6m_reg.datafield
-                    WHERE datatable_key = $1
-                "},
-                &[&datatable_key],
-            )
-            .await?;
+    tree_relationships.sort_by_key(|(rel_tag, _)| rel_tag.0);
 
-        if let Some(row) = row {
-            let _datafield_key: PgSerial = row.get(0);
-            let column: Box<str> = row.get(1);
-            let key_rel_tag: u16 = row.get::<_, i32>(2).try_into()?;
+    for (rel_tag, rel) in tree_relationships {
+        let pg_data_field = pg_domain
+            .datatables
+            .get(&def_uid)
+            .and_then(|datatable| datatable.data_fields.get(&rel_tag));
 
-            if column != key_column_name {
-                return Err(anyhow!("migrate key column change"));
-            }
+        let column_name = format!("r_{}", &ontology[rel.name]).into_boxed_str();
 
-            if key_rel_tag != entity.id_relationship_id.tag().0 {
-                return Err(anyhow!("key def tag has changed"));
-            }
+        if let Some(pg_data_field) = pg_data_field {
+            assert_eq!(
+                pg_data_field.column_name, column_name,
+                "TODO: rename column"
+            );
+        } else {
+            ctx.steps.push((
+                domain_uid,
+                MigrationStep::DeployDataField {
+                    datatable_def_id: vertex_def_id,
+                    rel_tag,
+                    column_name,
+                },
+            ));
         }
     }
 
@@ -406,21 +471,15 @@ async fn execute_migration_step<'t>(
         MigrationStep::DeployVertex {
             vertex_def_id,
             table_name,
-            id_rel_id,
-            key_column_name: key_column,
         } => {
             let vertex_def_tag = vertex_def_id.1 as i32;
-            let pg_domain = ctx.domains.get(&domain_uid).unwrap();
+            let pg_domain = ctx.domains.get_mut(&domain_uid).unwrap();
 
             txn.query(
                 &format!(
-                    "CREATE TABLE {schema}.{table} (
-                        {key_column} bytea NOT NULL UNIQUE,
-                        data jsonb NOT NULL
-                    )",
+                    "CREATE TABLE {schema}.{table} (key bigserial PRIMARY KEY)",
                     schema = EscapeIdent(&pg_domain.schema_name),
                     table = EscapeIdent(&table_name),
-                    key_column = EscapeIdent(&key_column),
                 ),
                 &[],
             )
@@ -451,8 +510,39 @@ async fn execute_migration_step<'t>(
                 .context("insert datatable")?;
 
             let datatable_key: PgSerial = row.get(0);
+            pg_domain.datatables.insert(
+                DefUid(domain_uid, vertex_def_id.1),
+                PgDataTable {
+                    key: datatable_key,
+                    table_name,
+                    data_fields: Default::default(),
+                },
+            );
+        }
+        MigrationStep::DeployDataField {
+            datatable_def_id,
+            rel_tag,
+            column_name,
+        } => {
+            let pg_domain = ctx.domains.get(&domain_uid).unwrap();
+            let datatable = pg_domain
+                .datatables
+                .get(&DefUid(domain_uid, datatable_def_id.1))
+                .unwrap();
 
             txn.query(
+                &format!(
+                    "ALTER TABLE {schema}.{table} ADD COLUMN {column} text",
+                    schema = EscapeIdent(&pg_domain.schema_name),
+                    table = EscapeIdent(&datatable.table_name),
+                    column = EscapeIdent(&column_name)
+                ),
+                &[],
+            )
+            .await
+            .context("alter table add column")?;
+
+            txn.query_one(
                 indoc! { "
                     INSERT INTO m6m_reg.datafield (
                         datatable_key,
@@ -461,10 +551,10 @@ async fn execute_migration_step<'t>(
                     ) VALUES($1, $2, $3)
                     RETURNING key
                 "},
-                &[&datatable_key, &(id_rel_id.tag().0 as i32), &key_column],
+                &[&datatable.key, &(rel_tag.0 as i32), &column_name],
             )
             .await
-            .context("insert vertex key")?;
+            .context("update datafield")?;
         }
         MigrationStep::RenameDomainSchema { old, new } => {
             let domain_key = ctx.domain_key(&domain_uid).unwrap();
@@ -490,14 +580,13 @@ async fn execute_migration_step<'t>(
             pg_domain.schema_name = new;
         }
         MigrationStep::RenameDataTable {
-            def_id,
+            def_uid,
             old: old_table,
             new: new_table,
         } => {
             let domain_key = ctx.domain_key(&domain_uid).unwrap();
-            let def_tag = def_id.1 as i32;
             let pg_domain = ctx.domains.get_mut(&domain_uid).unwrap();
-            let pg_vertex = ctx.vertices.get_mut(&(domain_uid, def_id)).unwrap();
+            let pg_datatable = pg_domain.datatables.get_mut(&def_uid).unwrap();
 
             txn.query(
                 &format!(
@@ -512,11 +601,11 @@ async fn execute_migration_step<'t>(
 
             txn.query(
                 "UPDATE m6m_reg.datatable SET(table_name = $1) WHERE domain_key = $2 AND def_tag = $3",
-                &[&new_table, &domain_key, &def_tag],
+                &[&new_table, &domain_key, &(def_uid.1 as i32)],
             )
             .await?;
 
-            pg_vertex.table_name = new_table;
+            pg_datatable.table_name = new_table;
         }
     }
 
