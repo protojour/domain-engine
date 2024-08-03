@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use tokio_postgres::{types::FromSql, Row};
+
 pub struct EscapeIdent<T>(pub T);
 
 impl<T: AsRef<str>> Display for EscapeIdent<T> {
@@ -20,6 +22,52 @@ impl<T: AsRef<str>> Display for EscapeIdent<T> {
         }
 
         write!(f, "{}\"", &str[prev..str.len()])
+    }
+}
+
+pub trait Unpack<'a, T> {
+    fn unpack(&'a self) -> T;
+}
+
+impl<'a, T> Unpack<'a, (T,)> for Row
+where
+    T: FromSql<'a>,
+{
+    fn unpack(&'a self) -> (T,) {
+        (self.get(0),)
+    }
+}
+
+impl<'a, T0, T1> Unpack<'a, (T0, T1)> for Row
+where
+    T0: FromSql<'a>,
+    T1: FromSql<'a>,
+{
+    fn unpack(&'a self) -> (T0, T1) {
+        (self.get(0), self.get(1))
+    }
+}
+
+impl<'a, T0, T1, T2> Unpack<'a, (T0, T1, T2)> for Row
+where
+    T0: FromSql<'a>,
+    T1: FromSql<'a>,
+    T2: FromSql<'a>,
+{
+    fn unpack(&'a self) -> (T0, T1, T2) {
+        (self.get(0), self.get(1), self.get(2))
+    }
+}
+
+impl<'a, T0, T1, T2, T3> Unpack<'a, (T0, T1, T2, T3)> for Row
+where
+    T0: FromSql<'a>,
+    T1: FromSql<'a>,
+    T2: FromSql<'a>,
+    T3: FromSql<'a>,
+{
+    fn unpack(&'a self) -> (T0, T1, T2, T3) {
+        (self.get(0), self.get(1), self.get(2), self.get(3))
     }
 }
 
