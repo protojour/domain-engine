@@ -4,7 +4,7 @@ use tokio_postgres::Transaction;
 use tracing::{info, info_span, Instrument};
 
 use crate::{
-    pg_model::{DefUid, PgDataTable, PgSerial},
+    pg_model::{DefUid, PgDataTable, PgSerial, PgType},
     sql::EscapeIdent,
 };
 
@@ -109,6 +109,7 @@ async fn execute_migration_step<'t>(
             datatable_def_id,
             rel_tag,
             column_name,
+            pg_type,
         } => {
             let pg_domain = ctx.domains.get(&domain_uid).unwrap();
             let datatable = pg_domain
@@ -116,12 +117,19 @@ async fn execute_migration_step<'t>(
                 .get(&DefUid(domain_uid, datatable_def_id.1))
                 .unwrap();
 
+            let type_ident = match pg_type {
+                PgType::Boolean => "boolean",
+                PgType::Text => "text",
+                PgType::Bytea => "bytea",
+            };
+
             txn.query(
                 &format!(
-                    "ALTER TABLE {schema}.{table} ADD COLUMN {column} text",
+                    "ALTER TABLE {schema}.{table} ADD COLUMN {column} {type}",
                     schema = EscapeIdent(&pg_domain.schema_name),
                     table = EscapeIdent(&datatable.table_name),
-                    column = EscapeIdent(&column_name)
+                    column = EscapeIdent(&column_name),
+                    type = EscapeIdent(&type_ident)
                 ),
                 &[],
             )
@@ -133,11 +141,17 @@ async fn execute_migration_step<'t>(
                     INSERT INTO m6m_reg.datafield (
                         datatable_key,
                         rel_tag,
+                        pg_type,
                         column_name
-                    ) VALUES($1, $2, $3)
+                    ) VALUES($1, $2, $3, $4)
                     RETURNING key
                 "},
-                &[&datatable.key, &(rel_tag.0 as i32), &column_name],
+                &[
+                    &datatable.key,
+                    &(rel_tag.0 as i32),
+                    &pg_type.to_string()?,
+                    &column_name,
+                ],
             )
             .await
             .context("update datafield")?;

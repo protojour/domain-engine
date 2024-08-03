@@ -46,5 +46,6 @@ CREATE TABLE m6m_reg.datafield
     key bigserial PRIMARY KEY,
     datatable_key bigint NOT NULL REFERENCES m6m_reg.datatable(key),
     rel_tag integer NOT NULL,
+    pg_type text NOT NULL,
     column_name text NOT NULL
 );

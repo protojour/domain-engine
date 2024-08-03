@@ -1,9 +1,11 @@
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use indoc::indoc;
 use itertools::Itertools;
 use ontol_runtime::{
+    debug::OntolDebug,
+    interface::serde::{operator::SerdeOperator, processor::ProcessorMode},
     ontology::{
-        domain::{DataRelationshipKind, Def, Domain, Entity},
+        domain::{DataRelationshipKind, DataRelationshipTarget, Def, Domain, Entity},
         Ontology,
     },
     DefId, DefRelTag,
@@ -13,7 +15,7 @@ use tracing::info;
 
 use crate::{
     migrate::{DefUid, MigrationStep, PgDomain, PgSerial},
-    pg_model::{PgDataField, PgDataTable},
+    pg_model::{PgDataField, PgDataTable, PgType},
     sql::Unpack,
 };
 
@@ -150,7 +152,13 @@ async fn migrate_vertex_steps<'t>(
                 let rel_tag = DefRelTag(row.get::<_, i32>(1).try_into()?);
                 let column_name: Box<str> = row.get(2);
 
-                Ok((rel_tag, PgDataField { column_name }))
+                Ok((
+                    rel_tag,
+                    PgDataField {
+                        column_name,
+                        pg_type: PgType::Text,
+                    },
+                ))
             })
             .try_collect()?;
 
@@ -195,10 +203,57 @@ async fn migrate_vertex_steps<'t>(
 
         let column_name = format!("r_{}", &ontology[rel.name]).into_boxed_str();
 
+        let pg_type = match rel.target {
+            DataRelationshipTarget::Unambiguous(def_id) => {
+                let def = ontology.get_def(def_id).unwrap();
+                let operator_addr = def
+                    .operator_addr
+                    .ok_or_else(|| anyhow!("no operator addr available for PgType detection"))?;
+
+                // BUG: it's not right to look at the external interface for the type
+                let operator = ontology
+                    .new_serde_processor(operator_addr, ProcessorMode::Raw)
+                    .value_operator;
+                match operator {
+                    SerdeOperator::Unit => continue,
+                    SerdeOperator::True(_)
+                    | SerdeOperator::False(_)
+                    | SerdeOperator::Boolean(_) => PgType::Boolean,
+                    SerdeOperator::TextPattern(_) => PgType::Text,
+                    SerdeOperator::CapturingTextPattern(_) => PgType::Text,
+
+                    other @ (SerdeOperator::AnyPlaceholder
+                    | SerdeOperator::I32(_, _)
+                    | SerdeOperator::I64(_, _)
+                    | SerdeOperator::F64(_, _)
+                    | SerdeOperator::Serial(_)
+                    | SerdeOperator::String(_)
+                    | SerdeOperator::StringConstant(_, _)
+                    | SerdeOperator::DynamicSequence
+                    | SerdeOperator::RelationList(_)
+                    | SerdeOperator::RelationIndexSet(_)
+                    | SerdeOperator::ConstructorSequence(_)
+                    | SerdeOperator::Alias(_)
+                    | SerdeOperator::Union(_)
+                    | SerdeOperator::Struct(_)
+                    | SerdeOperator::IdSingletonStruct(_, _, _)) => {
+                        return Err(anyhow!("cannot use operator {:?}", other.debug(ontology)))
+                    }
+                }
+            }
+            DataRelationshipTarget::Union(_) => {
+                return Err(anyhow!("FIXME: union target for {rel_tag:?}"));
+            }
+        };
+
         if let Some(pg_data_field) = pg_data_field {
             assert_eq!(
                 pg_data_field.column_name, column_name,
                 "TODO: rename column"
+            );
+            assert_eq!(
+                pg_data_field.pg_type, pg_type,
+                "TODO: change data field pg_type",
             );
         } else {
             ctx.steps.push((
@@ -206,6 +261,7 @@ async fn migrate_vertex_steps<'t>(
                 MigrationStep::DeployDataField {
                     datatable_def_id: vertex_def_id,
                     rel_tag,
+                    pg_type,
                     column_name,
                 },
             ));

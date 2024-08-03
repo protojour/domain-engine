@@ -6,7 +6,7 @@ use ontol_runtime::{ontology::Ontology, DefId, DefRelTag, PackageId};
 use tokio_postgres::{Client, NoTls, Transaction};
 use tracing::{debug_span, info, Instrument};
 
-use crate::pg_model::{DefUid, DomainUid, PgDomain, PgSerial, RegVersion};
+use crate::pg_model::{DefUid, DomainUid, PgDomain, PgSerial, PgType, RegVersion};
 
 mod registry {
     refinery::embed_migrations!("./registry_migrations");
@@ -46,6 +46,7 @@ enum MigrationStep {
         datatable_def_id: DefId,
         rel_tag: DefRelTag,
         column_name: Box<str>,
+        pg_type: PgType,
     },
     RenameDomainSchema {
         old: Box<str>,
