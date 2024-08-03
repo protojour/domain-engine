@@ -2,10 +2,10 @@ use anyhow::{anyhow, Context};
 use indoc::indoc;
 use itertools::Itertools;
 use ontol_runtime::{
-    debug::OntolDebug,
-    interface::serde::{operator::SerdeOperator, processor::ProcessorMode},
     ontology::{
-        domain::{DataRelationshipKind, DataRelationshipTarget, Def, Domain, Entity},
+        domain::{
+            DataRelationshipKind, DataRelationshipTarget, Def, DefKind, DefRepr, Domain, Entity,
+        },
         Ontology,
     },
     DefId, DefRelTag,
@@ -138,7 +138,7 @@ async fn migrate_vertex_steps<'t>(
         let pg_fields = txn
             .query(
                 indoc! {"
-                    SELECT key, rel_tag, column_name
+                    SELECT key, rel_tag, pg_type, column_name
                     FROM m6m_reg.datafield
                     WHERE datatable_key = $1
                 "},
@@ -150,13 +150,14 @@ async fn migrate_vertex_steps<'t>(
             .map(|row| -> anyhow::Result<_> {
                 let _key: PgSerial = row.get(0);
                 let rel_tag = DefRelTag(row.get::<_, i32>(1).try_into()?);
-                let column_name: Box<str> = row.get(2);
+                let pg_type = row.get(2);
+                let column_name: Box<str> = row.get(3);
 
                 Ok((
                     rel_tag,
                     PgDataField {
                         column_name,
-                        pg_type: PgType::Text,
+                        pg_type,
                     },
                 ))
             })
@@ -206,39 +207,26 @@ async fn migrate_vertex_steps<'t>(
         let pg_type = match rel.target {
             DataRelationshipTarget::Unambiguous(def_id) => {
                 let def = ontology.get_def(def_id).unwrap();
-                let operator_addr = def
-                    .operator_addr
-                    .ok_or_else(|| anyhow!("no operator addr available for PgType detection"))?;
+                let def_repr = match &def.kind {
+                    DefKind::Data(basic_def) => &basic_def.repr,
+                    _ => &DefRepr::Unknown,
+                };
 
-                // BUG: it's not right to look at the external interface for the type
-                let operator = ontology
-                    .new_serde_processor(operator_addr, ProcessorMode::Raw)
-                    .value_operator;
-                match operator {
-                    SerdeOperator::Unit => continue,
-                    SerdeOperator::True(_)
-                    | SerdeOperator::False(_)
-                    | SerdeOperator::Boolean(_) => PgType::Boolean,
-                    SerdeOperator::TextPattern(_) => PgType::Text,
-                    SerdeOperator::CapturingTextPattern(_) => PgType::Text,
-
-                    other @ (SerdeOperator::AnyPlaceholder
-                    | SerdeOperator::I32(_, _)
-                    | SerdeOperator::I64(_, _)
-                    | SerdeOperator::F64(_, _)
-                    | SerdeOperator::Serial(_)
-                    | SerdeOperator::String(_)
-                    | SerdeOperator::StringConstant(_, _)
-                    | SerdeOperator::DynamicSequence
-                    | SerdeOperator::RelationList(_)
-                    | SerdeOperator::RelationIndexSet(_)
-                    | SerdeOperator::ConstructorSequence(_)
-                    | SerdeOperator::Alias(_)
-                    | SerdeOperator::Union(_)
-                    | SerdeOperator::Struct(_)
-                    | SerdeOperator::IdSingletonStruct(_, _, _)) => {
-                        return Err(anyhow!("cannot use operator {:?}", other.debug(ontology)))
-                    }
+                match def_repr {
+                    DefRepr::Unit => return Err(anyhow!("TODO: ignore unit column")),
+                    DefRepr::I64 => todo!(),
+                    DefRepr::F64 => todo!(),
+                    DefRepr::Serial => PgType::Bigserial,
+                    DefRepr::Boolean => PgType::Boolean,
+                    DefRepr::Text => PgType::Text,
+                    DefRepr::Octets => PgType::Bytea,
+                    DefRepr::DateTime => PgType::Timestamp,
+                    DefRepr::Seq => todo!(),
+                    DefRepr::Struct => todo!(),
+                    DefRepr::Intersection(_) => todo!(),
+                    DefRepr::StructUnion(_) => todo!(),
+                    DefRepr::Union(_) => todo!(),
+                    DefRepr::Unknown => return Err(anyhow!("unknown repr: {def_id:?}")),
                 }
             }
             DataRelationshipTarget::Union(_) => {

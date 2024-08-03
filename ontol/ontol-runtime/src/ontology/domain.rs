@@ -5,6 +5,7 @@ use std::{collections::BTreeMap, fmt::Debug};
 use fnv::FnvHashMap;
 use ontol_macros::OntolDebug;
 use serde::{Deserialize, Serialize};
+use thin_vec::ThinVec;
 use ulid::Ulid;
 
 use crate::{
@@ -100,7 +101,10 @@ impl Domain {
         self.types.resize_with(new_size, || Def {
             id: DefId(info.id.0, 0),
             public: false,
-            kind: DefKind::Data(BasicDef { name: None }),
+            kind: DefKind::Data(BasicDef {
+                name: None,
+                repr: DefRepr::Unit,
+            }),
             store_key: None,
             operator_addr: None,
             data_relationships: Default::default(),
@@ -180,9 +184,28 @@ pub enum DefKind {
     Generator(BasicDef),
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct BasicDef {
     pub name: Option<TextConstant>,
+    pub repr: DefRepr,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub enum DefRepr {
+    Unit,
+    I64,
+    F64,
+    Serial,
+    Boolean,
+    Text,
+    Octets,
+    DateTime,
+    Seq,
+    Struct,
+    Intersection(ThinVec<DefId>),
+    StructUnion(ThinVec<DefId>),
+    Union(ThinVec<DefId>),
+    Unknown,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

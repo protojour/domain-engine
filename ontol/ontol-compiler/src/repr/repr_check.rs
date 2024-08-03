@@ -9,7 +9,7 @@ use std::collections::{hash_map::Entry, HashMap};
 
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
-use ontol_runtime::{DefId, RelId};
+use ontol_runtime::{ontology::ontol::TextLikeType, DefId, RelId};
 use tracing::{debug_span, trace};
 
 use crate::{
@@ -289,16 +289,42 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                     data,
                                 );
                             }
-                            PrimitiveKind::Boolean
-                            | PrimitiveKind::False
-                            | PrimitiveKind::True
-                            | PrimitiveKind::Text
-                            | PrimitiveKind::Number
-                            | PrimitiveKind::Serial => {
+                            PrimitiveKind::Boolean | PrimitiveKind::False | PrimitiveKind::True => {
+                                self.merge_repr(
+                                    &mut builder,
+                                    leaf_def_id,
+                                    ReprKind::Scalar(
+                                        def_id,
+                                        ReprScalarKind::Boolean,
+                                        data.rel_span,
+                                    ),
+                                    def_id,
+                                    data,
+                                );
+                            }
+                            PrimitiveKind::Text => {
+                                self.merge_repr(
+                                    &mut builder,
+                                    leaf_def_id,
+                                    ReprKind::Scalar(def_id, ReprScalarKind::Text, data.rel_span),
+                                    def_id,
+                                    data,
+                                );
+                            }
+                            PrimitiveKind::Number => {
                                 self.merge_repr(
                                     &mut builder,
                                     leaf_def_id,
                                     ReprKind::Scalar(def_id, ReprScalarKind::Other, data.rel_span),
+                                    def_id,
+                                    data,
+                                );
+                            }
+                            PrimitiveKind::Serial => {
+                                self.merge_repr(
+                                    &mut builder,
+                                    leaf_def_id,
+                                    ReprKind::Scalar(def_id, ReprScalarKind::Serial, data.rel_span),
                                     def_id,
                                     data,
                                 );
@@ -346,11 +372,16 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 }
                 DefKind::Type(type_def) => {
                     // Some `ontol` types are "domain types" but still scalars
-                    if self.defs.text_like_types.contains_key(&def_id) {
+                    if let Some(text_like) = self.defs.text_like_types.get(&def_id) {
+                        let scalar_kind = match text_like {
+                            TextLikeType::Ulid | TextLikeType::Uuid => ReprScalarKind::Octets,
+                            TextLikeType::DateTime => ReprScalarKind::DateTime,
+                        };
+
                         self.merge_repr(
                             &mut builder,
                             leaf_def_id,
-                            ReprKind::Scalar(def_id, ReprScalarKind::Other, data.rel_span),
+                            ReprKind::Scalar(def_id, scalar_kind, data.rel_span),
                             def_id,
                             data,
                         )

@@ -2,7 +2,7 @@ use std::ops::RangeInclusive;
 
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
-use ontol_runtime::DefId;
+use ontol_runtime::{ontology::domain::DefRepr, DefId};
 use ordered_float::NotNan;
 use smallvec::SmallVec;
 
@@ -36,12 +36,46 @@ pub enum ReprKind {
     Extern,
 }
 
+impl ReprKind {
+    pub fn to_def_repr(&self) -> DefRepr {
+        match self {
+            ReprKind::Unit => DefRepr::Unit,
+            ReprKind::Scalar(_, ReprScalarKind::I64(_), _) => DefRepr::I64,
+            ReprKind::Scalar(_, ReprScalarKind::F64(_), _) => DefRepr::F64,
+            ReprKind::Scalar(_, ReprScalarKind::Serial, _) => DefRepr::Serial,
+            ReprKind::Scalar(_, ReprScalarKind::Boolean, _) => DefRepr::Boolean,
+            ReprKind::Scalar(_, ReprScalarKind::Text, _) => DefRepr::Text,
+            ReprKind::Scalar(_, ReprScalarKind::TextConstant(_), _) => DefRepr::Unit,
+            ReprKind::Scalar(_, ReprScalarKind::Octets, _) => DefRepr::Octets,
+            ReprKind::Scalar(_, ReprScalarKind::DateTime, _) => DefRepr::DateTime,
+            ReprKind::Scalar(_, ReprScalarKind::Other, _) => DefRepr::Unknown,
+            ReprKind::Seq => DefRepr::Seq,
+            ReprKind::Struct => DefRepr::Struct,
+            ReprKind::StructIntersection(_) => DefRepr::Struct,
+            ReprKind::Intersection(defs) => {
+                DefRepr::Intersection(defs.iter().map(|(def_id, _)| *def_id).collect())
+            }
+            ReprKind::StructUnion(defs) => {
+                DefRepr::StructUnion(defs.iter().map(|(def_id, _)| *def_id).collect())
+            }
+            ReprKind::Union(defs) => {
+                DefRepr::Union(defs.iter().map(|(def_id, _)| *def_id).collect())
+            }
+            ReprKind::Extern => DefRepr::Unknown,
+        }
+    }
+}
+
 #[derive(Eq, PartialEq, Debug)]
 pub enum ReprScalarKind {
     I64(RangeInclusive<i64>),
     F64(RangeInclusive<NotNan<f64>>),
+    Serial,
+    Boolean,
     Text,
     TextConstant(DefId),
+    Octets,
+    DateTime,
     Other,
 }
 

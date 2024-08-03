@@ -9,7 +9,7 @@ use ontol_runtime::{
     ontology::{
         domain::{
             self, BasicDef, DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource,
-            DataRelationshipTarget, Def, Domain, EdgeCardinal, EdgeCardinalFlags,
+            DataRelationshipTarget, Def, DefRepr, Domain, EdgeCardinal, EdgeCardinalFlags,
             EdgeCardinalProjection, EdgeInfo, Entity,
         },
         map::MapMeta,
@@ -189,6 +189,11 @@ impl<'m> Compiler<'m> {
                         Some(entity) => domain::DefKind::Entity(entity),
                         None => def_kind.as_ontology_type_kind(BasicDef {
                             name: Some(type_name_constant),
+                            repr: self
+                                .repr_ctx
+                                .get_repr_kind(&type_def_id)
+                                .map(|repr_kind| repr_kind.to_def_repr())
+                                .unwrap_or(DefRepr::Unknown),
                         }),
                     },
                     operator_addr: serde_gen.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
@@ -213,7 +218,14 @@ impl<'m> Compiler<'m> {
                     kind: self
                         .defs
                         .def_kind(type_def_id)
-                        .as_ontology_type_kind(BasicDef { name: None }),
+                        .as_ontology_type_kind(BasicDef {
+                            name: None,
+                            repr: self
+                                .repr_ctx
+                                .get_repr_kind(&type_def_id)
+                                .map(|repr_kind| repr_kind.to_def_repr())
+                                .unwrap_or(DefRepr::Unknown),
+                        }),
                     operator_addr: serde_gen.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
                         type_def_id,
                         SerdeModifier::json_default(),
@@ -233,7 +245,10 @@ impl<'m> Compiler<'m> {
                     domain.add_def(Def {
                         id: def_id,
                         public: false,
-                        kind: domain::DefKind::Data(BasicDef { name: None }),
+                        kind: domain::DefKind::Data(BasicDef {
+                            name: None,
+                            repr: DefRepr::Unit,
+                        }),
                         operator_addr: None,
                         store_key: None,
                         data_relationships: Default::default(),

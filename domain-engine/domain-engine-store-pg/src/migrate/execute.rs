@@ -121,6 +121,8 @@ async fn execute_migration_step<'t>(
                 PgType::Boolean => "boolean",
                 PgType::Text => "text",
                 PgType::Bytea => "bytea",
+                PgType::Timestamp => "timestamp",
+                PgType::Bigserial => "bigserial",
             };
 
             txn.query(

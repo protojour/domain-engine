@@ -53,11 +53,14 @@ pub struct PgDataField {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "lowercase")]
 pub enum PgType {
     /// TODO: Can join all bool fields in one bitstring that's just appended to?
     Boolean,
     Text,
     Bytea,
+    Timestamp,
+    Bigserial,
 }
 
 impl PgType {
