@@ -7,7 +7,7 @@ use tokio_postgres::{Client, Transaction};
 use tracing::{debug_span, info, Instrument};
 
 use crate::{
-    pg_model::{DefUid, DomainUid, PgDomain, PgSerial, PgType, RegVersion},
+    pg_model::{DomainUid, PgDomain, PgSerial, PgType, RegVersion},
     PgModel,
 };
 
@@ -24,14 +24,8 @@ const MIGRATIONS_TABLE_NAME: &str = "public.m6m_registry_schema_history";
 struct MigrationCtx {
     current_version: RegVersion,
     deployed_version: RegVersion,
-    domains: FnvHashMap<DomainUid, PgDomain>,
-    steps: Vec<(DomainUid, MigrationStep)>,
-}
-
-impl MigrationCtx {
-    pub fn domain_key(&self, uid: &DomainUid) -> Option<PgSerial> {
-        self.domains.get(uid).and_then(|domain| domain.key)
-    }
+    domains: FnvHashMap<PackageId, PgDomain>,
+    steps: Vec<(PackageId, DomainUid, MigrationStep)>,
 }
 
 /// The descructive steps that may be performed by the domain migration
@@ -56,7 +50,7 @@ enum MigrationStep {
         new: Box<str>,
     },
     RenameDataTable {
-        def_uid: DefUid,
+        def_id: DefId,
         old: Box<str>,
         new: Box<str>,
     },
@@ -107,7 +101,7 @@ pub async fn migrate(
             .find_domain(*package_id)
             .ok_or_else(|| anyhow!("domain does not exist"))?;
 
-        steps::migrate_domain_steps(domain, ontology, &mut ctx, &txn)
+        steps::migrate_domain_steps(*package_id, domain, ontology, &mut ctx, &txn)
             .instrument(debug_span!("migrate", id = %domain.domain_id().ulid))
             .await
             .context("domain migration steps")?;

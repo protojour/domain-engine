@@ -1,10 +1,11 @@
 use anyhow::Context;
 use indoc::indoc;
+use ontol_runtime::PackageId;
 use tokio_postgres::Transaction;
 use tracing::{info, info_span, Instrument};
 
 use crate::{
-    pg_model::{DefUid, PgDataTable, PgSerial, PgType},
+    pg_model::{PgDataTable, PgSerial, PgType},
     sql::EscapeIdent,
 };
 
@@ -14,8 +15,8 @@ pub async fn execute_domain_migration<'t>(
     txn: &Transaction<'t>,
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
-    for (domain_uid, step) in std::mem::take(&mut ctx.steps) {
-        execute_migration_step(domain_uid, step, txn, ctx)
+    for (pkg_id, domain_uid, step) in std::mem::take(&mut ctx.steps) {
+        execute_migration_step(pkg_id, domain_uid, step, txn, ctx)
             .instrument(info_span!("migrate", uid = %domain_uid))
             .await?;
     }
@@ -24,6 +25,7 @@ pub async fn execute_domain_migration<'t>(
 }
 
 async fn execute_migration_step<'t>(
+    pkg_id: PackageId,
     domain_uid: DomainUid,
     step: MigrationStep,
     txn: &Transaction<'t>,
@@ -52,14 +54,14 @@ async fn execute_migration_step<'t>(
                 )
                 .await?;
 
-            ctx.domains.get_mut(&domain_uid).unwrap().key = Some(row.get(0));
+            ctx.domains.get_mut(&pkg_id).unwrap().key = Some(row.get(0));
         }
         MigrationStep::DeployVertex {
             vertex_def_id,
             table_name,
         } => {
             let vertex_def_tag = vertex_def_id.1 as i32;
-            let pg_domain = ctx.domains.get_mut(&domain_uid).unwrap();
+            let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
 
             txn.query(
                 &format!(
@@ -97,7 +99,7 @@ async fn execute_migration_step<'t>(
 
             let datatable_key: PgSerial = row.get(0);
             pg_domain.datatables.insert(
-                DefUid(domain_uid, vertex_def_id.1),
+                vertex_def_id,
                 PgDataTable {
                     key: datatable_key,
                     table_name,
@@ -111,11 +113,8 @@ async fn execute_migration_step<'t>(
             column_name,
             pg_type,
         } => {
-            let pg_domain = ctx.domains.get(&domain_uid).unwrap();
-            let datatable = pg_domain
-                .datatables
-                .get(&DefUid(domain_uid, datatable_def_id.1))
-                .unwrap();
+            let pg_domain = ctx.domains.get(&pkg_id).unwrap();
+            let datatable = pg_domain.datatables.get(&datatable_def_id).unwrap();
 
             let type_ident = match pg_type {
                 PgType::Boolean => "boolean",
@@ -159,8 +158,8 @@ async fn execute_migration_step<'t>(
             .context("update datafield")?;
         }
         MigrationStep::RenameDomainSchema { old, new } => {
-            let domain_key = ctx.domain_key(&domain_uid).unwrap();
-            let pg_domain = ctx.domains.get_mut(&domain_uid).unwrap();
+            let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
+            let domain_key = pg_domain.key.unwrap();
 
             txn.query(
                 &format!(
@@ -182,13 +181,13 @@ async fn execute_migration_step<'t>(
             pg_domain.schema_name = new;
         }
         MigrationStep::RenameDataTable {
-            def_uid,
+            def_id,
             old: old_table,
             new: new_table,
         } => {
-            let domain_key = ctx.domain_key(&domain_uid).unwrap();
-            let pg_domain = ctx.domains.get_mut(&domain_uid).unwrap();
-            let pg_datatable = pg_domain.datatables.get_mut(&def_uid).unwrap();
+            let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
+            let domain_key = pg_domain.key.unwrap();
+            let pg_datatable = pg_domain.datatables.get_mut(&def_id).unwrap();
 
             txn.query(
                 &format!(
@@ -203,7 +202,7 @@ async fn execute_migration_step<'t>(
 
             txn.query(
                 "UPDATE m6m_reg.datatable SET(table_name = $1) WHERE domain_key = $2 AND def_tag = $3",
-                &[&new_table, &domain_key, &(def_uid.1 as i32)],
+                &[&new_table, &domain_key, &(def_id.1 as i32)],
             )
             .await?;
 

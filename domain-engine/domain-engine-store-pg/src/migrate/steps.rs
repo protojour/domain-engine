@@ -8,13 +8,13 @@ use ontol_runtime::{
         },
         Ontology,
     },
-    DefId, DefRelTag,
+    DefId, DefRelTag, PackageId,
 };
 use tokio_postgres::Transaction;
 use tracing::info;
 
 use crate::{
-    migrate::{DefUid, MigrationStep, PgDomain, PgSerial},
+    migrate::{MigrationStep, PgDomain, PgSerial},
     pg_model::{PgDataField, PgDataTable, PgType},
     sql::Unpack,
 };
@@ -22,6 +22,7 @@ use crate::{
 use super::{DomainUid, MigrationCtx};
 
 pub async fn migrate_domain_steps<'t>(
+    pkg_id: PackageId,
     domain: &Domain,
     ontology: &Ontology,
     ctx: &mut MigrationCtx,
@@ -64,7 +65,7 @@ pub async fn migrate_domain_steps<'t>(
                 assert_eq!(def_domain_key, domain_key);
 
                 Ok((
-                    DefUid(domain_uid, def_tag),
+                    DefId(pkg_id, def_tag),
                     PgDataTable {
                         key,
                         table_name,
@@ -79,10 +80,11 @@ pub async fn migrate_domain_steps<'t>(
             schema_name,
             datatables: pg_datatables,
         };
-        ctx.domains.insert(domain_uid, pg_domain.clone());
+        ctx.domains.insert(pkg_id, pg_domain.clone());
 
         if pg_domain.schema_name != schema {
             ctx.steps.push((
+                pkg_id,
                 domain_uid,
                 MigrationStep::RenameDomainSchema {
                     old: pg_domain.schema_name.clone(),
@@ -92,7 +94,7 @@ pub async fn migrate_domain_steps<'t>(
         }
     } else {
         ctx.domains.insert(
-            domain_uid,
+            pkg_id,
             PgDomain {
                 key: None,
                 schema_name: schema.clone(),
@@ -101,6 +103,7 @@ pub async fn migrate_domain_steps<'t>(
         );
 
         ctx.steps.push((
+            pkg_id,
             domain_uid,
             MigrationStep::DeployDomain {
                 name: ontology[domain.unique_name()].into(),
@@ -114,13 +117,14 @@ pub async fn migrate_domain_steps<'t>(
             continue;
         };
 
-        migrate_vertex_steps(domain_uid, def.id, def, entity, ontology, txn, ctx).await?;
+        migrate_vertex_steps(pkg_id, domain_uid, def.id, def, entity, ontology, txn, ctx).await?;
     }
 
     Ok(())
 }
 
 async fn migrate_vertex_steps<'t>(
+    pkg_id: PackageId,
     domain_uid: DomainUid,
     vertex_def_id: DefId,
     def: &Def,
@@ -131,10 +135,9 @@ async fn migrate_vertex_steps<'t>(
 ) -> anyhow::Result<()> {
     let name = &ontology[entity.name];
     let table_name = format!("v_{}", name).into_boxed_str();
-    let pg_domain = ctx.domains.get_mut(&domain_uid).unwrap();
-    let def_uid = DefUid(domain_uid, vertex_def_id.1);
+    let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
 
-    if let Some(datatable) = pg_domain.datatables.get_mut(&def_uid) {
+    if let Some(datatable) = pg_domain.datatables.get_mut(&vertex_def_id) {
         let pg_fields = txn
             .query(
                 indoc! {"
@@ -165,9 +168,10 @@ async fn migrate_vertex_steps<'t>(
 
         if datatable.table_name != table_name {
             ctx.steps.push((
+                pkg_id,
                 domain_uid,
                 MigrationStep::RenameDataTable {
-                    def_uid,
+                    def_id: vertex_def_id,
                     old: datatable.table_name.clone(),
                     new: table_name.clone(),
                 },
@@ -177,6 +181,7 @@ async fn migrate_vertex_steps<'t>(
         datatable.data_fields = pg_fields;
     } else {
         ctx.steps.push((
+            pkg_id,
             domain_uid,
             MigrationStep::DeployVertex {
                 vertex_def_id,
@@ -199,7 +204,7 @@ async fn migrate_vertex_steps<'t>(
     for (rel_tag, rel) in tree_relationships {
         let pg_data_field = pg_domain
             .datatables
-            .get(&def_uid)
+            .get(&vertex_def_id)
             .and_then(|datatable| datatable.data_fields.get(&rel_tag));
 
         let column_name = format!("r_{}", &ontology[rel.name]).into_boxed_str();
@@ -245,6 +250,7 @@ async fn migrate_vertex_steps<'t>(
             );
         } else {
             ctx.steps.push((
+                pkg_id,
                 domain_uid,
                 MigrationStep::DeployDataField {
                     datatable_def_id: vertex_def_id,

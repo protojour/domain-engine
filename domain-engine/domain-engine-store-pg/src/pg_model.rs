@@ -1,10 +1,49 @@
+use std::ops::Deref;
+
 use fnv::FnvHashMap;
-use ontol_runtime::DefRelTag;
+use ontol_runtime::{value::Value, DefId, DefRelTag, PackageId};
 use serde::{de::value::StrDeserializer, Deserialize, Serialize};
 use tokio_postgres::types::FromSql;
 
 pub type PgSerial = i64;
 pub type DomainUid = ulid::Ulid;
+
+pub struct PgModel {
+    #[allow(unused)]
+    pub(crate) domains: FnvHashMap<PackageId, PgDomain>,
+}
+
+impl PgModel {
+    pub(crate) fn get_datatable(&self, pkg_id: PackageId, def_id: DefId) -> Option<&PgDataTable> {
+        let pg_domain = self.domains.get(&pkg_id)?;
+
+        pg_domain.datatables.get(&def_id)
+    }
+}
+
+/// Something belonging to a specific persisted domain
+#[derive(Clone, Copy)]
+pub struct InDomain<T> {
+    pub pkg_id: PackageId,
+    pub value: T,
+}
+
+impl<T> Deref for InDomain<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl From<Value> for InDomain<Value> {
+    fn from(value: Value) -> Self {
+        Self {
+            pkg_id: value.type_def_id().package_id(),
+            value,
+        }
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(i32)]
@@ -29,14 +68,11 @@ impl TryFrom<i32> for RegVersion {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
-pub struct DefUid(pub DomainUid, pub u16);
-
 #[derive(Clone)]
 pub struct PgDomain {
     pub key: Option<PgSerial>,
     pub schema_name: Box<str>,
-    pub datatables: FnvHashMap<DefUid, PgDataTable>,
+    pub datatables: FnvHashMap<DefId, PgDataTable>,
 }
 
 #[derive(Clone)]

@@ -8,12 +8,12 @@ use domain_engine_core::{
     transact::{ReqMessage, RespMessage},
     DomainResult, Session,
 };
-use fnv::FnvHashMap;
 use futures_util::stream::BoxStream;
 use ontol_runtime::{ontology::Ontology, PackageId};
-use pg_model::{DomainUid, PgDomain};
 use sql::EscapeIdent;
 use tokio_postgres::NoTls;
+
+pub use pg_model::PgModel;
 
 mod migrate;
 mod pg_model;
@@ -28,11 +28,6 @@ pub use tokio_postgres;
 use tracing::{error, info};
 
 pub type PgResult<T> = Result<T, tokio_postgres::Error>;
-
-pub struct PgModel {
-    #[allow(unused)]
-    domains: FnvHashMap<DomainUid, PgDomain>,
-}
 
 pub struct PostgresDataStore {
     #[allow(unused)]

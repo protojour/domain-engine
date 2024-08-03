@@ -5,18 +5,24 @@ use domain_engine_core::{
     DomainError, DomainResult,
 };
 use futures_util::{stream::BoxStream, StreamExt};
+use mutate::InsertMode;
 use ontol_runtime::{query::select::Select, DefId};
 use tracing::debug;
 
-use crate::PostgresDataStore;
+use crate::{PgModel, PostgresDataStore};
 
-mod write;
+mod mutate;
 
 enum State {
     Insert(Select),
     Update(Select),
     Upsert(Select),
     Delete(DefId),
+}
+
+struct TransactCtx<'m, 't> {
+    pg_model: &'m PgModel,
+    txn: deadpool_postgres::Transaction<'t>,
 }
 
 pub async fn transact(
@@ -43,6 +49,11 @@ pub async fn transact(
                 DomainError::data_store("could not initiate transaction")
             })?;
 
+        let ctx = TransactCtx {
+            pg_model: &store.pg_model,
+            txn
+        };
+
         if false {
             // FIXME: remove (needed for type inference)
             yield RespMessage::SequenceStart(0, None);
@@ -58,36 +69,34 @@ pub async fn transact(
                 ReqMessage::Insert(op_seq, select) => {
                     state = Some(State::Insert(select));
                     yield RespMessage::SequenceStart(op_seq, None);
-
-                    // Err(DomainError::data_store("Insert not implemented for Postgres"))?;
                 }
                 ReqMessage::Update(op_seq, select) => {
                     state = Some(State::Update(select));
                     yield RespMessage::SequenceStart(op_seq, None);
-
-                    Err(DomainError::data_store("Update not implemented for Postgres"))?;
                 }
                 ReqMessage::Upsert(op_seq, select) => {
                     state = Some(State::Upsert(select));
                     yield RespMessage::SequenceStart(op_seq, None);
-
-                    Err(DomainError::data_store("Upsert not implemented for Postgres"))?;
                 }
                 ReqMessage::Delete(op_seq, def_id) => {
                     state = Some(State::Delete(def_id));
                     yield RespMessage::SequenceStart(op_seq, None);
-
-                    Err(DomainError::data_store("Delete not implemented for Postgres"))?;
                 }
                 ReqMessage::Argument(value) => {
                     match state.as_ref() {
                         Some(State::Insert(select)) => {
+                            let (value, op) = ctx.insert(value.into(), InsertMode::Insert, select).await?;
+                            yield RespMessage::Element(value, op);
                         }
-                        Some(State::Update(select)) => {
+                        Some(State::Update(_select)) => {
+                            Err(DomainError::data_store("Update not implemented for Postgres"))?;
                         }
                         Some(State::Upsert(select)) => {
+                            let (value, op) = ctx.insert(value.into(), InsertMode::Upsert, select).await?;
+                            yield RespMessage::Element(value, op);
                         }
-                        Some(State::Delete(def_id)) => {
+                        Some(State::Delete(_def_id)) => {
+                            Err(DomainError::data_store("Delete not implemented for Postgres"))?;
                         }
                         None => {
                             Err(DomainError::data_store("invalid transaction state"))?
@@ -97,7 +106,7 @@ pub async fn transact(
             }
         }
 
-        txn.commit().await.map_err(|err| {
+        ctx.txn.commit().await.map_err(|err| {
             debug!("transaction not committed: {err:?}");
             DomainError::data_store("transaction could not be commmitted")
         })?;
