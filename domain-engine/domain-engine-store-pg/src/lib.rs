@@ -10,14 +10,53 @@ use domain_engine_core::{
 };
 use futures_util::{stream::BoxStream, StreamExt};
 use sql::EscapeIdent;
-use tokio_postgres::NoTls;
+use tokio_postgres::{types::FromSql, NoTls, Row};
 
 pub mod migrate;
 mod sql;
 
+#[cfg(test)]
+mod experiments;
+
 pub use deadpool_postgres;
 pub use tokio_postgres;
 use tracing::{error, info};
+
+pub type PgResult<T> = Result<T, tokio_postgres::Error>;
+
+trait Unpack<'a, T> {
+    fn unpack(&'a self) -> T;
+}
+
+impl<'a, T> Unpack<'a, (T,)> for Row
+where
+    T: FromSql<'a>,
+{
+    fn unpack(&'a self) -> (T,) {
+        (self.get(0),)
+    }
+}
+
+impl<'a, T0, T1> Unpack<'a, (T0, T1)> for Row
+where
+    T0: FromSql<'a>,
+    T1: FromSql<'a>,
+{
+    fn unpack(&'a self) -> (T0, T1) {
+        (self.get(0), self.get(1))
+    }
+}
+
+impl<'a, T0, T1, T2> Unpack<'a, (T0, T1, T2)> for Row
+where
+    T0: FromSql<'a>,
+    T1: FromSql<'a>,
+    T2: FromSql<'a>,
+{
+    fn unpack(&'a self) -> (T0, T1, T2) {
+        (self.get(0), self.get(1), self.get(2))
+    }
+}
 
 pub struct PostgresDataStore {
     pub pool: deadpool_postgres::Pool,

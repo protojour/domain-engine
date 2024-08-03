@@ -237,7 +237,7 @@ mod pg {
 
         connect_and_migrate(package_ids, ontology.as_ref(), &test_config)
             .await
-            .map_err(|err| DomainError::data_store(format!("{err}")))
+            .map_err(DomainError::data_store_from_anyhow)
             .with_context(|| "connect and migrate")?;
 
         let deadpool_manager = deadpool_postgres::Manager::from_config(

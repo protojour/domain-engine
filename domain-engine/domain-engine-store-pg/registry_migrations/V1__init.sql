@@ -1,4 +1,5 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS ltree;
 
 CREATE SCHEMA m6m_reg;
 
@@ -14,28 +15,36 @@ INSERT INTO m6m_reg.domain_migration (version) VALUES (1);
 -- The set of persisted domains
 CREATE TABLE m6m_reg.domain
 (
-    domain_id uuid UNIQUE NOT NULL,
+    key bigserial PRIMARY KEY,
+    uid uuid UNIQUE NOT NULL,
     name text NOT NULL,
-    schema text NOT NULL
+    schema_name text NOT NULL
 );
 
--- The set of persisted vertices per domain
-CREATE TABLE m6m_reg.vertex
+-- A data table
+CREATE TABLE m6m_reg.datatable
 (
-    domain_id uuid REFERENCES m6m_reg.domain(domain_id),
+    key bigserial PRIMARY KEY,
+    -- the domain which owns this data
+    domain_key bigint NOT NULL REFERENCES m6m_reg.domain(key),
+    -- the def domain (can be different than the owning domain)
+    def_domain_key bigint NOT NULL REFERENCES m6m_reg.domain(key),
+    -- the def tag within the def domain
     def_tag integer NOT NULL,
-    "table" text NOT NULL,
-
-    PRIMARY KEY (domain_id, def_tag)
+    -- a path of relationships in the case of child tables.
+    -- the root is always 'v'
+    relpath ltree NOT NULL DEFAULT 'Vertex',
+    -- the name of the table within the owning domain's schema
+    table_name text NOT NULL,
+    -- the name of the key column
+    key_column text NOT NULL
 );
 
 -- The set of keys per persisted vertice
-CREATE TABLE m6m_reg.vertex_key
+CREATE TABLE m6m_reg.datafield
 (
-    domain_id uuid REFERENCES m6m_reg.domain(domain_id),
-    vertex_def_tag integer NOT NULL,
-    key_def_tag integer NOT NULL,
-    "column" text NOT NULL,
-
-    PRIMARY KEY (domain_id, vertex_def_tag, key_def_tag)
+    key bigserial PRIMARY KEY,
+    datatable_key bigint NOT NULL REFERENCES m6m_reg.datatable(key),
+    rel_tag integer NOT NULL,
+    column_name text NOT NULL
 );

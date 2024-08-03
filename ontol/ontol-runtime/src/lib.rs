@@ -228,6 +228,12 @@ impl FromStr for DefRelTag {
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct RelId(pub DefId, pub DefRelTag);
 
+impl RelId {
+    pub fn tag(&self) -> DefRelTag {
+        self.1
+    }
+}
+
 /// This forces single-line output even when pretty-printed
 impl ::std::fmt::Debug for RelId {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {

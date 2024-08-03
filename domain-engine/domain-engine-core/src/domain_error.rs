@@ -14,6 +14,25 @@ impl DomainError {
         DomainErrorKind::DataStore(str.into()).into_error()
     }
 
+    pub fn data_store_from_anyhow(error: anyhow::Error) -> Self {
+        let mut stack = vec![];
+
+        for error in error.chain() {
+            stack.push(format!("{error}"));
+        }
+
+        let msg = if let Some(root_cause) = stack.pop() {
+            root_cause
+        } else {
+            "chainless error".to_string()
+        };
+
+        Self {
+            kind: DomainErrorKind::DataStore(msg),
+            stack,
+        }
+    }
+
     pub fn data_store_bad_request(str: impl Into<String>) -> Self {
         DomainErrorKind::DataStoreBadRequest(str.into()).into_error()
     }

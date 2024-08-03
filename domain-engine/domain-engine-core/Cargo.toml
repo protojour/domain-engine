@@ -10,6 +10,7 @@ doctest = false
 
 [dependencies]
 ontol-runtime.path = "../../ontol/ontol-runtime"
+anyhow = "1"
 thiserror.workspace = true
 tracing.workspace = true
 fnv.workspace = true
