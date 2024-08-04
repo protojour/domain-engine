@@ -20,9 +20,6 @@ mod pg_model;
 mod sql;
 mod transact;
 
-#[cfg(test)]
-mod experiments;
-
 pub use deadpool_postgres;
 pub use tokio_postgres;
 use tracing::{error, info};
