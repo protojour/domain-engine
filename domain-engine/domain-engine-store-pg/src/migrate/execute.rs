@@ -1,23 +1,22 @@
 use anyhow::Context;
 use indoc::indoc;
-use ontol_runtime::PackageId;
 use tokio_postgres::Transaction;
 use tracing::{info, info_span, Instrument};
 
 use crate::{
-    pg_model::{PgDataTable, PgSerial, PgType},
+    pg_model::{PgDataField, PgDataTable, PgSerial, PgType},
     sql::EscapeIdent,
 };
 
-use super::{DomainUid, MigrationCtx, MigrationStep};
+use super::{MigrationCtx, MigrationStep, PgDomainIds};
 
 pub async fn execute_domain_migration<'t>(
     txn: &Transaction<'t>,
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
-    for (pkg_id, domain_uid, step) in std::mem::take(&mut ctx.steps) {
-        execute_migration_step(pkg_id, domain_uid, step, txn, ctx)
-            .instrument(info_span!("migrate", uid = %domain_uid))
+    for (ids, step) in std::mem::take(&mut ctx.steps) {
+        execute_migration_step(ids, step, txn, ctx)
+            .instrument(info_span!("migrate", uid = %ids.uid))
             .await?;
     }
 
@@ -25,13 +24,15 @@ pub async fn execute_domain_migration<'t>(
 }
 
 async fn execute_migration_step<'t>(
-    pkg_id: PackageId,
-    domain_uid: DomainUid,
+    domain_ids: PgDomainIds,
     step: MigrationStep,
     txn: &Transaction<'t>,
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
     info!("{step:?}");
+
+    let pkg_id = domain_ids.pkg_id;
+    let domain_uid = domain_ids.uid;
 
     match step {
         MigrationStep::DeployDomain { name, schema_name } => {
@@ -65,7 +66,7 @@ async fn execute_migration_step<'t>(
 
             txn.query(
                 &format!(
-                    "CREATE TABLE {schema}.{table} (key bigserial PRIMARY KEY)",
+                    "CREATE TABLE {schema}.{table} (_key bigserial PRIMARY KEY)",
                     schema = EscapeIdent(&pg_domain.schema_name),
                     table = EscapeIdent(&table_name),
                 ),
@@ -113,11 +114,13 @@ async fn execute_migration_step<'t>(
             column_name,
             pg_type,
         } => {
-            let pg_domain = ctx.domains.get(&pkg_id).unwrap();
-            let datatable = pg_domain.datatables.get(&datatable_def_id).unwrap();
+            let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
+            let datatable = pg_domain.datatables.get_mut(&datatable_def_id).unwrap();
 
             let type_ident = match pg_type {
                 PgType::Boolean => "boolean",
+                PgType::BigInt => "bigint",
+                PgType::DoublePrecision => "double precision",
                 PgType::Text => "text",
                 PgType::Bytea => "bytea",
                 PgType::Timestamp => "timestamp",
@@ -156,6 +159,14 @@ async fn execute_migration_step<'t>(
             )
             .await
             .context("update datafield")?;
+
+            datatable.data_fields.insert(
+                rel_tag,
+                PgDataField {
+                    column_name,
+                    pg_type,
+                },
+            );
         }
         MigrationStep::RenameDomainSchema { old, new } => {
             let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();

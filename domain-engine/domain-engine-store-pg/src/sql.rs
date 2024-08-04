@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use itertools::Itertools;
 use tokio_postgres::{types::FromSql, Row};
 
 pub struct EscapeIdent<T>(pub T);
@@ -22,6 +23,44 @@ impl<T: AsRef<str>> Display for EscapeIdent<T> {
         }
 
         write!(f, "{}\"", &str[prev..str.len()])
+    }
+}
+
+pub struct Insert<'d> {
+    pub schema: &'d str,
+    pub table: &'d str,
+    pub columns: Vec<&'d str>,
+    pub returning: Vec<&'d str>,
+}
+
+impl<'d> Display for Insert<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "INSERT INTO {schema}.{table} ({columns}) VALUES ({binds})",
+            schema = EscapeIdent(self.schema),
+            table = EscapeIdent(self.table),
+            columns = self.columns.iter().map(EscapeIdent).format(","),
+            binds = self.columns.iter().enumerate().map(Dollar).format(","),
+        )?;
+
+        if !self.returning.is_empty() {
+            write!(
+                f,
+                " RETURNING {}",
+                self.returning.iter().map(EscapeIdent).format(",")
+            )?;
+        }
+
+        Ok(())
+    }
+}
+
+struct Dollar<T>((usize, T));
+
+impl<T> Display for Dollar<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "${}", self.0 .0 + 1)
     }
 }
 

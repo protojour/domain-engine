@@ -250,6 +250,7 @@ mod pg {
         Ok(Box::new(PgTestDatastore {
             handle: PostgresDataStore::new(
                 pg_model,
+                ontology,
                 deadpool_postgres::Pool::builder(deadpool_manager)
                     .max_size(1)
                     .build()

@@ -1,17 +1,21 @@
 use std::sync::Arc;
 
 use domain_engine_core::{
+    system::SystemAPI,
     transact::{ReqMessage, RespMessage},
     DomainError, DomainResult,
 };
 use futures_util::{stream::BoxStream, StreamExt};
 use mutate::InsertMode;
-use ontol_runtime::{query::select::Select, DefId};
+use ontol_runtime::{ontology::Ontology, query::select::Select, DefId};
+use tokio_postgres::IsolationLevel;
 use tracing::debug;
 
 use crate::{PgModel, PostgresDataStore};
 
+mod data;
 mod mutate;
+mod struct_analyzer;
 
 enum State {
     Insert(Select),
@@ -20,8 +24,10 @@ enum State {
     Delete(DefId),
 }
 
-struct TransactCtx<'m, 't> {
-    pg_model: &'m PgModel,
+struct TransactCtx<'d, 't> {
+    pg_model: &'d PgModel,
+    ontology: &'d Ontology,
+    system: &'d (dyn SystemAPI + Send + Sync),
     txn: deadpool_postgres::Transaction<'t>,
 }
 
@@ -39,9 +45,7 @@ pub async fn transact(
         let txn = pg_client
             .build_transaction()
             .deferrable(false)
-            // TODO: Could we get a hint on what kind of transaction is needed?
-            // The interface levels of the system could know this.
-            .isolation_level(tokio_postgres::IsolationLevel::Serializable)
+            .isolation_level(IsolationLevel::ReadCommitted)
             .start()
             .await
             .map_err(|err| {
@@ -51,13 +55,10 @@ pub async fn transact(
 
         let ctx = TransactCtx {
             pg_model: &store.pg_model,
+            ontology: &store.ontology,
+            system: store.system.as_ref(),
             txn
         };
-
-        if false {
-            // FIXME: remove (needed for type inference)
-            yield RespMessage::SequenceStart(0, None);
-        }
 
         let mut state: Option<State> = None;
 
@@ -85,14 +86,14 @@ pub async fn transact(
                 ReqMessage::Argument(value) => {
                     match state.as_ref() {
                         Some(State::Insert(select)) => {
-                            let (value, op) = ctx.insert(value.into(), InsertMode::Insert, select).await?;
+                            let (value, op) = ctx.insert_entity(value.into(), InsertMode::Insert, select).await?;
                             yield RespMessage::Element(value, op);
                         }
                         Some(State::Update(_select)) => {
                             Err(DomainError::data_store("Update not implemented for Postgres"))?;
                         }
                         Some(State::Upsert(select)) => {
-                            let (value, op) = ctx.insert(value.into(), InsertMode::Upsert, select).await?;
+                            let (value, op) = ctx.insert_entity(value.into(), InsertMode::Upsert, select).await?;
                             yield RespMessage::Element(value, op);
                         }
                         Some(State::Delete(_def_id)) => {

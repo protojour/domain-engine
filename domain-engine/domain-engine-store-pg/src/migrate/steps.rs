@@ -19,7 +19,7 @@ use crate::{
     sql::Unpack,
 };
 
-use super::{DomainUid, MigrationCtx};
+use super::{MigrationCtx, PgDomainIds};
 
 pub async fn migrate_domain_steps<'t>(
     pkg_id: PackageId,
@@ -29,6 +29,10 @@ pub async fn migrate_domain_steps<'t>(
     txn: &Transaction<'t>,
 ) -> anyhow::Result<()> {
     let domain_uid = domain.domain_id().ulid;
+    let domain_ids = PgDomainIds {
+        pkg_id,
+        uid: domain_uid,
+    };
     let unique_name = &ontology[domain.unique_name()];
     let schema = format!("m6m_d_{unique_name}").into_boxed_str();
 
@@ -84,8 +88,7 @@ pub async fn migrate_domain_steps<'t>(
 
         if pg_domain.schema_name != schema {
             ctx.steps.push((
-                pkg_id,
-                domain_uid,
+                domain_ids,
                 MigrationStep::RenameDomainSchema {
                     old: pg_domain.schema_name.clone(),
                     new: schema,
@@ -103,8 +106,7 @@ pub async fn migrate_domain_steps<'t>(
         );
 
         ctx.steps.push((
-            pkg_id,
-            domain_uid,
+            domain_ids,
             MigrationStep::DeployDomain {
                 name: ontology[domain.unique_name()].into(),
                 schema_name: schema,
@@ -117,15 +119,14 @@ pub async fn migrate_domain_steps<'t>(
             continue;
         };
 
-        migrate_vertex_steps(pkg_id, domain_uid, def.id, def, entity, ontology, txn, ctx).await?;
+        migrate_vertex_steps(domain_ids, def.id, def, entity, ontology, txn, ctx).await?;
     }
 
     Ok(())
 }
 
 async fn migrate_vertex_steps<'t>(
-    pkg_id: PackageId,
-    domain_uid: DomainUid,
+    domain_ids: PgDomainIds,
     vertex_def_id: DefId,
     def: &Def,
     entity: &Entity,
@@ -135,7 +136,7 @@ async fn migrate_vertex_steps<'t>(
 ) -> anyhow::Result<()> {
     let name = &ontology[entity.name];
     let table_name = format!("v_{}", name).into_boxed_str();
-    let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
+    let pg_domain = ctx.domains.get_mut(&domain_ids.pkg_id).unwrap();
 
     if let Some(datatable) = pg_domain.datatables.get_mut(&vertex_def_id) {
         let pg_fields = txn
@@ -168,8 +169,7 @@ async fn migrate_vertex_steps<'t>(
 
         if datatable.table_name != table_name {
             ctx.steps.push((
-                pkg_id,
-                domain_uid,
+                domain_ids,
                 MigrationStep::RenameDataTable {
                     def_id: vertex_def_id,
                     old: datatable.table_name.clone(),
@@ -181,8 +181,7 @@ async fn migrate_vertex_steps<'t>(
         datatable.data_fields = pg_fields;
     } else {
         ctx.steps.push((
-            pkg_id,
-            domain_uid,
+            domain_ids,
             MigrationStep::DeployVertex {
                 vertex_def_id,
                 table_name: table_name.clone(),
@@ -207,7 +206,7 @@ async fn migrate_vertex_steps<'t>(
             .get(&vertex_def_id)
             .and_then(|datatable| datatable.data_fields.get(&rel_tag));
 
-        let column_name = format!("r_{}", &ontology[rel.name]).into_boxed_str();
+        let column_name = format!("{}", &ontology[rel.name]).into_boxed_str();
 
         let pg_type = match rel.target {
             DataRelationshipTarget::Unambiguous(def_id) => {
@@ -219,18 +218,18 @@ async fn migrate_vertex_steps<'t>(
 
                 match def_repr {
                     DefRepr::Unit => return Err(anyhow!("TODO: ignore unit column")),
-                    DefRepr::I64 => todo!(),
-                    DefRepr::F64 => todo!(),
+                    DefRepr::I64 => PgType::BigInt,
+                    DefRepr::F64 => PgType::DoublePrecision,
                     DefRepr::Serial => PgType::Bigserial,
                     DefRepr::Boolean => PgType::Boolean,
                     DefRepr::Text => PgType::Text,
                     DefRepr::Octets => PgType::Bytea,
                     DefRepr::DateTime => PgType::Timestamp,
-                    DefRepr::Seq => todo!(),
-                    DefRepr::Struct => todo!(),
-                    DefRepr::Intersection(_) => todo!(),
-                    DefRepr::StructUnion(_) => todo!(),
-                    DefRepr::Union(_) => todo!(),
+                    DefRepr::Seq => todo!("seq"),
+                    DefRepr::Struct => todo!("struct"),
+                    DefRepr::Intersection(_) => todo!("intersection"),
+                    DefRepr::StructUnion(_) => todo!("struct union"),
+                    DefRepr::Union(_) => todo!("union"),
                     DefRepr::Unknown => return Err(anyhow!("unknown repr: {def_id:?}")),
                 }
             }
@@ -250,8 +249,7 @@ async fn migrate_vertex_steps<'t>(
             );
         } else {
             ctx.steps.push((
-                pkg_id,
-                domain_uid,
+                domain_ids,
                 MigrationStep::DeployDataField {
                     datatable_def_id: vertex_def_id,
                     rel_tag,

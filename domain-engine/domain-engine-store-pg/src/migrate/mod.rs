@@ -21,11 +21,17 @@ mod steps;
 /// NB: Changing this is likely a bad idea.
 const MIGRATIONS_TABLE_NAME: &str = "public.m6m_registry_schema_history";
 
+#[derive(Clone, Copy)]
+struct PgDomainIds {
+    pkg_id: PackageId,
+    uid: DomainUid,
+}
+
 struct MigrationCtx {
     current_version: RegVersion,
     deployed_version: RegVersion,
     domains: FnvHashMap<PackageId, PgDomain>,
-    steps: Vec<(PackageId, DomainUid, MigrationStep)>,
+    steps: Vec<(PgDomainIds, MigrationStep)>,
 }
 
 /// The descructive steps that may be performed by the domain migration

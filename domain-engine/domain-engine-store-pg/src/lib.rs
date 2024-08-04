@@ -32,15 +32,22 @@ pub type PgResult<T> = Result<T, tokio_postgres::Error>;
 pub struct PostgresDataStore {
     #[allow(unused)]
     pg_model: PgModel,
+    ontology: Arc<Ontology>,
     pool: deadpool_postgres::Pool,
     #[allow(unused)]
     system: ArcSystemApi,
 }
 
 impl PostgresDataStore {
-    pub fn new(pg_model: PgModel, pool: deadpool_postgres::Pool, system: ArcSystemApi) -> Self {
+    pub fn new(
+        pg_model: PgModel,
+        ontology: Arc<Ontology>,
+        pool: deadpool_postgres::Pool,
+        system: ArcSystemApi,
+    ) -> Self {
         Self {
             pg_model,
+            ontology,
             pool,
             system,
         }

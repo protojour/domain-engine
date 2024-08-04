@@ -1,9 +1,11 @@
 use std::ops::Deref;
 
+use domain_engine_core::{DomainError, DomainResult};
 use fnv::FnvHashMap;
-use ontol_runtime::{value::Value, DefId, DefRelTag, PackageId};
+use ontol_runtime::{value::Value, DefId, DefRelTag, PackageId, RelId};
 use serde::{de::value::StrDeserializer, Deserialize, Serialize};
 use tokio_postgres::types::FromSql;
+use tracing::debug;
 
 pub type PgSerial = i64;
 pub type DomainUid = ulid::Ulid;
@@ -14,10 +16,25 @@ pub struct PgModel {
 }
 
 impl PgModel {
-    pub(crate) fn get_datatable(&self, pkg_id: PackageId, def_id: DefId) -> Option<&PgDataTable> {
-        let pg_domain = self.domains.get(&pkg_id)?;
+    pub(crate) fn find_pg_domain(&self, pkg_id: PackageId) -> DomainResult<&PgDomain> {
+        self.domains
+            .get(&pkg_id)
+            .ok_or_else(|| DomainError::data_store(format!("pg_domain not found for {pkg_id:?}")))
+    }
 
-        pg_domain.datatables.get(&def_id)
+    pub(crate) fn find_datatable(
+        &self,
+        pkg_id: PackageId,
+        def_id: DefId,
+    ) -> DomainResult<&PgDataTable> {
+        self.domains
+            .get(&pkg_id)
+            .and_then(|pg_domain| pg_domain.datatables.get(&def_id))
+            .ok_or_else(|| {
+                DomainError::data_store(format!(
+                    "pg_datatable not found for {pkg_id:?}->{def_id:?}"
+                ))
+            })
     }
 }
 
@@ -82,18 +99,38 @@ pub struct PgDataTable {
     pub data_fields: FnvHashMap<DefRelTag, PgDataField>,
 }
 
-#[derive(Clone)]
+impl PgDataTable {
+    pub fn find_data_field(&self, rel_id: &RelId) -> DomainResult<&PgDataField> {
+        self.data_fields.get(&rel_id.tag()).ok_or_else(|| {
+            debug!("field not found in {:?}", self.data_fields);
+
+            DomainError::data_store(format!(
+                "datatable not found for {rel_id:?} in {}",
+                self.table_name
+            ))
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct PgDataField {
     pub column_name: Box<str>,
     pub pg_type: PgType,
 }
 
+/// NB: Do not change the names of these enum variants.
+/// They are serialized to and deserialized from DB.
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum PgType {
     /// TODO: Can join all bool fields in one bitstring that's just appended to?
     Boolean,
+    /// i64
+    BigInt,
+    /// f64
+    DoublePrecision,
     Text,
+    /// byte array
     Bytea,
     Timestamp,
     Bigserial,
