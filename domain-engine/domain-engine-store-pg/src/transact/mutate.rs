@@ -1,3 +1,5 @@
+use std::collections::hash_map::Entry;
+
 use domain_engine_core::{
     domain_error::DomainErrorKind,
     entity_id_utils::{try_generate_entity_id, GeneratedId},
@@ -43,7 +45,7 @@ impl<'d, 't> TransactCtx<'d, 't> {
             .ok_or(DomainErrorKind::NotAnEntity(value.type_def_id()).into_error())?;
 
         if let Value::Struct(map, _) = &mut value.value {
-            if !map.contains_key(&entity.id_relationship_id) {
+            if let Entry::Vacant(vacant) = map.entry(entity.id_relationship_id) {
                 match mode {
                     InsertMode::Insert => {
                         let value_generator = entity.id_value_generator.ok_or_else(|| {
@@ -59,7 +61,7 @@ impl<'d, 't> TransactCtx<'d, 't> {
                             self.system,
                         )?;
                         if let GeneratedId::Generated(value) = generated_id {
-                            map.insert(entity.id_relationship_id, Attr::Unit(value));
+                            vacant.insert(Attr::Unit(value));
                         }
                     }
                     InsertMode::Upsert => {
@@ -102,8 +104,6 @@ impl<'d, 't> TransactCtx<'d, 't> {
             }
         }
 
-        if matches!(select, Select::EntityId) {}
-
         let sql = sql.to_string();
         debug!("{sql}");
 
@@ -127,7 +127,7 @@ impl<'d, 't> TransactCtx<'d, 't> {
                 let scalar: Scalar = row.get(1);
                 debug!("deserialized entity ID: {scalar:?}");
                 Ok((
-                    scalar.to_value(entity.id_value_def_id.into()),
+                    scalar.into_value(entity.id_value_def_id.into()),
                     DataOperation::Inserted,
                 ))
             }
@@ -141,7 +141,7 @@ impl<'d, 't> TransactCtx<'d, 't> {
 
                     match data_relationship.target {
                         DataRelationshipTarget::Unambiguous(def_id) => {
-                            attrs.insert(*rel_id, Attr::Unit(scalar.to_value(def_id.into())));
+                            attrs.insert(*rel_id, Attr::Unit(scalar.into_value(def_id.into())));
                         }
                         DataRelationshipTarget::Union(_) => {}
                     }

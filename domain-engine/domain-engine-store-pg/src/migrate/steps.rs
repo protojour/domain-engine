@@ -206,7 +206,9 @@ async fn migrate_vertex_steps<'t>(
             .get(&vertex_def_id)
             .and_then(|datatable| datatable.data_fields.get(&rel_tag));
 
-        let column_name = format!("{}", &ontology[rel.name]).into_boxed_str();
+        // FIXME: should mix columns on the root _and_ child structures,
+        // so there needs to be some disambiguation in place
+        let column_name = ontology[rel.name].to_string().into_boxed_str();
 
         let pg_type = match rel.target {
             DataRelationshipTarget::Unambiguous(def_id) => {

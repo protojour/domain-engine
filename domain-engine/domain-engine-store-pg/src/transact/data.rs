@@ -88,7 +88,7 @@ impl Data {
 }
 
 impl Scalar {
-    pub fn to_value(self, tag: ValueTag) -> Value {
+    pub fn into_value(self, tag: ValueTag) -> Value {
         match self {
             Scalar::Unit => Value::Unit(tag),
             Scalar::I64(i) => Value::I64(i, tag),
@@ -132,8 +132,10 @@ impl<'a> FromSql<'a> for Scalar {
     ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
         match ty.name() {
             "boolean" => Ok(Self::I64(if bool::from_sql(ty, raw)? { 1 } else { 0 })),
-            "bigint" => Ok(Self::I64(i64::from_sql(ty, raw)?)),
-            "double precision" => Ok(Self::F64(f64::from_sql(ty, raw)?)),
+            "smallint" | "int" | "integer" | "bigint" | "int2" | "int4" | "int8" => {
+                Ok(Self::I64(i64::from_sql(ty, raw)?))
+            }
+            "real" | "double precision" => Ok(Self::F64(f64::from_sql(ty, raw)?)),
             "text" => {
                 let text = String::from_sql(ty, raw)?;
                 Ok(Self::Text(text.into()))
