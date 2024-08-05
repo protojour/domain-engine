@@ -153,7 +153,7 @@ async fn execute_migration_step<'t>(
                 &[
                     &datatable.key,
                     &(rel_tag.0 as i32),
-                    &pg_type.to_string()?,
+                    &pg_type.as_string()?,
                     &column_name,
                 ],
             )

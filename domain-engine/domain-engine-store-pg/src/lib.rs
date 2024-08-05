@@ -17,6 +17,7 @@ pub use pg_model::PgModel;
 mod migrate;
 mod pg_model;
 mod sql;
+mod sql_value;
 mod transact;
 
 pub use deadpool_postgres;

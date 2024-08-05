@@ -5,9 +5,7 @@ use indoc::indoc;
 use itertools::Itertools;
 use ontol_runtime::{
     ontology::{
-        domain::{
-            DataRelationshipKind, DataRelationshipTarget, Def, DefKind, DefRepr, Domain, Entity,
-        },
+        domain::{DataRelationshipKind, DataRelationshipTarget, Def, Domain, Entity},
         Ontology,
     },
     DefId, DefRelTag, PackageId,
@@ -17,8 +15,9 @@ use tracing::info;
 
 use crate::{
     migrate::{MigrationStep, PgDomain},
-    pg_model::{PgDataField, PgDataTable, PgEdge, PgEdgeCardinal, PgRegKey, PgType},
+    pg_model::{PgDataField, PgDataTable, PgEdge, PgEdgeCardinal, PgRegKey},
     sql::Unpack,
+    sql_value::get_pg_type,
 };
 
 use super::{MigrationCtx, PgDomainIds};
@@ -307,13 +306,15 @@ async fn migrate_vertex_steps<'t>(
         let column_name = ontology[rel.name].to_string().into_boxed_str();
 
         let pg_type = match rel.target {
-            DataRelationshipTarget::Unambiguous(def_id) => match get_pg_type(def_id, ontology)? {
-                Some(pg_type) => pg_type,
-                None => {
-                    // This is a unit type, does not need to be represented
-                    continue;
+            DataRelationshipTarget::Unambiguous(def_id) => {
+                match get_pg_type(def_id, ontology).map_err(|err| anyhow!("{err:?}"))? {
+                    Some(pg_type) => pg_type,
+                    None => {
+                        // This is a unit type, does not need to be represented
+                        continue;
+                    }
                 }
-            },
+            }
             DataRelationshipTarget::Union(_) => {
                 return Err(anyhow!("FIXME: union target for {rel_tag:?}"));
             }
@@ -339,30 +340,4 @@ async fn migrate_vertex_steps<'t>(
     }
 
     Ok(())
-}
-
-fn get_pg_type(def_id: DefId, ontology: &Ontology) -> anyhow::Result<Option<PgType>> {
-    let def = ontology.get_def(def_id).unwrap();
-    let def_repr = match &def.kind {
-        DefKind::Data(basic_def) => &basic_def.repr,
-        _ => &DefRepr::Unknown,
-    };
-
-    match def_repr {
-        DefRepr::Unit => Err(anyhow!("TODO: ignore unit column")),
-        DefRepr::I64 => Ok(Some(PgType::BigInt)),
-        DefRepr::F64 => Ok(Some(PgType::DoublePrecision)),
-        DefRepr::Serial => Ok(Some(PgType::Bigserial)),
-        DefRepr::Boolean => Ok(Some(PgType::Boolean)),
-        DefRepr::Text => Ok(Some(PgType::Text)),
-        DefRepr::Octets => Ok(Some(PgType::Bytea)),
-        DefRepr::DateTime => Ok(Some(PgType::Timestamp)),
-        DefRepr::FmtStruct(Some((_rel_id, def_id))) => get_pg_type(*def_id, ontology),
-        DefRepr::FmtStruct(None) => Ok(None),
-        DefRepr::Seq => todo!("seq"),
-        DefRepr::Struct => todo!("struct"),
-        DefRepr::Intersection(_) => todo!("intersection"),
-        DefRepr::Union(..) => todo!("union"),
-        DefRepr::Unknown => Err(anyhow!("unknown repr: {def_id:?}")),
-    }
 }

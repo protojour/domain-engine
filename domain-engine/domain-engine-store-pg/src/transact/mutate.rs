@@ -18,9 +18,10 @@ use tokio_postgres::types::ToSql;
 use tracing::{debug, trace, warn};
 
 use crate::{
-    pg_model::{InDomain, PgDataKey},
+    pg_model::{InDomain, PgDataKey, PgType},
     sql::{self, Param, TableName},
-    transact::data::{Data, Scalar},
+    sql_value::{read_column, Layout, SqlVal},
+    transact::data::Data,
 };
 
 use super::{data::RowValue, TransactCtx};
@@ -102,11 +103,13 @@ impl<'a> TransactCtx<'a> {
             column_names: analyzed.root_attrs.column_selection()?,
             returning: vec!["_key"],
         };
+        let mut row_layout: Vec<Layout> = vec![Layout::Scalar(PgType::BigInt)];
 
         match select {
             Select::EntityId => {
                 let id_rel_tag = entity.id_relationship_id.tag();
                 if let Some(field) = analyzed.root_attrs.datatable.data_fields.get(&id_rel_tag) {
+                    row_layout.push(Layout::Scalar(field.pg_type));
                     insert.returning.push(&field.col_name);
                 }
             }
@@ -115,6 +118,7 @@ impl<'a> TransactCtx<'a> {
                     if let Some(field) =
                         analyzed.root_attrs.datatable.data_fields.get(&rel_id.tag())
                     {
+                        row_layout.push(Layout::Scalar(field.pg_type));
                         insert.returning.push(&field.col_name);
                     }
                 }
@@ -165,15 +169,15 @@ impl<'a> TransactCtx<'a> {
 
             let sql = insert.to_string();
 
-            let mut edge_row_values: Vec<Scalar> = vec![];
+            let mut edge_row_values: Vec<SqlVal> = vec![];
 
             for tuple in projection.tuples {
                 edge_row_values.clear();
                 let tuple_width = tuple.len();
 
                 let subject_pair = [
-                    Scalar::I32(analyzed.root_attrs.datatable.key),
-                    Scalar::I64(key),
+                    SqlVal::I32(analyzed.root_attrs.datatable.key),
+                    SqlVal::I64(key),
                 ];
 
                 for (index, value) in tuple.into_iter().enumerate() {
@@ -189,7 +193,7 @@ impl<'a> TransactCtx<'a> {
                         .pg_model
                         .datatable(foreign_def_id.package_id(), foreign_def_id)?;
 
-                    edge_row_values.extend([Scalar::I32(datatable.key), Scalar::I64(foreign_key)]);
+                    edge_row_values.extend([SqlVal::I32(datatable.key), SqlVal::I64(foreign_key)]);
                 }
 
                 // subject at the end of the tuple
@@ -209,10 +213,11 @@ impl<'a> TransactCtx<'a> {
 
         match select {
             Select::EntityId => {
-                let scalar: Scalar = row.get(1);
-                trace!("deserialized entity ID: {scalar:?}");
+                let sql_val = read_column(&row, &row_layout, 1)?
+                    .ok_or_else(|| DomainError::data_store("no entity id"))?;
+                trace!("deserialized entity ID: {sql_val:?}");
                 Ok(RowValue {
-                    value: self.deserialize_scalar(entity.id_value_def_id, scalar)?,
+                    value: self.deserialize_sql(entity.id_value_def_id, sql_val)?,
                     key,
                     op: DataOperation::Inserted,
                 })
@@ -222,17 +227,18 @@ impl<'a> TransactCtx<'a> {
                     FnvHashMap::with_capacity_and_hasher(sel.properties.len(), Default::default());
 
                 for (idx, rel_id) in sel.properties.keys().enumerate() {
-                    let scalar: Scalar = row.get(idx + 1);
+                    let sql_val: Option<SqlVal> = read_column(&row, &row_layout, idx + 1)?;
                     let data_relationship = def.data_relationships.get(rel_id).unwrap();
 
-                    match data_relationship.target {
-                        DataRelationshipTarget::Unambiguous(def_id) => {
+                    match (&data_relationship.target, sql_val) {
+                        (DataRelationshipTarget::Unambiguous(def_id), Some(sql_val)) => {
                             attrs.insert(
                                 *rel_id,
-                                Attr::Unit(self.deserialize_scalar(def_id, scalar)?),
+                                Attr::Unit(self.deserialize_sql(*def_id, sql_val)?),
                             );
                         }
-                        DataRelationshipTarget::Union(_) => {}
+                        (DataRelationshipTarget::Union(_), Some(_sql_val)) => {}
+                        (_, None) => {}
                     }
                 }
 
@@ -282,19 +288,19 @@ impl<'a> TransactCtx<'a> {
                 .datatable(entity_def_id.package_id(), *entity_def_id)?;
             let entity = self.ontology.def(*entity_def_id).entity().unwrap();
 
-            let id_field = pg_datatable.find_data_field(&entity.id_relationship_id)?;
+            let id_field = pg_datatable.field(&entity.id_relationship_id)?;
 
             let select = sql::Select {
-                expressions: vec![sql::Expression::Column("_key")],
+                expressions: vec![sql::Expr::Column("_key")],
                 from: vec![sql::TableName(&pg_domain.schema_name, &pg_datatable.table_name).into()],
-                where_: Some(sql::Expression::Eq(
-                    Box::new(sql::Expression::Column(&id_field.col_name)),
-                    Box::new(sql::Expression::Param(Param(0))),
+                where_: Some(sql::Expr::Eq(
+                    Box::new(sql::Expr::Column(&id_field.col_name)),
+                    Box::new(sql::Expr::Param(Param(0))),
                 )),
                 limit: None,
             };
 
-            let Data::Scalar(id_param) = self.data_from_value(value)? else {
+            let Data::Sql(id_param) = self.data_from_value(value)? else {
                 return Err(DomainError::data_store_bad_request("compound foreign key"));
             };
 
@@ -309,7 +315,7 @@ impl<'a> TransactCtx<'a> {
                     DomainError::data_store(format!("could not look up foreign key: {e:?}"))
                 })?
                 .ok_or_else(|| {
-                    let value = match self.deserialize_scalar(def_id, id_param) {
+                    let value = match self.deserialize_sql(def_id, id_param) {
                         Ok(value) => value,
                         Err(error) => return error,
                     };

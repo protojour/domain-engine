@@ -26,11 +26,26 @@ impl<T: AsRef<str>> Display for Ident<T> {
     }
 }
 
+pub struct IndexIdent(pub usize);
+
+impl IndexIdent {
+    pub fn incr(&mut self) -> IndexIdent {
+        self.0 += 1;
+        Self(self.0)
+    }
+}
+
+impl Display for IndexIdent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "i{}", self.0)
+    }
+}
+
 pub struct Select<'d> {
     // TODO: `with`
-    pub expressions: Vec<Expression<'d>>,
+    pub expressions: Vec<Expr<'d>>,
     pub from: Vec<FromItem<'d>>,
-    pub where_: Option<Expression<'d>>,
+    pub where_: Option<Expr<'d>>,
     pub limit: Option<usize>,
 }
 
@@ -40,14 +55,20 @@ pub struct Insert<'d> {
     pub returning: Vec<&'d str>,
 }
 
-pub enum Expression<'d> {
+pub enum Expr<'d> {
     /// unqualified column name
     Column(&'d str),
     /// indexed parameter
     #[allow(unused)]
     Param(Param),
     /// a = b
-    Eq(Box<Expression<'d>>, Box<Expression<'d>>),
+    Eq(Box<Expr<'d>>, Box<Expr<'d>>),
+    Select(Box<Select<'d>>),
+    Row(Vec<Expr<'d>>),
+    Array(Box<Expr<'d>>),
+    #[allow(unused)]
+    ArrayAgg(Box<Expr<'d>>),
+    AsIndex(Box<Expr<'d>>, IndexIdent),
 }
 
 pub enum FromItem<'d> {
@@ -99,12 +120,17 @@ impl<'d> Display for Insert<'d> {
     }
 }
 
-impl<'d> Display for Expression<'d> {
+impl<'d> Display for Expr<'d> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Column(name) => write!(f, "{}", Ident(name)),
             Self::Param(param) => write!(f, "{param}"),
             Self::Eq(a, b) => write!(f, "{a} = {b}"),
+            Self::Select(select) => write!(f, "({select})"),
+            Self::Row(fields) => write!(f, "ROW({})", fields.iter().format(",")),
+            Self::Array(expr) => write!(f, "ARRAY({expr})"),
+            Self::ArrayAgg(expr) => write!(f, "ARRAY_AGG({expr})"),
+            Self::AsIndex(expr, index) => write!(f, "{expr} AS {index}"),
         }
     }
 }

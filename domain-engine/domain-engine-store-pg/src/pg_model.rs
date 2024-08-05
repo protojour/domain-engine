@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, ops::Deref};
 
 use domain_engine_core::{DomainError, DomainResult};
 use fnv::FnvHashMap;
-use ontol_runtime::{value::Value, DefId, DefRelTag, PackageId, RelId};
+use ontol_runtime::{tuple::CardinalIdx, value::Value, DefId, DefRelTag, PackageId, RelId};
 use serde::{de::value::StrDeserializer, Deserialize, Serialize};
 use tokio_postgres::types::FromSql;
 use tracing::debug;
@@ -105,7 +105,7 @@ pub struct PgDataTable {
 }
 
 impl PgDataTable {
-    pub fn find_data_field(&self, rel_id: &RelId) -> DomainResult<&PgDataField> {
+    pub fn field(&self, rel_id: &RelId) -> DomainResult<&PgDataField> {
         self.data_fields.get(&rel_id.tag()).ok_or_else(|| {
             debug!("field not found in {:?}", self.data_fields);
 
@@ -130,6 +130,14 @@ pub struct PgEdge {
     pub cardinals: BTreeMap<usize, PgEdgeCardinal>,
 }
 
+impl PgEdge {
+    pub fn cardinal(&self, c: CardinalIdx) -> DomainResult<&PgEdgeCardinal> {
+        self.cardinals
+            .get(&(c.0 as usize))
+            .ok_or_else(|| DomainError::data_store("edge cardinal not found"))
+    }
+}
+
 #[derive(Clone)]
 pub struct PgEdgeCardinal {
     #[allow(unused)]
@@ -142,7 +150,7 @@ pub struct PgEdgeCardinal {
 
 /// NB: Do not change the names of these enum variants.
 /// They are serialized to and deserialized from DB.
-#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, PartialEq, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum PgType {
     /// TODO: Can join all bool fields in one bitstring that's just appended to?
@@ -159,7 +167,7 @@ pub enum PgType {
 }
 
 impl PgType {
-    pub fn to_string(&self) -> anyhow::Result<String> {
+    pub fn as_string(&self) -> anyhow::Result<String> {
         match serde_json::to_value(self) {
             Ok(serde_json::Value::String(string)) => Ok(string),
             _ => panic!("cannot serialize to string"),

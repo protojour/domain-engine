@@ -1034,6 +1034,7 @@ dependencies = [
  "deadpool-postgres",
  "domain-engine-core",
  "domain-engine-test-utils",
+ "fallible-iterator",
  "fnv",
  "futures-util",
  "indexmap",
@@ -1043,7 +1044,8 @@ dependencies = [
  "ontol-runtime",
  "ontol-test-utils",
  "pin-utils",
- "postgres-protocol",
+ "postgres-protocol 0.6.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "postgres-types",
  "pretty_assertions",
  "refinery",
  "serde",
@@ -2653,15 +2655,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "postgres-protocol"
+version = "0.6.7"
+source = "git+https://github.com/audunhalland/rust-postgres.git?branch=pub_col_buffer#e14e93187bc98d5c199cedcfaa2bc64d455d1b0f"
+dependencies = [
+ "base64 0.22.1",
+ "byteorder",
+ "bytes",
+ "fallible-iterator",
+ "hmac",
+ "md-5",
+ "memchr",
+ "rand",
+ "sha2",
+ "stringprep",
+]
+
+[[package]]
 name = "postgres-types"
 version = "0.2.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02048d9e032fb3cc3413bbf7b83a15d84a5d419778e2628751896d856498eee9"
+source = "git+https://github.com/audunhalland/rust-postgres.git?branch=pub_col_buffer#e14e93187bc98d5c199cedcfaa2bc64d455d1b0f"
 dependencies = [
  "bytes",
  "chrono",
  "fallible-iterator",
- "postgres-protocol",
+ "postgres-protocol 0.6.7 (git+https://github.com/audunhalland/rust-postgres.git?branch=pub_col_buffer)",
  "serde",
  "serde_json",
 ]
@@ -3590,8 +3608,7 @@ dependencies = [
 [[package]]
 name = "tokio-postgres"
 version = "0.7.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03adcf0147e203b6032c0b2d30be1415ba03bc348901f3ff1cc0df6a733e60c3"
+source = "git+https://github.com/audunhalland/rust-postgres.git?branch=pub_col_buffer#e14e93187bc98d5c199cedcfaa2bc64d455d1b0f"
 dependencies = [
  "async-trait",
  "byteorder",
@@ -3604,7 +3621,7 @@ dependencies = [
  "percent-encoding",
  "phf",
  "pin-project-lite",
- "postgres-protocol",
+ "postgres-protocol 0.6.7 (git+https://github.com/audunhalland/rust-postgres.git?branch=pub_col_buffer)",
  "postgres-types",
  "rand",
  "socket2",

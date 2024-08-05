@@ -57,7 +57,7 @@ impl<'a> TransactCtx<'a> {
             ) {
                 (DataRelationshipKind::Id | DataRelationshipKind::Tree, Attr::Unit(value), _) => {
                     match self.data_from_value(value)? {
-                        Data::Scalar(scalar) => {
+                        Data::Sql(scalar) => {
                             root_attrs.map.insert(rel_id, scalar);
                         }
                         Data::Compound(comp) => {
