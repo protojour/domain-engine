@@ -113,7 +113,7 @@ impl<'m> Compiler<'m> {
                 // step 1: resolve unions
                 for (def_id, rel_set) in std::mem::take(&mut var.members) {
                     match self.repr_ctx.get_repr_kind(&def_id) {
-                        Some(ReprKind::Union(members) | ReprKind::StructUnion(members)) => {
+                        Some(ReprKind::Union(members, _)) => {
                             for (member, _span) in members {
                                 var.members.entry(*member).or_default().extend(&rel_set);
                             }

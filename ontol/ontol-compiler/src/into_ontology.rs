@@ -38,7 +38,7 @@ use crate::{
     primitive::PrimitiveKind,
     properties::Properties,
     relation::{rel_def_meta, rel_repr_meta, RelDefMeta, RelParams, UnionMemberCache},
-    repr::repr_model::{ReprKind, ReprScalarKind},
+    repr::repr_model::{ReprKind, ReprScalarKind, UnionBound},
     strings::StringCtx,
     Compiler,
 };
@@ -102,7 +102,7 @@ impl<'m> Compiler<'m> {
                 let namespace = namespaces.get(package_id).unwrap();
 
                 for (_, union_def_id) in &namespace.types {
-                    let Some(ReprKind::StructUnion(variants)) =
+                    let Some(ReprKind::Union(variants, UnionBound::Struct)) =
                         self.repr_ctx.get_repr_kind(union_def_id)
                     else {
                         continue;
@@ -152,7 +152,7 @@ impl<'m> Compiler<'m> {
             }
 
             for type_def_id in self.defs.iter_package_def_ids(package_id) {
-                if let Some(ReprKind::Union(members) | ReprKind::StructUnion(members)) =
+                if let Some(ReprKind::Union(members, _bound)) =
                     self.repr_ctx.get_repr_kind(&type_def_id)
                 {
                     ontology_union_variants.insert(
@@ -547,7 +547,7 @@ impl<'m> Compiler<'m> {
         let edge_projection = meta.relationship.projection;
 
         let (data_relationship_kind, target) = match target_repr_kind {
-            ReprKind::Union(members) | ReprKind::StructUnion(members) => {
+            ReprKind::Union(members, _bound) => {
                 let kinds_and_targets = members
                     .iter()
                     .map(|(member_def_id, _)| {
@@ -645,7 +645,7 @@ impl<'m> Compiler<'m> {
 
                     cardinal_target.clear();
 
-                    let Some(ReprKind::Union(members) | ReprKind::StructUnion(members)) =
+                    let Some(ReprKind::Union(members, _)) =
                         self.repr_ctx.get_repr_kind(union_def_id)
                     else {
                         panic!("not a union");

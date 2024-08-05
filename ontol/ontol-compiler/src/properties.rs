@@ -100,7 +100,7 @@ pub enum Constructor {
 /// Check if a def identifies any entities/vertices
 pub fn identifies_any(def_id: DefId, prop_ctx: &PropCtx, repr_ctx: &ReprCtx) -> bool {
     match repr_ctx.get_repr_kind(&def_id) {
-        Some(ReprKind::Union(members) | ReprKind::StructUnion(members)) => members
+        Some(ReprKind::Union(members, _bound)) => members
             .iter()
             .any(|(def_id, _span)| identifies_any(*def_id, prop_ctx, repr_ctx)),
         _ => prop_ctx

@@ -55,7 +55,7 @@ pub fn generate_union_maps(proc_table: &mut ProcTable, compiler: &mut Compiler) 
 
     // populate union_data and reverse_union_map
     for (def_id, repr) in &compiler.repr_ctx.repr_table {
-        if let ReprKind::Union(members) | ReprKind::StructUnion(members) = &repr.kind {
+        if let ReprKind::Union(members, _bound) = &repr.kind {
             union_data.insert(
                 *def_id,
                 UnionData {

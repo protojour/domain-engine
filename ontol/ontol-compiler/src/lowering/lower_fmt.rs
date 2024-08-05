@@ -3,7 +3,7 @@ use ontol_parser::cst::{
     view::NodeView,
 };
 use ontol_runtime::property::ValueCardinality;
-use tracing::debug;
+use tracing::{debug, debug_span};
 
 use crate::{
     fmt::{FmtChain, FmtTransition},
@@ -18,6 +18,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         stmt: insp::FmtStatement<V>,
         block: BlockContext,
     ) -> Option<RootDefs> {
+        let _entered = debug_span!("fmt").entered();
+
         let mut transition_iter = stmt.transitions().peekable();
 
         let Some(origin) = transition_iter.next() else {

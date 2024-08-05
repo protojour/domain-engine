@@ -20,6 +20,7 @@ use crate::{
     primitive::{PrimitiveKind, Primitives},
     properties::{Constructor, PropCtx, Properties},
     relation::{rel_def_meta, RelCtx, RelParams},
+    repr::repr_model::UnionBound,
     thesaurus::{Is, Thesaurus, TypeRelation},
     types::{DefTypeCtx, Type},
     CompileErrors, Note, SourceId, SourceSpan, SpannedNote, NATIVE_SOURCE, NO_SPAN,
@@ -114,6 +115,11 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 .with_notes(std::mem::take(&mut self.state.abstract_notes))
                 .report(self.errors);
         }
+
+        trace!(
+            "result repr: {:?}",
+            self.repr_ctx.get_repr_kind(&self.root_def_id)
+        );
     }
 
     fn check_def_repr(&mut self, def_id: DefId, def: &Def, properties: Option<&Properties>) {
@@ -420,19 +426,19 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                         );
                                     }
                                 }
-                                Constructor::TextFmt(_) => {
+                                Constructor::TextFmt(segment) => {
                                     assert!(!has_table);
-                                    self.merge_repr(
-                                        &mut builder,
-                                        leaf_def_id,
-                                        ReprKind::Scalar(
-                                            def_id,
-                                            ReprScalarKind::Other,
-                                            data.rel_span,
-                                        ),
-                                        def_id,
-                                        data,
-                                    );
+                                    let mut attributes = Default::default();
+                                    segment.collect_attributes(&mut attributes, self.primitives);
+                                    let kind = if attributes.len() == 1 {
+                                        ReprKind::FmtStruct(Some(
+                                            attributes.into_iter().next().unwrap(),
+                                        ))
+                                    } else {
+                                        ReprKind::FmtStruct(None)
+                                    };
+
+                                    self.merge_repr(&mut builder, leaf_def_id, kind, def_id, data);
                                 }
                                 Constructor::Sequence(_) => {
                                     assert!(!has_table);
@@ -579,19 +585,31 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             // Handle subtypes - results in unions
             (Sub, Some(ReprKind::Unit), ReprKind::Unit) => {
                 if data.is_leaf {
-                    builder.kind = Some(ReprKind::Union(vec![(next_def_id, data.rel_span)]));
+                    builder.kind = Some(ReprKind::Union(
+                        vec![(next_def_id, data.rel_span)],
+                        UnionBound::Any,
+                    ));
                 }
             }
             (Sub, Some(ReprKind::Unit), _) => {
-                builder.kind = Some(ReprKind::Union(vec![(next_def_id, data.rel_span)]));
+                builder.kind = Some(ReprKind::Union(
+                    vec![(next_def_id, data.rel_span)],
+                    UnionBound::Any,
+                ));
             }
             (Sub, Some(ReprKind::Struct), ReprKind::Struct | ReprKind::Unit) => {
-                builder.kind = Some(ReprKind::StructUnion([(next_def_id, data.rel_span)].into()));
+                builder.kind = Some(ReprKind::Union(
+                    [(next_def_id, data.rel_span)].into(),
+                    UnionBound::Struct,
+                ));
             }
-            (Sub, Some(ReprKind::StructUnion(variants)), ReprKind::Struct) => {
+            (Sub, Some(ReprKind::Union(variants, UnionBound::Struct)), ReprKind::Struct) => {
                 variants.push((next_def_id, data.rel_span));
             }
-            (Sub, Some(ReprKind::StructUnion(_)), _) => {
+            (Sub, Some(ReprKind::Union(variants, UnionBound::Fmt)), ReprKind::FmtStruct(_)) => {
+                variants.push((next_def_id, data.rel_span));
+            }
+            (Sub, Some(ReprKind::Union(_, UnionBound::Struct)), _) => {
                 CompileError::TypeNotRepresentable
                     .span(self.defs.def_span(repr_def_id))
                     .with_note(
@@ -599,30 +617,49 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     )
                     .report(self);
             }
-            (Sub, Some(ReprKind::Union(variants)), ReprKind::Struct) => {
+            (Sub, Some(ReprKind::Union(variants, _)), ReprKind::Struct) => {
                 let mut variants = std::mem::take(variants);
                 variants.push((next_def_id, data.rel_span));
-                builder.kind = Some(ReprKind::StructUnion(variants));
+                builder.kind = Some(ReprKind::Union(variants, UnionBound::Struct));
             }
-            (Sub, Some(ReprKind::Union(variants)), ReprKind::Unit) => {
+            (Sub, Some(ReprKind::Union(variants, _)), ReprKind::Unit) => {
                 if data.is_leaf {
                     variants.push((next_def_id, data.rel_span));
                 }
             }
             (Sub, None, ReprKind::Struct) => {
-                builder.kind = Some(ReprKind::StructUnion(vec![(next_def_id, data.rel_span)]));
+                builder.kind = Some(ReprKind::Union(
+                    vec![(next_def_id, data.rel_span)],
+                    UnionBound::Struct,
+                ));
+            }
+            (Sub, None, ReprKind::FmtStruct(_)) => {
+                builder.kind = Some(ReprKind::Union(
+                    vec![(next_def_id, data.rel_span)],
+                    UnionBound::Fmt,
+                ));
             }
             (Sub, None, _) => {
-                builder.kind = Some(ReprKind::Union(vec![(next_def_id, data.rel_span)]));
+                builder.kind = Some(ReprKind::Union(
+                    vec![(next_def_id, data.rel_span)],
+                    UnionBound::Any,
+                ));
             }
             (
                 Sub,
                 Some(ReprKind::Scalar(scalar1, _, span1)),
                 ReprKind::Scalar(scalar2, _, span2),
             ) => {
-                builder.kind = Some(ReprKind::Union(vec![(*scalar1, *span1), (scalar2, span2)]));
+                builder.kind = Some(ReprKind::Union(
+                    vec![(*scalar1, *span1), (scalar2, span2)],
+                    UnionBound::Any,
+                ));
             }
-            (Sub, Some(ReprKind::Union(variants)), ReprKind::Scalar(def_id, _, span)) => {
+            (
+                Sub,
+                Some(ReprKind::Union(variants, UnionBound::Any)),
+                ReprKind::Scalar(def_id, _, span),
+            ) => {
                 variants.push((def_id, span));
             }
             (Super | Sub, Some(ReprKind::Seq), _) => {

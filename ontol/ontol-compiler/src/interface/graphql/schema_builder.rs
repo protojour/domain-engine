@@ -365,7 +365,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             .collect();
 
         let input_arg = match self.serde_gen.repr_ctx.get_repr_kind(&map_key.input.def_id) {
-            Some(ReprKind::Scalar(..)) => {
+            Some(ReprKind::Scalar(..) | ReprKind::FmtStruct(..)) => {
                 let scalar_input_name: String =
                     match self.serde_gen.defs.def_kind(map_key.input.def_id) {
                         DefKind::Type(type_def) => match type_def.ident {

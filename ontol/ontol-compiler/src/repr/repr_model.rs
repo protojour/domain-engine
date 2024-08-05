@@ -2,7 +2,10 @@ use std::ops::RangeInclusive;
 
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
-use ontol_runtime::{ontology::domain::DefRepr, DefId};
+use ontol_runtime::{
+    ontology::domain::{DefRepr, DefReprUnionBound},
+    DefId, RelId,
+};
 use ordered_float::NotNan;
 use smallvec::SmallVec;
 
@@ -23,6 +26,9 @@ pub enum ReprKind {
     /// Scalar type without further attributes.
     /// Currently placeholder for boolean, unit, text
     Scalar(DefId, ReprScalarKind, SourceSpan),
+    /// struct variant, from fmt constructors with 1 allowed scalar property (for now).
+    /// Possibly generalize this later
+    FmtStruct(Option<(RelId, DefId)>),
     /// Sequence
     Seq,
     /// Just a plain old struct, no `is` business
@@ -31,9 +37,19 @@ pub enum ReprKind {
     StructIntersection(SmallVec<(DefId, SourceSpan), 1>),
     // Intersection of non-structs
     Intersection(Vec<(DefId, SourceSpan)>),
-    StructUnion(Vec<(DefId, SourceSpan)>),
-    Union(Vec<(DefId, SourceSpan)>),
+    // StructUnion(Vec<(DefId, SourceSpan)>),
+    Union(Vec<(DefId, SourceSpan)>, UnionBound),
     Extern,
+}
+
+#[derive(Eq, PartialEq, Debug)]
+pub enum UnionBound {
+    /// Any kind of union, no recognized uniformity
+    Any,
+    /// Every member of the union is a struct
+    Struct,
+    /// Every member of the union is an FmtStruct
+    Fmt,
 }
 
 impl ReprKind {
@@ -49,24 +65,27 @@ impl ReprKind {
             ReprKind::Scalar(_, ReprScalarKind::Octets, _) => DefRepr::Octets,
             ReprKind::Scalar(_, ReprScalarKind::DateTime, _) => DefRepr::DateTime,
             ReprKind::Scalar(_, ReprScalarKind::Other, _) => DefRepr::Unknown,
+            ReprKind::FmtStruct(opt_attr) => DefRepr::FmtStruct(*opt_attr),
             ReprKind::Seq => DefRepr::Seq,
             ReprKind::Struct => DefRepr::Struct,
             ReprKind::StructIntersection(_) => DefRepr::Struct,
             ReprKind::Intersection(defs) => {
                 DefRepr::Intersection(defs.iter().map(|(def_id, _)| *def_id).collect())
             }
-            ReprKind::StructUnion(defs) => {
-                DefRepr::StructUnion(defs.iter().map(|(def_id, _)| *def_id).collect())
-            }
-            ReprKind::Union(defs) => {
-                DefRepr::Union(defs.iter().map(|(def_id, _)| *def_id).collect())
-            }
+            ReprKind::Union(defs, bound) => DefRepr::Union(
+                defs.iter().map(|(def_id, _)| *def_id).collect(),
+                match bound {
+                    UnionBound::Any => DefReprUnionBound::Any,
+                    UnionBound::Struct => DefReprUnionBound::Struct,
+                    UnionBound::Fmt => DefReprUnionBound::Fmt,
+                },
+            ),
             ReprKind::Extern => DefRepr::Unknown,
         }
     }
 }
 
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub enum ReprScalarKind {
     I64(RangeInclusive<i64>),
     F64(RangeInclusive<NotNan<f64>>),

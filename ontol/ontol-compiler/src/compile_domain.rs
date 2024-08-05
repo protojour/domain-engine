@@ -192,7 +192,7 @@ impl<'m> Compiler<'m> {
         // union and extern checks
         for def_id in type_check.defs.iter_package_def_ids(package_id) {
             match type_check.repr_ctx.get_repr_kind(&def_id) {
-                Some(ReprKind::Union(_) | ReprKind::StructUnion(_)) => {
+                Some(ReprKind::Union(..)) => {
                     for error in type_check.check_union(def_id) {
                         error.report(&mut type_check);
                     }

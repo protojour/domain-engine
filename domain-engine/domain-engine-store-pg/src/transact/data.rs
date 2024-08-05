@@ -7,6 +7,7 @@ use fnv::FnvHashMap;
 use itertools::Itertools;
 use ontol_runtime::{
     attr::Attr,
+    ontology::domain::{DefKind, DefRepr},
     query::filter::Filter,
     sequence::Sequence,
     value::{Value, ValueTag},
@@ -16,6 +17,8 @@ use thin_vec::ThinVec;
 use tokio_postgres::types::{FromSql, ToSql};
 
 use crate::pg_model::PgDataTable;
+
+use super::TransactCtx;
 
 pub enum Data {
     Scalar(Scalar),
@@ -57,32 +60,48 @@ pub enum Compound {
     Filter(Box<Filter>, ValueTag),
 }
 
-impl Data {
-    pub fn try_from_value(value: Value) -> DomainResult<Self> {
-        match value {
-            Value::Unit(_) | Value::Void(_) => Ok(Scalar::Unit.into()),
-            Value::I64(n, _) => Ok(Scalar::I64(n).into()),
-            Value::F64(f, _) => Ok(Scalar::F64(f).into()),
-            Value::Serial(s, _) => {
+impl<'d, 't> TransactCtx<'d, 't> {
+    pub fn data_from_value(&self, value: Value) -> DomainResult<Data> {
+        let def = self.ontology.def(value.type_def_id());
+
+        match (value, &def.kind) {
+            (Value::Unit(_) | Value::Void(_), _) => Ok(Scalar::Unit.into()),
+            (Value::I64(n, _), _) => Ok(Scalar::I64(n).into()),
+            (Value::F64(f, _), _) => Ok(Scalar::F64(f).into()),
+            (Value::Serial(s, _), _) => {
                 let i: i64 =
                     s.0.try_into()
                         .map_err(|_| DomainError::data_store_bad_request("serial overflow"))?;
 
                 Ok(Scalar::I64(i).into())
             }
-            Value::Rational(_, _) => Err(DomainError::data_store_bad_request(
+            (Value::Rational(_, _), _) => Err(DomainError::data_store_bad_request(
                 "rational not supported yet",
             )),
-            Value::Text(s, _) => Ok(Scalar::Text(s).into()),
-            Value::OctetSequence(s, _) => Ok(Scalar::Octets(s).into()),
-            Value::ChronoDateTime(dt, _) => Ok(Scalar::DateTime(dt).into()),
-            Value::ChronoDate(d, _) => Ok(Scalar::Date(d).into()),
-            Value::ChronoTime(t, _) => Ok(Scalar::Time(t).into()),
-            Value::Struct(map, tag) => Ok(Compound::Struct(map, tag).into()),
-            Value::Dict(map, tag) => Ok(Compound::Dict(*map, tag).into()),
-            Value::Sequence(seq, tag) => Ok(Compound::Sequence(seq, tag).into()),
-            Value::DeleteRelationship(tag) => Ok(Compound::DeleteRelationship(tag).into()),
-            Value::Filter(f, tag) => Ok(Compound::Filter(f, tag).into()),
+            (Value::Text(s, _), _) => Ok(Scalar::Text(s).into()),
+            (Value::OctetSequence(s, _), _) => Ok(Scalar::Octets(s).into()),
+            (Value::ChronoDateTime(dt, _), _) => Ok(Scalar::DateTime(dt).into()),
+            (Value::ChronoDate(d, _), _) => Ok(Scalar::Date(d).into()),
+            (Value::ChronoTime(t, _), _) => Ok(Scalar::Time(t).into()),
+            (Value::Struct(map, tag), DefKind::Data(basic_def)) => match &basic_def.repr {
+                DefRepr::FmtStruct(Some(_)) => {
+                    let inner_value = map
+                        .into_values()
+                        .next()
+                        .ok_or_else(|| {
+                            DomainError::data_store_bad_request("missing property in fmt struct")
+                        })?
+                        .unwrap_unit();
+
+                    self.data_from_value(inner_value)
+                }
+                _ => Ok(Compound::Struct(map, tag).into()),
+            },
+            (Value::Struct(map, tag), _) => Ok(Compound::Struct(map, tag).into()),
+            (Value::Dict(map, tag), _) => Ok(Compound::Dict(*map, tag).into()),
+            (Value::Sequence(seq, tag), _) => Ok(Compound::Sequence(seq, tag).into()),
+            (Value::DeleteRelationship(tag), _) => Ok(Compound::DeleteRelationship(tag).into()),
+            (Value::Filter(f, tag), _) => Ok(Compound::Filter(f, tag).into()),
         }
     }
 }

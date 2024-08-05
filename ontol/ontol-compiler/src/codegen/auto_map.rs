@@ -320,7 +320,7 @@ fn autogenerate_fmt_segment_property<'m>(
     compiler: &Compiler<'m>,
     arena: &mut TypedArena<'m>,
 ) -> Option<ontol_hir::Node> {
-    if let TextPatternSegment::Property {
+    if let TextPatternSegment::Attribute {
         rel_id,
         type_def_id,
         segment: _,

@@ -569,7 +569,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     ),
                 ))
             }
-            ReprKind::Scalar(def_id, _kind, _span) => {
+            ReprKind::FmtStruct(..) => {
+                if let Constructor::TextFmt(segment) = &properties.constructor {
+                    return self.alloc_string_fmt_operator(def, segment);
+                }
+
+                panic!("FmtStruct without TextFmt: {def:?}");
+            }
+            ReprKind::Scalar(def_id, ..) => {
                 if def_id == &def.def_id {
                     // If it's a "self-scalar" it must be a string fmt (for now).
                     if let Constructor::TextFmt(segment) = &properties.constructor {
@@ -620,7 +627,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     members.as_slice(),
                 )
             }
-            ReprKind::Union(members) | ReprKind::StructUnion(members) => {
+            ReprKind::Union(members, _bound) => {
                 if def.modifier.contains(SerdeModifier::UNION) {
                     Some(self.alloc_union_repr_operator(def, typename, properties))
                 } else {

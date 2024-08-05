@@ -26,7 +26,7 @@ use crate::{
     phf_build::build_phf_index_map,
     properties::{identifies_any, Properties, Property},
     relation::{rel_def_meta, rel_repr_meta, RelParams, RelReprMeta},
-    repr::repr_model::{ReprKind, ReprScalarKind},
+    repr::repr_model::{ReprKind, ReprScalarKind, UnionBound},
 };
 
 use super::{
@@ -251,7 +251,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         must_flatten_unions: &mut bool,
     ) {
         let object = meta.relationship.object;
-        let ReprKind::StructUnion(_members) = self.repr_ctx.get_repr_kind(&object.0).unwrap()
+        let ReprKind::Union(_members, UnionBound::Struct) =
+            self.repr_ctx.get_repr_kind(&object.0).unwrap()
         else {
             panic!("flattened object is not a struct union");
         };

@@ -46,12 +46,12 @@ impl<'d, 't> TransactCtx<'d, 't> {
                 data_relationship.cardinality.1,
             ) {
                 (DataRelationshipKind::Id | DataRelationshipKind::Tree, Attr::Unit(value), _) => {
-                    match Data::try_from_value(value)? {
+                    match self.data_from_value(value)? {
                         Data::Scalar(scalar) => {
                             root_attrs.map.insert(rel_id, scalar);
                         }
-                        Data::Compound(_) => {
-                            todo!("compound");
+                        Data::Compound(comp) => {
+                            todo!("compound: {comp:?}");
                         }
                     }
                 }

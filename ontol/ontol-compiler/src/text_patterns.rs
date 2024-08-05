@@ -1,15 +1,16 @@
-use fnv::FnvHashMap;
+use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::{
     ontology::ontol::text_pattern::{
         Regex, TextPattern, TextPatternConstantPart, TextPatternProperty,
     },
-    DefId, RelId,
+    DefId, DefRelTag, RelId,
 };
 use regex_syntax::hir::{Capture, Hir, Look};
 use std::fmt::Write;
 use tracing::debug;
 
 use crate::{
+    primitive::Primitives,
     properties::Constructor,
     regex_util::{self, unsigned_integer_with_radix},
     strings::StringCtx,
@@ -32,7 +33,7 @@ pub enum TextPatternSegment {
         radix: u8,
     },
     Regex(Hir),
-    Property {
+    Attribute {
         rel_id: RelId,
         type_def_id: DefId,
         segment: Box<TextPatternSegment>,
@@ -100,7 +101,7 @@ impl TextPatternSegment {
             Self::Literal(string) => Some(string.clone()),
             Self::Serial { .. } => None,
             Self::Regex(hir) => regex_util::constant_prefix(hir),
-            Self::Property { .. } => None,
+            Self::Attribute { .. } => None,
             Self::Concat(segments) => segments.iter().next().and_then(Self::constant_prefix),
             Self::Alternation(_) => None,
         }
@@ -127,7 +128,7 @@ impl TextPatternSegment {
                 })
             }
             Self::Regex(hir) => hir.clone(),
-            Self::Property { segment, .. } => {
+            Self::Attribute { segment, .. } => {
                 let index = capture_cursor.increment();
                 debug!("creating capture group with index {index}");
                 Hir::capture(Capture {
@@ -148,6 +149,34 @@ impl TextPatternSegment {
                     .map(|segment| segment.to_regex_hir(capture_cursor))
                     .collect(),
             ),
+        }
+    }
+
+    pub fn collect_attributes(
+        &self,
+        output: &mut FnvHashSet<(RelId, DefId)>,
+        primitives: &Primitives,
+    ) {
+        match self {
+            Self::Attribute {
+                rel_id,
+                type_def_id,
+                segment,
+            } => {
+                output.insert((*rel_id, *type_def_id));
+                segment.collect_attributes(output, primitives);
+            }
+            Self::AnyString => {
+                // note: should match what ontol-runtime/../text_matcher.rs does
+                let rel_id = RelId(primitives.text, DefRelTag(0));
+                output.insert((rel_id, primitives.text));
+            }
+            Self::Concat(segments) | Self::Alternation(segments) => {
+                for segment in segments {
+                    segment.collect_attributes(output, primitives);
+                }
+            }
+            _ => {}
         }
     }
 
@@ -177,7 +206,7 @@ impl TextPatternSegment {
                     parts.push(TextPatternConstantPart::Literal(constant));
                 }
             }
-            Self::Property {
+            Self::Attribute {
                 rel_id,
                 type_def_id,
                 ..

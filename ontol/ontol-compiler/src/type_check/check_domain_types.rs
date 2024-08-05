@@ -12,7 +12,7 @@ use crate::{
     primitive::PrimitiveKind,
     properties::{Constructor, Property},
     relation::rel_def_meta,
-    repr::repr_model::{ReprKind, ReprScalarKind},
+    repr::repr_model::{ReprKind, ReprScalarKind, UnionBound},
     text_patterns::TextPatternSegment,
     types::{FormatType, Type},
     SourceSpan,
@@ -138,7 +138,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         let object = meta.relationship.object;
                         let object_repr_kind = self.repr_ctx.get_repr_kind(&object.0).unwrap();
 
-                        if !matches!(object_repr_kind, ReprKind::StructUnion(_)) {
+                        if !matches!(object_repr_kind, ReprKind::Union(_, UnionBound::Struct)) {
                             CompileError::FlattenedRelationshipObjectMustBeStructUnion
                                 .span(object.1)
                                 .report(&mut self.errors);
@@ -237,6 +237,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let scalar_def_id = match &repr.kind {
             ReprKind::Scalar(scalar_def_id, _, _) => *scalar_def_id,
+            ReprKind::FmtStruct(Some((_rel_id, attr_def_id))) => *attr_def_id,
             _ => return Err(()),
         };
 
@@ -299,7 +300,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 output_generator.ok_or(())
             }
-            TextPatternSegment::Property { type_def_id, .. } => {
+            TextPatternSegment::Attribute { type_def_id, .. } => {
                 self.determine_value_generator(self.primitives.generators.auto, *type_def_id)
             }
             _ => Err(()),

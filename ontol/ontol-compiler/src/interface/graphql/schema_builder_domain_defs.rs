@@ -39,7 +39,7 @@ use crate::{
     phf_build::build_phf_index_map,
     properties::{identifies_any, Property},
     relation::{rel_def_meta, rel_repr_meta, RelParams, RelReprMeta},
-    repr::repr_model::{ReprKind, ReprScalarKind},
+    repr::repr_model::{ReprKind, ReprScalarKind, UnionBound},
 };
 
 use super::{graphql_namespace::GraphqlNamespace, schema_builder::*};
@@ -283,7 +283,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     },
                 )
             }
-            ReprKind::Union(variants) | ReprKind::StructUnion(variants) => {
+            ReprKind::Union(variants, _) => {
                 let def = self.partial_ontology.def(def_id);
 
                 let mut needs_scalar = false;
@@ -383,7 +383,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     kind: NativeScalarKind::Number(*def_id),
                 })
             }
-            ReprKind::Scalar(..) => {
+            ReprKind::Scalar(..) | ReprKind::FmtStruct(..) => {
                 let operator_addr = self.serde_gen.gen_addr_lazy(gql_serde_key(def_id)).unwrap();
 
                 NewType::NativeScalar(NativeScalarRef {
@@ -852,7 +852,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         let is_entity_value = {
             let repr_kind = self.repr_ctx.get_repr_kind(&value_def_id);
             match repr_kind {
-                Some(ReprKind::StructUnion(variants)) => {
+                Some(ReprKind::Union(variants, UnionBound::Struct)) => {
                     variants.iter().all(|(variant_def_id, _)| {
                         let variant_properties =
                             self.prop_ctx.properties_by_def_id(*variant_def_id);

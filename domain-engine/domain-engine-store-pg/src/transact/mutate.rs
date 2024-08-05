@@ -10,8 +10,12 @@ use domain_engine_core::{
 use fnv::FnvHashMap;
 use futures_util::TryStreamExt;
 use ontol_runtime::{
-    attr::Attr, interface::serde::processor::ProcessorMode,
-    ontology::domain::DataRelationshipTarget, query::select::Select, value::Value, RelId,
+    attr::Attr,
+    interface::serde::processor::ProcessorMode,
+    ontology::domain::{DataRelationshipTarget, DefKind, DefRepr},
+    query::select::Select,
+    value::Value,
+    DefId, RelId,
 };
 use pin_utils::pin_mut;
 use tracing::debug;
@@ -127,7 +131,7 @@ impl<'d, 't> TransactCtx<'d, 't> {
                 let scalar: Scalar = row.get(1);
                 debug!("deserialized entity ID: {scalar:?}");
                 Ok((
-                    scalar.into_value(entity.id_value_def_id.into()),
+                    self.deserialize_scalar(entity.id_value_def_id, scalar)?,
                     DataOperation::Inserted,
                 ))
             }
@@ -141,7 +145,10 @@ impl<'d, 't> TransactCtx<'d, 't> {
 
                     match data_relationship.target {
                         DataRelationshipTarget::Unambiguous(def_id) => {
-                            attrs.insert(*rel_id, Attr::Unit(scalar.into_value(def_id.into())));
+                            attrs.insert(
+                                *rel_id,
+                                Attr::Unit(self.deserialize_scalar(def_id, scalar)?),
+                            );
                         }
                         DataRelationshipTarget::Union(_) => {}
                     }
@@ -153,6 +160,33 @@ impl<'d, 't> TransactCtx<'d, 't> {
                 ))
             }
             _ => Ok((Value::unit(), DataOperation::Inserted)),
+        }
+    }
+
+    fn deserialize_scalar(&self, def_id: DefId, scalar: Scalar) -> DomainResult<Value> {
+        debug!("pg deserialize scalar {def_id:?}");
+
+        match &self.ontology.def(def_id).kind {
+            DefKind::Data(basic) => match basic.repr {
+                DefRepr::FmtStruct(Some((attr_rel_id, attr_def_id))) => Ok(Value::Struct(
+                    Box::new(
+                        [(
+                            attr_rel_id,
+                            Attr::Unit(scalar.into_value(attr_def_id.into())),
+                        )]
+                        .into_iter()
+                        .collect(),
+                    ),
+                    def_id.into(),
+                )),
+                DefRepr::FmtStruct(None) => {
+                    unreachable!("tried to deserialize an empty FmtStruct (has no data)")
+                }
+                _ => Ok(scalar.into_value(def_id.into())),
+            },
+            _ => Err(DomainError::data_store(
+                "unrecognized DefKind for PG scalar deserialization",
+            )),
         }
     }
 }

@@ -203,9 +203,18 @@ pub enum DefRepr {
     Seq,
     Struct,
     Intersection(ThinVec<DefId>),
-    StructUnion(ThinVec<DefId>),
-    Union(ThinVec<DefId>),
+    Union(ThinVec<DefId>, DefReprUnionBound),
+    /// FIXME: not sure if this should exist as a separate DefRepr:
+    /// It exists as a simplification for now:
+    FmtStruct(Option<(RelId, DefId)>),
     Unknown,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub enum DefReprUnionBound {
+    Any,
+    Struct,
+    Fmt,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

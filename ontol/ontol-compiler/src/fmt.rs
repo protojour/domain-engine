@@ -74,7 +74,7 @@ impl<'m> Compiler<'m> {
             )),
             DefKind::Primitive(PrimitiveKind::Serial, _) => {
                 let rel_id = self.make_relationship(fmt_def_id, transition_def_id, span);
-                Ok(TextPatternSegment::Property {
+                Ok(TextPatternSegment::Attribute {
                     rel_id,
                     type_def_id: transition_def_id,
                     segment: Box::new(TextPatternSegment::Serial { radix: 10 }),
@@ -89,7 +89,7 @@ impl<'m> Compiler<'m> {
                     .map(Properties::constructor);
 
                 match constructor {
-                    Some(Constructor::TextFmt(rel_segment)) => Ok(TextPatternSegment::Property {
+                    Some(Constructor::TextFmt(rel_segment)) => Ok(TextPatternSegment::Attribute {
                         rel_id,
                         type_def_id: transition_def_id,
                         segment: Box::new(rel_segment.clone()),

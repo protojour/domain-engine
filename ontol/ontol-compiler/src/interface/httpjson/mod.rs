@@ -69,7 +69,7 @@ pub fn generate_httpjson_interface(
 
 fn is_entity_union(def_id: DefId, serde_gen: &SerdeGenerator) -> bool {
     let members = match serde_gen.repr_ctx.get_repr_kind(&def_id) {
-        Some(ReprKind::Union(members) | ReprKind::StructUnion(members)) => members,
+        Some(ReprKind::Union(members, _bound)) => members,
         _ => return false,
     };
 

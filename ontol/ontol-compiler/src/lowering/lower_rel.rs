@@ -10,6 +10,7 @@ use ontol_runtime::{
     tuple::CardinalIdx,
     DefId, EdgeId,
 };
+use tracing::debug_span;
 
 use crate::{
     def::{DefKind, TypeDef, TypeDefFlags},
@@ -220,6 +221,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
             RelParams::IndexRange(index_range_rel_params)
         } else if let Some(rp) = relation.rel_params() {
+            let _entered = debug_span!("rel_params").entered();
+
             let rel_def_id = self.ctx.define_anonymous_type(
                 TypeDef {
                     ident: None,

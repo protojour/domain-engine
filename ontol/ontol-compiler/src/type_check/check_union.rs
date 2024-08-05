@@ -41,8 +41,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let repr_kind = &self.repr_ctx.get_repr_kind(&value_union_def_id).unwrap();
 
         let union_variants = match repr_kind {
-            ReprKind::Union(variants) => variants,
-            ReprKind::StructUnion(variants) => variants,
+            ReprKind::Union(variants, _) => variants,
             _ => panic!("not a union"),
         };
 
