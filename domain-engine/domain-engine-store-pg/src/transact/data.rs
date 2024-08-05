@@ -68,7 +68,7 @@ pub enum Compound {
     Filter(Box<Filter>, ValueTag),
 }
 
-impl<'d, 't> TransactCtx<'d, 't> {
+impl<'a> TransactCtx<'a> {
     pub fn deserialize_scalar(&self, def_id: DefId, scalar: Scalar) -> DomainResult<Value> {
         trace!("pg deserialize scalar {def_id:?}");
 

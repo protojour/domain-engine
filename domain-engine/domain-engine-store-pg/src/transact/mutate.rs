@@ -29,10 +29,10 @@ pub enum InsertMode {
     Upsert,
 }
 
-impl<'d, 't> TransactCtx<'d, 't> {
+impl<'a> TransactCtx<'a> {
     /// Returns BoxFuture because of potential recursion
-    pub fn insert_vertex<'a>(
-        &'a self,
+    pub fn insert_vertex(
+        &self,
         value: InDomain<Value>,
         mode: InsertMode,
         select: &'a Select,
@@ -45,8 +45,8 @@ impl<'d, 't> TransactCtx<'d, 't> {
         })
     }
 
-    async fn insert_vertex_impl<'a>(
-        &'a self,
+    async fn insert_vertex_impl(
+        &self,
         mut value: InDomain<Value>,
         mode: InsertMode,
         select: &'a Select,

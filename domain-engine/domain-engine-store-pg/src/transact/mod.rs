@@ -18,18 +18,18 @@ mod mutate;
 mod query;
 mod struct_analyzer;
 
+struct TransactCtx<'a> {
+    pg_model: &'a PgModel,
+    ontology: &'a Ontology,
+    system: &'a (dyn SystemAPI + Send + Sync),
+    txn: deadpool_postgres::Transaction<'a>,
+}
+
 enum State {
     Insert(Select),
     Update(Select),
     Upsert(Select),
     Delete(DefId),
-}
-
-struct TransactCtx<'d, 't> {
-    pg_model: &'d PgModel,
-    ontology: &'d Ontology,
-    system: &'d (dyn SystemAPI + Send + Sync),
-    txn: deadpool_postgres::Transaction<'t>,
 }
 
 pub async fn transact(
@@ -43,22 +43,20 @@ pub async fn transact(
         .map_err(|_| DomainError::data_store("could not acquire database connection"))?;
 
     Ok(async_stream::try_stream! {
-        let txn = pg_client
-            .build_transaction()
-            .deferrable(false)
-            .isolation_level(IsolationLevel::ReadCommitted)
-            .start()
-            .await
-            .map_err(|err| {
-                debug!("transaction not initiated: {err:?}");
-                DomainError::data_store("could not initiate transaction")
-            })?;
-
         let ctx = TransactCtx {
             pg_model: &store.pg_model,
             ontology: &store.ontology,
             system: store.system.as_ref(),
-            txn
+            txn: pg_client
+                .build_transaction()
+                .deferrable(false)
+                .isolation_level(IsolationLevel::ReadCommitted)
+                .start()
+                .await
+                .map_err(|err| {
+                    debug!("transaction not initiated: {err:?}");
+                    DomainError::data_store("could not initiate transaction")
+                })?
         };
 
         let mut state: Option<State> = None;

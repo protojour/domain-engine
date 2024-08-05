@@ -16,7 +16,7 @@ use crate::{pg_model::PgSerial, sql, transact::data::Scalar};
 
 use super::{data::RowValue, TransactCtx};
 
-impl<'d, 't> TransactCtx<'d, 't> {
+impl<'a> TransactCtx<'a> {
     pub async fn query(
         &self,
         entity_select: EntitySelect,

@@ -28,7 +28,7 @@ pub struct EdgeProjection {
     pub tuples: Vec<Vec<Value>>,
 }
 
-impl<'d, 't> TransactCtx<'d, 't> {
+impl<'a> TransactCtx<'a> {
     pub(super) fn analyze_struct(
         &self,
         value: InDomain<Value>,
