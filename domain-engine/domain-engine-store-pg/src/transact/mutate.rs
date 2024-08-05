@@ -164,10 +164,16 @@ impl<'a> TransactCtx<'a> {
             let sql = insert.to_string();
             debug!("{sql}");
 
-            let mut insert_row: Vec<Scalar> = vec![];
+            let mut edge_row_values: Vec<Scalar> = vec![];
 
             for tuple in projection.tuples {
-                insert_row.clear();
+                edge_row_values.clear();
+                let tuple_width = tuple.len();
+
+                let subject_pair = [
+                    Scalar::I32(analyzed.root_attrs.datatable.key),
+                    Scalar::I64(key),
+                ];
 
                 for (index, value) in tuple.into_iter().enumerate() {
                     let (foreign_def_id, foreign_key) = self
@@ -175,22 +181,27 @@ impl<'a> TransactCtx<'a> {
                         .await?;
 
                     if index == subject_index.0 as usize {
-                        insert_row.push(Scalar::I64(analyzed.root_attrs.datatable.key as i64));
-                        insert_row.push(Scalar::I64(key));
+                        edge_row_values.extend(subject_pair.clone());
                     }
 
                     let datatable = self
                         .pg_model
                         .datatable(foreign_def_id.package_id(), foreign_def_id)?;
 
-                    insert_row.push(Scalar::I64(datatable.key as i64));
-                    insert_row.push(Scalar::I64(foreign_key));
+                    edge_row_values.extend([Scalar::I32(datatable.key), Scalar::I64(foreign_key)]);
+                }
+
+                // subject at the end of the tuple
+                if subject_index.0 as usize == tuple_width {
+                    edge_row_values.extend(subject_pair);
                 }
 
                 self.txn
-                    .query_raw(&sql, insert_row.iter().map(|sc| sc as &dyn ToSql))
+                    .query_raw(&sql, edge_row_values.iter().map(|sc| sc as &dyn ToSql))
                     .await
-                    .map_err(|_| DomainError::data_store("unable to insert edge"))?;
+                    .map_err(|e| {
+                        DomainError::data_store(format!("unable to insert edge: {e:?}"))
+                    })?;
             }
         }
 
@@ -262,9 +273,11 @@ impl<'a> TransactCtx<'a> {
                 .await?;
 
             Ok((def_id, row_value.key))
-        } else {
+        } else if let Some(entity_def_id) = self.pg_model.entity_id_to_entity.get(&def_id) {
             // TODO: find reference
-            Ok((def_id, 1337))
+            Ok((*entity_def_id, 1337))
+        } else {
+            Err(DomainError::data_store_bad_request("bad foreign key"))
         }
     }
 }

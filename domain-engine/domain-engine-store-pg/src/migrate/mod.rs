@@ -2,12 +2,15 @@ use std::collections::BTreeSet;
 
 use anyhow::{anyhow, Context};
 use fnv::FnvHashMap;
-use ontol_runtime::{ontology::Ontology, DefId, DefRelTag, PackageId};
+use ontol_runtime::{
+    ontology::{domain::DefKind, Ontology},
+    DefId, DefRelTag, PackageId,
+};
 use tokio_postgres::{Client, Transaction};
 use tracing::{debug_span, info, Instrument};
 
 use crate::{
-    pg_model::{DomainUid, PgDataKey, PgDomain, PgType, RegVersion},
+    pg_model::{DomainUid, PgDomain, PgType, RegVersion},
     PgModel,
 };
 
@@ -111,6 +114,8 @@ pub async fn migrate(
 
     ctx.deployed_version = query_domain_migration_version(&txn).await?;
 
+    let mut entity_id_to_entity = FnvHashMap::<DefId, DefId>::default();
+
     // collect migration steps
     // this improves separation of concerns while also enabling dry run simulations
     for package_id in persistent_domains {
@@ -122,6 +127,12 @@ pub async fn migrate(
             .instrument(debug_span!("migrate", id = %domain.domain_id().ulid))
             .await
             .context("domain migration steps")?;
+
+        for def in domain.defs() {
+            if let DefKind::Entity(entity) = &def.kind {
+                entity_id_to_entity.insert(entity.id_value_def_id, def.id);
+            }
+        }
     }
 
     execute::execute_domain_migration(&txn, &mut ctx)
@@ -141,6 +152,7 @@ pub async fn migrate(
 
     Ok(PgModel {
         domains: ctx.domains,
+        entity_id_to_entity,
     })
 }
 

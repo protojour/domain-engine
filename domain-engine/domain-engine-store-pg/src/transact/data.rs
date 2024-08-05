@@ -17,7 +17,7 @@ use thin_vec::ThinVec;
 use tokio_postgres::types::{FromSql, ToSql};
 use tracing::trace;
 
-use crate::pg_model::{PgDataTable, PgDataKey};
+use crate::pg_model::{PgDataKey, PgDataTable};
 
 use super::TransactCtx;
 
@@ -46,9 +46,10 @@ impl From<Compound> for Data {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Scalar {
     Unit,
+    I32(i32),
     I64(i64),
     F64(f64),
     Text(smartstring::alias::String),
@@ -145,6 +146,7 @@ impl Scalar {
     pub fn into_value(self, tag: ValueTag) -> Value {
         match self {
             Scalar::Unit => Value::Unit(tag),
+            Scalar::I32(i) => Value::I64(i as i64, tag),
             Scalar::I64(i) => Value::I64(i, tag),
             Scalar::F64(f) => Value::F64(f, tag),
             Scalar::Text(t) => Value::Text(t, tag),
@@ -218,6 +220,7 @@ impl ToSql for Scalar {
     {
         match &self {
             Scalar::Unit => Option::<i32>::None.to_sql(ty, out),
+            Scalar::I32(i) => i.to_sql(ty, out),
             Scalar::I64(i) => i.to_sql(ty, out),
             Scalar::F64(f) => f.to_sql(ty, out),
             Scalar::Text(s) => s.as_str().to_sql(ty, out),
@@ -242,6 +245,7 @@ impl ToSql for Scalar {
     ) -> Result<tokio_postgres::types::IsNull, Box<dyn std::error::Error + Sync + Send>> {
         match &self {
             Scalar::Unit => Option::<i32>::None.to_sql_checked(ty, out),
+            Scalar::I32(i) => i.to_sql_checked(ty, out),
             Scalar::I64(i) => i.to_sql_checked(ty, out),
             Scalar::F64(f) => f.to_sql_checked(ty, out),
             Scalar::Text(s) => s.as_str().to_sql_checked(ty, out),

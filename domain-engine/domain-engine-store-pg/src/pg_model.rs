@@ -18,6 +18,8 @@ pub type DomainUid = ulid::Ulid;
 pub struct PgModel {
     #[allow(unused)]
     pub(crate) domains: FnvHashMap<PackageId, PgDomain>,
+
+    pub(crate) entity_id_to_entity: FnvHashMap<DefId, DefId>,
 }
 
 impl PgModel {

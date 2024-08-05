@@ -16,7 +16,7 @@ use tokio_postgres::Transaction;
 use tracing::info;
 
 use crate::{
-    migrate::{MigrationStep, PgDataKey, PgDomain},
+    migrate::{MigrationStep, PgDomain},
     pg_model::{PgDataField, PgDataTable, PgEdge, PgEdgeCardinal, PgRegKey, PgType},
     sql::Unpack,
 };
@@ -95,7 +95,7 @@ pub async fn migrate_domain_steps<'t>(
             .map(|row| -> anyhow::Result<_> {
                 let key: PgRegKey = row.get(0);
                 let edge_tag: u16 = row.get::<_, i32>(1).try_into()?;
-                let table_name: Box<str> = row.get(3);
+                let table_name: Box<str> = row.get(2);
 
                 Ok((
                     edge_tag,
@@ -254,7 +254,7 @@ async fn migrate_vertex_steps<'t>(
             .context("read datatables")?
             .into_iter()
             .map(|row| -> anyhow::Result<_> {
-                let _key: PgDataKey = row.get(0);
+                let _key: PgRegKey = row.get(0);
                 let rel_tag = DefRelTag(row.get::<_, i32>(1).try_into()?);
                 let pg_type = row.get(2);
                 let column_name: Box<str> = row.get(3);
