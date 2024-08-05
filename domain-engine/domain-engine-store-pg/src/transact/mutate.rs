@@ -107,7 +107,7 @@ impl<'a> TransactCtx<'a> {
             Select::EntityId => {
                 let id_rel_tag = entity.id_relationship_id.tag();
                 if let Some(field) = analyzed.root_attrs.datatable.data_fields.get(&id_rel_tag) {
-                    insert.returning.push(&field.column_name);
+                    insert.returning.push(&field.col_name);
                 }
             }
             Select::Struct(sel) => {
@@ -115,7 +115,7 @@ impl<'a> TransactCtx<'a> {
                     if let Some(field) =
                         analyzed.root_attrs.datatable.data_fields.get(&rel_id.tag())
                     {
-                        insert.returning.push(&field.column_name);
+                        insert.returning.push(&field.col_name);
                     }
                 }
             }
@@ -157,8 +157,10 @@ impl<'a> TransactCtx<'a> {
             };
 
             for pg_cardinal in pg_edge.cardinals.values() {
-                insert.column_names.push(&pg_cardinal.type_table_name);
-                insert.column_names.push(&pg_cardinal.key_table_name);
+                insert.column_names.extend([
+                    pg_cardinal.def_col_name.as_ref(),
+                    pg_cardinal.key_col_name.as_ref(),
+                ]);
             }
 
             let sql = insert.to_string();
@@ -286,7 +288,7 @@ impl<'a> TransactCtx<'a> {
                 expressions: vec![sql::Expression::Column("_key")],
                 from: vec![sql::TableName(&pg_domain.schema_name, &pg_datatable.table_name).into()],
                 where_: Some(sql::Expression::Eq(
-                    Box::new(sql::Expression::Column(&id_field.column_name)),
+                    Box::new(sql::Expression::Column(&id_field.col_name)),
                     Box::new(sql::Expression::Param(Param(0))),
                 )),
                 limit: None,

@@ -119,7 +119,7 @@ impl PgDataTable {
 
 #[derive(Clone, Debug)]
 pub struct PgDataField {
-    pub column_name: Box<str>,
+    pub col_name: Box<str>,
     pub pg_type: PgType,
 }
 
@@ -136,8 +136,8 @@ pub struct PgEdgeCardinal {
     pub key: PgRegKey,
     #[allow(unused)]
     pub ident: Box<str>,
-    pub type_table_name: Box<str>,
-    pub key_table_name: Box<str>,
+    pub def_col_name: Box<str>,
+    pub key_col_name: Box<str>,
 }
 
 /// NB: Do not change the names of these enum variants.

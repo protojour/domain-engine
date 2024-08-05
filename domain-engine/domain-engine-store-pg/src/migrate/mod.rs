@@ -62,8 +62,8 @@ enum MigrationStep {
         edge_tag: u16,
         ordinal: u16,
         ident: Box<str>,
-        type_table_name: Box<str>,
-        key_table_name: Box<str>,
+        def_col_name: Box<str>,
+        key_col_name: Box<str>,
     },
     RenameDomainSchema {
         old: Box<str>,

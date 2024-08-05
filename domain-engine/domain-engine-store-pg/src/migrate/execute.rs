@@ -163,7 +163,7 @@ async fn execute_migration_step<'t>(
             datatable.data_fields.insert(
                 rel_tag,
                 PgDataField {
-                    column_name,
+                    col_name: column_name,
                     pg_type,
                 },
             );
@@ -214,8 +214,8 @@ async fn execute_migration_step<'t>(
             edge_tag,
             ordinal,
             ident,
-            type_table_name,
-            key_table_name,
+            def_col_name,
+            key_col_name,
         } => {
             let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
             let pg_edge = pg_domain.edges.get_mut(&edge_tag).unwrap();
@@ -225,7 +225,7 @@ async fn execute_migration_step<'t>(
                     "ALTER TABLE {schema}.{table} ADD COLUMN {column} integer",
                     schema = sql::Ident(&pg_domain.schema_name),
                     table = sql::Ident(&pg_edge.table_name),
-                    column = sql::Ident(&type_table_name)
+                    column = sql::Ident(&def_col_name)
                 ),
                 &[],
             )
@@ -237,7 +237,7 @@ async fn execute_migration_step<'t>(
                     "ALTER TABLE {schema}.{table} ADD COLUMN {column} bigint",
                     schema = sql::Ident(&pg_domain.schema_name),
                     table = sql::Ident(&pg_edge.table_name),
-                    column = sql::Ident(&key_table_name)
+                    column = sql::Ident(&key_col_name)
                 ),
                 &[],
             )
@@ -251,8 +251,8 @@ async fn execute_migration_step<'t>(
                             edge_key,
                             ordinal,
                             ident,
-                            type_table_name,
-                            key_table_name
+                            def_column_name,
+                            key_column_name
                         ) VALUES($1, $2, $3, $4, $5)
                         RETURNING key
                     "},
@@ -260,8 +260,8 @@ async fn execute_migration_step<'t>(
                         &pg_edge.key,
                         &(ordinal as i32),
                         &ident,
-                        &type_table_name,
-                        &key_table_name,
+                        &def_col_name,
+                        &key_col_name,
                     ],
                 )
                 .await
@@ -272,8 +272,8 @@ async fn execute_migration_step<'t>(
                 PgEdgeCardinal {
                     key: row.get(0),
                     ident,
-                    type_table_name,
-                    key_table_name,
+                    def_col_name,
+                    key_col_name,
                 },
             );
         }

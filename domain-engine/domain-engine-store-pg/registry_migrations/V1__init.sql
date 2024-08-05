@@ -66,8 +66,8 @@ CREATE TABLE m6m_reg.edgecardinal
     edge_key integer NOT NULL REFERENCES m6m_reg.edgetable(key),
     ordinal integer NOT NULL,
     ident text NOT NULL,
-    type_table_name text NOT NULL,
-    key_table_name text NOT NULL,
+    def_column_name text NOT NULL,
+    key_column_name text NOT NULL,
 
     UNIQUE (edge_key, ordinal)
 );

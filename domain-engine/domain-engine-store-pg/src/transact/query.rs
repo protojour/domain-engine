@@ -51,7 +51,7 @@ impl<'a> TransactCtx<'a> {
                     let data_field = datatable.data_fields.get(&rel_id.tag()).unwrap();
 
                     sql.expressions
-                        .push(sql::Expression::Column(&data_field.column_name));
+                        .push(sql::Expression::Column(&data_field.col_name));
                 }
                 DataRelationshipKind::Edge(_) => {}
             }

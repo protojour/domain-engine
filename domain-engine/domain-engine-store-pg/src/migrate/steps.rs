@@ -163,7 +163,7 @@ pub async fn migrate_domain_steps<'t>(
             let pg_cardinals: BTreeMap<usize, PgEdgeCardinal> = txn
                 .query(
                     indoc! {"
-                        SELECT key, ordinal, ident, type_table_name, key_table_name
+                        SELECT key, ordinal, ident, def_column_name, key_column_name
                         FROM m6m_reg.edgecardinal
                         WHERE edge_key = $1
                         ORDER BY ordinal
@@ -173,7 +173,7 @@ pub async fn migrate_domain_steps<'t>(
                 .await?
                 .into_iter()
                 .map(|row| -> anyhow::Result<_> {
-                    let (key, ordinal, ident, type_table_name, key_table_name) = row.unpack();
+                    let (key, ordinal, ident, def_col_name, key_col_name) = row.unpack();
                     let ordinal: i32 = ordinal;
 
                     Ok((
@@ -181,8 +181,8 @@ pub async fn migrate_domain_steps<'t>(
                         PgEdgeCardinal {
                             key,
                             ident,
-                            type_table_name,
-                            key_table_name,
+                            def_col_name,
+                            key_col_name,
                         },
                     ))
                 })
@@ -207,8 +207,8 @@ pub async fn migrate_domain_steps<'t>(
 
                 // FIXME: ontology must provide human readable name for cardinal
                 let ident = format!("todo_{ordinal}").into_boxed_str();
-                let type_table_name = format!("type_{ordinal}").into_boxed_str();
-                let key_table_name = format!("key_{ordinal}").into_boxed_str();
+                let def_col_name = format!("def_{ordinal}").into_boxed_str();
+                let key_col_name = format!("key_{ordinal}").into_boxed_str();
 
                 ctx.steps.push((
                     domain_ids,
@@ -216,8 +216,8 @@ pub async fn migrate_domain_steps<'t>(
                         edge_tag,
                         ordinal,
                         ident,
-                        type_table_name,
-                        key_table_name,
+                        def_col_name,
+                        key_col_name,
                     },
                 ))
             }
@@ -257,15 +257,9 @@ async fn migrate_vertex_steps<'t>(
                 let _key: PgRegKey = row.get(0);
                 let rel_tag = DefRelTag(row.get::<_, i32>(1).try_into()?);
                 let pg_type = row.get(2);
-                let column_name: Box<str> = row.get(3);
+                let col_name: Box<str> = row.get(3);
 
-                Ok((
-                    rel_tag,
-                    PgDataField {
-                        column_name,
-                        pg_type,
-                    },
-                ))
+                Ok((rel_tag, PgDataField { col_name, pg_type }))
             })
             .try_collect()?;
 
@@ -326,10 +320,7 @@ async fn migrate_vertex_steps<'t>(
         };
 
         if let Some(pg_data_field) = pg_data_field {
-            assert_eq!(
-                pg_data_field.column_name, column_name,
-                "TODO: rename column"
-            );
+            assert_eq!(pg_data_field.col_name, column_name, "TODO: rename column");
             assert_eq!(
                 pg_data_field.pg_type, pg_type,
                 "TODO: change data field pg_type",

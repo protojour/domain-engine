@@ -171,7 +171,7 @@ impl<'d> ScalarAttrs<'d> {
             .keys()
             .map(|rel_id| {
                 let field = datatable.find_data_field(rel_id)?;
-                Ok(field.column_name.as_ref())
+                Ok(field.col_name.as_ref())
             })
             .try_collect()
     }
