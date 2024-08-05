@@ -62,6 +62,7 @@ impl<'a> TransactCtx<'a> {
 
         let sql = sql_select.to_string();
         debug!("{sql}");
+        debug!("{row_layout:?}");
 
         let row_stream = self
             .txn
@@ -207,6 +208,7 @@ impl<'a> TransactCtx<'a> {
                             .datatable(target_def_id.package_id(), def_id)?;
                         let pg_datafield = pg_datatable.field(&target_entity.id_relationship_id)?;
 
+                        sub_layout.push(Layout::Scalar(pg_datafield.pg_type));
                         vec![sql::Expr::Column(&pg_datafield.col_name)]
                     }
                     Select::Struct(struct_select) => {

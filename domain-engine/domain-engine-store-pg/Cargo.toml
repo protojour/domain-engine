@@ -37,6 +37,7 @@ thin-vec.workspace = true
 chrono.workspace = true
 pin-utils = "0.1"
 fallible-iterator = "0.2"
+byteorder = "1"
 
 [dev-dependencies]
 ontol-test-utils.path = "../../ontol/ontol-test-utils"

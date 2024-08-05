@@ -1029,6 +1029,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "bincode",
+ "byteorder",
  "bytes",
  "chrono",
  "deadpool-postgres",

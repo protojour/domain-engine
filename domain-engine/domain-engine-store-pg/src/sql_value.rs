@@ -1,4 +1,7 @@
-use bytes::BytesMut;
+use std::error::Error;
+
+use byteorder::{BigEndian, ReadBytesExt};
+use bytes::{Buf, BytesMut};
 use domain_engine_core::{DomainError, DomainResult};
 use fallible_iterator::FallibleIterator;
 use ontol_runtime::{
@@ -30,6 +33,7 @@ pub enum SqlVal {
 }
 
 /// Layout of Sql data
+#[derive(Debug)]
 pub enum Layout {
     Ignore,
     Scalar(PgType),
@@ -110,19 +114,30 @@ fn read_value(
 
             Ok(Some(SqlVal::Array(items)))
         }
-        Layout::Record(subs) => {
-            let array = postgres_protocol::types::array_from_sql(raw)?;
-            if array.dimensions().count()? > 1 {
-                return Err("array contains too many dimensions".into());
+        Layout::Record(field_layouts) => {
+            let composite = Composite::from_sql(raw)?;
+
+            if composite.field_count as usize != field_layouts.len() {
+                return Err(
+                    "field layout length does not correspond to composite value field count".into(),
+                );
             }
 
-            let array_values = array.values();
-            let mut elements = Vec::with_capacity(array_values.size_hint().1.unwrap_or(0));
+            let mut elements: Vec<Option<SqlVal>> =
+                Vec::with_capacity(composite.field_count as usize);
 
-            for (result, structure) in array_values.iterator().zip(subs.iter()) {
-                let raw = result?;
-                elements.push(read_value(structure, raw)?);
+            let mut fields = composite.fields();
+            let mut field_layout_iter = field_layouts.iter();
+
+            for field_layout in field_layout_iter.by_ref() {
+                if let Some(element) = fields.next_field(field_layout)? {
+                    elements.push(element);
+                } else {
+                    break;
+                }
             }
+
+            assert!(field_layout_iter.next().is_none());
 
             Ok(Some(SqlVal::Record(elements)))
         }
@@ -176,5 +191,52 @@ impl ToSql for SqlVal {
             SqlVal::Time(t) => t.to_sql_checked(ty, out),
             SqlVal::Array(v) | SqlVal::Record(v) => v.as_slice().to_sql_checked(ty, out),
         }
+    }
+}
+
+struct Composite<'a> {
+    field_count: i32,
+    buf: &'a [u8],
+}
+
+impl<'a> Composite<'a> {
+    /// It was hard to find the binary documentation for composite types.
+    /// Used this as a reference: https://github.com/jackc/pgtype/blob/a4d4bbf043f7988ea29696a612cf311026fedf92/composite_type.go
+    fn from_sql(mut buf: &[u8]) -> Result<Composite<'_>, Box<dyn Error + Sync + Send>> {
+        let field_count = buf.read_i32::<BigEndian>()?;
+        if field_count < 0 {
+            return Err("invalid field count".into());
+        }
+
+        Ok(Composite { field_count, buf })
+    }
+
+    fn fields(&self) -> CompositeFields {
+        CompositeFields { buf: self.buf }
+    }
+}
+
+struct CompositeFields<'a> {
+    buf: &'a [u8],
+}
+
+impl<'a> CompositeFields<'a> {
+    fn next_field(
+        &mut self,
+        layout: &Layout,
+    ) -> Result<Option<Option<SqlVal>>, Box<dyn std::error::Error + Sync + Send>> {
+        if self.buf.is_empty() {
+            return Ok(None);
+        }
+
+        let _oid = self.buf.read_u32::<BigEndian>()?;
+        let field_len = self.buf.read_u32::<BigEndian>()? as usize;
+
+        let field_buf = &self.buf[0..field_len];
+        self.buf.advance(field_len);
+
+        let value = read_value(layout, Some(field_buf))?;
+
+        Ok(Some(value))
     }
 }
