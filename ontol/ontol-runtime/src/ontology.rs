@@ -9,6 +9,7 @@ use fnv::FnvHashMap;
 use tracing::debug;
 
 use crate::{
+    attr::AttrRef,
     debug::{OntolDebug, OntolFormatter},
     interface::{
         serde::{
@@ -288,6 +289,27 @@ impl Ontology {
     pub fn bool_value(&self, value: bool) -> Value {
         let bool_def = self.data.ontol_domain_meta.bool;
         Value::I64(if value { 1 } else { 0 }, bool_def.into())
+    }
+
+    /// best-effort formatting of a value
+    pub fn format_value(&self, value: &Value) -> String {
+        let def = self.def(value.type_def_id());
+        if let Some(operator_addr) = def.operator_addr {
+            // TODO: Easier way to report values in "human readable"/JSON format
+
+            let processor = self.new_serde_processor(operator_addr, ProcessorMode::Read);
+
+            let mut buf: Vec<u8> = vec![];
+            processor
+                .serialize_attr(
+                    AttrRef::Unit(value),
+                    &mut serde_json::Serializer::new(&mut buf),
+                )
+                .unwrap();
+            String::from(std::str::from_utf8(&buf).unwrap())
+        } else {
+            "N/A".to_string()
+        }
     }
 }
 

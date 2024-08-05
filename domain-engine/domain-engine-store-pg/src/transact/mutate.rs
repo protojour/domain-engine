@@ -19,8 +19,8 @@ use tracing::{debug, trace, warn};
 
 use crate::{
     pg_model::{InDomain, PgDataKey},
-    sql::{self, TableName},
-    transact::data::Scalar,
+    sql::{self, Param, TableName},
+    transact::data::{Data, Scalar},
 };
 
 use super::{data::RowValue, TransactCtx};
@@ -162,7 +162,6 @@ impl<'a> TransactCtx<'a> {
             }
 
             let sql = insert.to_string();
-            debug!("{sql}");
 
             let mut edge_row_values: Vec<Scalar> = vec![];
 
@@ -196,6 +195,7 @@ impl<'a> TransactCtx<'a> {
                     edge_row_values.extend(subject_pair);
                 }
 
+                debug!("{sql}");
                 self.txn
                     .query_raw(&sql, edge_row_values.iter().map(|sc| sc as &dyn ToSql))
                     .await
@@ -274,8 +274,50 @@ impl<'a> TransactCtx<'a> {
 
             Ok((def_id, row_value.key))
         } else if let Some(entity_def_id) = self.pg_model.entity_id_to_entity.get(&def_id) {
-            // TODO: find reference
-            Ok((*entity_def_id, 1337))
+            let pg_domain = self.pg_model.pg_domain(entity_def_id.package_id())?;
+            let pg_datatable = self
+                .pg_model
+                .datatable(entity_def_id.package_id(), *entity_def_id)?;
+            let entity = self.ontology.def(*entity_def_id).entity().unwrap();
+
+            let id_field = pg_datatable.find_data_field(&entity.id_relationship_id)?;
+
+            let select = sql::Select {
+                expressions: vec![sql::Expression::Column("_key")],
+                from: vec![sql::TableName(&pg_domain.schema_name, &pg_datatable.table_name).into()],
+                where_: Some(sql::Expression::Eq(
+                    Box::new(sql::Expression::Column(&id_field.column_name)),
+                    Box::new(sql::Expression::Param(Param(0))),
+                )),
+                limit: None,
+            };
+
+            let Data::Scalar(id_param) = self.data_from_value(value)? else {
+                return Err(DomainError::data_store_bad_request("compound foreign key"));
+            };
+
+            let sql = select.to_string();
+            debug!("{sql}");
+
+            let row = self
+                .txn
+                .query_opt(&sql, &[&id_param])
+                .await
+                .map_err(|e| {
+                    DomainError::data_store(format!("could not look up foreign key: {e:?}"))
+                })?
+                .ok_or_else(|| {
+                    let value = match self.deserialize_scalar(def_id, id_param) {
+                        Ok(value) => value,
+                        Err(error) => return error,
+                    };
+                    DomainErrorKind::UnresolvedForeignKey(self.ontology.format_value(&value))
+                        .into_error()
+                })?;
+
+            let key: PgDataKey = row.get(0);
+
+            Ok((*entity_def_id, key))
         } else {
             Err(DomainError::data_store_bad_request("bad foreign key"))
         }

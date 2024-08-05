@@ -30,6 +30,7 @@ pub struct Select<'d> {
     // TODO: `with`
     pub expressions: Vec<Expression<'d>>,
     pub from: Vec<FromItem<'d>>,
+    pub where_: Option<Expression<'d>>,
     pub limit: Option<usize>,
 }
 
@@ -40,9 +41,13 @@ pub struct Insert<'d> {
 }
 
 pub enum Expression<'d> {
+    /// unqualified column name
     Column(&'d str),
+    /// indexed parameter
     #[allow(unused)]
     Param(Param),
+    /// a = b
+    Eq(Box<Expression<'d>>, Box<Expression<'d>>),
 }
 
 pub enum FromItem<'d> {
@@ -59,6 +64,10 @@ impl<'d> Display for Select<'d> {
             expressions = self.expressions.iter().format(","),
             from = self.from.iter().format(","),
         )?;
+
+        if let Some(condition) = &self.where_ {
+            write!(f, " WHERE {condition}")?;
+        }
 
         if let Some(limit) = self.limit {
             write!(f, " LIMIT {limit}")?;
@@ -95,6 +104,7 @@ impl<'d> Display for Expression<'d> {
         match self {
             Self::Column(name) => write!(f, "{}", Ident(name)),
             Self::Param(param) => write!(f, "{param}"),
+            Self::Eq(a, b) => write!(f, "{a} = {b}"),
         }
     }
 }
@@ -118,7 +128,7 @@ impl<'d> Display for TableName<'d> {
         write!(f, "{}.{}", Ident(self.0), Ident(self.1))
     }
 }
-pub struct Param(usize);
+pub struct Param(pub usize);
 
 impl Display for Param {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

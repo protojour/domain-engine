@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use fnv::{FnvHashMap, FnvHashSet};
 use itertools::Itertools;
 use ontol_runtime::{
-    attr::{Attr, AttrRef},
-    interface::serde::{operator::SerdeOperatorAddr, processor::ProcessorMode},
+    attr::Attr,
+    interface::serde::operator::SerdeOperatorAddr,
     ontology::{
         domain::{
             DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget,
@@ -639,27 +639,10 @@ impl InMemoryStore {
                 ctx,
             )?;
         } else if entity_data.is_none() {
-            let def = ctx.ontology.def(id_value.type_def_id());
-            let repr = if let Some(operator_addr) = def.operator_addr {
-                // TODO: Easier way to report values in "human readable"/JSON format
-
-                let processor = ctx
-                    .ontology
-                    .new_serde_processor(operator_addr, ProcessorMode::Read);
-
-                let mut buf: Vec<u8> = vec![];
-                processor
-                    .serialize_attr(
-                        AttrRef::Unit(&id_value),
-                        &mut serde_json::Serializer::new(&mut buf),
-                    )
-                    .unwrap();
-                String::from(std::str::from_utf8(&buf).unwrap())
-            } else {
-                "N/A".to_string()
-            };
-
-            return Err(DomainErrorKind::UnresolvedForeignKey(repr).into_error());
+            return Err(DomainErrorKind::UnresolvedForeignKey(
+                ctx.ontology.format_value(&id_value),
+            )
+            .into_error());
         }
 
         Ok(VertexKey {

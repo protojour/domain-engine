@@ -41,6 +41,7 @@ impl<'a> TransactCtx<'a> {
         let mut sql = sql::Select {
             expressions: vec![sql::Expression::Column("_key")],
             from: vec![sql::TableName(&pg_domain.schema_name, &datatable.table_name).into()],
+            where_: None,
             limit: Some(entity_select.limit),
         };
 
