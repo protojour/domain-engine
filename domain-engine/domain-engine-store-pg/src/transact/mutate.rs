@@ -14,10 +14,11 @@ use ontol_runtime::{
     ontology::domain::DataRelationshipTarget, query::select::Select, value::Value, DefId, RelId,
 };
 use pin_utils::pin_mut;
+use tokio_postgres::types::ToSql;
 use tracing::{debug, trace, warn};
 
 use crate::{
-    pg_model::{InDomain, PgSerial},
+    pg_model::{InDomain, PgDataKey},
     sql::{self, TableName},
     transact::data::Scalar,
 };
@@ -54,7 +55,8 @@ impl<'a> TransactCtx<'a> {
         ObjectGenerator::new(ProcessorMode::Create, self.ontology, self.system)
             .generate_objects(&mut value.value);
 
-        let def = self.ontology.def(value.type_def_id());
+        let def_id = value.type_def_id();
+        let def = self.ontology.def(def_id);
         let entity = def.entity().ok_or_else(|| {
             warn!("not an entity");
             DomainErrorKind::NotAnEntity(value.type_def_id()).into_error()
@@ -140,15 +142,55 @@ impl<'a> TransactCtx<'a> {
                 .ok_or_else(|| DomainError::data_store("no rows returned"))?
         };
 
-        let key: PgSerial = row.get(0);
+        let key: PgDataKey = row.get(0);
 
         // write edges
-        for (_edge_id, projection) in analyzed.edge_projections {
+        for (edge_id, projection) in analyzed.edge_projections {
+            let subject_index = projection.subject;
+
+            let pg_edge = pg_domain.edges.get(&edge_id.1).unwrap();
+
+            let mut insert = sql::Insert {
+                table_name: TableName(&pg_domain.schema_name, &pg_edge.table_name),
+                column_names: vec![],
+                returning: vec![],
+            };
+
+            for pg_cardinal in pg_edge.cardinals.values() {
+                insert.column_names.push(&pg_cardinal.type_table_name);
+                insert.column_names.push(&pg_cardinal.key_table_name);
+            }
+
+            let sql = insert.to_string();
+            debug!("{sql}");
+
+            let mut insert_row: Vec<Scalar> = vec![];
+
             for tuple in projection.tuples {
-                for value in tuple {
-                    self.resolve_linked_vertex(value, InsertMode::Insert, Select::EntityId)
+                insert_row.clear();
+
+                for (index, value) in tuple.into_iter().enumerate() {
+                    let (foreign_def_id, foreign_key) = self
+                        .resolve_linked_vertex(value, InsertMode::Insert, Select::EntityId)
                         .await?;
+
+                    if index == subject_index.0 as usize {
+                        insert_row.push(Scalar::I64(analyzed.root_attrs.datatable.key as i64));
+                        insert_row.push(Scalar::I64(key));
+                    }
+
+                    let datatable = self
+                        .pg_model
+                        .datatable(foreign_def_id.package_id(), foreign_def_id)?;
+
+                    insert_row.push(Scalar::I64(datatable.key as i64));
+                    insert_row.push(Scalar::I64(foreign_key));
                 }
+
+                self.txn
+                    .query_raw(&sql, insert_row.iter().map(|sc| sc as &dyn ToSql))
+                    .await
+                    .map_err(|_| DomainError::data_store("unable to insert edge"))?;
             }
         }
 
@@ -200,7 +242,7 @@ impl<'a> TransactCtx<'a> {
         value: Value,
         mode: InsertMode,
         select: Select,
-    ) -> DomainResult<(DefId, PgSerial)> {
+    ) -> DomainResult<(DefId, PgDataKey)> {
         let def_id = value.type_def_id();
 
         if self

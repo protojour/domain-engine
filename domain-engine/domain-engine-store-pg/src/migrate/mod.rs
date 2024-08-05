@@ -7,7 +7,7 @@ use tokio_postgres::{Client, Transaction};
 use tracing::{debug_span, info, Instrument};
 
 use crate::{
-    pg_model::{DomainUid, PgDomain, PgSerial, PgType, RegVersion},
+    pg_model::{DomainUid, PgDataKey, PgDomain, PgType, RegVersion},
     PgModel,
 };
 
@@ -50,6 +50,17 @@ enum MigrationStep {
         rel_tag: DefRelTag,
         column_name: Box<str>,
         pg_type: PgType,
+    },
+    DeployEdge {
+        edge_tag: u16,
+        table_name: Box<str>,
+    },
+    DeployEdgeCardinal {
+        edge_tag: u16,
+        ordinal: u16,
+        ident: Box<str>,
+        type_table_name: Box<str>,
+        key_table_name: Box<str>,
     },
     RenameDomainSchema {
         old: Box<str>,

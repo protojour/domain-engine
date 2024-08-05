@@ -4,7 +4,7 @@ use tokio_postgres::Transaction;
 use tracing::{info, info_span, Instrument};
 
 use crate::{
-    pg_model::{PgDataField, PgDataTable, PgSerial, PgType},
+    pg_model::{PgDataField, PgDataTable, PgEdge, PgEdgeCardinal, PgRegKey, PgType},
     sql,
 };
 
@@ -98,7 +98,7 @@ async fn execute_migration_step<'t>(
                 .await
                 .context("insert datatable")?;
 
-            let datatable_key: PgSerial = row.get(0);
+            let datatable_key: PgRegKey = row.get(0);
             pg_domain.datatables.insert(
                 vertex_def_id,
                 PgDataTable {
@@ -165,6 +165,115 @@ async fn execute_migration_step<'t>(
                 PgDataField {
                     column_name,
                     pg_type,
+                },
+            );
+        }
+        MigrationStep::DeployEdge {
+            edge_tag,
+            table_name,
+        } => {
+            let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
+            txn.query(
+                &format!(
+                    "CREATE TABLE {schema}.{table} ()",
+                    schema = sql::Ident(&pg_domain.schema_name),
+                    table = sql::Ident(&table_name),
+                ),
+                &[],
+            )
+            .await
+            .context("create edge table")?;
+
+            let row = txn
+                .query_one(
+                    indoc! { "
+                        INSERT INTO m6m_reg.edgetable (
+                            domain_key,
+                            edge_tag,
+                            table_name
+                        ) VALUES($1, $2, $3)
+                        RETURNING key
+                    "},
+                    &[&pg_domain.key, &(edge_tag as i32), &table_name],
+                )
+                .await
+                .context("insert edgetable")?;
+
+            let key: PgRegKey = row.get(0);
+
+            pg_domain.edges.insert(
+                edge_tag,
+                PgEdge {
+                    key,
+                    table_name,
+                    cardinals: Default::default(),
+                },
+            );
+        }
+        MigrationStep::DeployEdgeCardinal {
+            edge_tag,
+            ordinal,
+            ident,
+            type_table_name,
+            key_table_name,
+        } => {
+            let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
+            let pg_edge = pg_domain.edges.get_mut(&edge_tag).unwrap();
+
+            txn.query(
+                &format!(
+                    "ALTER TABLE {schema}.{table} ADD COLUMN {column} integer",
+                    schema = sql::Ident(&pg_domain.schema_name),
+                    table = sql::Ident(&pg_edge.table_name),
+                    column = sql::Ident(&type_table_name)
+                ),
+                &[],
+            )
+            .await
+            .context("alter table add type column")?;
+
+            txn.query(
+                &format!(
+                    "ALTER TABLE {schema}.{table} ADD COLUMN {column} bigint",
+                    schema = sql::Ident(&pg_domain.schema_name),
+                    table = sql::Ident(&pg_edge.table_name),
+                    column = sql::Ident(&key_table_name)
+                ),
+                &[],
+            )
+            .await
+            .context("alter table add key column")?;
+
+            let row = txn
+                .query_one(
+                    indoc! { "
+                        INSERT INTO m6m_reg.edgecardinal (
+                            edge_key,
+                            ordinal,
+                            ident,
+                            type_table_name,
+                            key_table_name
+                        ) VALUES($1, $2, $3, $4, $5)
+                        RETURNING key
+                    "},
+                    &[
+                        &pg_edge.key,
+                        &(ordinal as i32),
+                        &ident,
+                        &type_table_name,
+                        &key_table_name,
+                    ],
+                )
+                .await
+                .context("insert edgetable")?;
+
+            pg_edge.cardinals.insert(
+                ordinal as usize,
+                PgEdgeCardinal {
+                    key: row.get(0),
+                    ident,
+                    type_table_name,
+                    key_table_name,
                 },
             );
         }

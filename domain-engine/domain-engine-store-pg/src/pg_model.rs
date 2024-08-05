@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{collections::BTreeMap, ops::Deref};
 
 use domain_engine_core::{DomainError, DomainResult};
 use fnv::FnvHashMap;
@@ -7,7 +7,12 @@ use serde::{de::value::StrDeserializer, Deserialize, Serialize};
 use tokio_postgres::types::FromSql;
 use tracing::debug;
 
-pub type PgSerial = i64;
+/// The key type used in the registry for metadata
+pub type PgRegKey = i32;
+
+/// The key type used for data in the domains
+pub type PgDataKey = i64;
+
 pub type DomainUid = ulid::Ulid;
 
 pub struct PgModel {
@@ -84,14 +89,15 @@ impl TryFrom<i32> for RegVersion {
 
 #[derive(Clone)]
 pub struct PgDomain {
-    pub key: Option<PgSerial>,
+    pub key: Option<PgRegKey>,
     pub schema_name: Box<str>,
     pub datatables: FnvHashMap<DefId, PgDataTable>,
+    pub edges: FnvHashMap<u16, PgEdge>,
 }
 
 #[derive(Clone)]
 pub struct PgDataTable {
-    pub key: PgSerial,
+    pub key: PgRegKey,
     pub table_name: Box<str>,
     pub data_fields: FnvHashMap<DefRelTag, PgDataField>,
 }
@@ -113,6 +119,23 @@ impl PgDataTable {
 pub struct PgDataField {
     pub column_name: Box<str>,
     pub pg_type: PgType,
+}
+
+#[derive(Clone)]
+pub struct PgEdge {
+    pub key: PgRegKey,
+    pub table_name: Box<str>,
+    pub cardinals: BTreeMap<usize, PgEdgeCardinal>,
+}
+
+#[derive(Clone)]
+pub struct PgEdgeCardinal {
+    #[allow(unused)]
+    pub key: PgRegKey,
+    #[allow(unused)]
+    pub ident: Box<str>,
+    pub type_table_name: Box<str>,
+    pub key_table_name: Box<str>,
 }
 
 /// NB: Do not change the names of these enum variants.

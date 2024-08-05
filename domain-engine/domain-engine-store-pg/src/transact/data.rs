@@ -17,14 +17,14 @@ use thin_vec::ThinVec;
 use tokio_postgres::types::{FromSql, ToSql};
 use tracing::trace;
 
-use crate::pg_model::{PgDataTable, PgSerial};
+use crate::pg_model::{PgDataTable, PgDataKey};
 
 use super::TransactCtx;
 
 pub struct RowValue {
     pub value: Value,
     #[allow(unused)]
-    pub key: PgSerial,
+    pub key: PgDataKey,
     pub op: DataOperation,
 }
 

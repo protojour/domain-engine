@@ -15,7 +15,7 @@ INSERT INTO m6m_reg.domain_migration (version) VALUES (1);
 -- The set of persisted domains
 CREATE TABLE m6m_reg.domain
 (
-    key bigserial PRIMARY KEY,
+    key serial PRIMARY KEY,
     uid uuid UNIQUE NOT NULL,
     name text NOT NULL,
     schema_name text NOT NULL
@@ -24,11 +24,11 @@ CREATE TABLE m6m_reg.domain
 -- A data table with actual data
 CREATE TABLE m6m_reg.datatable
 (
-    key bigserial PRIMARY KEY,
+    key serial PRIMARY KEY,
     -- the domain which owns this data
-    domain_key bigint NOT NULL REFERENCES m6m_reg.domain(key),
+    domain_key integer NOT NULL REFERENCES m6m_reg.domain(key),
     -- the def domain (can be different than the owning domain)
-    def_domain_key bigint NOT NULL REFERENCES m6m_reg.domain(key),
+    def_domain_key integer NOT NULL REFERENCES m6m_reg.domain(key),
     -- the def tag within the def domain
     def_tag integer NOT NULL,
     -- a path of relationships in the case of child tables.
@@ -43,9 +43,31 @@ CREATE TABLE m6m_reg.datatable
 -- The set of keys per datatable
 CREATE TABLE m6m_reg.datafield
 (
-    key bigserial PRIMARY KEY,
-    datatable_key bigint NOT NULL REFERENCES m6m_reg.datatable(key),
+    key serial PRIMARY KEY,
+    datatable_key integer NOT NULL REFERENCES m6m_reg.datatable(key),
     rel_tag integer NOT NULL,
     pg_type text NOT NULL,
     column_name text NOT NULL
+);
+
+-- Registry of edge tables
+CREATE TABLE m6m_reg.edgetable
+(
+    key serial PRIMARY KEY,
+    domain_key integer NOT NULL REFERENCES m6m_reg.domain(key),
+    edge_tag integer NOT NULL,
+    table_name text NOT NULL
+);
+
+-- Registry of edge cardinals
+CREATE TABLE m6m_reg.edgecardinal
+(
+    key serial PRIMARY KEY,
+    edge_key integer NOT NULL REFERENCES m6m_reg.edgetable(key),
+    ordinal integer NOT NULL,
+    ident text NOT NULL,
+    type_table_name text NOT NULL,
+    key_table_name text NOT NULL,
+
+    UNIQUE (edge_key, ordinal)
 );

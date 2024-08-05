@@ -12,7 +12,7 @@ use pin_utils::pin_mut;
 use tokio_postgres::types::ToSql;
 use tracing::debug;
 
-use crate::{pg_model::PgSerial, sql, transact::data::Scalar};
+use crate::{pg_model::PgDataKey, sql, transact::data::Scalar};
 
 use super::{data::RowValue, TransactCtx};
 
@@ -71,7 +71,7 @@ impl<'a> TransactCtx<'a> {
             for await row_result in row_stream {
                 let row = row_result.map_err(|_| DomainError::data_store("unable to fetch row"))?;
 
-                let key: PgSerial = row.get(0);
+                let key: PgDataKey = row.get(0);
 
                 let mut attrs: FnvHashMap<RelId, Attr> =
                     FnvHashMap::with_capacity_and_hasher(def.data_relationships.len(), Default::default());
