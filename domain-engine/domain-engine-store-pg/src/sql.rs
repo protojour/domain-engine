@@ -3,9 +3,9 @@ use std::fmt::Display;
 use itertools::Itertools;
 use tokio_postgres::{types::FromSql, Row};
 
-pub struct EscapeIdent<T>(pub T);
+pub struct Ident<T>(pub T);
 
-impl<T: AsRef<str>> Display for EscapeIdent<T> {
+impl<T: AsRef<str>> Display for Ident<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "\"")?;
 
@@ -26,29 +26,63 @@ impl<T: AsRef<str>> Display for EscapeIdent<T> {
     }
 }
 
+pub struct Select<'d> {
+    // TODO: `with`
+    pub expressions: Vec<Expression<'d>>,
+    pub from: Vec<FromItem<'d>>,
+    pub limit: Option<usize>,
+}
+
 pub struct Insert<'d> {
-    pub schema: &'d str,
-    pub table: &'d str,
-    pub columns: Vec<&'d str>,
+    pub table_name: TableName<'d>,
+    pub column_names: Vec<&'d str>,
     pub returning: Vec<&'d str>,
+}
+
+pub enum Expression<'d> {
+    Column(&'d str),
+    #[allow(unused)]
+    Param(Param),
+}
+
+pub enum FromItem<'d> {
+    TableName(TableName<'d>),
+}
+
+pub struct TableName<'d>(pub &'d str, pub &'d str);
+
+impl<'d> Display for Select<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "SELECT {expressions} FROM {from}",
+            expressions = self.expressions.iter().format(","),
+            from = self.from.iter().format(","),
+        )?;
+
+        if let Some(limit) = self.limit {
+            write!(f, " LIMIT {limit}")?;
+        }
+
+        Ok(())
+    }
 }
 
 impl<'d> Display for Insert<'d> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "INSERT INTO {schema}.{table} ({columns}) VALUES ({binds})",
-            schema = EscapeIdent(self.schema),
-            table = EscapeIdent(self.table),
-            columns = self.columns.iter().map(EscapeIdent).format(","),
-            binds = self.columns.iter().enumerate().map(Dollar).format(","),
+            "INSERT INTO {table_name} ({columns}) VALUES ({values})",
+            table_name = self.table_name,
+            columns = self.column_names.iter().map(Ident).format(","),
+            values = (0..self.column_names.len()).map(Param).format(","),
         )?;
 
         if !self.returning.is_empty() {
             write!(
                 f,
                 " RETURNING {}",
-                self.returning.iter().map(EscapeIdent).format(",")
+                self.returning.iter().map(Ident).format(",")
             )?;
         }
 
@@ -56,11 +90,39 @@ impl<'d> Display for Insert<'d> {
     }
 }
 
-struct Dollar<T>((usize, T));
-
-impl<T> Display for Dollar<T> {
+impl<'d> Display for Expression<'d> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "${}", self.0 .0 + 1)
+        match self {
+            Self::Column(name) => write!(f, "{}", Ident(name)),
+            Self::Param(param) => write!(f, "{param}"),
+        }
+    }
+}
+
+impl<'d> Display for FromItem<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TableName(tn) => write!(f, "{tn}"),
+        }
+    }
+}
+
+impl<'d> From<TableName<'d>> for FromItem<'d> {
+    fn from(value: TableName<'d>) -> Self {
+        Self::TableName(value)
+    }
+}
+
+impl<'d> Display for TableName<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{}", Ident(self.0), Ident(self.1))
+    }
+}
+pub struct Param(usize);
+
+impl Display for Param {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "${}", self.0 + 1)
     }
 }
 
@@ -112,13 +174,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::sql::EscapeIdent;
+    use crate::sql::Ident;
 
     #[track_caller]
-    fn test_escape_identifier(input: &str, expected: &str) {
+    fn test_escape_ident(input: &str, expected: &str) {
         assert_eq!(
             expected,
-            format!("{}", EscapeIdent(input)),
+            format!("{}", Ident(input)),
             "fmt implementation should equal expected"
         );
         assert_eq!(
@@ -130,8 +192,8 @@ mod tests {
 
     #[test]
     fn escape_identifier() {
-        test_escape_identifier(r#"trivial"#, r#""trivial""#);
-        test_escape_identifier(r#"\backslash\\"#, r#""\backslash\\""#);
-        test_escape_identifier(r#"quote:" escaped:\""#, r#""quote:"" escaped:\""""#);
+        test_escape_ident(r#"trivial"#, r#""trivial""#);
+        test_escape_ident(r#"\backslash\\"#, r#""\backslash\\""#);
+        test_escape_ident(r#"quote:" escaped:\""#, r#""quote:"" escaped:\""""#);
     }
 }

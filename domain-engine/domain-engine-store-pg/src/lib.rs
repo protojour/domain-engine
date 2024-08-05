@@ -10,7 +10,6 @@ use domain_engine_core::{
 };
 use futures_util::stream::BoxStream;
 use ontol_runtime::{ontology::Ontology, PackageId};
-use sql::EscapeIdent;
 use tokio_postgres::NoTls;
 
 pub use pg_model::PgModel;
@@ -118,12 +117,12 @@ pub async fn recreate_database(
 
     client
         .query(
-            &format!("DROP DATABASE IF EXISTS {}", EscapeIdent(db_name)),
+            &format!("DROP DATABASE IF EXISTS {}", sql::Ident(db_name)),
             &[],
         )
         .await?;
     client
-        .query(&format!("CREATE DATABASE {}", EscapeIdent(db_name)), &[])
+        .query(&format!("CREATE DATABASE {}", sql::Ident(db_name)), &[])
         .await?;
 
     drop(client);

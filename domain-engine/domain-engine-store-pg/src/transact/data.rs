@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use anyhow::anyhow;
 use bytes::BytesMut;
-use domain_engine_core::{DomainError, DomainResult};
+use domain_engine_core::{transact::DataOperation, DomainError, DomainResult};
 use fnv::FnvHashMap;
 use itertools::Itertools;
 use ontol_runtime::{
@@ -11,14 +11,22 @@ use ontol_runtime::{
     query::filter::Filter,
     sequence::Sequence,
     value::{Value, ValueTag},
-    RelId,
+    DefId, RelId,
 };
 use thin_vec::ThinVec;
 use tokio_postgres::types::{FromSql, ToSql};
+use tracing::trace;
 
-use crate::pg_model::PgDataTable;
+use crate::pg_model::{PgDataTable, PgSerial};
 
 use super::TransactCtx;
+
+pub struct RowValue {
+    pub value: Value,
+    #[allow(unused)]
+    pub key: PgSerial,
+    pub op: DataOperation,
+}
 
 pub enum Data {
     Scalar(Scalar),
@@ -61,6 +69,33 @@ pub enum Compound {
 }
 
 impl<'d, 't> TransactCtx<'d, 't> {
+    pub fn deserialize_scalar(&self, def_id: DefId, scalar: Scalar) -> DomainResult<Value> {
+        trace!("pg deserialize scalar {def_id:?}");
+
+        match &self.ontology.def(def_id).kind {
+            DefKind::Data(basic) => match basic.repr {
+                DefRepr::FmtStruct(Some((attr_rel_id, attr_def_id))) => Ok(Value::Struct(
+                    Box::new(
+                        [(
+                            attr_rel_id,
+                            Attr::Unit(scalar.into_value(attr_def_id.into())),
+                        )]
+                        .into_iter()
+                        .collect(),
+                    ),
+                    def_id.into(),
+                )),
+                DefRepr::FmtStruct(None) => {
+                    unreachable!("tried to deserialize an empty FmtStruct (has no data)")
+                }
+                _ => Ok(scalar.into_value(def_id.into())),
+            },
+            _ => Err(DomainError::data_store(
+                "unrecognized DefKind for PG scalar deserialization",
+            )),
+        }
+    }
+
     pub fn data_from_value(&self, value: Value) -> DomainResult<Data> {
         let def = self.ontology.def(value.type_def_id());
 

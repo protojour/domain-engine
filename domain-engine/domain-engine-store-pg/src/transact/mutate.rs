@@ -8,25 +8,21 @@ use domain_engine_core::{
     DomainError, DomainResult,
 };
 use fnv::FnvHashMap;
-use futures_util::TryStreamExt;
+use futures_util::{future::BoxFuture, TryStreamExt};
 use ontol_runtime::{
-    attr::Attr,
-    interface::serde::processor::ProcessorMode,
-    ontology::domain::{DataRelationshipTarget, DefKind, DefRepr},
-    query::select::Select,
-    value::Value,
-    DefId, RelId,
+    attr::Attr, interface::serde::processor::ProcessorMode,
+    ontology::domain::DataRelationshipTarget, query::select::Select, value::Value, DefId, RelId,
 };
 use pin_utils::pin_mut;
-use tracing::debug;
+use tracing::{debug, trace, warn};
 
 use crate::{
     pg_model::{InDomain, PgSerial},
-    sql::Insert,
+    sql::{self, TableName},
     transact::data::Scalar,
 };
 
-use super::TransactCtx;
+use super::{data::RowValue, TransactCtx};
 
 pub enum InsertMode {
     Insert,
@@ -34,19 +30,35 @@ pub enum InsertMode {
 }
 
 impl<'d, 't> TransactCtx<'d, 't> {
-    pub async fn insert_entity(
-        &self,
+    /// Returns BoxFuture because of potential recursion
+    pub fn insert_vertex<'a>(
+        &'a self,
+        value: InDomain<Value>,
+        mode: InsertMode,
+        select: &'a Select,
+    ) -> BoxFuture<'_, DomainResult<RowValue>> {
+        Box::pin(async move {
+            let _def_id = value.value.type_def_id();
+            self.insert_vertex_impl(value, mode, select)
+                // .instrument(debug_span!("ins", id = ?def_id))
+                .await
+        })
+    }
+
+    async fn insert_vertex_impl<'a>(
+        &'a self,
         mut value: InDomain<Value>,
         mode: InsertMode,
-        select: &Select,
-    ) -> DomainResult<(Value, DataOperation)> {
+        select: &'a Select,
+    ) -> DomainResult<RowValue> {
         ObjectGenerator::new(ProcessorMode::Create, self.ontology, self.system)
             .generate_objects(&mut value.value);
 
         let def = self.ontology.def(value.type_def_id());
-        let entity = def
-            .entity()
-            .ok_or(DomainErrorKind::NotAnEntity(value.type_def_id()).into_error())?;
+        let entity = def.entity().ok_or_else(|| {
+            warn!("not an entity");
+            DomainErrorKind::NotAnEntity(value.type_def_id()).into_error()
+        })?;
 
         if let Value::Struct(map, _) = &mut value.value {
             if let Entry::Vacant(vacant) = map.entry(entity.id_relationship_id) {
@@ -76,14 +88,16 @@ impl<'d, 't> TransactCtx<'d, 't> {
         }
 
         let pkg_id = value.pkg_id;
+        let pg_domain = self.pg_model.pg_domain(pkg_id)?;
         let analyzed = self.analyze_struct(value, def)?;
-        let pg_domain = self.pg_model.find_pg_domain(pkg_id)?;
 
         // TODO: prepared statement for each entity type/select
-        let mut sql = Insert {
-            schema: &pg_domain.schema_name,
-            table: &analyzed.root_attrs.datatable.table_name,
-            columns: analyzed.root_attrs.column_selection()?,
+        let mut insert = sql::Insert {
+            table_name: TableName(
+                &pg_domain.schema_name,
+                &analyzed.root_attrs.datatable.table_name,
+            ),
+            column_names: analyzed.root_attrs.column_selection()?,
             returning: vec!["_key"],
         };
 
@@ -91,7 +105,7 @@ impl<'d, 't> TransactCtx<'d, 't> {
             Select::EntityId => {
                 let id_rel_tag = entity.id_relationship_id.tag();
                 if let Some(field) = analyzed.root_attrs.datatable.data_fields.get(&id_rel_tag) {
-                    sql.returning.push(&field.column_name);
+                    insert.returning.push(&field.column_name);
                 }
             }
             Select::Struct(sel) => {
@@ -99,7 +113,7 @@ impl<'d, 't> TransactCtx<'d, 't> {
                     if let Some(field) =
                         analyzed.root_attrs.datatable.data_fields.get(&rel_id.tag())
                     {
-                        sql.returning.push(&field.column_name);
+                        insert.returning.push(&field.column_name);
                     }
                 }
             }
@@ -108,32 +122,45 @@ impl<'d, 't> TransactCtx<'d, 't> {
             }
         }
 
-        let sql = sql.to_string();
-        debug!("{sql}");
+        let row = {
+            let sql = insert.to_string();
+            debug!("{sql}");
 
-        let stream = self
-            .txn
-            .query_raw(&sql, analyzed.root_attrs.as_params())
-            .await
-            .map_err(|err| DomainError::data_store(format!("{err}")))?;
-        pin_mut!(stream);
+            let stream = self
+                .txn
+                .query_raw(&sql, analyzed.root_attrs.as_params())
+                .await
+                .map_err(|err| DomainError::data_store(format!("{err}")))?;
+            pin_mut!(stream);
 
-        let row = stream
-            .try_next()
-            .await
-            .map_err(|_| DomainError::data_store("could not fetch row"))?
-            .ok_or_else(|| DomainError::data_store("no rows returned"))?;
+            stream
+                .try_next()
+                .await
+                .map_err(|_| DomainError::data_store("could not fetch row"))?
+                .ok_or_else(|| DomainError::data_store("no rows returned"))?
+        };
 
-        let _key: PgSerial = row.get(0);
+        let key: PgSerial = row.get(0);
+
+        // write edges
+        for (_edge_id, projection) in analyzed.edge_projections {
+            for tuple in projection.tuples {
+                for value in tuple {
+                    self.resolve_linked_vertex(value, InsertMode::Insert, Select::EntityId)
+                        .await?;
+                }
+            }
+        }
 
         match select {
             Select::EntityId => {
                 let scalar: Scalar = row.get(1);
-                debug!("deserialized entity ID: {scalar:?}");
-                Ok((
-                    self.deserialize_scalar(entity.id_value_def_id, scalar)?,
-                    DataOperation::Inserted,
-                ))
+                trace!("deserialized entity ID: {scalar:?}");
+                Ok(RowValue {
+                    value: self.deserialize_scalar(entity.id_value_def_id, scalar)?,
+                    key,
+                    op: DataOperation::Inserted,
+                })
             }
             Select::Struct(sel) => {
                 let mut attrs: FnvHashMap<RelId, Attr> =
@@ -154,39 +181,48 @@ impl<'d, 't> TransactCtx<'d, 't> {
                     }
                 }
 
-                Ok((
-                    Value::Struct(Box::new(attrs), def.id.into()),
-                    DataOperation::Inserted,
-                ))
+                Ok(RowValue {
+                    value: Value::Struct(Box::new(attrs), def.id.into()),
+                    key,
+                    op: DataOperation::Inserted,
+                })
             }
-            _ => Ok((Value::unit(), DataOperation::Inserted)),
+            _ => Ok(RowValue {
+                value: Value::unit(),
+                key,
+                op: DataOperation::Inserted,
+            }),
         }
     }
 
-    fn deserialize_scalar(&self, def_id: DefId, scalar: Scalar) -> DomainResult<Value> {
-        debug!("pg deserialize scalar {def_id:?}");
+    async fn resolve_linked_vertex(
+        &self,
+        value: Value,
+        mode: InsertMode,
+        select: Select,
+    ) -> DomainResult<(DefId, PgSerial)> {
+        let def_id = value.type_def_id();
 
-        match &self.ontology.def(def_id).kind {
-            DefKind::Data(basic) => match basic.repr {
-                DefRepr::FmtStruct(Some((attr_rel_id, attr_def_id))) => Ok(Value::Struct(
-                    Box::new(
-                        [(
-                            attr_rel_id,
-                            Attr::Unit(scalar.into_value(attr_def_id.into())),
-                        )]
-                        .into_iter()
-                        .collect(),
-                    ),
-                    def_id.into(),
-                )),
-                DefRepr::FmtStruct(None) => {
-                    unreachable!("tried to deserialize an empty FmtStruct (has no data)")
-                }
-                _ => Ok(scalar.into_value(def_id.into())),
-            },
-            _ => Err(DomainError::data_store(
-                "unrecognized DefKind for PG scalar deserialization",
-            )),
+        if self
+            .pg_model
+            .find_datatable(def_id.package_id(), def_id)
+            .is_some()
+        {
+            let row_value = self
+                .insert_vertex(
+                    InDomain {
+                        pkg_id: def_id.package_id(),
+                        value,
+                    },
+                    mode,
+                    &select,
+                )
+                .await?;
+
+            Ok((def_id, row_value.key))
+        } else {
+            // TODO: find reference
+            Ok((def_id, 1337))
         }
     }
 }

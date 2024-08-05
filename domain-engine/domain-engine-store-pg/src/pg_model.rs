@@ -16,25 +16,22 @@ pub struct PgModel {
 }
 
 impl PgModel {
-    pub(crate) fn find_pg_domain(&self, pkg_id: PackageId) -> DomainResult<&PgDomain> {
+    pub(crate) fn pg_domain(&self, pkg_id: PackageId) -> DomainResult<&PgDomain> {
         self.domains
             .get(&pkg_id)
             .ok_or_else(|| DomainError::data_store(format!("pg_domain not found for {pkg_id:?}")))
     }
 
-    pub(crate) fn find_datatable(
-        &self,
-        pkg_id: PackageId,
-        def_id: DefId,
-    ) -> DomainResult<&PgDataTable> {
+    pub(crate) fn find_datatable(&self, pkg_id: PackageId, def_id: DefId) -> Option<&PgDataTable> {
         self.domains
             .get(&pkg_id)
             .and_then(|pg_domain| pg_domain.datatables.get(&def_id))
-            .ok_or_else(|| {
-                DomainError::data_store(format!(
-                    "pg_datatable not found for {pkg_id:?}->{def_id:?}"
-                ))
-            })
+    }
+
+    pub(crate) fn datatable(&self, pkg_id: PackageId, def_id: DefId) -> DomainResult<&PgDataTable> {
+        self.find_datatable(pkg_id, def_id).ok_or_else(|| {
+            DomainError::data_store(format!("pg_datatable not found for {pkg_id:?}->{def_id:?}"))
+        })
     }
 }
 

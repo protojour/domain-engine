@@ -5,7 +5,7 @@ use tracing::{info, info_span, Instrument};
 
 use crate::{
     pg_model::{PgDataField, PgDataTable, PgSerial, PgType},
-    sql::EscapeIdent,
+    sql,
 };
 
 use super::{MigrationCtx, MigrationStep, PgDomainIds};
@@ -37,7 +37,7 @@ async fn execute_migration_step<'t>(
     match step {
         MigrationStep::DeployDomain { name, schema_name } => {
             // All the things owned by the domain will be isolated inside this schema.
-            txn.query(&format!("CREATE SCHEMA {}", EscapeIdent(&schema_name)), &[])
+            txn.query(&format!("CREATE SCHEMA {}", sql::Ident(&schema_name)), &[])
                 .await
                 .context("create schema")?;
 
@@ -67,8 +67,8 @@ async fn execute_migration_step<'t>(
             txn.query(
                 &format!(
                     "CREATE TABLE {schema}.{table} (_key bigserial PRIMARY KEY)",
-                    schema = EscapeIdent(&pg_domain.schema_name),
-                    table = EscapeIdent(&table_name),
+                    schema = sql::Ident(&pg_domain.schema_name),
+                    table = sql::Ident(&table_name),
                 ),
                 &[],
             )
@@ -130,10 +130,10 @@ async fn execute_migration_step<'t>(
             txn.query(
                 &format!(
                     "ALTER TABLE {schema}.{table} ADD COLUMN {column} {type}",
-                    schema = EscapeIdent(&pg_domain.schema_name),
-                    table = EscapeIdent(&datatable.table_name),
-                    column = EscapeIdent(&column_name),
-                    type = EscapeIdent(&type_ident)
+                    schema = sql::Ident(&pg_domain.schema_name),
+                    table = sql::Ident(&datatable.table_name),
+                    column = sql::Ident(&column_name),
+                    type = sql::Ident(&type_ident)
                 ),
                 &[],
             )
@@ -175,8 +175,8 @@ async fn execute_migration_step<'t>(
             txn.query(
                 &format!(
                     "ALTER SCHEMA {old} RENAME TO {new}",
-                    old = EscapeIdent(&old),
-                    new = EscapeIdent(&new),
+                    old = sql::Ident(&old),
+                    new = sql::Ident(&new),
                 ),
                 &[],
             )
@@ -203,9 +203,9 @@ async fn execute_migration_step<'t>(
             txn.query(
                 &format!(
                     "ALTER TABLE {schema}.{old} RENAME TO {schema}.{new}",
-                    schema = EscapeIdent(&pg_domain.schema_name),
-                    old = EscapeIdent(&old_table),
-                    new = EscapeIdent(&new_table),
+                    schema = sql::Ident(&pg_domain.schema_name),
+                    old = sql::Ident(&old_table),
+                    new = sql::Ident(&new_table),
                 ),
                 &[],
             )

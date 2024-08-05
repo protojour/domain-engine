@@ -1,9 +1,12 @@
+use std::collections::BTreeMap;
+
 use domain_engine_core::{domain_error::DomainErrorKind, DomainError, DomainResult};
 use ontol_runtime::{
     attr::Attr,
     ontology::domain::{DataRelationshipInfo, DataRelationshipKind, Def},
+    tuple::CardinalIdx,
     value::Value,
-    RelId,
+    EdgeId, RelId,
 };
 use tracing::debug;
 
@@ -16,6 +19,13 @@ use super::{
 
 pub struct AnalyzedStruct<'d> {
     pub root_attrs: ScalarAttrs<'d>,
+    pub edge_projections: BTreeMap<EdgeId, EdgeProjection>,
+}
+
+pub struct EdgeProjection {
+    #[allow(unused)]
+    pub subject: CardinalIdx,
+    pub tuples: Vec<Vec<Value>>,
 }
 
 impl<'d, 't> TransactCtx<'d, 't> {
@@ -24,9 +34,7 @@ impl<'d, 't> TransactCtx<'d, 't> {
         value: InDomain<Value>,
         def: &Def,
     ) -> DomainResult<AnalyzedStruct> {
-        let datatable = self
-            .pg_model
-            .find_datatable(value.pkg_id, value.type_def_id())?;
+        let datatable = self.pg_model.datatable(value.pkg_id, value.type_def_id())?;
 
         let Value::Struct(attrs, _struct_tag) = value.value else {
             return Err(DomainErrorKind::EntityMustBeStruct.into_error());
@@ -36,6 +44,8 @@ impl<'d, 't> TransactCtx<'d, 't> {
             map: Default::default(),
             datatable,
         };
+
+        let mut edge_projections: BTreeMap<EdgeId, EdgeProjection> = Default::default();
 
         for (rel_id, attr) in *attrs {
             let data_relationship = find_data_relationship(def, &rel_id)?;
@@ -55,13 +65,39 @@ impl<'d, 't> TransactCtx<'d, 't> {
                         }
                     }
                 }
+                (DataRelationshipKind::Edge(proj), attr, _) => {
+                    let projection =
+                        edge_projections
+                            .entry(proj.id)
+                            .or_insert_with(|| EdgeProjection {
+                                subject: proj.subject,
+                                tuples: vec![],
+                            });
+
+                    match attr {
+                        Attr::Unit(value) => {
+                            projection.tuples.push(vec![value]);
+                        }
+                        Attr::Tuple(tuple) => {
+                            projection.tuples.push(tuple.elements.into_iter().collect());
+                        }
+                        Attr::Matrix(matrix) => projection.tuples.extend(
+                            matrix
+                                .into_rows()
+                                .map(|tuple| tuple.elements.into_iter().collect()),
+                        ),
+                    }
+                }
                 _ => {
                     debug!("edge ignored");
                 }
             }
         }
 
-        Ok(AnalyzedStruct { root_attrs })
+        Ok(AnalyzedStruct {
+            root_attrs,
+            edge_projections,
+        })
     }
 }
 

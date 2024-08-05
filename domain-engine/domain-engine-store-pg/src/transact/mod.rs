@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use domain_engine_core::{
     system::SystemAPI,
-    transact::{ReqMessage, RespMessage},
+    transact::{DataOperation, ReqMessage, RespMessage},
     DomainError, DomainResult,
 };
 use futures_util::{stream::BoxStream, StreamExt};
@@ -15,6 +15,7 @@ use crate::{PgModel, PostgresDataStore};
 
 mod data;
 mod mutate;
+mod query;
 mod struct_analyzer;
 
 enum State {
@@ -64,8 +65,16 @@ pub async fn transact(
 
         for await message in messages {
             match message? {
-                ReqMessage::Query(..) => {
-                    Err(DomainError::data_store("Query not implemented for Postgres"))?;
+                ReqMessage::Query(op_seq, entity_select) => {
+                    state = None;
+                    let stream = ctx.query(entity_select).await?;
+
+                    yield RespMessage::SequenceStart(op_seq, None);
+
+                    for await result in stream {
+                        let row = result?;
+                        yield RespMessage::Element(row.value, DataOperation::Queried);
+                    }
                 }
                 ReqMessage::Insert(op_seq, select) => {
                     state = Some(State::Insert(select));
@@ -86,15 +95,15 @@ pub async fn transact(
                 ReqMessage::Argument(value) => {
                     match state.as_ref() {
                         Some(State::Insert(select)) => {
-                            let (value, op) = ctx.insert_entity(value.into(), InsertMode::Insert, select).await?;
-                            yield RespMessage::Element(value, op);
+                            let row = ctx.insert_vertex(value.into(), InsertMode::Insert, select).await?;
+                            yield RespMessage::Element(row.value, row.op);
                         }
                         Some(State::Update(_select)) => {
                             Err(DomainError::data_store("Update not implemented for Postgres"))?;
                         }
                         Some(State::Upsert(select)) => {
-                            let (value, op) = ctx.insert_entity(value.into(), InsertMode::Upsert, select).await?;
-                            yield RespMessage::Element(value, op);
+                            let row = ctx.insert_vertex(value.into(), InsertMode::Upsert, select).await?;
+                            yield RespMessage::Element(row.value, row.op);
                         }
                         Some(State::Delete(_def_id)) => {
                             Err(DomainError::data_store("Delete not implemented for Postgres"))?;
