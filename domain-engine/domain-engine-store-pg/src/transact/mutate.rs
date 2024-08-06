@@ -3,15 +3,14 @@ use std::collections::hash_map::Entry;
 use domain_engine_core::{
     domain_error::DomainErrorKind,
     entity_id_utils::{try_generate_entity_id, GeneratedId},
-    object_generator::ObjectGenerator,
     transact::DataOperation,
     DomainResult,
 };
 use fnv::FnvHashMap;
 use futures_util::{future::BoxFuture, TryStreamExt};
 use ontol_runtime::{
-    attr::Attr, interface::serde::processor::ProcessorMode,
-    ontology::domain::DataRelationshipTarget, query::select::Select, value::Value, DefId, RelId,
+    attr::Attr, ontology::domain::DataRelationshipTarget, query::select::Select, value::Value,
+    DefId, RelId,
 };
 use pin_utils::pin_mut;
 use tokio_postgres::types::ToSql;
@@ -54,9 +53,6 @@ impl<'a> TransactCtx<'a> {
         mode: InsertMode,
         select: &'a Select,
     ) -> DomainResult<RowValue> {
-        ObjectGenerator::new(ProcessorMode::Create, self.ontology, self.system)
-            .generate_objects(&mut value.value);
-
         let def_id = value.type_def_id();
         let def = self.ontology.def(def_id);
         let entity = def.entity().ok_or_else(|| {

@@ -1,13 +1,16 @@
 use std::sync::Arc;
 
 use domain_engine_core::{
+    object_generator::ObjectGenerator,
     system::SystemAPI,
     transact::{DataOperation, ReqMessage, RespMessage},
     DomainResult,
 };
 use futures_util::{stream::BoxStream, StreamExt};
 use mutate::InsertMode;
-use ontol_runtime::{ontology::Ontology, query::select::Select, DefId};
+use ontol_runtime::{
+    interface::serde::processor::ProcessorMode, ontology::Ontology, query::select::Select, DefId,
+};
 use tokio_postgres::IsolationLevel;
 use tracing::debug;
 
@@ -90,16 +93,25 @@ pub async fn transact(
                     state = Some(State::Delete(def_id));
                     yield RespMessage::SequenceStart(op_seq, None);
                 }
-                ReqMessage::Argument(value) => {
+                ReqMessage::Argument(mut value) => {
                     match state.as_ref() {
                         Some(State::Insert(select)) => {
+                            ObjectGenerator::new(ProcessorMode::Create, ctx.ontology, ctx.system)
+                                .generate_objects(&mut value);
+
                             let row = ctx.insert_vertex(value.into(), InsertMode::Insert, select).await?;
                             yield RespMessage::Element(row.value, row.op);
                         }
                         Some(State::Update(_select)) => {
+                            ObjectGenerator::new(ProcessorMode::Update, ctx.ontology, ctx.system)
+                                .generate_objects(&mut value);
+
                             Err(ds_err("Update not implemented for Postgres"))?;
                         }
                         Some(State::Upsert(select)) => {
+                            ObjectGenerator::new(ProcessorMode::Create, ctx.ontology, ctx.system)
+                                .generate_objects(&mut value);
+
                             let row = ctx.insert_vertex(value.into(), InsertMode::Upsert, select).await?;
                             yield RespMessage::Element(row.value, row.op);
                         }
