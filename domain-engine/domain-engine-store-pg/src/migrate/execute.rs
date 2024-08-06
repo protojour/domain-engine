@@ -123,7 +123,7 @@ async fn execute_migration_step<'t>(
                 PgType::DoublePrecision => "double precision",
                 PgType::Text => "text",
                 PgType::Bytea => "bytea",
-                PgType::Timestamp => "timestamp",
+                PgType::TimestampTz => "timestamptz",
                 PgType::Bigserial => "bigserial",
             };
 

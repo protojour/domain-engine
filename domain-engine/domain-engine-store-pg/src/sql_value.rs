@@ -5,12 +5,16 @@ use bytes::{Buf, BytesMut};
 use domain_engine_core::{DomainError, DomainResult};
 use fallible_iterator::FallibleIterator;
 use ontol_runtime::value::{Value, ValueTag};
-use postgres_types::ToSql;
+use postgres_types::{FromSql, ToSql, Type};
 use tokio_postgres::Row;
 
 use crate::pg_model::PgType;
 
 pub type CodecResult<T> = Result<T, Box<dyn std::error::Error + Sync + Send>>;
+
+mod wellknown_oid {
+    pub const TIMESTAMPTZ: u32 = 1184;
+}
 
 #[derive(Debug)]
 pub enum SqlVal<'b> {
@@ -129,10 +133,10 @@ impl<'b> SqlVal<'b> {
             Layout::Scalar(PgType::Bytea) => Ok(SqlVal::Octets(
                 postgres_protocol::types::bytea_from_sql(raw).into(),
             )),
-            Layout::Scalar(PgType::Timestamp) => {
-                //DateTime::<Utc>::from_sql(&Type::new(), raw);
-                todo!()
-            }
+            Layout::Scalar(PgType::TimestampTz) => Ok(SqlVal::DateTime(FromSql::from_sql(
+                &Type::from_oid(wellknown_oid::TIMESTAMPTZ).unwrap(),
+                raw,
+            )?)),
             Layout::Array(element_layout) => {
                 let array = postgres_protocol::types::array_from_sql(raw)?;
                 if array.dimensions().count()? > 1 {

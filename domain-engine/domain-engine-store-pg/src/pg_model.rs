@@ -170,7 +170,7 @@ pub enum PgType {
     Text,
     /// byte array
     Bytea,
-    Timestamp,
+    TimestampTz,
     Bigserial,
 }
 
@@ -197,7 +197,7 @@ impl PgType {
             DefRepr::Boolean => Ok(Some(PgType::Boolean)),
             DefRepr::Text => Ok(Some(PgType::Text)),
             DefRepr::Octets => Ok(Some(PgType::Bytea)),
-            DefRepr::DateTime => Ok(Some(PgType::Timestamp)),
+            DefRepr::DateTime => Ok(Some(PgType::TimestampTz)),
             DefRepr::FmtStruct(Some((_rel_id, def_id))) => Self::from_def_id(*def_id, ontology),
             DefRepr::FmtStruct(None) => Ok(None),
             DefRepr::Seq => todo!("seq"),
