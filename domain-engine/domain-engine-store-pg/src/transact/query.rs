@@ -94,8 +94,18 @@ impl<'a> TransactCtx<'a> {
     ) -> DomainResult<Vec<sql::Expr<'_>>> {
         let def = self.ontology.def(def_id);
 
-        let mut sql_expressions = vec![sql::Expr::path2(cur_alias, "_key")];
-        layout.push(Layout::Scalar(PgType::BigInt));
+        let mut sql_expressions = vec![
+            // Always present: the def key of the vertex.
+            // This is known ahead of time.
+            // It will be used later to parse unions.
+            sql::Expr::LiteralInt(pg.datatable.key),
+            // Always present: the data key of the vertex
+            sql::Expr::path2(cur_alias, "_key"),
+        ];
+        layout.extend([
+            Layout::Scalar(PgType::Integer),
+            Layout::Scalar(PgType::BigInt),
+        ]);
 
         // select data properties
         for (rel_id, rel) in &def.data_relationships {
@@ -224,7 +234,8 @@ impl<'a> TransactCtx<'a> {
         let mut attrs: FnvHashMap<RelId, Attr> =
             FnvHashMap::with_capacity_and_hasher(def.data_relationships.len(), Default::default());
 
-        let key = SqlVal::next_column(&mut row)?.into_i64()?;
+        let _def_key = SqlVal::next_column(&mut row)?.into_i32()?;
+        let data_key = SqlVal::next_column(&mut row)?.into_i64()?;
 
         // retrieve data properties
         for (rel_id, rel) in &def.data_relationships {
@@ -300,7 +311,7 @@ impl<'a> TransactCtx<'a> {
 
         Ok(RowValue {
             value: Value::Struct(Box::new(attrs), def.id.into()),
-            key,
+            data_key,
             op: DataOperation::Inserted,
         })
     }

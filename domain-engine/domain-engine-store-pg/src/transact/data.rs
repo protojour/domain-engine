@@ -24,7 +24,7 @@ use super::TransactCtx;
 pub struct RowValue {
     pub value: Value,
     #[allow(unused)]
-    pub key: PgDataKey,
+    pub data_key: PgDataKey,
     pub op: DataOperation,
 }
 

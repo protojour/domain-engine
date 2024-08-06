@@ -119,6 +119,7 @@ async fn execute_migration_step<'t>(
 
             let type_ident = match pg_type {
                 PgType::Boolean => "boolean",
+                PgType::Integer => "integer",
                 PgType::BigInt => "bigint",
                 PgType::DoublePrecision => "double precision",
                 PgType::Text => "text",

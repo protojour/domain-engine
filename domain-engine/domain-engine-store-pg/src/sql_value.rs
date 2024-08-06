@@ -59,6 +59,13 @@ impl<'b> SqlVal<'b> {
         }
     }
 
+    pub fn into_i32(self) -> DomainResult<i32> {
+        match self {
+            Self::I32(int) => Ok(int),
+            _ => Err(ds_err("expected i32")),
+        }
+    }
+
     pub fn into_i64(self) -> DomainResult<i64> {
         match self {
             Self::I64(int) => Ok(int),
@@ -96,6 +103,9 @@ impl<'b> SqlVal<'b> {
 
         match layout {
             Layout::Ignore => Ok(Self::Null),
+            Layout::Scalar(PgType::Integer) => {
+                Ok(SqlVal::I32(postgres_protocol::types::int4_from_sql(raw)?))
+            }
             Layout::Scalar(PgType::BigInt | PgType::Bigserial) => {
                 Ok(SqlVal::I64(postgres_protocol::types::int8_from_sql(raw)?))
             }

@@ -186,6 +186,8 @@ pub struct PgEdgeCardinal {
 pub enum PgType {
     /// TODO: Can join all bool fields in one bitstring that's just appended to?
     Boolean,
+    /// i32
+    Integer,
     /// i64
     BigInt,
     /// f64

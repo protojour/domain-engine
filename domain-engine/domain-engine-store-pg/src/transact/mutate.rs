@@ -142,7 +142,7 @@ impl<'a> TransactCtx<'a> {
         };
 
         let mut row = RowDecodeIterator::new(&row, &row_layout);
-        let key = SqlVal::next_column(&mut row)?.into_i64()?;
+        let data_key = SqlVal::next_column(&mut row)?.into_i64()?;
 
         // write edges
         let mut edge_params: Vec<SqlVal> = vec![];
@@ -172,7 +172,7 @@ impl<'a> TransactCtx<'a> {
 
                 let mut subject_pair = Some([
                     SqlVal::I32(analyzed.root_attrs.datatable.key),
-                    SqlVal::I64(key),
+                    SqlVal::I64(data_key),
                 ]);
 
                 for (index, value) in tuple.into_iter().enumerate() {
@@ -211,7 +211,7 @@ impl<'a> TransactCtx<'a> {
                 trace!("deserialized entity ID: {sql_val:?}");
                 Ok(RowValue {
                     value: self.deserialize_sql(entity.id_value_def_id, sql_val)?,
-                    key,
+                    data_key,
                     op: DataOperation::Inserted,
                 })
             }
@@ -237,13 +237,13 @@ impl<'a> TransactCtx<'a> {
 
                 Ok(RowValue {
                     value: Value::Struct(Box::new(attrs), def.id.into()),
-                    key,
+                    data_key,
                     op: DataOperation::Inserted,
                 })
             }
             _ => Ok(RowValue {
                 value: Value::unit(),
-                key,
+                data_key,
                 op: DataOperation::Inserted,
             }),
         }
@@ -273,7 +273,7 @@ impl<'a> TransactCtx<'a> {
                 )
                 .await?;
 
-            Ok((def_id, row_value.key))
+            Ok((def_id, row_value.data_key))
         } else if let Some(entity_def_id) = self.pg_model.entity_id_to_entity.get(&def_id) {
             let pg = self
                 .pg_model
