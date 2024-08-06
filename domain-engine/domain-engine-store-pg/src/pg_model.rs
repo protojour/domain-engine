@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, ops::Deref};
 
-use domain_engine_core::{DomainError, DomainResult};
+use domain_engine_core::DomainResult;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::{
@@ -14,6 +14,8 @@ use ontol_runtime::{
 use serde::{de::value::StrDeserializer, Deserialize, Serialize};
 use tokio_postgres::types::FromSql;
 use tracing::debug;
+
+use crate::{ds_err, sql};
 
 /// The key type used in the registry for metadata
 pub type PgRegKey = i32;
@@ -34,7 +36,17 @@ impl PgModel {
     pub(crate) fn pg_domain(&self, pkg_id: PackageId) -> DomainResult<&PgDomain> {
         self.domains
             .get(&pkg_id)
-            .ok_or_else(|| DomainError::data_store(format!("pg_domain not found for {pkg_id:?}")))
+            .ok_or_else(|| ds_err(format!("pg_domain not found for {pkg_id:?}")))
+    }
+
+    pub(crate) fn pg_domain_table(
+        &self,
+        pkg_id: PackageId,
+        def_id: DefId,
+    ) -> DomainResult<PgDomainTable> {
+        let domain = self.pg_domain(pkg_id)?;
+        let datatable = self.datatable(pkg_id, def_id)?;
+        Ok(PgDomainTable { domain, datatable })
     }
 
     pub(crate) fn find_datatable(&self, pkg_id: PackageId, def_id: DefId) -> Option<&PgDataTable> {
@@ -44,9 +56,8 @@ impl PgModel {
     }
 
     pub(crate) fn datatable(&self, pkg_id: PackageId, def_id: DefId) -> DomainResult<&PgDataTable> {
-        self.find_datatable(pkg_id, def_id).ok_or_else(|| {
-            DomainError::data_store(format!("pg_datatable not found for {pkg_id:?}->{def_id:?}"))
-        })
+        self.find_datatable(pkg_id, def_id)
+            .ok_or_else(|| ds_err(format!("pg_datatable not found for {pkg_id:?}->{def_id:?}")))
     }
 }
 
@@ -117,11 +128,23 @@ impl PgDataTable {
         self.data_fields.get(&rel_id.tag()).ok_or_else(|| {
             debug!("field not found in {:?}", self.data_fields);
 
-            DomainError::data_store(format!(
+            ds_err(format!(
                 "datatable not found for {rel_id:?} in {}",
                 self.table_name
             ))
         })
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct PgDomainTable<'a> {
+    pub domain: &'a PgDomain,
+    pub datatable: &'a PgDataTable,
+}
+
+impl<'a> PgDomainTable<'a> {
+    pub fn table_name(self) -> sql::TableName<'a> {
+        sql::TableName(&self.domain.schema_name, &self.datatable.table_name)
     }
 }
 
@@ -142,7 +165,7 @@ impl PgEdge {
     pub fn cardinal(&self, c: CardinalIdx) -> DomainResult<&PgEdgeCardinal> {
         self.cardinals
             .get(&(c.0 as usize))
-            .ok_or_else(|| DomainError::data_store("edge cardinal not found"))
+            .ok_or_else(|| ds_err("edge cardinal not found"))
     }
 }
 
@@ -190,7 +213,7 @@ impl PgType {
         };
 
         match def_repr {
-            DefRepr::Unit => Err(DomainError::data_store("TODO: ignore unit column")),
+            DefRepr::Unit => Err(ds_err("TODO: ignore unit column")),
             DefRepr::I64 => Ok(Some(PgType::BigInt)),
             DefRepr::F64 => Ok(Some(PgType::DoublePrecision)),
             DefRepr::Serial => Ok(Some(PgType::Bigserial)),
@@ -204,7 +227,7 @@ impl PgType {
             DefRepr::Struct => todo!("struct"),
             DefRepr::Intersection(_) => todo!("intersection"),
             DefRepr::Union(..) => todo!("union"),
-            DefRepr::Unknown => Err(DomainError::data_store("unknown repr: {def_id:?}")),
+            DefRepr::Unknown => Err(ds_err("unknown repr: {def_id:?}")),
         }
     }
 }

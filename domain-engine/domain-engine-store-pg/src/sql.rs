@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use itertools::Itertools;
+use smallvec::{smallvec, SmallVec};
 use tokio_postgres::{types::FromSql, Row};
 
 pub struct Ident<T>(pub T);
@@ -26,18 +27,19 @@ impl<T: AsRef<str>> Display for Ident<T> {
     }
 }
 
-pub struct IndexIdent(pub usize);
+#[derive(Default, Clone, Copy)]
+pub struct Alias(pub usize);
 
-impl IndexIdent {
-    pub fn incr(&mut self) -> IndexIdent {
+impl Alias {
+    pub fn incr(&mut self) -> Alias {
         self.0 += 1;
         Self(self.0)
     }
 }
 
-impl Display for IndexIdent {
+impl Display for Alias {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "i{}", self.0)
+        write!(f, "a{}", self.0)
     }
 }
 
@@ -56,26 +58,68 @@ pub struct Insert<'d> {
 }
 
 pub enum Expr<'d> {
-    /// unqualified column name
-    Column(&'d str),
-    /// indexed parameter
-    #[allow(unused)]
+    /// path in current scope
+    Path(SmallVec<PathSegment<'d>, 2>),
+    /// input parameter
     Param(Param),
+    Select(Box<Select<'d>>),
     /// a = b
     Eq(Box<Expr<'d>>, Box<Expr<'d>>),
-    Select(Box<Select<'d>>),
     Row(Vec<Expr<'d>>),
     Array(Box<Expr<'d>>),
     #[allow(unused)]
     ArrayAgg(Box<Expr<'d>>),
-    AsIndex(Box<Expr<'d>>, IndexIdent),
+    #[allow(unused)]
+    AsIndex(Box<Expr<'d>>, Alias),
+}
+
+impl<'d> Expr<'d> {
+    pub fn path1(segment: impl Into<PathSegment<'d>>) -> Self {
+        Self::Path(smallvec!(segment.into()))
+    }
+
+    pub fn path2(a: impl Into<PathSegment<'d>>, b: impl Into<PathSegment<'d>>) -> Self {
+        Self::Path(smallvec!(a.into(), b.into()))
+    }
+
+    pub fn param(p: usize) -> Self {
+        Self::Param(Param(p))
+    }
+
+    pub fn array(expr: Self) -> Self {
+        Self::Array(Box::new(expr))
+    }
+
+    pub fn eq(a: Self, b: Self) -> Self {
+        Self::Eq(Box::new(a), Box::new(b))
+    }
+}
+
+pub enum PathSegment<'d> {
+    Ident(&'d str),
+    Alias(Alias),
+    Param(Param),
 }
 
 pub enum FromItem<'d> {
     TableName(TableName<'d>),
+    TableNameAs(TableName<'d>, Alias),
+    Join(Box<Join<'d>>),
+}
+
+pub struct Join<'d> {
+    pub first: FromItem<'d>,
+    pub second: FromItem<'d>,
+    pub on: Expr<'d>,
 }
 
 pub struct TableName<'d>(pub &'d str, pub &'d str);
+
+impl<'d> TableName<'d> {
+    pub fn as_(self, alias: Alias) -> FromItem<'d> {
+        FromItem::TableNameAs(self, alias)
+    }
+}
 
 impl<'d> Display for Select<'d> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -123,7 +167,7 @@ impl<'d> Display for Insert<'d> {
 impl<'d> Display for Expr<'d> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Column(name) => write!(f, "{}", Ident(name)),
+            Self::Path(segments) => write!(f, "{}", segments.iter().format(".")),
             Self::Param(param) => write!(f, "{param}"),
             Self::Eq(a, b) => write!(f, "{a} = {b}"),
             Self::Select(select) => write!(f, "({select})"),
@@ -135,17 +179,69 @@ impl<'d> Display for Expr<'d> {
     }
 }
 
+impl<'d> Display for PathSegment<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PathSegment::Ident(i) => write!(f, "{i}"),
+            PathSegment::Alias(a) => write!(f, "{a}"),
+            PathSegment::Param(p) => write!(f, "{p}"),
+        }
+    }
+}
+
 impl<'d> Display for FromItem<'d> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::TableName(tn) => write!(f, "{tn}"),
+            Self::TableNameAs(tn, alias) => write!(f, "{tn} AS {alias}"),
+            Self::Join(join) => write!(f, "{join}"),
         }
+    }
+}
+
+impl<'d> Display for Join<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let first = &self.first;
+        let second = &self.second;
+        let on = &self.on;
+
+        write!(f, "{first} JOIN {second} ON {on}")
+    }
+}
+
+impl<'d> From<Select<'d>> for Expr<'d> {
+    fn from(value: Select<'d>) -> Self {
+        Self::Select(Box::new(value))
+    }
+}
+
+impl<'d> From<Join<'d>> for FromItem<'d> {
+    fn from(value: Join<'d>) -> Self {
+        FromItem::Join(Box::new(value))
     }
 }
 
 impl<'d> From<TableName<'d>> for FromItem<'d> {
     fn from(value: TableName<'d>) -> Self {
         Self::TableName(value)
+    }
+}
+
+impl<'d> From<&'d str> for PathSegment<'d> {
+    fn from(value: &'d str) -> Self {
+        Self::Ident(value)
+    }
+}
+
+impl<'d> From<Alias> for PathSegment<'d> {
+    fn from(value: Alias) -> Self {
+        Self::Alias(value)
+    }
+}
+
+impl<'d> From<Param> for PathSegment<'d> {
+    fn from(value: Param) -> Self {
+        Self::Param(value)
     }
 }
 

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use domain_engine_core::{
     system::SystemAPI,
     transact::{DataOperation, ReqMessage, RespMessage},
-    DomainError, DomainResult,
+    DomainResult,
 };
 use futures_util::{stream::BoxStream, StreamExt};
 use mutate::InsertMode;
@@ -11,7 +11,7 @@ use ontol_runtime::{ontology::Ontology, query::select::Select, DefId};
 use tokio_postgres::IsolationLevel;
 use tracing::debug;
 
-use crate::{PgModel, PostgresDataStore};
+use crate::{ds_err, PgModel, PostgresDataStore};
 
 mod data;
 mod mutate;
@@ -40,7 +40,7 @@ pub async fn transact(
         .pool
         .get()
         .await
-        .map_err(|_| DomainError::data_store("could not acquire database connection"))?;
+        .map_err(|_| ds_err("could not acquire database connection"))?;
 
     Ok(async_stream::try_stream! {
         let ctx = TransactCtx {
@@ -55,7 +55,7 @@ pub async fn transact(
                 .await
                 .map_err(|err| {
                     debug!("transaction not initiated: {err:?}");
-                    DomainError::data_store("could not initiate transaction")
+                    ds_err("could not initiate transaction")
                 })?
         };
 
@@ -97,17 +97,17 @@ pub async fn transact(
                             yield RespMessage::Element(row.value, row.op);
                         }
                         Some(State::Update(_select)) => {
-                            Err(DomainError::data_store("Update not implemented for Postgres"))?;
+                            Err(ds_err("Update not implemented for Postgres"))?;
                         }
                         Some(State::Upsert(select)) => {
                             let row = ctx.insert_vertex(value.into(), InsertMode::Upsert, select).await?;
                             yield RespMessage::Element(row.value, row.op);
                         }
                         Some(State::Delete(_def_id)) => {
-                            Err(DomainError::data_store("Delete not implemented for Postgres"))?;
+                            Err(ds_err("Delete not implemented for Postgres"))?;
                         }
                         None => {
-                            Err(DomainError::data_store("invalid transaction state"))?
+                            Err(ds_err("invalid transaction state"))?
                         }
                     }
                 }
@@ -116,7 +116,7 @@ pub async fn transact(
 
         ctx.txn.commit().await.map_err(|err| {
             debug!("transaction not committed: {err:?}");
-            DomainError::data_store("transaction could not be commmitted")
+            ds_err("transaction could not be commmitted")
         })?;
     }
     .boxed())

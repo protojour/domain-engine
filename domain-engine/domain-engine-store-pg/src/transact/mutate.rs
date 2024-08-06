@@ -5,7 +5,7 @@ use domain_engine_core::{
     entity_id_utils::{try_generate_entity_id, GeneratedId},
     object_generator::ObjectGenerator,
     transact::DataOperation,
-    DomainError, DomainResult,
+    DomainResult,
 };
 use fnv::FnvHashMap;
 use futures_util::{future::BoxFuture, TryStreamExt};
@@ -18,8 +18,9 @@ use tokio_postgres::types::ToSql;
 use tracing::{debug, trace, warn};
 
 use crate::{
+    ds_bad_req, ds_err,
     pg_model::{InDomain, PgDataKey, PgType},
-    sql::{self, Param, TableName},
+    sql::{self, TableName},
     sql_value::{Layout, RowDecodeIterator, SqlVal},
     transact::data::Data,
 };
@@ -67,11 +68,9 @@ impl<'a> TransactCtx<'a> {
             if let Entry::Vacant(vacant) = map.entry(entity.id_relationship_id) {
                 match mode {
                     InsertMode::Insert => {
-                        let value_generator = entity.id_value_generator.ok_or_else(|| {
-                            DomainError::data_store_bad_request(
-                                "no id provided and no ID generator",
-                            )
-                        })?;
+                        let value_generator = entity
+                            .id_value_generator
+                            .ok_or_else(|| ds_bad_req("no id provided and no ID generator"))?;
 
                         let (generated_id, _container) = try_generate_entity_id(
                             entity.id_operator_addr,
@@ -136,14 +135,14 @@ impl<'a> TransactCtx<'a> {
                 .txn
                 .query_raw(&sql, analyzed.root_attrs.as_params())
                 .await
-                .map_err(|err| DomainError::data_store(format!("{err}")))?;
+                .map_err(|err| ds_err(format!("{err}")))?;
             pin_mut!(stream);
 
             stream
                 .try_next()
                 .await
-                .map_err(|_| DomainError::data_store("could not fetch row"))?
-                .ok_or_else(|| DomainError::data_store("no rows returned"))?
+                .map_err(|_| ds_err("could not fetch row"))?
+                .ok_or_else(|| ds_err("no rows returned"))?
         };
 
         let mut row = RowDecodeIterator::new(&row, &row_layout);
@@ -205,9 +204,7 @@ impl<'a> TransactCtx<'a> {
                 self.txn
                     .query_raw(&sql, edge_params.iter().map(|param| param as &dyn ToSql))
                     .await
-                    .map_err(|e| {
-                        DomainError::data_store(format!("unable to insert edge: {e:?}"))
-                    })?;
+                    .map_err(|e| ds_err(format!("unable to insert edge: {e:?}")))?;
             }
         }
 
@@ -282,26 +279,25 @@ impl<'a> TransactCtx<'a> {
 
             Ok((def_id, row_value.key))
         } else if let Some(entity_def_id) = self.pg_model.entity_id_to_entity.get(&def_id) {
-            let pg_domain = self.pg_model.pg_domain(entity_def_id.package_id())?;
-            let pg_datatable = self
+            let pg = self
                 .pg_model
-                .datatable(entity_def_id.package_id(), *entity_def_id)?;
-            let entity = self.ontology.def(*entity_def_id).entity().unwrap();
+                .pg_domain_table(entity_def_id.package_id(), *entity_def_id)?;
 
-            let id_field = pg_datatable.field(&entity.id_relationship_id)?;
+            let entity = self.ontology.def(*entity_def_id).entity().unwrap();
+            let pg_id_field = pg.datatable.field(&entity.id_relationship_id)?;
 
             let select = sql::Select {
-                expressions: vec![sql::Expr::Column("_key")],
-                from: vec![sql::TableName(&pg_domain.schema_name, &pg_datatable.table_name).into()],
-                where_: Some(sql::Expr::Eq(
-                    Box::new(sql::Expr::Column(&id_field.col_name)),
-                    Box::new(sql::Expr::Param(Param(0))),
+                expressions: vec![sql::Expr::path1("_key")],
+                from: vec![pg.table_name().into()],
+                where_: Some(sql::Expr::eq(
+                    sql::Expr::path1(pg_id_field.col_name.as_ref()),
+                    sql::Expr::param(0),
                 )),
                 limit: None,
             };
 
             let Data::Sql(id_param) = self.data_from_value(value)? else {
-                return Err(DomainError::data_store_bad_request("compound foreign key"));
+                return Err(ds_bad_req("compound foreign key"));
             };
 
             let sql = select.to_string();
@@ -311,9 +307,7 @@ impl<'a> TransactCtx<'a> {
                 .txn
                 .query_opt(&sql, &[&id_param])
                 .await
-                .map_err(|e| {
-                    DomainError::data_store(format!("could not look up foreign key: {e:?}"))
-                })?
+                .map_err(|e| ds_err(format!("could not look up foreign key: {e:?}")))?
                 .ok_or_else(|| {
                     let value = match self.deserialize_sql(def_id, id_param) {
                         Ok(value) => value,
@@ -327,7 +321,7 @@ impl<'a> TransactCtx<'a> {
 
             Ok((*entity_def_id, key))
         } else {
-            Err(DomainError::data_store_bad_request("bad foreign key"))
+            Err(ds_bad_req("bad foreign key"))
         }
     }
 }

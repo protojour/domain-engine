@@ -1,8 +1,8 @@
-use domain_engine_core::{transact::DataOperation, DomainError, DomainResult};
+use domain_engine_core::{transact::DataOperation, DomainResult};
 use fnv::FnvHashMap;
 use futures_util::Stream;
 use ontol_runtime::{
-    attr::Attr,
+    attr::{Attr, AttrMatrix},
     ontology::domain::{DataRelationshipKind, DataRelationshipTarget, Def},
     query::select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     value::Value,
@@ -13,12 +13,18 @@ use tokio_postgres::types::ToSql;
 use tracing::debug;
 
 use crate::{
-    pg_model::{PgDataTable, PgDomain, PgType},
-    sql::{self, IndexIdent},
+    ds_bad_req, ds_err,
+    pg_model::{PgDomainTable, PgType},
+    sql::{self, Alias},
     sql_value::{domain_codec_error, CodecResult, Layout, RowDecodeIterator, SqlVal},
 };
 
 use super::{data::RowValue, TransactCtx};
+
+#[derive(Default)]
+struct QueryCtx {
+    alias: Alias,
+}
 
 impl<'a> TransactCtx<'a> {
     pub async fn query(
@@ -30,51 +36,47 @@ impl<'a> TransactCtx<'a> {
         let struct_select = match entity_select.source {
             StructOrUnionSelect::Struct(struct_select) => struct_select,
             StructOrUnionSelect::Union(..) => {
-                return Err(DomainError::data_store_bad_request(
-                    "union top-level query not supported (yet)",
-                ))
+                return Err(ds_bad_req("union top-level query not supported (yet)"))
             }
         };
 
         let def_id = struct_select.def_id;
 
         let def = self.ontology.def(def_id);
-        let pg_domain = self.pg_model.pg_domain(def_id.package_id())?;
-        let pg_datatable = self.pg_model.datatable(def_id.package_id(), def_id)?;
-
-        let mut col_ident = IndexIdent(0);
+        let pg = self.pg_model.pg_domain_table(def_id.package_id(), def_id)?;
 
         let mut row_layout: Vec<Layout> = vec![];
+        let mut ctx = QueryCtx::default();
+        let root_alias = ctx.alias;
 
         let sql_select = sql::Select {
             expressions: self.sql_select_expressions(
                 def_id,
                 &struct_select,
-                pg_domain,
-                pg_datatable,
-                &mut col_ident,
+                pg,
+                root_alias,
                 &mut row_layout,
+                &mut ctx,
             )?,
-            from: vec![sql::TableName(&pg_domain.schema_name, &pg_datatable.table_name).into()],
+            from: vec![pg.table_name().as_(root_alias)],
             where_: None,
             limit: Some(entity_select.limit),
         };
 
         let sql = sql_select.to_string();
         debug!("{sql}");
-        debug!("{row_layout:?}");
 
         let row_stream = self
             .txn
             .query_raw(&sql, slice_iter(&[]))
             .await
-            .map_err(|err| DomainError::data_store(format!("{err}")))?;
+            .map_err(|err| ds_err(format!("{err}")))?;
 
         Ok(async_stream::try_stream! {
             pin_mut!(row_stream);
 
             for await row_result in row_stream {
-                let row = row_result.map_err(|_| DomainError::data_store("unable to fetch row"))?;
+                let row = row_result.map_err(|_| ds_err("unable to fetch row"))?;
                 let row_value = self.read_row_value(RowDecodeIterator::new(&row, &row_layout), def, &struct_select)?;
                 yield row_value;
             }
@@ -85,31 +87,28 @@ impl<'a> TransactCtx<'a> {
         &self,
         def_id: DefId,
         struct_select: &StructSelect,
-        pg_domain: &'a PgDomain,
-        pg_datatable: &'a PgDataTable,
-        col_ident: &mut IndexIdent,
+        pg: PgDomainTable<'a>,
+        cur_alias: sql::Alias,
         layout: &mut Vec<Layout>,
+        ctx: &mut QueryCtx,
     ) -> DomainResult<Vec<sql::Expr<'_>>> {
         let def = self.ontology.def(def_id);
 
-        let mut sql_expressions = vec![sql::Expr::Column("_key")];
+        let mut sql_expressions = vec![sql::Expr::path2(cur_alias, "_key")];
         layout.push(Layout::Scalar(PgType::BigInt));
 
         // select data properties
         for (rel_id, rel) in &def.data_relationships {
             match &rel.kind {
                 DataRelationshipKind::Id | DataRelationshipKind::Tree => {
-                    let data_field = pg_datatable.data_fields.get(&rel_id.tag()).unwrap();
+                    let data_field = pg.datatable.data_fields.get(&rel_id.tag()).unwrap();
 
-                    sql_expressions.push(sql::Expr::AsIndex(
-                        Box::new(sql::Expr::Column(&data_field.col_name)),
-                        col_ident.incr(),
-                    ));
+                    sql_expressions.push(sql::Expr::path2(cur_alias, data_field.col_name.as_ref()));
 
                     let target_det_id = match rel.target {
                         DataRelationshipTarget::Unambiguous(def_id) => def_id,
                         DataRelationshipTarget::Union(_) => {
-                            return Err(DomainError::data_store("union doesn't work here"));
+                            return Err(ds_err("union doesn't work here"));
                         }
                     };
 
@@ -134,71 +133,79 @@ impl<'a> TransactCtx<'a> {
 
             let edge = self.ontology.find_edge(proj.id).unwrap();
 
-            let pg_edge = pg_domain
+            let pg_edge = pg
+                .domain
                 .edges
                 .get(&proj.id.1)
-                .ok_or_else(|| DomainError::data_store("edge not found"))?;
-            let _pg_subj = pg_edge.cardinal(proj.subject)?;
-            let _pg_obj = pg_edge.cardinal(proj.object)?;
+                .ok_or_else(|| ds_err("edge not found"))?;
+            let pg_edge_subj = pg_edge.cardinal(proj.subject)?;
+            let pg_edge_obj = pg_edge.cardinal(proj.object)?;
 
             let obj_cardinal = &edge.cardinals[proj.object.0 as usize];
             let mut sub_layout: Vec<Layout> = vec![];
+            let edge_alias = ctx.alias.incr();
+            let sub_alias = ctx.alias.incr();
 
-            let expressions = if obj_cardinal.target.len() == 1 {
-                let target_def_id = obj_cardinal.target.iter().next().unwrap();
-                let target_def = self.ontology.def(*target_def_id);
+            if obj_cardinal.target.len() == 1 {
+                let target_def_id = *obj_cardinal.target.iter().next().unwrap();
+                let target_def = self.ontology.def(target_def_id);
 
-                match select {
+                let pg_sub = self
+                    .pg_model
+                    .pg_domain_table(target_def_id.package_id(), target_def_id)?;
+
+                let expressions = match select {
                     Select::Leaf => {
                         let Some(target_entity) = target_def.entity() else {
-                            return Err(DomainError::data_store_bad_request(
-                                "cannot select id from non-entity",
-                            ));
+                            return Err(ds_bad_req("cannot select id from non-entity"));
                         };
 
-                        let pg_datatable = self
-                            .pg_model
-                            .datatable(target_def_id.package_id(), def_id)?;
-                        let pg_datafield = pg_datatable.field(&target_entity.id_relationship_id)?;
+                        let pg_id = pg_sub.datatable.field(&target_entity.id_relationship_id)?;
 
-                        sub_layout.push(Layout::Scalar(pg_datafield.pg_type));
-                        vec![sql::Expr::Column(&pg_datafield.col_name)]
+                        sub_layout.push(Layout::Scalar(pg_id.pg_type));
+                        vec![sql::Expr::path2(sub_alias, pg_id.col_name.as_ref())]
                     }
                     Select::Struct(struct_select) => {
                         let def_id = struct_select.def_id;
-                        let pg_domain = self.pg_model.pg_domain(def_id.package_id())?;
-                        let pg_datatable = self.pg_model.datatable(def_id.package_id(), def_id)?;
 
                         self.sql_select_expressions(
                             def_id,
                             struct_select,
-                            pg_domain,
-                            pg_datatable,
-                            col_ident,
+                            self.pg_model
+                                .pg_domain_table(target_def_id.package_id(), target_def_id)?,
+                            sub_alias,
                             &mut sub_layout,
+                            ctx,
                         )?
                     }
                     _ => todo!(),
-                }
+                };
+
+                let sql_subselect = sql::Select {
+                    expressions: vec![sql::Expr::Row(expressions)],
+                    from: vec![sql::Join {
+                        first: pg_sub.table_name().as_(sub_alias),
+                        second: sql::TableName(&pg.domain.schema_name, &pg_edge.table_name)
+                            .as_(edge_alias),
+                        on: sql::Expr::eq(
+                            sql::Expr::path2(sub_alias, "_key"),
+                            sql::Expr::path2(edge_alias, pg_edge_obj.key_col_name.as_ref()),
+                        ),
+                    }
+                    .into()],
+                    where_: Some(sql::Expr::eq(
+                        sql::Expr::path2(edge_alias, pg_edge_subj.key_col_name.as_ref()),
+                        sql::Expr::path2(cur_alias, "_key"),
+                    )),
+                    limit: None,
+                };
+
+                sql_expressions.push(sql::Expr::array(sql_subselect.into()));
+
+                layout.push(Layout::Array(Box::new(Layout::Record(sub_layout))));
             } else {
                 panic!("union edge");
             };
-
-            let sql_subselect = sql::Select {
-                expressions: vec![sql::Expr::Row(expressions)],
-                from: vec![sql::TableName(&pg_domain.schema_name, &pg_edge.table_name).into()],
-                where_: None,
-                limit: None,
-            };
-
-            sql_expressions.push(sql::Expr::AsIndex(
-                Box::new(sql::Expr::Array(Box::new(sql::Expr::Select(Box::new(
-                    sql_subselect,
-                ))))),
-                col_ident.incr(),
-            ));
-
-            layout.push(Layout::Array(Box::new(Layout::Record(sub_layout))));
         }
 
         Ok(sql_expressions)
@@ -238,7 +245,7 @@ impl<'a> TransactCtx<'a> {
         }
 
         // retrieve edges
-        for rel_id in struct_select.properties.keys() {
+        for (rel_id, select) in &struct_select.properties {
             let Some(rel) = def.data_relationships.get(rel_id) else {
                 continue;
             };
@@ -246,12 +253,45 @@ impl<'a> TransactCtx<'a> {
                 continue;
             };
 
-            let array = SqlVal::next_column(&mut row)?.into_array()?;
-            for element in array.elements() {
-                let record = element.map_err(domain_codec_error)?.into_record()?;
-                let field = record.fields().next().unwrap().unwrap();
-                todo!("field: {field:?}");
+            let mut matrix = AttrMatrix::default();
+            matrix.columns.push(Default::default());
+
+            let sql_array = SqlVal::next_column(&mut row)?.into_array()?;
+
+            let target_def_id = match rel.target {
+                DataRelationshipTarget::Unambiguous(def_id) => def_id,
+                DataRelationshipTarget::Union(_) => todo!(),
+            };
+
+            for result in sql_array.elements() {
+                let sql_record = result.map_err(domain_codec_error)?.into_record()?;
+
+                debug!("target def id: {target_def_id:?}");
+
+                match select {
+                    Select::Leaf => {
+                        let sql_field = sql_record
+                            .fields()
+                            .next()
+                            .ok_or_else(|| ds_err("no fields"))?
+                            .unwrap();
+                        let entity = self.ontology.def(target_def_id).entity().unwrap();
+
+                        let value = self.deserialize_sql(entity.id_value_def_id, sql_field)?;
+                        matrix.columns[0].push(value);
+                    }
+                    Select::Struct(next_struct_select) => {
+                        let def = self.ontology.def(target_def_id);
+                        let row_value =
+                            self.read_row_value(sql_record.fields(), def, next_struct_select)?;
+
+                        matrix.columns[0].push(row_value.value);
+                    }
+                    _ => todo!("unhandled select"),
+                }
             }
+
+            attrs.insert(*rel_id, Attr::Matrix(matrix));
         }
 
         Ok(RowValue {

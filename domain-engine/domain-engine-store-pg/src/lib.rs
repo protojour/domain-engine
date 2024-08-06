@@ -6,7 +6,7 @@ use domain_engine_core::{
     data_store::DataStoreAPI,
     system::ArcSystemApi,
     transact::{ReqMessage, RespMessage},
-    DomainResult, Session,
+    DomainError, DomainResult, Session,
 };
 use futures_util::stream::BoxStream;
 use ontol_runtime::{ontology::Ontology, PackageId};
@@ -130,4 +130,12 @@ pub async fn recreate_database(
     join_handle.await.unwrap();
 
     Ok(())
+}
+
+fn ds_err(s: impl Into<String>) -> DomainError {
+    DomainError::data_store(s)
+}
+
+fn ds_bad_req(s: impl Into<String>) -> DomainError {
+    DomainError::data_store_bad_request(s)
 }

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use domain_engine_core::{transact::DataOperation, DomainError, DomainResult};
+use domain_engine_core::{transact::DataOperation, DomainResult};
 use fnv::FnvHashMap;
 use itertools::Itertools;
 use ontol_runtime::{
@@ -8,12 +8,13 @@ use ontol_runtime::{
     ontology::domain::{DefKind, DefRepr},
     query::filter::Filter,
     sequence::Sequence,
-    value::{Value, ValueTag},
+    value::{Serial, Value, ValueTag},
     DefId, RelId,
 };
 use tracing::trace;
 
 use crate::{
+    ds_bad_req, ds_err,
     pg_model::{PgDataKey, PgDataTable},
     sql_value::SqlVal,
 };
@@ -56,27 +57,46 @@ pub enum Compound {
 }
 
 impl<'a> TransactCtx<'a> {
-    pub fn deserialize_sql(&self, def_id: DefId, sql: SqlVal) -> DomainResult<Value> {
+    pub fn deserialize_sql(&self, def_id: DefId, sql_val: SqlVal) -> DomainResult<Value> {
         trace!("pg deserialize sql {def_id:?}");
+        let tag = ValueTag::from(def_id);
 
         match &self.ontology.def(def_id).kind {
-            DefKind::Data(basic) => match basic.repr {
-                DefRepr::FmtStruct(Some((attr_rel_id, attr_def_id))) => Ok(Value::Struct(
-                    Box::new(
-                        [(attr_rel_id, Attr::Unit(sql.into_ontol(attr_def_id.into())?))]
+            DefKind::Data(basic) => match (sql_val, &basic.repr) {
+                (sql_val, DefRepr::FmtStruct(Some((attr_rel_id, attr_def_id)))) => {
+                    Ok(Value::Struct(
+                        Box::new(
+                            [(
+                                *attr_rel_id,
+                                Attr::Unit(self.deserialize_sql(*attr_def_id, sql_val)?),
+                            )]
                             .into_iter()
                             .collect(),
-                    ),
-                    def_id.into(),
-                )),
-                DefRepr::FmtStruct(None) => {
+                        ),
+                        def_id.into(),
+                    ))
+                }
+                (_sql_val, DefRepr::FmtStruct(None)) => {
                     unreachable!("tried to deserialize an empty FmtStruct (has no data)")
                 }
-                _ => sql.into_ontol(def_id.into()),
+                (SqlVal::Unit | SqlVal::Null, _) => Ok(Value::Unit(tag)),
+                (SqlVal::I32(i), _) => Ok(Value::I64(i as i64, tag)),
+                (SqlVal::I64(i), DefRepr::Serial) => Ok(Value::Serial(
+                    Serial(i.try_into().map_err(|_| ds_err("serial underflow"))?),
+                    tag,
+                )),
+                (SqlVal::I64(i), _) => Ok(Value::I64(i, tag)),
+                (SqlVal::F64(f), _) => Ok(Value::F64(f, tag)),
+                (SqlVal::Text(string), _) => Ok(Value::Text(string.into(), tag)),
+                (SqlVal::Octets(vec), _) => Ok(Value::OctetSequence(vec.into(), tag)),
+                (SqlVal::DateTime(dt), _) => Ok(Value::ChronoDateTime(dt, tag)),
+                (SqlVal::Date(d), _) => Ok(Value::ChronoDate(d, tag)),
+                (SqlVal::Time(t), _) => Ok(Value::ChronoTime(t, tag)),
+                (SqlVal::Array(_) | SqlVal::Record(_), _) => {
+                    Err(ds_err("cannot turn a composite into a value"))
+                }
             },
-            _ => Err(DomainError::data_store(
-                "unrecognized DefKind for PG scalar deserialization",
-            )),
+            _ => Err(ds_err("unrecognized DefKind for PG scalar deserialization")),
         }
     }
 
@@ -91,13 +111,11 @@ impl<'a> TransactCtx<'a> {
                 let int: i64 = serial
                     .0
                     .try_into()
-                    .map_err(|_| DomainError::data_store_bad_request("serial overflow"))?;
+                    .map_err(|_| ds_bad_req("serial overflow"))?;
 
                 Ok(SqlVal::I64(int).into())
             }
-            (Value::Rational(_, _), _) => Err(DomainError::data_store_bad_request(
-                "rational not supported yet",
-            )),
+            (Value::Rational(_, _), _) => Err(ds_bad_req("rational not supported yet")),
             (Value::Text(s, _), _) => Ok(SqlVal::Text(s.into()).into()),
             (Value::OctetSequence(vec, _), _) => Ok(SqlVal::Octets(vec.into()).into()),
             (Value::ChronoDateTime(dt, _), _) => Ok(SqlVal::DateTime(dt).into()),
@@ -108,9 +126,7 @@ impl<'a> TransactCtx<'a> {
                     let inner_value = map
                         .into_values()
                         .next()
-                        .ok_or_else(|| {
-                            DomainError::data_store_bad_request("missing property in fmt struct")
-                        })?
+                        .ok_or_else(|| ds_bad_req("missing property in fmt struct"))?
                         .unwrap_unit();
 
                     self.data_from_value(inner_value)

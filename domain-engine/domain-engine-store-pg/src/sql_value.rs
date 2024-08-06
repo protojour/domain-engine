@@ -4,11 +4,10 @@ use byteorder::{BigEndian, ReadBytesExt};
 use bytes::{Buf, BytesMut};
 use domain_engine_core::{DomainError, DomainResult};
 use fallible_iterator::FallibleIterator;
-use ontol_runtime::value::{Value, ValueTag};
 use postgres_types::{FromSql, ToSql, Type};
 use tokio_postgres::Row;
 
-use crate::pg_model::PgType;
+use crate::{ds_err, pg_model::PgType};
 
 pub type CodecResult<T> = Result<T, Box<dyn std::error::Error + Sync + Send>>;
 
@@ -42,7 +41,7 @@ pub enum Layout {
 }
 
 pub fn domain_codec_error(error: Box<dyn std::error::Error + Sync + Send>) -> DomainError {
-    DomainError::data_store(format!("codec error: {error:?}"))
+    ds_err(format!("codec error: {error:?}"))
 }
 
 impl<'b> SqlVal<'b> {
@@ -55,7 +54,7 @@ impl<'b> SqlVal<'b> {
 
     pub fn non_null(self) -> DomainResult<Self> {
         match self {
-            Self::Null => Err(DomainError::data_store("unexpected db null value")),
+            Self::Null => Err(ds_err("unexpected db null value")),
             other => Ok(other),
         }
     }
@@ -63,38 +62,21 @@ impl<'b> SqlVal<'b> {
     pub fn into_i64(self) -> DomainResult<i64> {
         match self {
             Self::I64(int) => Ok(int),
-            _ => Err(DomainError::data_store("expected i64")),
+            _ => Err(ds_err("expected i64")),
         }
     }
 
     pub fn into_array(self) -> DomainResult<SqlArray<'b>> {
         match self {
             Self::Array(array) => Ok(array),
-            _ => Err(DomainError::data_store("expected array")),
+            _ => Err(ds_err("expected array")),
         }
     }
 
     pub fn into_record(self) -> DomainResult<SqlComposite<'b>> {
         match self {
             Self::Record(composite) => Ok(composite),
-            _ => Err(DomainError::data_store("expected record")),
-        }
-    }
-
-    pub fn into_ontol(self, tag: ValueTag) -> DomainResult<Value> {
-        match self {
-            SqlVal::Unit | SqlVal::Null => Ok(Value::Unit(tag)),
-            SqlVal::I32(i) => Ok(Value::I64(i as i64, tag)),
-            SqlVal::I64(i) => Ok(Value::I64(i, tag)),
-            SqlVal::F64(f) => Ok(Value::F64(f, tag)),
-            SqlVal::Text(string) => Ok(Value::Text(string.into(), tag)),
-            SqlVal::Octets(vec) => Ok(Value::OctetSequence(vec.into(), tag)),
-            SqlVal::DateTime(dt) => Ok(Value::ChronoDateTime(dt, tag)),
-            SqlVal::Date(d) => Ok(Value::ChronoDate(d, tag)),
-            SqlVal::Time(t) => Ok(Value::ChronoTime(t, tag)),
-            SqlVal::Array(_) | SqlVal::Record(_) => Err(DomainError::data_store(
-                "cannot turn a composite into a value",
-            )),
+            _ => Err(ds_err("expected record")),
         }
     }
 
@@ -103,7 +85,7 @@ impl<'b> SqlVal<'b> {
     ) -> DomainResult<SqlVal<'b>> {
         match iter.next() {
             Some(result) => result.map_err(domain_codec_error),
-            None => Err(DomainError::data_store("too few columns")),
+            None => Err(ds_err("too few columns")),
         }
     }
 
