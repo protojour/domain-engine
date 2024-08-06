@@ -2,7 +2,15 @@ use std::{collections::BTreeMap, ops::Deref};
 
 use domain_engine_core::{DomainError, DomainResult};
 use fnv::FnvHashMap;
-use ontol_runtime::{tuple::CardinalIdx, value::Value, DefId, DefRelTag, PackageId, RelId};
+use ontol_runtime::{
+    ontology::{
+        domain::{DefKind, DefRepr},
+        Ontology,
+    },
+    tuple::CardinalIdx,
+    value::Value,
+    DefId, DefRelTag, PackageId, RelId,
+};
 use serde::{de::value::StrDeserializer, Deserialize, Serialize};
 use tokio_postgres::types::FromSql;
 use tracing::debug;
@@ -171,6 +179,32 @@ impl PgType {
         match serde_json::to_value(self) {
             Ok(serde_json::Value::String(string)) => Ok(string),
             _ => panic!("cannot serialize to string"),
+        }
+    }
+
+    pub fn from_def_id(def_id: DefId, ontology: &Ontology) -> DomainResult<Option<PgType>> {
+        let def = ontology.get_def(def_id).unwrap();
+        let def_repr = match &def.kind {
+            DefKind::Data(basic_def) => &basic_def.repr,
+            _ => &DefRepr::Unknown,
+        };
+
+        match def_repr {
+            DefRepr::Unit => Err(DomainError::data_store("TODO: ignore unit column")),
+            DefRepr::I64 => Ok(Some(PgType::BigInt)),
+            DefRepr::F64 => Ok(Some(PgType::DoublePrecision)),
+            DefRepr::Serial => Ok(Some(PgType::Bigserial)),
+            DefRepr::Boolean => Ok(Some(PgType::Boolean)),
+            DefRepr::Text => Ok(Some(PgType::Text)),
+            DefRepr::Octets => Ok(Some(PgType::Bytea)),
+            DefRepr::DateTime => Ok(Some(PgType::Timestamp)),
+            DefRepr::FmtStruct(Some((_rel_id, def_id))) => Self::from_def_id(*def_id, ontology),
+            DefRepr::FmtStruct(None) => Ok(None),
+            DefRepr::Seq => todo!("seq"),
+            DefRepr::Struct => todo!("struct"),
+            DefRepr::Intersection(_) => todo!("intersection"),
+            DefRepr::Union(..) => todo!("union"),
+            DefRepr::Unknown => Err(DomainError::data_store("unknown repr: {def_id:?}")),
         }
     }
 }

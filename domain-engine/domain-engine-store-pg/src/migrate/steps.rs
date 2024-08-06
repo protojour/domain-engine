@@ -15,9 +15,8 @@ use tracing::info;
 
 use crate::{
     migrate::{MigrationStep, PgDomain},
-    pg_model::{PgDataField, PgDataTable, PgEdge, PgEdgeCardinal, PgRegKey},
+    pg_model::{PgDataField, PgDataTable, PgEdge, PgEdgeCardinal, PgRegKey, PgType},
     sql::Unpack,
-    sql_value::get_pg_type,
 };
 
 use super::{MigrationCtx, PgDomainIds};
@@ -307,7 +306,7 @@ async fn migrate_vertex_steps<'t>(
 
         let pg_type = match rel.target {
             DataRelationshipTarget::Unambiguous(def_id) => {
-                match get_pg_type(def_id, ontology).map_err(|err| anyhow!("{err:?}"))? {
+                match PgType::from_def_id(def_id, ontology).map_err(|err| anyhow!("{err:?}"))? {
                     Some(pg_type) => pg_type,
                     None => {
                         // This is a unit type, does not need to be represented

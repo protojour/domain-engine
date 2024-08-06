@@ -27,19 +27,19 @@ pub struct RowValue {
     pub op: DataOperation,
 }
 
-pub enum Data {
-    Sql(SqlVal),
+pub enum Data<'a> {
+    Sql(SqlVal<'a>),
     #[allow(unused)]
     Compound(Compound),
 }
 
-impl From<SqlVal> for Data {
-    fn from(value: SqlVal) -> Self {
+impl<'a> From<SqlVal<'a>> for Data<'a> {
+    fn from(value: SqlVal<'a>) -> Self {
         Self::Sql(value)
     }
 }
 
-impl From<Compound> for Data {
+impl<'a> From<Compound> for Data<'a> {
     fn from(value: Compound) -> Self {
         Self::Compound(value)
     }
@@ -63,7 +63,7 @@ impl<'a> TransactCtx<'a> {
             DefKind::Data(basic) => match basic.repr {
                 DefRepr::FmtStruct(Some((attr_rel_id, attr_def_id))) => Ok(Value::Struct(
                     Box::new(
-                        [(attr_rel_id, Attr::Unit(sql.into_value(attr_def_id.into())?))]
+                        [(attr_rel_id, Attr::Unit(sql.into_ontol(attr_def_id.into())?))]
                             .into_iter()
                             .collect(),
                     ),
@@ -72,7 +72,7 @@ impl<'a> TransactCtx<'a> {
                 DefRepr::FmtStruct(None) => {
                     unreachable!("tried to deserialize an empty FmtStruct (has no data)")
                 }
-                _ => sql.into_value(def_id.into()),
+                _ => sql.into_ontol(def_id.into()),
             },
             _ => Err(DomainError::data_store(
                 "unrecognized DefKind for PG scalar deserialization",
@@ -125,32 +125,13 @@ impl<'a> TransactCtx<'a> {
     }
 }
 
-impl SqlVal {
-    pub fn into_value(self, tag: ValueTag) -> DomainResult<Value> {
-        match self {
-            SqlVal::Unit => Ok(Value::Unit(tag)),
-            SqlVal::I32(i) => Ok(Value::I64(i as i64, tag)),
-            SqlVal::I64(i) => Ok(Value::I64(i, tag)),
-            SqlVal::F64(f) => Ok(Value::F64(f, tag)),
-            SqlVal::Text(t) => Ok(Value::Text(t, tag)),
-            SqlVal::Octets(o) => Ok(Value::OctetSequence(o, tag)),
-            SqlVal::DateTime(dt) => Ok(Value::ChronoDateTime(dt, tag)),
-            SqlVal::Date(d) => Ok(Value::ChronoDate(d, tag)),
-            SqlVal::Time(t) => Ok(Value::ChronoTime(t, tag)),
-            SqlVal::Array(_) | SqlVal::Record(_) => Err(DomainError::data_store(
-                "cannot turn a composite into a value",
-            )),
-        }
-    }
+pub struct ScalarAttrs<'m, 'b> {
+    pub map: FnvHashMap<RelId, SqlVal<'b>>,
+    pub datatable: &'m PgDataTable,
 }
 
-pub struct ScalarAttrs<'d> {
-    pub map: FnvHashMap<RelId, SqlVal>,
-    pub datatable: &'d PgDataTable,
-}
-
-impl<'d> ScalarAttrs<'d> {
-    pub(super) fn column_selection(&self) -> DomainResult<Vec<&'d str>> {
+impl<'m, 'b> ScalarAttrs<'m, 'b> {
+    pub(super) fn column_selection(&self) -> DomainResult<Vec<&'m str>> {
         let datatable = self.datatable;
 
         self.map

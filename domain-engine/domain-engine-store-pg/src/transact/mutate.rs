@@ -20,7 +20,7 @@ use tracing::{debug, trace, warn};
 use crate::{
     pg_model::{InDomain, PgDataKey, PgType},
     sql::{self, Param, TableName},
-    sql_value::{read_column, Layout, SqlVal},
+    sql_value::{domain_codec_error, Layout, SqlVal},
     transact::data::Data,
 };
 
@@ -173,12 +173,11 @@ impl<'a> TransactCtx<'a> {
 
             for tuple in projection.tuples {
                 edge_row_values.clear();
-                let tuple_width = tuple.len();
 
-                let subject_pair = [
+                let mut subject_pair = Some([
                     SqlVal::I32(analyzed.root_attrs.datatable.key),
                     SqlVal::I64(key),
-                ];
+                ]);
 
                 for (index, value) in tuple.into_iter().enumerate() {
                     let (foreign_def_id, foreign_key) = self
@@ -186,7 +185,7 @@ impl<'a> TransactCtx<'a> {
                         .await?;
 
                     if index == subject_index.0 as usize {
-                        edge_row_values.extend(subject_pair.clone());
+                        edge_row_values.extend(subject_pair.take().unwrap());
                     }
 
                     let datatable = self
@@ -197,7 +196,7 @@ impl<'a> TransactCtx<'a> {
                 }
 
                 // subject at the end of the tuple
-                if subject_index.0 as usize == tuple_width {
+                if let Some(subject_pair) = subject_pair {
                     edge_row_values.extend(subject_pair);
                 }
 
@@ -213,8 +212,10 @@ impl<'a> TransactCtx<'a> {
 
         match select {
             Select::EntityId => {
-                let sql_val = read_column(&row, &row_layout, 1)?
-                    .ok_or_else(|| DomainError::data_store("no entity id"))?;
+                let sql_val = SqlVal::decode_column(&row, &row_layout, 1)
+                    .map_err(domain_codec_error)?
+                    .non_null()?;
+
                 trace!("deserialized entity ID: {sql_val:?}");
                 Ok(RowValue {
                     value: self.deserialize_sql(entity.id_value_def_id, sql_val)?,
@@ -227,7 +228,9 @@ impl<'a> TransactCtx<'a> {
                     FnvHashMap::with_capacity_and_hasher(sel.properties.len(), Default::default());
 
                 for (idx, rel_id) in sel.properties.keys().enumerate() {
-                    let sql_val: Option<SqlVal> = read_column(&row, &row_layout, idx + 1)?;
+                    let sql_val = SqlVal::decode_column(&row, &row_layout, idx + 1)
+                        .map_err(domain_codec_error)?
+                        .null_filter();
                     let data_relationship = def.data_relationships.get(rel_id).unwrap();
 
                     match (&data_relationship.target, sql_val) {

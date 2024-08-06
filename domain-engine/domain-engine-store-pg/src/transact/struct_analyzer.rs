@@ -17,8 +17,8 @@ use super::{
     TransactCtx,
 };
 
-pub struct AnalyzedStruct<'d> {
-    pub root_attrs: ScalarAttrs<'d>,
+pub struct AnalyzedStruct<'m, 'b> {
+    pub root_attrs: ScalarAttrs<'m, 'b>,
     pub edge_projections: BTreeMap<EdgeId, EdgeProjection>,
 }
 

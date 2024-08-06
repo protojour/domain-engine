@@ -3,7 +3,7 @@ use fnv::FnvHashMap;
 use futures_util::Stream;
 use ontol_runtime::{
     attr::Attr,
-    ontology::domain::{DataRelationshipKind, DataRelationshipTarget},
+    ontology::domain::{DataRelationshipKind, DataRelationshipTarget, Def},
     query::select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     value::Value,
     DefId, RelId,
@@ -13,9 +13,9 @@ use tokio_postgres::types::ToSql;
 use tracing::debug;
 
 use crate::{
-    pg_model::{PgDataKey, PgDataTable, PgDomain, PgType},
+    pg_model::{PgDataTable, PgDomain, PgType},
     sql::{self, IndexIdent},
-    sql_value::{get_pg_type, read_column, Layout},
+    sql_value::{domain_codec_error, CodecResult, Layout, RowDecodeIterator, SqlVal},
 };
 
 use super::{data::RowValue, TransactCtx};
@@ -75,55 +75,8 @@ impl<'a> TransactCtx<'a> {
 
             for await row_result in row_stream {
                 let row = row_result.map_err(|_| DomainError::data_store("unable to fetch row"))?;
-
-                let key: PgDataKey = row.get(0);
-
-                let mut attrs: FnvHashMap<RelId, Attr> =
-                    FnvHashMap::with_capacity_and_hasher(def.data_relationships.len(), Default::default());
-
-                let mut col_idx = 1;
-
-                // retrieve data properties
-                for (rel_id, rel) in &def.data_relationships {
-                    match &rel.kind {
-                        DataRelationshipKind::Id | DataRelationshipKind::Tree => {
-                            let sql_val = read_column(&row, &row_layout, col_idx)?;
-                            col_idx += 1;
-
-                            if let Some(sql_val) = sql_val {
-                                match rel.target {
-                                    DataRelationshipTarget::Unambiguous(def_id) => {
-                                        attrs.insert(
-                                            *rel_id,
-                                            Attr::Unit(self.deserialize_sql(def_id, sql_val)?),
-                                        );
-                                    }
-                                    DataRelationshipTarget::Union(_) => {}
-                                }
-                            }
-                        }
-                        DataRelationshipKind::Edge(_) => {}
-                    }
-                }
-
-                // retrieve edges
-                for rel_id in struct_select.properties.keys() {
-                    let Some(rel) = def.data_relationships.get(rel_id) else {
-                        continue;
-                    };
-                    let DataRelationshipKind::Edge(_proj) = &rel.kind else {
-                        continue;
-                    };
-
-                    let _sql_val = read_column(&row, &row_layout, col_idx)?;
-                    col_idx += 1;
-                }
-
-                yield RowValue {
-                    value: Value::Struct(Box::new(attrs), def.id.into()),
-                    key,
-                    op: DataOperation::Inserted,
-                }
+                let row_value = self.read_row_value(RowDecodeIterator::new(&row, &row_layout), def, &struct_select)?;
+                yield row_value;
             }
         })
     }
@@ -161,7 +114,7 @@ impl<'a> TransactCtx<'a> {
                     };
 
                     layout.push(
-                        get_pg_type(target_det_id, self.ontology)?
+                        PgType::from_def_id(target_det_id, self.ontology)?
                             .map(Layout::Scalar)
                             .unwrap_or(Layout::Ignore),
                     );
@@ -249,6 +202,72 @@ impl<'a> TransactCtx<'a> {
         }
 
         Ok(sql_expressions)
+    }
+
+    fn read_row_value<'b>(
+        &self,
+        mut row: impl Iterator<Item = CodecResult<SqlVal<'b>>>,
+        def: &Def,
+        struct_select: &StructSelect,
+    ) -> DomainResult<RowValue> {
+        let mut attrs: FnvHashMap<RelId, Attr> =
+            FnvHashMap::with_capacity_and_hasher(def.data_relationships.len(), Default::default());
+
+        let key = next_column(&mut row)?.into_i64()?;
+
+        // retrieve data properties
+        for (rel_id, rel) in &def.data_relationships {
+            match &rel.kind {
+                DataRelationshipKind::Id | DataRelationshipKind::Tree => {
+                    let sql_val = next_column(&mut row)?;
+
+                    if let Some(sql_val) = sql_val.null_filter() {
+                        match rel.target {
+                            DataRelationshipTarget::Unambiguous(def_id) => {
+                                attrs.insert(
+                                    *rel_id,
+                                    Attr::Unit(self.deserialize_sql(def_id, sql_val)?),
+                                );
+                            }
+                            DataRelationshipTarget::Union(_) => {}
+                        }
+                    }
+                }
+                DataRelationshipKind::Edge(_) => {}
+            }
+        }
+
+        // retrieve edges
+        for rel_id in struct_select.properties.keys() {
+            let Some(rel) = def.data_relationships.get(rel_id) else {
+                continue;
+            };
+            let DataRelationshipKind::Edge(_proj) = &rel.kind else {
+                continue;
+            };
+
+            let array = next_column(&mut row)?.into_array()?;
+            for element in array.elements() {
+                let record = element.map_err(domain_codec_error)?.into_record()?;
+                let field = record.fields().next().unwrap().unwrap();
+                todo!("field: {field:?}");
+            }
+        }
+
+        Ok(RowValue {
+            value: Value::Struct(Box::new(attrs), def.id.into()),
+            key,
+            op: DataOperation::Inserted,
+        })
+    }
+}
+
+fn next_column<'b>(
+    iter: &mut impl Iterator<Item = CodecResult<SqlVal<'b>>>,
+) -> DomainResult<SqlVal<'b>> {
+    match iter.next() {
+        Some(result) => result.map_err(domain_codec_error),
+        None => Err(DomainError::data_store("too few columns")),
     }
 }
 
