@@ -20,7 +20,7 @@ use tracing::{debug, trace, warn};
 use crate::{
     pg_model::{InDomain, PgDataKey, PgType},
     sql::{self, Param, TableName},
-    sql_value::{domain_codec_error, Layout, SqlVal},
+    sql_value::{Layout, RowDecodeIterator, SqlVal},
     transact::data::Data,
 };
 
@@ -146,9 +146,12 @@ impl<'a> TransactCtx<'a> {
                 .ok_or_else(|| DomainError::data_store("no rows returned"))?
         };
 
-        let key: PgDataKey = row.get(0);
+        let mut row = RowDecodeIterator::new(&row, &row_layout);
+        let key = SqlVal::next_column(&mut row)?.into_i64()?;
 
         // write edges
+        let mut edge_params: Vec<SqlVal> = vec![];
+
         for (edge_id, projection) in analyzed.edge_projections {
             let subject_index = projection.subject;
 
@@ -169,10 +172,8 @@ impl<'a> TransactCtx<'a> {
 
             let sql = insert.to_string();
 
-            let mut edge_row_values: Vec<SqlVal> = vec![];
-
             for tuple in projection.tuples {
-                edge_row_values.clear();
+                edge_params.clear();
 
                 let mut subject_pair = Some([
                     SqlVal::I32(analyzed.root_attrs.datatable.key),
@@ -185,24 +186,24 @@ impl<'a> TransactCtx<'a> {
                         .await?;
 
                     if index == subject_index.0 as usize {
-                        edge_row_values.extend(subject_pair.take().unwrap());
+                        edge_params.extend(subject_pair.take().unwrap());
                     }
 
                     let datatable = self
                         .pg_model
                         .datatable(foreign_def_id.package_id(), foreign_def_id)?;
 
-                    edge_row_values.extend([SqlVal::I32(datatable.key), SqlVal::I64(foreign_key)]);
+                    edge_params.extend([SqlVal::I32(datatable.key), SqlVal::I64(foreign_key)]);
                 }
 
                 // subject at the end of the tuple
                 if let Some(subject_pair) = subject_pair {
-                    edge_row_values.extend(subject_pair);
+                    edge_params.extend(subject_pair);
                 }
 
                 debug!("{sql}");
                 self.txn
-                    .query_raw(&sql, edge_row_values.iter().map(|sc| sc as &dyn ToSql))
+                    .query_raw(&sql, edge_params.iter().map(|param| param as &dyn ToSql))
                     .await
                     .map_err(|e| {
                         DomainError::data_store(format!("unable to insert edge: {e:?}"))
@@ -212,9 +213,7 @@ impl<'a> TransactCtx<'a> {
 
         match select {
             Select::EntityId => {
-                let sql_val = SqlVal::decode_column(&row, &row_layout, 1)
-                    .map_err(domain_codec_error)?
-                    .non_null()?;
+                let sql_val = SqlVal::next_column(&mut row)?.non_null()?;
 
                 trace!("deserialized entity ID: {sql_val:?}");
                 Ok(RowValue {
@@ -227,10 +226,8 @@ impl<'a> TransactCtx<'a> {
                 let mut attrs: FnvHashMap<RelId, Attr> =
                     FnvHashMap::with_capacity_and_hasher(sel.properties.len(), Default::default());
 
-                for (idx, rel_id) in sel.properties.keys().enumerate() {
-                    let sql_val = SqlVal::decode_column(&row, &row_layout, idx + 1)
-                        .map_err(domain_codec_error)?
-                        .null_filter();
+                for rel_id in sel.properties.keys() {
+                    let sql_val = SqlVal::next_column(&mut row)?.null_filter();
                     let data_relationship = def.data_relationships.get(rel_id).unwrap();
 
                     match (&data_relationship.target, sql_val) {

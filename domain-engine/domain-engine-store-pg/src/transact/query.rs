@@ -213,13 +213,13 @@ impl<'a> TransactCtx<'a> {
         let mut attrs: FnvHashMap<RelId, Attr> =
             FnvHashMap::with_capacity_and_hasher(def.data_relationships.len(), Default::default());
 
-        let key = next_column(&mut row)?.into_i64()?;
+        let key = SqlVal::next_column(&mut row)?.into_i64()?;
 
         // retrieve data properties
         for (rel_id, rel) in &def.data_relationships {
             match &rel.kind {
                 DataRelationshipKind::Id | DataRelationshipKind::Tree => {
-                    let sql_val = next_column(&mut row)?;
+                    let sql_val = SqlVal::next_column(&mut row)?;
 
                     if let Some(sql_val) = sql_val.null_filter() {
                         match rel.target {
@@ -246,7 +246,7 @@ impl<'a> TransactCtx<'a> {
                 continue;
             };
 
-            let array = next_column(&mut row)?.into_array()?;
+            let array = SqlVal::next_column(&mut row)?.into_array()?;
             for element in array.elements() {
                 let record = element.map_err(domain_codec_error)?.into_record()?;
                 let field = record.fields().next().unwrap().unwrap();
@@ -259,15 +259,6 @@ impl<'a> TransactCtx<'a> {
             key,
             op: DataOperation::Inserted,
         })
-    }
-}
-
-fn next_column<'b>(
-    iter: &mut impl Iterator<Item = CodecResult<SqlVal<'b>>>,
-) -> DomainResult<SqlVal<'b>> {
-    match iter.next() {
-        Some(result) => result.map_err(domain_codec_error),
-        None => Err(DomainError::data_store("too few columns")),
     }
 }
 

@@ -85,20 +85,21 @@ impl<'a> TransactCtx<'a> {
 
         match (value, &def.kind) {
             (Value::Unit(_) | Value::Void(_), _) => Ok(SqlVal::Unit.into()),
-            (Value::I64(n, _), _) => Ok(SqlVal::I64(n).into()),
-            (Value::F64(f, _), _) => Ok(SqlVal::F64(f).into()),
-            (Value::Serial(s, _), _) => {
-                let i: i64 =
-                    s.0.try_into()
-                        .map_err(|_| DomainError::data_store_bad_request("serial overflow"))?;
+            (Value::I64(int, _), _) => Ok(SqlVal::I64(int).into()),
+            (Value::F64(float, _), _) => Ok(SqlVal::F64(float).into()),
+            (Value::Serial(serial, _), _) => {
+                let int: i64 = serial
+                    .0
+                    .try_into()
+                    .map_err(|_| DomainError::data_store_bad_request("serial overflow"))?;
 
-                Ok(SqlVal::I64(i).into())
+                Ok(SqlVal::I64(int).into())
             }
             (Value::Rational(_, _), _) => Err(DomainError::data_store_bad_request(
                 "rational not supported yet",
             )),
-            (Value::Text(s, _), _) => Ok(SqlVal::Text(s).into()),
-            (Value::OctetSequence(s, _), _) => Ok(SqlVal::Octets(s).into()),
+            (Value::Text(s, _), _) => Ok(SqlVal::Text(s.into()).into()),
+            (Value::OctetSequence(vec, _), _) => Ok(SqlVal::Octets(vec.into()).into()),
             (Value::ChronoDateTime(dt, _), _) => Ok(SqlVal::DateTime(dt).into()),
             (Value::ChronoDate(d, _), _) => Ok(SqlVal::Date(d).into()),
             (Value::ChronoTime(t, _), _) => Ok(SqlVal::Time(t).into()),

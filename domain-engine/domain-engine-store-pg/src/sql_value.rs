@@ -6,7 +6,6 @@ use domain_engine_core::{DomainError, DomainResult};
 use fallible_iterator::FallibleIterator;
 use ontol_runtime::value::{Value, ValueTag};
 use postgres_types::ToSql;
-use thin_vec::ThinVec;
 use tokio_postgres::Row;
 
 use crate::pg_model::PgType;
@@ -20,8 +19,8 @@ pub enum SqlVal<'b> {
     I32(i32),
     I64(i64),
     F64(f64),
-    Text(smartstring::alias::String),
-    Octets(ThinVec<u8>),
+    Text(String),
+    Octets(Vec<u8>),
     DateTime(chrono::DateTime<chrono::Utc>),
     Date(chrono::NaiveDate),
     Time(chrono::NaiveTime),
@@ -84,8 +83,8 @@ impl<'b> SqlVal<'b> {
             SqlVal::I32(i) => Ok(Value::I64(i as i64, tag)),
             SqlVal::I64(i) => Ok(Value::I64(i, tag)),
             SqlVal::F64(f) => Ok(Value::F64(f, tag)),
-            SqlVal::Text(t) => Ok(Value::Text(t, tag)),
-            SqlVal::Octets(o) => Ok(Value::OctetSequence(o, tag)),
+            SqlVal::Text(string) => Ok(Value::Text(string.into(), tag)),
+            SqlVal::Octets(vec) => Ok(Value::OctetSequence(vec.into(), tag)),
             SqlVal::DateTime(dt) => Ok(Value::ChronoDateTime(dt, tag)),
             SqlVal::Date(d) => Ok(Value::ChronoDate(d, tag)),
             SqlVal::Time(t) => Ok(Value::ChronoTime(t, tag)),
@@ -95,15 +94,16 @@ impl<'b> SqlVal<'b> {
         }
     }
 
-    pub fn decode_column(row: &'b Row, layout: &'b [Layout], index: usize) -> CodecResult<Self> {
-        if let Some(buffer) = row.col_buffer(index) {
-            Self::decode(&layout[index], Some(buffer))
-        } else {
-            Ok(Self::Null)
+    pub fn next_column(
+        iter: &mut impl Iterator<Item = CodecResult<SqlVal<'b>>>,
+    ) -> DomainResult<SqlVal<'b>> {
+        match iter.next() {
+            Some(result) => result.map_err(domain_codec_error),
+            None => Err(DomainError::data_store("too few columns")),
         }
     }
 
-    fn decode(layout: &'b Layout, buf: Option<&'b [u8]>) -> CodecResult<Self> {
+    fn decode(buf: Option<&'b [u8]>, layout: &'b Layout) -> CodecResult<Self> {
         let Some(raw) = buf else {
             return Ok(Self::Null);
         };
@@ -124,12 +124,15 @@ impl<'b> SqlVal<'b> {
                 },
             )),
             Layout::Scalar(PgType::Text) => Ok(SqlVal::Text(
-                postgres_protocol::types::text_from_sql(raw)?.into(),
+                postgres_protocol::types::text_from_sql(raw)?.to_string(),
             )),
             Layout::Scalar(PgType::Bytea) => Ok(SqlVal::Octets(
                 postgres_protocol::types::bytea_from_sql(raw).into(),
             )),
-            Layout::Scalar(PgType::Timestamp) => todo!(),
+            Layout::Scalar(PgType::Timestamp) => {
+                //DateTime::<Utc>::from_sql(&Type::new(), raw);
+                todo!()
+            }
             Layout::Array(element_layout) => {
                 let array = postgres_protocol::types::array_from_sql(raw)?;
                 if array.dimensions().count()? > 1 {
@@ -229,7 +232,7 @@ impl<'b> Iterator for RowDecodeIterator<'b> {
             self.index += 1;
             let buf = self.row.col_buffer(index);
 
-            Some(SqlVal::decode(&self.layout[index], buf))
+            Some(SqlVal::decode(buf, &self.layout[index]))
         }
     }
 }
@@ -245,7 +248,7 @@ impl<'b> SqlArray<'b> {
         self.inner
             .values()
             .iterator()
-            .map(move |buf_result| SqlVal::decode(element_layout, buf_result?))
+            .map(move |buf_result| SqlVal::decode(buf_result?, element_layout))
     }
 }
 
@@ -327,11 +330,15 @@ impl<'b> CompositeFields<'b> {
         };
 
         let _oid = self.buf.read_u32::<BigEndian>()?;
-        let field_len = self.buf.read_u32::<BigEndian>()? as usize;
-
+        let field_len: usize = self.buf.read_u32::<BigEndian>()? as usize;
         let field_buf = &self.buf[0..field_len];
+
         self.buf.advance(field_len);
 
-        SqlVal::decode(layout, Some(field_buf))
+        if !field_buf.is_empty() {
+            SqlVal::decode(Some(field_buf), layout)
+        } else {
+            Ok(SqlVal::Null)
+        }
     }
 }
