@@ -14,7 +14,7 @@ use tracing::debug;
 
 use crate::{
     ds_bad_req, ds_err,
-    pg_model::{PgDomainTable, PgType},
+    pg_model::{PgDataTable, PgDomainTable, PgEdgeCardinal, PgType},
     sql::{self, Alias},
     sql_value::{domain_codec_error, CodecResult, Layout, RowDecodeIterator, SqlVal},
 };
@@ -187,15 +187,19 @@ impl<'a> TransactCtx<'a> {
                         first: pg_sub.table_name().as_(sub_alias),
                         second: sql::TableName(&pg.domain.schema_name, &pg_edge.table_name)
                             .as_(edge_alias),
-                        on: sql::Expr::eq(
-                            sql::Expr::path2(sub_alias, "_key"),
-                            sql::Expr::path2(edge_alias, pg_edge_obj.key_col_name.as_ref()),
+                        on: edge_join_condition(
+                            edge_alias,
+                            pg_edge_obj,
+                            sub_alias,
+                            pg_sub.datatable,
                         ),
                     }
                     .into()],
-                    where_: Some(sql::Expr::eq(
-                        sql::Expr::path2(edge_alias, pg_edge_subj.key_col_name.as_ref()),
-                        sql::Expr::path2(cur_alias, "_key"),
+                    where_: Some(edge_join_condition(
+                        edge_alias,
+                        pg_edge_subj,
+                        cur_alias,
+                        pg.datatable,
                     )),
                     limit: None,
                 };
@@ -306,4 +310,22 @@ fn slice_iter<'a>(
     s: &'a [&'a (dyn ToSql + Sync)],
 ) -> impl ExactSizeIterator<Item = &'a dyn ToSql> + 'a {
     s.iter().map(|s| *s as _)
+}
+
+fn edge_join_condition<'d>(
+    edge_alias: Alias,
+    cardinal: &'d PgEdgeCardinal,
+    data_alias: Alias,
+    data: &'d PgDataTable,
+) -> sql::Expr<'d> {
+    sql::Expr::And(vec![
+        sql::Expr::eq(
+            sql::Expr::path2(edge_alias, cardinal.def_col_name.as_ref()),
+            sql::Expr::LiteralInt(data.key),
+        ),
+        sql::Expr::eq(
+            sql::Expr::path2(edge_alias, cardinal.key_col_name.as_ref()),
+            sql::Expr::path2(data_alias, "_key"),
+        ),
+    ])
 }

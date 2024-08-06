@@ -62,7 +62,10 @@ pub enum Expr<'d> {
     Path(SmallVec<PathSegment<'d>, 2>),
     /// input parameter
     Param(Param),
+    LiteralInt(i32),
     Select(Box<Select<'d>>),
+    /// a AND b
+    And(Vec<Expr<'d>>),
     /// a = b
     Eq(Box<Expr<'d>>, Box<Expr<'d>>),
     Row(Vec<Expr<'d>>),
@@ -169,6 +172,8 @@ impl<'d> Display for Expr<'d> {
         match self {
             Self::Path(segments) => write!(f, "{}", segments.iter().format(".")),
             Self::Param(param) => write!(f, "{param}"),
+            Self::LiteralInt(i) => write!(f, "{i}"),
+            Self::And(clauses) => write!(f, "({})", clauses.iter().format(" AND ")),
             Self::Eq(a, b) => write!(f, "{a} = {b}"),
             Self::Select(select) => write!(f, "({select})"),
             Self::Row(fields) => write!(f, "ROW({})", fields.iter().format(",")),
