@@ -54,7 +54,7 @@ pub struct Select<'d> {
 pub struct Insert<'d> {
     pub table_name: TableName<'d>,
     pub column_names: Vec<&'d str>,
-    pub returning: Vec<&'d str>,
+    pub returning: Vec<Expr<'d>>,
 }
 
 pub enum Expr<'d> {
@@ -156,11 +156,7 @@ impl<'d> Display for Insert<'d> {
         )?;
 
         if !self.returning.is_empty() {
-            write!(
-                f,
-                " RETURNING {}",
-                self.returning.iter().map(Ident).format(",")
-            )?;
+            write!(f, " RETURNING {}", self.returning.iter().format(","))?;
         }
 
         Ok(())

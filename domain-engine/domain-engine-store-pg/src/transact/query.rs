@@ -108,29 +108,13 @@ impl<'a> TransactCtx<'a> {
         ]);
 
         // select data properties
-        for (rel_id, rel) in &def.data_relationships {
-            match &rel.kind {
-                DataRelationshipKind::Id | DataRelationshipKind::Tree => {
-                    let data_field = pg.datatable.data_fields.get(&rel_id.tag()).unwrap();
-
-                    sql_expressions.push(sql::Expr::path2(cur_alias, data_field.col_name.as_ref()));
-
-                    let target_det_id = match rel.target {
-                        DataRelationshipTarget::Unambiguous(def_id) => def_id,
-                        DataRelationshipTarget::Union(_) => {
-                            return Err(ds_err("union doesn't work here"));
-                        }
-                    };
-
-                    layout.push(
-                        PgType::from_def_id(target_det_id, self.ontology)?
-                            .map(Layout::Scalar)
-                            .unwrap_or(Layout::Ignore),
-                    );
-                }
-                DataRelationshipKind::Edge(_) => {}
-            }
-        }
+        self.select_inherent_struct_fields(
+            def,
+            pg.datatable,
+            Some(cur_alias),
+            &mut sql_expressions,
+            layout,
+        )?;
 
         // select edges
         for (rel_id, select) in &struct_select.properties {
@@ -238,26 +222,7 @@ impl<'a> TransactCtx<'a> {
         let data_key = SqlVal::next_column(&mut row)?.into_i64()?;
 
         // retrieve data properties
-        for (rel_id, rel) in &def.data_relationships {
-            match &rel.kind {
-                DataRelationshipKind::Id | DataRelationshipKind::Tree => {
-                    let sql_val = SqlVal::next_column(&mut row)?;
-
-                    if let Some(sql_val) = sql_val.null_filter() {
-                        match rel.target {
-                            DataRelationshipTarget::Unambiguous(def_id) => {
-                                attrs.insert(
-                                    *rel_id,
-                                    Attr::Unit(self.deserialize_sql(def_id, sql_val)?),
-                                );
-                            }
-                            DataRelationshipTarget::Union(_) => {}
-                        }
-                    }
-                }
-                DataRelationshipKind::Edge(_) => {}
-            }
-        }
+        self.read_inherent_struct_fields(def, &mut row, &mut attrs)?;
 
         // retrieve edges
         for (rel_id, select) in &struct_select.properties {

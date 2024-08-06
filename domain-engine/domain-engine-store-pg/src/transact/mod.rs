@@ -20,6 +20,7 @@ mod data;
 mod mutate;
 mod query;
 mod struct_analyzer;
+mod struct_select;
 
 struct TransactCtx<'a> {
     pg_model: &'a PgModel,

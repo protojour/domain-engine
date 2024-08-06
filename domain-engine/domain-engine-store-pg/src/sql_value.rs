@@ -92,7 +92,8 @@ impl<'b> SqlVal<'b> {
     ) -> DomainResult<SqlVal<'b>> {
         match iter.next() {
             Some(result) => result.map_err(domain_codec_error),
-            None => Err(ds_err("too few columns")),
+            None => panic!("too few columns"),
+            // None => Err(ds_err("too few columns")),
         }
     }
 

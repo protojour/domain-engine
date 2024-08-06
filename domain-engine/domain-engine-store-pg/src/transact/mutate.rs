@@ -8,10 +8,7 @@ use domain_engine_core::{
 };
 use fnv::FnvHashMap;
 use futures_util::{future::BoxFuture, TryStreamExt};
-use ontol_runtime::{
-    attr::Attr, ontology::domain::DataRelationshipTarget, query::select::Select, value::Value,
-    DefId, RelId,
-};
+use ontol_runtime::{attr::Attr, query::select::Select, value::Value, DefId, RelId};
 use pin_utils::pin_mut;
 use tokio_postgres::types::ToSql;
 use tracing::{debug, trace, warn};
@@ -96,27 +93,28 @@ impl<'a> TransactCtx<'a> {
                 &analyzed.root_attrs.datatable.table_name,
             ),
             column_names: analyzed.root_attrs.column_selection()?,
-            returning: vec!["_key"],
+            returning: vec![sql::Expr::path1("_key")],
         };
-        let mut row_layout: Vec<Layout> = vec![Layout::Scalar(PgType::BigInt)];
+        let mut layout: Vec<Layout> = vec![Layout::Scalar(PgType::BigInt)];
 
         match select {
             Select::EntityId => {
                 let id_rel_tag = entity.id_relationship_id.tag();
                 if let Some(field) = analyzed.root_attrs.datatable.data_fields.get(&id_rel_tag) {
-                    row_layout.push(Layout::Scalar(field.pg_type));
-                    insert.returning.push(&field.col_name);
+                    insert
+                        .returning
+                        .push(sql::Expr::path1(field.col_name.as_ref()));
+                    layout.push(Layout::Scalar(field.pg_type));
                 }
             }
-            Select::Struct(sel) => {
-                for rel_id in sel.properties.keys() {
-                    if let Some(field) =
-                        analyzed.root_attrs.datatable.data_fields.get(&rel_id.tag())
-                    {
-                        row_layout.push(Layout::Scalar(field.pg_type));
-                        insert.returning.push(&field.col_name);
-                    }
-                }
+            Select::Struct(_sel) => {
+                self.select_inherent_struct_fields(
+                    def,
+                    analyzed.root_attrs.datatable,
+                    None,
+                    &mut insert.returning,
+                    &mut layout,
+                )?;
             }
             _ => {
                 todo!()
@@ -141,7 +139,7 @@ impl<'a> TransactCtx<'a> {
                 .ok_or_else(|| ds_err("no rows returned"))?
         };
 
-        let mut row = RowDecodeIterator::new(&row, &row_layout);
+        let mut row = RowDecodeIterator::new(&row, &layout);
         let data_key = SqlVal::next_column(&mut row)?.into_i64()?;
 
         // write edges
@@ -219,21 +217,7 @@ impl<'a> TransactCtx<'a> {
                 let mut attrs: FnvHashMap<RelId, Attr> =
                     FnvHashMap::with_capacity_and_hasher(sel.properties.len(), Default::default());
 
-                for rel_id in sel.properties.keys() {
-                    let sql_val = SqlVal::next_column(&mut row)?.null_filter();
-                    let data_relationship = def.data_relationships.get(rel_id).unwrap();
-
-                    match (&data_relationship.target, sql_val) {
-                        (DataRelationshipTarget::Unambiguous(def_id), Some(sql_val)) => {
-                            attrs.insert(
-                                *rel_id,
-                                Attr::Unit(self.deserialize_sql(*def_id, sql_val)?),
-                            );
-                        }
-                        (DataRelationshipTarget::Union(_), Some(_sql_val)) => {}
-                        (_, None) => {}
-                    }
-                }
+                self.read_inherent_struct_fields(def, &mut row, &mut attrs)?;
 
                 Ok(RowValue {
                     value: Value::Struct(Box::new(attrs), def.id.into()),
