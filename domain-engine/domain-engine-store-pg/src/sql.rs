@@ -182,7 +182,7 @@ impl<'d> Display for Expr<'d> {
 impl<'d> Display for PathSegment<'d> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PathSegment::Ident(i) => write!(f, "{i}"),
+            PathSegment::Ident(i) => write!(f, "{}", Ident(i)),
             PathSegment::Alias(a) => write!(f, "{a}"),
             PathSegment::Param(p) => write!(f, "{p}"),
         }
