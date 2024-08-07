@@ -113,8 +113,8 @@ async fn execute_migration_step<'t>(
         MigrationStep::DeployDataField {
             datatable_def_id,
             rel_tag,
-            column_name,
             pg_type,
+            column_name,
         } => {
             let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
             let datatable = pg_domain.datatables.get_mut(&datatable_def_id).unwrap();
@@ -154,15 +154,10 @@ async fn execute_migration_step<'t>(
                     ) VALUES($1, $2, $3, $4)
                     RETURNING key
                 "},
-                    &[
-                        &datatable.key,
-                        &(rel_tag.0 as i32),
-                        &pg_type.as_string()?,
-                        &column_name,
-                    ],
+                    &[&datatable.key, &(rel_tag.0 as i32), &pg_type, &column_name],
                 )
                 .await
-                .context("update datafield")?
+                .context("create datafield")?
                 .unpack();
 
             datatable.data_fields.insert(

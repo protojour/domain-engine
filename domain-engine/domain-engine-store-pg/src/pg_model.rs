@@ -12,7 +12,6 @@ use ontol_runtime::{
     DefId, DefRelTag, PackageId, RelId,
 };
 use postgres_types::ToSql;
-use serde::{de::value::StrDeserializer, Deserialize, Serialize};
 use tokio_postgres::types::FromSql;
 use tracing::debug;
 
@@ -150,7 +149,7 @@ pub struct PgIndexData {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, ToSql, FromSql, Debug)]
-#[postgres(name = "m6m_index_type")]
+#[postgres(name = "m6m_pg_index_type")]
 pub enum PgIndexType {
     #[postgres(name = "unique")]
     Unique,
@@ -204,32 +203,33 @@ pub struct PgEdgeCardinal {
 
 /// NB: Do not change the names of these enum variants.
 /// They are serialized to and deserialized from DB.
-#[derive(Clone, Copy, PartialEq, Serialize, Deserialize, Debug)]
-#[serde(rename_all = "lowercase")]
+#[derive(Clone, Copy, PartialEq, ToSql, FromSql, Debug)]
+#[postgres(name = "m6m_pg_type")]
 pub enum PgType {
     /// TODO: Can join all bool fields in one bitstring that's just appended to?
+    #[postgres(name = "boolean")]
     Boolean,
     /// i32
+    #[postgres(name = "integer")]
     Integer,
     /// i64
+    #[postgres(name = "bigint")]
     BigInt,
     /// f64
+    #[postgres(name = "double precision")]
     DoublePrecision,
+    #[postgres(name = "text")]
     Text,
     /// byte array
+    #[postgres(name = "bytea")]
     Bytea,
+    #[postgres(name = "timestamptz")]
     TimestampTz,
+    #[postgres(name = "bigserial")]
     Bigserial,
 }
 
 impl PgType {
-    pub fn as_string(&self) -> anyhow::Result<String> {
-        match serde_json::to_value(self) {
-            Ok(serde_json::Value::String(string)) => Ok(string),
-            _ => panic!("cannot serialize to string"),
-        }
-    }
-
     pub fn from_def_id(def_id: DefId, ontology: &Ontology) -> DomainResult<Option<PgType>> {
         let def = ontology.get_def(def_id).unwrap();
         let def_repr = match &def.kind {
@@ -254,19 +254,5 @@ impl PgType {
             DefRepr::Union(..) => todo!("union"),
             DefRepr::Unknown => Err(ds_err("unknown repr: {def_id:?}")),
         }
-    }
-}
-
-impl<'a> FromSql<'a> for PgType {
-    fn from_sql(
-        ty: &tokio_postgres::types::Type,
-        raw: &'a [u8],
-    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
-        let str = <&str as FromSql>::from_sql(ty, raw)?;
-        Self::deserialize(StrDeserializer::<serde_json::Error>::new(str)).map_err(|err| err.into())
-    }
-
-    fn accepts(ty: &tokio_postgres::types::Type) -> bool {
-        <&str as FromSql>::accepts(ty)
     }
 }

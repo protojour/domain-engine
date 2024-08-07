@@ -1,9 +1,20 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS ltree;
 
-CREATE TYPE m6m_index_type AS ENUM (
+CREATE TYPE m6m_pg_index_type AS ENUM (
     'unique',
     'btree'
+);
+
+CREATE TYPE m6m_pg_type AS ENUM (
+    'boolean',
+    'integer',
+    'bigint',
+    'double precision',
+    'text',
+    'bytea',
+    'timestamptz',
+    'bigserial'
 );
 
 CREATE SCHEMA m6m_reg;
@@ -55,7 +66,7 @@ CREATE TABLE m6m_reg.datatable_index
     -- the tag of the definition that identifies this index
     def_tag integer NOT NULL,
     -- the type of the index
-    index_type m6m_index_type NOT NULL,
+    index_type m6m_pg_index_type NOT NULL,
     -- datafield participating in the index. Must be fields of the datatable key
     datafield_keys integer[] NOT NULL,
 
@@ -68,7 +79,7 @@ CREATE TABLE m6m_reg.datafield
     key serial PRIMARY KEY,
     datatable_key integer NOT NULL REFERENCES m6m_reg.datatable(key),
     rel_tag integer NOT NULL,
-    pg_type text NOT NULL,
+    pg_type m6m_pg_type NOT NULL,
     column_name text NOT NULL
 );
 
