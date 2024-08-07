@@ -4,6 +4,7 @@ use futures_util::Stream;
 use ontol_runtime::{
     attr::{Attr, AttrMatrix},
     ontology::domain::{DataRelationshipKind, DataRelationshipTarget, Def},
+    property::ValueCardinality,
     query::select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     value::Value,
     DefId, RelId,
@@ -77,7 +78,7 @@ impl<'a> TransactCtx<'a> {
 
             for await row_result in row_stream {
                 let row = row_result.map_err(|_| ds_err("unable to fetch row"))?;
-                let row_value = self.read_row_value(RowDecodeIterator::new(&row, &row_layout), def, &struct_select)?;
+                let row_value = self.read_struct_row_value(RowDecodeIterator::new(&row, &row_layout), def, &struct_select)?;
                 yield row_value;
             }
         })
@@ -175,7 +176,7 @@ impl<'a> TransactCtx<'a> {
                     _ => todo!(),
                 };
 
-                let sql_subselect = sql::Select {
+                let mut sql_subselect = sql::Select {
                     expressions: vec![sql::Expr::Row(expressions)],
                     from: vec![sql::Join {
                         first: pg_sub.table_name().as_(sub_alias),
@@ -198,9 +199,17 @@ impl<'a> TransactCtx<'a> {
                     limit: None,
                 };
 
-                sql_expressions.push(sql::Expr::array(sql_subselect.into()));
-
-                layout.push(Layout::Array(Box::new(Layout::Record(sub_layout))));
+                match rel_info.cardinality.1 {
+                    ValueCardinality::Unit => {
+                        sql_subselect.limit = Some(1);
+                        sql_expressions.push(sql_subselect.into());
+                        layout.push(Layout::Record(sub_layout));
+                    }
+                    ValueCardinality::IndexSet | ValueCardinality::List => {
+                        sql_expressions.push(sql::Expr::array(sql_subselect.into()));
+                        layout.push(Layout::Array(Box::new(Layout::Record(sub_layout))));
+                    }
+                }
             } else {
                 panic!("union edge");
             };
@@ -209,7 +218,7 @@ impl<'a> TransactCtx<'a> {
         Ok(sql_expressions)
     }
 
-    fn read_row_value<'b>(
+    fn read_struct_row_value<'b>(
         &self,
         mut row: impl Iterator<Item = CodecResult<SqlVal<'b>>>,
         def: &Def,
@@ -226,52 +235,41 @@ impl<'a> TransactCtx<'a> {
 
         // retrieve edges
         for (rel_id, select) in &struct_select.properties {
-            let Some(rel) = def.data_relationships.get(rel_id) else {
+            let Some(rel_info) = def.data_relationships.get(rel_id) else {
                 continue;
             };
-            let DataRelationshipKind::Edge(_proj) = &rel.kind else {
+            let DataRelationshipKind::Edge(_proj) = &rel_info.kind else {
                 continue;
             };
 
-            let mut matrix = AttrMatrix::default();
-            matrix.columns.push(Default::default());
-
-            let sql_array = SqlVal::next_column(&mut row)?.into_array()?;
-
-            let target_def_id = match rel.target {
+            let target_def_id = match rel_info.target {
                 DataRelationshipTarget::Unambiguous(def_id) => def_id,
                 DataRelationshipTarget::Union(_) => todo!(),
             };
 
-            for result in sql_array.elements() {
-                let sql_record = result.map_err(domain_codec_error)?.into_record()?;
+            debug!("target def id: {target_def_id:?}");
 
-                debug!("target def id: {target_def_id:?}");
+            let sql_val = SqlVal::next_column(&mut row)?;
 
-                match select {
-                    Select::Leaf => {
-                        let sql_field = sql_record
-                            .fields()
-                            .next()
-                            .ok_or_else(|| ds_err("no fields"))?
-                            .unwrap();
-                        let entity = self.ontology.def(target_def_id).entity().unwrap();
+            match rel_info.cardinality.1 {
+                ValueCardinality::Unit => {
+                    if let Some(sql_val) = sql_val.null_filter() {
+                        let value = self.read_record(sql_val, target_def_id, select)?;
+                        attrs.insert(*rel_id, Attr::Unit(value));
+                    }
+                }
+                ValueCardinality::IndexSet | ValueCardinality::List => {
+                    let mut matrix = AttrMatrix::default();
+                    matrix.columns.push(Default::default());
 
-                        let value = self.deserialize_sql(entity.id_value_def_id, sql_field)?;
+                    for result in sql_val.into_array()?.elements() {
+                        let sql_val = result.map_err(domain_codec_error)?;
+                        let value = self.read_record(sql_val, target_def_id, select)?;
                         matrix.columns[0].push(value);
                     }
-                    Select::Struct(next_struct_select) => {
-                        let def = self.ontology.def(target_def_id);
-                        let row_value =
-                            self.read_row_value(sql_record.fields(), def, next_struct_select)?;
-
-                        matrix.columns[0].push(row_value.value);
-                    }
-                    _ => todo!("unhandled select"),
+                    attrs.insert(*rel_id, Attr::Matrix(matrix));
                 }
             }
-
-            attrs.insert(*rel_id, Attr::Matrix(matrix));
         }
 
         Ok(RowValue {
@@ -279,6 +277,36 @@ impl<'a> TransactCtx<'a> {
             data_key,
             op: DataOperation::Inserted,
         })
+    }
+
+    fn read_record(
+        &self,
+        sql_val: SqlVal,
+        target_def_id: DefId,
+        select: &Select,
+    ) -> DomainResult<Value> {
+        let sql_record = sql_val.into_record()?;
+        match select {
+            Select::Leaf => {
+                let sql_field = sql_record
+                    .fields()
+                    .next()
+                    .ok_or_else(|| ds_err("no fields"))?
+                    .unwrap();
+                let entity = self.ontology.def(target_def_id).entity().unwrap();
+
+                let value = self.deserialize_sql(entity.id_value_def_id, sql_field)?;
+                Ok(value)
+            }
+            Select::Struct(struct_select) => {
+                let def = self.ontology.def(target_def_id);
+                let row_value =
+                    self.read_struct_row_value(sql_record.fields(), def, struct_select)?;
+
+                Ok(row_value.value)
+            }
+            _ => todo!("unhandled select"),
+        }
     }
 }
 

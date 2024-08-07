@@ -28,7 +28,7 @@ pub enum SqlVal<'b> {
     Date(chrono::NaiveDate),
     Time(chrono::NaiveTime),
     Array(SqlArray<'b>),
-    Record(SqlComposite<'b>),
+    Record(SqlRecord<'b>),
 }
 
 /// Layout of Sql data
@@ -80,9 +80,9 @@ impl<'b> SqlVal<'b> {
         }
     }
 
-    pub fn into_record(self) -> DomainResult<SqlComposite<'b>> {
+    pub fn into_record(self) -> DomainResult<SqlRecord<'b>> {
         match self {
-            Self::Record(composite) => Ok(composite),
+            Self::Record(record) => Ok(record),
             _ => Err(ds_err("expected record")),
         }
     }
@@ -142,7 +142,7 @@ impl<'b> SqlVal<'b> {
                 }))
             }
             Layout::Record(field_layouts) => {
-                Ok(Self::Record(SqlComposite::from_sql(raw, field_layouts)?))
+                Ok(Self::Record(SqlRecord::from_sql(raw, field_layouts)?))
             }
         }
     }
@@ -255,24 +255,24 @@ impl<'b> Debug for SqlArray<'b> {
     }
 }
 
-pub struct SqlComposite<'b> {
+pub struct SqlRecord<'b> {
     field_count: i32,
     buf: &'b [u8],
     field_layout: &'b [Layout],
 }
 
-impl<'b> Debug for SqlComposite<'b> {
+impl<'b> Debug for SqlRecord<'b> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SqlComposite")
+        f.debug_struct("SqlRecord")
             .field("field_count", &self.field_count)
             .finish()
     }
 }
 
-impl<'b> SqlComposite<'b> {
-    /// It was hard to find the binary documentation for composite types.
+impl<'b> SqlRecord<'b> {
+    /// It was hard to find the binary documentation for composite/record types.
     /// Used this as a reference: https://github.com/jackc/pgtype/blob/a4d4bbf043f7988ea29696a612cf311026fedf92/composite_type.go
-    fn from_sql(mut buf: &'b [u8], field_layout: &'b [Layout]) -> CodecResult<SqlComposite<'b>> {
+    fn from_sql(mut buf: &'b [u8], field_layout: &'b [Layout]) -> CodecResult<SqlRecord<'b>> {
         let field_count = buf.read_i32::<BigEndian>()?;
         if field_count < 0 {
             return Err("invalid field count".into());
@@ -280,37 +280,37 @@ impl<'b> SqlComposite<'b> {
 
         if field_count as usize != field_layout.len() {
             return Err(
-                "field layout length does not correspond to composite value field count".into(),
+                "field layout length does not correspond to record value field count".into(),
             );
         }
 
-        Ok(SqlComposite {
+        Ok(SqlRecord {
             field_count,
             buf,
             field_layout,
         })
     }
 
-    pub fn fields(&self) -> CompositeFields<'b> {
-        CompositeFields {
+    pub fn fields(&self) -> RecordFields<'b> {
+        RecordFields {
             buf: self.buf,
             layout_iter: self.field_layout.iter(),
         }
     }
 }
 
-pub struct CompositeFields<'b> {
+pub struct RecordFields<'b> {
     buf: &'b [u8],
     layout_iter: std::slice::Iter<'b, Layout>,
 }
 
-impl<'b> Iterator for CompositeFields<'b> {
+impl<'b> Iterator for RecordFields<'b> {
     type Item = CodecResult<SqlVal<'b>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.buf.is_empty() {
             return if self.layout_iter.next().is_some() {
-                Some(Err("layout is longer than actual composite fields".into()))
+                Some(Err("layout is longer than actual record fields".into()))
             } else {
                 None
             };
@@ -320,19 +320,21 @@ impl<'b> Iterator for CompositeFields<'b> {
     }
 }
 
-impl<'b> CompositeFields<'b> {
+impl<'b> RecordFields<'b> {
     fn decode_next_field(&mut self) -> CodecResult<SqlVal<'b>> {
         let Some(layout) = self.layout_iter.next() else {
-            return Err("more composite fields than layout fields".into());
+            return Err("more record fields than layout fields".into());
         };
 
         let _oid = self.buf.read_u32::<BigEndian>()?;
-        let field_len: usize = self.buf.read_u32::<BigEndian>()? as usize;
-        let field_buf = &self.buf[0..field_len];
+        let field_len = self.buf.read_i32::<BigEndian>()?;
 
-        self.buf.advance(field_len);
+        if field_len > 0 {
+            let field_len = field_len as usize;
+            let field_buf = &self.buf[0..field_len];
 
-        if !field_buf.is_empty() {
+            self.buf.advance(field_len);
+
             SqlVal::decode(Some(field_buf), layout)
         } else {
             Ok(SqlVal::Null)
