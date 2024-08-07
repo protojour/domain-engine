@@ -374,10 +374,15 @@ impl ArangoDatabase {
                 .aql(query, false, false, None, processor)
                 .await
                 .map_err(|err| {
-                    if err.to_string().starts_with("404") {
-                        return DomainErrorKind::EntityNotFound.into_error();
+                    let err_string = err.to_string();
+
+                    if err_string.starts_with("404") {
+                        DomainErrorKind::EntityNotFound.into_error()
+                    } else if err_string.starts_with("409") {
+                        DomainErrorKind::EntityAlreadyExists.into_error()
+                    } else {
+                        DomainError::data_store(err_string)
                     }
-                    DomainError::data_store(format!("{err}"))
                 })?;
         }
 

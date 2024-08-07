@@ -11,7 +11,7 @@ use futures_util::{future::BoxFuture, TryStreamExt};
 use ontol_runtime::{attr::Attr, query::select::Select, value::Value, DefId, RelId};
 use pin_utils::pin_mut;
 use tokio_postgres::types::ToSql;
-use tracing::{debug, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{
     ds_bad_req, ds_err,
@@ -135,7 +135,22 @@ impl<'a> TransactCtx<'a> {
             stream
                 .try_next()
                 .await
-                .map_err(|_| ds_err("could not fetch row"))?
+                .map_err(|e| {
+                    if let Some(db_error) = e.as_db_error() {
+                        if db_error
+                            .message()
+                            .starts_with("duplicate key value violates unique constraint")
+                        {
+                            DomainErrorKind::EntityAlreadyExists.into_error()
+                        } else {
+                            info!("row fetch error: {db_error:?}");
+                            ds_err("could not fetch row")
+                        }
+                    } else {
+                        error!("row fetch error: {e:?}");
+                        ds_err("could not fetch row")
+                    }
+                })?
                 .ok_or_else(|| ds_err("no rows returned"))?
         };
 

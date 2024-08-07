@@ -10,7 +10,7 @@ use tokio_postgres::{Client, Transaction};
 use tracing::{debug_span, info, Instrument};
 
 use crate::{
-    pg_model::{DomainUid, PgDomain, PgType, RegVersion},
+    pg_model::{DomainUid, PgDomain, PgIndexType, PgType, RegVersion},
     PgModel,
 };
 
@@ -53,6 +53,12 @@ enum MigrationStep {
         rel_tag: DefRelTag,
         column_name: Box<str>,
         pg_type: PgType,
+    },
+    DeployDataIndex {
+        datatable_def_id: DefId,
+        index_def_id: DefId,
+        index_type: PgIndexType,
+        field_tuple: Vec<DefRelTag>,
     },
     DeployEdge {
         edge_tag: u16,

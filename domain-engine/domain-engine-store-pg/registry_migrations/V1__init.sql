@@ -1,6 +1,11 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS ltree;
 
+CREATE TYPE m6m_index_type AS ENUM (
+    'unique',
+    'btree'
+);
+
 CREATE SCHEMA m6m_reg;
 
 -- The state of the migrated domain schemas outside m6m_reg.
@@ -38,6 +43,23 @@ CREATE TABLE m6m_reg.datatable
     table_name text NOT NULL,
     -- the name of the key column
     key_column text NOT NULL
+);
+
+-- Represents a postgres unique constraint over a field tuple
+CREATE TABLE m6m_reg.datatable_index
+(
+    -- the datatable implied by this unique group
+    datatable_key integer NOT NULL REFERENCES m6m_reg.datatable(key),
+    -- the domain of the definition that identifies this index
+    def_domain_key integer NOT NULL REFERENCES m6m_reg.domain(key),
+    -- the tag of the definition that identifies this index
+    def_tag integer NOT NULL,
+    -- the type of the index
+    index_type m6m_index_type NOT NULL,
+    -- datafield participating in the index. Must be fields of the datatable key
+    datafield_keys integer[] NOT NULL,
+
+    UNIQUE (datatable_key, def_domain_key, def_tag, index_type)
 );
 
 -- The set of keys per datatable

@@ -11,6 +11,7 @@ use ontol_runtime::{
     value::Value,
     DefId, DefRelTag, PackageId, RelId,
 };
+use postgres_types::ToSql;
 use serde::{de::value::StrDeserializer, Deserialize, Serialize};
 use tokio_postgres::types::FromSql;
 use tracing::debug;
@@ -121,6 +122,7 @@ pub struct PgDataTable {
     pub key: PgRegKey,
     pub table_name: Box<str>,
     pub data_fields: FnvHashMap<DefRelTag, PgDataField>,
+    pub datafield_indexes: FnvHashMap<(DefId, PgIndexType), PgIndexData>,
 }
 
 impl PgDataTable {
@@ -134,6 +136,26 @@ impl PgDataTable {
             ))
         })
     }
+
+    pub fn field_by_key(&self, key: PgRegKey) -> Option<&PgDataField> {
+        self.data_fields
+            .values()
+            .find(|datafield| datafield.key == key)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct PgIndexData {
+    pub datafield_keys: Vec<PgRegKey>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ToSql, FromSql, Debug)]
+#[postgres(name = "m6m_index_type")]
+pub enum PgIndexType {
+    #[postgres(name = "unique")]
+    Unique,
+    #[postgres(name = "btree")]
+    BTree,
 }
 
 #[derive(Clone, Copy)]
@@ -150,6 +172,7 @@ impl<'a> PgDomainTable<'a> {
 
 #[derive(Clone, Debug)]
 pub struct PgDataField {
+    pub key: PgRegKey,
     pub col_name: Box<str>,
     pub pg_type: PgType,
 }

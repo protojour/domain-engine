@@ -2638,6 +2638,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "postgres-derive"
+version = "0.4.5"
+source = "git+https://github.com/audunhalland/rust-postgres.git?branch=pub_col_buffer#e14e93187bc98d5c199cedcfaa2bc64d455d1b0f"
+dependencies = [
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "postgres-protocol"
 version = "0.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2680,6 +2691,7 @@ dependencies = [
  "bytes",
  "chrono",
  "fallible-iterator",
+ "postgres-derive",
  "postgres-protocol 0.6.7 (git+https://github.com/audunhalland/rust-postgres.git?branch=pub_col_buffer)",
  "serde",
  "serde_json",

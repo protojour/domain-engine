@@ -1,11 +1,12 @@
 use anyhow::Context;
 use indoc::indoc;
+use itertools::Itertools;
 use tokio_postgres::Transaction;
 use tracing::{info, info_span, Instrument};
 
 use crate::{
-    pg_model::{PgDataField, PgDataTable, PgEdge, PgEdgeCardinal, PgRegKey, PgType},
-    sql,
+    pg_model::{PgDataField, PgDataTable, PgEdge, PgEdgeCardinal, PgIndexType, PgRegKey, PgType},
+    sql::{self, Unpack},
 };
 
 use super::{MigrationCtx, MigrationStep, PgDomainIds};
@@ -105,6 +106,7 @@ async fn execute_migration_step<'t>(
                     key: datatable_key,
                     table_name,
                     data_fields: Default::default(),
+                    datafield_indexes: Default::default(),
                 },
             );
         }
@@ -141,8 +143,9 @@ async fn execute_migration_step<'t>(
             .await
             .context("alter table add column")?;
 
-            txn.query_one(
-                indoc! { "
+            let (key,) = txn
+                .query_one(
+                    indoc! { "
                     INSERT INTO m6m_reg.datafield (
                         datatable_key,
                         rel_tag,
@@ -151,23 +154,83 @@ async fn execute_migration_step<'t>(
                     ) VALUES($1, $2, $3, $4)
                     RETURNING key
                 "},
-                &[
-                    &datatable.key,
-                    &(rel_tag.0 as i32),
-                    &pg_type.as_string()?,
-                    &column_name,
-                ],
-            )
-            .await
-            .context("update datafield")?;
+                    &[
+                        &datatable.key,
+                        &(rel_tag.0 as i32),
+                        &pg_type.as_string()?,
+                        &column_name,
+                    ],
+                )
+                .await
+                .context("update datafield")?
+                .unpack();
 
             datatable.data_fields.insert(
                 rel_tag,
                 PgDataField {
+                    key,
                     col_name: column_name,
                     pg_type,
                 },
             );
+        }
+        MigrationStep::DeployDataIndex {
+            datatable_def_id,
+            index_def_id,
+            index_type,
+            field_tuple,
+        } => {
+            let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
+            let pg_datatable = pg_domain.datatables.get(&datatable_def_id).unwrap();
+
+            let datafield_tuple: Vec<_> = field_tuple
+                .iter()
+                .map(|rel_tag| pg_datatable.data_fields.get(rel_tag).unwrap())
+                .collect();
+
+            txn.query(
+                &format!(
+                    "CREATE {index} ON {schema}.{table} ({columns})",
+                    index = match index_type {
+                        PgIndexType::Unique => "UNIQUE INDEX",
+                        PgIndexType::BTree => "INDEX",
+                    },
+                    schema = sql::Ident(&pg_domain.schema_name),
+                    table = sql::Ident(&pg_datatable.table_name),
+                    columns = datafield_tuple
+                        .iter()
+                        .map(|pg_datafield| pg_datafield.col_name.as_ref())
+                        .map(sql::Ident)
+                        .format(","),
+                ),
+                &[],
+            )
+            .await
+            .context("create index")?;
+
+            txn.query(
+                indoc! { "
+                    INSERT INTO m6m_reg.datatable_index (
+                        datatable_key,
+                        def_domain_key,
+                        def_tag,
+                        index_type,
+                        datafield_keys
+                    ) VALUES($1, $2, $3, $4, $5)
+                "},
+                &[
+                    &pg_datatable.key,
+                    &pg_domain.key,
+                    &(index_def_id.1 as i32),
+                    &index_type,
+                    &datafield_tuple
+                        .iter()
+                        .map(|datafield| datafield.key)
+                        .collect_vec(),
+                ],
+            )
+            .await
+            .context("update datafield")?;
         }
         MigrationStep::DeployEdge {
             edge_tag,

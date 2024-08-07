@@ -83,14 +83,17 @@ async fn misc(ds: &str) {
 
     info!("Create duplicate user, should fail");
 
-    r#"mutation {
-        User(
-            create: [{ id: "user/bob" email: "bob2@bob.com" }]
-        ) { node { id } }
-    }"#
-    .exec([], &schema, &ctx)
-    .await
-    .expect_err("user/bob already exists, so this should be an error");
+    expect_eq!(
+        actual = r#"mutation {
+            User(
+                create: [{ id: "user/bob" email: "bob2@bob.com" }]
+            ) { node { id } }
+        }"#
+        .exec([], &schema, &ctx)
+        .await
+        .unwrap_first_exec_error_msg(),
+        expected = "entity already exists"
+    );
 
     info!("Create organization");
 

@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use anyhow::{anyhow, Context};
+use fnv::FnvHashMap;
 use indoc::indoc;
 use itertools::Itertools;
 use ontol_runtime::{
@@ -15,7 +16,10 @@ use tracing::info;
 
 use crate::{
     migrate::{MigrationStep, PgDomain},
-    pg_model::{PgDataField, PgDataTable, PgEdge, PgEdgeCardinal, PgRegKey, PgType},
+    pg_model::{
+        PgDataField, PgDataTable, PgEdge, PgEdgeCardinal, PgIndexData, PgIndexType, PgRegKey,
+        PgType,
+    },
     sql::Unpack,
 };
 
@@ -74,6 +78,7 @@ pub async fn migrate_domain_steps<'t>(
                         key,
                         table_name,
                         data_fields: Default::default(),
+                        datafield_indexes: Default::default(),
                     },
                 ))
             })
@@ -252,12 +257,50 @@ async fn migrate_vertex_steps<'t>(
             .context("read datatables")?
             .into_iter()
             .map(|row| -> anyhow::Result<_> {
-                let _key: PgRegKey = row.get(0);
+                let key: PgRegKey = row.get(0);
                 let rel_tag = DefRelTag(row.get::<_, i32>(1).try_into()?);
                 let pg_type = row.get(2);
                 let col_name: Box<str> = row.get(3);
 
-                Ok((rel_tag, PgDataField { col_name, pg_type }))
+                Ok((
+                    rel_tag,
+                    PgDataField {
+                        key,
+                        col_name,
+                        pg_type,
+                    },
+                ))
+            })
+            .try_collect()?;
+
+        let pg_indexes: FnvHashMap<(DefId, PgIndexType), PgIndexData> = txn
+            .query(
+                indoc! {"
+                    SELECT
+                        datatable_key,
+                        def_domain_key,
+                        def_tag,
+                        index_type,
+                        datafield_keys
+                    FROM m6m_reg.datatable_index
+                    WHERE datatable_key = $1
+                "},
+                &[&datatable.key],
+            )
+            .await
+            .context("read indexes")?
+            .into_iter()
+            .map(|row| -> anyhow::Result<_> {
+                let _datatable_key: PgRegKey = row.get(0);
+                let def_domain_key: PgRegKey = row.get(1);
+                let def_tag: u16 = row.get::<_, i32>(2).try_into()?;
+                let index_type: PgIndexType = row.get(3);
+                let datafield_keys: Vec<PgRegKey> = row.get(4);
+
+                assert_eq!(def_domain_key, pg_domain.key.unwrap());
+                let index_def_id = DefId(def.id.package_id(), def_tag);
+
+                Ok(((index_def_id, index_type), PgIndexData { datafield_keys }))
             })
             .try_collect()?;
 
@@ -273,6 +316,7 @@ async fn migrate_vertex_steps<'t>(
         }
 
         datatable.data_fields = pg_fields;
+        datatable.datafield_indexes = pg_indexes;
     } else {
         ctx.steps.push((
             domain_ids,
@@ -294,17 +338,18 @@ async fn migrate_vertex_steps<'t>(
 
     tree_relationships.sort_by_key(|(rel_tag, _)| rel_tag.0);
 
-    for (rel_tag, rel) in tree_relationships {
+    // fields
+    for (rel_tag, rel_info) in &tree_relationships {
         let pg_data_field = pg_domain
             .datatables
             .get(&vertex_def_id)
-            .and_then(|datatable| datatable.data_fields.get(&rel_tag));
+            .and_then(|datatable| datatable.data_fields.get(rel_tag));
 
         // FIXME: should mix columns on the root _and_ child structures,
         // so there needs to be some disambiguation in place
-        let column_name = ontology[rel.name].to_string().into_boxed_str();
+        let column_name = ontology[rel_info.name].to_string().into_boxed_str();
 
-        let pg_type = match rel.target {
+        let pg_type = match rel_info.target {
             DataRelationshipTarget::Unambiguous(def_id) => {
                 match PgType::from_def_id(def_id, ontology).map_err(|err| anyhow!("{err:?}"))? {
                     Some(pg_type) => pg_type,
@@ -330,11 +375,47 @@ async fn migrate_vertex_steps<'t>(
                 domain_ids,
                 MigrationStep::DeployDataField {
                     datatable_def_id: vertex_def_id,
-                    rel_tag,
+                    rel_tag: *rel_tag,
                     pg_type,
                     column_name,
                 },
             ));
+        }
+    }
+
+    // indexes
+    for (rel_tag, rel_info) in &tree_relationships {
+        if let DataRelationshipKind::Id = &rel_info.kind {
+            let index_type = PgIndexType::Unique;
+
+            let DataRelationshipTarget::Unambiguous(def_id) = rel_info.target else {
+                return Err(anyhow!("the ID must be unambiguously typed"));
+            };
+
+            let pg_datatable = pg_domain.datatables.get(&vertex_def_id);
+
+            let pg_index_data = pg_datatable
+                .and_then(|datatable| datatable.datafield_indexes.get(&(def_id, index_type)));
+
+            match pg_index_data {
+                Some(pg_index_data) => {
+                    let pg_datatable = &pg_domain.datatables.get(&vertex_def_id).unwrap();
+                    for datafield_key in &pg_index_data.datafield_keys {
+                        assert!(pg_datatable.field_by_key(*datafield_key).is_some());
+                    }
+                }
+                None => {
+                    ctx.steps.push((
+                        domain_ids,
+                        MigrationStep::DeployDataIndex {
+                            datatable_def_id: vertex_def_id,
+                            index_def_id: def_id,
+                            index_type,
+                            field_tuple: vec![*rel_tag],
+                        },
+                    ));
+                }
+            }
         }
     }
 
