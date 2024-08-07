@@ -6,6 +6,7 @@ use ontol_runtime::{
     ontology::domain::{DataRelationshipKind, DataRelationshipTarget, Def},
     property::ValueCardinality,
     query::select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
+    sequence::SubSequence,
     value::Value,
     DefId, RelId,
 };
@@ -22,8 +23,13 @@ use crate::{
 
 use super::{data::RowValue, TransactCtx};
 
+pub enum QueryFrame {
+    Header(Option<Box<SubSequence>>),
+    Row(RowValue),
+}
+
 #[derive(Default)]
-struct QueryCtx {
+struct QueryBuildCtx {
     alias: Alias,
 }
 
@@ -31,8 +37,10 @@ impl<'a> TransactCtx<'a> {
     pub async fn query(
         &self,
         entity_select: EntitySelect,
-    ) -> DomainResult<impl Stream<Item = DomainResult<RowValue>> + '_> {
+    ) -> DomainResult<impl Stream<Item = DomainResult<QueryFrame>> + '_> {
         debug!("query {entity_select:?}");
+
+        let include_total_len = entity_select.include_total_len;
 
         let struct_select = match entity_select.source {
             StructOrUnionSelect::Struct(struct_select) => struct_select,
@@ -47,22 +55,29 @@ impl<'a> TransactCtx<'a> {
         let pg = self.pg_model.pg_domain_table(def_id.package_id(), def_id)?;
 
         let mut row_layout: Vec<Layout> = vec![];
-        let mut ctx = QueryCtx::default();
+        let mut ctx = QueryBuildCtx::default();
         let root_alias = ctx.alias;
 
-        let sql_select = sql::Select {
-            expressions: self.sql_select_expressions(
-                def_id,
-                &struct_select,
-                pg,
-                root_alias,
-                &mut row_layout,
-                &mut ctx,
-            )?,
+        let mut sql_select = sql::Select {
+            expressions: vec![],
             from: vec![pg.table_name().as_(root_alias)],
             where_: None,
-            limit: Some(entity_select.limit),
+            limit: Some(entity_select.limit + 1),
         };
+
+        if include_total_len {
+            sql_select.expressions.push(sql::Expr::CountStarOver);
+            row_layout.push(Layout::Scalar(PgType::BigInt));
+        }
+
+        sql_select.expressions.extend(self.sql_select_expressions(
+            def_id,
+            &struct_select,
+            pg,
+            root_alias,
+            &mut row_layout,
+            &mut ctx,
+        )?);
 
         let sql = sql_select.to_string();
         debug!("{sql}");
@@ -76,10 +91,33 @@ impl<'a> TransactCtx<'a> {
         Ok(async_stream::try_stream! {
             pin_mut!(row_stream);
 
+            let mut send_header = true;
+
             for await row_result in row_stream {
                 let row = row_result.map_err(|_| ds_err("unable to fetch row"))?;
-                let row_value = self.read_struct_row_value(RowDecodeIterator::new(&row, &row_layout), def, &struct_select)?;
-                yield row_value;
+                let mut row_iter = RowDecodeIterator::new(&row, &row_layout);
+
+                let total_len = if include_total_len {
+                    // must read this for every row if include_total_len was true
+                    Some(row_iter.next().unwrap().map_err(domain_codec_error)?.into_i64()? as usize)
+                } else {
+                    None
+                };
+
+                if send_header {
+                    yield QueryFrame::Header(
+                        Some(Box::new(SubSequence {
+                            end_cursor: Some(Box::new([])),
+                            has_next: true,
+                            total_len
+                        }))
+                    );
+
+                    send_header = false;
+                }
+
+                let row_value = self.read_struct_row_value(row_iter, def, &struct_select)?;
+                yield QueryFrame::Row(row_value);
             }
         })
     }
@@ -91,7 +129,7 @@ impl<'a> TransactCtx<'a> {
         pg: PgDomainTable<'a>,
         cur_alias: sql::Alias,
         layout: &mut Vec<Layout>,
-        ctx: &mut QueryCtx,
+        ctx: &mut QueryBuildCtx,
     ) -> DomainResult<Vec<sql::Expr<'_>>> {
         let def = self.ontology.def(def_id);
 

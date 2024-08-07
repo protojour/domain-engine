@@ -11,6 +11,7 @@ use mutate::InsertMode;
 use ontol_runtime::{
     interface::serde::processor::ProcessorMode, ontology::Ontology, query::select::Select, DefId,
 };
+use query::QueryFrame;
 use tokio_postgres::IsolationLevel;
 use tracing::debug;
 
@@ -71,11 +72,15 @@ pub async fn transact(
                     state = None;
                     let stream = ctx.query(entity_select).await?;
 
-                    yield RespMessage::SequenceStart(op_seq, None);
-
                     for await result in stream {
-                        let row = result?;
-                        yield RespMessage::Element(row.value, DataOperation::Queried);
+                        match result? {
+                            QueryFrame::Header(sub_sequence) => {
+                                yield RespMessage::SequenceStart(op_seq, sub_sequence);
+                            }
+                            QueryFrame::Row(row) => {
+                                yield RespMessage::Element(row.value, DataOperation::Queried);
+                            }
+                        }
                     }
                 }
                 ReqMessage::Insert(op_seq, select) => {

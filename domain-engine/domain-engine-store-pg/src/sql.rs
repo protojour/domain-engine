@@ -74,6 +74,8 @@ pub enum Expr<'d> {
     ArrayAgg(Box<Expr<'d>>),
     #[allow(unused)]
     AsIndex(Box<Expr<'d>>, Alias),
+    /// count(*) over ()
+    CountStarOver,
 }
 
 impl<'d> Expr<'d> {
@@ -176,6 +178,7 @@ impl<'d> Display for Expr<'d> {
             Self::Array(expr) => write!(f, "ARRAY({expr})"),
             Self::ArrayAgg(expr) => write!(f, "ARRAY_AGG({expr})"),
             Self::AsIndex(expr, index) => write!(f, "{expr} AS {index}"),
+            Self::CountStarOver => write!(f, "COUNT(*) OVER()"),
         }
     }
 }
