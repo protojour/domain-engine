@@ -235,20 +235,31 @@ impl<'a> TransactCtx<'a> {
                         sub_layout.push(Layout::Scalar(pg_id.pg_type));
                         vec![sql::Expr::path2(sub_alias, pg_id.col_name.as_ref())]
                     }
-                    Select::Struct(struct_select) => {
-                        let def_id = struct_select.def_id;
-
-                        self.sql_select_expressions(
-                            def_id,
+                    Select::Struct(struct_select) => self.sql_select_expressions(
+                        struct_select.def_id,
+                        struct_select,
+                        self.pg_model
+                            .pg_domain_table(target_def_id.package_id(), target_def_id)?,
+                        sub_alias,
+                        &mut sub_layout,
+                        ctx,
+                    )?,
+                    Select::Entity(entity_select) => match &entity_select.source {
+                        StructOrUnionSelect::Struct(struct_select) => self.sql_select_expressions(
+                            struct_select.def_id,
                             struct_select,
                             self.pg_model
                                 .pg_domain_table(target_def_id.package_id(), target_def_id)?,
                             sub_alias,
                             &mut sub_layout,
                             ctx,
-                        )?
-                    }
-                    _ => todo!(),
+                        )?,
+                        StructOrUnionSelect::Union(_union_def_id, _variant_selects) => {
+                            todo!("union subselect")
+                        }
+                    },
+                    Select::EntityId => return Err(ds_err("select entity id")),
+                    Select::StructUnion(_, _) => todo!("struct-union"),
                 };
 
                 let mut sql_subselect = sql::Select {
@@ -373,13 +384,23 @@ impl<'a> TransactCtx<'a> {
                 let value = self.deserialize_sql(entity.id_value_def_id, sql_field)?;
                 Ok(value)
             }
-            Select::Struct(struct_select) => {
-                let def = self.ontology.def(target_def_id);
-                let row_value =
-                    self.read_struct_row_value(sql_record.fields(), def, struct_select)?;
-
-                Ok(row_value.value)
-            }
+            Select::Struct(struct_select) => Ok(self
+                .read_struct_row_value(
+                    sql_record.fields(),
+                    self.ontology.def(target_def_id),
+                    struct_select,
+                )?
+                .value),
+            Select::Entity(entity_select) => match &entity_select.source {
+                StructOrUnionSelect::Struct(struct_select) => Ok(self
+                    .read_struct_row_value(
+                        sql_record.fields(),
+                        self.ontology.def(target_def_id),
+                        struct_select,
+                    )?
+                    .value),
+                StructOrUnionSelect::Union(..) => todo!("unhandled union"),
+            },
             _ => todo!("unhandled select"),
         }
     }
