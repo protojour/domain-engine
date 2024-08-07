@@ -24,8 +24,8 @@ use crate::{
 use super::{data::RowValue, TransactCtx};
 
 pub enum QueryFrame {
-    Header(Option<Box<SubSequence>>),
     Row(RowValue),
+    Footer(Option<Box<SubSequence>>),
 }
 
 #[derive(Default)]
@@ -41,6 +41,7 @@ impl<'a> TransactCtx<'a> {
         debug!("query {entity_select:?}");
 
         let include_total_len = entity_select.include_total_len;
+        let limit = entity_select.limit;
 
         let struct_select = match entity_select.source {
             StructOrUnionSelect::Struct(struct_select) => struct_select,
@@ -62,7 +63,7 @@ impl<'a> TransactCtx<'a> {
             expressions: vec![],
             from: vec![pg.table_name().as_(root_alias)],
             where_: None,
-            limit: Some(entity_select.limit + 1),
+            limit: Some(limit + 1),
         };
 
         if include_total_len {
@@ -91,34 +92,36 @@ impl<'a> TransactCtx<'a> {
         Ok(async_stream::try_stream! {
             pin_mut!(row_stream);
 
-            let mut send_header = true;
+            let mut total_len: Option<usize> = None;
+            let mut observed_count = 0;
 
             for await row_result in row_stream {
                 let row = row_result.map_err(|_| ds_err("unable to fetch row"))?;
+                observed_count += 1;
                 let mut row_iter = RowDecodeIterator::new(&row, &row_layout);
 
-                let total_len = if include_total_len {
+                if include_total_len {
                     // must read this for every row if include_total_len was true
-                    Some(row_iter.next().unwrap().map_err(domain_codec_error)?.into_i64()? as usize)
-                } else {
-                    None
-                };
-
-                if send_header {
-                    yield QueryFrame::Header(
-                        Some(Box::new(SubSequence {
-                            end_cursor: Some(Box::new([])),
-                            has_next: true,
-                            total_len
-                        }))
-                    );
-
-                    send_header = false;
+                    total_len = Some(row_iter.next().unwrap().map_err(domain_codec_error)?.into_i64()? as usize);
                 }
 
                 let row_value = self.read_struct_row_value(row_iter, def, &struct_select)?;
-                yield QueryFrame::Row(row_value);
+
+                if observed_count <= limit {
+                    yield QueryFrame::Row(row_value);
+                } else {
+                    break;
+                }
             }
+
+            yield QueryFrame::Footer(
+                Some(Box::new(SubSequence {
+                    end_cursor: Some(Box::new([])),
+                    // The actual SQL limit is input limit + 1
+                    has_next: observed_count > limit,
+                    total_len
+                }))
+            );
         })
     }
 

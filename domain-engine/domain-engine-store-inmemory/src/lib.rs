@@ -7,7 +7,7 @@ use std::sync::Arc;
 use domain_engine_core::data_store::{DataStoreFactory, DataStoreFactorySync};
 use domain_engine_core::object_generator::ObjectGenerator;
 use domain_engine_core::system::ArcSystemApi;
-use domain_engine_core::transact::{DataOperation, ReqMessage, RespMessage};
+use domain_engine_core::transact::{DataOperation, OpSequence, ReqMessage, RespMessage};
 use domain_engine_core::{DomainError, Session};
 use fnv::{FnvHashMap, FnvHashSet};
 use futures_util::stream::BoxStream;
@@ -113,10 +113,34 @@ impl InMemoryDb {
         messages: BoxStream<'static, DomainResult<ReqMessage>>,
     ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
         enum State {
-            Insert(Select),
-            Update(Select),
-            Upsert(Select),
-            Delete(DefId),
+            Insert(OpSequence, Select),
+            Update(OpSequence, Select),
+            Upsert(OpSequence, Select),
+            Delete(OpSequence, DefId),
+        }
+
+        fn write_state(
+            op_seq: OpSequence,
+            new_state: State,
+            state: &mut Option<State>,
+        ) -> Vec<RespMessage> {
+            let mut messages = vec![];
+
+            match state {
+                Some(
+                    State::Insert(prev_op, _)
+                    | State::Update(prev_op, _)
+                    | State::Upsert(prev_op, _)
+                    | State::Delete(prev_op, _),
+                ) => {
+                    messages.push(RespMessage::SequenceEnd(*prev_op, None));
+                }
+                None => {}
+            }
+
+            *state = Some(new_state);
+            messages.push(RespMessage::SequenceStart(op_seq));
+            messages
         }
 
         let mut state: Option<State> = None;
@@ -125,36 +149,46 @@ impl InMemoryDb {
             for await req in messages {
                 match req? {
                     ReqMessage::Query(op_seq, select) => {
+                        state = None;
                         let store = self.store.read().await;
                         let sequence = store.query_entities(&select, &self.context)?;
 
-                        yield RespMessage::SequenceStart(op_seq, sequence.sub().map(|sub_seq| Box::new(sub_seq.clone())));
+                        let (elements, sub_sequence) = sequence.split();
 
-                        for item in sequence.into_elements() {
+                        yield RespMessage::SequenceStart(op_seq);
+
+                        for item in elements {
                             yield RespMessage::Element(item, DataOperation::Queried);
                         }
+
+                        yield RespMessage::SequenceEnd(op_seq, sub_sequence);
+
                     }
                     ReqMessage::Insert(op_seq, select) => {
-                        state = Some(State::Insert(select));
-                        yield RespMessage::SequenceStart(op_seq, None);
+                        for msg in write_state(op_seq, State::Insert(op_seq, select), &mut state) {
+                            yield msg;
+                        }
                     }
                     ReqMessage::Update(op_seq, select) => {
-                        state = Some(State::Update(select));
-                        yield RespMessage::SequenceStart(op_seq, None);
+                        for msg in write_state(op_seq, State::Update(op_seq, select), &mut state) {
+                            yield msg;
+                        }
                     }
                     ReqMessage::Upsert(op_seq, select) => {
-                        state = Some(State::Upsert(select));
-                        yield RespMessage::SequenceStart(op_seq, None);
+                        for msg in write_state(op_seq, State::Upsert(op_seq, select), &mut state) {
+                            yield msg;
+                        }
                     }
                     ReqMessage::Delete(op_seq, def_id) => {
-                        state = Some(State::Delete(def_id));
-                        yield RespMessage::SequenceStart(op_seq, None);
+                        for msg in write_state(op_seq, State::Delete(op_seq, def_id), &mut state) {
+                            yield msg;
+                        }
                     }
                     ReqMessage::Argument(mut value) => {
                         let mut store = self.store.write().await;
 
                         match state.as_ref() {
-                            Some(State::Insert(select)) => {
+                            Some(State::Insert(_, select)) => {
                                 ObjectGenerator::new(
                                     ProcessorMode::Create,
                                     &self.context.ontology,
@@ -170,7 +204,7 @@ impl InMemoryDb {
 
                                 yield RespMessage::Element(value, DataOperation::Inserted);
                             }
-                            Some(State::Update(select)) => {
+                            Some(State::Update(_, select)) => {
                                 ObjectGenerator::new(
                                     ProcessorMode::Update,
                                     &self.context.ontology,
@@ -186,7 +220,7 @@ impl InMemoryDb {
 
                                 yield RespMessage::Element(value, DataOperation::Updated);
                             }
-                            Some(State::Upsert(select)) => {
+                            Some(State::Upsert(_, select)) => {
                                 ObjectGenerator::new(
                                     ProcessorMode::Create,
                                     &self.context.ontology,
@@ -201,7 +235,7 @@ impl InMemoryDb {
                                 )?;
                                 yield RespMessage::Element(value, reason);
                             }
-                            Some(State::Delete(def_id)) => {
+                            Some(State::Delete(_, def_id)) => {
                                 let deleted = store.delete_entities(vec![value], *def_id)?;
 
                                 for deleted in deleted {

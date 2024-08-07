@@ -3,7 +3,7 @@ use std::sync::Arc;
 use domain_engine_core::{
     object_generator::ObjectGenerator,
     system::SystemAPI,
-    transact::{DataOperation, ReqMessage, RespMessage},
+    transact::{DataOperation, OpSequence, ReqMessage, RespMessage},
     DomainResult,
 };
 use futures_util::{stream::BoxStream, StreamExt};
@@ -31,10 +31,34 @@ struct TransactCtx<'a> {
 }
 
 enum State {
-    Insert(Select),
-    Update(Select),
-    Upsert(Select),
-    Delete(DefId),
+    Insert(OpSequence, Select),
+    Update(OpSequence, Select),
+    Upsert(OpSequence, Select),
+    Delete(OpSequence, DefId),
+}
+
+fn write_state(
+    op_seq: OpSequence,
+    new_state: State,
+    state: &mut Option<State>,
+) -> Vec<RespMessage> {
+    let mut messages = vec![];
+
+    match state {
+        Some(
+            State::Insert(prev_op, _)
+            | State::Update(prev_op, _)
+            | State::Upsert(prev_op, _)
+            | State::Delete(prev_op, _),
+        ) => {
+            messages.push(RespMessage::SequenceEnd(*prev_op, None));
+        }
+        None => {}
+    }
+
+    *state = Some(new_state);
+    messages.push(RespMessage::SequenceStart(op_seq));
+    messages
 }
 
 pub async fn transact(
@@ -72,56 +96,62 @@ pub async fn transact(
                     state = None;
                     let stream = ctx.query(entity_select).await?;
 
+                    yield RespMessage::SequenceStart(op_seq);
+
                     for await result in stream {
                         match result? {
-                            QueryFrame::Header(sub_sequence) => {
-                                yield RespMessage::SequenceStart(op_seq, sub_sequence);
-                            }
                             QueryFrame::Row(row) => {
                                 yield RespMessage::Element(row.value, DataOperation::Queried);
+                            }
+                            QueryFrame::Footer(sub_sequence) => {
+                                yield RespMessage::SequenceEnd(op_seq, sub_sequence);
                             }
                         }
                     }
                 }
                 ReqMessage::Insert(op_seq, select) => {
-                    state = Some(State::Insert(select));
-                    yield RespMessage::SequenceStart(op_seq, None);
+                    for msg in write_state(op_seq, State::Insert(op_seq, select), &mut state) {
+                        yield msg;
+                    }
                 }
                 ReqMessage::Update(op_seq, select) => {
-                    state = Some(State::Update(select));
-                    yield RespMessage::SequenceStart(op_seq, None);
+                    for msg in write_state(op_seq, State::Update(op_seq, select), &mut state) {
+                        yield msg;
+                    }
                 }
                 ReqMessage::Upsert(op_seq, select) => {
-                    state = Some(State::Upsert(select));
-                    yield RespMessage::SequenceStart(op_seq, None);
+                    for msg in write_state(op_seq, State::Upsert(op_seq, select), &mut state) {
+                        yield msg;
+                    }
                 }
                 ReqMessage::Delete(op_seq, def_id) => {
-                    state = Some(State::Delete(def_id));
-                    yield RespMessage::SequenceStart(op_seq, None);
+                    for msg in write_state(op_seq, State::Delete(op_seq, def_id), &mut state) {
+                        yield msg;
+                    }
                 }
                 ReqMessage::Argument(mut value) => {
                     match state.as_ref() {
-                        Some(State::Insert(select)) => {
+                        Some(State::Insert(_, select)) => {
                             ObjectGenerator::new(ProcessorMode::Create, ctx.ontology, ctx.system)
                                 .generate_objects(&mut value);
 
                             let row = ctx.insert_vertex(value.into(), InsertMode::Insert, select).await?;
                             yield RespMessage::Element(row.value, row.op);
                         }
-                        Some(State::Update(_select)) => {
+                        Some(State::Update(_, _select)) => {
                             ObjectGenerator::new(ProcessorMode::Update, ctx.ontology, ctx.system)
                                 .generate_objects(&mut value);
 
                             Err(ds_err("Update not implemented for Postgres"))?;
                         }
-                        Some(State::Upsert(select)) => {
+                        Some(State::Upsert(_, select)) => {
                             ObjectGenerator::new(ProcessorMode::Create, ctx.ontology, ctx.system)
                                 .generate_objects(&mut value);
 
                             let row = ctx.insert_vertex(value.into(), InsertMode::Upsert, select).await?;
                             yield RespMessage::Element(row.value, row.op);
                         }
-                        Some(State::Delete(_def_id)) => {
+                        Some(State::Delete(_, _def_id)) => {
                             Err(ds_err("Delete not implemented for Postgres"))?;
                         }
                         None => {

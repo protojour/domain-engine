@@ -393,14 +393,17 @@ async fn basic_pagination() {
                         assert_eq!(entity_select.limit, 42);
                         assert_eq!(entity_select.after_cursor.as_deref().unwrap(), &[b'1']);
 
-                        Ok(vec![Ok(RespMessage::SequenceStart(
-                            0,
-                            Some(Box::new(SubSequence {
-                                end_cursor: Some(Box::new([b'2'])),
-                                has_next: true,
-                                total_len: Some(42),
-                            })),
-                        ))])
+                        Ok(vec![
+                            Ok(RespMessage::SequenceStart(0)),
+                            Ok(RespMessage::SequenceEnd(
+                                0,
+                                Some(Box::new(SubSequence {
+                                    end_cursor: Some(Box::new([b'2'])),
+                                    has_next: true,
+                                    total_len: Some(42),
+                                })),
+                            )),
+                        ])
                     })
             ),
         )
@@ -442,14 +445,17 @@ async fn basic_pagination() {
                         assert_eq!(entity_select.limit, 1);
                         assert_eq!(entity_select.after_cursor, None);
 
-                        Ok(vec![Ok(RespMessage::SequenceStart(
-                            0,
-                            Some(Box::new(SubSequence {
-                                end_cursor: Some(Box::new([b'1'])),
-                                has_next: true,
-                                total_len: Some(42),
-                            })),
-                        ))])
+                        Ok(vec![
+                            Ok(RespMessage::SequenceStart(0)),
+                            Ok(RespMessage::SequenceEnd(
+                                0,
+                                Some(Box::new(SubSequence {
+                                    end_cursor: Some(Box::new([b'1'])),
+                                    has_next: true,
+                                    total_len: Some(42),
+                                })),
+                            )),
+                        ])
                     })
             ),
         )
@@ -1081,7 +1087,7 @@ async fn guitar_synth_union_selection() {
     let query_mock = LinearTransactMock::transact
         .next_call(matching!([Ok(ReqMessage::Query(0, _))], _session))
         .returns(Ok(vec![
-            Ok(RespMessage::SequenceStart(0, None)),
+            Ok(RespMessage::SequenceStart(0)),
             Ok(RespMessage::Element(
                 artist
                     .entity_builder(
@@ -1103,6 +1109,7 @@ async fn guitar_synth_union_selection() {
                     .into(),
                 DataOperation::Queried,
             )),
+            Ok(RespMessage::SequenceEnd(0, None)),
         ]));
 
     expect_eq!(
@@ -1371,7 +1378,7 @@ async fn municipalities_named_query() {
     let query_mock = LinearTransactMock::transact
         .next_call(matching!([Ok(ReqMessage::Query(..))], _session))
         .returns(Ok(vec![
-            Ok(RespMessage::SequenceStart(0, None)),
+            Ok(RespMessage::SequenceStart(0)),
             Ok(RespMessage::Element(
                 municipality
                     .entity_builder(
@@ -1387,6 +1394,7 @@ async fn municipalities_named_query() {
                     .into(),
                 DataOperation::Queried,
             )),
+            Ok(RespMessage::SequenceEnd(0, None)),
         ]));
 
     expect_eq!(

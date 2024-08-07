@@ -42,8 +42,9 @@ pub enum ReqMessage {
 pub enum RespMessage {
     /// Marks the start of a new output sequence.
     /// The subsequent Element messages are the elements of that sequence.
-    SequenceStart(OpSequence, Option<Box<SubSequence>>),
+    SequenceStart(OpSequence),
     Element(Value, DataOperation),
+    SequenceEnd(OpSequence, Option<Box<SubSequence>>),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -65,21 +66,21 @@ impl<'a> AccumulateSequences<'a> for BoxStream<'a, DomainResult<RespMessage>> {
 
             for await resp_message in self {
                 match resp_message? {
-                    RespMessage::SequenceStart(_, sub_seq) => {
-                        if let Some(current) = current {
-                            yield current;
-                        }
-
-                        let mut next = Sequence::default();
-                        if let Some(sub_seq) = sub_seq {
-                            next = next.with_sub(*sub_seq);
-                        }
-
-                        current = Some(next);
+                    RespMessage::SequenceStart(_) => {
+                        current = Some(Sequence::default());
                     }
                     RespMessage::Element(value, _reason) => {
                         if let Some(current) = &mut current {
                             current.push(value);
+                        }
+                    }
+                    RespMessage::SequenceEnd(_, sub_seq) => {
+                        if let Some(mut current) = current.take() {
+                            if let Some(sub_seq) = sub_seq {
+                                current = current.with_sub(*sub_seq);
+                            }
+
+                            yield current;
                         }
                     }
                 }
@@ -126,15 +127,18 @@ impl DomainEngine {
         async_stream::try_stream! {
             for await resp_msg in responses {
                 match resp_msg? {
-                    RespMessage::SequenceStart(op_seq, sub_seq) => {
+                    RespMessage::SequenceStart(op_seq) => {
                         self.recv_upmap(op_seq, &mut upmaps_rx, &mut cur_upmap).await?;
-                        yield RespMessage::SequenceStart(op_seq, sub_seq);
+                        yield RespMessage::SequenceStart(op_seq);
                     }
                     RespMessage::Element(value, reason) => {
                         yield RespMessage::Element(
                             self.upmap_value(value, &session, &cur_upmap).await.unwrap(),
                             reason
                         );
+                    }
+                    RespMessage::SequenceEnd(op_seq, sub_sequence) => {
+                        yield RespMessage::SequenceEnd(op_seq, sub_sequence);
                     }
                 };
             }

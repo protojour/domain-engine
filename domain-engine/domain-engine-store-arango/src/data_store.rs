@@ -4,7 +4,7 @@ use domain_engine_core::{
     data_store::DataStoreAPI,
     domain_error::DomainErrorKind,
     object_generator::ObjectGenerator,
-    transact::{DataOperation, ReqMessage, RespMessage},
+    transact::{DataOperation, OpSequence, ReqMessage, RespMessage},
     DomainError, DomainResult, Session,
 };
 use futures_util::{stream::BoxStream, StreamExt};
@@ -99,10 +99,34 @@ impl ArangoDatabase {
         messages: BoxStream<'static, DomainResult<ReqMessage>>,
     ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
         enum State {
-            Insert(Select),
-            Update(Select),
-            Upsert(Select),
-            Delete(DefId),
+            Insert(OpSequence, Select),
+            Update(OpSequence, Select),
+            Upsert(OpSequence, Select),
+            Delete(OpSequence, DefId),
+        }
+
+        fn write_state(
+            op_seq: OpSequence,
+            new_state: State,
+            state: &mut Option<State>,
+        ) -> Vec<RespMessage> {
+            let mut messages = vec![];
+
+            match state {
+                Some(
+                    State::Insert(prev_op, _)
+                    | State::Update(prev_op, _)
+                    | State::Upsert(prev_op, _)
+                    | State::Delete(prev_op, _),
+                ) => {
+                    messages.push(RespMessage::SequenceEnd(*prev_op, None));
+                }
+                None => {}
+            }
+
+            *state = Some(new_state);
+            messages.push(RespMessage::SequenceStart(op_seq));
+            messages
         }
 
         let mut state: Option<State> = None;
@@ -112,33 +136,39 @@ impl ArangoDatabase {
                 match req? {
                     ReqMessage::Query(op_seq, select) => {
                         state = None;
-                        let sequence = self.query(select).await?;
+                        let (elements, sub_sequence) = self.query(select).await?.split();
 
-                        yield RespMessage::SequenceStart(op_seq, sequence.sub().map(|sub_seq| Box::new(sub_seq.clone())));
+                        yield RespMessage::SequenceStart(op_seq);
 
-                        for item in sequence.into_elements() {
+                        for item in elements {
                             yield RespMessage::Element(item, DataOperation::Queried);
                         }
+
+                        yield RespMessage::SequenceEnd(op_seq, sub_sequence);
                     }
                     ReqMessage::Insert(op_seq, select) => {
-                        state = Some(State::Insert(select));
-                        yield RespMessage::SequenceStart(op_seq, None);
+                        for msg in write_state(op_seq, State::Insert(op_seq, select), &mut state) {
+                            yield msg;
+                        }
                     }
                     ReqMessage::Update(op_seq, select) => {
-                        state = Some(State::Update(select));
-                        yield RespMessage::SequenceStart(op_seq, None);
+                        for msg in write_state(op_seq, State::Update(op_seq, select), &mut state) {
+                            yield msg;
+                        }
                     }
                     ReqMessage::Upsert(op_seq, select) => {
-                        state = Some(State::Upsert(select));
-                        yield RespMessage::SequenceStart(op_seq, None);
+                        for msg in write_state(op_seq, State::Upsert(op_seq, select), &mut state) {
+                            yield msg;
+                        }
                     }
                     ReqMessage::Delete(op_seq, def_id) => {
-                        state = Some(State::Delete(def_id));
-                        yield RespMessage::SequenceStart(op_seq, None);
+                        for msg in write_state(op_seq, State::Delete(op_seq, def_id), &mut state) {
+                            yield msg;
+                        }
                     }
                     ReqMessage::Argument(value) => {
                         match state.as_ref() {
-                            Some(State::Insert(select)) => {
+                            Some(State::Insert(_, select)) => {
                                 let (value, op) = self.write(
                                     value,
                                     select,
@@ -150,7 +180,7 @@ impl ArangoDatabase {
 
                                 yield RespMessage::Element(value, op);
                             }
-                            Some(State::Update(select)) => {
+                            Some(State::Update(_, select)) => {
                                 let (value, op) = self.write(
                                     value,
                                     select,
@@ -162,7 +192,7 @@ impl ArangoDatabase {
 
                                 yield RespMessage::Element(value, op);
                             }
-                            Some(State::Upsert(select)) => {
+                            Some(State::Upsert(_, select)) => {
                                 let (value, op) = self.write(
                                     value,
                                     select,
@@ -175,7 +205,7 @@ impl ArangoDatabase {
 
                                 yield RespMessage::Element(value, op);
                             }
-                            Some(State::Delete(def_id)) => {
+                            Some(State::Delete(_, def_id)) => {
                                 let value = self.delete(value, *def_id).await?;
                                 yield RespMessage::Element(value, DataOperation::Deleted);
                             }

@@ -75,6 +75,10 @@ impl<T> Sequence<T> {
     pub fn clone_sub(&self) -> Option<Box<SubSequence>> {
         self.sub_seq.clone()
     }
+
+    pub fn split(self) -> (ThinVec<T>, Option<Box<SubSequence>>) {
+        (self.elements, self.sub_seq)
+    }
 }
 
 /// Create a new sequence that is not a subsequence.
