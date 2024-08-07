@@ -43,12 +43,14 @@ impl Display for Alias {
     }
 }
 
+#[derive(Default)]
 pub struct Select<'d> {
     // TODO: `with`
     pub expressions: Vec<Expr<'d>>,
     pub from: Vec<FromItem<'d>>,
     pub where_: Option<Expr<'d>>,
     pub limit: Option<usize>,
+    pub offset: Option<usize>,
 }
 
 pub struct Insert<'d> {
@@ -141,6 +143,10 @@ impl<'d> Display for Select<'d> {
 
         if let Some(limit) = self.limit {
             write!(f, " LIMIT {limit}")?;
+        }
+
+        if let Some(offset) = self.offset {
+            write!(f, " OFFSET {offset}")?;
         }
 
         Ok(())

@@ -11,6 +11,7 @@ use ontol_runtime::{
     DefId, RelId,
 };
 use pin_utils::pin_mut;
+use serde::{Deserialize, Serialize};
 use tokio_postgres::types::ToSql;
 use tracing::debug;
 
@@ -33,6 +34,14 @@ struct QueryBuildCtx {
     alias: Alias,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+enum Cursor {
+    /// The only pagination supported for now, is offset-pagination.
+    /// Future improvements include value pagination (WHERE (set of values) > (cursor values))
+    /// for a specific ordering.
+    Offset(usize),
+}
+
 impl<'a> TransactCtx<'a> {
     pub async fn query(
         &self,
@@ -42,6 +51,14 @@ impl<'a> TransactCtx<'a> {
 
         let include_total_len = entity_select.include_total_len;
         let limit = entity_select.limit;
+        let after_cursor: Option<Cursor> = match entity_select.after_cursor {
+            Some(bytes) => {
+                Some(bincode::deserialize(&bytes).map_err(|_| ds_bad_req("bad cursor"))?)
+            }
+            None => None,
+        };
+
+        debug!("after cursor: {after_cursor:?}");
 
         let struct_select = match entity_select.source {
             StructOrUnionSelect::Struct(struct_select) => struct_select,
@@ -64,6 +81,10 @@ impl<'a> TransactCtx<'a> {
             from: vec![pg.table_name().as_(root_alias)],
             where_: None,
             limit: Some(limit + 1),
+            offset: match &after_cursor {
+                Some(Cursor::Offset(offset)) => Some(*offset),
+                _ => None,
+            },
         };
 
         if include_total_len {
@@ -93,11 +114,11 @@ impl<'a> TransactCtx<'a> {
             pin_mut!(row_stream);
 
             let mut total_len: Option<usize> = None;
-            let mut observed_count = 0;
+            let mut observed_values = 0;
+            let mut observed_rows = 0;
 
             for await row_result in row_stream {
                 let row = row_result.map_err(|_| ds_err("unable to fetch row"))?;
-                observed_count += 1;
                 let mut row_iter = RowDecodeIterator::new(&row, &row_layout);
 
                 if include_total_len {
@@ -105,20 +126,33 @@ impl<'a> TransactCtx<'a> {
                     total_len = Some(row_iter.next().unwrap().map_err(domain_codec_error)?.into_i64()? as usize);
                 }
 
-                let row_value = self.read_struct_row_value(row_iter, def, &struct_select)?;
-
-                if observed_count <= limit {
+                if observed_rows < limit {
+                    let row_value = self.read_struct_row_value(row_iter, def, &struct_select)?;
                     yield QueryFrame::Row(row_value);
+
+                    observed_values += 1;
+                    observed_rows += 1;
                 } else {
+                    observed_rows += 1;
                     break;
                 }
             }
 
+            let end_cursor = if observed_values > 0 {
+                let original_offset = match &after_cursor {
+                    Some(Cursor::Offset(offset)) => *offset,
+                    None => 0,
+                };
+                Some(bincode::serialize(&Cursor::Offset(original_offset + observed_values)).unwrap().into_boxed_slice())
+            } else {
+                None
+            };
+
             yield QueryFrame::Footer(
                 Some(Box::new(SubSequence {
-                    end_cursor: Some(Box::new([])),
-                    // The actual SQL limit is input limit + 1
-                    has_next: observed_count > limit,
+                    end_cursor,
+                    // The actual SQL limit is (input limit) + 1
+                    has_next: observed_rows > observed_values,
                     total_len
                 }))
             );
@@ -237,7 +271,7 @@ impl<'a> TransactCtx<'a> {
                         cur_alias,
                         pg.datatable,
                     )),
-                    limit: None,
+                    ..Default::default()
                 };
 
                 match rel_info.cardinality.1 {

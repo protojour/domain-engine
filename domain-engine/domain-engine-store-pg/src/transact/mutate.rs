@@ -273,7 +273,7 @@ impl<'a> TransactCtx<'a> {
                     sql::Expr::path1(pg_id_field.col_name.as_ref()),
                     sql::Expr::param(0),
                 )),
-                limit: None,
+                ..Default::default()
             };
 
             let Data::Sql(id_param) = self.data_from_value(value)? else {

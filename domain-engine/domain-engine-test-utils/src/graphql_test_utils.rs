@@ -12,7 +12,7 @@ use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use juniper::ScalarValue;
 use ontol_test_utils::{OntolTest, SrcName, TestCompile, TestPackages};
 use ordered_float::NotNan;
-use tracing::debug;
+use tracing::info;
 use unimock::*;
 
 use crate::mock_datastore::LinearDataStoreAdapter;
@@ -285,7 +285,7 @@ impl GraphQLPageDebug {
         let total_count = connection.opt_field("totalCount");
         let page_info = connection.field("pageInfo");
 
-        debug!("page_info: {page_info:?}");
+        info!("page_info: {page_info:?}");
 
         let has_next_page = page_info.field("hasNextPage").as_scalar()?.as_bool()?;
         let end_cursor = page_info.opt_field("endCursor")?.as_scalar()?.as_string();
