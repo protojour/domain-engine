@@ -319,6 +319,7 @@ async fn execute_migration_step<'t>(
                                     ADD COLUMN {column} bigint NOT NULL
                                     REFERENCES {refschema}.{refdatatable}(_key)
                                     ON DELETE CASCADE
+                                    UNIQUE
                             "},
                             schema = sql::Ident(&pg_edge_domain.schema_name),
                             table = sql::Ident(&pg_edge.table_name),
