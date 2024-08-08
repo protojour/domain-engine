@@ -22,7 +22,6 @@ use crate::{
         PgDataField, PgDataTable, PgEdge, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexData,
         PgIndexType, PgRegKey, PgType,
     },
-    sql::Unpack,
 };
 
 use super::{MigrationCtx, PgDomainIds};
@@ -52,7 +51,8 @@ pub async fn migrate_domain_steps<'t>(
     if let Some(row) = row {
         info!("domain already deployed");
 
-        let (domain_key, schema_name) = row.unpack();
+        let domain_key = row.get(0);
+        let schema_name = row.get(1);
 
         let pg_datatables = txn
             .query(

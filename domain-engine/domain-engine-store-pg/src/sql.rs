@@ -2,7 +2,6 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 use smallvec::{smallvec, SmallVec};
-use tokio_postgres::{types::FromSql, Row};
 
 pub struct Ident<T>(pub T);
 
@@ -356,92 +355,6 @@ pub struct Param(pub usize);
 impl Display for Param {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "${}", self.0 + 1)
-    }
-}
-
-pub trait Unpack<'a, T> {
-    fn unpack(&'a self) -> T;
-}
-
-impl<'a, T> Unpack<'a, (T,)> for Row
-where
-    T: FromSql<'a>,
-{
-    fn unpack(&'a self) -> (T,) {
-        (self.get(0),)
-    }
-}
-
-impl<'a, T0, T1> Unpack<'a, (T0, T1)> for Row
-where
-    T0: FromSql<'a>,
-    T1: FromSql<'a>,
-{
-    fn unpack(&'a self) -> (T0, T1) {
-        (self.get(0), self.get(1))
-    }
-}
-
-impl<'a, T0, T1, T2> Unpack<'a, (T0, T1, T2)> for Row
-where
-    T0: FromSql<'a>,
-    T1: FromSql<'a>,
-    T2: FromSql<'a>,
-{
-    fn unpack(&'a self) -> (T0, T1, T2) {
-        (self.get(0), self.get(1), self.get(2))
-    }
-}
-
-impl<'a, T0, T1, T2, T3> Unpack<'a, (T0, T1, T2, T3)> for Row
-where
-    T0: FromSql<'a>,
-    T1: FromSql<'a>,
-    T2: FromSql<'a>,
-    T3: FromSql<'a>,
-{
-    fn unpack(&'a self) -> (T0, T1, T2, T3) {
-        (self.get(0), self.get(1), self.get(2), self.get(3))
-    }
-}
-
-impl<'a, T0, T1, T2, T3, T4> Unpack<'a, (T0, T1, T2, T3, T4)> for Row
-where
-    T0: FromSql<'a>,
-    T1: FromSql<'a>,
-    T2: FromSql<'a>,
-    T3: FromSql<'a>,
-    T4: FromSql<'a>,
-{
-    fn unpack(&'a self) -> (T0, T1, T2, T3, T4) {
-        (
-            self.get(0),
-            self.get(1),
-            self.get(2),
-            self.get(3),
-            self.get(4),
-        )
-    }
-}
-
-impl<'a, T0, T1, T2, T3, T4, T5> Unpack<'a, (T0, T1, T2, T3, T4, T5)> for Row
-where
-    T0: FromSql<'a>,
-    T1: FromSql<'a>,
-    T2: FromSql<'a>,
-    T3: FromSql<'a>,
-    T4: FromSql<'a>,
-    T5: FromSql<'a>,
-{
-    fn unpack(&'a self) -> (T0, T1, T2, T3, T4, T5) {
-        (
-            self.get(0),
-            self.get(1),
-            self.get(2),
-            self.get(3),
-            self.get(4),
-            self.get(5),
-        )
     }
 }
 

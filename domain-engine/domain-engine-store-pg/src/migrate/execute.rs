@@ -9,7 +9,7 @@ use crate::{
         PgDataField, PgDataTable, PgEdge, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexType,
         PgRegKey, PgType,
     },
-    sql::{self, Unpack},
+    sql::{self},
 };
 
 use super::{MigrationCtx, MigrationStep, PgDomainIds};
@@ -146,7 +146,7 @@ async fn execute_migration_step<'t>(
             .await
             .context("alter table add column")?;
 
-            let (key,) = txn
+            let key = txn
                 .query_one(
                     indoc! { "
                     INSERT INTO m6mreg.datafield (
@@ -161,7 +161,7 @@ async fn execute_migration_step<'t>(
                 )
                 .await
                 .context("create datafield")?
-                .unpack();
+                .get(0);
 
             datatable.data_fields.insert(
                 rel_tag,
