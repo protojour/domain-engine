@@ -18,6 +18,7 @@ use tracing::debug;
 use crate::{ds_err, PgModel, PostgresDataStore};
 
 mod data;
+mod delete;
 mod insert;
 mod query;
 mod struct_analyzer;
@@ -151,8 +152,10 @@ pub async fn transact(
                             let row = ctx.insert_vertex(value.into(), InsertMode::Upsert, select).await?;
                             yield RespMessage::Element(row.value, row.op);
                         }
-                        Some(State::Delete(_, _def_id)) => {
-                            Err(ds_err("Delete not implemented for Postgres"))?;
+                        Some(State::Delete(_, def_id)) => {
+                            let deleted = ctx.delete_vertex(*def_id, value).await?;
+
+                            yield RespMessage::Element(ctx.ontology.bool_value(deleted), DataOperation::Deleted);
                         }
                         None => {
                             Err(ds_err("invalid transaction state"))?

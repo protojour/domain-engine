@@ -88,7 +88,7 @@ impl<'a> TransactCtx<'a> {
 
         // TODO: prepared statement for each entity type/select
         let mut insert = sql::Insert {
-            table_name: TableName(
+            into: TableName(
                 &pg_domain.schema_name,
                 &analyzed.root_attrs.datatable.table_name,
             ),
@@ -167,7 +167,7 @@ impl<'a> TransactCtx<'a> {
             let pg_edge = pg_domain.edges.get(&edge_id.1).unwrap();
 
             let mut insert = sql::Insert {
-                table_name: TableName(&pg_domain.schema_name, &pg_edge.table_name),
+                into: TableName(&pg_domain.schema_name, &pg_edge.table_name),
                 column_names: vec![],
                 on_conflict: None,
                 returning: vec![],
@@ -290,7 +290,7 @@ impl<'a> TransactCtx<'a> {
             let sql = if entity.is_self_identifying {
                 // upsert
                 sql::Insert {
-                    table_name: pg.table_name().into(),
+                    into: pg.table_name().into(),
                     column_names: vec![&pg_id_field.col_name],
                     on_conflict: Some(sql::OnConflict {
                         target: Some(sql::ConflictTarget::Columns(vec![&pg_id_field.col_name])),
