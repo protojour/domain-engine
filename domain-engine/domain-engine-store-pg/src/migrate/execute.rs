@@ -6,8 +6,7 @@ use tracing::{info, info_span, Instrument};
 
 use crate::{
     pg_model::{
-        PgDataField, PgDataTable, PgEdge, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexType,
-        PgRegKey, PgType,
+        PgDataField, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexType, PgRegKey, PgTable, PgType,
     },
     sql::{self},
 };
@@ -82,7 +81,7 @@ async fn execute_migration_step<'t>(
             let row = txn
                 .query_one(
                     indoc! { "
-                        INSERT INTO m6mreg.datatable (
+                        INSERT INTO m6mreg.domaintable (
                             domain_key,
                             def_domain_key,
                             def_tag,
@@ -96,20 +95,21 @@ async fn execute_migration_step<'t>(
                         &pg_domain.key,
                         &vertex_def_tag,
                         &table_name,
-                        &"key",
+                        &"_key",
                     ],
                 )
                 .await
                 .context("insert datatable")?;
 
-            let datatable_key: PgRegKey = row.get(0);
+            let domaintable_key: PgRegKey = row.get(0);
             pg_domain.datatables.insert(
                 vertex_def_id,
-                PgDataTable {
-                    key: datatable_key,
+                PgTable {
+                    key: domaintable_key,
                     table_name,
                     data_fields: Default::default(),
                     datafield_indexes: Default::default(),
+                    edge_cardinals: Default::default(),
                 },
             );
         }
@@ -120,7 +120,7 @@ async fn execute_migration_step<'t>(
             column_name,
         } => {
             let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
-            let datatable = pg_domain.datatables.get_mut(&datatable_def_id).unwrap();
+            let pg_table = pg_domain.datatables.get_mut(&datatable_def_id).unwrap();
 
             let type_ident = match pg_type {
                 PgType::Boolean => "boolean",
@@ -137,7 +137,7 @@ async fn execute_migration_step<'t>(
                 &format!(
                     "ALTER TABLE {schema}.{table} ADD COLUMN {column} {type}",
                     schema = sql::Ident(&pg_domain.schema_name),
-                    table = sql::Ident(&datatable.table_name),
+                    table = sql::Ident(&pg_table.table_name),
                     column = sql::Ident(&column_name),
                     type = sql::Ident(&type_ident)
                 ),
@@ -150,20 +150,20 @@ async fn execute_migration_step<'t>(
                 .query_one(
                     indoc! { "
                     INSERT INTO m6mreg.datafield (
-                        datatable_key,
+                        domaintable_key,
                         rel_tag,
                         pg_type,
                         column_name
                     ) VALUES($1, $2, $3, $4)
                     RETURNING key
                 "},
-                    &[&datatable.key, &(rel_tag.0 as i32), &pg_type, &column_name],
+                    &[&pg_table.key, &(rel_tag.0 as i32), &pg_type, &column_name],
                 )
                 .await
                 .context("create datafield")?
                 .get(0);
 
-            datatable.data_fields.insert(
+            pg_table.data_fields.insert(
                 rel_tag,
                 PgDataField {
                     key,
@@ -208,8 +208,8 @@ async fn execute_migration_step<'t>(
 
             txn.query(
                 indoc! { "
-                    INSERT INTO m6mreg.datatable_index (
-                        datatable_key,
+                    INSERT INTO m6mreg.domaintable_index (
+                        domaintable_key,
                         def_domain_key,
                         def_tag,
                         index_type,
@@ -249,7 +249,7 @@ async fn execute_migration_step<'t>(
             let row = txn
                 .query_one(
                     indoc! { "
-                        INSERT INTO m6mreg.edgetable (
+                        INSERT INTO m6mreg.domaintable (
                             domain_key,
                             edge_tag,
                             table_name
@@ -265,10 +265,12 @@ async fn execute_migration_step<'t>(
 
             pg_domain.edges.insert(
                 edge_tag,
-                PgEdge {
+                PgTable {
                     key,
                     table_name,
-                    cardinals: Default::default(),
+                    data_fields: Default::default(),
+                    edge_cardinals: Default::default(),
+                    datafield_indexes: Default::default(),
                 },
             );
         }
@@ -280,7 +282,7 @@ async fn execute_migration_step<'t>(
             kind,
         } => {
             let pg_edge_domain = ctx.domains.get(&pkg_id).unwrap();
-            let pg_edge = pg_edge_domain.edges.get(&edge_tag).unwrap();
+            let pg_table = pg_edge_domain.edges.get(&edge_tag).unwrap();
 
             match &kind {
                 PgEdgeCardinalKind::Dynamic { def_col_name } => {
@@ -288,7 +290,7 @@ async fn execute_migration_step<'t>(
                         &format!(
                             "ALTER TABLE {schema}.{table} ADD COLUMN {column} integer",
                             schema = sql::Ident(&pg_edge_domain.schema_name),
-                            table = sql::Ident(&pg_edge.table_name),
+                            table = sql::Ident(&pg_table.table_name),
                             column = sql::Ident(&def_col_name)
                         ),
                         &[],
@@ -300,7 +302,7 @@ async fn execute_migration_step<'t>(
                         &format!(
                             "ALTER TABLE {schema}.{table} ADD COLUMN {column} bigint",
                             schema = sql::Ident(&pg_edge_domain.schema_name),
-                            table = sql::Ident(&pg_edge.table_name),
+                            table = sql::Ident(&pg_table.table_name),
                             column = sql::Ident(&key_col_name)
                         ),
                         &[],
@@ -322,7 +324,7 @@ async fn execute_migration_step<'t>(
                                     UNIQUE
                             "},
                             schema = sql::Ident(&pg_edge_domain.schema_name),
-                            table = sql::Ident(&pg_edge.table_name),
+                            table = sql::Ident(&pg_table.table_name),
                             column = sql::Ident(&key_col_name),
                             refschema = sql::Ident(&pg_target_domain.schema_name),
                             refdatatable = sql::Ident(&pg_target_datatable.table_name)
@@ -335,14 +337,15 @@ async fn execute_migration_step<'t>(
             };
 
             let mut def_column_name: Option<&str> = None;
-            let mut unique_datatable_key: Option<PgRegKey> = None;
+            let mut unique_domaintable_key: Option<PgRegKey> = None;
 
             match &kind {
                 PgEdgeCardinalKind::Dynamic { def_col_name } => {
                     def_column_name = Some(def_col_name.as_ref())
                 }
                 PgEdgeCardinalKind::Unique { def_id } => {
-                    unique_datatable_key = Some(pg_edge_domain.datatables.get(def_id).unwrap().key);
+                    unique_domaintable_key =
+                        Some(pg_edge_domain.datatables.get(def_id).unwrap().key);
                 }
             }
 
@@ -350,21 +353,21 @@ async fn execute_migration_step<'t>(
                 .query_one(
                     indoc! { "
                         INSERT INTO m6mreg.edgecardinal (
-                            edge_key,
+                            domaintable_key,
                             ordinal,
                             ident,
                             def_column_name,
-                            unique_datatable_key,
+                            unique_domaintable_key,
                             key_column_name
                         ) VALUES($1, $2, $3, $4, $5, $6)
                         RETURNING key
                     "},
                     &[
-                        &pg_edge.key,
+                        &pg_table.key,
                         &(ordinal as i32),
                         &ident,
                         &def_column_name,
-                        &unique_datatable_key,
+                        &unique_domaintable_key,
                         &key_col_name,
                     ],
                 )
@@ -379,7 +382,7 @@ async fn execute_migration_step<'t>(
                 .get_mut(&edge_tag)
                 .unwrap();
 
-            pg_edge.cardinals.insert(
+            pg_edge.edge_cardinals.insert(
                 ordinal as usize,
                 PgEdgeCardinal {
                     key: row.get(0),
@@ -433,7 +436,7 @@ async fn execute_migration_step<'t>(
             .await?;
 
             txn.query(
-                "UPDATE m6mreg.datatable SET(table_name = $1) WHERE domain_key = $2 AND def_tag = $3",
+                "UPDATE m6mreg.domaintable SET(table_name = $1) WHERE domain_key = $2 AND def_tag = $3",
                 &[&new_table, &domain_key, &(def_id.1 as i32)],
             )
             .await?;

@@ -46,16 +46,19 @@ impl PgModel {
     ) -> DomainResult<PgDomainTable> {
         let domain = self.pg_domain(pkg_id)?;
         let datatable = self.datatable(pkg_id, def_id)?;
-        Ok(PgDomainTable { domain, datatable })
+        Ok(PgDomainTable {
+            domain,
+            table: datatable,
+        })
     }
 
-    pub(crate) fn find_datatable(&self, pkg_id: PackageId, def_id: DefId) -> Option<&PgDataTable> {
+    pub(crate) fn find_datatable(&self, pkg_id: PackageId, def_id: DefId) -> Option<&PgTable> {
         self.domains
             .get(&pkg_id)
             .and_then(|pg_domain| pg_domain.datatables.get(&def_id))
     }
 
-    pub(crate) fn datatable(&self, pkg_id: PackageId, def_id: DefId) -> DomainResult<&PgDataTable> {
+    pub(crate) fn datatable(&self, pkg_id: PackageId, def_id: DefId) -> DomainResult<&PgTable> {
         self.find_datatable(pkg_id, def_id)
             .ok_or_else(|| ds_err(format!("pg_datatable not found for {pkg_id:?}->{def_id:?}")))
     }
@@ -112,19 +115,20 @@ impl TryFrom<i32> for RegVersion {
 pub struct PgDomain {
     pub key: Option<PgRegKey>,
     pub schema_name: Box<str>,
-    pub datatables: FnvHashMap<DefId, PgDataTable>,
-    pub edges: FnvHashMap<u16, PgEdge>,
+    pub datatables: FnvHashMap<DefId, PgTable>,
+    pub edges: FnvHashMap<u16, PgTable>,
 }
 
 #[derive(Clone)]
-pub struct PgDataTable {
+pub struct PgTable {
     pub key: PgRegKey,
     pub table_name: Box<str>,
     pub data_fields: FnvHashMap<DefRelTag, PgDataField>,
+    pub edge_cardinals: BTreeMap<usize, PgEdgeCardinal>,
     pub datafield_indexes: FnvHashMap<(DefId, PgIndexType), PgIndexData>,
 }
 
-impl PgDataTable {
+impl PgTable {
     pub fn field(&self, rel_id: &RelId) -> DomainResult<&PgDataField> {
         self.data_fields.get(&rel_id.tag()).ok_or_else(|| {
             debug!("field not found in {:?}", self.data_fields);
@@ -140,6 +144,12 @@ impl PgDataTable {
         self.data_fields
             .values()
             .find(|datafield| datafield.key == key)
+    }
+
+    pub fn edge_cardinal(&self, c: CardinalIdx) -> DomainResult<&PgEdgeCardinal> {
+        self.edge_cardinals
+            .get(&(c.0 as usize))
+            .ok_or_else(|| ds_err("edge cardinal not found"))
     }
 }
 
@@ -160,12 +170,12 @@ pub enum PgIndexType {
 #[derive(Clone, Copy)]
 pub struct PgDomainTable<'a> {
     pub domain: &'a PgDomain,
-    pub datatable: &'a PgDataTable,
+    pub table: &'a PgTable,
 }
 
 impl<'a> PgDomainTable<'a> {
     pub fn table_name(self) -> sql::TableName<'a> {
-        sql::TableName(&self.domain.schema_name, &self.datatable.table_name)
+        sql::TableName(&self.domain.schema_name, &self.table.table_name)
     }
 }
 
@@ -174,21 +184,6 @@ pub struct PgDataField {
     pub key: PgRegKey,
     pub col_name: Box<str>,
     pub pg_type: PgType,
-}
-
-#[derive(Clone)]
-pub struct PgEdge {
-    pub key: PgRegKey,
-    pub table_name: Box<str>,
-    pub cardinals: BTreeMap<usize, PgEdgeCardinal>,
-}
-
-impl PgEdge {
-    pub fn cardinal(&self, c: CardinalIdx) -> DomainResult<&PgEdgeCardinal> {
-        self.cardinals
-            .get(&(c.0 as usize))
-            .ok_or_else(|| ds_err("edge cardinal not found"))
-    }
 }
 
 #[derive(Clone)]

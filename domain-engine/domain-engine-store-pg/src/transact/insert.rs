@@ -173,14 +173,17 @@ impl<'a> TransactCtx<'a> {
                 returning: vec![],
             };
 
-            for pg_cardinal in pg_edge.cardinals.values() {
+            for pg_cardinal in pg_edge.edge_cardinals.values() {
                 if let PgEdgeCardinalKind::Dynamic { def_col_name } = &pg_cardinal.kind {
                     insert.column_names.push(def_col_name);
                 }
                 insert.column_names.push(&pg_cardinal.key_col_name);
             }
 
-            let pg_subject_cardinal = &pg_edge.cardinals.get(&(subject_index.0 as usize)).unwrap();
+            let pg_subject_cardinal = &pg_edge
+                .edge_cardinals
+                .get(&(subject_index.0 as usize))
+                .unwrap();
 
             let sql = insert.to_string();
 
@@ -206,7 +209,7 @@ impl<'a> TransactCtx<'a> {
                     }
 
                     if let Some(pg_edge_cardinal) =
-                        pg_edge.cardinals.get(&(cur_cardinal_idx as usize))
+                        pg_edge.edge_cardinals.get(&(cur_cardinal_idx as usize))
                     {
                         let datatable = self
                             .pg_model
@@ -278,6 +281,11 @@ impl<'a> TransactCtx<'a> {
     ) -> DomainResult<(DefId, PgDataKey)> {
         let def_id = value.type_def_id();
 
+        debug!(
+            "resolve linked vertex: {def_id:?} table: {:#?}",
+            self.pg_model.entity_id_to_entity
+        );
+
         if self
             .pg_model
             .find_datatable(def_id.package_id(), def_id)
@@ -301,7 +309,7 @@ impl<'a> TransactCtx<'a> {
                 .pg_domain_table(entity_def_id.package_id(), *entity_def_id)?;
 
             let entity = self.ontology.def(*entity_def_id).entity().unwrap();
-            let pg_id_field = pg.datatable.field(&entity.id_relationship_id)?;
+            let pg_id_field = pg.table.field(&entity.id_relationship_id)?;
 
             let Data::Sql(id_param) = self.data_from_value(value)? else {
                 return Err(ds_bad_req("compound foreign key"));

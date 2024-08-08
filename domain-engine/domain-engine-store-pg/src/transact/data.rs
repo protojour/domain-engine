@@ -15,7 +15,7 @@ use tracing::trace;
 
 use crate::{
     ds_bad_req, ds_err,
-    pg_model::{PgDataKey, PgDataTable},
+    pg_model::{PgDataKey, PgTable},
     sql_value::SqlVal,
 };
 
@@ -144,7 +144,7 @@ impl<'a> TransactCtx<'a> {
 
 pub struct ScalarAttrs<'m, 'b> {
     pub map: FnvHashMap<RelId, SqlVal<'b>>,
-    pub datatable: &'m PgDataTable,
+    pub datatable: &'m PgTable,
 }
 
 impl<'m, 'b> ScalarAttrs<'m, 'b> {

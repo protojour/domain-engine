@@ -37,72 +37,72 @@ CREATE TABLE m6mreg.domain
     schema_name text NOT NULL
 );
 
--- A data table with actual data
-CREATE TABLE m6mreg.datatable
+-- A dynamic table created for a domain
+CREATE TABLE m6mreg.domaintable
 (
     key serial PRIMARY KEY,
     -- the domain which owns this data
     domain_key integer NOT NULL REFERENCES m6mreg.domain(key),
     -- the def domain (can be different than the owning domain)
-    def_domain_key integer NOT NULL REFERENCES m6mreg.domain(key),
+    def_domain_key integer REFERENCES m6mreg.domain(key),
     -- the def tag within the def domain
-    def_tag integer NOT NULL,
+    def_tag integer,
+    edge_tag integer,
     -- a path of relationships in the case of child tables.
-    -- the root is always 'vtx'
-    relpath ltree NOT NULL DEFAULT 'vtx',
+    -- the root is always 'root'
+    relpath ltree NOT NULL DEFAULT 'root',
     -- the name of the table within the owning domain's schema
     table_name text NOT NULL,
-    -- the name of the key column
-    key_column text NOT NULL
+    -- the name of the key column, if specified
+    key_column text,
+
+    -- the domaintable is either for an edge or a def
+    CHECK ((edge_tag IS NULL) != (def_tag IS NULL)),
+    -- def_domain_key and def_tag must be set at the same time
+    CHECK ((def_domain_key IS NULL) = (def_tag IS NULL)),
+    -- def tables are keyed, edges are not
+    CHECK ((def_domain_key IS NULL) = (key_column IS NULL))
 );
 
 -- Represents a postgres unique constraint over a field tuple
-CREATE TABLE m6mreg.datatable_index
+CREATE TABLE m6mreg.domaintable_index
 (
-    -- the datatable implied by this unique group
-    datatable_key integer NOT NULL REFERENCES m6mreg.datatable(key),
+    -- the domaintable implied by this unique group
+    domaintable_key integer NOT NULL REFERENCES m6mreg.domaintable(key),
     -- the domain of the definition that identifies this index
     def_domain_key integer NOT NULL REFERENCES m6mreg.domain(key),
     -- the tag of the definition that identifies this index
     def_tag integer NOT NULL,
     -- the type of the index
     index_type m6m_pg_index_type NOT NULL,
-    -- datafield participating in the index. Must be fields of the datatable key
+    -- datafield participating in the index. Must be fields of the domaintable key
     datafield_keys integer[] NOT NULL,
 
-    UNIQUE (datatable_key, def_domain_key, def_tag, index_type)
+    UNIQUE (domaintable_key, def_domain_key, def_tag, index_type)
 );
 
--- The set of keys per datatable
+-- The set of keys per domaintable
 CREATE TABLE m6mreg.datafield
 (
     key serial PRIMARY KEY,
-    datatable_key integer NOT NULL REFERENCES m6mreg.datatable(key),
+    domaintable_key integer NOT NULL REFERENCES m6mreg.domaintable(key),
     rel_tag integer NOT NULL,
     pg_type m6m_pg_type NOT NULL,
     column_name text NOT NULL
-);
-
--- Registry of edge tables
-CREATE TABLE m6mreg.edgetable
-(
-    key serial PRIMARY KEY,
-    domain_key integer NOT NULL REFERENCES m6mreg.domain(key),
-    edge_tag integer NOT NULL,
-    table_name text NOT NULL
 );
 
 -- Registry of edge cardinals
 CREATE TABLE m6mreg.edgecardinal
 (
     key serial PRIMARY KEY,
-    edge_key integer NOT NULL REFERENCES m6mreg.edgetable(key),
+    domaintable_key integer NOT NULL REFERENCES m6mreg.domaintable(key),
     ordinal integer NOT NULL,
     ident text NOT NULL,
     def_column_name text,
-    unique_datatable_key integer REFERENCES m6mreg.datatable(key),
+    unique_domaintable_key integer REFERENCES m6mreg.domaintable(key),
     key_column_name text NOT NULL,
 
-    UNIQUE (edge_key, ordinal),
-    CHECK ((def_column_name IS NULL) != (unique_datatable_key IS NULL))
+    UNIQUE (domaintable_key, ordinal),
+    CHECK ((def_column_name IS NULL) != (unique_domaintable_key IS NULL)),
+    CHECK (unique_domaintable_key != domaintable_key)
 );

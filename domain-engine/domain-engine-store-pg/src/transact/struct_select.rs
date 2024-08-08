@@ -8,7 +8,7 @@ use ontol_runtime::{
 
 use crate::{
     ds_err,
-    pg_model::{PgDataTable, PgType},
+    pg_model::{PgTable, PgType},
     sql,
     sql_value::{CodecResult, Layout, SqlVal},
 };
@@ -20,7 +20,7 @@ impl<'a> TransactCtx<'a> {
     pub fn select_inherent_struct_fields(
         &self,
         def: &Def,
-        pg_datatable: &'a PgDataTable,
+        pg_datatable: &'a PgTable,
         table_alias: Option<sql::Alias>,
         sql_expressions: &mut Vec<sql::Expr<'a>>,
         layout: &mut Vec<Layout>,

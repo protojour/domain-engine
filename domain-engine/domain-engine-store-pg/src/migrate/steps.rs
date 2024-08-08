@@ -19,8 +19,8 @@ use tracing::info;
 use crate::{
     migrate::{MigrationStep, PgDomain},
     pg_model::{
-        PgDataField, PgDataTable, PgEdge, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexData,
-        PgIndexType, PgRegKey, PgType,
+        PgDataField, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexData, PgIndexType, PgRegKey,
+        PgTable, PgType,
     },
 };
 
@@ -51,67 +51,54 @@ pub async fn migrate_domain_steps<'t>(
     if let Some(row) = row {
         info!("domain already deployed");
 
-        let domain_key = row.get(0);
+        let domain_key: PgRegKey = row.get(0);
         let schema_name = row.get(1);
 
-        let pg_datatables = txn
+        let mut pg_datatables: FnvHashMap<DefId, PgTable> = Default::default();
+        let mut pg_edges: FnvHashMap<u16, PgTable> = Default::default();
+
+        for row in txn
             .query(
                 indoc! {"
-                    SELECT key, def_domain_key, def_tag, table_name
-                    FROM m6mreg.datatable
-                    WHERE domain_key = $1
-                "},
+                SELECT key, def_domain_key, def_tag, edge_tag, table_name
+                FROM m6mreg.domaintable
+                WHERE domain_key = $1
+            "},
                 &[&domain_key],
             )
             .await?
-            .into_iter()
-            .map(|row| -> anyhow::Result<_> {
-                let key: PgRegKey = row.get(0);
-                let def_domain_key: PgRegKey = row.get(1);
-                let def_tag: u16 = row.get::<_, i32>(2).try_into()?;
-                let table_name: Box<str> = row.get(3);
+        {
+            let key: PgRegKey = row.get(0);
+            let def_domain_key: Option<PgRegKey> = row.get(1);
+            let def_tag: Option<u16> = row
+                .get::<_, Option<i32>>(2)
+                .map(|tag: i32| tag.try_into())
+                .transpose()?;
+            let edge_tag: Option<u16> = row
+                .get::<_, Option<i32>>(3)
+                .map(|tag: i32| tag.try_into())
+                .transpose()?;
+            let table_name: Box<str> = row.get(4);
 
-                // for now
-                assert_eq!(def_domain_key, domain_key);
+            let pg_table = PgTable {
+                key,
+                table_name,
+                data_fields: Default::default(),
+                edge_cardinals: Default::default(),
+                datafield_indexes: Default::default(),
+            };
 
-                Ok((
-                    DefId(pkg_id, def_tag),
-                    PgDataTable {
-                        key,
-                        table_name,
-                        data_fields: Default::default(),
-                        datafield_indexes: Default::default(),
-                    },
-                ))
-            })
-            .try_collect()?;
-
-        let pg_edges = txn
-            .query(
-                indoc! {"
-                    SELECT key, edge_tag, table_name
-                    FROM m6mreg.edgetable
-                    WHERE domain_key = $1
-                "},
-                &[&domain_key],
-            )
-            .await?
-            .into_iter()
-            .map(|row| -> anyhow::Result<_> {
-                let key: PgRegKey = row.get(0);
-                let edge_tag: u16 = row.get::<_, i32>(1).try_into()?;
-                let table_name: Box<str> = row.get(2);
-
-                Ok((
-                    edge_tag,
-                    PgEdge {
-                        key,
-                        table_name,
-                        cardinals: Default::default(),
-                    },
-                ))
-            })
-            .try_collect()?;
+            match (def_domain_key, def_tag, edge_tag) {
+                (Some(def_domain_key), Some(def_tag), None) => {
+                    assert_eq!(def_domain_key, domain_key);
+                    pg_datatables.insert(DefId(pkg_id, def_tag), pg_table);
+                }
+                (None, None, Some(edge_tag)) => {
+                    pg_edges.insert(edge_tag, pg_table);
+                }
+                _ => unreachable!(),
+            }
+        }
 
         let pg_domain = PgDomain {
             key: Some(domain_key),
@@ -164,16 +151,16 @@ pub async fn migrate_domain_steps<'t>(
         let edge_tag = edge_id.1;
         let table_name = format!("e_{edge_tag}").into_boxed_str();
 
-        if let Some(pg_edge) = pg_domain.edges.get_mut(&edge_tag) {
+        if let Some(pg_table) = pg_domain.edges.get_mut(&edge_tag) {
             let pg_cardinals: BTreeMap<usize, PgEdgeCardinal> = txn
                 .query(
                     indoc! {"
-                        SELECT key, ordinal, ident, def_column_name, unique_datatable_key, key_column_name
+                        SELECT key, ordinal, ident, def_column_name, unique_domaintable_key, key_column_name
                         FROM m6mreg.edgecardinal
-                        WHERE edge_key = $1
+                        WHERE domaintable_key = $1
                         ORDER BY ordinal
                     "},
-                    &[&pg_edge.key],
+                    &[&pg_table.key],
                 )
                 .await?
                 .into_iter()
@@ -214,7 +201,7 @@ pub async fn migrate_domain_steps<'t>(
                 todo!("adjust edge arity");
             }
 
-            pg_edge.cardinals = pg_cardinals;
+            pg_table.edge_cardinals = pg_cardinals;
         } else {
             ctx.steps.push((
                 domain_ids,
@@ -225,29 +212,33 @@ pub async fn migrate_domain_steps<'t>(
             ));
 
             for (index, cardinal) in edge_info.cardinals.iter().enumerate() {
-                let ordinal: u16 = index.try_into()?;
+                if cardinal.flags.contains(EdgeCardinalFlags::ENTITY) {
+                    let ordinal: u16 = index.try_into()?;
 
-                // FIXME: ontology must provide human readable name for cardinal
-                let ident = format!("todo_{ordinal}").into_boxed_str();
-                let key_col_name = format!("key_{ordinal}").into_boxed_str();
+                    // FIXME: ontology must provide human readable name for cardinal
+                    let ident = format!("todo_{ordinal}").into_boxed_str();
+                    let key_col_name = format!("key_{ordinal}").into_boxed_str();
 
-                ctx.steps.push((
-                    domain_ids,
-                    MigrationStep::DeployEdgeCardinal {
-                        edge_tag,
-                        ordinal,
-                        ident,
-                        kind: if cardinal.flags.contains(EdgeCardinalFlags::UNIQUE) {
-                            PgEdgeCardinalKind::Unique {
-                                def_id: *cardinal.target.iter().next().unwrap(),
-                            }
-                        } else {
-                            let def_col_name = format!("def_{ordinal}").into_boxed_str();
-                            PgEdgeCardinalKind::Dynamic { def_col_name }
+                    ctx.steps.push((
+                        domain_ids,
+                        MigrationStep::DeployEdgeCardinal {
+                            edge_tag,
+                            ordinal,
+                            ident,
+                            kind: if cardinal.flags.contains(EdgeCardinalFlags::UNIQUE) {
+                                PgEdgeCardinalKind::Unique {
+                                    def_id: *cardinal.target.iter().next().unwrap(),
+                                }
+                            } else {
+                                let def_col_name = format!("def_{ordinal}").into_boxed_str();
+                                PgEdgeCardinalKind::Dynamic { def_col_name }
+                            },
+                            key_col_name,
                         },
-                        key_col_name,
-                    },
-                ))
+                    ));
+                } else {
+                    info!("TODO: non-entity cardinal: {cardinal:?}");
+                }
             }
         }
     }
@@ -274,12 +265,12 @@ async fn migrate_vertex_steps<'t>(
                 indoc! {"
                     SELECT key, rel_tag, pg_type, column_name
                     FROM m6mreg.datafield
-                    WHERE datatable_key = $1
+                    WHERE domaintable_key = $1
                 "},
                 &[&datatable.key],
             )
             .await
-            .context("read datatables")?
+            .context("read data fields")?
             .into_iter()
             .map(|row| -> anyhow::Result<_> {
                 let key: PgRegKey = row.get(0);
@@ -302,13 +293,13 @@ async fn migrate_vertex_steps<'t>(
             .query(
                 indoc! {"
                     SELECT
-                        datatable_key,
+                        domaintable_key,
                         def_domain_key,
                         def_tag,
                         index_type,
                         datafield_keys
-                    FROM m6mreg.datatable_index
-                    WHERE datatable_key = $1
+                    FROM m6mreg.domaintable_index
+                    WHERE domaintable_key = $1
                 "},
                 &[&datatable.key],
             )
@@ -316,7 +307,7 @@ async fn migrate_vertex_steps<'t>(
             .context("read indexes")?
             .into_iter()
             .map(|row| -> anyhow::Result<_> {
-                let _datatable_key: PgRegKey = row.get(0);
+                let _domaintable_key: PgRegKey = row.get(0);
                 let def_domain_key: PgRegKey = row.get(1);
                 let def_tag: u16 = row.get::<_, i32>(2).try_into()?;
                 let index_type: PgIndexType = row.get(3);

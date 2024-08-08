@@ -16,7 +16,7 @@ impl<'a> TransactCtx<'a> {
         })?;
 
         let pg = self.pg_model.pg_domain_table(def_id.package_id(), def_id)?;
-        let pg_id_field = pg.datatable.field(&entity.id_relationship_id)?;
+        let pg_id_field = pg.table.field(&entity.id_relationship_id)?;
 
         let Data::Sql(id_param) = self.data_from_value(id)? else {
             return Err(ds_bad_req("compound foreign key"));

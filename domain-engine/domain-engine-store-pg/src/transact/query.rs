@@ -17,7 +17,7 @@ use tracing::debug;
 
 use crate::{
     ds_bad_req, ds_err,
-    pg_model::{PgDataTable, PgDomainTable, PgEdgeCardinal, PgType},
+    pg_model::{PgDomainTable, PgEdgeCardinal, PgTable, PgType},
     sql::{self, Alias},
     sql_value::{domain_codec_error, CodecResult, Layout, RowDecodeIterator, SqlVal},
 };
@@ -174,7 +174,7 @@ impl<'a> TransactCtx<'a> {
             // Always present: the def key of the vertex.
             // This is known ahead of time.
             // It will be used later to parse unions.
-            sql::Expr::LiteralInt(pg.datatable.key),
+            sql::Expr::LiteralInt(pg.table.key),
             // Always present: the data key of the vertex
             sql::Expr::path2(cur_alias, "_key"),
         ];
@@ -186,7 +186,7 @@ impl<'a> TransactCtx<'a> {
         // select data properties
         self.select_inherent_struct_fields(
             def,
-            pg.datatable,
+            pg.table,
             Some(cur_alias),
             &mut sql_expressions,
             layout,
@@ -208,8 +208,8 @@ impl<'a> TransactCtx<'a> {
                 .edges
                 .get(&proj.id.1)
                 .ok_or_else(|| ds_err("edge not found"))?;
-            let pg_edge_subj = pg_edge.cardinal(proj.subject)?;
-            let pg_edge_obj = pg_edge.cardinal(proj.object)?;
+            let pg_edge_subj = pg_edge.edge_cardinal(proj.subject)?;
+            let pg_edge_obj = pg_edge.edge_cardinal(proj.object)?;
 
             let obj_cardinal = &edge.cardinals[proj.object.0 as usize];
             let mut sub_layout: Vec<Layout> = vec![];
@@ -230,7 +230,7 @@ impl<'a> TransactCtx<'a> {
                             return Err(ds_bad_req("cannot select id from non-entity"));
                         };
 
-                        let pg_id = pg_sub.datatable.field(&target_entity.id_relationship_id)?;
+                        let pg_id = pg_sub.table.field(&target_entity.id_relationship_id)?;
 
                         sub_layout.push(Layout::Scalar(pg_id.pg_type));
                         vec![sql::Expr::path2(sub_alias, pg_id.col_name.as_ref())]
@@ -268,19 +268,14 @@ impl<'a> TransactCtx<'a> {
                         first: pg_sub.table_name().as_(sub_alias),
                         second: sql::TableName(&pg.domain.schema_name, &pg_edge.table_name)
                             .as_(edge_alias),
-                        on: edge_join_condition(
-                            edge_alias,
-                            pg_edge_obj,
-                            sub_alias,
-                            pg_sub.datatable,
-                        ),
+                        on: edge_join_condition(edge_alias, pg_edge_obj, sub_alias, pg_sub.table),
                     }
                     .into()],
                     where_: Some(edge_join_condition(
                         edge_alias,
                         pg_edge_subj,
                         cur_alias,
-                        pg.datatable,
+                        pg.table,
                     )),
                     ..Default::default()
                 };
@@ -418,7 +413,7 @@ fn edge_join_condition<'d>(
     edge_alias: Alias,
     cardinal: &'d PgEdgeCardinal,
     data_alias: Alias,
-    data: &'d PgDataTable,
+    data: &'d PgTable,
 ) -> sql::Expr<'d> {
     let data_key_eq = sql::Expr::eq(
         sql::Expr::path2(edge_alias, cardinal.key_col_name.as_ref()),
