@@ -40,6 +40,6 @@ impl<'a> TransactCtx<'a> {
             .await
             .map_err(|e| ds_err(format!("unable to delete: {e:?}")))?;
 
-        Ok(rows.len() > 0)
+        Ok(!rows.is_empty())
     }
 }

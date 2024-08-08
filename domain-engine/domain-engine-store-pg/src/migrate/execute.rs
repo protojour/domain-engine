@@ -310,7 +310,7 @@ async fn execute_migration_step<'t>(
                 }
                 PgEdgeCardinalKind::Unique { def_id } => {
                     let pg_target_domain = ctx.domains.get(&def_id.package_id()).unwrap();
-                    let pg_target_datatable = pg_target_domain.datatables.get(&def_id).unwrap();
+                    let pg_target_datatable = pg_target_domain.datatables.get(def_id).unwrap();
 
                     txn.query(
                         &format!(

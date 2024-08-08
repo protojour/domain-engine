@@ -175,7 +175,7 @@ impl<'a> TransactCtx<'a> {
 
             for pg_cardinal in pg_edge.cardinals.values() {
                 if let PgEdgeCardinalKind::Dynamic { def_col_name } = &pg_cardinal.kind {
-                    insert.column_names.push(&def_col_name);
+                    insert.column_names.push(def_col_name);
                 }
                 insert.column_names.push(&pg_cardinal.key_col_name);
             }
@@ -312,7 +312,7 @@ impl<'a> TransactCtx<'a> {
                 // TODO: It might actually be better to do SELECT + optional INSERT.
                 // this approach (DO UPDATE SET) always re-appends the row.
                 sql::Insert {
-                    into: pg.table_name().into(),
+                    into: pg.table_name(),
                     column_names: vec![&pg_id_field.col_name],
                     on_conflict: Some(sql::OnConflict {
                         target: Some(sql::ConflictTarget::Columns(vec![&pg_id_field.col_name])),
