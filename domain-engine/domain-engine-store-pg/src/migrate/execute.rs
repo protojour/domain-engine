@@ -6,7 +6,8 @@ use tracing::{info, info_span, Instrument};
 
 use crate::{
     pg_model::{
-        PgDataField, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexType, PgRegKey, PgTable, PgType,
+        PgDataField, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexType, PgRegKey, PgTable,
+        PgTableIdUnion, PgType,
     },
     sql::{self},
 };
@@ -114,13 +115,17 @@ async fn execute_migration_step<'t>(
             );
         }
         MigrationStep::DeployDataField {
-            datatable_def_id,
+            table_id,
             rel_tag,
             pg_type,
             column_name,
         } => {
             let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
-            let pg_table = pg_domain.datatables.get_mut(&datatable_def_id).unwrap();
+            let pg_table = match table_id {
+                PgTableIdUnion::Def(def_id) => pg_domain.datatables.get_mut(&def_id),
+                PgTableIdUnion::Edge(edge_id) => pg_domain.edges.get_mut(&edge_id.1),
+            }
+            .unwrap();
 
             let type_ident = match pg_type {
                 PgType::Boolean => "boolean",
@@ -173,17 +178,17 @@ async fn execute_migration_step<'t>(
             );
         }
         MigrationStep::DeployDataIndex {
-            datatable_def_id,
+            table_id,
             index_def_id,
             index_type,
             field_tuple,
         } => {
             let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
-            let pg_datatable = pg_domain.datatables.get(&datatable_def_id).unwrap();
+            let pg_table = pg_domain.get_table(&table_id).unwrap();
 
             let datafield_tuple: Vec<_> = field_tuple
                 .iter()
-                .map(|rel_tag| pg_datatable.data_fields.get(rel_tag).unwrap())
+                .map(|rel_tag| pg_table.data_fields.get(rel_tag).unwrap())
                 .collect();
 
             txn.query(
@@ -194,7 +199,7 @@ async fn execute_migration_step<'t>(
                         PgIndexType::BTree => "INDEX",
                     },
                     schema = sql::Ident(&pg_domain.schema_name),
-                    table = sql::Ident(&pg_datatable.table_name),
+                    table = sql::Ident(&pg_table.table_name),
                     columns = datafield_tuple
                         .iter()
                         .map(|pg_datafield| pg_datafield.col_name.as_ref())
@@ -217,7 +222,7 @@ async fn execute_migration_step<'t>(
                     ) VALUES($1, $2, $3, $4, $5)
                 "},
                 &[
-                    &pg_datatable.key,
+                    &pg_table.key,
                     &pg_domain.key,
                     &(index_def_id.1 as i32),
                     &index_type,

@@ -11,7 +11,7 @@ use ontol_runtime::{
         },
         Ontology,
     },
-    DefId, DefRelTag, PackageId,
+    DefId, DefRelTag, EdgeId, PackageId,
 };
 use tokio_postgres::Transaction;
 use tracing::info;
@@ -20,7 +20,7 @@ use crate::{
     migrate::{MigrationStep, PgDomain},
     pg_model::{
         PgDataField, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexData, PgIndexType, PgRegKey,
-        PgTable, PgType,
+        PgTable, PgTableIdUnion, PgType,
     },
 };
 
@@ -145,103 +145,7 @@ pub async fn migrate_domain_steps<'t>(
         migrate_vertex_steps(domain_ids, def.id, def, entity, ontology, txn, ctx).await?;
     }
 
-    let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
-
-    for (edge_id, edge_info) in domain.edges() {
-        let edge_tag = edge_id.1;
-        let table_name = format!("e_{edge_tag}").into_boxed_str();
-
-        if let Some(pg_table) = pg_domain.edges.get_mut(&edge_tag) {
-            let pg_cardinals: BTreeMap<usize, PgEdgeCardinal> = txn
-                .query(
-                    indoc! {"
-                        SELECT key, ordinal, ident, def_column_name, unique_domaintable_key, key_column_name
-                        FROM m6mreg.edgecardinal
-                        WHERE domaintable_key = $1
-                        ORDER BY ordinal
-                    "},
-                    &[&pg_table.key],
-                )
-                .await?
-                .into_iter()
-                .map(|row| -> anyhow::Result<_> {
-                    let key = row.get(0);
-                    let ordinal: i32 = row.get(1);
-                    let ident = row.get(2);
-                    let def_col_name: Option<Box<str>> = row.get(3);
-                    let unique_datatable_key: Option<PgRegKey> = row.get(4);
-                    let key_col_name = row.get(5);
-
-                    let unique_datatable_def_id = unique_datatable_key.map(|key|
-                        *pg_domain.datatables.iter().find(|(_, dt)| dt.key == key).unwrap()
-                            .0
-                    );
-
-                    Ok((
-                        ordinal as usize,
-                        PgEdgeCardinal {
-                            key,
-                            ident,
-                            key_col_name,
-                            kind: if let Some(unique_datatable) = unique_datatable_def_id {
-                                PgEdgeCardinalKind::Unique {
-                                    def_id: unique_datatable,
-                                }
-                            } else {
-                                PgEdgeCardinalKind::Dynamic {
-                                    def_col_name: def_col_name.unwrap(),
-                                }
-                            },
-                        },
-                    ))
-                })
-                .try_collect()?;
-
-            if edge_info.cardinals.len() != pg_cardinals.len() {
-                todo!("adjust edge arity");
-            }
-
-            pg_table.edge_cardinals = pg_cardinals;
-        } else {
-            ctx.steps.push((
-                domain_ids,
-                MigrationStep::DeployEdge {
-                    edge_tag,
-                    table_name,
-                },
-            ));
-
-            for (index, cardinal) in edge_info.cardinals.iter().enumerate() {
-                if cardinal.flags.contains(EdgeCardinalFlags::ENTITY) {
-                    let ordinal: u16 = index.try_into()?;
-
-                    // FIXME: ontology must provide human readable name for cardinal
-                    let ident = format!("todo_{ordinal}").into_boxed_str();
-                    let key_col_name = format!("key_{ordinal}").into_boxed_str();
-
-                    ctx.steps.push((
-                        domain_ids,
-                        MigrationStep::DeployEdgeCardinal {
-                            edge_tag,
-                            ordinal,
-                            ident,
-                            kind: if cardinal.flags.contains(EdgeCardinalFlags::UNIQUE) {
-                                PgEdgeCardinalKind::Unique {
-                                    def_id: *cardinal.target.iter().next().unwrap(),
-                                }
-                            } else {
-                                let def_col_name = format!("def_{ordinal}").into_boxed_str();
-                                PgEdgeCardinalKind::Dynamic { def_col_name }
-                            },
-                            key_col_name,
-                        },
-                    ));
-                } else {
-                    info!("TODO: non-entity cardinal: {cardinal:?}");
-                }
-            }
-        }
-    }
+    migrate_domain_edges_steps(pkg_id, domain, domain_ids, ontology, txn, ctx).await?;
 
     Ok(())
 }
@@ -343,6 +247,148 @@ async fn migrate_vertex_steps<'t>(
         ));
     }
 
+    migrate_datafields_steps(
+        domain_ids,
+        PgTableIdUnion::Def(vertex_def_id),
+        def,
+        ontology,
+        ctx,
+    )?;
+
+    Ok(())
+}
+
+async fn migrate_domain_edges_steps<'t>(
+    pkg_id: PackageId,
+    domain: &Domain,
+    domain_ids: PgDomainIds,
+    ontology: &Ontology,
+    txn: &Transaction<'t>,
+    ctx: &mut MigrationCtx,
+) -> anyhow::Result<()> {
+    let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
+    let mut data_def_ids: Vec<(EdgeId, DefId)> = vec![];
+    for (edge_id, edge_info) in domain.edges() {
+        let edge_tag = edge_id.1;
+        let table_name = format!("e_{edge_tag}").into_boxed_str();
+
+        if let Some(pg_table) = pg_domain.edges.get_mut(&edge_tag) {
+            let pg_cardinals: BTreeMap<usize, PgEdgeCardinal> = txn
+                .query(
+                    indoc! {"
+                        SELECT key, ordinal, ident, def_column_name, unique_domaintable_key, key_column_name
+                        FROM m6mreg.edgecardinal
+                        WHERE domaintable_key = $1
+                        ORDER BY ordinal
+                    "},
+                    &[&pg_table.key],
+                )
+                .await?
+                .into_iter()
+                .map(|row| -> anyhow::Result<_> {
+                    let key = row.get(0);
+                    let ordinal: i32 = row.get(1);
+                    let ident = row.get(2);
+                    let def_col_name: Option<Box<str>> = row.get(3);
+                    let unique_datatable_key: Option<PgRegKey> = row.get(4);
+                    let key_col_name = row.get(5);
+
+                    let unique_datatable_def_id = unique_datatable_key.map(|key|
+                        *pg_domain.datatables.iter().find(|(_, dt)| dt.key == key).unwrap()
+                            .0
+                    );
+
+                    Ok((
+                        ordinal as usize,
+                        PgEdgeCardinal {
+                            key,
+                            ident,
+                            key_col_name,
+                            kind: if let Some(unique_datatable) = unique_datatable_def_id {
+                                PgEdgeCardinalKind::Unique {
+                                    def_id: unique_datatable,
+                                }
+                            } else {
+                                PgEdgeCardinalKind::Dynamic {
+                                    def_col_name: def_col_name.unwrap(),
+                                }
+                            },
+                        },
+                    ))
+                })
+                .try_collect()?;
+
+            if edge_info.cardinals.len() != pg_cardinals.len() {
+                todo!("adjust edge arity");
+            }
+
+            pg_table.edge_cardinals = pg_cardinals;
+        } else {
+            ctx.steps.push((
+                domain_ids,
+                MigrationStep::DeployEdge {
+                    edge_tag,
+                    table_name,
+                },
+            ));
+
+            for (index, cardinal) in edge_info.cardinals.iter().enumerate() {
+                if cardinal.flags.contains(EdgeCardinalFlags::ENTITY) {
+                    let ordinal: u16 = index.try_into()?;
+
+                    // FIXME: ontology must provide human readable name for cardinal
+                    let ident = format!("todo_{ordinal}").into_boxed_str();
+                    let key_col_name = format!("key_{ordinal}").into_boxed_str();
+
+                    ctx.steps.push((
+                        domain_ids,
+                        MigrationStep::DeployEdgeCardinal {
+                            edge_tag,
+                            ordinal,
+                            ident,
+                            kind: if cardinal.flags.contains(EdgeCardinalFlags::UNIQUE) {
+                                PgEdgeCardinalKind::Unique {
+                                    def_id: *cardinal.target.iter().next().unwrap(),
+                                }
+                            } else {
+                                let def_col_name = format!("def_{ordinal}").into_boxed_str();
+                                PgEdgeCardinalKind::Dynamic { def_col_name }
+                            },
+                            key_col_name,
+                        },
+                    ));
+                } else {
+                    if cardinal.target.len() != 1 {
+                        return Err(anyhow!("data cardinal should have unambiguous DefId"));
+                    }
+
+                    data_def_ids.push((*edge_id, *cardinal.target.iter().next().unwrap()));
+                }
+            }
+        }
+    }
+
+    for (edge_id, data_def_id) in data_def_ids {
+        migrate_datafields_steps(
+            domain_ids,
+            PgTableIdUnion::Edge(edge_id),
+            ontology.def(data_def_id),
+            ontology,
+            ctx,
+        )?;
+    }
+
+    Ok(())
+}
+
+fn migrate_datafields_steps(
+    domain_ids: PgDomainIds,
+    table_id: PgTableIdUnion,
+    def: &Def,
+    ontology: &Ontology,
+    ctx: &mut MigrationCtx,
+) -> anyhow::Result<()> {
+    let pg_domain = ctx.domains.get_mut(&domain_ids.pkg_id).unwrap();
     let mut tree_relationships: Vec<_> = def
         .data_relationships
         .iter()
@@ -357,8 +403,7 @@ async fn migrate_vertex_steps<'t>(
     // fields
     for (rel_tag, rel_info) in &tree_relationships {
         let pg_data_field = pg_domain
-            .datatables
-            .get(&vertex_def_id)
+            .get_table(&table_id)
             .and_then(|datatable| datatable.data_fields.get(rel_tag));
 
         // FIXME: should mix columns on the root _and_ child structures,
@@ -390,7 +435,7 @@ async fn migrate_vertex_steps<'t>(
             ctx.steps.push((
                 domain_ids,
                 MigrationStep::DeployDataField {
-                    datatable_def_id: vertex_def_id,
+                    table_id,
                     rel_tag: *rel_tag,
                     pg_type,
                     column_name,
@@ -408,14 +453,14 @@ async fn migrate_vertex_steps<'t>(
                 return Err(anyhow!("the ID must be unambiguously typed"));
             };
 
-            let pg_datatable = pg_domain.datatables.get(&vertex_def_id);
+            let pg_datatable = pg_domain.get_table(&table_id);
 
             let pg_index_data = pg_datatable
                 .and_then(|datatable| datatable.datafield_indexes.get(&(def_id, index_type)));
 
             match pg_index_data {
                 Some(pg_index_data) => {
-                    let pg_datatable = &pg_domain.datatables.get(&vertex_def_id).unwrap();
+                    let pg_datatable = &pg_domain.get_table(&table_id).unwrap();
                     for datafield_key in &pg_index_data.datafield_keys {
                         assert!(pg_datatable.field_by_key(*datafield_key).is_some());
                     }
@@ -424,7 +469,7 @@ async fn migrate_vertex_steps<'t>(
                     ctx.steps.push((
                         domain_ids,
                         MigrationStep::DeployDataIndex {
-                            datatable_def_id: vertex_def_id,
+                            table_id,
                             index_def_id: def_id,
                             index_type,
                             field_tuple: vec![*rel_tag],

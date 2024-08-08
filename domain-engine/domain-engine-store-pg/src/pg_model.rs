@@ -9,7 +9,7 @@ use ontol_runtime::{
     },
     tuple::CardinalIdx,
     value::Value,
-    DefId, DefRelTag, PackageId, RelId,
+    DefId, DefRelTag, EdgeId, PackageId, RelId,
 };
 use postgres_types::ToSql;
 use tokio_postgres::types::FromSql;
@@ -119,6 +119,12 @@ pub struct PgDomain {
     pub edges: FnvHashMap<u16, PgTable>,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum PgTableIdUnion {
+    Def(DefId),
+    Edge(EdgeId),
+}
+
 #[derive(Clone)]
 pub struct PgTable {
     pub key: PgRegKey,
@@ -126,6 +132,15 @@ pub struct PgTable {
     pub data_fields: FnvHashMap<DefRelTag, PgDataField>,
     pub edge_cardinals: BTreeMap<usize, PgEdgeCardinal>,
     pub datafield_indexes: FnvHashMap<(DefId, PgIndexType), PgIndexData>,
+}
+
+impl PgDomain {
+    pub fn get_table(&self, id: &PgTableIdUnion) -> Option<&PgTable> {
+        match id {
+            PgTableIdUnion::Def(def_id) => self.datatables.get(def_id),
+            PgTableIdUnion::Edge(edge_id) => self.edges.get(&edge_id.1),
+        }
+    }
 }
 
 impl PgTable {
