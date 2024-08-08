@@ -6,7 +6,9 @@ use indoc::indoc;
 use itertools::Itertools;
 use ontol_runtime::{
     ontology::{
-        domain::{DataRelationshipKind, DataRelationshipTarget, Def, Domain, Entity},
+        domain::{
+            DataRelationshipKind, DataRelationshipTarget, Def, Domain, EdgeCardinalFlags, Entity,
+        },
         Ontology,
     },
     DefId, DefRelTag, PackageId,
@@ -17,8 +19,8 @@ use tracing::info;
 use crate::{
     migrate::{MigrationStep, PgDomain},
     pg_model::{
-        PgDataField, PgDataTable, PgEdge, PgEdgeCardinal, PgIndexData, PgIndexType, PgRegKey,
-        PgType,
+        PgDataField, PgDataTable, PgEdge, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexData,
+        PgIndexType, PgRegKey, PgType,
     },
     sql::Unpack,
 };
@@ -166,7 +168,7 @@ pub async fn migrate_domain_steps<'t>(
             let pg_cardinals: BTreeMap<usize, PgEdgeCardinal> = txn
                 .query(
                     indoc! {"
-                        SELECT key, ordinal, ident, def_column_name, key_column_name
+                        SELECT key, ordinal, ident, def_column_name, unique_datatable_key, key_column_name
                         FROM m6mreg.edgecardinal
                         WHERE edge_key = $1
                         ORDER BY ordinal
@@ -176,16 +178,33 @@ pub async fn migrate_domain_steps<'t>(
                 .await?
                 .into_iter()
                 .map(|row| -> anyhow::Result<_> {
-                    let (key, ordinal, ident, def_col_name, key_col_name) = row.unpack();
-                    let ordinal: i32 = ordinal;
+                    let key = row.get(0);
+                    let ordinal: i32 = row.get(1);
+                    let ident = row.get(2);
+                    let def_col_name: Option<Box<str>> = row.get(3);
+                    let unique_datatable_key: Option<PgRegKey> = row.get(4);
+                    let key_col_name = row.get(5);
+
+                    let unique_datatable_def_id = unique_datatable_key.map(|key|
+                        *pg_domain.datatables.iter().find(|(_, dt)| dt.key == key).unwrap()
+                            .0
+                    );
 
                     Ok((
                         ordinal as usize,
                         PgEdgeCardinal {
                             key,
                             ident,
-                            def_col_name,
                             key_col_name,
+                            kind: if let Some(unique_datatable) = unique_datatable_def_id {
+                                PgEdgeCardinalKind::Unique {
+                                    def_id: unique_datatable,
+                                }
+                            } else {
+                                PgEdgeCardinalKind::Dynamic {
+                                    def_col_name: def_col_name.unwrap(),
+                                }
+                            },
                         },
                     ))
                 })
@@ -205,12 +224,11 @@ pub async fn migrate_domain_steps<'t>(
                 },
             ));
 
-            for (index, _cardinal) in edge_info.cardinals.iter().enumerate() {
+            for (index, cardinal) in edge_info.cardinals.iter().enumerate() {
                 let ordinal: u16 = index.try_into()?;
 
                 // FIXME: ontology must provide human readable name for cardinal
                 let ident = format!("todo_{ordinal}").into_boxed_str();
-                let def_col_name = format!("def_{ordinal}").into_boxed_str();
                 let key_col_name = format!("key_{ordinal}").into_boxed_str();
 
                 ctx.steps.push((
@@ -219,7 +237,14 @@ pub async fn migrate_domain_steps<'t>(
                         edge_tag,
                         ordinal,
                         ident,
-                        def_col_name,
+                        kind: if cardinal.flags.contains(EdgeCardinalFlags::UNIQUE) {
+                            PgEdgeCardinalKind::Unique {
+                                def_id: *cardinal.target.iter().next().unwrap(),
+                            }
+                        } else {
+                            let def_col_name = format!("def_{ordinal}").into_boxed_str();
+                            PgEdgeCardinalKind::Dynamic { def_col_name }
+                        },
                         key_col_name,
                     },
                 ))

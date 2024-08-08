@@ -15,7 +15,7 @@ use postgres_types::ToSql;
 use tokio_postgres::types::FromSql;
 use tracing::debug;
 
-use crate::{ds_err, sql};
+use crate::{ds_err, sql, sql_value::SqlVal};
 
 /// The key type used in the registry for metadata
 pub type PgRegKey = i32;
@@ -197,8 +197,31 @@ pub struct PgEdgeCardinal {
     pub key: PgRegKey,
     #[allow(unused)]
     pub ident: Box<str>,
-    pub def_col_name: Box<str>,
     pub key_col_name: Box<str>,
+    pub kind: PgEdgeCardinalKind,
+}
+
+impl PgEdgeCardinal {
+    pub fn extend_params(&self, def_key: PgRegKey, data_key: PgDataKey, params: &mut Vec<SqlVal>) {
+        match &self.kind {
+            PgEdgeCardinalKind::Dynamic { .. } => {
+                params.extend([SqlVal::I32(def_key), SqlVal::I64(data_key)]);
+            }
+            PgEdgeCardinalKind::Unique { .. } => {
+                params.push(SqlVal::I64(data_key));
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum PgEdgeCardinalKind {
+    /// Dynamic can link to unions, so it needs a def_col_name
+    Dynamic { def_col_name: Box<str> },
+    /// Unique can only link to fixed vertex type, the edge cardinal
+    /// is an "extension" of that vertex.
+    /// Unique edge cardinals have ON DELETE CASCADE set up.
+    Unique { def_id: DefId },
 }
 
 /// NB: Do not change the names of these enum variants.

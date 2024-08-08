@@ -420,14 +420,19 @@ fn edge_join_condition<'d>(
     data_alias: Alias,
     data: &'d PgDataTable,
 ) -> sql::Expr<'d> {
-    sql::Expr::And(vec![
-        sql::Expr::eq(
-            sql::Expr::path2(edge_alias, cardinal.def_col_name.as_ref()),
-            sql::Expr::LiteralInt(data.key),
-        ),
-        sql::Expr::eq(
-            sql::Expr::path2(edge_alias, cardinal.key_col_name.as_ref()),
-            sql::Expr::path2(data_alias, "_key"),
-        ),
-    ])
+    let data_key_eq = sql::Expr::eq(
+        sql::Expr::path2(edge_alias, cardinal.key_col_name.as_ref()),
+        sql::Expr::path2(data_alias, "_key"),
+    );
+
+    match &cardinal.kind {
+        crate::pg_model::PgEdgeCardinalKind::Dynamic { def_col_name } => sql::Expr::And(vec![
+            sql::Expr::eq(
+                sql::Expr::path2(edge_alias, def_col_name.as_ref()),
+                sql::Expr::LiteralInt(data.key),
+            ),
+            data_key_eq,
+        ]),
+        crate::pg_model::PgEdgeCardinalKind::Unique { .. } => data_key_eq,
+    }
 }

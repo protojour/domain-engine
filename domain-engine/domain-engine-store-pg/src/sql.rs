@@ -424,6 +424,27 @@ where
     }
 }
 
+impl<'a, T0, T1, T2, T3, T4, T5> Unpack<'a, (T0, T1, T2, T3, T4, T5)> for Row
+where
+    T0: FromSql<'a>,
+    T1: FromSql<'a>,
+    T2: FromSql<'a>,
+    T3: FromSql<'a>,
+    T4: FromSql<'a>,
+    T5: FromSql<'a>,
+{
+    fn unpack(&'a self) -> (T0, T1, T2, T3, T4, T5) {
+        (
+            self.get(0),
+            self.get(1),
+            self.get(2),
+            self.get(3),
+            self.get(4),
+            self.get(5),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::sql::Ident;

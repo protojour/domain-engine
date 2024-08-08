@@ -5,7 +5,10 @@ use tokio_postgres::Transaction;
 use tracing::{info, info_span, Instrument};
 
 use crate::{
-    pg_model::{PgDataField, PgDataTable, PgEdge, PgEdgeCardinal, PgIndexType, PgRegKey, PgType},
+    pg_model::{
+        PgDataField, PgDataTable, PgEdge, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexType,
+        PgRegKey, PgType,
+    },
     sql::{self, Unpack},
 };
 
@@ -273,35 +276,74 @@ async fn execute_migration_step<'t>(
             edge_tag,
             ordinal,
             ident,
-            def_col_name,
             key_col_name,
+            kind,
         } => {
-            let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
-            let pg_edge = pg_domain.edges.get_mut(&edge_tag).unwrap();
+            let pg_edge_domain = ctx.domains.get(&pkg_id).unwrap();
+            let pg_edge = pg_edge_domain.edges.get(&edge_tag).unwrap();
 
-            txn.query(
-                &format!(
-                    "ALTER TABLE {schema}.{table} ADD COLUMN {column} integer",
-                    schema = sql::Ident(&pg_domain.schema_name),
-                    table = sql::Ident(&pg_edge.table_name),
-                    column = sql::Ident(&def_col_name)
-                ),
-                &[],
-            )
-            .await
-            .context("alter table add type column")?;
+            match &kind {
+                PgEdgeCardinalKind::Dynamic { def_col_name } => {
+                    txn.query(
+                        &format!(
+                            "ALTER TABLE {schema}.{table} ADD COLUMN {column} integer",
+                            schema = sql::Ident(&pg_edge_domain.schema_name),
+                            table = sql::Ident(&pg_edge.table_name),
+                            column = sql::Ident(&def_col_name)
+                        ),
+                        &[],
+                    )
+                    .await
+                    .context("alter table add def column")?;
 
-            txn.query(
-                &format!(
-                    "ALTER TABLE {schema}.{table} ADD COLUMN {column} bigint",
-                    schema = sql::Ident(&pg_domain.schema_name),
-                    table = sql::Ident(&pg_edge.table_name),
-                    column = sql::Ident(&key_col_name)
-                ),
-                &[],
-            )
-            .await
-            .context("alter table add key column")?;
+                    txn.query(
+                        &format!(
+                            "ALTER TABLE {schema}.{table} ADD COLUMN {column} bigint",
+                            schema = sql::Ident(&pg_edge_domain.schema_name),
+                            table = sql::Ident(&pg_edge.table_name),
+                            column = sql::Ident(&key_col_name)
+                        ),
+                        &[],
+                    )
+                    .await
+                    .context("alter table add key column")?;
+                }
+                PgEdgeCardinalKind::Unique { def_id } => {
+                    let pg_target_domain = ctx.domains.get(&def_id.package_id()).unwrap();
+                    let pg_target_datatable = pg_target_domain.datatables.get(&def_id).unwrap();
+
+                    txn.query(
+                        &format!(
+                            indoc! { "
+                                ALTER TABLE {schema}.{table}
+                                    ADD COLUMN {column} bigint NOT NULL
+                                    REFERENCES {refschema}.{refdatatable}(_key)
+                                    ON DELETE CASCADE
+                            "},
+                            schema = sql::Ident(&pg_edge_domain.schema_name),
+                            table = sql::Ident(&pg_edge.table_name),
+                            column = sql::Ident(&key_col_name),
+                            refschema = sql::Ident(&pg_target_domain.schema_name),
+                            refdatatable = sql::Ident(&pg_target_datatable.table_name)
+                        ),
+                        &[],
+                    )
+                    .await
+                    .context("alter table add key column")?;
+                }
+            };
+
+            let mut def_column_name: Option<&str> = None;
+            let mut unique_datatable_key: Option<PgRegKey> = None;
+
+            match &kind {
+                PgEdgeCardinalKind::Dynamic { def_col_name } => {
+                    def_column_name = Some(def_col_name.as_ref())
+                }
+                PgEdgeCardinalKind::Unique { def_id } => {
+                    unique_datatable_key = Some(pg_edge_domain.datatables.get(def_id).unwrap().key);
+                }
+            }
 
             let row = txn
                 .query_one(
@@ -311,28 +353,38 @@ async fn execute_migration_step<'t>(
                             ordinal,
                             ident,
                             def_column_name,
+                            unique_datatable_key,
                             key_column_name
-                        ) VALUES($1, $2, $3, $4, $5)
+                        ) VALUES($1, $2, $3, $4, $5, $6)
                         RETURNING key
                     "},
                     &[
                         &pg_edge.key,
                         &(ordinal as i32),
                         &ident,
-                        &def_col_name,
+                        &def_column_name,
+                        &unique_datatable_key,
                         &key_col_name,
                     ],
                 )
                 .await
                 .context("insert edgetable")?;
 
+            let pg_edge = ctx
+                .domains
+                .get_mut(&pkg_id)
+                .unwrap()
+                .edges
+                .get_mut(&edge_tag)
+                .unwrap();
+
             pg_edge.cardinals.insert(
                 ordinal as usize,
                 PgEdgeCardinal {
                     key: row.get(0),
                     ident,
-                    def_col_name,
                     key_col_name,
+                    kind,
                 },
             );
         }

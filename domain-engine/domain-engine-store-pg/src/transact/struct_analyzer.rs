@@ -25,15 +25,15 @@ pub struct AnalyzedStruct<'m, 'b> {
 pub struct EdgeProjection {
     #[allow(unused)]
     pub subject: CardinalIdx,
-    pub tuples: Vec<EdgeTuple>,
+    pub tuples: Vec<EdgeEndoTuple>,
 }
 
-pub struct EdgeTuple {
+pub struct EdgeEndoTuple {
     /// The length of the vector is the edge cardinality - 1
     elements: Vec<(CardinalIdx, Value)>,
 }
 
-impl EdgeTuple {
+impl EdgeEndoTuple {
     pub fn into_elements(self) -> impl Iterator<Item = Value> {
         self.elements.into_iter().map(|(_, value)| value)
     }
@@ -108,19 +108,19 @@ impl<'a> TransactCtx<'a> {
                     match attr {
                         Attr::Unit(value) => {
                             if projection.tuples.is_empty() {
-                                projection.tuples.push(EdgeTuple { elements: vec![] });
+                                projection.tuples.push(EdgeEndoTuple { elements: vec![] });
                             }
                             projection.tuples[0].insert_element(proj.object, value)?;
                         }
                         Attr::Tuple(tuple) => {
                             projection
                                 .tuples
-                                .push(EdgeTuple::from_tuple(tuple.elements.into_iter()));
+                                .push(EdgeEndoTuple::from_tuple(tuple.elements.into_iter()));
                         }
                         Attr::Matrix(matrix) => projection.tuples.extend(
                             matrix
                                 .into_rows()
-                                .map(|tuple| EdgeTuple::from_tuple(tuple.elements.into_iter())),
+                                .map(|tuple| EdgeEndoTuple::from_tuple(tuple.elements.into_iter())),
                         ),
                     }
                 }

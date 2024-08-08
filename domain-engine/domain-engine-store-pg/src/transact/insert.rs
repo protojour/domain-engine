@@ -15,7 +15,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use crate::{
     ds_bad_req, ds_err,
-    pg_model::{InDomain, PgDataKey, PgType},
+    pg_model::{InDomain, PgDataKey, PgEdgeCardinalKind, PgType},
     sql::{self, TableName},
     sql_value::{Layout, RowDecodeIterator, SqlVal},
     transact::data::Data,
@@ -174,41 +174,61 @@ impl<'a> TransactCtx<'a> {
             };
 
             for pg_cardinal in pg_edge.cardinals.values() {
-                insert.column_names.extend([
-                    pg_cardinal.def_col_name.as_ref(),
-                    pg_cardinal.key_col_name.as_ref(),
-                ]);
+                if let PgEdgeCardinalKind::Dynamic { def_col_name } = &pg_cardinal.kind {
+                    insert.column_names.push(&def_col_name);
+                }
+                insert.column_names.push(&pg_cardinal.key_col_name);
             }
+
+            let pg_subject_cardinal = &pg_edge.cardinals.get(&(subject_index.0 as usize)).unwrap();
 
             let sql = insert.to_string();
 
             for tuple in projection.tuples {
                 edge_params.clear();
 
-                let mut subject_pair = Some([
-                    SqlVal::I32(analyzed.root_attrs.datatable.key),
-                    SqlVal::I64(data_key),
-                ]);
+                let mut cur_cardinal_idx = 0;
 
-                for (index, value) in tuple.into_elements().enumerate() {
+                // intersperse "endo tuple" with the subject arg and build parameter list
+                for value in tuple.into_elements() {
                     let (foreign_def_id, foreign_key) = self
                         .resolve_linked_vertex(value, InsertMode::Insert, Select::EntityId)
                         .await?;
 
-                    if index == subject_index.0 as usize {
-                        edge_params.extend(subject_pair.take().unwrap());
+                    if cur_cardinal_idx == subject_index.0 {
+                        // inject subject arg
+                        pg_subject_cardinal.extend_params(
+                            analyzed.root_attrs.datatable.key,
+                            data_key,
+                            &mut edge_params,
+                        );
+                        cur_cardinal_idx += 1;
                     }
 
-                    let datatable = self
-                        .pg_model
-                        .datatable(foreign_def_id.package_id(), foreign_def_id)?;
+                    if let Some(pg_edge_cardinal) =
+                        pg_edge.cardinals.get(&(cur_cardinal_idx as usize))
+                    {
+                        let datatable = self
+                            .pg_model
+                            .datatable(foreign_def_id.package_id(), foreign_def_id)?;
 
-                    edge_params.extend([SqlVal::I32(datatable.key), SqlVal::I64(foreign_key)]);
+                        pg_edge_cardinal.extend_params(
+                            datatable.key,
+                            foreign_key,
+                            &mut edge_params,
+                        );
+                    }
+
+                    cur_cardinal_idx += 1;
                 }
 
-                if let Some(subject_pair) = subject_pair {
+                if cur_cardinal_idx == subject_index.0 {
                     // subject at the end of the tuple
-                    edge_params.extend(subject_pair);
+                    pg_subject_cardinal.extend_params(
+                        analyzed.root_attrs.datatable.key,
+                        data_key,
+                        &mut edge_params,
+                    );
                 }
 
                 debug!("{sql}");

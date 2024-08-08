@@ -99,8 +99,10 @@ CREATE TABLE m6mreg.edgecardinal
     edge_key integer NOT NULL REFERENCES m6mreg.edgetable(key),
     ordinal integer NOT NULL,
     ident text NOT NULL,
-    def_column_name text NOT NULL,
+    def_column_name text,
+    unique_datatable_key integer REFERENCES m6mreg.datatable(key),
     key_column_name text NOT NULL,
 
-    UNIQUE (edge_key, ordinal)
+    UNIQUE (edge_key, ordinal),
+    CHECK ((def_column_name IS NULL) != (unique_datatable_key IS NULL))
 );
