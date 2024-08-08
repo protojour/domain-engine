@@ -93,6 +93,7 @@ impl<'a> TransactCtx<'a> {
                 &analyzed.root_attrs.datatable.table_name,
             ),
             column_names: analyzed.root_attrs.column_selection()?,
+            on_conflict: None,
             returning: vec![sql::Expr::path1("_key")],
         };
         let mut layout: Vec<Layout> = vec![Layout::Scalar(PgType::BigInt)];
@@ -168,6 +169,7 @@ impl<'a> TransactCtx<'a> {
             let mut insert = sql::Insert {
                 table_name: TableName(&pg_domain.schema_name, &pg_edge.table_name),
                 column_names: vec![],
+                on_conflict: None,
                 returning: vec![],
             };
 
@@ -188,7 +190,7 @@ impl<'a> TransactCtx<'a> {
                     SqlVal::I64(data_key),
                 ]);
 
-                for (index, value) in tuple.into_iter().enumerate() {
+                for (index, value) in tuple.into_elements().enumerate() {
                     let (foreign_def_id, foreign_key) = self
                         .resolve_linked_vertex(value, InsertMode::Insert, Select::EntityId)
                         .await?;
@@ -204,8 +206,8 @@ impl<'a> TransactCtx<'a> {
                     edge_params.extend([SqlVal::I32(datatable.key), SqlVal::I64(foreign_key)]);
                 }
 
-                // subject at the end of the tuple
                 if let Some(subject_pair) = subject_pair {
+                    // subject at the end of the tuple
                     edge_params.extend(subject_pair);
                 }
 
@@ -281,21 +283,38 @@ impl<'a> TransactCtx<'a> {
             let entity = self.ontology.def(*entity_def_id).entity().unwrap();
             let pg_id_field = pg.datatable.field(&entity.id_relationship_id)?;
 
-            let select = sql::Select {
-                expressions: vec![sql::Expr::path1("_key")],
-                from: vec![pg.table_name().into()],
-                where_: Some(sql::Expr::eq(
-                    sql::Expr::path1(pg_id_field.col_name.as_ref()),
-                    sql::Expr::param(0),
-                )),
-                ..Default::default()
-            };
-
             let Data::Sql(id_param) = self.data_from_value(value)? else {
                 return Err(ds_bad_req("compound foreign key"));
             };
 
-            let sql = select.to_string();
+            let sql = if entity.is_self_identifying {
+                // upsert
+                sql::Insert {
+                    table_name: pg.table_name().into(),
+                    column_names: vec![&pg_id_field.col_name],
+                    on_conflict: Some(sql::OnConflict {
+                        target: Some(sql::ConflictTarget::Columns(vec![&pg_id_field.col_name])),
+                        action: sql::ConflictAction::DoUpdateSet(vec![sql::UpdateColumn(
+                            &pg_id_field.col_name,
+                            sql::Expr::param(0),
+                        )]),
+                    }),
+                    returning: vec![sql::Expr::path1("_key")],
+                }
+                .to_string()
+            } else {
+                sql::Select {
+                    expressions: vec![sql::Expr::path1("_key")],
+                    from: vec![pg.table_name().into()],
+                    where_: Some(sql::Expr::eq(
+                        sql::Expr::path1(pg_id_field.col_name.as_ref()),
+                        sql::Expr::param(0),
+                    )),
+                    ..Default::default()
+                }
+                .to_string()
+            };
+
             debug!("{sql}");
 
             let row = self

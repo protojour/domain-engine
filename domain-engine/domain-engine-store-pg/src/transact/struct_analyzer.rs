@@ -10,7 +10,7 @@ use ontol_runtime::{
 };
 use tracing::debug;
 
-use crate::pg_model::InDomain;
+use crate::{ds_err, pg_model::InDomain};
 
 use super::{
     data::{Data, ScalarAttrs},
@@ -25,7 +25,38 @@ pub struct AnalyzedStruct<'m, 'b> {
 pub struct EdgeProjection {
     #[allow(unused)]
     pub subject: CardinalIdx,
-    pub tuples: Vec<Vec<Value>>,
+    pub tuples: Vec<EdgeTuple>,
+}
+
+pub struct EdgeTuple {
+    /// The length of the vector is the edge cardinality - 1
+    elements: Vec<(CardinalIdx, Value)>,
+}
+
+impl EdgeTuple {
+    pub fn into_elements(self) -> impl Iterator<Item = Value> {
+        self.elements.into_iter().map(|(_, value)| value)
+    }
+
+    fn from_tuple(it: impl Iterator<Item = Value>) -> Self {
+        Self {
+            elements: it
+                .enumerate()
+                .map(|(idx, value)| (CardinalIdx(idx as u8), value))
+                .collect(),
+        }
+    }
+
+    /// build the tuple one-by-one
+    fn insert_element(&mut self, idx: CardinalIdx, value: Value) -> DomainResult<()> {
+        match self.elements.binary_search_by_key(&idx, |(idx, _)| *idx) {
+            Ok(pos) => Err(ds_err(format!("duplicate edge cardinal at {pos}"))),
+            Err(pos) => {
+                self.elements.insert(pos, (idx, value));
+                Ok(())
+            }
+        }
+    }
 }
 
 impl<'a> TransactCtx<'a> {
@@ -76,15 +107,20 @@ impl<'a> TransactCtx<'a> {
 
                     match attr {
                         Attr::Unit(value) => {
-                            projection.tuples.push(vec![value]);
+                            if projection.tuples.is_empty() {
+                                projection.tuples.push(EdgeTuple { elements: vec![] });
+                            }
+                            projection.tuples[0].insert_element(proj.object, value)?;
                         }
                         Attr::Tuple(tuple) => {
-                            projection.tuples.push(tuple.elements.into_iter().collect());
+                            projection
+                                .tuples
+                                .push(EdgeTuple::from_tuple(tuple.elements.into_iter()));
                         }
                         Attr::Matrix(matrix) => projection.tuples.extend(
                             matrix
                                 .into_rows()
-                                .map(|tuple| tuple.elements.into_iter().collect()),
+                                .map(|tuple| EdgeTuple::from_tuple(tuple.elements.into_iter())),
                         ),
                     }
                 }

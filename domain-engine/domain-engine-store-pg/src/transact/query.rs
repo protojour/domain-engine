@@ -379,10 +379,12 @@ impl<'a> TransactCtx<'a> {
                     .next()
                     .ok_or_else(|| ds_err("no fields"))?
                     .unwrap();
-                let entity = self.ontology.def(target_def_id).entity().unwrap();
 
-                let value = self.deserialize_sql(entity.id_value_def_id, sql_field)?;
-                Ok(value)
+                if let Some(entity) = self.ontology.def(target_def_id).entity() {
+                    self.deserialize_sql(entity.id_value_def_id, sql_field)
+                } else {
+                    self.deserialize_sql(target_def_id, sql_field)
+                }
             }
             Select::Struct(struct_select) => Ok(self
                 .read_struct_row_value(

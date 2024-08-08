@@ -56,8 +56,27 @@ pub struct Select<'d> {
 pub struct Insert<'d> {
     pub table_name: TableName<'d>,
     pub column_names: Vec<&'d str>,
+    pub on_conflict: Option<OnConflict<'d>>,
     pub returning: Vec<Expr<'d>>,
 }
+
+pub struct OnConflict<'d> {
+    pub target: Option<ConflictTarget<'d>>,
+    pub action: ConflictAction<'d>,
+}
+
+pub enum ConflictTarget<'d> {
+    Columns(Vec<&'d str>),
+}
+
+pub enum ConflictAction<'d> {
+    DoUpdateSet(Vec<UpdateColumn<'d>>),
+    #[allow(unused)]
+    DoNothing,
+}
+
+/// column = expr
+pub struct UpdateColumn<'d>(pub &'d str, pub Expr<'d>);
 
 pub enum Expr<'d> {
     /// path in current scope
@@ -163,11 +182,61 @@ impl<'d> Display for Insert<'d> {
             values = (0..self.column_names.len()).map(Param).format(","),
         )?;
 
+        if let Some(on_conflict) = &self.on_conflict {
+            write!(f, " ON CONFLICT {on_conflict}")?;
+        }
+
         if !self.returning.is_empty() {
             write!(f, " RETURNING {}", self.returning.iter().format(","))?;
         }
 
         Ok(())
+    }
+}
+
+impl<'d> Display for OnConflict<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(target) = &self.target {
+            write!(f, "{target} ")?;
+        }
+
+        write!(f, "{}", self.action)
+    }
+}
+
+impl<'d> Display for ConflictTarget<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Columns(columns) => write!(f, "({})", columns.iter().map(Ident).format(",")),
+        }
+    }
+}
+
+impl<'d> Display for ConflictAction<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DoUpdateSet(update_columns) => {
+                write!(
+                    f,
+                    "DO UPDATE SET {update_columns}",
+                    update_columns = update_columns.iter().format(",")
+                )
+            }
+            Self::DoNothing => {
+                write!(f, "DO NOTHING")
+            }
+        }
+    }
+}
+
+impl<'d> Display for UpdateColumn<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{column_name} = {expr}",
+            column_name = Ident(self.0),
+            expr = self.1
+        )
     }
 }
 

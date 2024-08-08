@@ -7,7 +7,7 @@ use domain_engine_core::{
     DomainResult,
 };
 use futures_util::{stream::BoxStream, StreamExt};
-use mutate::InsertMode;
+use insert::InsertMode;
 use ontol_runtime::{
     interface::serde::processor::ProcessorMode, ontology::Ontology, query::select::Select, DefId,
 };
@@ -18,7 +18,7 @@ use tracing::debug;
 use crate::{ds_err, PgModel, PostgresDataStore};
 
 mod data;
-mod mutate;
+mod insert;
 mod query;
 mod struct_analyzer;
 mod struct_select;
