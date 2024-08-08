@@ -70,7 +70,6 @@ enum MigrationStep {
         edge_tag: u16,
         ordinal: u16,
         ident: Box<str>,
-        key_col_name: Box<str>,
         kind: PgEdgeCardinalKind,
     },
     RenameDomainSchema {

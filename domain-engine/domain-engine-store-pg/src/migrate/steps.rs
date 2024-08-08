@@ -291,7 +291,7 @@ async fn migrate_domain_edges_steps<'t>(
                     let ident = row.get(2);
                     let def_col_name: Option<Box<str>> = row.get(3);
                     let unique_datatable_key: Option<PgRegKey> = row.get(4);
-                    let key_col_name = row.get(5);
+                    let key_col_name: Option<Box<str>> = row.get(5);
 
                     let unique_datatable_def_id = unique_datatable_key.map(|key|
                         *pg_domain.datatables.iter().find(|(_, dt)| dt.key == key).unwrap()
@@ -303,16 +303,23 @@ async fn migrate_domain_edges_steps<'t>(
                         PgEdgeCardinal {
                             key,
                             ident,
-                            key_col_name,
-                            kind: if let Some(unique_datatable) = unique_datatable_def_id {
-                                PgEdgeCardinalKind::Unique {
-                                    def_id: unique_datatable,
+                            kind: match (key_col_name, unique_datatable_def_id, def_col_name) {
+                                (Some(key_col_name), Some(unique_datatable_def_id), None) => {
+                                    PgEdgeCardinalKind::Unique {
+                                        def_id: unique_datatable_def_id,
+                                        key_col_name
+                                    }
                                 }
-                            } else {
-                                PgEdgeCardinalKind::Dynamic {
-                                    def_col_name: def_col_name.unwrap(),
+                                (Some(key_col_name), None, Some(def_col_name)) => {
+                                    PgEdgeCardinalKind::Dynamic { def_col_name, key_col_name }
                                 }
-                            },
+                                (None, None, None) => {
+                                    PgEdgeCardinalKind::Parameters
+                                }
+                                _ => {
+                                    unreachable!()
+                                }
+                            }
                         },
                     ))
                 })
@@ -333,11 +340,11 @@ async fn migrate_domain_edges_steps<'t>(
             ));
 
             for (index, cardinal) in edge_info.cardinals.iter().enumerate() {
-                if cardinal.flags.contains(EdgeCardinalFlags::ENTITY) {
-                    let ordinal: u16 = index.try_into()?;
+                let ordinal: u16 = index.try_into()?;
+                let ident = format!("todo_{ordinal}").into_boxed_str();
 
+                if cardinal.flags.contains(EdgeCardinalFlags::ENTITY) {
                     // FIXME: ontology must provide human readable name for cardinal
-                    let ident = format!("todo_{ordinal}").into_boxed_str();
                     let key_col_name = format!("key_{ordinal}").into_boxed_str();
 
                     ctx.steps.push((
@@ -348,19 +355,32 @@ async fn migrate_domain_edges_steps<'t>(
                             ident,
                             kind: if cardinal.flags.contains(EdgeCardinalFlags::UNIQUE) {
                                 PgEdgeCardinalKind::Unique {
+                                    key_col_name,
                                     def_id: *cardinal.target.iter().next().unwrap(),
                                 }
                             } else {
                                 let def_col_name = format!("def_{ordinal}").into_boxed_str();
-                                PgEdgeCardinalKind::Dynamic { def_col_name }
+                                PgEdgeCardinalKind::Dynamic {
+                                    key_col_name,
+                                    def_col_name,
+                                }
                             },
-                            key_col_name,
                         },
                     ));
                 } else {
                     if cardinal.target.len() != 1 {
                         return Err(anyhow!("data cardinal should have unambiguous DefId"));
                     }
+
+                    ctx.steps.push((
+                        domain_ids,
+                        MigrationStep::DeployEdgeCardinal {
+                            edge_tag,
+                            ordinal,
+                            ident,
+                            kind: PgEdgeCardinalKind::Parameters,
+                        },
+                    ));
 
                     data_def_ids.push((*edge_id, *cardinal.target.iter().next().unwrap()));
                 }

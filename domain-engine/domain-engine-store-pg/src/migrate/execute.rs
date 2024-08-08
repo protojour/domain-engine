@@ -283,14 +283,16 @@ async fn execute_migration_step<'t>(
             edge_tag,
             ordinal,
             ident,
-            key_col_name,
             kind,
         } => {
             let pg_edge_domain = ctx.domains.get(&pkg_id).unwrap();
             let pg_table = pg_edge_domain.edges.get(&edge_tag).unwrap();
 
             match &kind {
-                PgEdgeCardinalKind::Dynamic { def_col_name } => {
+                PgEdgeCardinalKind::Dynamic {
+                    def_col_name,
+                    key_col_name,
+                } => {
                     txn.query(
                         &format!(
                             "ALTER TABLE {schema}.{table} ADD COLUMN {column} integer",
@@ -315,7 +317,10 @@ async fn execute_migration_step<'t>(
                     .await
                     .context("alter table add key column")?;
                 }
-                PgEdgeCardinalKind::Unique { def_id } => {
+                PgEdgeCardinalKind::Unique {
+                    def_id,
+                    key_col_name,
+                } => {
                     let pg_target_domain = ctx.domains.get(&def_id.package_id()).unwrap();
                     let pg_target_datatable = pg_target_domain.datatables.get(def_id).unwrap();
 
@@ -339,19 +344,30 @@ async fn execute_migration_step<'t>(
                     .await
                     .context("alter table add key column")?;
                 }
+                PgEdgeCardinalKind::Parameters => {}
             };
 
             let mut def_column_name: Option<&str> = None;
+            let mut key_column_name: Option<&str> = None;
             let mut unique_domaintable_key: Option<PgRegKey> = None;
 
             match &kind {
-                PgEdgeCardinalKind::Dynamic { def_col_name } => {
-                    def_column_name = Some(def_col_name.as_ref())
+                PgEdgeCardinalKind::Dynamic {
+                    def_col_name,
+                    key_col_name,
+                } => {
+                    def_column_name = Some(def_col_name.as_ref());
+                    key_column_name = Some(key_col_name.as_ref());
                 }
-                PgEdgeCardinalKind::Unique { def_id } => {
+                PgEdgeCardinalKind::Unique {
+                    def_id,
+                    key_col_name,
+                } => {
                     unique_domaintable_key =
                         Some(pg_edge_domain.datatables.get(def_id).unwrap().key);
+                    key_column_name = Some(key_col_name.as_ref());
                 }
+                PgEdgeCardinalKind::Parameters => {}
             }
 
             let row = txn
@@ -373,7 +389,7 @@ async fn execute_migration_step<'t>(
                         &ident,
                         &def_column_name,
                         &unique_domaintable_key,
-                        &key_col_name,
+                        &key_column_name,
                     ],
                 )
                 .await
@@ -392,7 +408,6 @@ async fn execute_migration_step<'t>(
                 PgEdgeCardinal {
                     key: row.get(0),
                     ident,
-                    key_col_name,
                     kind,
                 },
             );

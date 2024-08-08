@@ -1,4 +1,4 @@
-use std::collections::hash_map::Entry;
+use std::collections::{hash_map::Entry, BTreeMap};
 
 use domain_engine_core::{
     domain_error::DomainErrorKind,
@@ -8,20 +8,21 @@ use domain_engine_core::{
 };
 use fnv::FnvHashMap;
 use futures_util::{future::BoxFuture, TryStreamExt};
-use ontol_runtime::{attr::Attr, query::select::Select, value::Value, DefId, RelId};
+use itertools::Itertools;
+use ontol_runtime::{attr::Attr, query::select::Select, value::Value, DefId, EdgeId, RelId};
 use pin_utils::pin_mut;
 use tokio_postgres::types::ToSql;
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
     ds_bad_req, ds_err,
-    pg_model::{InDomain, PgDataKey, PgEdgeCardinalKind, PgType},
+    pg_model::{InDomain, PgDataKey, PgDomain, PgEdgeCardinalKind, PgTable, PgType},
     sql::{self, TableName},
     sql_value::{Layout, RowDecodeIterator, SqlVal},
     transact::data::Data,
 };
 
-use super::{data::RowValue, TransactCtx};
+use super::{data::RowValue, struct_analyzer::EdgeProjection, TransactCtx};
 
 pub enum InsertMode {
     Insert,
@@ -158,89 +159,13 @@ impl<'a> TransactCtx<'a> {
         let mut row = RowDecodeIterator::new(&row, &layout);
         let data_key = SqlVal::next_column(&mut row)?.into_i64()?;
 
-        // write edges
-        let mut edge_params: Vec<SqlVal> = vec![];
-
-        for (edge_id, projection) in analyzed.edge_projections {
-            let subject_index = projection.subject;
-
-            let pg_edge = pg_domain.edges.get(&edge_id.1).unwrap();
-
-            let mut insert = sql::Insert {
-                into: TableName(&pg_domain.schema_name, &pg_edge.table_name),
-                column_names: vec![],
-                on_conflict: None,
-                returning: vec![],
-            };
-
-            for pg_cardinal in pg_edge.edge_cardinals.values() {
-                if let PgEdgeCardinalKind::Dynamic { def_col_name } = &pg_cardinal.kind {
-                    insert.column_names.push(def_col_name);
-                }
-                insert.column_names.push(&pg_cardinal.key_col_name);
-            }
-
-            let pg_subject_cardinal = &pg_edge
-                .edge_cardinals
-                .get(&(subject_index.0 as usize))
-                .unwrap();
-
-            let sql = insert.to_string();
-
-            for tuple in projection.tuples {
-                edge_params.clear();
-
-                let mut cur_cardinal_idx = 0;
-
-                // intersperse "endo tuple" with the subject arg and build parameter list
-                for value in tuple.into_elements() {
-                    let (foreign_def_id, foreign_key) = self
-                        .resolve_linked_vertex(value, InsertMode::Insert, Select::EntityId)
-                        .await?;
-
-                    if cur_cardinal_idx == subject_index.0 {
-                        // inject subject arg
-                        pg_subject_cardinal.extend_params(
-                            analyzed.root_attrs.datatable.key,
-                            data_key,
-                            &mut edge_params,
-                        );
-                        cur_cardinal_idx += 1;
-                    }
-
-                    if let Some(pg_edge_cardinal) =
-                        pg_edge.edge_cardinals.get(&(cur_cardinal_idx as usize))
-                    {
-                        let datatable = self
-                            .pg_model
-                            .datatable(foreign_def_id.package_id(), foreign_def_id)?;
-
-                        pg_edge_cardinal.extend_params(
-                            datatable.key,
-                            foreign_key,
-                            &mut edge_params,
-                        );
-                    }
-
-                    cur_cardinal_idx += 1;
-                }
-
-                if cur_cardinal_idx == subject_index.0 {
-                    // subject at the end of the tuple
-                    pg_subject_cardinal.extend_params(
-                        analyzed.root_attrs.datatable.key,
-                        data_key,
-                        &mut edge_params,
-                    );
-                }
-
-                debug!("{sql}");
-                self.txn
-                    .query_raw(&sql, edge_params.iter().map(|param| param as &dyn ToSql))
-                    .await
-                    .map_err(|e| ds_err(format!("unable to insert edge: {e:?}")))?;
-            }
-        }
+        self.write_edges(
+            pg_domain,
+            analyzed.root_attrs.datatable,
+            data_key,
+            analyzed.edge_projections,
+        )
+        .await?;
 
         match select {
             Select::EntityId => {
@@ -271,6 +196,120 @@ impl<'a> TransactCtx<'a> {
                 op: DataOperation::Inserted,
             }),
         }
+    }
+
+    async fn write_edges(
+        &self,
+        pg_domain: &PgDomain,
+        subject_datatable: &PgTable,
+        subject_data_key: PgDataKey,
+        edge_projections: BTreeMap<EdgeId, EdgeProjection>,
+    ) -> DomainResult<()> {
+        enum Dynamic {
+            Yes,
+            No,
+        }
+
+        enum ProjectedEdgeCardinal {
+            Subject(Dynamic),
+            Object(usize, Dynamic),
+            Parameters,
+        }
+
+        let mut edge_params: Vec<SqlVal> = vec![];
+
+        for (edge_id, projection) in edge_projections {
+            let subject_index = projection.subject;
+
+            let pg_edge = pg_domain.edges.get(&edge_id.1).unwrap();
+
+            let mut sql_insert = sql::Insert {
+                into: TableName(&pg_domain.schema_name, &pg_edge.table_name),
+                column_names: vec![],
+                on_conflict: None,
+                returning: vec![],
+            };
+
+            let projected_cardinals = pg_edge
+                .edge_cardinals
+                .iter()
+                .map(|(index, pg_cardinal)| match &pg_cardinal.kind {
+                    PgEdgeCardinalKind::Dynamic {
+                        def_col_name,
+                        key_col_name,
+                    } => {
+                        sql_insert
+                            .column_names
+                            .extend([def_col_name.as_ref(), key_col_name]);
+                        if *index == subject_index.0 as usize {
+                            ProjectedEdgeCardinal::Subject(Dynamic::Yes)
+                        } else {
+                            ProjectedEdgeCardinal::Object(*index, Dynamic::Yes)
+                        }
+                    }
+                    PgEdgeCardinalKind::Unique { key_col_name, .. } => {
+                        sql_insert.column_names.push(key_col_name);
+                        if *index == subject_index.0 as usize {
+                            ProjectedEdgeCardinal::Subject(Dynamic::No)
+                        } else {
+                            ProjectedEdgeCardinal::Object(*index, Dynamic::No)
+                        }
+                    }
+                    PgEdgeCardinalKind::Parameters => ProjectedEdgeCardinal::Parameters,
+                })
+                .collect_vec();
+
+            let sql = sql_insert.to_string();
+            debug!("{sql}");
+
+            for tuple in projection.tuples {
+                edge_params.clear();
+
+                let mut element_iter = tuple.into_elements();
+
+                for projected_cardinal in &projected_cardinals {
+                    match projected_cardinal {
+                        ProjectedEdgeCardinal::Subject(Dynamic::Yes) => {
+                            edge_params.extend([
+                                SqlVal::I32(subject_datatable.key),
+                                SqlVal::I64(subject_data_key),
+                            ]);
+                        }
+                        ProjectedEdgeCardinal::Subject(Dynamic::No) => {
+                            edge_params.push(SqlVal::I64(subject_data_key));
+                        }
+                        ProjectedEdgeCardinal::Object(_index, dynamic) => {
+                            let (foreign_def_id, foreign_key) = self
+                                .resolve_linked_vertex(
+                                    element_iter.next().unwrap(),
+                                    InsertMode::Insert,
+                                    Select::EntityId,
+                                )
+                                .await?;
+
+                            if matches!(dynamic, Dynamic::Yes) {
+                                let datatable = self
+                                    .pg_model
+                                    .datatable(foreign_def_id.package_id(), foreign_def_id)?;
+                                edge_params.push(SqlVal::I32(datatable.key));
+                            }
+
+                            edge_params.push(SqlVal::I64(foreign_key));
+                        }
+                        ProjectedEdgeCardinal::Parameters => {
+                            todo!("PARAMETERS");
+                        }
+                    }
+                }
+
+                self.txn
+                    .query_raw(&sql, edge_params.iter().map(|param| param as &dyn ToSql))
+                    .await
+                    .map_err(|e| ds_err(format!("unable to insert edge: {e:?}")))?;
+            }
+        }
+
+        Ok(())
     }
 
     async fn resolve_linked_vertex(

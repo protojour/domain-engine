@@ -17,7 +17,7 @@ use tracing::debug;
 
 use crate::{
     ds_bad_req, ds_err,
-    pg_model::{PgDomainTable, PgEdgeCardinal, PgTable, PgType},
+    pg_model::{PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgTable, PgType},
     sql::{self, Alias},
     sql_value::{domain_codec_error, CodecResult, Layout, RowDecodeIterator, SqlVal},
 };
@@ -415,19 +415,24 @@ fn edge_join_condition<'d>(
     data_alias: Alias,
     data: &'d PgTable,
 ) -> sql::Expr<'d> {
-    let data_key_eq = sql::Expr::eq(
-        sql::Expr::path2(edge_alias, cardinal.key_col_name.as_ref()),
-        sql::Expr::path2(data_alias, "_key"),
-    );
-
     match &cardinal.kind {
-        crate::pg_model::PgEdgeCardinalKind::Dynamic { def_col_name } => sql::Expr::And(vec![
+        PgEdgeCardinalKind::Dynamic {
+            def_col_name,
+            key_col_name,
+        } => sql::Expr::And(vec![
             sql::Expr::eq(
                 sql::Expr::path2(edge_alias, def_col_name.as_ref()),
                 sql::Expr::LiteralInt(data.key),
             ),
-            data_key_eq,
+            sql::Expr::eq(
+                sql::Expr::path2(edge_alias, key_col_name.as_ref()),
+                sql::Expr::path2(data_alias, "_key"),
+            ),
         ]),
-        crate::pg_model::PgEdgeCardinalKind::Unique { .. } => data_key_eq,
+        PgEdgeCardinalKind::Unique { key_col_name, .. } => sql::Expr::eq(
+            sql::Expr::path2(edge_alias, key_col_name.as_ref()),
+            sql::Expr::path2(data_alias, "_key"),
+        ),
+        PgEdgeCardinalKind::Parameters => unreachable!(),
     }
 }

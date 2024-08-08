@@ -100,9 +100,9 @@ CREATE TABLE m6mreg.edgecardinal
     ident text NOT NULL,
     def_column_name text,
     unique_domaintable_key integer REFERENCES m6mreg.domaintable(key),
-    key_column_name text NOT NULL,
+    key_column_name text,
 
     UNIQUE (domaintable_key, ordinal),
-    CHECK ((def_column_name IS NULL) != (unique_domaintable_key IS NULL)),
+    CHECK ((key_column_name IS NULL) = ((def_column_name IS NULL) AND (unique_domaintable_key IS NULL))),
     CHECK (unique_domaintable_key != domaintable_key)
 );

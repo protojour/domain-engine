@@ -207,7 +207,6 @@ pub struct PgEdgeCardinal {
     pub key: PgRegKey,
     #[allow(unused)]
     pub ident: Box<str>,
-    pub key_col_name: Box<str>,
     pub kind: PgEdgeCardinalKind,
 }
 
@@ -220,6 +219,7 @@ impl PgEdgeCardinal {
             PgEdgeCardinalKind::Unique { .. } => {
                 params.push(SqlVal::I64(data_key));
             }
+            PgEdgeCardinalKind::Parameters => {}
         }
     }
 }
@@ -227,11 +227,18 @@ impl PgEdgeCardinal {
 #[derive(Clone, Debug)]
 pub enum PgEdgeCardinalKind {
     /// Dynamic can link to unions, so it needs a def_col_name
-    Dynamic { def_col_name: Box<str> },
+    Dynamic {
+        def_col_name: Box<str>,
+        key_col_name: Box<str>,
+    },
     /// Unique can only link to fixed vertex type, the edge cardinal
     /// is an "extension" of that vertex.
     /// Unique edge cardinals have ON DELETE CASCADE set up.
-    Unique { def_id: DefId },
+    Unique {
+        def_id: DefId,
+        key_col_name: Box<str>,
+    },
+    Parameters,
 }
 
 /// NB: Do not change the names of these enum variants.
