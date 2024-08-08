@@ -374,91 +374,136 @@ impl<'a> TransactCtx<'a> {
     ) -> DomainResult<(DefId, PgDataKey)> {
         let def_id = value.type_def_id();
 
-        debug!(
-            "resolve linked vertex: {def_id:?} table: {:#?}",
-            self.pg_model.entity_id_to_entity
-        );
+        enum ResolveMode {
+            VertexData,
+            Id(RelId, IdResolveMode),
+        }
 
-        if self
+        enum IdResolveMode {
+            Plain,
+            SelfIdentifying,
+        }
+
+        let (resolve_mode, vertex_def_id, value) = if self
             .pg_model
             .find_datatable(def_id.package_id(), def_id)
             .is_some()
         {
-            let row_value = self
-                .insert_vertex(
-                    InDomain {
-                        pkg_id: def_id.package_id(),
-                        value,
-                    },
-                    mode,
-                    &select,
+            let entity = self.ontology.def(def_id).entity().unwrap();
+
+            if entity.is_self_identifying {
+                let Value::Struct(mut map, _) = value else {
+                    return Err(ds_bad_req("must be a struct"));
+                };
+                let Some(Attr::Unit(id)) = map.remove(&entity.id_relationship_id) else {
+                    return Err(ds_bad_req("self-identifying vertex without id"));
+                };
+
+                (
+                    ResolveMode::Id(entity.id_relationship_id, IdResolveMode::SelfIdentifying),
+                    def_id,
+                    id,
                 )
-                .await?;
-
-            Ok((def_id, row_value.data_key))
-        } else if let Some(entity_def_id) = self.pg_model.entity_id_to_entity.get(&def_id) {
-            let pg = self
-                .pg_model
-                .pg_domain_table(entity_def_id.package_id(), *entity_def_id)?;
-
-            let entity = self.ontology.def(*entity_def_id).entity().unwrap();
-            let pg_id_field = pg.table.field(&entity.id_relationship_id)?;
-
-            let Data::Sql(id_param) = self.data_from_value(value)? else {
-                return Err(ds_bad_req("compound foreign key"));
-            };
-
-            let sql = if entity.is_self_identifying {
-                // upsert
-                // TODO: It might actually be better to do SELECT + optional INSERT.
-                // this approach (DO UPDATE SET) always re-appends the row.
-                sql::Insert {
-                    into: pg.table_name(),
-                    column_names: vec![&pg_id_field.col_name],
-                    on_conflict: Some(sql::OnConflict {
-                        target: Some(sql::ConflictTarget::Columns(vec![&pg_id_field.col_name])),
-                        action: sql::ConflictAction::DoUpdateSet(vec![sql::UpdateColumn(
-                            &pg_id_field.col_name,
-                            sql::Expr::param(0),
-                        )]),
-                    }),
-                    returning: vec![sql::Expr::path1("_key")],
-                }
-                .to_string()
             } else {
-                sql::Select {
-                    expressions: vec![sql::Expr::path1("_key")],
-                    from: vec![pg.table_name().into()],
-                    where_: Some(sql::Expr::eq(
-                        sql::Expr::path1(pg_id_field.col_name.as_ref()),
-                        sql::Expr::param(0),
-                    )),
-                    ..Default::default()
-                }
-                .to_string()
+                (ResolveMode::VertexData, def_id, value)
+            }
+        } else if let Some(vertex_def_id) = self.pg_model.entity_id_to_entity.get(&def_id) {
+            let entity = self.ontology.def(*vertex_def_id).entity().unwrap();
+            let id_rel_id = entity.id_relationship_id;
+            let id_resolve_mode = if entity.is_self_identifying {
+                IdResolveMode::SelfIdentifying
+            } else {
+                IdResolveMode::Plain
             };
 
-            debug!("{sql}");
-
-            let row = self
-                .txn
-                .query_opt(&sql, &[&id_param])
-                .await
-                .map_err(|e| ds_err(format!("could not look up foreign key: {e:?}")))?
-                .ok_or_else(|| {
-                    let value = match self.deserialize_sql(def_id, id_param) {
-                        Ok(value) => value,
-                        Err(error) => return error,
-                    };
-                    DomainErrorKind::UnresolvedForeignKey(self.ontology.format_value(&value))
-                        .into_error()
-                })?;
-
-            let key: PgDataKey = row.get(0);
-
-            Ok((*entity_def_id, key))
+            (
+                ResolveMode::Id(id_rel_id, id_resolve_mode),
+                *vertex_def_id,
+                value,
+            )
         } else {
-            Err(ds_bad_req("bad foreign key"))
+            return Err(ds_bad_req("bad foreign key"));
+        };
+
+        match resolve_mode {
+            ResolveMode::VertexData => {
+                let row_value = self
+                    .insert_vertex(
+                        InDomain {
+                            pkg_id: def_id.package_id(),
+                            value,
+                        },
+                        mode,
+                        &select,
+                    )
+                    .await?;
+
+                Ok((def_id, row_value.data_key))
+            }
+            ResolveMode::Id(id_rel_id, id_resolve_mode) => {
+                let pg = self
+                    .pg_model
+                    .pg_domain_table(vertex_def_id.package_id(), vertex_def_id)?;
+
+                let pg_id_field = pg.table.field(&id_rel_id)?;
+
+                let Data::Sql(id_param) = self.data_from_value(value)? else {
+                    return Err(ds_bad_req("compound foreign key"));
+                };
+
+                let sql = match id_resolve_mode {
+                    IdResolveMode::Plain => sql::Select {
+                        expressions: vec![sql::Expr::path1("_key")],
+                        from: vec![pg.table_name().into()],
+                        where_: Some(sql::Expr::eq(
+                            sql::Expr::path1(pg_id_field.col_name.as_ref()),
+                            sql::Expr::param(0),
+                        )),
+                        ..Default::default()
+                    }
+                    .to_string(),
+                    IdResolveMode::SelfIdentifying => {
+                        // upsert
+                        // TODO: It might actually be better to do SELECT + optional INSERT.
+                        // this approach (DO UPDATE SET) always re-appends the row.
+                        sql::Insert {
+                            into: pg.table_name(),
+                            column_names: vec![&pg_id_field.col_name],
+                            on_conflict: Some(sql::OnConflict {
+                                target: Some(sql::ConflictTarget::Columns(vec![
+                                    &pg_id_field.col_name,
+                                ])),
+                                action: sql::ConflictAction::DoUpdateSet(vec![sql::UpdateColumn(
+                                    &pg_id_field.col_name,
+                                    sql::Expr::param(0),
+                                )]),
+                            }),
+                            returning: vec![sql::Expr::path1("_key")],
+                        }
+                        .to_string()
+                    }
+                };
+
+                debug!("{sql}");
+
+                let row = self
+                    .txn
+                    .query_opt(&sql, &[&id_param])
+                    .await
+                    .map_err(|e| ds_err(format!("could not look up foreign key: {e:?}")))?
+                    .ok_or_else(|| {
+                        let value = match self.deserialize_sql(def_id, id_param) {
+                            Ok(value) => value,
+                            Err(error) => return error,
+                        };
+                        DomainErrorKind::UnresolvedForeignKey(self.ontology.format_value(&value))
+                            .into_error()
+                    })?;
+
+                let key: PgDataKey = row.get(0);
+
+                Ok((vertex_def_id, key))
+            }
         }
     }
 }
