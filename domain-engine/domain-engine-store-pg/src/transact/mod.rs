@@ -22,7 +22,7 @@ mod delete;
 mod insert;
 mod query;
 mod struct_analyzer;
-mod struct_select;
+mod struct_fields;
 
 struct TransactCtx<'a> {
     pg_model: &'a PgModel,

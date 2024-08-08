@@ -15,7 +15,7 @@ use postgres_types::ToSql;
 use tokio_postgres::types::FromSql;
 use tracing::debug;
 
-use crate::{ds_err, sql, sql_value::SqlVal};
+use crate::{ds_err, sql};
 
 /// The key type used in the registry for metadata
 pub type PgRegKey = i32;
@@ -210,21 +210,7 @@ pub struct PgEdgeCardinal {
     pub kind: PgEdgeCardinalKind,
 }
 
-impl PgEdgeCardinal {
-    pub fn extend_params(&self, def_key: PgRegKey, data_key: PgDataKey, params: &mut Vec<SqlVal>) {
-        match &self.kind {
-            PgEdgeCardinalKind::Dynamic { .. } => {
-                params.extend([SqlVal::I32(def_key), SqlVal::I64(data_key)]);
-            }
-            PgEdgeCardinalKind::Unique { .. } => {
-                params.push(SqlVal::I64(data_key));
-            }
-            PgEdgeCardinalKind::Parameters => {}
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum PgEdgeCardinalKind {
     /// Dynamic can link to unions, so it needs a def_col_name
     Dynamic {
@@ -238,7 +224,7 @@ pub enum PgEdgeCardinalKind {
         def_id: DefId,
         key_col_name: Box<str>,
     },
-    Parameters,
+    Parameters(DefId),
 }
 
 /// NB: Do not change the names of these enum variants.

@@ -344,7 +344,7 @@ async fn execute_migration_step<'t>(
                     .await
                     .context("alter table add key column")?;
                 }
-                PgEdgeCardinalKind::Parameters => {}
+                PgEdgeCardinalKind::Parameters(_param_def_id) => {}
             };
 
             let mut def_column_name: Option<&str> = None;
@@ -367,7 +367,7 @@ async fn execute_migration_step<'t>(
                         Some(pg_edge_domain.datatables.get(def_id).unwrap().key);
                     key_column_name = Some(key_col_name.as_ref());
                 }
-                PgEdgeCardinalKind::Parameters => {}
+                PgEdgeCardinalKind::Parameters(_) => {}
             }
 
             let row = txn

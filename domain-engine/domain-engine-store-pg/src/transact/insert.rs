@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Entry, BTreeMap};
+use std::collections::{hash_map::Entry, BTreeMap, BTreeSet};
 
 use domain_engine_core::{
     domain_error::DomainErrorKind,
@@ -8,8 +8,13 @@ use domain_engine_core::{
 };
 use fnv::FnvHashMap;
 use futures_util::{future::BoxFuture, TryStreamExt};
-use itertools::Itertools;
-use ontol_runtime::{attr::Attr, query::select::Select, value::Value, DefId, EdgeId, RelId};
+use ontol_runtime::{
+    attr::Attr,
+    ontology::domain::{DataRelationshipKind, DataRelationshipTarget},
+    query::select::Select,
+    value::Value,
+    DefId, EdgeId, RelId,
+};
 use pin_utils::pin_mut;
 use tokio_postgres::types::ToSql;
 use tracing::{debug, error, info, trace, warn};
@@ -230,10 +235,11 @@ impl<'a> TransactCtx<'a> {
                 returning: vec![],
             };
 
-            let projected_cardinals = pg_edge
-                .edge_cardinals
-                .iter()
-                .map(|(index, pg_cardinal)| match &pg_cardinal.kind {
+            let mut param_order: BTreeSet<(RelId, DefId)> = Default::default();
+            let mut projected_cardinals: Vec<ProjectedEdgeCardinal> = vec![];
+
+            for (index, pg_cardinal) in &pg_edge.edge_cardinals {
+                match &pg_cardinal.kind {
                     PgEdgeCardinalKind::Dynamic {
                         def_col_name,
                         key_col_name,
@@ -241,23 +247,46 @@ impl<'a> TransactCtx<'a> {
                         sql_insert
                             .column_names
                             .extend([def_col_name.as_ref(), key_col_name]);
-                        if *index == subject_index.0 as usize {
+                        projected_cardinals.push(if *index == subject_index.0 as usize {
                             ProjectedEdgeCardinal::Subject(Dynamic::Yes)
                         } else {
                             ProjectedEdgeCardinal::Object(*index, Dynamic::Yes)
-                        }
+                        });
                     }
                     PgEdgeCardinalKind::Unique { key_col_name, .. } => {
                         sql_insert.column_names.push(key_col_name);
-                        if *index == subject_index.0 as usize {
+                        projected_cardinals.push(if *index == subject_index.0 as usize {
                             ProjectedEdgeCardinal::Subject(Dynamic::No)
                         } else {
                             ProjectedEdgeCardinal::Object(*index, Dynamic::No)
-                        }
+                        });
                     }
-                    PgEdgeCardinalKind::Parameters => ProjectedEdgeCardinal::Parameters,
-                })
-                .collect_vec();
+                    PgEdgeCardinalKind::Parameters(params_def_id) => {
+                        let def = self.ontology.def(*params_def_id);
+                        for (rel_id, rel_info) in &def.data_relationships {
+                            if let DataRelationshipKind::Tree = &rel_info.kind {
+                                match &rel_info.target {
+                                    DataRelationshipTarget::Unambiguous(def_id) => {
+                                        let Some(pg_field) = pg_edge.data_fields.get(&rel_id.1)
+                                        else {
+                                            return Err(ds_err(
+                                                "no data store field for edge parameter",
+                                            ));
+                                        };
+
+                                        sql_insert.column_names.push(&pg_field.col_name);
+                                        param_order.insert((*rel_id, *def_id));
+                                    }
+                                    DataRelationshipTarget::Union(_) => {
+                                        todo!("union in params");
+                                    }
+                                }
+                            }
+                        }
+                        projected_cardinals.push(ProjectedEdgeCardinal::Parameters);
+                    }
+                }
+            }
 
             let sql = sql_insert.to_string();
             debug!("{sql}");
@@ -297,7 +326,32 @@ impl<'a> TransactCtx<'a> {
                             edge_params.push(SqlVal::I64(foreign_key));
                         }
                         ProjectedEdgeCardinal::Parameters => {
-                            todo!("PARAMETERS");
+                            let Some(Value::Struct(mut map, _)) = element_iter.next() else {
+                                return Err(ds_bad_req("edge params must be a struct"));
+                            };
+
+                            for (rel_id, _def_id) in &param_order {
+                                let data = match map.remove(rel_id) {
+                                    Some(Attr::Unit(value)) => self.data_from_value(value)?,
+                                    Some(_) => {
+                                        return Err(ds_bad_req(
+                                            "non-scalar attribute in edge parameter",
+                                        ))
+                                    }
+                                    None => Data::Sql(SqlVal::Null),
+                                };
+
+                                match data {
+                                    Data::Sql(sql_val) => {
+                                        edge_params.push(sql_val);
+                                    }
+                                    Data::Compound(_) => {
+                                        return Err(ds_bad_req(
+                                            "non-scalar value in edge parameter",
+                                        ));
+                                    }
+                                }
+                            }
                         }
                     }
                 }

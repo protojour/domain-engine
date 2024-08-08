@@ -433,6 +433,6 @@ fn edge_join_condition<'d>(
             sql::Expr::path2(edge_alias, key_col_name.as_ref()),
             sql::Expr::path2(data_alias, "_key"),
         ),
-        PgEdgeCardinalKind::Parameters => unreachable!(),
+        PgEdgeCardinalKind::Parameters(_params_def_id) => unreachable!(),
     }
 }
