@@ -45,7 +45,7 @@ async fn execute_migration_step<'t>(
             let row = txn
                 .query_one(
                     indoc! {"
-                        INSERT INTO m6m_reg.domain (
+                        INSERT INTO m6mreg.domain (
                             uid,
                             name,
                             schema_name
@@ -79,7 +79,7 @@ async fn execute_migration_step<'t>(
             let row = txn
                 .query_one(
                     indoc! { "
-                        INSERT INTO m6m_reg.datatable (
+                        INSERT INTO m6mreg.datatable (
                             domain_key,
                             def_domain_key,
                             def_tag,
@@ -146,7 +146,7 @@ async fn execute_migration_step<'t>(
             let (key,) = txn
                 .query_one(
                     indoc! { "
-                    INSERT INTO m6m_reg.datafield (
+                    INSERT INTO m6mreg.datafield (
                         datatable_key,
                         rel_tag,
                         pg_type,
@@ -205,7 +205,7 @@ async fn execute_migration_step<'t>(
 
             txn.query(
                 indoc! { "
-                    INSERT INTO m6m_reg.datatable_index (
+                    INSERT INTO m6mreg.datatable_index (
                         datatable_key,
                         def_domain_key,
                         def_tag,
@@ -246,7 +246,7 @@ async fn execute_migration_step<'t>(
             let row = txn
                 .query_one(
                     indoc! { "
-                        INSERT INTO m6m_reg.edgetable (
+                        INSERT INTO m6mreg.edgetable (
                             domain_key,
                             edge_tag,
                             table_name
@@ -306,7 +306,7 @@ async fn execute_migration_step<'t>(
             let row = txn
                 .query_one(
                     indoc! { "
-                        INSERT INTO m6m_reg.edgecardinal (
+                        INSERT INTO m6mreg.edgecardinal (
                             edge_key,
                             ordinal,
                             ident,
@@ -351,7 +351,7 @@ async fn execute_migration_step<'t>(
             .await?;
 
             txn.query(
-                "UPDATE m6m_reg.domain SET(schema_name = $1) WHERE (key = $2)",
+                "UPDATE m6mreg.domain SET(schema_name = $1) WHERE (key = $2)",
                 &[&new, &domain_key],
             )
             .await
@@ -380,7 +380,7 @@ async fn execute_migration_step<'t>(
             .await?;
 
             txn.query(
-                "UPDATE m6m_reg.datatable SET(table_name = $1) WHERE domain_key = $2 AND def_tag = $3",
+                "UPDATE m6mreg.datatable SET(table_name = $1) WHERE domain_key = $2 AND def_tag = $3",
                 &[&new_table, &domain_key, &(def_id.1 as i32)],
             )
             .await?;

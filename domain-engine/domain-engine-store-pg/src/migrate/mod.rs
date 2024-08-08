@@ -15,14 +15,14 @@ use crate::{
 };
 
 mod registry {
-    refinery::embed_migrations!("./registry_migrations");
+    refinery::embed_migrations!("./m6mreg_migrations");
 }
 
 mod execute;
 mod steps;
 
 /// NB: Changing this is likely a bad idea.
-const MIGRATIONS_TABLE_NAME: &str = "public.m6m_registry_schema_history";
+const MIGRATIONS_TABLE_NAME: &str = "public.m6mreg_schema_history";
 
 #[derive(Clone, Copy)]
 struct PgDomainIds {
@@ -164,7 +164,7 @@ pub async fn migrate(
 
 async fn query_domain_migration_version<'t>(txn: &Transaction<'t>) -> anyhow::Result<RegVersion> {
     RegVersion::try_from(
-        txn.query_one("SELECT version FROM m6m_reg.domain_migration", &[])
+        txn.query_one("SELECT version FROM m6mreg.domain_migration", &[])
             .await?
             .get::<_, i32>(0),
     )

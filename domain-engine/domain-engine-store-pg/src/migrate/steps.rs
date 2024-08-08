@@ -38,11 +38,11 @@ pub async fn migrate_domain_steps<'t>(
         uid: domain_uid,
     };
     let unique_name = &ontology[domain.unique_name()];
-    let schema = format!("m6m_d_{unique_name}").into_boxed_str();
+    let schema = format!("m6md_{unique_name}").into_boxed_str();
 
     let row = txn
         .query_opt(
-            "SELECT key, schema_name FROM m6m_reg.domain WHERE uid = $1",
+            "SELECT key, schema_name FROM m6mreg.domain WHERE uid = $1",
             &[&domain_uid],
         )
         .await?;
@@ -56,7 +56,7 @@ pub async fn migrate_domain_steps<'t>(
             .query(
                 indoc! {"
                     SELECT key, def_domain_key, def_tag, table_name
-                    FROM m6m_reg.datatable
+                    FROM m6mreg.datatable
                     WHERE domain_key = $1
                 "},
                 &[&domain_key],
@@ -88,7 +88,7 @@ pub async fn migrate_domain_steps<'t>(
             .query(
                 indoc! {"
                     SELECT key, edge_tag, table_name
-                    FROM m6m_reg.edgetable
+                    FROM m6mreg.edgetable
                     WHERE domain_key = $1
                 "},
                 &[&domain_key],
@@ -167,7 +167,7 @@ pub async fn migrate_domain_steps<'t>(
                 .query(
                     indoc! {"
                         SELECT key, ordinal, ident, def_column_name, key_column_name
-                        FROM m6m_reg.edgecardinal
+                        FROM m6mreg.edgecardinal
                         WHERE edge_key = $1
                         ORDER BY ordinal
                     "},
@@ -248,7 +248,7 @@ async fn migrate_vertex_steps<'t>(
             .query(
                 indoc! {"
                     SELECT key, rel_tag, pg_type, column_name
-                    FROM m6m_reg.datafield
+                    FROM m6mreg.datafield
                     WHERE datatable_key = $1
                 "},
                 &[&datatable.key],
@@ -282,7 +282,7 @@ async fn migrate_vertex_steps<'t>(
                         def_tag,
                         index_type,
                         datafield_keys
-                    FROM m6m_reg.datatable_index
+                    FROM m6mreg.datatable_index
                     WHERE datatable_key = $1
                 "},
                 &[&datatable.key],

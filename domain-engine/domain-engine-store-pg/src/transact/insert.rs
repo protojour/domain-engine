@@ -289,6 +289,8 @@ impl<'a> TransactCtx<'a> {
 
             let sql = if entity.is_self_identifying {
                 // upsert
+                // TODO: It might actually be better to do SELECT + optional INSERT.
+                // this approach (DO UPDATE SET) always re-appends the row.
                 sql::Insert {
                     into: pg.table_name().into(),
                     column_names: vec![&pg_id_field.col_name],
