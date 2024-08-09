@@ -4,10 +4,10 @@ use domain_engine_core::{
     domain_error::DomainErrorKind,
     entity_id_utils::{try_generate_entity_id, GeneratedId},
     transact::DataOperation,
-    DomainResult,
+    DomainError, DomainResult,
 };
 use fnv::FnvHashMap;
-use futures_util::{future::BoxFuture, TryStreamExt};
+use futures_util::{future::BoxFuture, TryFutureExt, TryStreamExt};
 use ontol_runtime::{
     attr::Attr,
     ontology::domain::{DataRelationshipKind, DataRelationshipTarget},
@@ -138,26 +138,29 @@ impl<'a> TransactCtx<'a> {
                 .map_err(|err| ds_err(format!("{err}")))?;
             pin_mut!(stream);
 
+            let row = stream
+                .try_next()
+                .await
+                .map_err(map_row_error)?
+                .ok_or_else(|| ds_err("no rows returned"))?;
+
             stream
                 .try_next()
                 .await
-                .map_err(|e| {
-                    if let Some(db_error) = e.as_db_error() {
-                        if db_error
-                            .message()
-                            .starts_with("duplicate key value violates unique constraint")
-                        {
-                            DomainErrorKind::EntityAlreadyExists.into_error()
-                        } else {
-                            info!("row fetch error: {db_error:?}");
-                            ds_err("could not fetch row")
-                        }
-                    } else {
-                        error!("row fetch error: {e:?}");
-                        ds_err("could not fetch row")
+                .map_err(|_| ds_err("row stream not closed"))?;
+
+            match stream.rows_affected() {
+                Some(affected) => {
+                    if affected != 1 {
+                        return Err(ds_err("expected 1 affected row"));
                     }
-                })?
-                .ok_or_else(|| ds_err("no rows returned"))?
+                }
+                None => {
+                    return Err(ds_err("unknown problem"));
+                }
+            }
+
+            row
         };
 
         let mut row = RowDecodeIterator::new(&row, &layout);
@@ -288,7 +291,6 @@ impl<'a> TransactCtx<'a> {
             }
 
             let sql = sql_insert.to_string();
-            debug!("{sql}");
 
             for tuple in projection.tuples {
                 edge_params.clear();
@@ -355,10 +357,16 @@ impl<'a> TransactCtx<'a> {
                     }
                 }
 
+                debug!("{sql}");
+                trace!("{edge_params:?}");
+
                 self.txn
                     .query_raw(&sql, edge_params.iter().map(|param| param as &dyn ToSql))
                     .await
-                    .map_err(|e| ds_err(format!("unable to insert edge: {e:?}")))?;
+                    .map_err(|e| ds_err(format!("unable to insert edge(1): {e:?}")))?
+                    .try_collect::<IgnoreRows>()
+                    .map_err(map_row_error)
+                    .await?;
             }
         }
 
@@ -499,10 +507,32 @@ impl<'a> TransactCtx<'a> {
                             .into_error()
                     })?;
 
-                let key: PgDataKey = row.get(0);
-
-                Ok((vertex_def_id, key))
+                Ok((vertex_def_id, row.get(0)))
             }
         }
+    }
+}
+
+#[derive(Default)]
+struct IgnoreRows;
+
+impl<T> Extend<T> for IgnoreRows {
+    fn extend<I: IntoIterator<Item = T>>(&mut self, _iter: I) {}
+}
+
+fn map_row_error(pg_err: tokio_postgres::Error) -> DomainError {
+    if let Some(db_error) = pg_err.as_db_error() {
+        if db_error
+            .message()
+            .starts_with("duplicate key value violates unique constraint")
+        {
+            DomainErrorKind::EntityAlreadyExists.into_error()
+        } else {
+            info!("row fetch error: {db_error:?}");
+            ds_err("could not fetch row")
+        }
+    } else {
+        error!("row fetch error: {pg_err:?}");
+        ds_err("could not fetch row")
     }
 }

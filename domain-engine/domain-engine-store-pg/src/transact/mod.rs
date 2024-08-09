@@ -13,7 +13,7 @@ use ontol_runtime::{
 };
 use query::QueryFrame;
 use tokio_postgres::IsolationLevel;
-use tracing::debug;
+use tracing::{debug, trace};
 
 use crate::{ds_err, PgModel, PostgresDataStore};
 
@@ -169,6 +169,8 @@ pub async fn transact(
             debug!("transaction not committed: {err:?}");
             ds_err("transaction could not be commmitted")
         })?;
+
+        trace!("COMMIT OK");
     }
     .boxed())
 }
