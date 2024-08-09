@@ -281,7 +281,7 @@ async fn execute_migration_step<'t>(
         }
         MigrationStep::DeployEdgeCardinal {
             edge_tag,
-            ordinal,
+            index,
             ident,
             kind,
         } => {
@@ -385,7 +385,7 @@ async fn execute_migration_step<'t>(
                     "},
                     &[
                         &pg_table.key,
-                        &(ordinal as i32),
+                        &(index.0 as i32),
                         &ident,
                         &def_column_name,
                         &unique_domaintable_key,
@@ -404,7 +404,7 @@ async fn execute_migration_step<'t>(
                 .unwrap();
 
             pg_edge.edge_cardinals.insert(
-                ordinal as usize,
+                index,
                 PgEdgeCardinal {
                     key: row.get(0),
                     ident,

@@ -12,6 +12,7 @@ use ontol_runtime::{
     attr::Attr,
     ontology::domain::{DataRelationshipKind, DataRelationshipTarget},
     query::select::Select,
+    tuple::CardinalIdx,
     value::Value,
     DefId, EdgeId, RelId,
 };
@@ -219,7 +220,7 @@ impl<'a> TransactCtx<'a> {
 
         enum ProjectedEdgeCardinal {
             Subject(Dynamic),
-            Object(usize, Dynamic),
+            Object(CardinalIdx, Dynamic),
             Parameters,
         }
 
@@ -249,7 +250,7 @@ impl<'a> TransactCtx<'a> {
                         sql_insert
                             .column_names
                             .extend([def_col_name.as_ref(), key_col_name]);
-                        projected_cardinals.push(if *index == subject_index.0 as usize {
+                        projected_cardinals.push(if *index == subject_index {
                             ProjectedEdgeCardinal::Subject(Dynamic::Yes)
                         } else {
                             ProjectedEdgeCardinal::Object(*index, Dynamic::Yes)
@@ -257,7 +258,7 @@ impl<'a> TransactCtx<'a> {
                     }
                     PgEdgeCardinalKind::Unique { key_col_name, .. } => {
                         sql_insert.column_names.push(key_col_name);
-                        projected_cardinals.push(if *index == subject_index.0 as usize {
+                        projected_cardinals.push(if *index == subject_index {
                             ProjectedEdgeCardinal::Subject(Dynamic::No)
                         } else {
                             ProjectedEdgeCardinal::Object(*index, Dynamic::No)

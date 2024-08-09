@@ -44,6 +44,8 @@ impl StructOrUnionSelect {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StructSelect {
     pub def_id: DefId,
+    /// TODO: It should be possible to select ONTOL attributes,
+    /// and attributes may be multivalued.
     pub properties: FnvHashMap<RelId, Select>,
 }
 

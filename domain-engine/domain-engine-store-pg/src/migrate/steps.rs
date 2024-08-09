@@ -11,6 +11,7 @@ use ontol_runtime::{
         },
         Ontology,
     },
+    tuple::CardinalIdx,
     DefId, DefRelTag, EdgeId, PackageId,
 };
 use tokio_postgres::Transaction;
@@ -273,7 +274,7 @@ async fn migrate_domain_edges_steps<'t>(
         let table_name = format!("e_{edge_tag}").into_boxed_str();
 
         if let Some(pg_table) = pg_domain.edges.get_mut(&edge_tag) {
-            let pg_cardinals: BTreeMap<usize, PgEdgeCardinal> = txn
+            let pg_cardinals: BTreeMap<CardinalIdx, PgEdgeCardinal> = txn
                 .query(
                     indoc! {"
                         SELECT key, ordinal, ident, def_column_name, unique_domaintable_key, key_column_name
@@ -299,7 +300,7 @@ async fn migrate_domain_edges_steps<'t>(
                     );
 
                     Ok((
-                        ordinal as usize,
+                        CardinalIdx(ordinal.try_into()?),
                         PgEdgeCardinal {
                             key,
                             ident,
@@ -342,12 +343,12 @@ async fn migrate_domain_edges_steps<'t>(
         }
 
         for (index, cardinal) in edge_info.cardinals.iter().enumerate() {
-            let ordinal: u16 = index.try_into()?;
-            let ident = format!("todo_{ordinal}").into_boxed_str();
+            let index = CardinalIdx(index.try_into()?);
+            let ident = format!("cardinal{index}").into_boxed_str();
 
             let edge_cardinal_kind = if cardinal.flags.contains(EdgeCardinalFlags::ENTITY) {
                 // FIXME: ontology must provide human readable name for cardinal
-                let key_col_name = format!("key_{ordinal}").into_boxed_str();
+                let key_col_name = format!("_key{index}").into_boxed_str();
 
                 if cardinal.flags.contains(EdgeCardinalFlags::UNIQUE) {
                     PgEdgeCardinalKind::Unique {
@@ -355,7 +356,7 @@ async fn migrate_domain_edges_steps<'t>(
                         def_id: *cardinal.target.iter().next().unwrap(),
                     }
                 } else {
-                    let def_col_name = format!("def_{ordinal}").into_boxed_str();
+                    let def_col_name = format!("_def{index}").into_boxed_str();
                     PgEdgeCardinalKind::Dynamic {
                         key_col_name,
                         def_col_name,
@@ -405,7 +406,7 @@ async fn migrate_domain_edges_steps<'t>(
                     domain_ids,
                     MigrationStep::DeployEdgeCardinal {
                         edge_tag,
-                        ordinal,
+                        index,
                         ident,
                         kind: edge_cardinal_kind,
                     },

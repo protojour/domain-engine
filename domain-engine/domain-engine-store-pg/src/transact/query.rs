@@ -201,31 +201,42 @@ impl<'a> TransactCtx<'a> {
             let mut sub_layout: Vec<Layout> = vec![];
             let edge_alias = ctx.alias.incr();
 
-            if obj_cardinal.target.len() == 1 {
-                let target_def_id = *obj_cardinal.target.iter().next().unwrap();
-                let target_def = self.ontology.def(target_def_id);
+            if obj_cardinal.target.len() != 1 {
+                panic!("union edge");
+            }
+            let target_def_id = *obj_cardinal.target.iter().next().unwrap();
+            let target_def = self.ontology.def(target_def_id);
 
-                let pg_sub = self
-                    .pg_model
-                    .pg_domain_table(target_def_id.package_id(), target_def_id)?;
+            let pg_sub = self
+                .pg_model
+                .pg_domain_table(target_def_id.package_id(), target_def_id)?;
 
-                let (from, sub_alias, expressions) = match select {
-                    Select::Leaf => {
-                        let Some(target_entity) = target_def.entity() else {
-                            return Err(ds_bad_req("cannot select id from non-entity"));
-                        };
+            let (from, sub_alias, expressions) = match select {
+                Select::Leaf => {
+                    let Some(target_entity) = target_def.entity() else {
+                        return Err(ds_bad_req("cannot select id from non-entity"));
+                    };
 
-                        let pg_id = pg_sub.table.field(&target_entity.id_relationship_id)?;
-                        let leaf_alias = ctx.alias.incr();
+                    let pg_id = pg_sub.table.field(&target_entity.id_relationship_id)?;
+                    let leaf_alias = ctx.alias.incr();
 
-                        sub_layout.push(Layout::Scalar(pg_id.pg_type));
-                        (
-                            pg_sub.table_name().as_(leaf_alias),
-                            leaf_alias,
-                            vec![sql::Expr::path2(leaf_alias, pg_id.col_name.as_ref())],
-                        )
-                    }
-                    Select::Struct(struct_select) => self.sql_select_expressions(
+                    sub_layout.push(Layout::Scalar(pg_id.pg_type));
+                    (
+                        pg_sub.table_name().as_(leaf_alias),
+                        leaf_alias,
+                        vec![sql::Expr::path2(leaf_alias, pg_id.col_name.as_ref())],
+                    )
+                }
+                Select::Struct(struct_select) => self.sql_select_expressions(
+                    struct_select.def_id,
+                    struct_select,
+                    self.pg_model
+                        .pg_domain_table(target_def_id.package_id(), target_def_id)?,
+                    &mut sub_layout,
+                    ctx,
+                )?,
+                Select::Entity(entity_select) => match &entity_select.source {
+                    StructOrUnionSelect::Struct(struct_select) => self.sql_select_expressions(
                         struct_select.def_id,
                         struct_select,
                         self.pg_model
@@ -233,55 +244,43 @@ impl<'a> TransactCtx<'a> {
                         &mut sub_layout,
                         ctx,
                     )?,
-                    Select::Entity(entity_select) => match &entity_select.source {
-                        StructOrUnionSelect::Struct(struct_select) => self.sql_select_expressions(
-                            struct_select.def_id,
-                            struct_select,
-                            self.pg_model
-                                .pg_domain_table(target_def_id.package_id(), target_def_id)?,
-                            &mut sub_layout,
-                            ctx,
-                        )?,
-                        StructOrUnionSelect::Union(_union_def_id, _variant_selects) => {
-                            todo!("union subselect")
-                        }
-                    },
-                    Select::EntityId => return Err(ds_err("select entity id")),
-                    Select::StructUnion(_, _) => todo!("struct-union"),
-                };
-
-                let mut sql_subselect = sql::Select {
-                    expressions: vec![sql::Expr::Row(expressions)],
-                    from: vec![sql::Join {
-                        first: from,
-                        second: sql::TableName(&pg.domain.schema_name, &pg_edge.table_name)
-                            .as_(edge_alias),
-                        on: edge_join_condition(edge_alias, pg_edge_obj, sub_alias, pg_sub.table),
+                    StructOrUnionSelect::Union(_union_def_id, _variant_selects) => {
+                        todo!("union subselect")
                     }
-                    .into()],
-                    where_: Some(edge_join_condition(
-                        edge_alias,
-                        pg_edge_subj,
-                        data_alias,
-                        pg.table,
-                    )),
-                    ..Default::default()
-                };
-
-                match rel_info.cardinality.1 {
-                    ValueCardinality::Unit => {
-                        sql_subselect.limit = Some(1);
-                        sql_expressions.push(sql_subselect.into());
-                        layout.push(Layout::Record(sub_layout));
-                    }
-                    ValueCardinality::IndexSet | ValueCardinality::List => {
-                        sql_expressions.push(sql::Expr::array(sql_subselect.into()));
-                        layout.push(Layout::Array(Box::new(Layout::Record(sub_layout))));
-                    }
-                }
-            } else {
-                panic!("union edge");
+                },
+                Select::EntityId => return Err(ds_err("select entity id")),
+                Select::StructUnion(_, _) => todo!("struct-union"),
             };
+
+            let mut sql_subselect = sql::Select {
+                expressions: vec![sql::Expr::Row(expressions)],
+                from: vec![sql::Join {
+                    first: from,
+                    second: sql::TableName(&pg.domain.schema_name, &pg_edge.table_name)
+                        .as_(edge_alias),
+                    on: edge_join_condition(edge_alias, pg_edge_obj, sub_alias, pg_sub.table),
+                }
+                .into()],
+                where_: Some(edge_join_condition(
+                    edge_alias,
+                    pg_edge_subj,
+                    data_alias,
+                    pg.table,
+                )),
+                ..Default::default()
+            };
+
+            match rel_info.cardinality.1 {
+                ValueCardinality::Unit => {
+                    sql_subselect.limit = Some(1);
+                    sql_expressions.push(sql_subselect.into());
+                    layout.push(Layout::Record(sub_layout));
+                }
+                ValueCardinality::IndexSet | ValueCardinality::List => {
+                    sql_expressions.push(sql::Expr::array(sql_subselect.into()));
+                    layout.push(Layout::Array(Box::new(Layout::Record(sub_layout))));
+                }
+            }
         }
 
         Ok((

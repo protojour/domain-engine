@@ -105,6 +105,9 @@ pub enum Expr<'d> {
     Param(Param),
     LiteralInt(i32),
     Select(Box<Select<'d>>),
+    /// a UNION b
+    #[allow(unused)]
+    Union(Box<Union<'d>>),
     /// a AND b
     And(Vec<Expr<'d>>),
     /// a = b
@@ -117,10 +120,6 @@ pub enum Expr<'d> {
     AsIndex(Box<Expr<'d>>, Alias),
     /// count(*) over ()
     CountStarOver,
-}
-
-pub enum Name {
-    Alias(Alias),
 }
 
 impl<'d> Expr<'d> {
@@ -145,6 +144,10 @@ impl<'d> Expr<'d> {
     }
 }
 
+pub enum Name {
+    Alias(Alias),
+}
+
 pub enum PathSegment<'d> {
     Ident(&'d str),
     Alias(Alias),
@@ -164,6 +167,12 @@ pub struct Join<'d> {
     pub first: FromItem<'d>,
     pub second: FromItem<'d>,
     pub on: Expr<'d>,
+}
+
+pub struct Union<'d> {
+    pub first: FromItem<'d>,
+    pub all: bool,
+    pub second: FromItem<'d>,
 }
 
 pub struct TableName<'d>(pub &'d str, pub &'d str);
@@ -333,9 +342,10 @@ impl<'d> Display for Expr<'d> {
             Self::Path(segments) => write!(f, "{}", segments.iter().format(".")),
             Self::Param(param) => write!(f, "{param}"),
             Self::LiteralInt(i) => write!(f, "{i}"),
+            Self::Select(select) => write!(f, "({select})"),
+            Self::Union(union) => write!(f, "{union}"),
             Self::And(clauses) => write!(f, "({})", clauses.iter().format(" AND ")),
             Self::Eq(a, b) => write!(f, "{a} = {b}"),
-            Self::Select(select) => write!(f, "({select})"),
             Self::Row(fields) => write!(f, "ROW({})", fields.iter().format(",")),
             Self::Array(expr) => write!(f, "ARRAY({expr})"),
             Self::ArrayAgg(expr) => write!(f, "ARRAY_AGG({expr})"),
@@ -374,6 +384,16 @@ impl<'d> Display for Join<'d> {
         let on = &self.on;
 
         write!(f, "{first} JOIN {second} ON {on}")
+    }
+}
+
+impl<'d> Display for Union<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let first = &self.first;
+        let second = &self.second;
+        let infix = if self.all { "UNION ALL" } else { "UNION" };
+
+        write!(f, "{first} {infix} {second}")
     }
 }
 

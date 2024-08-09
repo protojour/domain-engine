@@ -4,6 +4,7 @@ use anyhow::{anyhow, Context};
 use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::{domain::DefKind, Ontology},
+    tuple::CardinalIdx,
     DefId, DefRelTag, PackageId,
 };
 use tokio_postgres::{Client, Transaction};
@@ -68,7 +69,7 @@ enum MigrationStep {
     },
     DeployEdgeCardinal {
         edge_tag: u16,
-        ordinal: u16,
+        index: CardinalIdx,
         ident: Box<str>,
         kind: PgEdgeCardinalKind,
     },

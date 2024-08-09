@@ -130,7 +130,7 @@ pub struct PgTable {
     pub key: PgRegKey,
     pub table_name: Box<str>,
     pub data_fields: FnvHashMap<DefRelTag, PgDataField>,
-    pub edge_cardinals: BTreeMap<usize, PgEdgeCardinal>,
+    pub edge_cardinals: BTreeMap<CardinalIdx, PgEdgeCardinal>,
     pub datafield_indexes: FnvHashMap<(DefId, PgIndexType), PgIndexData>,
 }
 
@@ -163,7 +163,7 @@ impl PgTable {
 
     pub fn edge_cardinal(&self, c: CardinalIdx) -> DomainResult<&PgEdgeCardinal> {
         self.edge_cardinals
-            .get(&(c.0 as usize))
+            .get(&c)
             .ok_or_else(|| ds_err("edge cardinal not found"))
     }
 }
