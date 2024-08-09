@@ -26,7 +26,7 @@ impl<T: AsRef<str>> Display for Ident<T> {
     }
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Alias(pub usize);
 
 impl Alias {
@@ -42,14 +42,29 @@ impl Display for Alias {
     }
 }
 
+pub enum Stmt<'d> {
+    Select(Select<'d>),
+}
+
 #[derive(Default)]
 pub struct Select<'d> {
-    // TODO: `with`
+    pub with: Option<With<'d>>,
     pub expressions: Vec<Expr<'d>>,
     pub from: Vec<FromItem<'d>>,
     pub where_: Option<Expr<'d>>,
     pub limit: Option<usize>,
     pub offset: Option<usize>,
+}
+
+pub struct With<'d> {
+    pub recursive: bool,
+    pub queries: Vec<WithQuery<'d>>,
+}
+
+pub struct WithQuery<'d> {
+    pub name: Name,
+    pub column_names: Vec<&'d str>,
+    pub stmt: Stmt<'d>,
 }
 
 pub struct Insert<'d> {
@@ -104,6 +119,10 @@ pub enum Expr<'d> {
     CountStarOver,
 }
 
+pub enum Name {
+    Alias(Alias),
+}
+
 impl<'d> Expr<'d> {
     pub fn path1(segment: impl Into<PathSegment<'d>>) -> Self {
         Self::Path(smallvec!(segment.into()))
@@ -130,11 +149,14 @@ pub enum PathSegment<'d> {
     Ident(&'d str),
     Alias(Alias),
     Param(Param),
+    /// * (every column)
+    Asterisk,
 }
 
 pub enum FromItem<'d> {
     TableName(TableName<'d>),
-    TableNameAs(TableName<'d>, Alias),
+    TableNameAs(TableName<'d>, Name),
+    Alias(Alias),
     Join(Box<Join<'d>>),
 }
 
@@ -148,12 +170,24 @@ pub struct TableName<'d>(pub &'d str, pub &'d str);
 
 impl<'d> TableName<'d> {
     pub fn as_(self, alias: Alias) -> FromItem<'d> {
-        FromItem::TableNameAs(self, alias)
+        FromItem::TableNameAs(self, Name::Alias(alias))
+    }
+}
+
+impl<'d> Display for Stmt<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Select(select) => write!(f, "{select}"),
+        }
     }
 }
 
 impl<'d> Display for Select<'d> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(with) = &self.with {
+            writeln!(f, "{with}")?;
+        }
+
         write!(
             f,
             "SELECT {expressions} FROM {from}",
@@ -174,6 +208,30 @@ impl<'d> Display for Select<'d> {
         }
 
         Ok(())
+    }
+}
+
+impl<'d> Display for With<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.recursive {
+            writeln!(f, "WITH RECURSIVE")?;
+        } else {
+            writeln!(f, "WITH")?;
+        }
+
+        write!(f, "{}", self.queries.iter().format(",\n"))
+    }
+}
+
+impl<'d> Display for WithQuery<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{name}", name = self.name)?;
+
+        if !self.column_names.is_empty() {
+            write!(f, " ({})", self.column_names.iter().format(","))?;
+        }
+
+        write!(f, " AS ({stmt})", stmt = self.stmt)
     }
 }
 
@@ -261,6 +319,14 @@ impl<'d> Display for Delete<'d> {
     }
 }
 
+impl Display for Name {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Alias(alias) => write!(f, "{alias}"),
+        }
+    }
+}
+
 impl<'d> Display for Expr<'d> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -285,6 +351,7 @@ impl<'d> Display for PathSegment<'d> {
             PathSegment::Ident(i) => write!(f, "{}", Ident(i)),
             PathSegment::Alias(a) => write!(f, "{a}"),
             PathSegment::Param(p) => write!(f, "{p}"),
+            PathSegment::Asterisk => write!(f, "*"),
         }
     }
 }
@@ -294,6 +361,7 @@ impl<'d> Display for FromItem<'d> {
         match self {
             Self::TableName(tn) => write!(f, "{tn}"),
             Self::TableNameAs(tn, alias) => write!(f, "{tn} AS {alias}"),
+            Self::Alias(alias) => write!(f, "{alias}"),
             Self::Join(join) => write!(f, "{join}"),
         }
     }
@@ -312,6 +380,16 @@ impl<'d> Display for Join<'d> {
 impl<'d> From<Select<'d>> for Expr<'d> {
     fn from(value: Select<'d>) -> Self {
         Self::Select(Box::new(value))
+    }
+}
+
+impl<'d> From<Vec<WithQuery<'d>>> for With<'d> {
+    fn from(value: Vec<WithQuery<'d>>) -> Self {
+        let recursive = value.iter().any(|wq| !wq.column_names.is_empty());
+        With {
+            recursive,
+            queries: value,
+        }
     }
 }
 

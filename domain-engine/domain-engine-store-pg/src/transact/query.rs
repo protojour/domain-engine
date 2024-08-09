@@ -30,8 +30,10 @@ pub enum QueryFrame {
 }
 
 #[derive(Default)]
-struct QueryBuildCtx {
+struct QueryBuildCtx<'d> {
     alias: Alias,
+    with_def_aliases: FnvHashMap<DefId, Alias>,
+    with_queries: Vec<sql::WithQuery<'d>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -74,32 +76,35 @@ impl<'a> TransactCtx<'a> {
 
         let mut row_layout: Vec<Layout> = vec![];
         let mut ctx = QueryBuildCtx::default();
-        let root_alias = ctx.alias;
 
-        let mut sql_select = sql::Select {
-            expressions: vec![],
-            from: vec![pg.table_name().as_(root_alias)],
-            where_: None,
-            limit: Some(limit + 1),
-            offset: match &after_cursor {
-                Some(Cursor::Offset(offset)) => Some(*offset),
-                _ => None,
-            },
+        let sql_select = {
+            let mut expressions = vec![];
+
+            if include_total_len {
+                expressions.push(sql::Expr::CountStarOver);
+                row_layout.push(Layout::Scalar(PgType::BigInt));
+            }
+
+            let (from, _alias, tail_expressions) =
+                self.sql_select_expressions(def_id, &struct_select, pg, &mut row_layout, &mut ctx)?;
+            expressions.extend(tail_expressions);
+
+            sql::Select {
+                with: if !ctx.with_queries.is_empty() {
+                    Some(std::mem::take(&mut ctx.with_queries).into())
+                } else {
+                    None
+                },
+                expressions,
+                from: vec![from],
+                where_: None,
+                limit: Some(limit + 1),
+                offset: match &after_cursor {
+                    Some(Cursor::Offset(offset)) => Some(*offset),
+                    _ => None,
+                },
+            }
         };
-
-        if include_total_len {
-            sql_select.expressions.push(sql::Expr::CountStarOver);
-            row_layout.push(Layout::Scalar(PgType::BigInt));
-        }
-
-        sql_select.expressions.extend(self.sql_select_expressions(
-            def_id,
-            &struct_select,
-            pg,
-            root_alias,
-            &mut row_layout,
-            &mut ctx,
-        )?);
 
         let sql = sql_select.to_string();
         debug!("{sql}");
@@ -164,33 +169,14 @@ impl<'a> TransactCtx<'a> {
         def_id: DefId,
         struct_select: &StructSelect,
         pg: PgDomainTable<'a>,
-        cur_alias: sql::Alias,
         layout: &mut Vec<Layout>,
-        ctx: &mut QueryBuildCtx,
-    ) -> DomainResult<Vec<sql::Expr<'_>>> {
+        ctx: &mut QueryBuildCtx<'a>,
+    ) -> DomainResult<(sql::FromItem<'_>, sql::Alias, Vec<sql::Expr<'_>>)> {
         let def = self.ontology.def(def_id);
 
-        let mut sql_expressions = vec![
-            // Always present: the def key of the vertex.
-            // This is known ahead of time.
-            // It will be used later to parse unions.
-            sql::Expr::LiteralInt(pg.table.key),
-            // Always present: the data key of the vertex
-            sql::Expr::path2(cur_alias, "_key"),
-        ];
-        layout.extend([
-            Layout::Scalar(PgType::Integer),
-            Layout::Scalar(PgType::BigInt),
-        ]);
-
         // select data properties
-        self.select_inherent_struct_fields(
-            def,
-            pg.table,
-            Some(cur_alias),
-            &mut sql_expressions,
-            layout,
-        )?;
+        let data_alias = self.select_datatable_fields_as_alias(def, pg, layout, ctx)?;
+        let mut sql_expressions = vec![sql::Expr::path2(data_alias, sql::PathSegment::Asterisk)];
 
         // select edges
         for (rel_id, select) in &struct_select.properties {
@@ -214,7 +200,6 @@ impl<'a> TransactCtx<'a> {
             let obj_cardinal = &edge.cardinals[proj.object.0 as usize];
             let mut sub_layout: Vec<Layout> = vec![];
             let edge_alias = ctx.alias.incr();
-            let sub_alias = ctx.alias.incr();
 
             if obj_cardinal.target.len() == 1 {
                 let target_def_id = *obj_cardinal.target.iter().next().unwrap();
@@ -224,23 +209,27 @@ impl<'a> TransactCtx<'a> {
                     .pg_model
                     .pg_domain_table(target_def_id.package_id(), target_def_id)?;
 
-                let expressions = match select {
+                let (from, sub_alias, expressions) = match select {
                     Select::Leaf => {
                         let Some(target_entity) = target_def.entity() else {
                             return Err(ds_bad_req("cannot select id from non-entity"));
                         };
 
                         let pg_id = pg_sub.table.field(&target_entity.id_relationship_id)?;
+                        let leaf_alias = ctx.alias.incr();
 
                         sub_layout.push(Layout::Scalar(pg_id.pg_type));
-                        vec![sql::Expr::path2(sub_alias, pg_id.col_name.as_ref())]
+                        (
+                            pg_sub.table_name().as_(leaf_alias),
+                            leaf_alias,
+                            vec![sql::Expr::path2(leaf_alias, pg_id.col_name.as_ref())],
+                        )
                     }
                     Select::Struct(struct_select) => self.sql_select_expressions(
                         struct_select.def_id,
                         struct_select,
                         self.pg_model
                             .pg_domain_table(target_def_id.package_id(), target_def_id)?,
-                        sub_alias,
                         &mut sub_layout,
                         ctx,
                     )?,
@@ -250,7 +239,6 @@ impl<'a> TransactCtx<'a> {
                             struct_select,
                             self.pg_model
                                 .pg_domain_table(target_def_id.package_id(), target_def_id)?,
-                            sub_alias,
                             &mut sub_layout,
                             ctx,
                         )?,
@@ -265,7 +253,7 @@ impl<'a> TransactCtx<'a> {
                 let mut sql_subselect = sql::Select {
                     expressions: vec![sql::Expr::Row(expressions)],
                     from: vec![sql::Join {
-                        first: pg_sub.table_name().as_(sub_alias),
+                        first: from,
                         second: sql::TableName(&pg.domain.schema_name, &pg_edge.table_name)
                             .as_(edge_alias),
                         on: edge_join_condition(edge_alias, pg_edge_obj, sub_alias, pg_sub.table),
@@ -274,7 +262,7 @@ impl<'a> TransactCtx<'a> {
                     where_: Some(edge_join_condition(
                         edge_alias,
                         pg_edge_subj,
-                        cur_alias,
+                        data_alias,
                         pg.table,
                     )),
                     ..Default::default()
@@ -296,7 +284,56 @@ impl<'a> TransactCtx<'a> {
             };
         }
 
-        Ok(sql_expressions)
+        Ok((
+            sql::FromItem::Alias(data_alias),
+            data_alias,
+            sql_expressions,
+        ))
+    }
+
+    fn select_datatable_fields_as_alias(
+        &self,
+        def: &Def,
+        pg: PgDomainTable<'a>,
+        layout: &mut Vec<Layout>,
+        ctx: &mut QueryBuildCtx<'a>,
+    ) -> DomainResult<Alias> {
+        layout.extend([
+            Layout::Scalar(PgType::Integer),
+            Layout::Scalar(PgType::BigInt),
+        ]);
+
+        if let Some(with_alias) = ctx.with_def_aliases.get(&def.id) {
+            // still need to fetch layout
+            self.select_inherent_struct_fields(def, pg.table, None, layout)?;
+            Ok(*with_alias)
+        } else {
+            let with_alias = ctx.alias.incr();
+
+            let mut expressions = vec![
+                // Always present: the def key of the vertex.
+                // This is known ahead of time.
+                // It will be used later to parse unions.
+                sql::Expr::LiteralInt(pg.table.key),
+                // Always present: the data key of the vertex
+                sql::Expr::path1("_key"),
+            ];
+            self.select_inherent_struct_fields(def, pg.table, Some(&mut expressions), layout)?;
+
+            ctx.with_queries.push(sql::WithQuery {
+                name: sql::Name::Alias(with_alias),
+                column_names: vec![],
+                stmt: sql::Stmt::Select(sql::Select {
+                    expressions,
+                    from: vec![pg.table_name().into()],
+                    ..Default::default()
+                }),
+            });
+
+            ctx.with_def_aliases.insert(def.id, with_alias);
+
+            Ok(with_alias)
+        }
     }
 
     fn read_struct_row_value<'b>(
@@ -353,8 +390,12 @@ impl<'a> TransactCtx<'a> {
             }
         }
 
+        let value = Value::Struct(Box::new(attrs), def.id.into());
+
+        // debug!("queried value: {value:#?}");
+
         Ok(RowValue {
-            value: Value::Struct(Box::new(attrs), def.id.into()),
+            value,
             data_key,
             op: DataOperation::Inserted,
         })

@@ -21,8 +21,7 @@ impl<'a> TransactCtx<'a> {
         &self,
         def: &Def,
         pg_datatable: &'a PgTable,
-        table_alias: Option<sql::Alias>,
-        sql_expressions: &mut Vec<sql::Expr<'a>>,
+        mut sql_expressions: Option<&mut Vec<sql::Expr<'a>>>,
         layout: &mut Vec<Layout>,
     ) -> DomainResult<()> {
         for (rel_id, rel) in &def.data_relationships {
@@ -37,10 +36,9 @@ impl<'a> TransactCtx<'a> {
                         }
                     };
 
-                    sql_expressions.push(match table_alias {
-                        Some(alias) => sql::Expr::path2(alias, data_field.col_name.as_ref()),
-                        None => sql::Expr::path1(data_field.col_name.as_ref()),
-                    });
+                    if let Some(output) = sql_expressions.as_mut() {
+                        output.push(sql::Expr::path1(data_field.col_name.as_ref()));
+                    }
                     layout.push(
                         PgType::from_def_id(target_det_id, self.ontology)?
                             .map(Layout::Scalar)
