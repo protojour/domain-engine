@@ -1,13 +1,15 @@
 use std::fmt::Debug;
 
-use byteorder::{BigEndian, ReadBytesExt};
-use bytes::{Buf, BytesMut};
+use bytes::BytesMut;
 use domain_engine_core::{DomainError, DomainResult};
 use fallible_iterator::FallibleIterator;
 use postgres_types::{FromSql, ToSql, Type};
-use tokio_postgres::Row;
 
-use crate::{ds_err, pg_model::PgType};
+use crate::{
+    ds_err,
+    pg_model::PgType,
+    sql_record::{SqlDynRecord, SqlRecord},
+};
 
 pub type CodecResult<T> = Result<T, Box<dyn std::error::Error + Sync + Send>>;
 
@@ -29,6 +31,7 @@ pub enum SqlVal<'b> {
     Time(chrono::NaiveTime),
     Array(SqlArray<'b>),
     Record(SqlRecord<'b>),
+    DynRecord(SqlDynRecord<'b>),
 }
 
 /// Layout of Sql data
@@ -38,6 +41,7 @@ pub enum Layout {
     Scalar(PgType),
     Array(Box<Layout>),
     Record(Vec<Layout>),
+    DynRecord,
 }
 
 pub fn domain_codec_error(error: Box<dyn std::error::Error + Sync + Send>) -> DomainError {
@@ -87,6 +91,13 @@ impl<'b> SqlVal<'b> {
         }
     }
 
+    pub fn into_dyn_record(self) -> DomainResult<SqlDynRecord<'b>> {
+        match self {
+            Self::DynRecord(record) => Ok(record),
+            _ => Err(ds_err("expected dyn record")),
+        }
+    }
+
     pub fn next_column(
         iter: &mut impl Iterator<Item = CodecResult<SqlVal<'b>>>,
     ) -> DomainResult<SqlVal<'b>> {
@@ -97,7 +108,7 @@ impl<'b> SqlVal<'b> {
         }
     }
 
-    fn decode(buf: Option<&'b [u8]>, layout: &'b Layout) -> CodecResult<Self> {
+    pub(crate) fn decode(buf: Option<&'b [u8]>, layout: &'b Layout) -> CodecResult<Self> {
         let Some(raw) = buf else {
             return Ok(Self::Null);
         };
@@ -144,6 +155,7 @@ impl<'b> SqlVal<'b> {
             Layout::Record(field_layouts) => {
                 Ok(Self::Record(SqlRecord::from_sql(raw, field_layouts)?))
             }
+            Layout::DynRecord => Ok(Self::DynRecord(SqlDynRecord::from_sql(raw)?)),
         }
     }
 }
@@ -158,16 +170,16 @@ impl<'b> ToSql for SqlVal<'b> {
         Self: Sized,
     {
         match &self {
-            SqlVal::Unit | SqlVal::Null => Option::<i32>::None.to_sql(ty, out),
-            SqlVal::I32(i) => i.to_sql(ty, out),
-            SqlVal::I64(i) => i.to_sql(ty, out),
-            SqlVal::F64(f) => f.to_sql(ty, out),
-            SqlVal::Text(s) => s.as_str().to_sql(ty, out),
-            SqlVal::Octets(s) => s.as_slice().to_sql(ty, out),
-            SqlVal::DateTime(dt) => dt.to_sql(ty, out),
-            SqlVal::Date(d) => d.to_sql(ty, out),
-            SqlVal::Time(t) => t.to_sql(ty, out),
-            SqlVal::Array(_) | SqlVal::Record(_) => {
+            Self::Unit | Self::Null => Option::<i32>::None.to_sql(ty, out),
+            Self::I32(i) => i.to_sql(ty, out),
+            Self::I64(i) => i.to_sql(ty, out),
+            Self::F64(f) => f.to_sql(ty, out),
+            Self::Text(s) => s.as_str().to_sql(ty, out),
+            Self::Octets(s) => s.as_slice().to_sql(ty, out),
+            Self::DateTime(dt) => dt.to_sql(ty, out),
+            Self::Date(d) => d.to_sql(ty, out),
+            Self::Time(t) => t.to_sql(ty, out),
+            Self::Array(_) | Self::Record(_) | Self::DynRecord(_) => {
                 Err("cannot convert output values to SQL".into())
             }
         }
@@ -186,50 +198,18 @@ impl<'b> ToSql for SqlVal<'b> {
         out: &mut BytesMut,
     ) -> CodecResult<tokio_postgres::types::IsNull> {
         match &self {
-            SqlVal::Unit | SqlVal::Null => Option::<i32>::None.to_sql_checked(ty, out),
-            SqlVal::I32(i) => i.to_sql_checked(ty, out),
-            SqlVal::I64(i) => i.to_sql_checked(ty, out),
-            SqlVal::F64(f) => f.to_sql_checked(ty, out),
-            SqlVal::Text(s) => s.as_str().to_sql_checked(ty, out),
-            SqlVal::Octets(s) => s.as_slice().to_sql_checked(ty, out),
-            SqlVal::DateTime(dt) => dt.to_sql_checked(ty, out),
-            SqlVal::Date(d) => d.to_sql_checked(ty, out),
-            SqlVal::Time(t) => t.to_sql_checked(ty, out),
-            SqlVal::Array(_) | SqlVal::Record(_) => {
+            Self::Unit | Self::Null => Option::<i32>::None.to_sql_checked(ty, out),
+            Self::I32(i) => i.to_sql_checked(ty, out),
+            Self::I64(i) => i.to_sql_checked(ty, out),
+            Self::F64(f) => f.to_sql_checked(ty, out),
+            Self::Text(s) => s.as_str().to_sql_checked(ty, out),
+            Self::Octets(s) => s.as_slice().to_sql_checked(ty, out),
+            Self::DateTime(dt) => dt.to_sql_checked(ty, out),
+            Self::Date(d) => d.to_sql_checked(ty, out),
+            Self::Time(t) => t.to_sql_checked(ty, out),
+            Self::Array(_) | Self::Record(_) | Self::DynRecord(_) => {
                 Err("cannot convert output values to SQL".into())
             }
-        }
-    }
-}
-
-pub struct RowDecodeIterator<'b> {
-    row: &'b Row,
-    layout: &'b [Layout],
-    index: usize,
-}
-
-impl<'b> RowDecodeIterator<'b> {
-    pub fn new(row: &'b Row, layout: &'b [Layout]) -> Self {
-        Self {
-            row,
-            layout,
-            index: 0,
-        }
-    }
-}
-
-impl<'b> Iterator for RowDecodeIterator<'b> {
-    type Item = CodecResult<SqlVal<'b>>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.index >= self.row.columns().len() {
-            None
-        } else {
-            let index = self.index;
-            self.index += 1;
-            let buf = self.row.col_buffer(index);
-
-            Some(SqlVal::decode(buf, &self.layout[index]))
         }
     }
 }
@@ -252,92 +232,5 @@ impl<'b> SqlArray<'b> {
 impl<'b> Debug for SqlArray<'b> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SqlArray").finish()
-    }
-}
-
-pub struct SqlRecord<'b> {
-    field_count: i32,
-    buf: &'b [u8],
-    field_layout: &'b [Layout],
-}
-
-impl<'b> Debug for SqlRecord<'b> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SqlRecord")
-            .field("field_count", &self.field_count)
-            .finish()
-    }
-}
-
-impl<'b> SqlRecord<'b> {
-    /// It was hard to find the binary documentation for composite/record types.
-    /// Used this as a reference: https://github.com/jackc/pgtype/blob/a4d4bbf043f7988ea29696a612cf311026fedf92/composite_type.go
-    fn from_sql(mut buf: &'b [u8], field_layout: &'b [Layout]) -> CodecResult<SqlRecord<'b>> {
-        let field_count = buf.read_i32::<BigEndian>()?;
-        if field_count < 0 {
-            return Err("invalid field count".into());
-        }
-
-        if field_count as usize != field_layout.len() {
-            return Err(
-                "field layout length does not correspond to record value field count".into(),
-            );
-        }
-
-        Ok(SqlRecord {
-            field_count,
-            buf,
-            field_layout,
-        })
-    }
-
-    pub fn fields(&self) -> RecordFields<'b> {
-        RecordFields {
-            buf: self.buf,
-            layout_iter: self.field_layout.iter(),
-        }
-    }
-}
-
-pub struct RecordFields<'b> {
-    buf: &'b [u8],
-    layout_iter: std::slice::Iter<'b, Layout>,
-}
-
-impl<'b> Iterator for RecordFields<'b> {
-    type Item = CodecResult<SqlVal<'b>>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.buf.is_empty() {
-            return if self.layout_iter.next().is_some() {
-                Some(Err("layout is longer than actual record fields".into()))
-            } else {
-                None
-            };
-        }
-
-        Some(self.decode_next_field())
-    }
-}
-
-impl<'b> RecordFields<'b> {
-    fn decode_next_field(&mut self) -> CodecResult<SqlVal<'b>> {
-        let Some(layout) = self.layout_iter.next() else {
-            return Err("more record fields than layout fields".into());
-        };
-
-        let _oid = self.buf.read_u32::<BigEndian>()?;
-        let field_len = self.buf.read_i32::<BigEndian>()?;
-
-        if field_len > 0 {
-            let field_len = field_len as usize;
-            let field_buf = &self.buf[0..field_len];
-
-            self.buf.advance(field_len);
-
-            SqlVal::decode(Some(field_buf), layout)
-        } else {
-            Ok(SqlVal::Null)
-        }
     }
 }

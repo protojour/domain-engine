@@ -24,7 +24,8 @@ use crate::{
     ds_bad_req, ds_err,
     pg_model::{InDomain, PgDataKey, PgDomain, PgEdgeCardinalKind, PgTable, PgType},
     sql::{self, TableName},
-    sql_value::{Layout, RowDecodeIterator, SqlVal},
+    sql_record::RowDecodeIterator,
+    sql_value::{Layout, SqlVal},
     transact::data::Data,
 };
 
@@ -229,7 +230,7 @@ impl<'a> TransactCtx<'a> {
         for (edge_id, projection) in edge_projections {
             let subject_index = projection.subject;
 
-            let pg_edge = pg_domain.edges.get(&edge_id.1).unwrap();
+            let pg_edge = pg_domain.edgetables.get(&edge_id.1).unwrap();
 
             let mut sql_insert = sql::Insert {
                 into: TableName(&pg_domain.schema_name, &pg_edge.table_name),
@@ -451,7 +452,7 @@ impl<'a> TransactCtx<'a> {
             ResolveMode::Id(id_rel_id, id_resolve_mode) => {
                 let pg = self
                     .pg_model
-                    .pg_domain_table(vertex_def_id.package_id(), vertex_def_id)?;
+                    .pg_domain_datatable(vertex_def_id.package_id(), vertex_def_id)?;
 
                 let pg_id_field = pg.table.field(&id_rel_id)?;
 
@@ -461,7 +462,10 @@ impl<'a> TransactCtx<'a> {
 
                 let sql = match id_resolve_mode {
                     IdResolveMode::Plain => sql::Select {
-                        expressions: vec![sql::Expr::path1("_key")],
+                        expressions: sql::Expressions {
+                            items: vec![sql::Expr::path1("_key")],
+                            multiline: false,
+                        },
                         from: vec![pg.table_name().into()],
                         where_: Some(sql::Expr::eq(
                             sql::Expr::path1(pg_id_field.col_name.as_ref()),

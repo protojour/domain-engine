@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, sync::Arc};
 
 use itertools::Itertools;
 use smallvec::{smallvec, SmallVec};
@@ -42,25 +42,33 @@ impl Display for Alias {
     }
 }
 
+#[derive(Clone)]
 pub enum Stmt<'d> {
     Select(Select<'d>),
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Select<'d> {
     pub with: Option<With<'d>>,
-    pub expressions: Vec<Expr<'d>>,
+    pub expressions: Expressions<'d>,
     pub from: Vec<FromItem<'d>>,
     pub where_: Option<Expr<'d>>,
-    pub limit: Option<usize>,
-    pub offset: Option<usize>,
+    pub limit: Limit,
 }
 
+#[derive(Clone, Default)]
+pub struct Expressions<'d> {
+    pub items: Vec<Expr<'d>>,
+    pub multiline: bool,
+}
+
+#[derive(Clone)]
 pub struct With<'d> {
     pub recursive: bool,
     pub queries: Vec<WithQuery<'d>>,
 }
 
+#[derive(Clone)]
 pub struct WithQuery<'d> {
     pub name: Name,
     pub column_names: Vec<&'d str>,
@@ -98,11 +106,19 @@ pub struct Delete<'d> {
 /// column = expr
 pub struct UpdateColumn<'d>(pub &'d str, pub Expr<'d>);
 
+#[derive(Clone, Default)]
+pub struct Limit {
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
+
+#[derive(Clone)]
 pub enum Expr<'d> {
     /// path in current scope
     Path(SmallVec<PathSegment<'d>, 2>),
     /// input parameter
     Param(Param),
+    Paren(Box<Expr<'d>>),
     LiteralInt(i32),
     Select(Box<Select<'d>>),
     /// a UNION b
@@ -120,6 +136,8 @@ pub enum Expr<'d> {
     AsIndex(Box<Expr<'d>>, Alias),
     /// count(*) over ()
     CountStarOver,
+    Limit(Box<Expr<'d>>, Limit),
+    Arc(Arc<Expr<'d>>),
 }
 
 impl<'d> Expr<'d> {
@@ -135,19 +153,29 @@ impl<'d> Expr<'d> {
         Self::Param(Param(p))
     }
 
-    pub fn array(expr: Self) -> Self {
-        Self::Array(Box::new(expr))
+    pub fn paren(expr: impl Into<Self>) -> Self {
+        Self::Paren(Box::new(expr.into()))
     }
 
-    pub fn eq(a: Self, b: Self) -> Self {
-        Self::Eq(Box::new(a), Box::new(b))
+    pub fn array(expr: impl Into<Self>) -> Self {
+        Self::Array(Box::new(expr.into()))
+    }
+
+    pub fn eq(a: impl Into<Self>, b: impl Into<Self>) -> Self {
+        Self::Eq(Box::new(a.into()), Box::new(b.into()))
+    }
+
+    pub fn arc(expr: impl Into<Self>) -> Self {
+        Self::Arc(Arc::new(expr.into()))
     }
 }
 
+#[derive(Clone)]
 pub enum Name {
     Alias(Alias),
 }
 
+#[derive(Clone)]
 pub enum PathSegment<'d> {
     Ident(&'d str),
     Alias(Alias),
@@ -156,6 +184,7 @@ pub enum PathSegment<'d> {
     Asterisk,
 }
 
+#[derive(Clone)]
 pub enum FromItem<'d> {
     TableName(TableName<'d>),
     TableNameAs(TableName<'d>, Name),
@@ -163,18 +192,22 @@ pub enum FromItem<'d> {
     Join(Box<Join<'d>>),
 }
 
+#[derive(Clone)]
 pub struct Join<'d> {
     pub first: FromItem<'d>,
     pub second: FromItem<'d>,
     pub on: Expr<'d>,
 }
 
+#[derive(Clone)]
 pub struct Union<'d> {
-    pub first: FromItem<'d>,
+    pub first: Expr<'d>,
+    /// UNION ALL?
     pub all: bool,
-    pub second: FromItem<'d>,
+    pub second: Expr<'d>,
 }
 
+#[derive(Clone)]
 pub struct TableName<'d>(pub &'d str, pub &'d str);
 
 impl<'d> TableName<'d> {
@@ -200,7 +233,7 @@ impl<'d> Display for Select<'d> {
         write!(
             f,
             "SELECT {expressions} FROM {from}",
-            expressions = self.expressions.iter().format(","),
+            expressions = self.expressions,
             from = self.from.iter().format(","),
         )?;
 
@@ -208,6 +241,22 @@ impl<'d> Display for Select<'d> {
             write!(f, " WHERE {condition}")?;
         }
 
+        write!(f, "{}", self.limit)
+    }
+}
+
+impl<'d> Display for Expressions<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.multiline {
+            write!(f, "{}\n", self.items.iter().format(",\n"))
+        } else {
+            write!(f, "{}", self.items.iter().format(","))
+        }
+    }
+}
+
+impl<'d> Display for Limit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(limit) = self.limit {
             write!(f, " LIMIT {limit}")?;
         }
@@ -341,16 +390,19 @@ impl<'d> Display for Expr<'d> {
         match self {
             Self::Path(segments) => write!(f, "{}", segments.iter().format(".")),
             Self::Param(param) => write!(f, "{param}"),
+            Self::Paren(expr) => write!(f, "({expr})"),
             Self::LiteralInt(i) => write!(f, "{i}"),
-            Self::Select(select) => write!(f, "({select})"),
+            Self::Select(select) => write!(f, "{select}"),
             Self::Union(union) => write!(f, "{union}"),
-            Self::And(clauses) => write!(f, "({})", clauses.iter().format(" AND ")),
+            Self::And(clauses) => write!(f, "{}", clauses.iter().format(" AND ")),
             Self::Eq(a, b) => write!(f, "{a} = {b}"),
             Self::Row(fields) => write!(f, "ROW({})", fields.iter().format(",")),
             Self::Array(expr) => write!(f, "ARRAY({expr})"),
             Self::ArrayAgg(expr) => write!(f, "ARRAY_AGG({expr})"),
             Self::AsIndex(expr, index) => write!(f, "{expr} AS {index}"),
             Self::CountStarOver => write!(f, "COUNT(*) OVER()"),
+            Self::Limit(expr, limit) => write!(f, "{expr}{limit}"),
+            Self::Arc(expr) => write!(f, "{expr}"),
         }
     }
 }
@@ -397,13 +449,13 @@ impl<'d> Display for Union<'d> {
     }
 }
 
-impl<'d> From<Select<'d>> for Expr<'d> {
+impl<'d> std::convert::From<Select<'d>> for Expr<'d> {
     fn from(value: Select<'d>) -> Self {
         Self::Select(Box::new(value))
     }
 }
 
-impl<'d> From<Vec<WithQuery<'d>>> for With<'d> {
+impl<'d> std::convert::From<Vec<WithQuery<'d>>> for With<'d> {
     fn from(value: Vec<WithQuery<'d>>) -> Self {
         let recursive = value.iter().any(|wq| !wq.column_names.is_empty());
         With {
@@ -413,31 +465,31 @@ impl<'d> From<Vec<WithQuery<'d>>> for With<'d> {
     }
 }
 
-impl<'d> From<Join<'d>> for FromItem<'d> {
+impl<'d> std::convert::From<Join<'d>> for FromItem<'d> {
     fn from(value: Join<'d>) -> Self {
         FromItem::Join(Box::new(value))
     }
 }
 
-impl<'d> From<TableName<'d>> for FromItem<'d> {
+impl<'d> std::convert::From<TableName<'d>> for FromItem<'d> {
     fn from(value: TableName<'d>) -> Self {
         Self::TableName(value)
     }
 }
 
-impl<'d> From<&'d str> for PathSegment<'d> {
+impl<'d> std::convert::From<&'d str> for PathSegment<'d> {
     fn from(value: &'d str) -> Self {
         Self::Ident(value)
     }
 }
 
-impl<'d> From<Alias> for PathSegment<'d> {
+impl<'d> std::convert::From<Alias> for PathSegment<'d> {
     fn from(value: Alias) -> Self {
         Self::Alias(value)
     }
 }
 
-impl<'d> From<Param> for PathSegment<'d> {
+impl<'d> std::convert::From<Param> for PathSegment<'d> {
     fn from(value: Param) -> Self {
         Self::Param(value)
     }
@@ -448,6 +500,8 @@ impl<'d> Display for TableName<'d> {
         write!(f, "{}.{}", Ident(self.0), Ident(self.1))
     }
 }
+
+#[derive(Clone)]
 pub struct Param(pub usize);
 
 impl Display for Param {

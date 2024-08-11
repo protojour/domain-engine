@@ -123,7 +123,7 @@ async fn execute_migration_step<'t>(
             let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
             let pg_table = match table_id {
                 PgTableIdUnion::Def(def_id) => pg_domain.datatables.get_mut(&def_id),
-                PgTableIdUnion::Edge(edge_id) => pg_domain.edges.get_mut(&edge_id.1),
+                PgTableIdUnion::Edge(edge_id) => pg_domain.edgetables.get_mut(&edge_id.1),
             }
             .unwrap();
 
@@ -268,7 +268,7 @@ async fn execute_migration_step<'t>(
 
             let key: PgRegKey = row.get(0);
 
-            pg_domain.edges.insert(
+            pg_domain.edgetables.insert(
                 edge_tag,
                 PgTable {
                     key,
@@ -286,7 +286,7 @@ async fn execute_migration_step<'t>(
             kind,
         } => {
             let pg_edge_domain = ctx.domains.get(&pkg_id).unwrap();
-            let pg_table = pg_edge_domain.edges.get(&edge_tag).unwrap();
+            let pg_table = pg_edge_domain.edgetables.get(&edge_tag).unwrap();
 
             match &kind {
                 PgEdgeCardinalKind::Dynamic {
@@ -399,7 +399,7 @@ async fn execute_migration_step<'t>(
                 .domains
                 .get_mut(&pkg_id)
                 .unwrap()
-                .edges
+                .edgetables
                 .get_mut(&edge_tag)
                 .unwrap();
 

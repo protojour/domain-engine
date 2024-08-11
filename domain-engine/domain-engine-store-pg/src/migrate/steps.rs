@@ -105,7 +105,7 @@ pub async fn migrate_domain_steps<'t>(
             key: Some(domain_key),
             schema_name,
             datatables: pg_datatables,
-            edges: pg_edges,
+            edgetables: pg_edges,
         };
         ctx.domains.insert(pkg_id, pg_domain.clone());
 
@@ -125,7 +125,7 @@ pub async fn migrate_domain_steps<'t>(
                 key: None,
                 schema_name: schema.clone(),
                 datatables: Default::default(),
-                edges: Default::default(),
+                edgetables: Default::default(),
             },
         );
 
@@ -273,7 +273,7 @@ async fn migrate_domain_edges_steps<'t>(
         let edge_tag = edge_id.1;
         let table_name = format!("e_{edge_tag}").into_boxed_str();
 
-        if let Some(pg_table) = pg_domain.edges.get_mut(&edge_tag) {
+        if let Some(pg_table) = pg_domain.edgetables.get_mut(&edge_tag) {
             let pg_cardinals: BTreeMap<CardinalIdx, PgEdgeCardinal> = txn
                 .query(
                     indoc! {"
@@ -374,7 +374,7 @@ async fn migrate_domain_edges_steps<'t>(
             };
 
             if let Some(deployed_pg_cardinal) = pg_domain
-                .edges
+                .edgetables
                 .get_mut(&edge_tag)
                 .and_then(|edge_table| edge_table.edge_cardinals.get_mut(&index))
             {

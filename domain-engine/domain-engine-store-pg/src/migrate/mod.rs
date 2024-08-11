@@ -158,10 +158,7 @@ pub async fn migrate(
 
     txn.commit().await?;
 
-    Ok(PgModel {
-        domains: ctx.domains,
-        entity_id_to_entity,
-    })
+    Ok(PgModel::new(ctx.domains, entity_id_to_entity))
 }
 
 async fn query_domain_migration_version<'t>(txn: &Transaction<'t>) -> anyhow::Result<RegVersion> {

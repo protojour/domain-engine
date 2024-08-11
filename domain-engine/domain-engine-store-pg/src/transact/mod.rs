@@ -15,12 +15,13 @@ use query::QueryFrame;
 use tokio_postgres::IsolationLevel;
 use tracing::{debug, trace};
 
-use crate::{ds_err, PgModel, PostgresDataStore};
+use crate::{ds_err, pg_model::PgDef, PgModel, PostgresDataStore};
 
 mod data;
 mod delete;
 mod insert;
 mod query;
+mod query_edge;
 mod struct_analyzer;
 mod struct_fields;
 
@@ -29,6 +30,18 @@ struct TransactCtx<'a> {
     ontology: &'a Ontology,
     system: &'a (dyn SystemAPI + Send + Sync),
     txn: deadpool_postgres::Transaction<'a>,
+}
+
+impl<'a> TransactCtx<'a> {
+    /// Look up ontology def and PG data for the given def_id
+    pub fn lookup_def(&self, def_id: DefId) -> DomainResult<PgDef<'a>> {
+        let def = self.ontology.def(def_id);
+        let pg = self
+            .pg_model
+            .pg_domain_datatable(def_id.package_id(), def_id)?;
+
+        Ok(PgDef { def, pg })
+    }
 }
 
 enum State {

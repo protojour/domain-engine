@@ -4,7 +4,7 @@ use domain_engine_core::DomainResult;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::{
-        domain::{DefKind, DefRepr},
+        domain::{Def, DefKind, DefRepr},
         Ontology,
     },
     tuple::CardinalIdx,
@@ -25,27 +25,67 @@ pub type PgDataKey = i64;
 
 pub type DomainUid = ulid::Ulid;
 
+pub enum PgTableKey {
+    Data { pkg_id: PackageId, def_id: DefId },
+}
+
 pub struct PgModel {
     #[allow(unused)]
     pub(crate) domains: FnvHashMap<PackageId, PgDomain>,
-
+    /// A map from PG table key to semantic key
+    /// This is used for dynamic typing.
+    pub(crate) reg_key_to_table_key: FnvHashMap<PgRegKey, PgTableKey>,
     pub(crate) entity_id_to_entity: FnvHashMap<DefId, DefId>,
 }
 
 impl PgModel {
+    pub(crate) fn new(
+        domains: FnvHashMap<PackageId, PgDomain>,
+        entity_id_to_entity: FnvHashMap<DefId, DefId>,
+    ) -> Self {
+        let mut reg_key_to_table_key: FnvHashMap<PgRegKey, PgTableKey> = Default::default();
+
+        for (pkg_id, pg_domain) in &domains {
+            for (def_id, pg_table) in &pg_domain.datatables {
+                reg_key_to_table_key.insert(
+                    pg_table.key,
+                    PgTableKey::Data {
+                        pkg_id: *pkg_id,
+                        def_id: *def_id,
+                    },
+                );
+            }
+        }
+
+        Self {
+            domains,
+            reg_key_to_table_key,
+            entity_id_to_entity,
+        }
+    }
+
     pub(crate) fn pg_domain(&self, pkg_id: PackageId) -> DomainResult<&PgDomain> {
         self.domains
             .get(&pkg_id)
             .ok_or_else(|| ds_err(format!("pg_domain not found for {pkg_id:?}")))
     }
 
-    pub(crate) fn pg_domain_table(
+    pub(crate) fn pg_domain_datatable(
         &self,
         pkg_id: PackageId,
         def_id: DefId,
     ) -> DomainResult<PgDomainTable> {
         let domain = self.pg_domain(pkg_id)?;
         let datatable = self.datatable(pkg_id, def_id)?;
+        Ok(PgDomainTable {
+            domain,
+            table: datatable,
+        })
+    }
+
+    pub(crate) fn pg_domain_edgetable(&self, edge_id: &EdgeId) -> DomainResult<PgDomainTable> {
+        let domain = self.pg_domain(edge_id.0)?;
+        let datatable = self.edgetable(edge_id)?;
         Ok(PgDomainTable {
             domain,
             table: datatable,
@@ -60,7 +100,29 @@ impl PgModel {
 
     pub(crate) fn datatable(&self, pkg_id: PackageId, def_id: DefId) -> DomainResult<&PgTable> {
         self.find_datatable(pkg_id, def_id)
-            .ok_or_else(|| ds_err(format!("pg_datatable not found for {pkg_id:?}->{def_id:?}")))
+            .ok_or_else(|| ds_err(format!("PgTable not found for {pkg_id:?}->{def_id:?}")))
+    }
+
+    pub(crate) fn find_edgetable(&self, edge_id: &EdgeId) -> Option<&PgTable> {
+        self.domains
+            .get(&edge_id.0)
+            .and_then(|pg_domain| pg_domain.edgetables.get(&edge_id.1))
+    }
+
+    pub(crate) fn edgetable(&self, edge_id: &EdgeId) -> DomainResult<&PgTable> {
+        self.find_edgetable(edge_id)
+            .ok_or_else(|| ds_err(format!("PgTable not found for {edge_id:?}")))
+    }
+
+    pub(crate) fn datatable_key_by_def_key(
+        &self,
+        def_key: PgRegKey,
+    ) -> DomainResult<(PackageId, DefId)> {
+        let Some(PgTableKey::Data { pkg_id, def_id }) = self.reg_key_to_table_key.get(&def_key)
+        else {
+            return Err(ds_err("table not found"));
+        };
+        Ok((*pkg_id, *def_id))
     }
 }
 
@@ -116,7 +178,7 @@ pub struct PgDomain {
     pub key: Option<PgRegKey>,
     pub schema_name: Box<str>,
     pub datatables: FnvHashMap<DefId, PgTable>,
-    pub edges: FnvHashMap<u16, PgTable>,
+    pub edgetables: FnvHashMap<u16, PgTable>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -138,7 +200,7 @@ impl PgDomain {
     pub fn get_table(&self, id: &PgTableIdUnion) -> Option<&PgTable> {
         match id {
             PgTableIdUnion::Def(def_id) => self.datatables.get(def_id),
-            PgTableIdUnion::Edge(edge_id) => self.edges.get(&edge_id.1),
+            PgTableIdUnion::Edge(edge_id) => self.edgetables.get(&edge_id.1),
         }
     }
 }
@@ -166,6 +228,11 @@ impl PgTable {
             .get(&c)
             .ok_or_else(|| ds_err("edge cardinal not found"))
     }
+}
+
+pub struct PgDef<'a> {
+    pub def: &'a Def,
+    pub pg: PgDomainTable<'a>,
 }
 
 #[derive(Clone, Debug)]
@@ -201,7 +268,7 @@ pub struct PgDataField {
     pub pg_type: PgType,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PgEdgeCardinal {
     #[allow(unused)]
     pub key: PgRegKey,

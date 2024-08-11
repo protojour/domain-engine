@@ -302,6 +302,10 @@ impl DefIdSet {
         self.0.iter()
     }
 
+    pub fn contains(&self, def_id: &DefId) -> bool {
+        self.0.binary_search(def_id).is_ok()
+    }
+
     pub fn insert(&mut self, def_id: DefId) {
         match self.0.binary_search(&def_id) {
             Ok(_pos) => {} // element already in vector @ `pos`
