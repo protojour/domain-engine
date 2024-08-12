@@ -320,7 +320,9 @@ impl<'a> TransactCtx<'a> {
         let mut attrs: FnvHashMap<RelId, Attr> =
             FnvHashMap::with_capacity_and_hasher(def.data_relationships.len(), Default::default());
 
-        let _def_key = iterator.next_field(&Layout::Scalar(PgType::Integer))?;
+        let _def_key = iterator
+            .next_field(&Layout::Scalar(PgType::Integer))?
+            .into_i32()?;
         let data_key = iterator
             .next_field(&Layout::Scalar(PgType::BigInt))?
             .into_i64()?;

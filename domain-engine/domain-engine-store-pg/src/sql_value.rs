@@ -97,16 +97,6 @@ impl<'b> SqlVal<'b> {
         }
     }
 
-    pub fn next_column(
-        iter: &mut impl Iterator<Item = CodecResult<SqlVal<'b>>>,
-    ) -> DomainResult<SqlVal<'b>> {
-        match iter.next() {
-            Some(result) => Ok(result?),
-            None => panic!("too few columns"),
-            // None => Err(ds_err("too few columns")),
-        }
-    }
-
     pub(crate) fn decode(buf: Option<&'b [u8]>, layout: &Layout) -> CodecResult<Self> {
         let Some(raw) = buf else {
             return Ok(Self::Null);
