@@ -265,9 +265,7 @@ impl<'v> AttributeType<'v> {
                         info.schema_ctx.schema.type_data(implementor.addr),
                     )
                 }
-                ObjectInterface::Implements(_) => {
-                    panic!("already concrete")
-                }
+                ObjectInterface::Implements(_) => (info.type_addr, info.type_data()),
             },
             _ => panic!(
                 "should not need concrete type name for other things than unions or interfaces"

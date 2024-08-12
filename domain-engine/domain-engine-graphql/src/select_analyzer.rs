@@ -292,7 +292,9 @@ impl<'a> SelectAnalyzer<'a> {
 
                 for field_look_ahead in look_ahead.children() {
                     let field_name = field_look_ahead.field_original_name();
-                    let field_data = object_data.fields.get(field_name).unwrap();
+                    let Some(field_data) = object_data.fields.get(field_name) else {
+                        continue;
+                    };
 
                     if let FieldKind::Node = &field_data.kind {
                         selection = self.analyze_selection(field_look_ahead, field_data)?;
@@ -384,8 +386,9 @@ impl<'a> SelectAnalyzer<'a> {
 
         for field_look_ahead in look_ahead.children() {
             let field_name = field_look_ahead.field_original_name();
-            let field_data = connection_object_data.fields.get(field_name).unwrap();
-
+            let Some(field_data) = connection_object_data.fields.get(field_name) else {
+                continue;
+            };
             match &field_data.kind {
                 FieldKind::Nodes | FieldKind::Edges => {
                     if let Some(selection) = self.analyze_selection(field_look_ahead, field_data)? {
@@ -445,10 +448,12 @@ impl<'a> SelectAnalyzer<'a> {
                             ),
                         };
 
-                        let variant_map = union_map.entry(def_id).or_default();
-                        let field_data =
-                            fields.get(field_look_ahead.field_original_name()).unwrap();
+                        let Some(field_data) = fields.get(field_look_ahead.field_original_name())
+                        else {
+                            continue;
+                        };
 
+                        let variant_map = union_map.entry(def_id).or_default();
                         if let Some(selection) =
                             self.analyze_selection(field_look_ahead, field_data)?
                         {
@@ -492,7 +497,9 @@ impl<'a> SelectAnalyzer<'a> {
                             continue;
                         };
 
-                        let field_data = inner_object_data.fields.get(field_name).unwrap();
+                        let Some(field_data) = inner_object_data.fields.get(field_name) else {
+                            continue;
+                        };
 
                         let Some(selection) =
                             self.analyze_selection(field_look_ahead, field_data)?
@@ -536,7 +543,9 @@ impl<'a> SelectAnalyzer<'a> {
                             }
                         }
                     } else {
-                        let field_data = object_data.fields.get(field_name).unwrap();
+                        let Some(field_data) = object_data.fields.get(field_name) else {
+                            continue;
+                        };
                         if let Some(selection) =
                             self.analyze_selection(field_look_ahead, field_data)?
                         {
