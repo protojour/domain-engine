@@ -7,18 +7,19 @@ use ontol_runtime::{
     property::ValueCardinality,
     query::select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     sequence::SubSequence,
-    tuple::CardinalIdx,
+    tuple::{CardinalIdx, EndoTuple},
     value::Value,
     DefId, RelId,
 };
 use pin_utils::pin_mut;
 use serde::{Deserialize, Serialize};
+use smallvec::smallvec;
 use tokio_postgres::types::ToSql;
 use tracing::debug;
 
 use crate::{
     ds_bad_req, ds_err,
-    pg_model::{PgDef, PgDomainTable, PgType},
+    pg_model::{PgDef, PgDomainTable, PgEdgeCardinalKind, PgTable, PgType},
     sql,
     sql_record::{SqlColumnStream, SqlRecord, SqlRecordIterator},
     sql_value::{Layout, SqlVal},
@@ -293,7 +294,7 @@ impl<'a> TransactCtx<'a> {
                 multiline: false,
             };
 
-            self.select_inherent_struct_fields(def, pg.table, Some(&mut expressions.items))?;
+            self.select_inherent_struct_fields(def, pg.table, &mut expressions.items, None)?;
 
             ctx.with_queries.push(sql::WithQuery {
                 name: sql::Name::Alias(with_alias),
@@ -335,17 +336,21 @@ impl<'a> TransactCtx<'a> {
             let Some(rel_info) = def.data_relationships.get(rel_id) else {
                 continue;
             };
-            let DataRelationshipKind::Edge(_proj) = &rel_info.kind else {
+            let DataRelationshipKind::Edge(proj) = &rel_info.kind else {
                 continue;
             };
 
+            let pg_edge = self.pg_model.edgetable(&proj.id)?;
+
             match rel_info.cardinality.1 {
                 ValueCardinality::Unit => {
-                    let sql_edge_tuple = iterator.next_field(&Layout::Record)?.into_record()?;
-
-                    let sql_field = sql_edge_tuple.fields().next_field(&Layout::Record)?;
-                    let value = self.read_dyn_record(sql_field, select)?;
-                    attrs.insert(*rel_id, Attr::Unit(value));
+                    if let Some(sql_edge_tuple) =
+                        iterator.next_field(&Layout::Record)?.null_filter()
+                    {
+                        let sql_edge_tuple = sql_edge_tuple.into_record()?;
+                        let attr = self.read_edge_tuple_as_attr(sql_edge_tuple, select, pg_edge)?;
+                        attrs.insert(*rel_id, attr);
+                    }
                 }
                 ValueCardinality::IndexSet | ValueCardinality::List => {
                     let sql_array = iterator.next_field(&Layout::Array)?.into_array()?;
@@ -355,18 +360,36 @@ impl<'a> TransactCtx<'a> {
 
                     for result in sql_array.elements(&Layout::Record) {
                         let sql_edge_tuple = result?.into_record()?;
-                        let sql_field = sql_edge_tuple.fields().next_field(&Layout::Record)?;
-                        let value = self.read_dyn_record(sql_field, select)?;
-                        matrix.columns[0].push(value);
+
+                        match self.read_edge_tuple_as_attr(sql_edge_tuple, select, pg_edge)? {
+                            Attr::Unit(value) => {
+                                matrix.columns[0].push(value);
+                            }
+                            Attr::Tuple(tuple) => {
+                                let mut tuple_iter = tuple.elements.into_iter();
+                                matrix.columns[0].push(tuple_iter.next().unwrap());
+
+                                let mut column_index: usize = 1;
+
+                                for value in tuple_iter {
+                                    if matrix.columns.len() <= column_index {
+                                        matrix.columns.push(Default::default());
+                                    }
+
+                                    matrix.columns[column_index].push(value);
+                                    column_index += 1;
+                                }
+                            }
+                            Attr::Matrix(_) => return Err(ds_err("matrix in matrix")),
+                        }
                     }
+
                     attrs.insert(*rel_id, Attr::Matrix(matrix));
                 }
             }
         }
 
         let value = Value::Struct(Box::new(attrs), def.id.into());
-
-        // debug!("queried value: {value:#?}");
 
         Ok(RowValue {
             value,
@@ -375,9 +398,52 @@ impl<'a> TransactCtx<'a> {
         })
     }
 
-    fn read_dyn_record(&self, sql_val: SqlVal, select: &Select) -> DomainResult<Value> {
-        let sql_dyn_record = sql_val.into_record()?;
-        let def_key = sql_dyn_record.def_key()?;
+    fn read_edge_tuple_as_attr(
+        &self,
+        sql_edge_tuple: SqlRecord,
+        select: &Select,
+        pg_edge: &PgTable,
+    ) -> DomainResult<Attr> {
+        let mut fields = sql_edge_tuple.fields();
+
+        let sql_field = fields.next_field(&Layout::Record)?;
+        let value = self.read_record(sql_field, select)?;
+
+        if sql_edge_tuple.field_count() > 1 {
+            // handle parameters
+            let sql_field = fields.next_field(&Layout::Record)?;
+
+            for cardinal in pg_edge.edge_cardinals.values() {
+                if let PgEdgeCardinalKind::Parameters(def_id) = &cardinal.kind {
+                    let def = self.ontology.def(*def_id);
+                    let mut attrs: FnvHashMap<RelId, Attr> = FnvHashMap::with_capacity_and_hasher(
+                        def.data_relationships.len(),
+                        Default::default(),
+                    );
+
+                    let struct_record = sql_field.into_record()?;
+
+                    // retrieve data properties
+                    self.read_inherent_struct_fields(def, &mut struct_record.fields(), &mut attrs)?;
+
+                    return Ok(Attr::Tuple(Box::new(EndoTuple {
+                        elements: smallvec![
+                            value,
+                            Value::Struct(Box::new(attrs), (*def_id).into())
+                        ],
+                    })));
+                }
+            }
+
+            Err(ds_err("cannot deserialize parameters"))
+        } else {
+            Ok(Attr::Unit(value))
+        }
+    }
+
+    fn read_record(&self, sql_val: SqlVal, select: &Select) -> DomainResult<Value> {
+        let sql_record = sql_val.into_record()?;
+        let def_key = sql_record.def_key()?;
         let (_pkg_id, def_id) = self.pg_model.datatable_key_by_def_key(def_key)?;
         let pg_def = self.lookup_def(def_id)?;
 
@@ -388,18 +454,18 @@ impl<'a> TransactCtx<'a> {
                 };
 
                 let pg_id = pg_def.pg.table.field(&entity.id_relationship_id)?;
-                let mut fields = sql_dyn_record.fields();
+                let mut fields = sql_record.fields();
                 fields.next_field(&Layout::Scalar(PgType::Integer))?;
                 let sql_field = fields.next_field(&Layout::Scalar(pg_id.pg_type))?;
 
                 self.deserialize_sql(entity.id_value_def_id, sql_field)
             }
             Select::Struct(struct_select) => {
-                self.read_dyn_struct(pg_def, sql_dyn_record, &struct_select.properties)
+                self.read_record_as_struct(pg_def, sql_record, &struct_select.properties)
             }
             Select::Entity(entity_select) => match &entity_select.source {
                 StructOrUnionSelect::Struct(struct_select) => {
-                    self.read_dyn_struct(pg_def, sql_dyn_record, &struct_select.properties)
+                    self.read_record_as_struct(pg_def, sql_record, &struct_select.properties)
                 }
                 StructOrUnionSelect::Union(_, variants) => {
                     let actual_select = variants
@@ -407,7 +473,7 @@ impl<'a> TransactCtx<'a> {
                         .find(|sel| sel.def_id == def_id)
                         .ok_or_else(|| ds_err("actual value not found in select union"))?;
 
-                    self.read_dyn_struct(pg_def, sql_dyn_record, &actual_select.properties)
+                    self.read_record_as_struct(pg_def, sql_record, &actual_select.properties)
                 }
             },
             Select::StructUnion(_, variants) => {
@@ -416,20 +482,20 @@ impl<'a> TransactCtx<'a> {
                     .find(|sel| sel.def_id == def_id)
                     .ok_or_else(|| ds_err("actual value not found in select union"))?;
 
-                self.read_dyn_struct(pg_def, sql_dyn_record, &actual_select.properties)
+                self.read_record_as_struct(pg_def, sql_record, &actual_select.properties)
             }
             _ => todo!("unhandled select"),
         }
     }
 
-    fn read_dyn_struct(
+    fn read_record_as_struct(
         &self,
         pg_def: PgDef,
-        sql_dyn_record: SqlRecord,
+        sql_record: SqlRecord,
         select_properties: &FnvHashMap<RelId, Select>,
     ) -> DomainResult<Value> {
         let row_value =
-            self.read_struct_row_value(sql_dyn_record.fields(), pg_def.def, select_properties)?;
+            self.read_struct_row_value(sql_record.fields(), pg_def.def, select_properties)?;
 
         Ok(row_value.value)
     }

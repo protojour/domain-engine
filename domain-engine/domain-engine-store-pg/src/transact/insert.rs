@@ -120,7 +120,8 @@ impl<'a> TransactCtx<'a> {
                 self.select_inherent_struct_fields(
                     def,
                     analyzed.root_attrs.datatable,
-                    Some(&mut insert.returning),
+                    &mut insert.returning,
+                    None,
                 )?;
             }
             _ => {

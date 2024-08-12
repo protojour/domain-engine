@@ -14,7 +14,7 @@ pub trait SqlRecordIterator<'b> {
 }
 
 pub struct SqlRecord<'b> {
-    field_count: i32,
+    field_count: usize,
     buf: &'b [u8],
 }
 
@@ -25,6 +25,10 @@ impl<'b> SqlRecord<'b> {
         let field_count = read_record_field_count(&mut buf)?;
 
         Ok(SqlRecord { field_count, buf })
+    }
+
+    pub fn field_count(&self) -> usize {
+        self.field_count
     }
 
     pub fn def_key(&self) -> CodecResult<PgRegKey> {
@@ -65,14 +69,14 @@ impl<'b> SqlRecordIterator<'b> for RecordFields<'b> {
     }
 }
 
-fn read_record_field_count(buf: &mut &[u8]) -> CodecResult<i32> {
+fn read_record_field_count(buf: &mut &[u8]) -> CodecResult<usize> {
     let field_count = buf
         .read_i32::<BigEndian>()
         .map_err(|err| CodecError(err.into()))?;
     if field_count < 0 {
         return Err(CodecError("invalid field count".into()));
     }
-    Ok(field_count)
+    Ok(field_count as usize)
 }
 
 fn decode_record_field<'b>(buf: &mut &'b [u8], layout: &Layout) -> CodecResult<SqlVal<'b>> {

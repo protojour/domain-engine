@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use domain_engine_core::DomainResult;
 use ontol_runtime::{
     ontology::domain::EdgeInfo,
@@ -10,10 +8,9 @@ use ontol_runtime::{
 use tracing::debug;
 
 use crate::{
-    ds_bad_req,
+    ds_bad_req, ds_err,
     pg_model::{PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgTable},
     sql,
-    sql_value::Layout,
 };
 
 use super::{query::QueryBuildCtx, TransactCtx};
@@ -55,16 +52,7 @@ pub struct PgEdgeProjection<'a> {
 
 #[derive(Default)]
 pub struct EdgeUnionSelectBuilder<'d> {
-    pub edge_layout: BTreeMap<CardinalIdx, Layout>,
     pub union_exprs: Vec<sql::Expr<'d>>,
-}
-
-impl<'d> EdgeUnionSelectBuilder<'d> {
-    pub fn set_dyn_record_layout(&mut self, cardinal_idx: CardinalIdx) {
-        self.edge_layout
-            .entry(cardinal_idx)
-            .or_insert_with(|| Layout::Record);
-    }
 }
 
 #[derive(Default)]
@@ -133,8 +121,6 @@ impl<'a> TransactCtx<'a> {
                         ctx,
                     );
                 }
-
-                union_builder.set_dyn_record_layout(cardinal_idx);
 
                 match select {
                     CardinalSelect::Leaf => {
@@ -227,9 +213,37 @@ impl<'a> TransactCtx<'a> {
                 }
             }
             PgEdgeCardinalKind::Parameters(_) => {
-                union_builder.set_dyn_record_layout(cardinal_idx);
+                let edge_cardinal = pg_proj
+                    .edge_info
+                    .cardinals
+                    .get(cardinal_idx.0 as usize)
+                    .ok_or_else(|| ds_err("no edge cardinal for parameters"))?;
 
-                todo!("parameters");
+                let params_def_id = *edge_cardinal
+                    .target
+                    .iter()
+                    .next()
+                    .ok_or_else(|| ds_err("no target for edge cardinal"))?;
+                let params_def = self.ontology.def(params_def_id);
+
+                let mut sql_expressions = vec![];
+                self.select_inherent_struct_fields(
+                    params_def,
+                    pg_proj.pg_edge.table,
+                    &mut sql_expressions,
+                    Some(pg_proj.edge_alias),
+                )?;
+
+                return self.sql_select_edge_cardinals(
+                    next_cardinal_idx(cardinal_idx),
+                    pg_proj,
+                    select,
+                    variant_builder.append(EdgeUnionCardinalVariantSelect::Parameters {
+                        expr: sql::Expr::arc(sql::Expr::Row(sql_expressions)),
+                    }),
+                    union_builder,
+                    ctx,
+                );
             }
         }
 
@@ -266,7 +280,9 @@ impl<'a> TransactCtx<'a> {
                     }));
                     where_conjunctions.extend(where_condition);
                 }
-                EdgeUnionCardinalVariantSelect::Parameters { .. } => {}
+                EdgeUnionCardinalVariantSelect::Parameters { expr } => {
+                    row_tuple.push(expr);
+                }
             }
         }
 
