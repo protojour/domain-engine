@@ -20,8 +20,8 @@ use crate::{
     ds_bad_req, ds_err,
     pg_model::{PgDef, PgDomainTable, PgType},
     sql,
-    sql_record::{RowDecodeIterator, SqlDynRecord},
-    sql_value::{domain_codec_error, CodecResult, Layout, SqlVal},
+    sql_record::{SqlColumnStream, SqlRecord, SqlRecordIterator},
+    sql_value::{Layout, SqlVal},
 };
 
 use super::{
@@ -99,7 +99,7 @@ impl<'a> TransactCtx<'a> {
             }
 
             let (from, _alias, tail_expressions) =
-                self.sql_select_expressions(def_id, &struct_select, pg, &mut row_layout, &mut ctx)?;
+                self.sql_select_expressions(def_id, &struct_select, pg, &mut ctx)?;
             expressions.items.extend(tail_expressions);
 
             sql::Select {
@@ -139,11 +139,14 @@ impl<'a> TransactCtx<'a> {
 
             for await row_result in row_stream {
                 let row = row_result.map_err(|_| ds_err("unable to fetch row"))?;
-                let mut row_iter = RowDecodeIterator::new(&row, &row_layout);
+                let mut row_iter = SqlColumnStream::new(&row);
 
                 if include_total_len {
                     // must read this for every row if include_total_len was true
-                    total_len = Some(row_iter.next().unwrap().map_err(domain_codec_error)?.into_i64()? as usize);
+                    total_len = Some(
+                        row_iter
+                            .next_field(&Layout::Scalar(PgType::BigInt))?.into_i64()? as usize
+                    );
                 }
 
                 if observed_rows < limit {
@@ -184,13 +187,12 @@ impl<'a> TransactCtx<'a> {
         def_id: DefId,
         struct_select: &StructSelect,
         pg: PgDomainTable<'a>,
-        layout: &mut Vec<Layout>,
         ctx: &mut QueryBuildCtx<'a>,
     ) -> DomainResult<(sql::FromItem<'a>, sql::Alias, Vec<sql::Expr<'a>>)> {
         let def = self.ontology.def(def_id);
 
         // select data properties
-        let data_alias = self.select_inherent_fields_as_alias(def, pg, layout, ctx)?;
+        let data_alias = self.select_inherent_fields_as_alias(def, pg, ctx)?;
         let mut sql_expressions = vec![sql::Expr::path2(data_alias, sql::PathSegment::Asterisk)];
 
         // select edges
@@ -231,9 +233,6 @@ impl<'a> TransactCtx<'a> {
                 ctx,
             )?;
 
-            let edge_tuple_layout =
-                Layout::Record(union_builder.edge_layout.into_values().collect());
-
             let mut union_iter = union_builder.union_exprs.into_iter();
 
             if let Some(mut union_expr) = union_iter.next() {
@@ -256,11 +255,9 @@ impl<'a> TransactCtx<'a> {
                                 offset: None,
                             },
                         )));
-                        layout.push(edge_tuple_layout);
                     }
                     ValueCardinality::IndexSet | ValueCardinality::List => {
                         sql_expressions.push(sql::Expr::array(union_expr));
-                        layout.push(Layout::Array(Box::new(edge_tuple_layout)));
                     }
                 }
             }
@@ -277,17 +274,9 @@ impl<'a> TransactCtx<'a> {
         &self,
         def: &Def,
         pg: PgDomainTable<'a>,
-        layout: &mut Vec<Layout>,
         ctx: &mut QueryBuildCtx<'a>,
     ) -> DomainResult<sql::Alias> {
-        layout.extend([
-            Layout::Scalar(PgType::Integer),
-            Layout::Scalar(PgType::BigInt),
-        ]);
-
         if let Some(with_alias) = ctx.with_def_aliases.get(&def.id) {
-            // still need to fetch layout
-            self.select_inherent_struct_fields(def, pg.table, None, layout)?;
             Ok(*with_alias)
         } else {
             let with_alias = ctx.alias.incr();
@@ -304,12 +293,7 @@ impl<'a> TransactCtx<'a> {
                 multiline: false,
             };
 
-            self.select_inherent_struct_fields(
-                def,
-                pg.table,
-                Some(&mut expressions.items),
-                layout,
-            )?;
+            self.select_inherent_struct_fields(def, pg.table, Some(&mut expressions.items))?;
 
             ctx.with_queries.push(sql::WithQuery {
                 name: sql::Name::Alias(with_alias),
@@ -329,18 +313,20 @@ impl<'a> TransactCtx<'a> {
 
     fn read_struct_row_value<'b>(
         &self,
-        mut row: impl Iterator<Item = CodecResult<SqlVal<'b>>>,
+        mut iterator: impl SqlRecordIterator<'b>,
         def: &Def,
         select_properties: &FnvHashMap<RelId, Select>,
     ) -> DomainResult<RowValue> {
         let mut attrs: FnvHashMap<RelId, Attr> =
             FnvHashMap::with_capacity_and_hasher(def.data_relationships.len(), Default::default());
 
-        let _def_key = SqlVal::next_column(&mut row)?.into_i32()?;
-        let data_key = SqlVal::next_column(&mut row)?.into_i64()?;
+        let _def_key = iterator.next_field(&Layout::Scalar(PgType::Integer))?;
+        let data_key = iterator
+            .next_field(&Layout::Scalar(PgType::BigInt))?
+            .into_i64()?;
 
         // retrieve data properties
-        self.read_inherent_struct_fields(def, &mut row, &mut attrs)?;
+        self.read_inherent_struct_fields(def, &mut iterator, &mut attrs)?;
 
         // retrieve edges
         for (rel_id, select) in select_properties {
@@ -351,29 +337,23 @@ impl<'a> TransactCtx<'a> {
                 continue;
             };
 
-            let sql_val = SqlVal::next_column(&mut row)?;
-
             match rel_info.cardinality.1 {
                 ValueCardinality::Unit => {
-                    let sql_edge_tuple = sql_val.into_record()?;
+                    let sql_edge_tuple = iterator.next_field(&Layout::Record)?.into_record()?;
 
-                    if let Some(sql_field) = sql_edge_tuple.fields().nth(0) {
-                        let sql_field = sql_field.map_err(domain_codec_error)?;
-                        let value = self.read_dyn_record(sql_field, select)?;
-                        attrs.insert(*rel_id, Attr::Unit(value));
-                    }
+                    let sql_field = sql_edge_tuple.fields().next_field(&Layout::Record)?;
+                    let value = self.read_dyn_record(sql_field, select)?;
+                    attrs.insert(*rel_id, Attr::Unit(value));
                 }
                 ValueCardinality::IndexSet | ValueCardinality::List => {
+                    let sql_array = iterator.next_field(&Layout::Array)?.into_array()?;
+
                     let mut matrix = AttrMatrix::default();
                     matrix.columns.push(Default::default());
 
-                    for result in sql_val.into_array()?.elements() {
-                        let sql_edge_tuple = result.map_err(domain_codec_error)?.into_record()?;
-                        let sql_field = sql_edge_tuple
-                            .fields()
-                            .nth(0)
-                            .unwrap()
-                            .map_err(domain_codec_error)?;
+                    for result in sql_array.elements(&Layout::Record) {
+                        let sql_edge_tuple = result?.into_record()?;
+                        let sql_field = sql_edge_tuple.fields().next_field(&Layout::Record)?;
                         let value = self.read_dyn_record(sql_field, select)?;
                         matrix.columns[0].push(value);
                     }
@@ -394,8 +374,8 @@ impl<'a> TransactCtx<'a> {
     }
 
     fn read_dyn_record(&self, sql_val: SqlVal, select: &Select) -> DomainResult<Value> {
-        let sql_dyn_record = sql_val.into_dyn_record()?;
-        let def_key = sql_dyn_record.def_key().map_err(domain_codec_error)?;
+        let sql_dyn_record = sql_val.into_record()?;
+        let def_key = sql_dyn_record.def_key()?;
         let (_pkg_id, def_id) = self.pg_model.datatable_key_by_def_key(def_key)?;
         let pg_def = self.lookup_def(def_id)?;
 
@@ -406,15 +386,9 @@ impl<'a> TransactCtx<'a> {
                 };
 
                 let pg_id = pg_def.pg.table.field(&entity.id_relationship_id)?;
-                let layout = [
-                    Layout::Scalar(PgType::Integer),
-                    Layout::Scalar(pg_id.pg_type),
-                ];
-                let sql_field = sql_dyn_record
-                    .fields(layout.iter())
-                    .nth(1)
-                    .ok_or_else(|| ds_err("no fields"))?
-                    .unwrap();
+                let mut fields = sql_dyn_record.fields();
+                fields.next_field(&Layout::Scalar(PgType::Integer))?;
+                let sql_field = fields.next_field(&Layout::Scalar(pg_id.pg_type))?;
 
                 self.deserialize_sql(entity.id_value_def_id, sql_field)
             }
@@ -446,30 +420,14 @@ impl<'a> TransactCtx<'a> {
         }
     }
 
-    fn read_dyn_struct<'b>(
+    fn read_dyn_struct(
         &self,
         pg_def: PgDef,
-        sql_dyn_record: SqlDynRecord<'b>,
+        sql_dyn_record: SqlRecord,
         select_properties: &FnvHashMap<RelId, Select>,
     ) -> DomainResult<Value> {
-        // TODO: Don't re-build this every time?
-        // can be stored together with the PgTable since the order is fixed for one Ontology
-        let mut inherent_layout = vec![
-            Layout::Scalar(PgType::Integer),
-            Layout::Scalar(PgType::BigInt),
-        ];
-        self.select_inherent_struct_fields(
-            pg_def.def,
-            pg_def.pg.table,
-            None,
-            &mut inherent_layout,
-        )?;
-
-        let row_value = self.read_struct_row_value(
-            sql_dyn_record.fields(inherent_layout.iter()),
-            pg_def.def,
-            select_properties,
-        )?;
+        let row_value =
+            self.read_struct_row_value(sql_dyn_record.fields(), pg_def.def, select_properties)?;
 
         Ok(row_value.value)
     }

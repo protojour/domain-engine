@@ -10,7 +10,8 @@ use crate::{
     ds_err,
     pg_model::{PgTable, PgType},
     sql,
-    sql_value::{CodecResult, Layout, SqlVal},
+    sql_record::SqlRecordIterator,
+    sql_value::Layout,
 };
 
 use super::TransactCtx;
@@ -22,28 +23,15 @@ impl<'a> TransactCtx<'a> {
         def: &Def,
         pg_datatable: &'a PgTable,
         mut sql_expressions: Option<&mut Vec<sql::Expr<'a>>>,
-        layout: &mut Vec<Layout>,
     ) -> DomainResult<()> {
         for (rel_id, rel) in &def.data_relationships {
             match &rel.kind {
                 DataRelationshipKind::Id | DataRelationshipKind::Tree => {
                     let data_field = pg_datatable.data_fields.get(&rel_id.tag()).unwrap();
 
-                    let target_det_id = match rel.target {
-                        DataRelationshipTarget::Unambiguous(def_id) => def_id,
-                        DataRelationshipTarget::Union(_) => {
-                            return Err(ds_err("union doesn't work here"));
-                        }
-                    };
-
                     if let Some(output) = sql_expressions.as_mut() {
                         output.push(sql::Expr::path1(data_field.col_name.as_ref()));
                     }
-                    layout.push(
-                        PgType::from_def_id(target_det_id, self.ontology)?
-                            .map(Layout::Scalar)
-                            .unwrap_or(Layout::Ignore),
-                    );
                 }
                 DataRelationshipKind::Edge(_) => {}
             }
@@ -56,13 +44,26 @@ impl<'a> TransactCtx<'a> {
     pub fn read_inherent_struct_fields<'b>(
         &self,
         def: &Def,
-        row: &mut impl Iterator<Item = CodecResult<SqlVal<'b>>>,
+        record_iter: &mut impl SqlRecordIterator<'b>,
         attrs: &mut FnvHashMap<RelId, Attr>,
     ) -> DomainResult<()> {
         for (rel_id, rel) in &def.data_relationships {
             match &rel.kind {
                 DataRelationshipKind::Id | DataRelationshipKind::Tree => {
-                    let sql_val = SqlVal::next_column(row)?;
+                    // TODO: Might be able to cache this,
+                    // but is it worth it?
+                    let target_def_id = match rel.target {
+                        DataRelationshipTarget::Unambiguous(def_id) => def_id,
+                        DataRelationshipTarget::Union(_) => {
+                            return Err(ds_err("union doesn't work here"));
+                        }
+                    };
+
+                    let sql_val = record_iter.next_field(
+                        &PgType::from_def_id(target_def_id, self.ontology)?
+                            .map(Layout::Scalar)
+                            .unwrap_or(Layout::Ignore),
+                    )?;
 
                     if let Some(sql_val) = sql_val.null_filter() {
                         match rel.target {

@@ -5,13 +5,25 @@ use domain_engine_core::{DomainError, DomainResult};
 use fallible_iterator::FallibleIterator;
 use postgres_types::{FromSql, ToSql, Type};
 
-use crate::{
-    ds_err,
-    pg_model::PgType,
-    sql_record::{SqlDynRecord, SqlRecord},
-};
+use crate::{ds_err, pg_model::PgType, sql_record::SqlRecord};
 
-pub type CodecResult<T> = Result<T, Box<dyn std::error::Error + Sync + Send>>;
+type BoxError = Box<dyn std::error::Error + Sync + Send>;
+
+pub struct CodecError(pub BoxError);
+
+impl From<Box<dyn std::error::Error + Sync + Send>> for CodecError {
+    fn from(value: Box<dyn std::error::Error + Sync + Send>) -> Self {
+        Self(value)
+    }
+}
+
+impl From<CodecError> for DomainError {
+    fn from(value: CodecError) -> Self {
+        ds_err(format!("codec error: {:?}", value.0))
+    }
+}
+
+pub type CodecResult<T> = Result<T, CodecError>;
 
 mod wellknown_oid {
     pub const TIMESTAMPTZ: u32 = 1184;
@@ -31,7 +43,6 @@ pub enum SqlVal<'b> {
     Time(chrono::NaiveTime),
     Array(SqlArray<'b>),
     Record(SqlRecord<'b>),
-    DynRecord(SqlDynRecord<'b>),
 }
 
 /// Layout of Sql data
@@ -39,13 +50,8 @@ pub enum SqlVal<'b> {
 pub enum Layout {
     Ignore,
     Scalar(PgType),
-    Array(Box<Layout>),
-    Record(Vec<Layout>),
-    DynRecord,
-}
-
-pub fn domain_codec_error(error: Box<dyn std::error::Error + Sync + Send>) -> DomainError {
-    ds_err(format!("codec error: {error:?}"))
+    Array,
+    Record,
 }
 
 impl<'b> SqlVal<'b> {
@@ -91,24 +97,17 @@ impl<'b> SqlVal<'b> {
         }
     }
 
-    pub fn into_dyn_record(self) -> DomainResult<SqlDynRecord<'b>> {
-        match self {
-            Self::DynRecord(record) => Ok(record),
-            _ => Err(ds_err("expected dyn record")),
-        }
-    }
-
     pub fn next_column(
         iter: &mut impl Iterator<Item = CodecResult<SqlVal<'b>>>,
     ) -> DomainResult<SqlVal<'b>> {
         match iter.next() {
-            Some(result) => result.map_err(domain_codec_error),
+            Some(result) => Ok(result?),
             None => panic!("too few columns"),
             // None => Err(ds_err("too few columns")),
         }
     }
 
-    pub(crate) fn decode(buf: Option<&'b [u8]>, layout: &'b Layout) -> CodecResult<Self> {
+    pub(crate) fn decode(buf: Option<&'b [u8]>, layout: &Layout) -> CodecResult<Self> {
         let Some(raw) = buf else {
             return Ok(Self::Null);
         };
@@ -141,21 +140,15 @@ impl<'b> SqlVal<'b> {
                 &Type::from_oid(wellknown_oid::TIMESTAMPTZ).unwrap(),
                 raw,
             )?)),
-            Layout::Array(element_layout) => {
+            Layout::Array => {
                 let array = postgres_protocol::types::array_from_sql(raw)?;
                 if array.dimensions().count()? > 1 {
-                    return Err("array contains too many dimensions".into());
+                    return Err(CodecError("array contains too many dimensions".into()));
                 }
 
-                Ok(Self::Array(SqlArray {
-                    inner: array,
-                    element_layout,
-                }))
+                Ok(Self::Array(SqlArray { inner: array }))
             }
-            Layout::Record(field_layouts) => {
-                Ok(Self::Record(SqlRecord::from_sql(raw, field_layouts)?))
-            }
-            Layout::DynRecord => Ok(Self::DynRecord(SqlDynRecord::from_sql(raw)?)),
+            Layout::Record => Ok(Self::Record(SqlRecord::from_sql(raw)?)),
         }
     }
 }
@@ -165,7 +158,7 @@ impl<'b> ToSql for SqlVal<'b> {
         &self,
         ty: &tokio_postgres::types::Type,
         out: &mut BytesMut,
-    ) -> CodecResult<tokio_postgres::types::IsNull>
+    ) -> Result<tokio_postgres::types::IsNull, BoxError>
     where
         Self: Sized,
     {
@@ -179,9 +172,7 @@ impl<'b> ToSql for SqlVal<'b> {
             Self::DateTime(dt) => dt.to_sql(ty, out),
             Self::Date(d) => d.to_sql(ty, out),
             Self::Time(t) => t.to_sql(ty, out),
-            Self::Array(_) | Self::Record(_) | Self::DynRecord(_) => {
-                Err("cannot convert output values to SQL".into())
-            }
+            Self::Array(_) | Self::Record(_) => Err("cannot convert output values to SQL".into()),
         }
     }
 
@@ -196,7 +187,7 @@ impl<'b> ToSql for SqlVal<'b> {
         &self,
         ty: &tokio_postgres::types::Type,
         out: &mut BytesMut,
-    ) -> CodecResult<tokio_postgres::types::IsNull> {
+    ) -> Result<tokio_postgres::types::IsNull, BoxError> {
         match &self {
             Self::Unit | Self::Null => Option::<i32>::None.to_sql_checked(ty, out),
             Self::I32(i) => i.to_sql_checked(ty, out),
@@ -207,21 +198,23 @@ impl<'b> ToSql for SqlVal<'b> {
             Self::DateTime(dt) => dt.to_sql_checked(ty, out),
             Self::Date(d) => d.to_sql_checked(ty, out),
             Self::Time(t) => t.to_sql_checked(ty, out),
-            Self::Array(_) | Self::Record(_) | Self::DynRecord(_) => {
-                Err("cannot convert output values to SQL".into())
-            }
+            Self::Array(_) | Self::Record(_) => Err("cannot convert output values to SQL".into()),
         }
     }
 }
 
 pub struct SqlArray<'b> {
     inner: postgres_protocol::types::Array<'b>,
-    element_layout: &'b Layout,
 }
 
 impl<'b> SqlArray<'b> {
-    pub fn elements(&self) -> impl Iterator<Item = CodecResult<SqlVal<'b>>> {
-        let element_layout = self.element_layout;
+    pub fn elements<'l>(
+        &self,
+        element_layout: &'l Layout,
+    ) -> impl Iterator<Item = CodecResult<SqlVal<'b>>> + 'l
+    where
+        'b: 'l,
+    {
         self.inner
             .values()
             .iterator()

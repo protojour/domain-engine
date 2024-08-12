@@ -24,7 +24,7 @@ use crate::{
     ds_bad_req, ds_err,
     pg_model::{InDomain, PgDataKey, PgDomain, PgEdgeCardinalKind, PgTable, PgType},
     sql::{self, TableName},
-    sql_record::RowDecodeIterator,
+    sql_record::{SqlColumnStream, SqlRecordIterator},
     sql_value::{Layout, SqlVal},
     transact::data::Data,
 };
@@ -121,7 +121,6 @@ impl<'a> TransactCtx<'a> {
                     def,
                     analyzed.root_attrs.datatable,
                     Some(&mut insert.returning),
-                    &mut layout,
                 )?;
             }
             _ => {
@@ -165,8 +164,10 @@ impl<'a> TransactCtx<'a> {
             row
         };
 
-        let mut row = RowDecodeIterator::new(&row, &layout);
-        let data_key = SqlVal::next_column(&mut row)?.into_i64()?;
+        let mut row = SqlColumnStream::new(&row);
+        let data_key = row
+            .next_field(&Layout::Scalar(PgType::BigInt))?
+            .into_i64()?;
 
         self.write_edges(
             pg_domain,
@@ -178,7 +179,7 @@ impl<'a> TransactCtx<'a> {
 
         match select {
             Select::EntityId => {
-                let sql_val = SqlVal::next_column(&mut row)?.non_null()?;
+                let sql_val = row.next_field(&layout[1])?.non_null()?;
 
                 trace!("deserialized entity ID: {sql_val:?}");
                 Ok(RowValue {

@@ -248,14 +248,14 @@ impl<'d> Display for Select<'d> {
 impl<'d> Display for Expressions<'d> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.multiline {
-            write!(f, "{}\n", self.items.iter().format(",\n"))
+            writeln!(f, "{}", self.items.iter().format(",\n"))
         } else {
             write!(f, "{}", self.items.iter().format(","))
         }
     }
 }
 
-impl<'d> Display for Limit {
+impl Display for Limit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(limit) = self.limit {
             write!(f, " LIMIT {limit}")?;

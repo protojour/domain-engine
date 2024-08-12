@@ -92,7 +92,7 @@ impl<'a> TransactCtx<'a> {
                 (SqlVal::DateTime(dt), _) => Ok(Value::ChronoDateTime(dt, tag)),
                 (SqlVal::Date(d), _) => Ok(Value::ChronoDate(d, tag)),
                 (SqlVal::Time(t), _) => Ok(Value::ChronoTime(t, tag)),
-                (SqlVal::Array(_) | SqlVal::Record(_) | SqlVal::DynRecord(_), _) => {
+                (SqlVal::Array(_) | SqlVal::Record(_), _) => {
                     Err(ds_err("cannot turn a composite into a value"))
                 }
             },

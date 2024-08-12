@@ -11,7 +11,7 @@ use tracing::debug;
 
 use crate::{
     ds_bad_req,
-    pg_model::{PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgTable, PgType},
+    pg_model::{PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgTable},
     sql,
     sql_value::Layout,
 };
@@ -63,7 +63,7 @@ impl<'d> EdgeUnionSelectBuilder<'d> {
     pub fn set_dyn_record_layout(&mut self, cardinal_idx: CardinalIdx) {
         self.edge_layout
             .entry(cardinal_idx)
-            .or_insert_with(|| Layout::DynRecord);
+            .or_insert_with(|| Layout::Record);
     }
 }
 
@@ -119,8 +119,6 @@ impl<'a> TransactCtx<'a> {
         );
         */
 
-        let mut sub_layout: Vec<Layout> = vec![];
-
         match &pg_cardinal.kind {
             PgEdgeCardinalKind::Dynamic { .. } | PgEdgeCardinalKind::Unique { .. } => {
                 // potentially skip cardinal
@@ -160,8 +158,6 @@ impl<'a> TransactCtx<'a> {
                         let pg_id = pg_def.pg.table.field(&target_entity.id_relationship_id)?;
                         let leaf_alias = ctx.alias.incr();
 
-                        sub_layout.push(Layout::Scalar(PgType::Integer));
-                        sub_layout.push(Layout::Scalar(pg_id.pg_type));
                         self.sql_select_edge_cardinals(
                             next_cardinal_idx(cardinal_idx),
                             pg_proj,
@@ -201,7 +197,6 @@ impl<'a> TransactCtx<'a> {
                                 target_def_id,
                                 struct_select,
                                 pg_def.pg,
-                                &mut sub_layout,
                                 ctx,
                             )?;
                             self.sql_select_edge_cardinals(
