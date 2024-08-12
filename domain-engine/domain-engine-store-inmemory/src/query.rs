@@ -181,27 +181,18 @@ impl InMemoryStore {
                 continue;
             };
 
-            let matrix = self.sub_query_edge(projection, subselect, vertex_key, ctx)?;
-
             match data_relationship.cardinality.1 {
                 ValueCardinality::Unit => {
+                    let matrix =
+                        self.sub_query_edge(projection, subselect, vertex_key, false, ctx)?;
                     if let Some(row) = matrix.into_rows().next() {
                         properties.insert(*rel_id, row.into());
                     }
                 }
                 ValueCardinality::IndexSet | ValueCardinality::List => {
-                    properties.insert(
-                        *rel_id,
-                        Attr::Matrix(matrix),
-                        // Value::Sequence(
-                        //     Sequence::from_iter(attrs),
-                        //     match data_relationship.target {
-                        //         DataRelationshipTarget::Unambiguous(def_id) => def_id,
-                        //         DataRelationshipTarget::Union(union_def_id) => union_def_id,
-                        //     },
-                        // )
-                        // .into(),
-                    );
+                    let matrix =
+                        self.sub_query_edge(projection, subselect, vertex_key, true, ctx)?;
+                    properties.insert(*rel_id, Attr::Matrix(matrix));
                 }
             }
         }
@@ -214,6 +205,7 @@ impl InMemoryStore {
         projection: EdgeCardinalProjection,
         select: &Select,
         parent_key: VertexKey<&DynamicKey>,
+        include_null: bool,
         ctx: &DbContext,
     ) -> DomainResult<AttrMatrix> {
         let edge_store = self.edges.get(&projection.id).expect("No edge store");
@@ -257,10 +249,18 @@ impl InMemoryStore {
                     ctx,
                 )?;
 
-                out.columns[0].push(entity);
+                if let Some(entity) = entity {
+                    out.columns[0].push(entity);
 
-                if let Some(value_vector) = value_vector {
-                    out.columns[1].push(value_vector[edge_idx].clone());
+                    if let Some(value_vector) = value_vector {
+                        out.columns[1].push(value_vector[edge_idx].clone());
+                    }
+                } else if include_null {
+                    out.columns[0].push(Value::Void(DefId::unit().into()));
+
+                    if value_vector.is_some() {
+                        out.columns[1].push(Value::Void(DefId::unit().into()));
+                    }
                 }
             }
         }
@@ -273,7 +273,7 @@ impl InMemoryStore {
         vertex_key: VertexKey<&DynamicKey>,
         select: &Select,
         ctx: &DbContext,
-    ) -> DomainResult<Value> {
+    ) -> DomainResult<Option<Value>> {
         if let Select::Struct(struct_select) = select {
             // sanity check
             if !self.vertices.contains_key(&struct_select.def_id) {
@@ -301,56 +301,63 @@ impl InMemoryStore {
             Select::Leaf => {
                 // Entity leaf only includes the ID of that entity, not its other fields
                 let id_attr = properties.get(&entity.id_relationship_id).unwrap();
-                Ok(id_attr.as_unit().unwrap().clone())
+                Ok(Some(id_attr.as_unit().unwrap().clone()))
             }
-            Select::Struct(struct_select) => self.apply_struct_select(
+            Select::Struct(struct_select) => Some(self.apply_struct_select(
                 def,
                 vertex_key,
                 properties.clone(),
                 vertex_key.type_def_id,
                 &struct_select.properties,
                 ctx,
-            ),
+            ))
+            .transpose(),
             Select::StructUnion(_, variant_selects) => {
                 for variant_select in variant_selects {
                     if variant_select.def_id == def.id {
-                        return self.apply_struct_select(
+                        return Some(self.apply_struct_select(
                             def,
                             vertex_key,
                             properties.clone(),
                             vertex_key.type_def_id,
                             &variant_select.properties,
                             ctx,
-                        );
+                        ))
+                        .transpose();
                     }
                 }
 
-                Ok(Value::Struct(Box::new(properties.clone()), def.id.into()))
+                Ok(None)
             }
             Select::EntityId => Err(DomainError::data_store("entity id")),
             Select::Entity(entity_select) => match &entity_select.source {
-                StructOrUnionSelect::Struct(struct_select) => self.apply_struct_select(
-                    def,
-                    vertex_key,
-                    properties.clone(),
-                    struct_select.def_id,
-                    &struct_select.properties,
-                    ctx,
-                ),
-                StructOrUnionSelect::Union(_, candidates) => {
-                    let struct_select = candidates
-                        .iter()
-                        .find(|struct_select| struct_select.def_id == vertex_key.type_def_id)
-                        .expect("Union variant not found");
-
-                    self.apply_struct_select(
+                StructOrUnionSelect::Struct(struct_select) => {
+                    let value = self.apply_struct_select(
                         def,
                         vertex_key,
                         properties.clone(),
                         struct_select.def_id,
                         &struct_select.properties,
                         ctx,
-                    )
+                    )?;
+                    Ok(Some(value))
+                }
+                StructOrUnionSelect::Union(_, candidates) => {
+                    for variant_select in candidates {
+                        if variant_select.def_id == def.id {
+                            return Some(self.apply_struct_select(
+                                def,
+                                vertex_key,
+                                properties.clone(),
+                                vertex_key.type_def_id,
+                                &variant_select.properties,
+                                ctx,
+                            ))
+                            .transpose();
+                        }
+                    }
+
+                    Ok(None)
                 }
             },
         }

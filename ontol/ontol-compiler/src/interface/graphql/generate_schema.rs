@@ -110,7 +110,7 @@ pub fn generate_graphql_schema<'c>(
         if def.operator_addr.is_some() {
             trace!("adapt def `{name:?}`", name = def.name());
 
-            let type_ref = builder.get_def_type_ref(def.id, QLevel::Node);
+            let type_ref = builder.gen_def_type_ref(def.id, QLevel::Node);
 
             if let Some(entity_data) = entity_check(builder.schema, type_ref) {
                 builder.add_entity_queries_and_mutations(entity_data, &mut mutation_fields);

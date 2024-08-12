@@ -50,7 +50,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             QLevel::Node => self.make_node_type(def_id),
             QLevel::Edge { rel_params } => {
                 let def = self.partial_ontology.def(def_id);
-                let node_ref = self.get_def_type_ref(def_id, QLevel::Node);
+                let node_ref = self.gen_def_type_ref(def_id, QLevel::Node);
                 let node_type_addr = node_ref.unwrap_addr();
 
                 let mut field_namespace = GraphqlNamespace::default();
@@ -70,7 +70,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     self.serde_gen.gen_addr_lazy(gql_serde_key(def.id)).unwrap();
 
                 if let Some((rel_def_id, _operator_addr)) = rel_params {
-                    let rel_edge_ref = self.get_def_type_ref(rel_def_id, QLevel::Node);
+                    let rel_edge_ref = self.gen_def_type_ref(rel_def_id, QLevel::Node);
 
                     let typename = self.mk_typename(|namespace, ctx| {
                         namespace.edge(Some(rel_def_id), def_id, ctx)
@@ -121,8 +121,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 }
             }
             QLevel::Connection { rel_params } => {
-                let edge_ref = self.get_def_type_ref(def_id, QLevel::Edge { rel_params });
-                let node_ref = self.get_def_type_ref(def_id, QLevel::Node);
+                let edge_ref = self.gen_def_type_ref(def_id, QLevel::Edge { rel_params });
+                let node_ref = self.gen_def_type_ref(def_id, QLevel::Node);
                 let node_type_addr = node_ref.unwrap_addr();
 
                 let rel_params_def_id = rel_params.map(|(def_id, _)| def_id);
@@ -191,7 +191,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 )
             }
             QLevel::MutationResult => {
-                let node_ref = self.get_def_type_ref(def_id, QLevel::Node);
+                let node_ref = self.gen_def_type_ref(def_id, QLevel::Node);
 
                 NewType::TypeData(
                     TypeData {
@@ -295,7 +295,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                             needs_scalar = true;
                             break;
                         }
-                        _ => match self.get_def_type_ref(*variant_def_id, QLevel::Node) {
+                        _ => match self.gen_def_type_ref(*variant_def_id, QLevel::Node) {
                             UnitTypeRef::Addr(type_addr) => {
                                 type_variants.push(type_addr);
                             }
@@ -773,7 +773,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                             kind: NativeScalarKind::String,
                         })
                     } else if scalar_union == LeafDiscriminantScalarUnion::INT {
-                        self.get_def_type_ref(self.primitives.i64, QLevel::Node)
+                        self.gen_def_type_ref(self.primitives.i64, QLevel::Node)
                     } else {
                         UnitTypeRef::Addr(self.schema.json_scalar)
                     };
@@ -868,7 +868,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         };
 
         let field_data = if matches!(value_cardinality, ValueCardinality::Unit) {
-            let modifier = TypeModifier::new_unit(Optionality::from_optional(matches!(
+            let mut modifier = TypeModifier::new_unit(Optionality::from_optional(matches!(
                 prop_cardinality,
                 PropertyCardinality::Optional
             )));
@@ -902,7 +902,23 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     RelParams::IndexRange(_) => todo!(),
                 };
 
-                let unit = self.get_def_type_ref(value_def_id, qlevel);
+                let unit = self.gen_def_type_ref(value_def_id, qlevel);
+
+                // If the field is a union, it should be optional.
+                // The reason is that the client explicitly needs to select its variants,
+                // and when the runtime variant is not selected, NULL should be returned.
+                if let UnitTypeRef::Addr(addr) = &unit {
+                    if matches!(self.schema.type_data(*addr).kind, TypeKind::Union(_)) {
+                        match &mut modifier {
+                            TypeModifier::Unit(optionality) => {
+                                *optionality = Optionality::Optional;
+                            }
+                            TypeModifier::Array { element, .. } => {
+                                *element = Optionality::Optional;
+                            }
+                        }
+                    }
+                }
 
                 TypeRef { modifier, unit }
             };
@@ -924,7 +940,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     RelParams::IndexRange(_) => todo!(),
                 };
 
-                self.get_def_type_ref(value_def_id, QLevel::Connection { rel_params })
+                self.gen_def_type_ref(value_def_id, QLevel::Connection { rel_params })
             };
 
             FieldData::mandatory(
@@ -941,14 +957,14 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     .serde_gen
                     .gen_addr_lazy(gql_serde_key(rel_def_id))
                     .unwrap();
-                self.get_def_type_ref(
+                self.gen_def_type_ref(
                     value_def_id,
                     QLevel::Edge {
                         rel_params: Some((rel_def_id, rel_operator_addr)),
                     },
                 )
             } else {
-                self.get_def_type_ref(value_def_id, QLevel::Node)
+                self.gen_def_type_ref(value_def_id, QLevel::Node)
             };
 
             let value_operator_addr = self

@@ -219,7 +219,7 @@ async fn misc(ds: &str) {
         .exec([], &schema, &ctx)
         .await,
         // What happens is that the `awesomeproj` which has an Organzation owner that didn't get selected,
-        // just returns an empty object:
+        // just returns null:
         expected = Ok(graphql_value!({
             "repositories": {
                 "nodes": [
@@ -232,7 +232,7 @@ async fn misc(ds: &str) {
                     },
                     {
                         "handle": "awesomeproj",
-                        "owner": {}
+                        "owner": null
                     },
                 ]
             }

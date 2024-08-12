@@ -282,7 +282,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         );
     }
 
-    pub fn get_def_type_ref(&mut self, def_id: DefId, level: QLevel) -> UnitTypeRef {
+    pub fn gen_def_type_ref(&mut self, def_id: DefId, level: QLevel) -> UnitTypeRef {
         if let Some(type_addr) = self
             .schema
             .type_addr_by_def
@@ -385,7 +385,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 }
             }
             _ => {
-                let _unit_type_ref = self.get_def_type_ref(map_key.input.def_id, QLevel::Node);
+                let _unit_type_ref = self.gen_def_type_ref(map_key.input.def_id, QLevel::Node);
                 let mut hidden = false;
 
                 let default_arg = match self.serde_gen.get_operator(input_operator_addr) {
@@ -426,7 +426,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 })),
                 field_type: TypeRef {
                     modifier: TypeModifier::Unit(Optionality::Mandatory),
-                    unit: self.get_def_type_ref(
+                    unit: self.gen_def_type_ref(
                         map_key.output.def_id,
                         QLevel::Connection { rel_params: None },
                     ),
@@ -441,7 +441,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 })),
                 field_type: TypeRef {
                     modifier: TypeModifier::Unit(Optionality::Optional),
-                    unit: self.get_def_type_ref(map_key.output.def_id, QLevel::Node),
+                    unit: self.gen_def_type_ref(map_key.output.def_id, QLevel::Node),
                 },
             }
         };
@@ -457,12 +457,12 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         let def = self.partial_ontology.def(entity_data.node_def_id);
 
         let mutation_result_ref =
-            self.get_def_type_ref(entity_data.node_def_id, QLevel::MutationResult);
+            self.gen_def_type_ref(entity_data.node_def_id, QLevel::MutationResult);
 
         let mut mutation_namespace = GraphqlNamespace::default();
 
         // This is here for a reason
-        let _id_unit_type_ref = self.get_def_type_ref(entity_data.id_def_id, QLevel::Node);
+        let _id_unit_type_ref = self.gen_def_type_ref(entity_data.id_def_id, QLevel::Node);
 
         let entity_array_operator_addr = self
             .serde_gen

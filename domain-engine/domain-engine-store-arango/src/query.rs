@@ -312,13 +312,16 @@ impl<'a> AttrMut<'a> {
 }
 
 /// Apply Select to deserialized data from Arango
-pub fn apply_select(attr: AttrMut, select: &Select, ontology: &Ontology) -> DomainResult<()> {
+/// a false return value means the attribute should be deleted
+pub fn apply_select(attr: AttrMut, select: &Select, ontology: &Ontology) -> DomainResult<bool> {
     // debug!("attr {attr:#?} select {select:#?}");
 
     match (attr, select) {
         (AttrMut::Unit(Value::Sequence(seq, _)), select) => {
             for value in seq.elements_mut() {
-                apply_select(AttrMut::Unit(value), select, ontology)?;
+                if !apply_select(AttrMut::Unit(value), select, ontology)? {
+                    *value = Value::Void(DefId::unit().into());
+                }
             }
         }
         (AttrMut::Unit(val), Select::EntityId | Select::Leaf) => {
@@ -360,43 +363,21 @@ pub fn apply_select(attr: AttrMut, select: &Select, ontology: &Ontology) -> Doma
                     };
                     match &select {
                         Select::StructUnion(_, ref selects) => {
-                            match selects.iter().any(|s| s.def_id == def_id) {
-                                true => {
-                                    if let Some(attr) = attr_map.get_mut(rel_id) {
-                                        apply_select(AttrMut::from_attr(attr), select, ontology)?;
+                            if selects.iter().any(|s| s.def_id == def_id) {
+                                if let Some(attr) = attr_map.get_mut(rel_id) {
+                                    if !apply_select(AttrMut::from_attr(attr), select, ontology)? {
+                                        attr_map.remove(rel_id);
                                     }
                                 }
-                                false => {
-                                    if let Some(attr) = attr_map.get_mut(rel_id) {
-                                        if let Some(def) = ontology
-                                            .find_domain(def_id.package_id())
-                                            .unwrap()
-                                            .defs()
-                                            .find(|def| {
-                                                if let Some(entity) = def.entity() {
-                                                    entity.id_value_def_id == def_id
-                                                } else {
-                                                    false
-                                                }
-                                            })
-                                        {
-                                            match attr {
-                                                Attr::Unit(val) => {
-                                                    *val = Value::new_struct(
-                                                        HashMap::new(),
-                                                        def.id.into(),
-                                                    );
-                                                }
-                                                _ => todo!("other"),
-                                            }
-                                        }
-                                    }
-                                }
+                            } else {
+                                attr_map.remove(rel_id);
                             }
                         }
                         _ => {
                             if let Some(attr) = attr_map.get_mut(rel_id) {
-                                apply_select(AttrMut::from_attr(attr), select, ontology)?;
+                                if !apply_select(AttrMut::from_attr(attr), select, ontology)? {
+                                    attr_map.remove(rel_id);
+                                }
                             }
                         }
                     }
@@ -412,24 +393,31 @@ pub fn apply_select(attr: AttrMut, select: &Select, ontology: &Ontology) -> Doma
                 )?;
             }
             StructOrUnionSelect::Union(_, selects) => {
-                let struct_select = selects
+                if let Some(struct_select) = selects
                     .iter()
                     .find(|struct_select| struct_select.def_id == val.type_def_id())
-                    .expect("union variant not found");
-                apply_select(
-                    AttrMut::Unit(val),
-                    &Select::Struct(struct_select.clone()),
-                    ontology,
-                )?;
+                {
+                    apply_select(
+                        AttrMut::Unit(val),
+                        &Select::Struct(struct_select.clone()),
+                        ontology,
+                    )?;
+                } else {
+                    return Ok(false);
+                }
             }
         },
         (AttrMut::Unit(value), Select::StructUnion(_, selects)) => {
-            for struct_select in selects.iter() {
-                apply_select(
-                    AttrMut::Unit(value),
-                    &Select::Struct(struct_select.clone()),
-                    ontology,
-                )?;
+            if selects.iter().any(|sel| sel.def_id == value.type_def_id()) {
+                for struct_select in selects.iter() {
+                    apply_select(
+                        AttrMut::Unit(value),
+                        &Select::Struct(struct_select.clone()),
+                        ontology,
+                    )?;
+                }
+            } else {
+                return Ok(false);
             }
         }
         (AttrMut::Matrix(columns), select) => {
@@ -442,5 +430,5 @@ pub fn apply_select(attr: AttrMut, select: &Select, ontology: &Ontology) -> Doma
         (a, b) => todo!("{a:?} {b:?}"),
     }
 
-    Ok(())
+    Ok(true)
 }
