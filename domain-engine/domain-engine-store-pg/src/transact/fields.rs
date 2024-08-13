@@ -2,7 +2,8 @@ use domain_engine_core::DomainResult;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     attr::Attr,
-    ontology::domain::{DataRelationshipKind, DataRelationshipTarget, Def},
+    ontology::domain::{DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget, Def},
+    value::Value,
     RelId,
 };
 
@@ -50,34 +51,11 @@ impl<'a> TransactCtx<'a> {
         record_iter: &mut impl SqlRecordIterator<'b>,
         attrs: &mut FnvHashMap<RelId, Attr>,
     ) -> DomainResult<()> {
-        for (rel_id, rel) in &def.data_relationships {
-            match &rel.kind {
+        for (rel_id, rel_info) in &def.data_relationships {
+            match &rel_info.kind {
                 DataRelationshipKind::Id | DataRelationshipKind::Tree => {
-                    // TODO: Might be able to cache this,
-                    // but is it worth it?
-                    let target_def_id = match rel.target {
-                        DataRelationshipTarget::Unambiguous(def_id) => def_id,
-                        DataRelationshipTarget::Union(_) => {
-                            return Err(ds_err("union doesn't work here"));
-                        }
-                    };
-
-                    let sql_val = record_iter.next_field(
-                        &PgType::from_def_id(target_def_id, self.ontology)?
-                            .map(Layout::Scalar)
-                            .unwrap_or(Layout::Ignore),
-                    )?;
-
-                    if let Some(sql_val) = sql_val.null_filter() {
-                        match rel.target {
-                            DataRelationshipTarget::Unambiguous(def_id) => {
-                                attrs.insert(
-                                    *rel_id,
-                                    Attr::Unit(self.deserialize_sql(def_id, sql_val)?),
-                                );
-                            }
-                            DataRelationshipTarget::Union(_) => {}
-                        }
+                    if let Some(value) = self.read_field(rel_info, record_iter)? {
+                        attrs.insert(*rel_id, Attr::Unit(value));
                     }
                 }
                 DataRelationshipKind::Edge(_) => {}
@@ -85,5 +63,37 @@ impl<'a> TransactCtx<'a> {
         }
 
         Ok(())
+    }
+
+    pub fn read_field<'b>(
+        &self,
+        rel_info: &DataRelationshipInfo,
+        record_iter: &mut impl SqlRecordIterator<'b>,
+    ) -> DomainResult<Option<Value>> {
+        // TODO: Might be able to cache this,
+        // but is it worth it?
+        let target_def_id = match rel_info.target {
+            DataRelationshipTarget::Unambiguous(def_id) => def_id,
+            DataRelationshipTarget::Union(_) => {
+                return Err(ds_err("union doesn't work here"));
+            }
+        };
+
+        let sql_val = record_iter.next_field(
+            &PgType::from_def_id(target_def_id, self.ontology)?
+                .map(Layout::Scalar)
+                .unwrap_or(Layout::Ignore),
+        )?;
+
+        if let Some(sql_val) = sql_val.null_filter() {
+            match rel_info.target {
+                DataRelationshipTarget::Unambiguous(def_id) => {
+                    Ok(Some(self.deserialize_sql(def_id, sql_val)?))
+                }
+                DataRelationshipTarget::Union(_) => Ok(None),
+            }
+        } else {
+            Ok(None)
+        }
     }
 }

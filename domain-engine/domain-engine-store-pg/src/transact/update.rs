@@ -4,7 +4,7 @@ use domain_engine_core::{
 use futures_util::{Stream, StreamExt, TryFutureExt, TryStreamExt};
 use ontol_runtime::{
     attr::Attr, ontology::domain::DataRelationshipKind, property::ValueCardinality,
-    query::select::Select, value::Value,
+    query::select::Select, value::Value, RelId,
 };
 use postgres_types::ToSql;
 use tracing::{debug, warn};
@@ -22,8 +22,14 @@ use super::{
     TransactCtx,
 };
 
+enum UpdateCondition {
+    FieldEq(RelId, Value),
+    #[allow(unused)]
+    PgKey(PgDataKey),
+}
+
 impl<'a> TransactCtx<'a> {
-    pub async fn update_vertex<'s>(
+    pub async fn update_vertex_with_select<'s>(
         &'s self,
         value: InDomain<Value>,
         select: &'s Select,
@@ -37,27 +43,69 @@ impl<'a> TransactCtx<'a> {
 
         let entity_id = find_inherent_entity_id(&value, self.ontology)?
             .ok_or_else(|| DomainErrorKind::EntityNotFound.into_error())?;
+
+        let key = self
+            .update_datatable(
+                value,
+                UpdateCondition::FieldEq(entity.id_relationship_id, entity_id),
+            )
+            .await?;
+
+        let query_select = match select {
+            Select::Struct(sel) => QuerySelect::Struct(&sel.properties),
+            Select::Leaf | Select::EntityId => QuerySelect::Field(entity.id_relationship_id),
+            _ => todo!(),
+        };
+
+        let row = collect_one_row_value(
+            self.query(def_id, false, 1, None, Some(key), query_select)
+                .await?,
+        )
+        .await?;
+
+        Ok(row.value)
+    }
+
+    async fn update_datatable<'s>(
+        &'s self,
+        value: InDomain<Value>,
+        update_condition: UpdateCondition,
+    ) -> DomainResult<PgDataKey> {
+        let def_id = value.type_def_id();
+        let def = self.ontology.def(def_id);
+
         let pg = self
             .pg_model
             .pg_domain_datatable(value.pkg_id, value.type_def_id())?;
-        let id_field = pg.table.field(&entity.id_relationship_id)?;
 
         let mut sql_update = sql::Update {
             with: None,
             table_name: pg.table_name(),
             set: vec![],
-            where_: Some(sql::Expr::eq(
-                sql::Expr::path1(id_field.col_name.as_ref()),
-                sql::Expr::param(0),
-            )),
+            where_: None,
             returning: vec![sql::Expr::path1("_key")],
         };
 
-        let Data::Sql(entity_id) = self.data_from_value(entity_id)? else {
-            return Err(ds_bad_req("id must be a scalar"));
-        };
+        let mut update_params: Vec<SqlVal> = vec![];
 
-        let mut update_params: Vec<SqlVal> = vec![entity_id];
+        match update_condition {
+            UpdateCondition::FieldEq(rel_id, value) => {
+                let pg_field = pg.table.field(&rel_id)?;
+                sql_update.where_ = Some(sql::Expr::eq(
+                    sql::Expr::path1(pg_field.col_name.as_ref()),
+                    sql::Expr::param(0),
+                ));
+                let Data::Sql(sql_value) = self.data_from_value(value)? else {
+                    return Err(ds_bad_req("id must be a scalar"));
+                };
+                update_params.push(sql_value);
+            }
+            UpdateCondition::PgKey(key) => {
+                sql_update.where_ =
+                    Some(sql::Expr::eq(sql::Expr::path1("_key"), sql::Expr::param(0)));
+                update_params.push(SqlVal::I64(key));
+            }
+        }
 
         let Value::Struct(data_struct, _) = value.value else {
             return Err(
@@ -133,19 +181,7 @@ impl<'a> TransactCtx<'a> {
             .await?;
 
         if rows.len() == 1 {
-            let key: PgDataKey = rows[0].get(0);
-            let query_select = match select {
-                Select::Struct(sel) => QuerySelect::Struct(sel),
-                _ => QuerySelect::EntityId,
-            };
-
-            let row = collect_one_row_value(
-                self.query(def_id, false, 1, None, Some(key), query_select)
-                    .await?,
-            )
-            .await?;
-
-            Ok(row.value)
+            Ok(rows[0].get(0))
         } else {
             Err(DomainErrorKind::EntityNotFound.into_error())
         }

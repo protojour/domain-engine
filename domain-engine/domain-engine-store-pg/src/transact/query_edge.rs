@@ -181,7 +181,7 @@ impl<'a> TransactCtx<'a> {
 
                             let (from, vertex_alias, expressions) = self.sql_select_expressions(
                                 target_def_id,
-                                struct_select,
+                                &struct_select.properties,
                                 pg_def.pg,
                                 ctx,
                             )?;

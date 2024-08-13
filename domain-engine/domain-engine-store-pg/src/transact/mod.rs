@@ -23,7 +23,7 @@ mod insert;
 mod query;
 mod query_edge;
 mod struct_analyzer;
-mod struct_fields;
+mod fields;
 mod update;
 
 struct TransactCtx<'a> {
@@ -175,7 +175,7 @@ pub async fn transact(
                             ObjectGenerator::new(ProcessorMode::Update, ctx.ontology, ctx.system)
                                 .generate_objects(&mut value);
 
-                            let value = ctx.update_vertex(value.into(), select).await?;
+                            let value = ctx.update_vertex_with_select(value.into(), select).await?;
                             yield RespMessage::Element(value, DataOperation::Updated);
                         }
                         Some(State::Upsert(_, select)) => {

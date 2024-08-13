@@ -5,7 +5,7 @@ use ontol_runtime::{
     attr::{Attr, AttrMatrix},
     ontology::domain::{DataRelationshipKind, Def},
     property::ValueCardinality,
-    query::select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
+    query::select::{EntitySelect, Select, StructOrUnionSelect},
     sequence::SubSequence,
     tuple::{CardinalIdx, EndoTuple},
     value::Value,
@@ -52,9 +52,10 @@ pub enum Cursor {
     Offset(usize),
 }
 
+#[derive(Clone, Copy)]
 pub enum QuerySelect<'a> {
-    Struct(&'a StructSelect),
-    EntityId,
+    Struct(&'a FnvHashMap<RelId, Select>),
+    Field(RelId),
 }
 
 impl<'a> TransactCtx<'a> {
@@ -69,9 +70,7 @@ impl<'a> TransactCtx<'a> {
             }
         };
         let after_cursor: Option<Cursor> = match &entity_select.after_cursor {
-            Some(bytes) => {
-                Some(bincode::deserialize(&bytes).map_err(|_| ds_bad_req("bad cursor"))?)
-            }
+            Some(bytes) => Some(bincode::deserialize(bytes).map_err(|_| ds_bad_req("bad cursor"))?),
             None => None,
         };
 
@@ -81,7 +80,7 @@ impl<'a> TransactCtx<'a> {
             entity_select.limit,
             after_cursor,
             None,
-            QuerySelect::Struct(struct_select),
+            QuerySelect::Struct(&struct_select.properties),
         )
         .await
     }
@@ -117,21 +116,12 @@ impl<'a> TransactCtx<'a> {
             }
 
             let (from, _alias, tail_expressions) = match query_select {
-                QuerySelect::Struct(struct_select) => {
-                    self.sql_select_expressions(def_id, struct_select, pg, &mut ctx)?
+                QuerySelect::Struct(properties) => {
+                    self.sql_select_expressions(def_id, properties, pg, &mut ctx)?
                 }
-                QuerySelect::EntityId => {
+                QuerySelect::Field(rel_id) => {
                     let mut fields = self.initial_standard_data_fields(pg);
-                    let Some(entity) = def.entity() else {
-                        return Err(ds_bad_req("entity without id"));
-                    };
-
-                    fields.push(sql::Expr::path1(
-                        pg.table
-                            .field(&entity.id_relationship_id)?
-                            .col_name
-                            .as_ref(),
-                    ));
+                    fields.push(sql::Expr::path1(pg.table.field(&rel_id)?.col_name.as_ref()));
 
                     (pg.table_name().into(), sql::Alias(0), fields)
                 }
@@ -193,14 +183,7 @@ impl<'a> TransactCtx<'a> {
                 }
 
                 if observed_rows < limit {
-                    let row_value = match query_select {
-                        QuerySelect::Struct(sel) => {
-                            self.read_struct_row_value(row_iter, def, &sel.properties)?
-                        }
-                        QuerySelect::EntityId => {
-                            todo!()
-                        }
-                    };
+                    let row_value = self.read_row_value(row_iter, def, query_select)?;
                     yield QueryFrame::Row(row_value);
 
                     observed_values += 1;
@@ -235,7 +218,7 @@ impl<'a> TransactCtx<'a> {
     pub(super) fn sql_select_expressions(
         &self,
         def_id: DefId,
-        struct_select: &StructSelect,
+        properties: &FnvHashMap<RelId, Select>,
         pg: PgDomainTable<'a>,
         ctx: &mut QueryBuildCtx<'a>,
     ) -> DomainResult<(sql::FromItem<'a>, sql::Alias, Vec<sql::Expr<'a>>)> {
@@ -246,7 +229,7 @@ impl<'a> TransactCtx<'a> {
         let mut sql_expressions = vec![sql::Expr::path2(data_alias, sql::PathSegment::Asterisk)];
 
         // select edges
-        for (rel_id, select) in &struct_select.properties {
+        for (rel_id, select) in properties {
             let Some(rel_info) = def.data_relationships.get(rel_id) else {
                 continue;
             };
@@ -365,15 +348,12 @@ impl<'a> TransactCtx<'a> {
         ]
     }
 
-    fn read_struct_row_value<'b>(
+    fn read_row_value<'b>(
         &self,
         mut iterator: impl SqlRecordIterator<'b>,
         def: &Def,
-        select_properties: &FnvHashMap<RelId, Select>,
+        query_select: QuerySelect,
     ) -> DomainResult<RowValue> {
-        let mut attrs: FnvHashMap<RelId, Attr> =
-            FnvHashMap::with_capacity_and_hasher(def.data_relationships.len(), Default::default());
-
         let _def_key = iterator
             .next_field(&Layout::Scalar(PgType::Integer))?
             .into_i32()?;
@@ -381,74 +361,111 @@ impl<'a> TransactCtx<'a> {
             .next_field(&Layout::Scalar(PgType::BigInt))?
             .into_i64()?;
 
-        // retrieve data properties
-        self.read_inherent_struct_fields(def, &mut iterator, &mut attrs)?;
+        match query_select {
+            QuerySelect::Struct(properties) => {
+                let mut attrs: FnvHashMap<RelId, Attr> = FnvHashMap::with_capacity_and_hasher(
+                    def.data_relationships.len(),
+                    Default::default(),
+                );
 
-        // retrieve edges
-        for (rel_id, select) in select_properties {
-            let Some(rel_info) = def.data_relationships.get(rel_id) else {
-                continue;
-            };
-            let DataRelationshipKind::Edge(proj) = &rel_info.kind else {
-                continue;
-            };
+                // retrieve data properties
+                self.read_inherent_struct_fields(def, &mut iterator, &mut attrs)?;
 
-            let pg_edge = self.pg_model.edgetable(&proj.id)?;
+                // retrieve edges
+                for (rel_id, select) in properties {
+                    let Some(rel_info) = def.data_relationships.get(rel_id) else {
+                        continue;
+                    };
+                    let DataRelationshipKind::Edge(proj) = &rel_info.kind else {
+                        continue;
+                    };
 
-            match rel_info.cardinality.1 {
-                ValueCardinality::Unit => {
-                    if let Some(sql_edge_tuple) =
-                        iterator.next_field(&Layout::Record)?.null_filter()
-                    {
-                        let sql_edge_tuple = sql_edge_tuple.into_record()?;
-                        let attr = self.read_edge_tuple_as_attr(sql_edge_tuple, select, pg_edge)?;
-                        attrs.insert(*rel_id, attr);
-                    }
-                }
-                ValueCardinality::IndexSet | ValueCardinality::List => {
-                    let sql_array = iterator.next_field(&Layout::Array)?.into_array()?;
+                    let pg_edge = self.pg_model.edgetable(&proj.id)?;
 
-                    let mut matrix = AttrMatrix::default();
-                    matrix.columns.push(Default::default());
-
-                    for result in sql_array.elements(&Layout::Record) {
-                        let sql_edge_tuple = result?.into_record()?;
-
-                        match self.read_edge_tuple_as_attr(sql_edge_tuple, select, pg_edge)? {
-                            Attr::Unit(value) => {
-                                matrix.columns[0].push(value);
+                    match rel_info.cardinality.1 {
+                        ValueCardinality::Unit => {
+                            if let Some(sql_edge_tuple) =
+                                iterator.next_field(&Layout::Record)?.null_filter()
+                            {
+                                let sql_edge_tuple = sql_edge_tuple.into_record()?;
+                                let attr =
+                                    self.read_edge_tuple_as_attr(sql_edge_tuple, select, pg_edge)?;
+                                attrs.insert(*rel_id, attr);
                             }
-                            Attr::Tuple(tuple) => {
-                                let mut tuple_iter = tuple.elements.into_iter();
-                                matrix.columns[0].push(tuple_iter.next().unwrap());
+                        }
+                        ValueCardinality::IndexSet | ValueCardinality::List => {
+                            let sql_array = iterator.next_field(&Layout::Array)?.into_array()?;
 
-                                let mut column_index: usize = 1;
+                            let mut matrix = AttrMatrix::default();
+                            matrix.columns.push(Default::default());
 
-                                for value in tuple_iter {
-                                    if matrix.columns.len() <= column_index {
-                                        matrix.columns.push(Default::default());
+                            for result in sql_array.elements(&Layout::Record) {
+                                let sql_edge_tuple = result?.into_record()?;
+
+                                match self.read_edge_tuple_as_attr(
+                                    sql_edge_tuple,
+                                    select,
+                                    pg_edge,
+                                )? {
+                                    Attr::Unit(value) => {
+                                        matrix.columns[0].push(value);
                                     }
+                                    Attr::Tuple(tuple) => {
+                                        let mut tuple_iter = tuple.elements.into_iter();
+                                        matrix.columns[0].push(tuple_iter.next().unwrap());
 
-                                    matrix.columns[column_index].push(value);
-                                    column_index += 1;
+                                        let mut column_index: usize = 1;
+
+                                        for value in tuple_iter {
+                                            if matrix.columns.len() <= column_index {
+                                                matrix.columns.push(Default::default());
+                                            }
+
+                                            matrix.columns[column_index].push(value);
+                                            column_index += 1;
+                                        }
+                                    }
+                                    Attr::Matrix(_) => return Err(ds_err("matrix in matrix")),
                                 }
                             }
-                            Attr::Matrix(_) => return Err(ds_err("matrix in matrix")),
+
+                            attrs.insert(*rel_id, Attr::Matrix(matrix));
                         }
                     }
-
-                    attrs.insert(*rel_id, Attr::Matrix(matrix));
                 }
+
+                let value = Value::Struct(Box::new(attrs), def.id.into());
+
+                Ok(RowValue {
+                    value,
+                    data_key,
+                    op: DataOperation::Inserted,
+                })
+            }
+            QuerySelect::Field(rel_id) => {
+                let _def_key = iterator
+                    .next_field(&Layout::Scalar(PgType::Integer))?
+                    .into_i32()?;
+                let data_key = iterator
+                    .next_field(&Layout::Scalar(PgType::BigInt))?
+                    .into_i64()?;
+
+                let field_value = self
+                    .read_field(
+                        def.data_relationships
+                            .get(&rel_id)
+                            .ok_or_else(|| ds_err("field does not exist"))?,
+                        &mut iterator,
+                    )?
+                    .ok_or_else(|| ds_err("field was not defined"))?;
+
+                Ok(RowValue {
+                    value: field_value,
+                    data_key,
+                    op: DataOperation::Inserted,
+                })
             }
         }
-
-        let value = Value::Struct(Box::new(attrs), def.id.into());
-
-        Ok(RowValue {
-            value,
-            data_key,
-            op: DataOperation::Inserted,
-        })
     }
 
     fn read_edge_tuple_as_attr(
@@ -547,8 +564,11 @@ impl<'a> TransactCtx<'a> {
         sql_record: SqlRecord,
         select_properties: &FnvHashMap<RelId, Select>,
     ) -> DomainResult<Value> {
-        let row_value =
-            self.read_struct_row_value(sql_record.fields(), pg_def.def, select_properties)?;
+        let row_value = self.read_row_value(
+            sql_record.fields(),
+            pg_def.def,
+            QuerySelect::Struct(select_properties),
+        )?;
 
         Ok(row_value.value)
     }
