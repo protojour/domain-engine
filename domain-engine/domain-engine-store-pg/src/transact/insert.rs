@@ -20,12 +20,7 @@ use crate::{
     sql_value::Layout,
 };
 
-use super::{data::RowValue, TransactCtx};
-
-pub enum InsertMode {
-    Insert,
-    Upsert,
-}
+use super::{data::RowValue, InsertMode, TransactCtx};
 
 impl<'a> TransactCtx<'a> {
     /// Returns BoxFuture because of potential recursion
@@ -161,12 +156,8 @@ impl<'a> TransactCtx<'a> {
             .next_field(&Layout::Scalar(PgType::BigInt))?
             .into_i64()?;
 
-        self.patch_edges(
-            analyzed.root_attrs.datatable,
-            data_key,
-            analyzed.edge_projections,
-        )
-        .await?;
+        self.patch_edges(analyzed.root_attrs.datatable, data_key, analyzed.edges)
+            .await?;
 
         match select {
             Select::EntityId => {

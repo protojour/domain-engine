@@ -7,7 +7,6 @@ use domain_engine_core::{
     DomainResult,
 };
 use futures_util::{stream::BoxStream, StreamExt};
-use insert::InsertMode;
 use ontol_runtime::{
     interface::serde::processor::ProcessorMode, ontology::Ontology, query::select::Select, DefId,
 };
@@ -26,6 +25,25 @@ mod struct_analyzer;
 mod edge_patch;
 mod fields;
 mod update;
+
+#[derive(Debug)]
+pub enum MutationMode {
+    Create(InsertMode),
+    Update,
+}
+
+impl MutationMode {
+    pub const fn insert() -> Self {
+        Self::Create(InsertMode::Insert)
+    }
+}
+
+#[derive(Debug)]
+pub enum InsertMode {
+    Insert,
+    Upsert,
+}
+
 
 struct TransactCtx<'a> {
     pg_model: &'a PgModel,

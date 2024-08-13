@@ -14,7 +14,7 @@ use ontol_runtime::{
 use pin_utils::pin_mut;
 use serde::{Deserialize, Serialize};
 use smallvec::smallvec;
-use tracing::debug;
+use tracing::{debug, trace};
 
 use crate::{
     ds_bad_req, ds_err,
@@ -160,6 +160,7 @@ impl<'a> TransactCtx<'a> {
 
         let sql = sql_select.to_string();
         debug!("{sql}");
+        trace!("{select_params:?}");
 
         let row_stream = self
             .client()

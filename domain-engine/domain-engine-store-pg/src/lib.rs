@@ -158,3 +158,20 @@ fn map_row_error(pg_err: tokio_postgres::Error) -> DomainError {
         ds_err("could not fetch row")
     }
 }
+
+#[derive(Default)]
+struct IgnoreRows;
+
+impl<T> Extend<T> for IgnoreRows {
+    fn extend<I: IntoIterator<Item = T>>(&mut self, _iter: I) {}
+}
+
+#[derive(Default)]
+struct CountRows(usize);
+
+impl<T> Extend<T> for CountRows {
+    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        let count = iter.into_iter().count();
+        self.0 += count;
+    }
+}

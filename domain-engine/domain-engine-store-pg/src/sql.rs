@@ -71,6 +71,23 @@ pub struct Update<'d> {
     pub returning: Vec<Expr<'d>>,
 }
 
+impl<'d> Update<'d> {
+    pub fn where_and(&mut self, expr: Expr<'d>) {
+        match self.where_.take() {
+            Some(Expr::And(mut clauses)) => {
+                clauses.push(expr);
+                self.where_ = Some(Expr::And(clauses));
+            }
+            Some(old) => {
+                self.where_ = Some(Expr::And(vec![old, expr]));
+            }
+            None => {
+                self.where_ = Some(expr);
+            }
+        }
+    }
+}
+
 pub struct Delete<'d> {
     pub from: TableName<'d>,
     pub where_: Option<Expr<'d>>,
@@ -123,7 +140,7 @@ pub struct Limit {
 #[derive(Clone)]
 pub enum Expr<'d> {
     /// path in current scope
-    Path(SmallVec<PathSegment<'d>, 2>),
+    Path(Path<'d>),
     /// input parameter
     Param(Param),
     Paren(Box<Expr<'d>>),
@@ -150,11 +167,11 @@ pub enum Expr<'d> {
 
 impl<'d> Expr<'d> {
     pub fn path1(segment: impl Into<PathSegment<'d>>) -> Self {
-        Self::Path(smallvec!(segment.into()))
+        Self::Path(Path(smallvec!(segment.into())))
     }
 
     pub fn path2(a: impl Into<PathSegment<'d>>, b: impl Into<PathSegment<'d>>) -> Self {
-        Self::Path(smallvec!(a.into(), b.into()))
+        Self::Path(Path(smallvec!(a.into(), b.into())))
     }
 
     pub fn param(p: usize) -> Self {
@@ -175,6 +192,33 @@ impl<'d> Expr<'d> {
 
     pub fn arc(expr: impl Into<Self>) -> Self {
         Self::Arc(Arc::new(expr.into()))
+    }
+}
+
+#[derive(Clone)]
+pub struct Path<'d>(SmallVec<PathSegment<'d>, 2>);
+
+impl<'d> Path<'d> {
+    pub fn empty() -> Self {
+        Self(smallvec![])
+    }
+
+    pub fn join(&self, segment: impl Into<PathSegment<'d>>) -> Self {
+        let mut segments = self.0.clone();
+        segments.push(segment.into());
+        Self(segments)
+    }
+}
+
+impl<'d> FromIterator<PathSegment<'d>> for Path<'d> {
+    fn from_iter<T: IntoIterator<Item = PathSegment<'d>>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+impl<'d> From<PathSegment<'d>> for Path<'d> {
+    fn from(value: PathSegment<'d>) -> Self {
+        Self(smallvec![value])
     }
 }
 
@@ -421,7 +465,7 @@ impl Display for Name {
 impl<'d> Display for Expr<'d> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Path(segments) => write!(f, "{}", segments.iter().format(".")),
+            Self::Path(path) => write!(f, "{path}"),
             Self::Param(param) => write!(f, "{param}"),
             Self::Paren(expr) => write!(f, "({expr})"),
             Self::LiteralInt(i) => write!(f, "{i}"),
@@ -437,6 +481,12 @@ impl<'d> Display for Expr<'d> {
             Self::Limit(expr, limit) => write!(f, "{expr}{limit}"),
             Self::Arc(expr) => write!(f, "{expr}"),
         }
+    }
+}
+
+impl<'d> Display for Path<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.iter().format("."))
     }
 }
 
@@ -485,6 +535,12 @@ impl<'d> Display for Union<'d> {
 impl<'d> std::convert::From<Select<'d>> for Expr<'d> {
     fn from(value: Select<'d>) -> Self {
         Self::Select(Box::new(value))
+    }
+}
+
+impl<'d> std::convert::From<Path<'d>> for Expr<'d> {
+    fn from(value: Path<'d>) -> Self {
+        Self::Path(value)
     }
 }
 

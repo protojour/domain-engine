@@ -474,6 +474,8 @@ async fn patch_members(ds: &str) {
     .await
     .unwrap();
 
+    info!("add bob as a contributor");
+
     r#"mutation {
         Organization(
             update: [{
@@ -492,6 +494,8 @@ async fn patch_members(ds: &str) {
     .exec([], &schema, &ctx)
     .await
     .unwrap();
+
+    info!("bob should be a member in the query");
 
     expect_eq!(
         actual = r#"{
@@ -520,6 +524,8 @@ async fn patch_members(ds: &str) {
         })),
     );
 
+    info!("alice is not a member, so upgrading to admin should fail");
+
     expect_eq!(
         actual = r#"mutation {
             Organization(
@@ -542,6 +548,8 @@ async fn patch_members(ds: &str) {
         expected = "entity not found"
     );
 
+    info!("upgrade bob to admin should succeed");
+
     r#"mutation {
         Organization(
             update: [{
@@ -560,6 +568,8 @@ async fn patch_members(ds: &str) {
     .exec([], &schema, &ctx)
     .await
     .unwrap();
+
+    info!("delete bob");
 
     // Delete a member
     r#"mutation {

@@ -15,187 +15,434 @@ use tracing::{debug, trace};
 
 use crate::{
     ds_bad_req, ds_err, map_row_error,
-    pg_model::{InDomain, PgDataKey, PgEdgeCardinalKind, PgTable},
+    pg_model::{InDomain, PgDataKey, PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgTable},
     sql,
     sql_value::SqlVal,
-    transact::{data::Data, insert::InsertMode},
+    transact::{data::Data, edge_query::edge_join_condition},
+    CountRows, IgnoreRows,
 };
 
-use super::{struct_analyzer::EdgeProjection, TransactCtx};
+use super::{MutationMode, TransactCtx};
+
+#[derive(Default, Debug)]
+pub struct EdgePatches {
+    pub patches: BTreeMap<EdgeId, ProjectedEdgePatch>,
+}
+
+impl EdgePatches {
+    pub fn patch(&mut self, edge_id: EdgeId, subject: CardinalIdx) -> &mut ProjectedEdgePatch {
+        self.patches
+            .entry(edge_id)
+            .or_insert_with(|| ProjectedEdgePatch {
+                subject,
+                tuples: vec![],
+                deletes: Default::default(),
+            })
+    }
+}
+
+#[derive(Debug)]
+pub struct ProjectedEdgePatch {
+    #[allow(unused)]
+    pub subject: CardinalIdx,
+    pub tuples: Vec<EdgeEndoTuplePatch>,
+    pub deletes: BTreeMap<CardinalIdx, Vec<Value>>,
+}
+
+impl ProjectedEdgePatch {
+    pub fn delete(&mut self, object_idx: CardinalIdx, foreign_id: Value) {
+        self.deletes.entry(object_idx).or_default().push(foreign_id);
+    }
+}
+
+#[derive(Debug)]
+pub struct EdgeEndoTuplePatch {
+    /// The length of the vector is the edge cardinality - 1
+    pub elements: Vec<(CardinalIdx, Value, MutationMode)>,
+}
+
+impl EdgeEndoTuplePatch {
+    pub fn into_element_ops(self) -> impl Iterator<Item = (Value, MutationMode)> {
+        self.elements.into_iter().map(|(_, value, op)| (value, op))
+    }
+
+    pub fn from_tuple(it: impl Iterator<Item = (Value, MutationMode)>) -> Self {
+        Self {
+            elements: it
+                .enumerate()
+                .map(|(idx, (value, mode))| (CardinalIdx(idx as u8), value, mode))
+                .collect(),
+        }
+    }
+
+    /// build the tuple one-by-one
+    pub fn insert_element(
+        &mut self,
+        idx: CardinalIdx,
+        value: Value,
+        mode: MutationMode,
+    ) -> DomainResult<()> {
+        match self.elements.binary_search_by_key(&idx, |(idx, ..)| *idx) {
+            Ok(pos) => Err(ds_err(format!("duplicate edge cardinal at {pos}"))),
+            Err(pos) => {
+                self.elements.insert(pos, (idx, value, mode));
+                Ok(())
+            }
+        }
+    }
+}
+
+enum ProjectedEdgeCardinal<'a> {
+    Subject(&'a PgEdgeCardinal, Dynamic),
+    Object(&'a PgEdgeCardinal, Dynamic),
+    Parameters,
+}
+
+enum Dynamic {
+    Yes,
+    No,
+}
+
+#[derive(Default)]
+struct EdgeAnalysis<'a> {
+    param_order: BTreeSet<(RelId, DefId)>,
+    projected_cardinals: Vec<ProjectedEdgeCardinal<'a>>,
+}
 
 impl<'a> TransactCtx<'a> {
     pub async fn patch_edges(
         &self,
         subject_datatable: &PgTable,
         subject_data_key: PgDataKey,
-        edge_projections: BTreeMap<EdgeId, EdgeProjection>,
+        patches: EdgePatches,
     ) -> DomainResult<()> {
-        enum Dynamic {
-            Yes,
-            No,
+        // debug!("patch edges: {patches:#?}");
+
+        for (edge_id, patch) in patches.patches {
+            self.patch_edge(edge_id, subject_datatable, subject_data_key, patch)
+                .await?;
         }
 
-        enum ProjectedEdgeCardinal {
-            Subject(Dynamic),
-            Object(CardinalIdx, Dynamic),
-            Parameters,
-        }
+        Ok(())
+    }
 
-        let mut edge_params: Vec<SqlVal> = vec![];
+    async fn patch_edge(
+        &self,
+        edge_id: EdgeId,
+        subject_datatable: &PgTable,
+        subject_data_key: PgDataKey,
+        projection: ProjectedEdgePatch,
+    ) -> DomainResult<()> {
+        let subject_index = projection.subject;
+        let pg_edge = self.pg_model.pg_domain_edgetable(&edge_id)?;
 
-        for (edge_id, projection) in edge_projections {
-            let subject_index = projection.subject;
+        let mut sql_insert = sql::Insert {
+            into: pg_edge.table_name(),
+            column_names: vec![],
+            on_conflict: None,
+            returning: vec![],
+        };
 
-            let pg_edge = self.pg_model.pg_domain_edgetable(&edge_id)?;
+        let mut analysis = EdgeAnalysis::default();
 
-            let mut sql_insert = sql::Insert {
-                into: pg_edge.table_name(),
-                column_names: vec![],
-                on_conflict: None,
-                returning: vec![],
-            };
-
-            let mut param_order: BTreeSet<(RelId, DefId)> = Default::default();
-            let mut projected_cardinals: Vec<ProjectedEdgeCardinal> = vec![];
-
-            for (index, pg_cardinal) in &pg_edge.table.edge_cardinals {
-                match &pg_cardinal.kind {
-                    PgEdgeCardinalKind::Dynamic {
-                        def_col_name,
-                        key_col_name,
-                    } => {
-                        sql_insert
-                            .column_names
-                            .extend([def_col_name.as_ref(), key_col_name]);
-                        projected_cardinals.push(if *index == subject_index {
-                            ProjectedEdgeCardinal::Subject(Dynamic::Yes)
+        for (index, pg_cardinal) in &pg_edge.table.edge_cardinals {
+            match &pg_cardinal.kind {
+                PgEdgeCardinalKind::Dynamic {
+                    def_col_name,
+                    key_col_name,
+                } => {
+                    sql_insert
+                        .column_names
+                        .extend([def_col_name.as_ref(), key_col_name]);
+                    analysis
+                        .projected_cardinals
+                        .push(if *index == subject_index {
+                            ProjectedEdgeCardinal::Subject(pg_cardinal, Dynamic::Yes)
                         } else {
-                            ProjectedEdgeCardinal::Object(*index, Dynamic::Yes)
+                            ProjectedEdgeCardinal::Object(pg_cardinal, Dynamic::Yes)
                         });
-                    }
-                    PgEdgeCardinalKind::Unique { key_col_name, .. } => {
-                        sql_insert.column_names.push(key_col_name);
-                        projected_cardinals.push(if *index == subject_index {
-                            ProjectedEdgeCardinal::Subject(Dynamic::No)
+                }
+                PgEdgeCardinalKind::Unique { key_col_name, .. } => {
+                    sql_insert.column_names.push(key_col_name);
+                    analysis
+                        .projected_cardinals
+                        .push(if *index == subject_index {
+                            ProjectedEdgeCardinal::Subject(pg_cardinal, Dynamic::No)
                         } else {
-                            ProjectedEdgeCardinal::Object(*index, Dynamic::No)
+                            ProjectedEdgeCardinal::Object(pg_cardinal, Dynamic::No)
                         });
-                    }
-                    PgEdgeCardinalKind::Parameters(params_def_id) => {
-                        let def = self.ontology.def(*params_def_id);
-                        for (rel_id, rel_info) in &def.data_relationships {
-                            if let DataRelationshipKind::Tree = &rel_info.kind {
-                                match &rel_info.target {
-                                    DataRelationshipTarget::Unambiguous(def_id) => {
-                                        let Some(pg_field) =
-                                            pg_edge.table.data_fields.get(&rel_id.1)
-                                        else {
-                                            return Err(ds_err(
-                                                "no data store field for edge parameter",
-                                            ));
-                                        };
+                }
+                PgEdgeCardinalKind::Parameters(params_def_id) => {
+                    let def = self.ontology.def(*params_def_id);
+                    for (rel_id, rel_info) in &def.data_relationships {
+                        if let DataRelationshipKind::Tree = &rel_info.kind {
+                            match &rel_info.target {
+                                DataRelationshipTarget::Unambiguous(def_id) => {
+                                    let Some(pg_field) = pg_edge.table.data_fields.get(&rel_id.1)
+                                    else {
+                                        return Err(ds_err(
+                                            "no data store field for edge parameter",
+                                        ));
+                                    };
 
-                                        sql_insert.column_names.push(&pg_field.col_name);
-                                        param_order.insert((*rel_id, *def_id));
-                                    }
-                                    DataRelationshipTarget::Union(_) => {
-                                        todo!("union in params");
-                                    }
+                                    sql_insert.column_names.push(&pg_field.col_name);
+                                    analysis.param_order.insert((*rel_id, *def_id));
+                                }
+                                DataRelationshipTarget::Union(_) => {
+                                    todo!("union in params");
                                 }
                             }
                         }
-                        projected_cardinals.push(ProjectedEdgeCardinal::Parameters);
                     }
+                    analysis
+                        .projected_cardinals
+                        .push(ProjectedEdgeCardinal::Parameters);
                 }
             }
+        }
 
-            let sql = sql_insert.to_string();
+        let mut insert_sql: Option<String> = None;
 
-            for tuple in projection.tuples {
-                edge_params.clear();
+        let mut param_buf: Vec<SqlVal> = vec![];
 
-                let mut element_iter = tuple.into_elements();
+        for tuple in projection.tuples {
+            param_buf.clear();
 
-                for projected_cardinal in &projected_cardinals {
-                    match projected_cardinal {
-                        ProjectedEdgeCardinal::Subject(Dynamic::Yes) => {
-                            edge_params.extend([
-                                SqlVal::I32(subject_datatable.key),
-                                SqlVal::I64(subject_data_key),
-                            ]);
-                        }
-                        ProjectedEdgeCardinal::Subject(Dynamic::No) => {
-                            edge_params.push(SqlVal::I64(subject_data_key));
-                        }
-                        ProjectedEdgeCardinal::Object(_index, dynamic) => {
-                            let (foreign_def_id, foreign_key) = self
-                                .resolve_linked_vertex(
-                                    element_iter.next().unwrap(),
-                                    InsertMode::Insert,
-                                    Select::EntityId,
-                                )
-                                .await?;
-
-                            if matches!(dynamic, Dynamic::Yes) {
-                                let datatable = self
-                                    .pg_model
-                                    .datatable(foreign_def_id.package_id(), foreign_def_id)?;
-                                edge_params.push(SqlVal::I32(datatable.key));
-                            }
-
-                            edge_params.push(SqlVal::I64(foreign_key));
-                        }
-                        ProjectedEdgeCardinal::Parameters => {
-                            let Some(Value::Struct(mut map, _)) = element_iter.next() else {
-                                return Err(ds_bad_req("edge params must be a struct"));
-                            };
-
-                            for (rel_id, _def_id) in &param_order {
-                                let data = match map.remove(rel_id) {
-                                    Some(Attr::Unit(value)) => self.data_from_value(value)?,
-                                    Some(_) => {
-                                        return Err(ds_bad_req(
-                                            "non-scalar attribute in edge parameter",
-                                        ))
-                                    }
-                                    None => Data::Sql(SqlVal::Null),
-                                };
-
-                                match data {
-                                    Data::Sql(sql_val) => {
-                                        edge_params.push(sql_val);
-                                    }
-                                    Data::Compound(_) => {
-                                        return Err(ds_bad_req(
-                                            "non-scalar value in edge parameter",
-                                        ));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                debug!("{sql}");
-                trace!("{edge_params:?}");
-
-                self.client()
-                    .query_raw(&sql, edge_params.iter().map(|param| param as &dyn ToSql))
-                    .await
-                    .map_err(|e| ds_err(format!("unable to insert edge(1): {e:?}")))?
-                    .try_collect::<IgnoreRows>()
-                    .map_err(map_row_error)
-                    .await?;
+            if tuple
+                .elements
+                .iter()
+                .any(|(_, _, mutation_mode)| matches!(mutation_mode, MutationMode::Update))
+            {
+                self.update_edge(
+                    pg_edge,
+                    subject_datatable,
+                    subject_data_key,
+                    &analysis,
+                    tuple,
+                    &mut param_buf,
+                )
+                .await?;
+            } else {
+                self.insert_edge(
+                    subject_datatable,
+                    subject_data_key,
+                    &analysis,
+                    tuple,
+                    &mut param_buf,
+                    insert_sql.get_or_insert_with(|| sql_insert.to_string()),
+                )
+                .await?;
             }
         }
 
         Ok(())
     }
 
+    async fn insert_edge<'s>(
+        &'s self,
+        subject_datatable: &PgTable,
+        subject_data_key: PgDataKey,
+        analysis: &EdgeAnalysis<'s>,
+        tuple: EdgeEndoTuplePatch,
+        param_buf: &mut Vec<SqlVal<'s>>,
+        insert_sql: &str,
+    ) -> DomainResult<()> {
+        let mut element_iter = tuple.into_element_ops();
+
+        for projected_cardinal in &analysis.projected_cardinals {
+            match projected_cardinal {
+                ProjectedEdgeCardinal::Subject(_, Dynamic::Yes) => {
+                    param_buf.extend([
+                        SqlVal::I32(subject_datatable.key),
+                        SqlVal::I64(subject_data_key),
+                    ]);
+                }
+                ProjectedEdgeCardinal::Subject(_, Dynamic::No) => {
+                    param_buf.push(SqlVal::I64(subject_data_key));
+                }
+                ProjectedEdgeCardinal::Object(.., dynamic) => {
+                    let (value, mode) = element_iter.next().unwrap();
+                    let (foreign_def_id, foreign_key) = self
+                        .resolve_linked_vertex(value, mode, Select::EntityId)
+                        .await?;
+
+                    if matches!(dynamic, Dynamic::Yes) {
+                        let datatable = self
+                            .pg_model
+                            .datatable(foreign_def_id.package_id(), foreign_def_id)?;
+                        param_buf.push(SqlVal::I32(datatable.key));
+                    }
+
+                    param_buf.push(SqlVal::I64(foreign_key));
+                }
+                ProjectedEdgeCardinal::Parameters => {
+                    let Some((Value::Struct(mut map, _), _op)) = element_iter.next() else {
+                        return Err(ds_bad_req("edge params must be a struct"));
+                    };
+
+                    for (rel_id, _def_id) in &analysis.param_order {
+                        let data = match map.remove(rel_id) {
+                            Some(Attr::Unit(value)) => self.data_from_value(value)?,
+                            Some(_) => {
+                                return Err(ds_bad_req("non-scalar attribute in edge parameter"))
+                            }
+                            None => Data::Sql(SqlVal::Null),
+                        };
+
+                        match data {
+                            Data::Sql(sql_val) => {
+                                param_buf.push(sql_val);
+                            }
+                            Data::Compound(_) => {
+                                return Err(ds_bad_req("non-scalar value in edge parameter"));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        debug!("{insert_sql}");
+        trace!("{param_buf:?}");
+
+        self.client()
+            .query_raw(
+                insert_sql,
+                param_buf.iter().map(|param| param as &dyn ToSql),
+            )
+            .await
+            .map_err(|e| ds_err(format!("unable to insert edge(1): {e:?}")))?
+            .try_collect::<IgnoreRows>()
+            .map_err(map_row_error)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn update_edge<'s>(
+        &'s self,
+        pg_edge: PgDomainTable<'_>,
+        subject_datatable: &PgTable,
+        subject_data_key: PgDataKey,
+        analysis: &EdgeAnalysis<'s>,
+        tuple: EdgeEndoTuplePatch,
+        param_buf: &mut Vec<SqlVal<'s>>,
+    ) -> DomainResult<()> {
+        let mut element_iter = tuple.into_element_ops();
+
+        let mut sql_update = sql::Update {
+            with: None,
+            table_name: pg_edge.table_name(),
+            set: vec![],
+            where_: None,
+            returning: vec![sql::Expr::LiteralInt(0)],
+        };
+
+        for projected_cardinal in &analysis.projected_cardinals {
+            match projected_cardinal {
+                ProjectedEdgeCardinal::Subject(pg_cardinal, _) => {
+                    sql_update.where_and(edge_join_condition(
+                        sql::Path::empty(),
+                        pg_cardinal,
+                        subject_datatable,
+                        sql::Expr::param(param_buf.len()),
+                    ));
+                    param_buf.push(SqlVal::I64(subject_data_key));
+                }
+                ProjectedEdgeCardinal::Object(pg_cardinal, ..) => {
+                    // for objects, the edge itself is not updated
+                    let (value, mode) = element_iter.next().unwrap();
+                    let (foreign_def_id, foreign_key) = self
+                        .resolve_linked_vertex(value, mode, Select::EntityId)
+                        .await?;
+                    let object_datatable = self
+                        .pg_model
+                        .datatable(foreign_def_id.package_id(), foreign_def_id)?;
+
+                    sql_update.where_and(edge_join_condition(
+                        sql::Path::empty(),
+                        pg_cardinal,
+                        object_datatable,
+                        sql::Expr::param(param_buf.len()),
+                    ));
+                    param_buf.push(SqlVal::I64(foreign_key));
+                }
+                ProjectedEdgeCardinal::Parameters => {
+                    let Some((Value::Struct(mut map, _), _op)) = element_iter.next() else {
+                        return Err(ds_bad_req("edge params must be a struct"));
+                    };
+
+                    for (rel_id, _def_id) in &analysis.param_order {
+                        let data = match map.remove(rel_id) {
+                            Some(Attr::Unit(value)) => self.data_from_value(value)?,
+                            Some(_) => {
+                                return Err(ds_bad_req("non-scalar attribute in edge parameter"))
+                            }
+                            None => Data::Sql(SqlVal::Null),
+                        };
+
+                        match data {
+                            Data::Sql(sql_val) => {
+                                let field = pg_edge.table.field(rel_id)?;
+                                sql_update.set.push(sql::UpdateColumn(
+                                    &field.col_name,
+                                    sql::Expr::param(param_buf.len()),
+                                ));
+                                param_buf.push(sql_val);
+                            }
+                            Data::Compound(_) => {
+                                return Err(ds_bad_req("non-scalar value in edge parameter"));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let sql = if !sql_update.set.is_empty() {
+            sql_update.to_string()
+        } else {
+            // nothing to update, but it should be proven that the edge exists.
+            let sql_select = sql::Select {
+                with: None,
+                expressions: sql::Expressions {
+                    items: vec![sql::Expr::LiteralInt(0)],
+                    multiline: false,
+                },
+                from: vec![pg_edge.table_name().into()],
+                where_: sql_update.where_,
+                limit: sql::Limit {
+                    limit: Some(1),
+                    offset: None,
+                },
+            };
+            sql_select.to_string()
+        };
+
+        debug!("{sql}");
+        trace!("{param_buf:?}");
+
+        let count = self
+            .client()
+            .query_raw(&sql, param_buf.iter().map(|param| param as &dyn ToSql))
+            .await
+            .map_err(|e| ds_err(format!("unable to update edge(1): {e:?}")))?
+            .try_collect::<CountRows>()
+            .map_err(map_row_error)
+            .await?;
+
+        if count.0 == 1 {
+            Ok(())
+        } else {
+            // FIXME: bad error message.. It's the _edge_ that's not found.
+            Err(DomainErrorKind::EntityNotFound.into_error())
+        }
+    }
+
     pub async fn resolve_linked_vertex(
         &self,
         value: Value,
-        mode: InsertMode,
+        mode: MutationMode,
         select: Select,
     ) -> DomainResult<(DefId, PgDataKey)> {
         let def_id = value.type_def_id();
@@ -253,16 +500,20 @@ impl<'a> TransactCtx<'a> {
 
         match resolve_mode {
             ResolveMode::VertexData => {
-                let row_value = self
-                    .insert_vertex(
-                        InDomain {
-                            pkg_id: def_id.package_id(),
-                            value,
-                        },
-                        mode,
-                        &select,
-                    )
-                    .await?;
+                let row_value = match mode {
+                    MutationMode::Create(insert_mode) => {
+                        self.insert_vertex(
+                            InDomain {
+                                pkg_id: def_id.package_id(),
+                                value,
+                            },
+                            insert_mode,
+                            &select,
+                        )
+                        .await?
+                    }
+                    MutationMode::Update => todo!(),
+                };
 
                 Ok((def_id, row_value.data_key))
             }
@@ -333,11 +584,4 @@ impl<'a> TransactCtx<'a> {
             }
         }
     }
-}
-
-#[derive(Default)]
-struct IgnoreRows;
-
-impl<T> Extend<T> for IgnoreRows {
-    fn extend<I: IntoIterator<Item = T>>(&mut self, _iter: I) {}
 }
