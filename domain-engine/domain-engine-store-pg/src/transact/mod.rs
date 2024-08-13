@@ -21,7 +21,6 @@ mod delete;
 mod insert;
 mod query;
 mod edge_query;
-mod struct_analyzer;
 mod edge_patch;
 mod fields;
 mod update;
