@@ -26,7 +26,7 @@ use crate::{
 
 use super::{
     data::RowValue,
-    query_edge::{
+    edge_query::{
         CardinalSelect, EdgeUnionSelectBuilder, EdgeUnionVariantSelectBuilder, PgEdgeProjection,
     },
     TransactCtx,

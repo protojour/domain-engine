@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use domain_engine_core::{
     domain_error::DomainErrorKind, entity_id_utils::find_inherent_entity_id, DomainResult,
 };
@@ -5,14 +7,14 @@ use fnv::FnvHashMap;
 use futures_util::{Stream, StreamExt, TryFutureExt, TryStreamExt};
 use ontol_runtime::{
     attr::Attr, ontology::domain::DataRelationshipKind, property::ValueCardinality,
-    query::select::Select, value::Value, DefId, RelId,
+    query::select::Select, tuple::CardinalIdx, value::Value, DefId, EdgeId, RelId,
 };
 use postgres_types::ToSql;
 use tracing::{debug, warn};
 
 use crate::{
     ds_bad_req, ds_err,
-    pg_model::{InDomain, PgDataKey},
+    pg_model::{InDomain, PgDataKey, PgDomainTable, PgEdgeCardinalKind, PgRegKey},
     sql::{self, UpdateColumn},
     sql_value::SqlVal,
     transact::query::{QueryFrame, QuerySelect},
@@ -20,6 +22,7 @@ use crate::{
 
 use super::{
     data::{Data, RowValue},
+    edge_query::edge_join_condition,
     TransactCtx,
 };
 
@@ -191,7 +194,7 @@ impl<'a> TransactCtx<'a> {
 
         if key_rows.len() == 1 {
             let key = key_rows[0].get(0);
-            self.update_edges(def_id, key, edge_updates).await?;
+            self.update_edges(def_id, pg, key, edge_updates).await?;
             Ok(key)
         } else {
             Err(DomainErrorKind::EntityNotFound.into_error())
@@ -201,10 +204,17 @@ impl<'a> TransactCtx<'a> {
     async fn update_edges(
         &self,
         def_id: DefId,
+        subject_pg: PgDomainTable<'a>,
         subject_key: PgDataKey,
         edge_updates: FnvHashMap<RelId, Attr>,
     ) -> DomainResult<()> {
         let def = self.ontology.def(def_id);
+
+        let mut unit_edges: BTreeMap<EdgeId, BTreeMap<CardinalIdx, EdgeCardinalPatch>> =
+            Default::default();
+        let mut patches: BTreeMap<EdgeId, Vec<BTreeMap<CardinalIdx, EdgeCardinalPatch>>> =
+            Default::default();
+        let mut deletions: BTreeMap<(EdgeId, CardinalIdx), Vec<Value>> = Default::default();
 
         for (rel_id, attr) in edge_updates {
             let rel_info = def
@@ -216,8 +226,60 @@ impl<'a> TransactCtx<'a> {
             };
 
             match (attr, rel_info.cardinality.1) {
-                (Attr::Unit(unit), ValueCardinality::Unit) => {}
-                (Attr::Matrix(matrix), ValueCardinality::IndexSet | ValueCardinality::List) => {}
+                (Attr::Unit(unit), ValueCardinality::Unit) => {
+                    unit_edges
+                        .entry(proj.id)
+                        .or_insert_with(|| {
+                            BTreeMap::from_iter([(
+                                proj.subject,
+                                EdgeCardinalPatch::MatchKey(subject_pg.table.key, subject_key),
+                            )])
+                        })
+                        .insert(proj.object, EdgeCardinalPatch::Update(unit));
+                }
+                (Attr::Matrix(matrix), ValueCardinality::IndexSet | ValueCardinality::List) => {
+                    for tuple in matrix.into_rows() {
+                        if tuple.elements.iter().any(|value| value.tag().is_delete()) {
+                            let mut iter = tuple.elements.into_iter();
+                            let foreign_id = iter.next().unwrap();
+
+                            deletions
+                                .entry((proj.id, proj.object))
+                                .or_default()
+                                .push(foreign_id);
+                        } else {
+                            let mut edge_tuple: BTreeMap<CardinalIdx, EdgeCardinalPatch> =
+                                Default::default();
+
+                            let mut cardinal_idx = CardinalIdx(0);
+
+                            for value in tuple.elements {
+                                if cardinal_idx == proj.subject {
+                                    edge_tuple.insert(
+                                        cardinal_idx,
+                                        EdgeCardinalPatch::MatchKey(
+                                            subject_pg.table.key,
+                                            subject_key,
+                                        ),
+                                    );
+
+                                    cardinal_idx.0 += 1;
+                                }
+
+                                edge_tuple.insert(
+                                    cardinal_idx,
+                                    if value.tag().is_update() {
+                                        EdgeCardinalPatch::Update(value)
+                                    } else {
+                                        EdgeCardinalPatch::Insert(value)
+                                    },
+                                );
+
+                                cardinal_idx.0 += 1;
+                            }
+                        }
+                    }
+                }
                 (Attr::Unit(_unit), ValueCardinality::IndexSet | ValueCardinality::List) => {
                     return Err(ds_bad_req("invalid input for multi-relation write"));
                 }
@@ -227,8 +289,96 @@ impl<'a> TransactCtx<'a> {
             }
         }
 
+        for (edge_id, tuple) in unit_edges {
+            self.patch_edge(edge_id, subject_pg, subject_key, tuple)
+                .await?;
+        }
+
+        for (edge_id, patches) in patches {
+            for tuple in patches {
+                self.patch_edge(edge_id, subject_pg, subject_key, tuple)
+                    .await?;
+            }
+        }
+
         Ok(())
     }
+
+    async fn patch_edge(
+        &self,
+        edge_id: EdgeId,
+        subject_pg: PgDomainTable<'a>,
+        subject_key: PgDataKey,
+        tuple: BTreeMap<CardinalIdx, EdgeCardinalPatch>,
+    ) -> DomainResult<()> {
+        let pg_edge = self.pg_model.pg_domain_edgetable(&edge_id)?;
+        let mut objects: Vec<EdgeCardinalPatch> = vec![];
+
+        let mut edge_exprs: Vec<sql::Expr> = vec![];
+        let mut params: Vec<SqlVal> = vec![];
+        let mut subject_condition: Option<sql::Expr> = None;
+
+        for (idx, patch) in tuple {
+            let pg_cardinal = pg_edge.table.edge_cardinal(idx)?;
+
+            match patch {
+                EdgeCardinalPatch::MatchKey(def, key) => {
+                    subject_condition = Some(edge_join_condition(
+                        sql::Alias(0),
+                        pg_cardinal,
+                        subject_pg.table,
+                        sql::Expr::param(0),
+                    ));
+                    params.push(SqlVal::I64(subject_key));
+                }
+                patch @ (EdgeCardinalPatch::Update(_) | EdgeCardinalPatch::Insert(_)) => {
+                    match &pg_cardinal.kind {
+                        PgEdgeCardinalKind::Dynamic {
+                            def_col_name,
+                            key_col_name,
+                        } => {
+                            edge_exprs.extend([
+                                sql::Expr::path1(def_col_name.as_ref()),
+                                sql::Expr::path1(key_col_name.as_ref()),
+                            ]);
+                        }
+                        PgEdgeCardinalKind::Unique {
+                            def_id,
+                            key_col_name,
+                        } => {
+                            edge_exprs.push(sql::Expr::path1(key_col_name.as_ref()));
+                        }
+                        PgEdgeCardinalKind::Parameters(_) => todo!(),
+                    }
+                }
+            }
+        }
+
+        let mut sql_select = sql::Select {
+            with: None,
+            expressions: sql::Expressions {
+                items: edge_exprs,
+                multiline: false,
+            },
+            from: vec![sql::FromItem::TableNameAs(
+                pg_edge.table_name(),
+                sql::Name::Alias(sql::Alias(0)),
+            )],
+            where_: subject_condition,
+            limit: sql::Limit {
+                limit: Some(1),
+                offset: None,
+            },
+        };
+
+        Ok(())
+    }
+}
+
+enum EdgeCardinalPatch {
+    MatchKey(PgRegKey, PgDataKey),
+    Update(Value),
+    Insert(Value),
 }
 
 async fn collect_one_row_value(

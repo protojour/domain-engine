@@ -4,6 +4,7 @@ use std::{collections::BTreeSet, sync::Arc};
 
 use domain_engine_core::{
     data_store::DataStoreAPI,
+    domain_error::DomainErrorKind,
     system::ArcSystemApi,
     transact::{ReqMessage, RespMessage},
     DomainError, DomainResult, Session,
@@ -139,4 +140,21 @@ fn ds_err(s: impl Into<String>) -> DomainError {
 
 fn ds_bad_req(s: impl Into<String>) -> DomainError {
     DomainError::data_store_bad_request(s)
+}
+
+fn map_row_error(pg_err: tokio_postgres::Error) -> DomainError {
+    if let Some(db_error) = pg_err.as_db_error() {
+        if db_error
+            .message()
+            .starts_with("duplicate key value violates unique constraint")
+        {
+            DomainErrorKind::EntityAlreadyExists.into_error()
+        } else {
+            info!("row fetch error: {db_error:?}");
+            ds_err("could not fetch row")
+        }
+    } else {
+        error!("row fetch error: {pg_err:?}");
+        ds_err("could not fetch row")
+    }
 }

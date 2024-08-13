@@ -158,14 +158,14 @@ impl<'a> TransactCtx<'a> {
                                 join_condition: edge_join_condition(
                                     pg_proj.edge_alias,
                                     pg_cardinal,
-                                    leaf_alias,
                                     pg_def.pg.table,
+                                    sql::Expr::path2(leaf_alias, "_key"),
                                 ),
                                 where_condition: Some(sql::Expr::arc(edge_join_condition(
                                     pg_proj.edge_alias,
                                     pg_proj.pg_subj_cardinal,
-                                    pg_proj.subj_alias,
                                     pg_proj.pg_subj_data.table,
+                                    sql::Expr::path2(pg_proj.subj_alias, "_key"),
                                 ))),
                             }),
                             union_builder,
@@ -195,14 +195,14 @@ impl<'a> TransactCtx<'a> {
                                     join_condition: edge_join_condition(
                                         pg_proj.edge_alias,
                                         pg_cardinal,
-                                        vertex_alias,
                                         pg_def.pg.table,
+                                        sql::Expr::path2(vertex_alias, "_key"),
                                     ),
                                     where_condition: Some(sql::Expr::arc(edge_join_condition(
                                         pg_proj.edge_alias,
                                         pg_proj.pg_subj_cardinal,
-                                        pg_proj.subj_alias,
                                         pg_proj.pg_subj_data.table,
+                                        sql::Expr::path2(pg_proj.subj_alias, "_key"),
                                     ))),
                                 }),
                                 union_builder,
@@ -306,11 +306,11 @@ impl<'a> TransactCtx<'a> {
     }
 }
 
-fn edge_join_condition<'d>(
+pub fn edge_join_condition<'d>(
     edge_alias: sql::Alias,
     cardinal: &'d PgEdgeCardinal,
-    data_alias: sql::Alias,
     data: &'d PgTable,
+    data_key_expr: sql::Expr<'d>,
 ) -> sql::Expr<'d> {
     match &cardinal.kind {
         PgEdgeCardinalKind::Dynamic {
@@ -323,12 +323,12 @@ fn edge_join_condition<'d>(
             ),
             sql::Expr::eq(
                 sql::Expr::path2(edge_alias, key_col_name.as_ref()),
-                sql::Expr::path2(data_alias, "_key"),
+                data_key_expr,
             ),
         ]),
         PgEdgeCardinalKind::Unique { key_col_name, .. } => sql::Expr::eq(
             sql::Expr::path2(edge_alias, key_col_name.as_ref()),
-            sql::Expr::path2(data_alias, "_key"),
+            data_key_expr,
         ),
         PgEdgeCardinalKind::Parameters(_params_def_id) => unreachable!(),
     }
