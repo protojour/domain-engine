@@ -80,7 +80,7 @@ impl<'a> TransactCtx<'a> {
             entity_select.limit,
             after_cursor,
             None,
-            QuerySelect::Struct(&struct_select.properties),
+            Some(QuerySelect::Struct(&struct_select.properties)),
         )
         .await
     }
@@ -92,7 +92,7 @@ impl<'a> TransactCtx<'a> {
         limit: usize,
         after_cursor: Option<Cursor>,
         native_id_condition: Option<PgDataKey>,
-        query_select: QuerySelect<'s>,
+        query_select: Option<QuerySelect<'s>>,
     ) -> DomainResult<impl Stream<Item = DomainResult<QueryFrame>> + 's> {
         debug!("after cursor: {after_cursor:?}");
 
@@ -116,13 +116,17 @@ impl<'a> TransactCtx<'a> {
             }
 
             let (from, _alias, tail_expressions) = match query_select {
-                QuerySelect::Struct(properties) => {
+                Some(QuerySelect::Struct(properties)) => {
                     self.sql_select_expressions(def_id, properties, pg, &mut ctx)?
                 }
-                QuerySelect::Field(rel_id) => {
+                Some(QuerySelect::Field(rel_id)) => {
                     let mut fields = self.initial_standard_data_fields(pg);
                     fields.push(sql::Expr::path1(pg.table.field(&rel_id)?.col_name.as_ref()));
 
+                    (pg.table_name().into(), sql::Alias(0), fields)
+                }
+                None => {
+                    let fields = self.initial_standard_data_fields(pg);
                     (pg.table_name().into(), sql::Alias(0), fields)
                 }
             };
@@ -352,7 +356,7 @@ impl<'a> TransactCtx<'a> {
         &self,
         mut iterator: impl SqlRecordIterator<'b>,
         def: &Def,
-        query_select: QuerySelect,
+        query_select: Option<QuerySelect>,
     ) -> DomainResult<RowValue> {
         let _def_key = iterator
             .next_field(&Layout::Scalar(PgType::Integer))?
@@ -362,7 +366,7 @@ impl<'a> TransactCtx<'a> {
             .into_i64()?;
 
         match query_select {
-            QuerySelect::Struct(properties) => {
+            Some(QuerySelect::Struct(properties)) => {
                 let mut attrs: FnvHashMap<RelId, Attr> = FnvHashMap::with_capacity_and_hasher(
                     def.data_relationships.len(),
                     Default::default(),
@@ -439,10 +443,10 @@ impl<'a> TransactCtx<'a> {
                 Ok(RowValue {
                     value,
                     data_key,
-                    op: DataOperation::Inserted,
+                    op: DataOperation::Queried,
                 })
             }
-            QuerySelect::Field(rel_id) => {
+            Some(QuerySelect::Field(rel_id)) => {
                 let _def_key = iterator
                     .next_field(&Layout::Scalar(PgType::Integer))?
                     .into_i32()?;
@@ -462,7 +466,21 @@ impl<'a> TransactCtx<'a> {
                 Ok(RowValue {
                     value: field_value,
                     data_key,
-                    op: DataOperation::Inserted,
+                    op: DataOperation::Queried,
+                })
+            }
+            None => {
+                let _def_key = iterator
+                    .next_field(&Layout::Scalar(PgType::Integer))?
+                    .into_i32()?;
+                let data_key = iterator
+                    .next_field(&Layout::Scalar(PgType::BigInt))?
+                    .into_i64()?;
+
+                Ok(RowValue {
+                    value: Value::Void(DefId::unit().into()),
+                    data_key,
+                    op: DataOperation::Queried,
                 })
             }
         }
@@ -567,7 +585,7 @@ impl<'a> TransactCtx<'a> {
         let row_value = self.read_row_value(
             sql_record.fields(),
             pg_def.def,
-            QuerySelect::Struct(select_properties),
+            Some(QuerySelect::Struct(select_properties)),
         )?;
 
         Ok(row_value.value)
