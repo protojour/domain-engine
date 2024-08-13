@@ -339,6 +339,8 @@ async fn blog_post_implicit_join(ds: &str) {
     let test = ConduitBundle::new(mock_current_time_monotonic(), ds).await;
     test.create_db_article_for_teh_user("The title").await;
 
+    info!("expecting filtered results");
+
     expect_eq!(
         actual = r#"{
             posts(input: { written_by: "teh_user" }) {
@@ -365,6 +367,8 @@ async fn blog_post_implicit_join(ds: &str) {
             }
         })),
     );
+
+    info!("expecting empty results");
 
     expect_eq!(
         actual = r#"{

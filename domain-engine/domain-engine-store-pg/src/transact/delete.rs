@@ -37,7 +37,7 @@ impl<'a> TransactCtx<'a> {
         debug!("{sql}");
 
         let rows = self
-            .txn
+            .client()
             .query(&sql, &[&id_param])
             .await
             .map_err(|e| ds_err(format!("unable to delete: {e:?}")))?;

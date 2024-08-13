@@ -24,15 +24,22 @@ mod query;
 mod query_edge;
 mod struct_analyzer;
 mod struct_fields;
+mod update;
 
 struct TransactCtx<'a> {
     pg_model: &'a PgModel,
     ontology: &'a Ontology,
     system: &'a (dyn SystemAPI + Send + Sync),
-    txn: deadpool_postgres::Transaction<'a>,
+    connection_state: ConnectionState<'a>,
 }
 
 impl<'a> TransactCtx<'a> {
+    pub fn client(&self) -> &tokio_postgres::Client {
+        match &self.connection_state {
+            ConnectionState::Transaction(txn) => txn.client(),
+        }
+    }
+
     /// Look up ontology def and PG data for the given def_id
     pub fn lookup_def(&self, def_id: DefId) -> DomainResult<PgDef<'a>> {
         let def = self.ontology.def(def_id);
@@ -49,6 +56,16 @@ enum State {
     Update(OpSequence, Select),
     Upsert(OpSequence, Select),
     Delete(OpSequence, DefId),
+}
+
+/// TODO: support out-of-transaction statements by expanding ReqMessage
+/// with an explicit Start/End Transaction
+/// 
+/// Since a transaction needs a &mut Client,
+/// there seems to be no other way to dynamically support
+/// this than re-acquire the connection every time the state needs to be changed.
+enum ConnectionState<'a> {
+    Transaction(deadpool_postgres::Transaction<'a>),
 }
 
 fn write_state(
@@ -90,16 +107,18 @@ pub async fn transact(
             pg_model: &store.pg_model,
             ontology: &store.ontology,
             system: store.system.as_ref(),
-            txn: pg_client
-                .build_transaction()
-                .deferrable(false)
-                .isolation_level(IsolationLevel::ReadCommitted)
-                .start()
-                .await
-                .map_err(|err| {
-                    debug!("transaction not initiated: {err:?}");
-                    ds_err("could not initiate transaction")
-                })?
+            connection_state: ConnectionState::Transaction(
+                pg_client
+                    .build_transaction()
+                    .deferrable(false)
+                    .isolation_level(IsolationLevel::ReadCommitted)
+                    .start()
+                    .await
+                    .map_err(|err| {
+                        debug!("transaction not initiated: {err:?}");
+                        ds_err("could not initiate transaction")
+                    })?
+            )
         };
 
         let mut state: Option<State> = None;
@@ -108,7 +127,7 @@ pub async fn transact(
             match message? {
                 ReqMessage::Query(op_seq, entity_select) => {
                     state = None;
-                    let stream = ctx.query(entity_select).await?;
+                    let stream = ctx.query_vertex(&entity_select).await?;
 
                     yield RespMessage::SequenceStart(op_seq);
 
@@ -152,11 +171,12 @@ pub async fn transact(
                             let row = ctx.insert_vertex(value.into(), InsertMode::Insert, select).await?;
                             yield RespMessage::Element(row.value, row.op);
                         }
-                        Some(State::Update(_, _select)) => {
+                        Some(State::Update(_, select)) => {
                             ObjectGenerator::new(ProcessorMode::Update, ctx.ontology, ctx.system)
                                 .generate_objects(&mut value);
 
-                            Err(ds_err("Update not implemented for Postgres"))?;
+                            let value = ctx.update_vertex(value.into(), select).await?;
+                            yield RespMessage::Element(value, DataOperation::Updated);
                         }
                         Some(State::Upsert(_, select)) => {
                             ObjectGenerator::new(ProcessorMode::Create, ctx.ontology, ctx.system)
@@ -178,12 +198,17 @@ pub async fn transact(
             }
         }
 
-        ctx.txn.commit().await.map_err(|err| {
-            debug!("transaction not committed: {err:?}");
-            ds_err("transaction could not be commmitted")
-        })?;
+        match ctx.connection_state {
+            ConnectionState::Transaction(txn) => {
+                txn.commit().await.map_err(|err| {
+                    debug!("transaction not committed: {err:?}");
+                    ds_err("transaction could not be commmitted")
+                })?;
+        
+                trace!("COMMIT OK");
+            }
+        }
 
-        trace!("COMMIT OK");
     }
     .boxed())
 }

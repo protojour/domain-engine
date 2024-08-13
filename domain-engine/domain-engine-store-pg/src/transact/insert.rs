@@ -134,7 +134,7 @@ impl<'a> TransactCtx<'a> {
             debug!("{sql}");
 
             let stream = self
-                .txn
+                .client()
                 .query_raw(&sql, analyzed.root_attrs.as_params())
                 .await
                 .map_err(|err| ds_err(format!("{err}")))?;
@@ -364,7 +364,7 @@ impl<'a> TransactCtx<'a> {
                 debug!("{sql}");
                 trace!("{edge_params:?}");
 
-                self.txn
+                self.client()
                     .query_raw(&sql, edge_params.iter().map(|param| param as &dyn ToSql))
                     .await
                     .map_err(|e| ds_err(format!("unable to insert edge(1): {e:?}")))?
@@ -501,7 +501,7 @@ impl<'a> TransactCtx<'a> {
                 debug!("{sql}");
 
                 let row = self
-                    .txn
+                    .client()
                     .query_opt(&sql, &[&id_param])
                     .await
                     .map_err(|e| ds_err(format!("could not look up foreign key: {e:?}")))?

@@ -14,12 +14,11 @@ use ontol_runtime::{
 use pin_utils::pin_mut;
 use serde::{Deserialize, Serialize};
 use smallvec::smallvec;
-use tokio_postgres::types::ToSql;
 use tracing::debug;
 
 use crate::{
     ds_bad_req, ds_err,
-    pg_model::{PgDef, PgDomainTable, PgEdgeCardinalKind, PgTable, PgType},
+    pg_model::{PgDataKey, PgDef, PgDomainTable, PgEdgeCardinalKind, PgTable, PgType},
     sql,
     sql_record::{SqlColumnStream, SqlRecord, SqlRecordIterator},
     sql_value::{Layout, SqlVal},
@@ -46,39 +45,57 @@ pub(super) struct QueryBuildCtx<'d> {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-enum Cursor {
+pub enum Cursor {
     /// The only pagination supported for now, is offset-pagination.
     /// Future improvements include value pagination (WHERE (set of values) > (cursor values))
     /// for a specific ordering.
     Offset(usize),
 }
 
-impl<'a> TransactCtx<'a> {
-    pub async fn query(
-        &self,
-        entity_select: EntitySelect,
-    ) -> DomainResult<impl Stream<Item = DomainResult<QueryFrame>> + '_> {
-        debug!("query {entity_select:?}");
+pub enum QuerySelect<'a> {
+    Struct(&'a StructSelect),
+    EntityId,
+}
 
-        let include_total_len = entity_select.include_total_len;
-        let limit = entity_select.limit;
-        let after_cursor: Option<Cursor> = match entity_select.after_cursor {
+impl<'a> TransactCtx<'a> {
+    pub async fn query_vertex<'s>(
+        &'s self,
+        entity_select: &'s EntitySelect,
+    ) -> DomainResult<impl Stream<Item = DomainResult<QueryFrame>> + '_> {
+        let struct_select = match &entity_select.source {
+            StructOrUnionSelect::Struct(struct_select) => struct_select,
+            StructOrUnionSelect::Union(..) => {
+                return Err(ds_bad_req("union top-level query not supported (yet)"))
+            }
+        };
+        let after_cursor: Option<Cursor> = match &entity_select.after_cursor {
             Some(bytes) => {
                 Some(bincode::deserialize(&bytes).map_err(|_| ds_bad_req("bad cursor"))?)
             }
             None => None,
         };
 
+        self.query(
+            struct_select.def_id,
+            entity_select.include_total_len,
+            entity_select.limit,
+            after_cursor,
+            None,
+            QuerySelect::Struct(struct_select),
+        )
+        .await
+    }
+
+    pub async fn query<'s>(
+        &'s self,
+        def_id: DefId,
+        include_total_len: bool,
+        limit: usize,
+        after_cursor: Option<Cursor>,
+        native_id_condition: Option<PgDataKey>,
+        query_select: QuerySelect<'s>,
+    ) -> DomainResult<impl Stream<Item = DomainResult<QueryFrame>> + 's> {
         debug!("after cursor: {after_cursor:?}");
-
-        let struct_select = match entity_select.source {
-            StructOrUnionSelect::Struct(struct_select) => struct_select,
-            StructOrUnionSelect::Union(..) => {
-                return Err(ds_bad_req("union top-level query not supported (yet)"))
-            }
-        };
-
-        let def_id = struct_select.def_id;
 
         let def = self.ontology.def(def_id);
         let pg = self
@@ -88,7 +105,7 @@ impl<'a> TransactCtx<'a> {
         let mut row_layout: Vec<Layout> = vec![];
         let mut ctx = QueryBuildCtx::default();
 
-        let sql_select = {
+        let mut sql_select = {
             let mut expressions = sql::Expressions {
                 items: vec![],
                 multiline: true,
@@ -99,8 +116,26 @@ impl<'a> TransactCtx<'a> {
                 row_layout.push(Layout::Scalar(PgType::BigInt));
             }
 
-            let (from, _alias, tail_expressions) =
-                self.sql_select_expressions(def_id, &struct_select, pg, &mut ctx)?;
+            let (from, _alias, tail_expressions) = match query_select {
+                QuerySelect::Struct(struct_select) => {
+                    self.sql_select_expressions(def_id, struct_select, pg, &mut ctx)?
+                }
+                QuerySelect::EntityId => {
+                    let mut fields = self.initial_standard_data_fields(pg);
+                    let Some(entity) = def.entity() else {
+                        return Err(ds_bad_req("entity without id"));
+                    };
+
+                    fields.push(sql::Expr::path1(
+                        pg.table
+                            .field(&entity.id_relationship_id)?
+                            .col_name
+                            .as_ref(),
+                    ));
+
+                    (pg.table_name().into(), sql::Alias(0), fields)
+                }
+            };
             expressions.items.extend(tail_expressions);
 
             sql::Select {
@@ -122,12 +157,19 @@ impl<'a> TransactCtx<'a> {
             }
         };
 
+        let mut select_params: Vec<SqlVal> = vec![];
+
+        if let Some(native_id_condition) = native_id_condition {
+            sql_select.where_ = Some(sql::Expr::eq(sql::Expr::path1("_key"), sql::Expr::param(0)));
+            select_params.push(SqlVal::I64(native_id_condition));
+        }
+
         let sql = sql_select.to_string();
         debug!("{sql}");
 
         let row_stream = self
-            .txn
-            .query_raw(&sql, slice_iter(&[]))
+            .client()
+            .query_raw(&sql, &select_params)
             .await
             .map_err(|err| ds_err(format!("{err}")))?;
 
@@ -151,7 +193,14 @@ impl<'a> TransactCtx<'a> {
                 }
 
                 if observed_rows < limit {
-                    let row_value = self.read_struct_row_value(row_iter, def, &struct_select.properties)?;
+                    let row_value = match query_select {
+                        QuerySelect::Struct(sel) => {
+                            self.read_struct_row_value(row_iter, def, &sel.properties)?
+                        }
+                        QuerySelect::EntityId => {
+                            todo!()
+                        }
+                    };
                     yield QueryFrame::Row(row_value);
 
                     observed_values += 1;
@@ -283,14 +332,7 @@ impl<'a> TransactCtx<'a> {
             let with_alias = ctx.alias.incr();
 
             let mut expressions = sql::Expressions {
-                items: vec![
-                    // Always present: the def key of the vertex.
-                    // This is known ahead of time.
-                    // It will be used later to parse unions.
-                    sql::Expr::LiteralInt(pg.table.key),
-                    // Always present: the data key of the vertex
-                    sql::Expr::path1("_key"),
-                ],
+                items: self.initial_standard_data_fields(pg),
                 multiline: false,
             };
 
@@ -310,6 +352,17 @@ impl<'a> TransactCtx<'a> {
 
             Ok(with_alias)
         }
+    }
+
+    fn initial_standard_data_fields(&self, pg: PgDomainTable<'a>) -> Vec<sql::Expr<'a>> {
+        vec![
+            // Always present: the def key of the vertex.
+            // This is known ahead of time.
+            // It will be used later to parse unions.
+            sql::Expr::LiteralInt(pg.table.key),
+            // Always present: the data key of the vertex
+            sql::Expr::path1("_key"),
+        ]
     }
 
     fn read_struct_row_value<'b>(
@@ -499,10 +552,4 @@ impl<'a> TransactCtx<'a> {
 
         Ok(row_value.value)
     }
-}
-
-fn slice_iter<'a>(
-    s: &'a [&'a (dyn ToSql + Sync)],
-) -> impl ExactSizeIterator<Item = &'a dyn ToSql> + 'a {
-    s.iter().map(|s| *s as _)
 }

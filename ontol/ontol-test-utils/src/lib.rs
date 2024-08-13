@@ -44,8 +44,14 @@ macro_rules! expect_eq {
     (expected = $expected:expr, actual = $actual:expr $(,)?) => {
         pretty_assertions::assert_eq!($expected, $actual);
     };
+    (expected = $expected:expr, actual = $actual:expr, $msg:expr) => {
+        pretty_assertions::assert_eq!($expected, $actual, $msg);
+    };
     (actual = $actual:expr, expected = $expected:expr $(,)?) => {
         pretty_assertions::assert_eq!($expected, $actual);
+    };
+    (actual = $actual:expr, expected = $expected:expr, $msg:expr) => {
+        pretty_assertions::assert_eq!($expected, $actual, $msg);
     };
 }
 

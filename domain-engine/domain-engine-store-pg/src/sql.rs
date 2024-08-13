@@ -56,6 +56,27 @@ pub struct Select<'d> {
     pub limit: Limit,
 }
 
+pub struct Insert<'d> {
+    pub into: TableName<'d>,
+    pub column_names: Vec<&'d str>,
+    pub on_conflict: Option<OnConflict<'d>>,
+    pub returning: Vec<Expr<'d>>,
+}
+
+pub struct Update<'d> {
+    pub with: Option<With<'d>>,
+    pub table_name: TableName<'d>,
+    pub set: Vec<UpdateColumn<'d>>,
+    pub where_: Option<Expr<'d>>,
+    pub returning: Vec<Expr<'d>>,
+}
+
+pub struct Delete<'d> {
+    pub from: TableName<'d>,
+    pub where_: Option<Expr<'d>>,
+    pub returning: Vec<Expr<'d>>,
+}
+
 #[derive(Clone, Default)]
 pub struct Expressions<'d> {
     pub items: Vec<Expr<'d>>,
@@ -75,13 +96,6 @@ pub struct WithQuery<'d> {
     pub stmt: Stmt<'d>,
 }
 
-pub struct Insert<'d> {
-    pub into: TableName<'d>,
-    pub column_names: Vec<&'d str>,
-    pub on_conflict: Option<OnConflict<'d>>,
-    pub returning: Vec<Expr<'d>>,
-}
-
 pub struct OnConflict<'d> {
     pub target: Option<ConflictTarget<'d>>,
     pub action: ConflictAction<'d>,
@@ -95,12 +109,6 @@ pub enum ConflictAction<'d> {
     DoUpdateSet(Vec<UpdateColumn<'d>>),
     #[allow(unused)]
     DoNothing,
-}
-
-pub struct Delete<'d> {
-    pub from: TableName<'d>,
-    pub where_: Option<Expr<'d>>,
-    pub returning: Vec<Expr<'d>>,
 }
 
 /// column = expr
@@ -245,6 +253,69 @@ impl<'d> Display for Select<'d> {
     }
 }
 
+impl<'d> Display for Insert<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "INSERT INTO {table_name} ({columns}) VALUES ({values})",
+            table_name = self.into,
+            columns = self.column_names.iter().map(Ident).format(","),
+            values = (0..self.column_names.len()).map(Param).format(","),
+        )?;
+
+        if let Some(on_conflict) = &self.on_conflict {
+            write!(f, " ON CONFLICT {on_conflict}")?;
+        }
+
+        if !self.returning.is_empty() {
+            write!(f, " RETURNING {}", self.returning.iter().format(","))?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<'d> Display for Update<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(with) = &self.with {
+            writeln!(f, "{with}")?;
+        }
+
+        write!(
+            f,
+            "UPDATE {table_name} SET {set}",
+            table_name = self.table_name,
+            set = self.set.iter().format(",")
+        )?;
+
+        if let Some(condition) = &self.where_ {
+            write!(f, " WHERE {condition}")?;
+        }
+
+        if !self.returning.is_empty() {
+            write!(f, " RETURNING {}", self.returning.iter().format(","))?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<'d> Display for Delete<'d> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DELETE FROM {from}", from = self.from)?;
+
+        if let Some(condition) = &self.where_ {
+            write!(f, " WHERE {condition}")?;
+        }
+
+        if !self.returning.is_empty() {
+            write!(f, " RETURNING {}", self.returning.iter().format(","))?;
+        }
+
+        Ok(())
+    }
+}
+
 impl<'d> Display for Expressions<'d> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.multiline {
@@ -293,28 +364,6 @@ impl<'d> Display for WithQuery<'d> {
     }
 }
 
-impl<'d> Display for Insert<'d> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "INSERT INTO {table_name} ({columns}) VALUES ({values})",
-            table_name = self.into,
-            columns = self.column_names.iter().map(Ident).format(","),
-            values = (0..self.column_names.len()).map(Param).format(","),
-        )?;
-
-        if let Some(on_conflict) = &self.on_conflict {
-            write!(f, " ON CONFLICT {on_conflict}")?;
-        }
-
-        if !self.returning.is_empty() {
-            write!(f, " RETURNING {}", self.returning.iter().format(","))?;
-        }
-
-        Ok(())
-    }
-}
-
 impl<'d> Display for OnConflict<'d> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(target) = &self.target {
@@ -358,22 +407,6 @@ impl<'d> Display for UpdateColumn<'d> {
             column_name = Ident(self.0),
             expr = self.1
         )
-    }
-}
-
-impl<'d> Display for Delete<'d> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "DELETE FROM {from}", from = self.from)?;
-
-        if let Some(condition) = &self.where_ {
-            write!(f, " WHERE {condition}")?;
-        }
-
-        if !self.returning.is_empty() {
-            write!(f, " RETURNING {}", self.returning.iter().format(","))?;
-        }
-
-        Ok(())
     }
 }
 
