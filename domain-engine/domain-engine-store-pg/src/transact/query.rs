@@ -18,7 +18,7 @@ use tracing::{debug, trace};
 
 use crate::{
     pg_error::{PgError, PgInputError, PgModelError},
-    pg_model::{PgDataKey, PgDef, PgDomainTable, PgEdgeCardinalKind, PgTable, PgType},
+    pg_model::{PgDataKey, PgDomainTable, PgEdgeCardinalKind, PgTable, PgTableKey, PgType},
     sql::{self},
     sql_record::{SqlColumnStream, SqlRecord, SqlRecordIterator},
     sql_value::{Layout, SqlVal},
@@ -111,7 +111,6 @@ impl<'a> TransactCtx<'a> {
     ) -> DomainResult<impl Stream<Item = DomainResult<QueryFrame>> + 's> {
         debug!("after cursor: {after_cursor:?}");
 
-        let def = self.ontology.def(def_id);
         let pg = self
             .pg_model
             .pg_domain_datatable(def_id.package_id(), def_id)?;
@@ -203,7 +202,7 @@ impl<'a> TransactCtx<'a> {
                 }
 
                 if observed_rows < limit {
-                    let row_value = self.read_row_value(row_iter, def, query_select, DataOperation::Queried)?;
+                    let row_value = self.read_row_value_as_vertex(row_iter, query_select, DataOperation::Queried)?;
                     yield QueryFrame::Row(row_value);
 
                     observed_values += 1;
@@ -370,16 +369,25 @@ impl<'a> TransactCtx<'a> {
         }
     }
 
-    pub fn read_row_value<'b>(
+    pub fn read_row_value_as_vertex<'b>(
         &self,
         mut iterator: impl SqlRecordIterator<'b>,
-        def: &Def,
         query_select: Option<QuerySelect>,
         op: DataOperation,
     ) -> DomainResult<RowValue> {
-        let _def_key = iterator
-            .next_field(&Layout::Scalar(PgType::Integer))?
-            .into_i32()?;
+        let def = {
+            let def_key = iterator
+                .next_field(&Layout::Scalar(PgType::Integer))?
+                .into_i32()?;
+
+            let Some(PgTableKey::Data { pkg_id: _, def_id }) =
+                self.pg_model.reg_key_to_table_key.get(&def_key)
+            else {
+                return Err(PgError::InvalidDynamicDataType(def_key).into());
+            };
+            self.ontology.def(*def_id)
+        };
+
         let data_key = iterator
             .next_field(&Layout::Scalar(PgType::BigInt))?
             .into_i64()?;
@@ -483,20 +491,11 @@ impl<'a> TransactCtx<'a> {
                     op,
                 })
             }
-            None => {
-                let _def_key = iterator
-                    .next_field(&Layout::Scalar(PgType::Integer))?
-                    .into_i32()?;
-                let data_key = iterator
-                    .next_field(&Layout::Scalar(PgType::BigInt))?
-                    .into_i64()?;
-
-                Ok(RowValue {
-                    value: Value::Void(DefId::unit().into()),
-                    data_key,
-                    op,
-                })
-            }
+            None => Ok(RowValue {
+                value: Value::Void(DefId::unit().into()),
+                data_key,
+                op,
+            }),
         }
     }
 
@@ -563,11 +562,11 @@ impl<'a> TransactCtx<'a> {
                 self.deserialize_sql(entity.id_value_def_id, sql_field)
             }
             Select::Struct(struct_select) => {
-                self.read_record_as_struct(pg_def, sql_record, &struct_select.properties)
+                self.read_record_as_struct(sql_record, &struct_select.properties)
             }
             Select::Entity(entity_select) => match &entity_select.source {
                 StructOrUnionSelect::Struct(struct_select) => {
-                    self.read_record_as_struct(pg_def, sql_record, &struct_select.properties)
+                    self.read_record_as_struct(sql_record, &struct_select.properties)
                 }
                 StructOrUnionSelect::Union(_, variants) => {
                     let actual_select = variants
@@ -575,7 +574,7 @@ impl<'a> TransactCtx<'a> {
                         .find(|sel| sel.def_id == def_id)
                         .ok_or(PgInputError::UnionVariantNotFound)?;
 
-                    self.read_record_as_struct(pg_def, sql_record, &actual_select.properties)
+                    self.read_record_as_struct(sql_record, &actual_select.properties)
                 }
             },
             Select::StructUnion(_, variants) => {
@@ -584,7 +583,7 @@ impl<'a> TransactCtx<'a> {
                     .find(|sel| sel.def_id == def_id)
                     .ok_or(PgInputError::UnionVariantNotFound)?;
 
-                self.read_record_as_struct(pg_def, sql_record, &actual_select.properties)
+                self.read_record_as_struct(sql_record, &actual_select.properties)
             }
             _ => todo!("unhandled select"),
         }
@@ -592,13 +591,11 @@ impl<'a> TransactCtx<'a> {
 
     fn read_record_as_struct(
         &self,
-        pg_def: PgDef,
         sql_record: SqlRecord,
         select_properties: &FnvHashMap<RelId, Select>,
     ) -> DomainResult<Value> {
-        let row_value = self.read_row_value(
+        let row_value = self.read_row_value_as_vertex(
             sql_record.fields(),
-            pg_def.def,
             Some(QuerySelect::Struct(select_properties)),
             DataOperation::Queried,
         )?;

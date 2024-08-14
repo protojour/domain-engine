@@ -59,7 +59,7 @@ impl<'a> TransactCtx<'a> {
         mode: InsertMode,
         select: &'a Select,
     ) -> DomainResult<RowValue> {
-        let def = self.preprocess_insert_value(mode, &mut value.value)?;
+        self.preprocess_insert_value(mode, &mut value.value)?;
 
         let mut layout = vec![];
         let (sql, analyzed, query_select) =
@@ -99,9 +99,8 @@ impl<'a> TransactCtx<'a> {
             row
         };
 
-        let row_value = self.read_row_value(
+        let row_value = self.read_row_value_as_vertex(
             SqlColumnStream::new(&row),
-            def,
             Some(query_select),
             DataOperation::Inserted,
         )?;
@@ -116,11 +115,7 @@ impl<'a> TransactCtx<'a> {
         Ok(row_value)
     }
 
-    fn preprocess_insert_value(
-        &self,
-        mode: InsertMode,
-        value: &mut Value,
-    ) -> DomainResult<&'a Def> {
+    fn preprocess_insert_value(&self, mode: InsertMode, value: &mut Value) -> DomainResult<()> {
         let def_id = value.type_def_id();
         let def = self.ontology.def(def_id);
         let entity = def.entity().ok_or_else(|| {
@@ -153,7 +148,7 @@ impl<'a> TransactCtx<'a> {
             }
         }
 
-        Ok(def)
+        Ok(())
     }
 
     // TODO: This should not depend on the value

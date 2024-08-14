@@ -40,6 +40,8 @@ pub enum PgError {
     CommitTransaction(tokio_postgres::Error),
     /// foreign key lookup
     ForeignKeyLookup(tokio_postgres::Error),
+    /// invalid dynamic data type
+    InvalidDynamicDataType(PgRegKey),
     /// select
     SelectQuery(tokio_postgres::Error),
     /// select data
