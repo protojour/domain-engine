@@ -64,6 +64,7 @@ impl<'b> SqlVal<'b> {
         }
     }
 
+    #[allow(unused)]
     pub fn non_null(self) -> DomainResult<Self> {
         match self {
             Self::Null => Err(PgError::InvalidType("null").into()),

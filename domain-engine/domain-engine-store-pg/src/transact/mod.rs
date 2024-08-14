@@ -29,7 +29,7 @@ mod insert;
 mod query;
 mod update;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum MutationMode {
     Create(InsertMode),
     Update,
@@ -41,7 +41,7 @@ impl MutationMode {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum InsertMode {
     Insert,
     Upsert,

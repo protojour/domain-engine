@@ -139,6 +139,7 @@ impl<'a> TransactCtx<'a> {
         let mut sql_insert = sql::Insert {
             with: None,
             into: pg_edge.table_name(),
+            as_: None,
             column_names: vec![],
             on_conflict: None,
             returning: vec![],
@@ -626,6 +627,7 @@ impl<'a> TransactCtx<'a> {
                         sql::Insert {
                             with: None,
                             into: pg.table_name(),
+                            as_: None,
                             column_names: vec![&pg_id_field.col_name],
                             on_conflict: Some(sql::OnConflict {
                                 target: Some(sql::ConflictTarget::Columns(vec![

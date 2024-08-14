@@ -11,6 +11,7 @@ use crate::{
     pg_error::{ds_err, PgInputError},
     pg_model::{PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgTable},
     sql::{self, Path},
+    transact::query::QueryContext,
 };
 
 use super::{query::QueryBuildCtx, TransactCtx};
@@ -182,6 +183,7 @@ impl<'a> TransactCtx<'a> {
                             let (from, vertex_alias, expressions) = self.sql_select_expressions(
                                 target_def_id,
                                 &struct_select.properties,
+                                QueryContext::Select,
                                 pg_def.pg,
                                 ctx,
                             )?;

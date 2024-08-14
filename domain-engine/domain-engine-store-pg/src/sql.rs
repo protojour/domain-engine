@@ -59,6 +59,7 @@ pub struct Select<'a> {
 pub struct Insert<'a> {
     pub with: Option<With<'a>>,
     pub into: TableName<'a>,
+    pub as_: Option<Alias>,
     pub column_names: Vec<&'a str>,
     pub on_conflict: Option<OnConflict<'a>>,
     pub returning: Vec<Expr<'a>>,
@@ -315,10 +316,15 @@ impl<'a> Display for Insert<'a> {
             writeln!(f, "{with}")?;
         }
 
+        write!(f, "INSERT INTO {table_name}", table_name = self.into,)?;
+
+        if let Some(as_) = self.as_ {
+            write!(f, " AS {as_}")?;
+        }
+
         write!(
             f,
-            "INSERT INTO {table_name} ({columns}) VALUES ({values})",
-            table_name = self.into,
+            " ({columns}) VALUES ({values})",
             columns = self.column_names.iter().map(Ident).format(","),
             values = (0..self.column_names.len()).map(Param).format(","),
         )?;

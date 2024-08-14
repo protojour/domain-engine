@@ -9,7 +9,7 @@ use ontol_runtime::{
 
 use crate::{
     pg_error::PgError,
-    pg_model::{PgTable, PgType},
+    pg_model::{PgDomainTable, PgTable, PgType},
     sql,
     sql_record::SqlRecordIterator,
     sql_value::Layout,
@@ -18,6 +18,17 @@ use crate::{
 use super::TransactCtx;
 
 impl<'a> TransactCtx<'a> {
+    pub fn initial_standard_data_fields(&self, pg: PgDomainTable<'a>) -> [sql::Expr<'a>; 2] {
+        [
+            // Always present: the def key of the vertex.
+            // This is known ahead of time.
+            // It will be used later to parse unions.
+            sql::Expr::LiteralInt(pg.table.key),
+            // Always present: the data key of the vertex
+            sql::Expr::path1("_key"),
+        ]
+    }
+
     /// Select the columns in the order of the data relationships in the Def.
     pub fn select_inherent_struct_fields(
         &self,

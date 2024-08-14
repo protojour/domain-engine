@@ -19,7 +19,7 @@ use tracing::{debug, trace};
 use crate::{
     pg_error::{PgError, PgInputError, PgModelError},
     pg_model::{PgDataKey, PgDef, PgDomainTable, PgEdgeCardinalKind, PgTable, PgType},
-    sql,
+    sql::{self},
     sql_record::{SqlColumnStream, SqlRecord, SqlRecordIterator},
     sql_value::{Layout, SqlVal},
 };
@@ -38,10 +38,20 @@ pub enum QueryFrame {
 }
 
 #[derive(Default)]
-pub(super) struct QueryBuildCtx<'d> {
+pub(super) struct QueryBuildCtx<'a> {
     pub alias: sql::Alias,
     pub with_def_aliases: FnvHashMap<DefId, sql::Alias>,
-    pub with_queries: Vec<sql::WithQuery<'d>>,
+    pub with_queries: Vec<sql::WithQuery<'a>>,
+}
+
+impl<'a> QueryBuildCtx<'a> {
+    pub fn with(&mut self) -> Option<sql::With<'a>> {
+        if !self.with_queries.is_empty() {
+            Some(std::mem::take(&mut self.with_queries).into())
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -56,6 +66,11 @@ pub enum Cursor {
 pub enum QuerySelect<'a> {
     Struct(&'a FnvHashMap<RelId, Select>),
     Field(RelId),
+}
+
+pub enum QueryContext {
+    Select,
+    Insert,
 }
 
 impl<'a> TransactCtx<'a> {
@@ -116,28 +131,28 @@ impl<'a> TransactCtx<'a> {
             }
 
             let (from, _alias, tail_expressions) = match query_select {
-                Some(QuerySelect::Struct(properties)) => {
-                    self.sql_select_expressions(def_id, properties, pg, &mut ctx)?
-                }
+                Some(QuerySelect::Struct(properties)) => self.sql_select_expressions(
+                    def_id,
+                    properties,
+                    QueryContext::Select,
+                    pg,
+                    &mut ctx,
+                )?,
                 Some(QuerySelect::Field(rel_id)) => {
-                    let mut fields = self.initial_standard_data_fields(pg);
+                    let mut fields: Vec<_> = self.initial_standard_data_fields(pg).into();
                     fields.push(sql::Expr::path1(pg.table.field(&rel_id)?.col_name.as_ref()));
 
                     (pg.table_name().into(), sql::Alias(0), fields)
                 }
                 None => {
-                    let fields = self.initial_standard_data_fields(pg);
+                    let fields: Vec<_> = self.initial_standard_data_fields(pg).into();
                     (pg.table_name().into(), sql::Alias(0), fields)
                 }
             };
             expressions.items.extend(tail_expressions);
 
             sql::Select {
-                with: if !ctx.with_queries.is_empty() {
-                    Some(std::mem::take(&mut ctx.with_queries).into())
-                } else {
-                    None
-                },
+                with: ctx.with(),
                 expressions,
                 from: vec![from],
                 where_: None,
@@ -188,7 +203,7 @@ impl<'a> TransactCtx<'a> {
                 }
 
                 if observed_rows < limit {
-                    let row_value = self.read_row_value(row_iter, def, query_select)?;
+                    let row_value = self.read_row_value(row_iter, def, query_select, DataOperation::Queried)?;
                     yield QueryFrame::Row(row_value);
 
                     observed_values += 1;
@@ -224,14 +239,27 @@ impl<'a> TransactCtx<'a> {
         &self,
         def_id: DefId,
         properties: &FnvHashMap<RelId, Select>,
+        query_context: QueryContext,
         pg: PgDomainTable<'a>,
         ctx: &mut QueryBuildCtx<'a>,
     ) -> DomainResult<(sql::FromItem<'a>, sql::Alias, Vec<sql::Expr<'a>>)> {
         let def = self.ontology.def(def_id);
 
         // select data properties
-        let data_alias = self.select_inherent_fields_as_alias(def, pg, ctx)?;
-        let mut sql_expressions = vec![sql::Expr::path2(data_alias, sql::PathSegment::Asterisk)];
+        let mut sql_expressions = vec![];
+        let data_alias = match query_context {
+            QueryContext::Select => {
+                let data_alias = self.select_inherent_fields_as_alias(def, pg, ctx)?;
+                sql_expressions.push(sql::Expr::path2(data_alias, sql::PathSegment::Asterisk));
+                data_alias
+            }
+            QueryContext::Insert => {
+                let alias = ctx.with_def_aliases.get(&def_id).unwrap();
+                sql_expressions.extend(self.initial_standard_data_fields(pg));
+                self.select_inherent_struct_fields(def, pg.table, &mut sql_expressions, None)?;
+                *alias
+            }
+        };
 
         // select edges
         for (rel_id, select) in properties {
@@ -320,7 +348,7 @@ impl<'a> TransactCtx<'a> {
             let with_alias = ctx.alias.incr();
 
             let mut expressions = sql::Expressions {
-                items: self.initial_standard_data_fields(pg),
+                items: self.initial_standard_data_fields(pg).into(),
                 multiline: false,
             };
 
@@ -342,22 +370,12 @@ impl<'a> TransactCtx<'a> {
         }
     }
 
-    fn initial_standard_data_fields(&self, pg: PgDomainTable<'a>) -> Vec<sql::Expr<'a>> {
-        vec![
-            // Always present: the def key of the vertex.
-            // This is known ahead of time.
-            // It will be used later to parse unions.
-            sql::Expr::LiteralInt(pg.table.key),
-            // Always present: the data key of the vertex
-            sql::Expr::path1("_key"),
-        ]
-    }
-
-    fn read_row_value<'b>(
+    pub fn read_row_value<'b>(
         &self,
         mut iterator: impl SqlRecordIterator<'b>,
         def: &Def,
         query_select: Option<QuerySelect>,
+        op: DataOperation,
     ) -> DomainResult<RowValue> {
         let _def_key = iterator
             .next_field(&Layout::Scalar(PgType::Integer))?
@@ -446,17 +464,10 @@ impl<'a> TransactCtx<'a> {
                 Ok(RowValue {
                     value,
                     data_key,
-                    op: DataOperation::Queried,
+                    op,
                 })
             }
             Some(QuerySelect::Field(rel_id)) => {
-                let _def_key = iterator
-                    .next_field(&Layout::Scalar(PgType::Integer))?
-                    .into_i32()?;
-                let data_key = iterator
-                    .next_field(&Layout::Scalar(PgType::BigInt))?
-                    .into_i64()?;
-
                 let field_value = self
                     .read_field(
                         def.data_relationships
@@ -469,7 +480,7 @@ impl<'a> TransactCtx<'a> {
                 Ok(RowValue {
                     value: field_value,
                     data_key,
-                    op: DataOperation::Queried,
+                    op,
                 })
             }
             None => {
@@ -483,7 +494,7 @@ impl<'a> TransactCtx<'a> {
                 Ok(RowValue {
                     value: Value::Void(DefId::unit().into()),
                     data_key,
-                    op: DataOperation::Queried,
+                    op,
                 })
             }
         }
@@ -589,6 +600,7 @@ impl<'a> TransactCtx<'a> {
             sql_record.fields(),
             pg_def.def,
             Some(QuerySelect::Struct(select_properties)),
+            DataOperation::Queried,
         )?;
 
         Ok(row_value.value)
