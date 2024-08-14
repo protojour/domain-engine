@@ -167,7 +167,7 @@ impl<'a> TransactCtx<'a> {
                             ProjectedEdgeCardinal::Object(pg_cardinal, dynamic)
                         });
                 }
-                PgEdgeCardinalKind::Unique { key_col_name, .. } => {
+                PgEdgeCardinalKind::PinnedDef { key_col_name, .. } => {
                     sql_insert.column_names.push(key_col_name);
                     analysis
                         .projected_cardinals
@@ -288,7 +288,7 @@ impl<'a> TransactCtx<'a> {
 
                         key_col_name
                     }
-                    PgEdgeCardinalKind::Unique { key_col_name, .. } => key_col_name,
+                    PgEdgeCardinalKind::PinnedDef { key_col_name, .. } => key_col_name,
                     PgEdgeCardinalKind::Parameters(_) => {
                         return Err(DomainError::data_store_bad_request(
                             "cannot delete edge based on parameters (yet)",

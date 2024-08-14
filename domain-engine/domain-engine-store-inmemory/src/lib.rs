@@ -87,7 +87,7 @@ impl InMemoryDb {
                         EdgeColumn {
                             data: vector,
                             vertex_union,
-                            unique: cardinal.flags.contains(EdgeCardinalFlags::UNIQUE),
+                            pinned: cardinal.flags.contains(EdgeCardinalFlags::PINNED_DEF),
                         }
                     })
                     .collect();

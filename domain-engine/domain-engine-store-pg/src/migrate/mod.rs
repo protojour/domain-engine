@@ -72,6 +72,7 @@ enum MigrationStep {
         index: CardinalIdx,
         ident: Box<str>,
         kind: PgEdgeCardinalKind,
+        index_type: Option<PgIndexType>,
     },
     RenameDomainSchema {
         old: Box<str>,

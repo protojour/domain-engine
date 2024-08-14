@@ -620,9 +620,9 @@ fn edge_entity_simple() {
         assert_eq!(edge.cardinals.len(), 3);
         assert!(edge.cardinals.iter().all(|cardinal| cardinal.is_entity()));
 
-        assert!(!edge.cardinals[0].is_unique());
-        assert!(!edge.cardinals[1].is_unique());
-        assert!(edge.cardinals[2].is_unique());
+        assert!(!edge.cardinals[0].is_one_to_one());
+        assert!(!edge.cardinals[1].is_one_to_one());
+        assert!(edge.cardinals[2].is_one_to_one());
     }
 
     assert!(foo.def.entity().is_some());
@@ -679,7 +679,7 @@ fn edge_entity_union() {
         assert_eq!(edge.cardinals.len(), 3);
         assert!(edge.cardinals.iter().all(|cardinal| cardinal.is_entity()));
 
-        assert!(!edge.cardinals[0].is_unique());
+        assert!(!edge.cardinals[0].is_one_to_one());
         assert_eq!(
             DefIdSet::from_iter([foo.def_id(), bar.def_id()]),
             edge.cardinals[0].target
@@ -688,12 +688,12 @@ fn edge_entity_union() {
             DefIdSet::from_iter([baz.def_id(), qux.def_id()]),
             edge.cardinals[1].target
         );
-        assert!(!edge.cardinals[1].is_unique());
+        assert!(!edge.cardinals[1].is_one_to_one());
         assert_eq!(
             DefIdSet::from_iter([link.def_id()]),
             edge.cardinals[2].target
         );
-        assert!(edge.cardinals[2].is_unique());
+        assert!(edge.cardinals[2].is_one_to_one());
     }
 
     {

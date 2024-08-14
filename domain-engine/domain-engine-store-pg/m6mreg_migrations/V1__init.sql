@@ -99,10 +99,11 @@ CREATE TABLE m6mreg.edgecardinal
     ordinal integer NOT NULL,
     ident text NOT NULL,
     def_column_name text,
-    unique_domaintable_key integer REFERENCES m6mreg.domaintable(key),
+    pinned_domaintable_key integer REFERENCES m6mreg.domaintable(key),
     key_column_name text,
+    index_type m6m_pg_index_type,
 
     UNIQUE (domaintable_key, ordinal),
-    CHECK ((key_column_name IS NULL) = ((def_column_name IS NULL) AND (unique_domaintable_key IS NULL))),
-    CHECK (unique_domaintable_key != domaintable_key)
+    CHECK ((key_column_name IS NULL) = ((def_column_name IS NULL) AND (pinned_domaintable_key IS NULL))),
+    CHECK (pinned_domaintable_key != domaintable_key)
 );

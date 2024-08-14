@@ -278,7 +278,7 @@ impl<'m> Compiler<'m> {
                         flags.insert(EdgeCardinalFlags::ENTITY);
 
                         if variable.one_to_one_count > 0 {
-                            flags.insert(EdgeCardinalFlags::UNIQUE);
+                            flags.insert(EdgeCardinalFlags::PINNED_DEF);
                         }
                     } else if entity_count > 0 {
                         panic!("FIXME: mix of entity/non-entity");

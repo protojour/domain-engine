@@ -8,7 +8,7 @@ use ontol_runtime::{
     value::Value, RelId,
 };
 use postgres_types::ToSql;
-use tracing::{debug, warn};
+use tracing::{debug, trace, warn};
 
 use crate::{
     pg_error::{PgError, PgInputError},
@@ -117,7 +117,7 @@ impl<'a> TransactCtx<'a> {
 
             match rel_info.kind {
                 DataRelationshipKind::Id => {
-                    debug!("skipping ID for update");
+                    trace!("skipping ID for update");
                 }
                 DataRelationshipKind::Tree => {
                     let pg_field = pg.table.field(&rel_id)?;

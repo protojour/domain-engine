@@ -410,7 +410,7 @@ impl InMemoryStore {
                     (
                         cardinal_idx,
                         column.vertex_union.clone(),
-                        format!("unique={}", column.unique),
+                        format!("pinned={}", column.pinned),
                     )
                 })
                 .collect_vec();

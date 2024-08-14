@@ -59,7 +59,7 @@ pub(super) struct HyperEdgeTable {
 pub(super) struct EdgeColumn {
     pub data: EdgeVectorData,
     pub vertex_union: FnvHashSet<DefId>,
-    pub unique: bool,
+    pub pinned: bool,
 }
 
 #[derive(Debug)]
@@ -242,7 +242,7 @@ impl HyperEdgeTable {
         output: &mut BTreeSet<usize>,
     ) {
         for (cardinal_idx, column) in self.columns.iter().enumerate() {
-            if !column.unique {
+            if !column.pinned {
                 continue;
             }
 

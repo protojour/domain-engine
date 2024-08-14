@@ -284,6 +284,7 @@ async fn execute_migration_step<'t>(
             index,
             ident,
             kind,
+            ..
         } => {
             let pg_edge_domain = ctx.domains.get(&pkg_id).unwrap();
             let pg_table = pg_edge_domain.edgetables.get(&edge_tag).unwrap();
@@ -317,7 +318,7 @@ async fn execute_migration_step<'t>(
                     .await
                     .context("alter table add key column")?;
                 }
-                PgEdgeCardinalKind::Unique {
+                PgEdgeCardinalKind::PinnedDef {
                     def_id,
                     key_col_name,
                 } => {
@@ -349,7 +350,7 @@ async fn execute_migration_step<'t>(
 
             let mut def_column_name: Option<&str> = None;
             let mut key_column_name: Option<&str> = None;
-            let mut unique_domaintable_key: Option<PgRegKey> = None;
+            let mut pinned_domaintable_key: Option<PgRegKey> = None;
 
             match &kind {
                 PgEdgeCardinalKind::Dynamic {
@@ -359,11 +360,11 @@ async fn execute_migration_step<'t>(
                     def_column_name = Some(def_col_name.as_ref());
                     key_column_name = Some(key_col_name.as_ref());
                 }
-                PgEdgeCardinalKind::Unique {
+                PgEdgeCardinalKind::PinnedDef {
                     def_id,
                     key_col_name,
                 } => {
-                    unique_domaintable_key =
+                    pinned_domaintable_key =
                         Some(pg_edge_domain.datatables.get(def_id).unwrap().key);
                     key_column_name = Some(key_col_name.as_ref());
                 }
@@ -378,7 +379,7 @@ async fn execute_migration_step<'t>(
                             ordinal,
                             ident,
                             def_column_name,
-                            unique_domaintable_key,
+                            pinned_domaintable_key,
                             key_column_name
                         ) VALUES($1, $2, $3, $4, $5, $6)
                         RETURNING key
@@ -388,7 +389,7 @@ async fn execute_migration_step<'t>(
                         &(index.0 as i32),
                         &ident,
                         &def_column_name,
-                        &unique_domaintable_key,
+                        &pinned_domaintable_key,
                         &key_column_name,
                     ],
                 )

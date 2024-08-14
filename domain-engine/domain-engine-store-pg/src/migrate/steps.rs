@@ -277,7 +277,7 @@ async fn migrate_domain_edges_steps<'t>(
             let pg_cardinals: BTreeMap<CardinalIdx, PgEdgeCardinal> = txn
                 .query(
                     indoc! {"
-                        SELECT key, ordinal, ident, def_column_name, unique_domaintable_key, key_column_name
+                        SELECT key, ordinal, ident, def_column_name, pinned_domaintable_key, key_column_name
                         FROM m6mreg.edgecardinal
                         WHERE domaintable_key = $1
                         ORDER BY ordinal
@@ -291,10 +291,10 @@ async fn migrate_domain_edges_steps<'t>(
                     let ordinal: i32 = row.get(1);
                     let ident = row.get(2);
                     let def_col_name: Option<Box<str>> = row.get(3);
-                    let unique_datatable_key: Option<PgRegKey> = row.get(4);
+                    let pinned_domaintable_key: Option<PgRegKey> = row.get(4);
                     let key_col_name: Option<Box<str>> = row.get(5);
 
-                    let unique_datatable_def_id = unique_datatable_key.map(|key|
+                    let pinned_domaintable_def_id = pinned_domaintable_key.map(|key|
                         *pg_domain.datatables.iter().find(|(_, dt)| dt.key == key).unwrap()
                             .0
                     );
@@ -304,10 +304,10 @@ async fn migrate_domain_edges_steps<'t>(
                         PgEdgeCardinal {
                             key,
                             ident,
-                            kind: match (key_col_name, unique_datatable_def_id, def_col_name) {
-                                (Some(key_col_name), Some(unique_datatable_def_id), None) => {
-                                    PgEdgeCardinalKind::Unique {
-                                        def_id: unique_datatable_def_id,
+                            kind: match (key_col_name, pinned_domaintable_def_id, def_col_name) {
+                                (Some(key_col_name), Some(pinned_domaintable_def_id), None) => {
+                                    PgEdgeCardinalKind::PinnedDef {
+                                        def_id: pinned_domaintable_def_id,
                                         key_col_name
                                     }
                                 }
@@ -350,8 +350,8 @@ async fn migrate_domain_edges_steps<'t>(
                 // FIXME: ontology must provide human readable name for cardinal
                 let key_col_name = format!("_key{index}").into_boxed_str();
 
-                if cardinal.flags.contains(EdgeCardinalFlags::UNIQUE) {
-                    PgEdgeCardinalKind::Unique {
+                if cardinal.flags.contains(EdgeCardinalFlags::PINNED_DEF) {
+                    PgEdgeCardinalKind::PinnedDef {
                         key_col_name,
                         def_id: *cardinal.target.iter().next().unwrap(),
                     }
@@ -386,8 +386,8 @@ async fn migrate_domain_edges_steps<'t>(
                         assert_eq!(deployed, generated);
                     }
                     (
-                        deployed @ PgEdgeCardinalKind::Unique { .. },
-                        generated @ PgEdgeCardinalKind::Unique { .. },
+                        deployed @ PgEdgeCardinalKind::PinnedDef { .. },
+                        generated @ PgEdgeCardinalKind::PinnedDef { .. },
                     ) => {
                         assert_eq!(deployed, generated);
                     }
@@ -409,6 +409,7 @@ async fn migrate_domain_edges_steps<'t>(
                         index,
                         ident,
                         kind: edge_cardinal_kind,
+                        index_type: None,
                     },
                 ));
             }

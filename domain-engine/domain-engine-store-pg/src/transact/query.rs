@@ -317,7 +317,7 @@ impl<'a> TransactCtx<'a> {
                     }));
                 }
 
-                debug!("union expr: {union_expr}");
+                trace!("union expr: {union_expr}");
 
                 match rel_info.cardinality.1 {
                     ValueCardinality::Unit => {

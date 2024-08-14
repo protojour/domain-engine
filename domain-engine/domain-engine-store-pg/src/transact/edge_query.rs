@@ -5,7 +5,7 @@ use ontol_runtime::{
     tuple::CardinalIdx,
     EdgeId,
 };
-use tracing::debug;
+use tracing::trace;
 
 use crate::{
     pg_error::{ds_err, PgInputError},
@@ -96,19 +96,19 @@ impl<'a> TransactCtx<'a> {
             return Ok(());
         };
 
-        debug!(
+        trace!(
             "select edge {:?} cardinal {cardinal_idx} {select:?}",
             pg_proj.id
         );
         /*
-        debug!(
+        trace!(
             "pg edge cardinals: {:?}",
             pg_proj.pg_edge.table.edge_cardinals
         );
         */
 
         match &pg_cardinal.kind {
-            PgEdgeCardinalKind::Dynamic { .. } | PgEdgeCardinalKind::Unique { .. } => {
+            PgEdgeCardinalKind::Dynamic { .. } | PgEdgeCardinalKind::PinnedDef { .. } => {
                 // potentially skip cardinal
                 // FIXME: select more than one non-parameter cardinal, but CardinalSelect model has to improve
                 if cardinal_idx == pg_proj.subject_index || cardinal_idx != pg_proj.object_index {
@@ -324,7 +324,7 @@ pub fn edge_join_condition<'a>(
             ),
             sql::Expr::eq(edge_path.join(key_col_name.as_ref()), data_key_expr),
         ]),
-        PgEdgeCardinalKind::Unique { key_col_name, .. } => {
+        PgEdgeCardinalKind::PinnedDef { key_col_name, .. } => {
             sql::Expr::eq(edge_path.join(key_col_name.as_ref()), data_key_expr)
         }
         PgEdgeCardinalKind::Parameters(_params_def_id) => unreachable!(),

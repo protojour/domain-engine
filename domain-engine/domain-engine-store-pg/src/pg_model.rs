@@ -282,7 +282,7 @@ impl PgEdgeCardinal {
     pub fn key_col_name(&self) -> Option<&str> {
         match &self.kind {
             PgEdgeCardinalKind::Dynamic { key_col_name, .. } => Some(key_col_name),
-            PgEdgeCardinalKind::Unique { key_col_name, .. } => Some(key_col_name),
+            PgEdgeCardinalKind::PinnedDef { key_col_name, .. } => Some(key_col_name),
             PgEdgeCardinalKind::Parameters(_) => None,
         }
     }
@@ -298,7 +298,7 @@ pub enum PgEdgeCardinalKind {
     /// Unique can only link to fixed vertex type, the edge cardinal
     /// is an "extension" of that vertex.
     /// Unique edge cardinals have ON DELETE CASCADE set up.
-    Unique {
+    PinnedDef {
         def_id: DefId,
         key_col_name: Box<str>,
     },

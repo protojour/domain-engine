@@ -320,8 +320,8 @@ pub struct EdgeCardinal {
 }
 
 impl EdgeCardinal {
-    pub fn is_unique(&self) -> bool {
-        self.flags.contains(EdgeCardinalFlags::UNIQUE)
+    pub fn is_one_to_one(&self) -> bool {
+        self.flags.contains(EdgeCardinalFlags::PINNED_DEF)
     }
 
     pub fn is_entity(&self) -> bool {
@@ -332,10 +332,12 @@ impl EdgeCardinal {
 bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Serialize, Deserialize, Debug)]
     pub struct EdgeCardinalFlags: u8 {
-        /// Whether the values in this edge cardinal are unique
-        const UNIQUE = 0b00000001;
         /// Whether the values in this edge cardinal references an entity
-        const ENTITY = 0b00000010;
+        const ENTITY = 0b00000001;
+        /// Whether the link represented by this cardinal can only
+        /// ever link to just one entity/vertex def.
+        /// The reason can be that parts of the edge represents direct properties in the vertex.
+        const PINNED_DEF = 0b00000010;
     }
 }
 
