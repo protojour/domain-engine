@@ -71,20 +71,9 @@ pub struct Update<'d> {
     pub returning: Vec<Expr<'d>>,
 }
 
-impl<'d> Update<'d> {
-    pub fn where_and(&mut self, expr: Expr<'d>) {
-        match self.where_.take() {
-            Some(Expr::And(mut clauses)) => {
-                clauses.push(expr);
-                self.where_ = Some(Expr::And(clauses));
-            }
-            Some(old) => {
-                self.where_ = Some(Expr::And(vec![old, expr]));
-            }
-            None => {
-                self.where_ = Some(expr);
-            }
-        }
+impl<'d> WhereExt<'d> for Update<'d> {
+    fn where_mut(&mut self) -> &mut Option<Expr<'d>> {
+        &mut self.where_
     }
 }
 
@@ -94,10 +83,25 @@ pub struct Delete<'d> {
     pub returning: Vec<Expr<'d>>,
 }
 
+impl<'d> WhereExt<'d> for Delete<'d> {
+    fn where_mut(&mut self) -> &mut Option<Expr<'d>> {
+        &mut self.where_
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct Expressions<'d> {
     pub items: Vec<Expr<'d>>,
     pub multiline: bool,
+}
+
+impl<'d> From<Vec<Expr<'d>>> for Expressions<'d> {
+    fn from(value: Vec<Expr<'d>>) -> Self {
+        Self {
+            items: value,
+            multiline: false,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -153,7 +157,10 @@ pub enum Expr<'d> {
     And(Vec<Expr<'d>>),
     /// a = b
     Eq(Box<Expr<'d>>, Box<Expr<'d>>),
+    /// a IN b
+    In(Box<Expr<'d>>, Box<Expr<'d>>),
     Row(Vec<Expr<'d>>),
+    Any(Box<Expr<'d>>),
     Array(Box<Expr<'d>>),
     #[allow(unused)]
     ArrayAgg(Box<Expr<'d>>),
@@ -188,6 +195,10 @@ impl<'d> Expr<'d> {
 
     pub fn eq(a: impl Into<Self>, b: impl Into<Self>) -> Self {
         Self::Eq(Box::new(a.into()), Box::new(b.into()))
+    }
+
+    pub fn in_(a: impl Into<Self>, b: impl Into<Self>) -> Self {
+        Self::In(Box::new(a.into()), Box::new(b.into()))
     }
 
     pub fn arc(expr: impl Into<Self>) -> Self {
@@ -473,7 +484,9 @@ impl<'d> Display for Expr<'d> {
             Self::Union(union) => write!(f, "{union}"),
             Self::And(clauses) => write!(f, "{}", clauses.iter().format(" AND ")),
             Self::Eq(a, b) => write!(f, "{a} = {b}"),
+            Self::In(a, b) => write!(f, "{a} IN {b}"),
             Self::Row(fields) => write!(f, "ROW({})", fields.iter().format(",")),
+            Self::Any(expr) => write!(f, "ANY({expr})"),
             Self::Array(expr) => write!(f, "ARRAY({expr})"),
             Self::ArrayAgg(expr) => write!(f, "ARRAY_AGG({expr})"),
             Self::AsIndex(expr, index) => write!(f, "{expr} AS {index}"),
@@ -587,6 +600,25 @@ impl<'d> std::convert::From<Param> for PathSegment<'d> {
 impl<'d> Display for TableName<'d> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}.{}", Ident(self.0), Ident(self.1))
+    }
+}
+
+pub trait WhereExt<'d> {
+    fn where_mut(&mut self) -> &mut Option<Expr<'d>>;
+
+    fn where_and(&mut self, expr: Expr<'d>) {
+        match self.where_mut().take() {
+            Some(Expr::And(mut clauses)) => {
+                clauses.push(expr);
+                (*self.where_mut()) = Some(Expr::And(clauses));
+            }
+            Some(old) => {
+                (*self.where_mut()) = Some(Expr::And(vec![old, expr]));
+            }
+            None => {
+                (*self.where_mut()) = Some(expr);
+            }
+        }
     }
 }
 

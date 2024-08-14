@@ -4,6 +4,7 @@ use bytes::BytesMut;
 use domain_engine_core::{DomainError, DomainResult};
 use fallible_iterator::FallibleIterator;
 use postgres_types::{FromSql, ToSql, Type};
+use tracing::error;
 
 use crate::{ds_err, pg_model::PgType, sql_record::SqlRecord};
 
@@ -19,7 +20,8 @@ impl From<Box<dyn std::error::Error + Sync + Send>> for CodecError {
 
 impl From<CodecError> for DomainError {
     fn from(value: CodecError) -> Self {
-        ds_err(format!("codec error: {:?}", value.0))
+        error!("codec error: {:?}", value.0);
+        DomainError::data_store("internal datastore error")
     }
 }
 

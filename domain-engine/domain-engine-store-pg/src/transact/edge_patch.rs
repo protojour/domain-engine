@@ -14,9 +14,10 @@ use postgres_types::ToSql;
 use tracing::{debug, trace};
 
 use crate::{
-    ds_bad_req, ds_err, map_row_error,
+    ds_bad_req, map_row_error,
+    pg_error::{PgDataError, PgModelError},
     pg_model::{InDomain, PgDataKey, PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgTable},
-    sql,
+    sql::{self, WhereExt},
     sql_value::SqlVal,
     transact::{data::Data, edge_query::edge_join_condition},
     CountRows, IgnoreRows,
@@ -83,7 +84,7 @@ impl EdgeEndoTuplePatch {
         mode: MutationMode,
     ) -> DomainResult<()> {
         match self.elements.binary_search_by_key(&idx, |(idx, ..)| *idx) {
-            Ok(pos) => Err(ds_err(format!("duplicate edge cardinal at {pos}"))),
+            Ok(pos) => Err(PgModelError::DuplicateEdgeCardinal(pos).into()),
             Err(pos) => {
                 self.elements.insert(pos, (idx, value, mode));
                 Ok(())
@@ -131,9 +132,9 @@ impl<'a> TransactCtx<'a> {
         edge_id: EdgeId,
         subject_datatable: &PgTable,
         subject_data_key: PgDataKey,
-        projection: ProjectedEdgePatch,
+        patch: ProjectedEdgePatch,
     ) -> DomainResult<()> {
-        let subject_index = projection.subject;
+        let subject_index = patch.subject;
         let pg_edge = self.pg_model.pg_domain_edgetable(&edge_id)?;
 
         let mut sql_insert = sql::Insert {
@@ -178,13 +179,7 @@ impl<'a> TransactCtx<'a> {
                         if let DataRelationshipKind::Tree = &rel_info.kind {
                             match &rel_info.target {
                                 DataRelationshipTarget::Unambiguous(def_id) => {
-                                    let Some(pg_field) = pg_edge.table.data_fields.get(&rel_id.1)
-                                    else {
-                                        return Err(ds_err(
-                                            "no data store field for edge parameter",
-                                        ));
-                                    };
-
+                                    let pg_field = pg_edge.table.field(rel_id)?;
                                     sql_insert.column_names.push(&pg_field.col_name);
                                     analysis.param_order.insert((*rel_id, *def_id));
                                 }
@@ -205,7 +200,7 @@ impl<'a> TransactCtx<'a> {
 
         let mut param_buf: Vec<SqlVal> = vec![];
 
-        for tuple in projection.tuples {
+        for tuple in patch.tuples {
             param_buf.clear();
 
             if tuple
@@ -232,6 +227,90 @@ impl<'a> TransactCtx<'a> {
                     insert_sql.get_or_insert_with(|| sql_insert.to_string()),
                 )
                 .await?;
+            }
+        }
+
+        for (cardinal_idx, foreign_ids) in patch.deletes {
+            let pg_cardinal = pg_edge.table.edge_cardinal(cardinal_idx)?;
+
+            let mut foreigns_per_vertex: BTreeMap<DefId, Vec<Value>> = Default::default();
+
+            for id in foreign_ids {
+                let vertex_def_id = self
+                    .pg_model
+                    .entity_id_to_entity
+                    .get(&id.type_def_id())
+                    .ok_or_else(|| DomainErrorKind::NotAnEntity(id.type_def_id()).into_error())?;
+
+                foreigns_per_vertex
+                    .entry(*vertex_def_id)
+                    .or_default()
+                    .push(id);
+            }
+
+            for (vertex_def_id, foreign_ids) in foreigns_per_vertex {
+                let mut sql_ids: Vec<SqlVal> = Vec::with_capacity(foreign_ids.len());
+                let pg_foreign = self
+                    .pg_model
+                    .pg_domain_datatable(vertex_def_id.package_id(), vertex_def_id)?;
+                let foreign_def = self.ontology.def(vertex_def_id);
+                let Some(foreign_entity) = foreign_def.entity() else {
+                    return Err(ds_bad_req("not an entity"));
+                };
+
+                for id in foreign_ids {
+                    let Data::Sql(sql_val) = self.data_from_value(id)? else {
+                        return Err(ds_bad_req("foreign id must be a scalar"));
+                    };
+                    sql_ids.push(sql_val);
+                }
+
+                let (def_col_name, key_col_name) = match &pg_cardinal.kind {
+                    PgEdgeCardinalKind::Dynamic {
+                        def_col_name,
+                        key_col_name,
+                    } => (Some(def_col_name), key_col_name),
+                    PgEdgeCardinalKind::Unique { key_col_name, .. } => (None, key_col_name),
+                    PgEdgeCardinalKind::Parameters(_) => {
+                        return Err(ds_bad_req("cannot delete edge based on parameters (yet)"))
+                    }
+                };
+
+                let mut sql_delete = sql::Delete {
+                    from: pg_edge.table_name(),
+                    where_: None,
+                    returning: vec![],
+                };
+
+                if let Some(def_col_name) = def_col_name {
+                    sql_delete.where_and(sql::Expr::eq(
+                        sql::Expr::path1(def_col_name.as_ref()),
+                        sql::Expr::LiteralInt(pg_foreign.table.key),
+                    ));
+                }
+
+                let pg_foreign_id = pg_foreign.table.field(&foreign_entity.id_relationship_id)?;
+
+                sql_delete.where_and(sql::Expr::in_(
+                    sql::Expr::path1(key_col_name.as_ref()),
+                    sql::Expr::paren(sql::Expr::Select(Box::new(sql::Select {
+                        expressions: vec![sql::Expr::path1("_key")].into(),
+                        from: vec![pg_foreign.table_name().into()],
+                        where_: Some(sql::Expr::eq(
+                            sql::Expr::path1(pg_foreign_id.col_name.as_ref()),
+                            sql::Expr::Any(Box::new(sql::Expr::param(0))),
+                        )),
+                        ..Default::default()
+                    }))),
+                ));
+
+                let sql = sql_delete.to_string();
+                debug!("{sql}");
+
+                self.client()
+                    .query(&sql, &[&sql_ids])
+                    .await
+                    .map_err(PgDataError::EdgeDeletion)?;
             }
         }
 
@@ -311,7 +390,7 @@ impl<'a> TransactCtx<'a> {
                 param_buf.iter().map(|param| param as &dyn ToSql),
             )
             .await
-            .map_err(|e| ds_err(format!("unable to insert edge(1): {e:?}")))?
+            .map_err(PgDataError::EdgeInsertion)?
             .try_collect::<IgnoreRows>()
             .map_err(map_row_error)
             .await?;
@@ -405,10 +484,7 @@ impl<'a> TransactCtx<'a> {
             // nothing to update, but it should be proven that the edge exists.
             let sql_select = sql::Select {
                 with: None,
-                expressions: sql::Expressions {
-                    items: vec![sql::Expr::LiteralInt(0)],
-                    multiline: false,
-                },
+                expressions: vec![sql::Expr::LiteralInt(0)].into(),
                 from: vec![pg_edge.table_name().into()],
                 where_: sql_update.where_,
                 limit: sql::Limit {
@@ -426,7 +502,7 @@ impl<'a> TransactCtx<'a> {
             .client()
             .query_raw(&sql, param_buf.iter().map(|param| param as &dyn ToSql))
             .await
-            .map_err(|e| ds_err(format!("unable to update edge(1): {e:?}")))?
+            .map_err(PgDataError::EdgeUpdate)?
             .try_collect::<CountRows>()
             .map_err(map_row_error)
             .await?;
@@ -570,7 +646,7 @@ impl<'a> TransactCtx<'a> {
                     .client()
                     .query_opt(&sql, &[&id_param])
                     .await
-                    .map_err(|e| ds_err(format!("could not look up foreign key: {e:?}")))?
+                    .map_err(PgDataError::ForeignKeyLookup)?
                     .ok_or_else(|| {
                         let value = match self.deserialize_sql(def_id, id_param) {
                             Ok(value) => value,

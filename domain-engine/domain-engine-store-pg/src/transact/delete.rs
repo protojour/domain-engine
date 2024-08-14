@@ -2,7 +2,11 @@ use domain_engine_core::{domain_error::DomainErrorKind, DomainResult};
 use ontol_runtime::{value::Value, DefId};
 use tracing::{debug, warn};
 
-use crate::{ds_bad_req, ds_err, sql, transact::data::Data};
+use crate::{
+    pg_error::{PgDataError, PgInputError},
+    sql,
+    transact::data::Data,
+};
 
 use super::TransactCtx;
 
@@ -21,7 +25,7 @@ impl<'a> TransactCtx<'a> {
         let pg_id_field = pg.table.field(&entity.id_relationship_id)?;
 
         let Data::Sql(id_param) = self.data_from_value(id)? else {
-            return Err(ds_bad_req("compound foreign key"));
+            return Err(PgInputError::CompoundForeignKey.into());
         };
 
         let sql_delete = sql::Delete {
@@ -40,7 +44,7 @@ impl<'a> TransactCtx<'a> {
             .client()
             .query(&sql, &[&id_param])
             .await
-            .map_err(|e| ds_err(format!("unable to delete: {e:?}")))?;
+            .map_err(PgDataError::EdgeDeletion)?;
 
         Ok(!rows.is_empty())
     }

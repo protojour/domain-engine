@@ -1,5 +1,6 @@
 use domain_engine_core::{
-    domain_error::DomainErrorKind, entity_id_utils::find_inherent_entity_id, DomainResult,
+    domain_error::DomainErrorKind, entity_id_utils::find_inherent_entity_id, DomainError,
+    DomainResult,
 };
 use futures_util::{Stream, StreamExt, TryFutureExt, TryStreamExt};
 use ontol_runtime::{
@@ -10,7 +11,7 @@ use postgres_types::ToSql;
 use tracing::{debug, warn};
 
 use crate::{
-    ds_bad_req, ds_err,
+    pg_error::{PgDataError, PgInputError},
     pg_model::{InDomain, PgDataKey},
     sql::{self, UpdateColumn},
     sql_value::SqlVal,
@@ -92,7 +93,7 @@ impl<'a> TransactCtx<'a> {
                     sql::Expr::param(0),
                 ));
                 let Data::Sql(sql_value) = self.data_from_value(value)? else {
-                    return Err(ds_bad_req("id must be a scalar"));
+                    return Err(PgInputError::IdMustBeScalar.into());
                 };
                 update_params.push(sql_value);
             }
@@ -103,9 +104,7 @@ impl<'a> TransactCtx<'a> {
         }
 
         let Value::Struct(data_struct, _) = value.value else {
-            return Err(
-                DomainErrorKind::BadInputData("expected a struct".to_string()).into_error(),
-            );
+            return Err(PgInputError::VertexMustBeStruct.into());
         };
 
         let mut edge_patches = EdgePatches::default();
@@ -114,7 +113,7 @@ impl<'a> TransactCtx<'a> {
             let rel_info = def
                 .data_relationships
                 .get(&rel_id)
-                .ok_or_else(|| ds_bad_req("update: invalid data relationship"))?;
+                .ok_or(PgInputError::DataRelationshipNotFound(rel_id))?;
 
             match rel_info.kind {
                 DataRelationshipKind::Id => {
@@ -131,7 +130,7 @@ impl<'a> TransactCtx<'a> {
                     match attr {
                         Attr::Unit(val) => {
                             let Data::Sql(sql_val) = self.data_from_value(val)? else {
-                                return Err(ds_err("TODO: compound update value"));
+                                return Err(DomainError::data_store("TODO: compound update value"));
                             };
                             update_params.push(sql_val);
                         }
@@ -193,9 +192,9 @@ impl<'a> TransactCtx<'a> {
             self.client()
                 .query_raw(&sql, update_params.iter().map(|param| param as &dyn ToSql))
                 .await
-                .map_err(|e| ds_err(format!("unable to update data(1): {e:?}")))?
+                .map_err(PgDataError::UpdateQuery)?
                 .try_collect::<Vec<_>>()
-                .map_err(|e| ds_err(format!("update problem: {e:?}")))
+                .map_err(PgDataError::UpdateRow)
                 .await?
         } else {
             // nothing inherent to update. Just fetch key.
@@ -218,9 +217,9 @@ impl<'a> TransactCtx<'a> {
             self.client()
                 .query_raw(&sql, update_params.iter().map(|param| param as &dyn ToSql))
                 .await
-                .map_err(|e| ds_err(format!("unable to select data for update: {e:?}")))?
+                .map_err(PgDataError::UpdateQueryKeyFetch)?
                 .try_collect::<Vec<_>>()
-                .map_err(|e| ds_err(format!("update problem: {e:?}")))
+                .map_err(PgDataError::UpdateRow)
                 .await?
         };
 
@@ -268,10 +267,10 @@ async fn collect_one_row_value(
     let frame = frames
         .into_iter()
         .next()
-        .ok_or_else(|| ds_err("expected frame from post-update query"))??;
+        .ok_or(PgDataError::NothingUpdated)??;
 
     let QueryFrame::Row(row) = frame else {
-        return Err(ds_err("expected Row"));
+        return Err(PgDataError::InvalidQueryFrame.into());
     };
 
     Ok(row)

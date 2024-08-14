@@ -15,7 +15,7 @@ use postgres_types::ToSql;
 use tokio_postgres::types::FromSql;
 use tracing::debug;
 
-use crate::{ds_err, sql};
+use crate::{ds_err, pg_error::PgModelError, sql};
 
 /// The key type used in the registry for metadata
 pub type PgRegKey = i32;
@@ -65,9 +65,10 @@ impl PgModel {
     }
 
     pub(crate) fn pg_domain(&self, pkg_id: PackageId) -> DomainResult<&PgDomain> {
-        self.domains
+        Ok(self
+            .domains
             .get(&pkg_id)
-            .ok_or_else(|| ds_err(format!("pg_domain not found for {pkg_id:?}")))
+            .ok_or(PgModelError::DomainNotFound(pkg_id))?)
     }
 
     pub(crate) fn pg_domain_datatable(
@@ -99,8 +100,9 @@ impl PgModel {
     }
 
     pub(crate) fn datatable(&self, pkg_id: PackageId, def_id: DefId) -> DomainResult<&PgTable> {
-        self.find_datatable(pkg_id, def_id)
-            .ok_or_else(|| ds_err(format!("PgTable not found for {pkg_id:?}->{def_id:?}")))
+        Ok(self
+            .find_datatable(pkg_id, def_id)
+            .ok_or(PgModelError::CollectionNotFound(pkg_id, def_id))?)
     }
 
     pub(crate) fn find_edgetable(&self, edge_id: &EdgeId) -> Option<&PgTable> {
@@ -110,8 +112,9 @@ impl PgModel {
     }
 
     pub(crate) fn edgetable(&self, edge_id: &EdgeId) -> DomainResult<&PgTable> {
-        self.find_edgetable(edge_id)
-            .ok_or_else(|| ds_err(format!("PgTable not found for {edge_id:?}")))
+        Ok(self
+            .find_edgetable(edge_id)
+            .ok_or(PgModelError::EdgeNotFound(*edge_id))?)
     }
 
     pub(crate) fn datatable_key_by_def_key(
@@ -120,7 +123,7 @@ impl PgModel {
     ) -> DomainResult<(PackageId, DefId)> {
         let Some(PgTableKey::Data { pkg_id, def_id }) = self.reg_key_to_table_key.get(&def_key)
         else {
-            return Err(ds_err("table not found"));
+            return Err(PgModelError::NotFoundInRegistry(def_key).into());
         };
         Ok((*pkg_id, *def_id))
     }
@@ -210,10 +213,7 @@ impl PgTable {
         self.data_fields.get(&rel_id.tag()).ok_or_else(|| {
             debug!("field not found in {:?}", self.data_fields);
 
-            ds_err(format!(
-                "datatable not found for {rel_id:?} in {}",
-                self.table_name
-            ))
+            PgModelError::FieldNotFound(self.table_name.clone(), *rel_id).into()
         })
     }
 
@@ -224,9 +224,10 @@ impl PgTable {
     }
 
     pub fn edge_cardinal(&self, c: CardinalIdx) -> DomainResult<&PgEdgeCardinal> {
-        self.edge_cardinals
+        Ok(self
+            .edge_cardinals
             .get(&c)
-            .ok_or_else(|| ds_err("edge cardinal not found"))
+            .ok_or(PgModelError::EdgeCardinalNotFound(c))?)
     }
 }
 
@@ -345,7 +346,7 @@ impl PgType {
             DefRepr::Struct => todo!("struct"),
             DefRepr::Intersection(_) => todo!("intersection"),
             DefRepr::Union(..) => todo!("union"),
-            DefRepr::Unknown => Err(ds_err("unknown repr: {def_id:?}")),
+            DefRepr::Unknown => Err(PgModelError::UnhandledRepr)?,
         }
     }
 }

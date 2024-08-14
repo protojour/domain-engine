@@ -18,11 +18,11 @@ use crate::{ds_err, pg_model::PgDef, PgModel, PostgresDataStore};
 
 mod data;
 mod delete;
+mod edge_patch;
+mod edge_query;
+mod fields;
 mod insert;
 mod query;
-mod edge_query;
-mod edge_patch;
-mod fields;
 mod update;
 
 #[derive(Debug)]
@@ -42,7 +42,6 @@ pub enum InsertMode {
     Insert,
     Upsert,
 }
-
 
 struct TransactCtx<'a> {
     pg_model: &'a PgModel,
@@ -78,7 +77,7 @@ enum State {
 
 /// TODO: support out-of-transaction statements by expanding ReqMessage
 /// with an explicit Start/End Transaction
-/// 
+///
 /// Since a transaction needs a &mut Client,
 /// there seems to be no other way to dynamically support
 /// this than re-acquire the connection every time the state needs to be changed.
@@ -222,7 +221,7 @@ pub async fn transact(
                     debug!("transaction not committed: {err:?}");
                     ds_err("transaction could not be commmitted")
                 })?;
-        
+
                 trace!("COMMIT OK");
             }
         }

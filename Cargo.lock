@@ -1033,6 +1033,7 @@ dependencies = [
  "bytes",
  "chrono",
  "deadpool-postgres",
+ "displaydoc",
  "domain-engine-core",
  "domain-engine-test-utils",
  "fallible-iterator",

@@ -19,7 +19,8 @@ use pin_utils::pin_mut;
 use tracing::{debug, trace, warn};
 
 use crate::{
-    ds_bad_req, ds_err, map_row_error,
+    map_row_error,
+    pg_error::{PgDataError, PgInputError},
     pg_model::{InDomain, PgType},
     sql::{self, TableName},
     sql_record::{SqlColumnStream, SqlRecordIterator},
@@ -72,7 +73,7 @@ impl<'a> TransactCtx<'a> {
                     InsertMode::Insert => {
                         let value_generator = entity
                             .id_value_generator
-                            .ok_or_else(|| ds_bad_req("no id provided and no ID generator"))?;
+                            .ok_or(PgInputError::MissingValueWithoutGenerator)?;
 
                         let (generated_id, _container) = try_generate_entity_id(
                             entity.id_operator_addr,
@@ -138,28 +139,28 @@ impl<'a> TransactCtx<'a> {
                 .client()
                 .query_raw(&sql, analyzed.root_attrs.as_params())
                 .await
-                .map_err(|err| ds_err(format!("{err}")))?;
+                .map_err(PgDataError::InsertQuery)?;
             pin_mut!(stream);
 
             let row = stream
                 .try_next()
                 .await
                 .map_err(map_row_error)?
-                .ok_or_else(|| ds_err("no rows returned"))?;
+                .ok_or(PgDataError::NothingInserted)?;
 
             stream
                 .try_next()
                 .await
-                .map_err(|_| ds_err("row stream not closed"))?;
+                .map_err(PgDataError::InsertRowStreamNotClosed)?;
 
             match stream.rows_affected() {
                 Some(affected) => {
                     if affected != 1 {
-                        return Err(ds_err("expected 1 affected row"));
+                        return Err(PgDataError::InsertIncorrectAffectCount.into());
                     }
                 }
                 None => {
-                    return Err(ds_err("unknown problem"));
+                    return Err(PgDataError::InsertNoRowsAffected.into());
                 }
             }
 
@@ -288,10 +289,8 @@ fn find_data_relationship<'d>(
     def: &'d Def,
     rel_id: &RelId,
 ) -> DomainResult<&'d DataRelationshipInfo> {
-    def.data_relationships.get(rel_id).ok_or_else(|| {
-        ds_bad_req(format!(
-            "data relationship {def_id:?} -> {rel_id} does not exist",
-            def_id = def.id
-        ))
-    })
+    Ok(def
+        .data_relationships
+        .get(rel_id)
+        .ok_or(PgInputError::DataRelationshipNotFound(*rel_id))?)
 }

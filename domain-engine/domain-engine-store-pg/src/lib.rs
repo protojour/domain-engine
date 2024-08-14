@@ -16,6 +16,7 @@ use tokio_postgres::NoTls;
 pub use pg_model::PgModel;
 
 mod migrate;
+mod pg_error;
 mod pg_model;
 mod sql;
 mod sql_record;
