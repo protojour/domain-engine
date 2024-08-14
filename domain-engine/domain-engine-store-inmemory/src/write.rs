@@ -18,7 +18,7 @@ use ontol_runtime::{
     value::{Serial, Value, ValueDebug},
     DefId, EdgeId, RelId,
 };
-use tracing::{debug, debug_span, warn};
+use tracing::{debug, debug_span};
 
 use domain_engine_core::{
     domain_error::DomainErrorKind,
@@ -132,7 +132,7 @@ impl InMemoryStore {
                 data_relationship.cardinality.1,
             ) {
                 (DataRelationshipKind::Id, ..) => {
-                    warn!("ID should not be updated");
+                    debug!("Skipping ID for update");
                 }
                 (DataRelationshipKind::Tree, attr, _) => {
                     raw_props_update.insert(rel_id, attr);

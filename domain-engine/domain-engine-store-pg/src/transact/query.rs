@@ -380,11 +380,11 @@ impl<'a> TransactCtx<'a> {
         include_edge_attrs: IncludeEdgeAttrs,
         op: DataOperation,
     ) -> DomainResult<RowValue> {
-        let def = {
-            let def_key = iterator
-                .next_field(&Layout::Scalar(PgType::Integer))?
-                .into_i32()?;
+        let def_key = iterator
+            .next_field(&Layout::Scalar(PgType::Integer))?
+            .into_i32()?;
 
+        let def = {
             let Some(PgTableKey::Data { pkg_id: _, def_id }) =
                 self.pg_model.reg_key_to_table_key.get(&def_key)
             else {
@@ -415,6 +415,7 @@ impl<'a> TransactCtx<'a> {
 
                 Ok(RowValue {
                     value,
+                    def_key,
                     data_key,
                     op,
                 })
@@ -431,12 +432,14 @@ impl<'a> TransactCtx<'a> {
 
                 Ok(RowValue {
                     value: field_value,
+                    def_key,
                     data_key,
                     op,
                 })
             }
             None => Ok(RowValue {
                 value: Value::Void(DefId::unit().into()),
+                def_key,
                 data_key,
                 op,
             }),

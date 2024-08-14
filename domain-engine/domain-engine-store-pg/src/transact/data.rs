@@ -15,7 +15,7 @@ use tracing::trace;
 
 use crate::{
     pg_error::{ds_bad_req, ds_err},
-    pg_model::{PgDataKey, PgTable},
+    pg_model::{PgDataKey, PgRegKey, PgTable},
     sql_value::SqlVal,
 };
 
@@ -23,7 +23,7 @@ use super::TransactCtx;
 
 pub struct RowValue {
     pub value: Value,
-    #[allow(unused)]
+    pub def_key: PgRegKey,
     pub data_key: PgDataKey,
     pub op: DataOperation,
 }

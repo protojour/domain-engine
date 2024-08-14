@@ -117,7 +117,7 @@ impl<'a> TransactCtx<'a> {
 
             match rel_info.kind {
                 DataRelationshipKind::Id => {
-                    warn!("ID should not be updated");
+                    debug!("skipping ID for update");
                 }
                 DataRelationshipKind::Tree => {
                     let pg_field = pg.table.field(&rel_id)?;
@@ -150,10 +150,10 @@ impl<'a> TransactCtx<'a> {
                             edge_patch.tuples[0].insert_element(
                                 proj.object,
                                 value,
-                                MutationMode::Update,
+                                MutationMode::UpdateEdgeCardinal,
                             )?;
                         }
-                        Attr::Tuple(tuple) => match analyze_update_tuple(*tuple) {
+                        Attr::Tuple(tuple) => match analyze_update_tuple(*tuple, false) {
                             AnalyzedTuple::Patch(patch) => {
                                 edge_patch.tuples.push(patch);
                             }
@@ -163,7 +163,7 @@ impl<'a> TransactCtx<'a> {
                         },
                         Attr::Matrix(matrix) => {
                             for tuple in matrix.into_rows() {
-                                match analyze_update_tuple(tuple) {
+                                match analyze_update_tuple(tuple, true) {
                                     AnalyzedTuple::Patch(patch) => {
                                         edge_patch.tuples.push(patch);
                                     }
@@ -239,7 +239,7 @@ enum AnalyzedTuple {
     Delete(Value),
 }
 
-fn analyze_update_tuple(tuple: EndoTuple<Value>) -> AnalyzedTuple {
+fn analyze_update_tuple(tuple: EndoTuple<Value>, from_matrix: bool) -> AnalyzedTuple {
     if tuple.elements.iter().any(|value| value.tag().is_delete()) {
         let mut iter = tuple.elements.into_iter();
         let foreign_id = iter.next().unwrap();
@@ -249,7 +249,11 @@ fn analyze_update_tuple(tuple: EndoTuple<Value>) -> AnalyzedTuple {
         AnalyzedTuple::Patch(EdgeEndoTuplePatch::from_tuple(
             tuple.elements.into_iter().map(|val| {
                 let mutation_mode = if val.tag().is_update() {
-                    MutationMode::Update
+                    if from_matrix {
+                        MutationMode::Update
+                    } else {
+                        MutationMode::UpdateEdgeCardinal
+                    }
                 } else {
                     MutationMode::insert()
                 };

@@ -278,6 +278,16 @@ pub struct PgEdgeCardinal {
     pub kind: PgEdgeCardinalKind,
 }
 
+impl PgEdgeCardinal {
+    pub fn key_col_name(&self) -> Option<&str> {
+        match &self.kind {
+            PgEdgeCardinalKind::Dynamic { key_col_name, .. } => Some(key_col_name),
+            PgEdgeCardinalKind::Unique { key_col_name, .. } => Some(key_col_name),
+            PgEdgeCardinalKind::Parameters(_) => None,
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum PgEdgeCardinalKind {
     /// Dynamic can link to unions, so it needs a def_col_name

@@ -33,6 +33,7 @@ mod update;
 pub enum MutationMode {
     Create(InsertMode),
     Update,
+    UpdateEdgeCardinal,
 }
 
 impl MutationMode {

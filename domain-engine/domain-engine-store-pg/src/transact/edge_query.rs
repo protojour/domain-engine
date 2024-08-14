@@ -309,11 +309,11 @@ impl<'a> TransactCtx<'a> {
 
 pub fn edge_join_condition<'a>(
     edge_path: sql::Path<'a>,
-    cardinal: &'a PgEdgeCardinal,
+    pg_cardinal: &'a PgEdgeCardinal,
     data: &'a PgTable,
     data_key_expr: sql::Expr<'a>,
 ) -> sql::Expr<'a> {
-    match &cardinal.kind {
+    match &pg_cardinal.kind {
         PgEdgeCardinalKind::Dynamic {
             def_col_name,
             key_col_name,

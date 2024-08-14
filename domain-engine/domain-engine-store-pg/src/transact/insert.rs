@@ -225,21 +225,9 @@ impl<'a> TransactCtx<'a> {
                 if select_stats.edge_count > 0 {
                     let mut ctx = QueryBuildCtx::default();
                     let root_alias = ctx.alias;
-                    let mut select_sql = sql::Select {
-                        with: None,
-                        expressions: sql::Expressions {
-                            items: vec![],
-                            multiline: true,
-                        },
-                        from: vec![sql::FromItem::TableNameAs(
-                            pg.table_name(),
-                            sql::Name::Alias(root_alias),
-                        )],
-                        where_: Some(sql::Expr::eq(sql::Expr::path1("_key"), sql::Expr::param(0))),
-                        limit: sql::Limit {
-                            limit: Some(1),
-                            offset: None,
-                        },
+                    let mut expressions = sql::Expressions {
+                        items: vec![],
+                        multiline: true,
                     };
 
                     self.sql_select_edge_properties(
@@ -248,11 +236,30 @@ impl<'a> TransactCtx<'a> {
                         &sel.properties,
                         pg,
                         &mut ctx,
-                        &mut select_sql.expressions.items,
+                        &mut expressions.items,
                     )?;
-                    select_sql.with = ctx.with();
 
-                    edge_select_sql = Some(select_sql.to_string());
+                    if !expressions.items.is_empty() {
+                        edge_select_sql = Some(
+                            sql::Select {
+                                with: ctx.with(),
+                                expressions,
+                                from: vec![sql::FromItem::TableNameAs(
+                                    pg.table_name(),
+                                    sql::Name::Alias(root_alias),
+                                )],
+                                where_: Some(sql::Expr::eq(
+                                    sql::Expr::path1("_key"),
+                                    sql::Expr::param(0),
+                                )),
+                                limit: sql::Limit {
+                                    limit: Some(1),
+                                    offset: None,
+                                },
+                            }
+                            .to_string(),
+                        );
+                    }
                 }
 
                 QuerySelect::Struct(&sel.properties)

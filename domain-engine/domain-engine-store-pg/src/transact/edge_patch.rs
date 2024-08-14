@@ -15,7 +15,9 @@ use tracing::{debug, trace};
 
 use crate::{
     pg_error::{ds_bad_req, map_row_error, PgError, PgInputError, PgModelError},
-    pg_model::{InDomain, PgDataKey, PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgTable},
+    pg_model::{
+        InDomain, PgDataKey, PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgRegKey, PgTable,
+    },
     sql::{self, WhereExt},
     sql_value::SqlVal,
     transact::{data::Data, edge_query::edge_join_condition},
@@ -93,13 +95,13 @@ impl EdgeEndoTuplePatch {
 }
 
 enum ProjectedEdgeCardinal<'a> {
-    Subject(&'a PgEdgeCardinal, Dynamic),
-    Object(&'a PgEdgeCardinal, Dynamic),
+    Subject(&'a PgEdgeCardinal, Dynamic<'a>),
+    Object(&'a PgEdgeCardinal, Dynamic<'a>),
     Parameters,
 }
 
-enum Dynamic {
-    Yes,
+enum Dynamic<'a> {
+    Yes { def_col_name: &'a str },
     No,
 }
 
@@ -156,12 +158,13 @@ impl<'a> TransactCtx<'a> {
                     sql_insert
                         .column_names
                         .extend([def_col_name.as_ref(), key_col_name]);
+                    let dynamic = Dynamic::Yes { def_col_name };
                     analysis
                         .projected_cardinals
                         .push(if *index == subject_index {
-                            ProjectedEdgeCardinal::Subject(pg_cardinal, Dynamic::Yes)
+                            ProjectedEdgeCardinal::Subject(pg_cardinal, dynamic)
                         } else {
-                            ProjectedEdgeCardinal::Object(pg_cardinal, Dynamic::Yes)
+                            ProjectedEdgeCardinal::Object(pg_cardinal, dynamic)
                         });
                 }
                 PgEdgeCardinalKind::Unique { key_col_name, .. } => {
@@ -204,11 +207,12 @@ impl<'a> TransactCtx<'a> {
         for tuple in patch.tuples {
             param_buf.clear();
 
-            if tuple
-                .elements
-                .iter()
-                .any(|(_, _, mutation_mode)| matches!(mutation_mode, MutationMode::Update))
-            {
+            if tuple.elements.iter().any(|(_, _, mutation_mode)| {
+                matches!(
+                    mutation_mode,
+                    MutationMode::Update | MutationMode::UpdateEdgeCardinal
+                )
+            }) {
                 self.update_edge(
                     pg_edge,
                     subject_datatable,
@@ -333,7 +337,7 @@ impl<'a> TransactCtx<'a> {
 
         for projected_cardinal in &analysis.projected_cardinals {
             match projected_cardinal {
-                ProjectedEdgeCardinal::Subject(_, Dynamic::Yes) => {
+                ProjectedEdgeCardinal::Subject(_, Dynamic::Yes { .. }) => {
                     param_buf.extend([
                         SqlVal::I32(subject_datatable.key),
                         SqlVal::I64(subject_data_key),
@@ -344,11 +348,11 @@ impl<'a> TransactCtx<'a> {
                 }
                 ProjectedEdgeCardinal::Object(.., dynamic) => {
                     let (value, mode) = element_iter.next().unwrap();
-                    let (foreign_def_id, foreign_key) = self
+                    let (foreign_def_id, _, foreign_key) = self
                         .resolve_linked_vertex(value, mode, Select::EntityId)
                         .await?;
 
-                    if matches!(dynamic, Dynamic::Yes) {
+                    if matches!(dynamic, Dynamic::Yes { .. }) {
                         let datatable = self
                             .pg_model
                             .datatable(foreign_def_id.package_id(), foreign_def_id)?;
@@ -431,23 +435,43 @@ impl<'a> TransactCtx<'a> {
                     ));
                     param_buf.push(SqlVal::I64(subject_data_key));
                 }
-                ProjectedEdgeCardinal::Object(pg_cardinal, ..) => {
+                ProjectedEdgeCardinal::Object(pg_cardinal, dynamic) => {
                     // for objects, the edge itself is not updated
                     let (value, mode) = element_iter.next().unwrap();
-                    let (foreign_def_id, foreign_key) = self
+                    let (foreign_def_id, foreign_def_key, foreign_data_key) = self
                         .resolve_linked_vertex(value, mode, Select::EntityId)
                         .await?;
-                    let object_datatable = self
-                        .pg_model
-                        .datatable(foreign_def_id.package_id(), foreign_def_id)?;
 
-                    sql_update.where_and(edge_join_condition(
-                        sql::Path::empty(),
-                        pg_cardinal,
-                        object_datatable,
-                        sql::Expr::param(param_buf.len()),
-                    ));
-                    param_buf.push(SqlVal::I64(foreign_key));
+                    match mode {
+                        MutationMode::UpdateEdgeCardinal => {
+                            if let Dynamic::Yes { def_col_name } = dynamic {
+                                sql_update.set.push(sql::UpdateColumn(
+                                    def_col_name,
+                                    sql::Expr::param(param_buf.len()),
+                                ));
+                                param_buf.push(SqlVal::I32(foreign_def_key));
+                            }
+
+                            sql_update.set.push(sql::UpdateColumn(
+                                pg_cardinal.key_col_name().unwrap(),
+                                sql::Expr::param(param_buf.len()),
+                            ));
+                            param_buf.push(SqlVal::I64(foreign_data_key));
+                        }
+                        MutationMode::Create(_) | MutationMode::Update => {
+                            let object_datatable = self
+                                .pg_model
+                                .datatable(foreign_def_id.package_id(), foreign_def_id)?;
+
+                            sql_update.where_and(edge_join_condition(
+                                sql::Path::empty(),
+                                pg_cardinal,
+                                object_datatable,
+                                sql::Expr::param(param_buf.len()),
+                            ));
+                            param_buf.push(SqlVal::I64(foreign_data_key));
+                        }
+                    }
                 }
                 ProjectedEdgeCardinal::Parameters => {
                     let Some((Value::Struct(mut map, _), _op)) = element_iter.next() else {
@@ -485,6 +509,7 @@ impl<'a> TransactCtx<'a> {
             sql_update.to_string()
         } else {
             // nothing to update, but it should be proven that the edge exists.
+            debug!("nothing to update");
             let sql_select = sql::Select {
                 with: None,
                 expressions: vec![sql::Expr::LiteralInt(0)].into(),
@@ -522,7 +547,7 @@ impl<'a> TransactCtx<'a> {
         value: Value,
         mode: MutationMode,
         select: Select,
-    ) -> DomainResult<(DefId, PgDataKey)> {
+    ) -> DomainResult<(DefId, PgRegKey, PgDataKey)> {
         let def_id = value.type_def_id();
 
         enum ResolveMode {
@@ -590,10 +615,10 @@ impl<'a> TransactCtx<'a> {
                         )
                         .await?
                     }
-                    MutationMode::Update => todo!(),
+                    MutationMode::Update | MutationMode::UpdateEdgeCardinal => todo!(),
                 };
 
-                Ok((def_id, row_value.data_key))
+                Ok((def_id, row_value.def_key, row_value.data_key))
             }
             ResolveMode::Id(id_rel_id, id_resolve_mode) => {
                 let pg = self
@@ -645,6 +670,7 @@ impl<'a> TransactCtx<'a> {
                 };
 
                 debug!("{sql}");
+                trace!("resolve linked vertex {:?}", [&id_param]);
 
                 let row = self
                     .client()
@@ -660,7 +686,7 @@ impl<'a> TransactCtx<'a> {
                             .into_error()
                     })?;
 
-                Ok((vertex_def_id, row.get(0)))
+                Ok((vertex_def_id, pg.table.key, row.get(0)))
             }
         }
     }
