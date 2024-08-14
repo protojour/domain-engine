@@ -14,7 +14,7 @@ use ontol_runtime::{
 use tracing::trace;
 
 use crate::{
-    ds_bad_req, ds_err,
+    pg_error::{ds_bad_req, ds_err},
     pg_model::{PgDataKey, PgTable},
     sql_value::SqlVal,
 };

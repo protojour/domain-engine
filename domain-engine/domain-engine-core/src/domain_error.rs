@@ -103,6 +103,8 @@ pub enum DomainErrorKind {
     NoResolvePathToDataStore,
     /// entity not found
     EntityNotFound,
+    /// edge not found
+    EdgeNotFound,
     /// not an entity
     NotAnEntity(DefId),
     /// entity must be a struct

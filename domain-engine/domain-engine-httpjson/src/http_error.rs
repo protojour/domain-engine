@@ -53,6 +53,11 @@ pub fn domain_error_to_response(error: DomainError) -> http::Response<Body> {
         DomainErrorKind::EntityNotFound => {
             (StatusCode::NOT_FOUND, json_error("entity not found")).into_response()
         }
+        DomainErrorKind::EdgeNotFound => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            json_error("edge not found"),
+        )
+            .into_response(),
         DomainErrorKind::NotAnEntity(_) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             json_error("not an entity"),

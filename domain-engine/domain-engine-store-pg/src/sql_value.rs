@@ -6,7 +6,7 @@ use fallible_iterator::FallibleIterator;
 use postgres_types::{FromSql, ToSql, Type};
 use tracing::error;
 
-use crate::{ds_err, pg_model::PgType, sql_record::SqlRecord};
+use crate::{pg_error::PgError, pg_model::PgType, sql_record::SqlRecord};
 
 type BoxError = Box<dyn std::error::Error + Sync + Send>;
 
@@ -66,7 +66,7 @@ impl<'b> SqlVal<'b> {
 
     pub fn non_null(self) -> DomainResult<Self> {
         match self {
-            Self::Null => Err(ds_err("unexpected db null value")),
+            Self::Null => Err(PgError::InvalidType("null").into()),
             other => Ok(other),
         }
     }
@@ -74,28 +74,28 @@ impl<'b> SqlVal<'b> {
     pub fn into_i32(self) -> DomainResult<i32> {
         match self {
             Self::I32(int) => Ok(int),
-            _ => Err(ds_err("expected i32")),
+            _ => Err(PgError::ExpectedType("i32").into()),
         }
     }
 
     pub fn into_i64(self) -> DomainResult<i64> {
         match self {
             Self::I64(int) => Ok(int),
-            _ => Err(ds_err("expected i64")),
+            _ => Err(PgError::ExpectedType("i64").into()),
         }
     }
 
     pub fn into_array(self) -> DomainResult<SqlArray<'b>> {
         match self {
             Self::Array(array) => Ok(array),
-            _ => Err(ds_err("expected array")),
+            _ => Err(PgError::ExpectedType("array").into()),
         }
     }
 
     pub fn into_record(self) -> DomainResult<SqlRecord<'b>> {
         match self {
             Self::Record(record) => Ok(record),
-            _ => Err(ds_err("expected record")),
+            _ => Err(PgError::ExpectedType("record").into()),
         }
     }
 

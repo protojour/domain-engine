@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use domain_engine_core::{domain_error::DomainErrorKind, DomainResult};
+use domain_engine_core::{domain_error::DomainErrorKind, DomainError, DomainResult};
 use futures_util::{TryFutureExt, TryStreamExt};
 use ontol_runtime::{
     attr::Attr,
@@ -14,8 +14,7 @@ use postgres_types::ToSql;
 use tracing::{debug, trace};
 
 use crate::{
-    ds_bad_req, map_row_error,
-    pg_error::{PgDataError, PgModelError},
+    pg_error::{ds_bad_req, map_row_error, PgError, PgInputError, PgModelError},
     pg_model::{InDomain, PgDataKey, PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgTable},
     sql::{self, WhereExt},
     sql_value::SqlVal,
@@ -250,32 +249,21 @@ impl<'a> TransactCtx<'a> {
             }
 
             for (vertex_def_id, foreign_ids) in foreigns_per_vertex {
-                let mut sql_ids: Vec<SqlVal> = Vec::with_capacity(foreign_ids.len());
+                let mut sql_ids_param: Vec<SqlVal> = Vec::with_capacity(foreign_ids.len());
                 let pg_foreign = self
                     .pg_model
                     .pg_domain_datatable(vertex_def_id.package_id(), vertex_def_id)?;
                 let foreign_def = self.ontology.def(vertex_def_id);
                 let Some(foreign_entity) = foreign_def.entity() else {
-                    return Err(ds_bad_req("not an entity"));
+                    return Err(PgInputError::NotAnEntity.into());
                 };
 
                 for id in foreign_ids {
                     let Data::Sql(sql_val) = self.data_from_value(id)? else {
-                        return Err(ds_bad_req("foreign id must be a scalar"));
+                        return Err(PgInputError::IdMustBeScalar)?;
                     };
-                    sql_ids.push(sql_val);
+                    sql_ids_param.push(sql_val);
                 }
-
-                let (def_col_name, key_col_name) = match &pg_cardinal.kind {
-                    PgEdgeCardinalKind::Dynamic {
-                        def_col_name,
-                        key_col_name,
-                    } => (Some(def_col_name), key_col_name),
-                    PgEdgeCardinalKind::Unique { key_col_name, .. } => (None, key_col_name),
-                    PgEdgeCardinalKind::Parameters(_) => {
-                        return Err(ds_bad_req("cannot delete edge based on parameters (yet)"))
-                    }
-                };
 
                 let mut sql_delete = sql::Delete {
                     from: pg_edge.table_name(),
@@ -283,12 +271,25 @@ impl<'a> TransactCtx<'a> {
                     returning: vec![],
                 };
 
-                if let Some(def_col_name) = def_col_name {
-                    sql_delete.where_and(sql::Expr::eq(
-                        sql::Expr::path1(def_col_name.as_ref()),
-                        sql::Expr::LiteralInt(pg_foreign.table.key),
-                    ));
-                }
+                let key_col_name = match &pg_cardinal.kind {
+                    PgEdgeCardinalKind::Dynamic {
+                        def_col_name,
+                        key_col_name,
+                    } => {
+                        sql_delete.where_and(sql::Expr::eq(
+                            sql::Expr::path1(def_col_name.as_ref()),
+                            sql::Expr::LiteralInt(pg_foreign.table.key),
+                        ));
+
+                        key_col_name
+                    }
+                    PgEdgeCardinalKind::Unique { key_col_name, .. } => key_col_name,
+                    PgEdgeCardinalKind::Parameters(_) => {
+                        return Err(DomainError::data_store_bad_request(
+                            "cannot delete edge based on parameters (yet)",
+                        ))
+                    }
+                };
 
                 let pg_foreign_id = pg_foreign.table.field(&foreign_entity.id_relationship_id)?;
 
@@ -309,9 +310,9 @@ impl<'a> TransactCtx<'a> {
                 debug!("{sql}");
 
                 self.client()
-                    .query(&sql, &[&sql_ids])
+                    .query(&sql, &[&sql_ids_param])
                     .await
-                    .map_err(PgDataError::EdgeDeletion)?;
+                    .map_err(PgError::EdgeDeletion)?;
             }
         }
 
@@ -391,7 +392,7 @@ impl<'a> TransactCtx<'a> {
                 param_buf.iter().map(|param| param as &dyn ToSql),
             )
             .await
-            .map_err(PgDataError::EdgeInsertion)?
+            .map_err(PgError::EdgeInsertion)?
             .try_collect::<IgnoreRows>()
             .map_err(map_row_error)
             .await?;
@@ -503,7 +504,7 @@ impl<'a> TransactCtx<'a> {
             .client()
             .query_raw(&sql, param_buf.iter().map(|param| param as &dyn ToSql))
             .await
-            .map_err(PgDataError::EdgeUpdate)?
+            .map_err(PgError::EdgeUpdate)?
             .try_collect::<CountRows>()
             .map_err(map_row_error)
             .await?;
@@ -511,8 +512,7 @@ impl<'a> TransactCtx<'a> {
         if count.0 == 1 {
             Ok(())
         } else {
-            // FIXME: bad error message.. It's the _edge_ that's not found.
-            Err(DomainErrorKind::EntityNotFound.into_error())
+            Err(DomainErrorKind::EdgeNotFound.into_error())
         }
     }
 
@@ -648,7 +648,7 @@ impl<'a> TransactCtx<'a> {
                     .client()
                     .query_opt(&sql, &[&id_param])
                     .await
-                    .map_err(PgDataError::ForeignKeyLookup)?
+                    .map_err(PgError::ForeignKeyLookup)?
                     .ok_or_else(|| {
                         let value = match self.deserialize_sql(def_id, id_param) {
                             Ok(value) => value,

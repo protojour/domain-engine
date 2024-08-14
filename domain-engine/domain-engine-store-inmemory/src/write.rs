@@ -498,7 +498,7 @@ impl InMemoryStore {
             };
 
             if matching.is_empty() {
-                return Err(DomainErrorKind::EntityNotFound.into_error());
+                return Err(DomainErrorKind::EdgeNotFound.into_error());
             }
 
             for (cardinal_idx, (write_mode, data)) in mapped_input {

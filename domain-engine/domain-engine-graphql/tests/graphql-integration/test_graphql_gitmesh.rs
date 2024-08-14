@@ -545,7 +545,7 @@ async fn patch_members(ds: &str) {
         .exec([], &schema, &ctx)
         .await
         .unwrap_first_exec_error_msg(),
-        expected = "entity not found"
+        expected = "edge not found"
     );
 
     info!("upgrade bob to admin should succeed");

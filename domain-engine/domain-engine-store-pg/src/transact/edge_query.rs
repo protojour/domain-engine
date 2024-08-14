@@ -8,7 +8,7 @@ use ontol_runtime::{
 use tracing::debug;
 
 use crate::{
-    ds_bad_req, ds_err,
+    pg_error::{ds_err, PgInputError},
     pg_model::{PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgTable},
     sql::{self, Path},
 };
@@ -138,7 +138,7 @@ impl<'a> TransactCtx<'a> {
                         let pg_def = self.lookup_def(target_def_id)?;
 
                         let Some(target_entity) = pg_def.def.entity() else {
-                            return Err(ds_bad_req("cannot select id from non-entity"));
+                            return Err(PgInputError::NotAnEntity.into());
                         };
 
                         let pg_id = pg_def.pg.table.field(&target_entity.id_relationship_id)?;

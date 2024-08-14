@@ -19,8 +19,7 @@ use pin_utils::pin_mut;
 use tracing::{debug, trace, warn};
 
 use crate::{
-    map_row_error,
-    pg_error::{PgDataError, PgInputError},
+    pg_error::{map_row_error, PgError, PgInputError},
     pg_model::{InDomain, PgType},
     sql::{self, TableName},
     sql_record::{SqlColumnStream, SqlRecordIterator},
@@ -140,28 +139,28 @@ impl<'a> TransactCtx<'a> {
                 .client()
                 .query_raw(&sql, analyzed.root_attrs.as_params())
                 .await
-                .map_err(PgDataError::InsertQuery)?;
+                .map_err(PgError::InsertQuery)?;
             pin_mut!(stream);
 
             let row = stream
                 .try_next()
                 .await
                 .map_err(map_row_error)?
-                .ok_or(PgDataError::NothingInserted)?;
+                .ok_or(PgError::NothingInserted)?;
 
             stream
                 .try_next()
                 .await
-                .map_err(PgDataError::InsertRowStreamNotClosed)?;
+                .map_err(PgError::InsertRowStreamNotClosed)?;
 
             match stream.rows_affected() {
                 Some(affected) => {
                     if affected != 1 {
-                        return Err(PgDataError::InsertIncorrectAffectCount.into());
+                        return Err(PgError::InsertIncorrectAffectCount.into());
                     }
                 }
                 None => {
-                    return Err(PgDataError::InsertNoRowsAffected.into());
+                    return Err(PgError::InsertNoRowsAffected.into());
                 }
             }
 

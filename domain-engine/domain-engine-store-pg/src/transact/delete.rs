@@ -3,7 +3,7 @@ use ontol_runtime::{value::Value, DefId};
 use tracing::{debug, warn};
 
 use crate::{
-    pg_error::{PgDataError, PgInputError},
+    pg_error::{PgError, PgInputError},
     sql,
     transact::data::Data,
 };
@@ -44,7 +44,7 @@ impl<'a> TransactCtx<'a> {
             .client()
             .query(&sql, &[&id_param])
             .await
-            .map_err(PgDataError::EdgeDeletion)?;
+            .map_err(PgError::EdgeDeletion)?;
 
         Ok(!rows.is_empty())
     }

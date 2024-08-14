@@ -17,7 +17,7 @@ use smallvec::smallvec;
 use tracing::{debug, trace};
 
 use crate::{
-    ds_bad_req, ds_err,
+    pg_error::{PgError, PgInputError, PgModelError},
     pg_model::{PgDataKey, PgDef, PgDomainTable, PgEdgeCardinalKind, PgTable, PgType},
     sql,
     sql_record::{SqlColumnStream, SqlRecord, SqlRecordIterator},
@@ -65,12 +65,12 @@ impl<'a> TransactCtx<'a> {
     ) -> DomainResult<impl Stream<Item = DomainResult<QueryFrame>> + '_> {
         let struct_select = match &entity_select.source {
             StructOrUnionSelect::Struct(struct_select) => struct_select,
-            StructOrUnionSelect::Union(..) => {
-                return Err(ds_bad_req("union top-level query not supported (yet)"))
-            }
+            StructOrUnionSelect::Union(..) => return Err(PgInputError::UnionTopLevelQuery.into()),
         };
         let after_cursor: Option<Cursor> = match &entity_select.after_cursor {
-            Some(bytes) => Some(bincode::deserialize(bytes).map_err(|_| ds_bad_req("bad cursor"))?),
+            Some(bytes) => {
+                Some(bincode::deserialize(bytes).map_err(|e| PgInputError::BadCursor(e.into()))?)
+            }
             None => None,
         };
 
@@ -166,7 +166,7 @@ impl<'a> TransactCtx<'a> {
             .client()
             .query_raw(&sql, &select_params)
             .await
-            .map_err(|err| ds_err(format!("{err}")))?;
+            .map_err(PgError::SelectQuery)?;
 
         Ok(async_stream::try_stream! {
             pin_mut!(row_stream);
@@ -176,7 +176,7 @@ impl<'a> TransactCtx<'a> {
             let mut observed_rows = 0;
 
             for await row_result in row_stream {
-                let row = row_result.map_err(|_| ds_err("unable to fetch row"))?;
+                let row = row_result.map_err(PgError::SelectRow)?;
                 let mut row_iter = SqlColumnStream::new(&row);
 
                 if include_total_len {
@@ -430,7 +430,9 @@ impl<'a> TransactCtx<'a> {
                                             column_index += 1;
                                         }
                                     }
-                                    Attr::Matrix(_) => return Err(ds_err("matrix in matrix")),
+                                    Attr::Matrix(_) => {
+                                        return Err(PgInputError::MatrixInMatrix.into())
+                                    }
                                 }
                             }
 
@@ -459,10 +461,10 @@ impl<'a> TransactCtx<'a> {
                     .read_field(
                         def.data_relationships
                             .get(&rel_id)
-                            .ok_or_else(|| ds_err("field does not exist"))?,
+                            .ok_or(PgModelError::NonExistentField(rel_id))?,
                         &mut iterator,
                     )?
-                    .ok_or_else(|| ds_err("field was not defined"))?;
+                    .ok_or(PgError::MissingField(rel_id))?;
 
                 Ok(RowValue {
                     value: field_value,
@@ -524,7 +526,7 @@ impl<'a> TransactCtx<'a> {
                 }
             }
 
-            Err(ds_err("cannot deserialize parameters"))
+            Err(PgError::EdgeParametersMissing.into())
         } else {
             Ok(Attr::Unit(value))
         }
@@ -539,7 +541,7 @@ impl<'a> TransactCtx<'a> {
         match select {
             Select::Leaf => {
                 let Some(entity) = pg_def.def.entity() else {
-                    return Err(ds_err("not an entity"));
+                    return Err(PgInputError::NotAnEntity.into());
                 };
 
                 let pg_id = pg_def.pg.table.field(&entity.id_relationship_id)?;
@@ -560,7 +562,7 @@ impl<'a> TransactCtx<'a> {
                     let actual_select = variants
                         .iter()
                         .find(|sel| sel.def_id == def_id)
-                        .ok_or_else(|| ds_err("actual value not found in select union"))?;
+                        .ok_or(PgInputError::UnionVariantNotFound)?;
 
                     self.read_record_as_struct(pg_def, sql_record, &actual_select.properties)
                 }
@@ -569,7 +571,7 @@ impl<'a> TransactCtx<'a> {
                 let actual_select = variants
                     .iter()
                     .find(|sel| sel.def_id == def_id)
-                    .ok_or_else(|| ds_err("actual value not found in select union"))?;
+                    .ok_or(PgInputError::UnionVariantNotFound)?;
 
                 self.read_record_as_struct(pg_def, sql_record, &actual_select.properties)
             }

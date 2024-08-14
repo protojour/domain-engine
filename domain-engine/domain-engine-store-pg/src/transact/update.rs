@@ -11,7 +11,7 @@ use postgres_types::ToSql;
 use tracing::{debug, warn};
 
 use crate::{
-    pg_error::{PgDataError, PgInputError},
+    pg_error::{PgError, PgInputError},
     pg_model::{InDomain, PgDataKey},
     sql::{self, UpdateColumn},
     sql_value::SqlVal,
@@ -192,9 +192,9 @@ impl<'a> TransactCtx<'a> {
             self.client()
                 .query_raw(&sql, update_params.iter().map(|param| param as &dyn ToSql))
                 .await
-                .map_err(PgDataError::UpdateQuery)?
+                .map_err(PgError::UpdateQuery)?
                 .try_collect::<Vec<_>>()
-                .map_err(PgDataError::UpdateRow)
+                .map_err(PgError::UpdateRow)
                 .await?
         } else {
             // nothing inherent to update. Just fetch key.
@@ -217,9 +217,9 @@ impl<'a> TransactCtx<'a> {
             self.client()
                 .query_raw(&sql, update_params.iter().map(|param| param as &dyn ToSql))
                 .await
-                .map_err(PgDataError::UpdateQueryKeyFetch)?
+                .map_err(PgError::UpdateQueryKeyFetch)?
                 .try_collect::<Vec<_>>()
-                .map_err(PgDataError::UpdateRow)
+                .map_err(PgError::UpdateRow)
                 .await?
         };
 
@@ -264,13 +264,10 @@ async fn collect_one_row_value(
     frame_stream: impl Stream<Item = DomainResult<QueryFrame>>,
 ) -> DomainResult<RowValue> {
     let frames: Vec<_> = frame_stream.collect().await;
-    let frame = frames
-        .into_iter()
-        .next()
-        .ok_or(PgDataError::NothingUpdated)??;
+    let frame = frames.into_iter().next().ok_or(PgError::NothingUpdated)??;
 
     let QueryFrame::Row(row) = frame else {
-        return Err(PgDataError::InvalidQueryFrame.into());
+        return Err(PgError::InvalidQueryFrame.into());
     };
 
     Ok(row)

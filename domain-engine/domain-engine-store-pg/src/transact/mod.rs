@@ -4,7 +4,7 @@ use domain_engine_core::{
     object_generator::ObjectGenerator,
     system::SystemAPI,
     transact::{DataOperation, OpSequence, ReqMessage, RespMessage},
-    DomainResult,
+    DomainError, DomainResult,
 };
 use futures_util::{stream::BoxStream, StreamExt};
 use ontol_runtime::{
@@ -12,9 +12,13 @@ use ontol_runtime::{
 };
 use query::QueryFrame;
 use tokio_postgres::IsolationLevel;
-use tracing::{debug, trace};
+use tracing::trace;
 
-use crate::{ds_err, pg_model::PgDef, PgModel, PostgresDataStore};
+use crate::{
+    pg_error::{PgError, PgModelError},
+    pg_model::PgDef,
+    PgModel, PostgresDataStore,
+};
 
 mod data;
 mod delete;
@@ -117,7 +121,7 @@ pub async fn transact(
         .pool
         .get()
         .await
-        .map_err(|_| ds_err("could not acquire database connection"))?;
+        .map_err(|e| PgError::DbConnectionAcquire(e.into()))?;
 
     Ok(async_stream::try_stream! {
         let ctx = TransactCtx {
@@ -131,10 +135,7 @@ pub async fn transact(
                     .isolation_level(IsolationLevel::ReadCommitted)
                     .start()
                     .await
-                    .map_err(|err| {
-                        debug!("transaction not initiated: {err:?}");
-                        ds_err("could not initiate transaction")
-                    })?
+                    .map_err(PgError::BeginTransaction)?
             )
         };
 
@@ -208,7 +209,7 @@ pub async fn transact(
                             yield RespMessage::Element(ctx.ontology.bool_value(deleted), DataOperation::Deleted);
                         }
                         None => {
-                            Err(ds_err("invalid transaction state"))?
+                            Result::<(), DomainError>::Err(PgModelError::InvalidTransactionState.into())?;
                         }
                     }
                 }
@@ -217,11 +218,7 @@ pub async fn transact(
 
         match ctx.connection_state {
             ConnectionState::Transaction(txn) => {
-                txn.commit().await.map_err(|err| {
-                    debug!("transaction not committed: {err:?}");
-                    ds_err("transaction could not be commmitted")
-                })?;
-
+                txn.commit().await.map_err(PgError::CommitTransaction)?;
                 trace!("COMMIT OK");
             }
         }

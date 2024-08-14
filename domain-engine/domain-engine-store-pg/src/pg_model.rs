@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, ops::Deref};
 
-use domain_engine_core::DomainResult;
+use domain_engine_core::{DomainError, DomainResult};
 use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::{
@@ -15,7 +15,7 @@ use postgres_types::ToSql;
 use tokio_postgres::types::FromSql;
 use tracing::debug;
 
-use crate::{ds_err, pg_error::PgModelError, sql};
+use crate::{pg_error::PgModelError, sql};
 
 /// The key type used in the registry for metadata
 pub type PgRegKey = i32;
@@ -332,7 +332,7 @@ impl PgType {
         };
 
         match def_repr {
-            DefRepr::Unit => Err(ds_err("TODO: ignore unit column")),
+            DefRepr::Unit => Err(DomainError::data_store("TODO: ignore unit column")),
             DefRepr::I64 => Ok(Some(PgType::BigInt)),
             DefRepr::F64 => Ok(Some(PgType::DoublePrecision)),
             DefRepr::Serial => Ok(Some(PgType::Bigserial)),
