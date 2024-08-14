@@ -16,7 +16,8 @@ use tracing::{debug, trace};
 use crate::{
     pg_error::{ds_bad_req, map_row_error, PgError, PgInputError, PgModelError},
     pg_model::{
-        InDomain, PgDataKey, PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgRegKey, PgTable,
+        InDomain, PgDataKey, PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexType,
+        PgRegKey, PgTable,
     },
     sql::{self, WhereExt},
     sql_value::SqlVal,
@@ -138,6 +139,15 @@ impl<'a> TransactCtx<'a> {
         let subject_index = patch.subject;
         let pg_edge = self.pg_model.pg_domain_edgetable(&edge_id)?;
 
+        let mut unique_cardinal: Option<CardinalIdx> = None;
+        let mut conflict_actions: Vec<sql::UpdateColumn> = vec![];
+
+        for (index, pg_cardinal) in &pg_edge.table.edge_cardinals {
+            if matches!(pg_cardinal.index_type, Some(PgIndexType::Unique)) {
+                unique_cardinal = Some(*index);
+            }
+        }
+
         let mut sql_insert = sql::Insert {
             with: None,
             into: pg_edge.table_name(),
@@ -148,6 +158,8 @@ impl<'a> TransactCtx<'a> {
         };
 
         let mut analysis = EdgeAnalysis::default();
+
+        let mut param_index: usize = 0;
 
         for (index, pg_cardinal) in &pg_edge.table.edge_cardinals {
             match &pg_cardinal.kind {
@@ -166,6 +178,19 @@ impl<'a> TransactCtx<'a> {
                         } else {
                             ProjectedEdgeCardinal::Object(pg_cardinal, dynamic)
                         });
+
+                    if unique_cardinal.is_some() && Some(*index) != unique_cardinal {
+                        conflict_actions.push(sql::UpdateColumn(
+                            def_col_name,
+                            sql::Expr::param(param_index),
+                        ));
+                        conflict_actions.push(sql::UpdateColumn(
+                            key_col_name,
+                            sql::Expr::param(param_index + 1),
+                        ));
+                    }
+
+                    param_index += 2;
                 }
                 PgEdgeCardinalKind::PinnedDef { key_col_name, .. } => {
                     sql_insert.column_names.push(key_col_name);
@@ -176,6 +201,15 @@ impl<'a> TransactCtx<'a> {
                         } else {
                             ProjectedEdgeCardinal::Object(pg_cardinal, Dynamic::No)
                         });
+
+                    if unique_cardinal.is_some() && Some(*index) != unique_cardinal {
+                        conflict_actions.push(sql::UpdateColumn(
+                            key_col_name,
+                            sql::Expr::param(param_index),
+                        ));
+                    }
+
+                    param_index += 1;
                 }
                 PgEdgeCardinalKind::Parameters(params_def_id) => {
                     let def = self.ontology.def(*params_def_id);
@@ -186,6 +220,7 @@ impl<'a> TransactCtx<'a> {
                                     let pg_field = pg_edge.table.field(rel_id)?;
                                     sql_insert.column_names.push(&pg_field.col_name);
                                     analysis.param_order.insert((*rel_id, *def_id));
+                                    param_index += 1;
                                 }
                                 DataRelationshipTarget::Union(_) => {
                                     todo!("union in params");
@@ -197,6 +232,29 @@ impl<'a> TransactCtx<'a> {
                         .projected_cardinals
                         .push(ProjectedEdgeCardinal::Parameters);
                 }
+            }
+        }
+
+        if let Some(unique_cardinal) = unique_cardinal {
+            if !conflict_actions.is_empty() {
+                let pg_unique_cardinal = pg_edge.table.edge_cardinal(unique_cardinal)?;
+
+                let mut unique_columns = vec![];
+
+                match &pg_unique_cardinal.kind {
+                    PgEdgeCardinalKind::Dynamic {
+                        def_col_name,
+                        key_col_name,
+                    } => {
+                        unique_columns.extend([def_col_name.as_ref(), key_col_name.as_ref()]);
+                    }
+                    _ => return Err(PgModelError::InvalidUniqueCardinal.into()),
+                }
+
+                sql_insert.on_conflict = Some(sql::OnConflict {
+                    target: Some(sql::ConflictTarget::Columns(unique_columns)),
+                    action: sql::ConflictAction::DoUpdateSet(conflict_actions),
+                });
             }
         }
 

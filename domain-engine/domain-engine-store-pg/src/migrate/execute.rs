@@ -284,7 +284,7 @@ async fn execute_migration_step<'t>(
             index,
             ident,
             kind,
-            ..
+            index_type,
         } => {
             let pg_edge_domain = ctx.domains.get(&pkg_id).unwrap();
             let pg_table = pg_edge_domain.edgetables.get(&edge_tag).unwrap();
@@ -317,6 +317,27 @@ async fn execute_migration_step<'t>(
                     )
                     .await
                     .context("alter table add key column")?;
+
+                    if let Some(index_type) = &index_type {
+                        txn.query(
+                            &format!(
+                                "CREATE {index} ON {schema}.{table} ({columns})",
+                                index = match index_type {
+                                    PgIndexType::Unique => "UNIQUE INDEX",
+                                    PgIndexType::BTree => "INDEX",
+                                },
+                                schema = sql::Ident(&pg_edge_domain.schema_name),
+                                table = sql::Ident(&pg_table.table_name),
+                                columns = [def_col_name, key_col_name]
+                                    .iter()
+                                    .map(sql::Ident)
+                                    .format(","),
+                            ),
+                            &[],
+                        )
+                        .await
+                        .context("create edge index")?;
+                    }
                 }
                 PgEdgeCardinalKind::PinnedDef {
                     def_id,
@@ -380,8 +401,9 @@ async fn execute_migration_step<'t>(
                             ident,
                             def_column_name,
                             pinned_domaintable_key,
-                            key_column_name
-                        ) VALUES($1, $2, $3, $4, $5, $6)
+                            key_column_name,
+                            index_type
+                        ) VALUES($1, $2, $3, $4, $5, $6, $7)
                         RETURNING key
                     "},
                     &[
@@ -391,6 +413,7 @@ async fn execute_migration_step<'t>(
                         &def_column_name,
                         &pinned_domaintable_key,
                         &key_column_name,
+                        &index_type,
                     ],
                 )
                 .await
@@ -410,6 +433,7 @@ async fn execute_migration_step<'t>(
                     key: row.get(0),
                     ident,
                     kind,
+                    index_type,
                 },
             );
         }

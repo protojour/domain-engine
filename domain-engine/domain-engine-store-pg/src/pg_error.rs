@@ -125,7 +125,7 @@ impl From<PgInputError> for DomainError {
     }
 }
 
-/// public facing postgres errors
+/// public facing postgres errors about model invariant violations
 #[derive(displaydoc::Display, Debug)]
 pub enum PgModelError {
     /// domain not found for {0:?}
@@ -148,6 +148,8 @@ pub enum PgModelError {
     NonExistentField(RelId),
     /// invalid transaction state
     InvalidTransactionState,
+    /// invalid unique cardinal
+    InvalidUniqueCardinal,
 }
 
 impl From<PgModelError> for DomainError {

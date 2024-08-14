@@ -277,7 +277,14 @@ async fn migrate_domain_edges_steps<'t>(
             let pg_cardinals: BTreeMap<CardinalIdx, PgEdgeCardinal> = txn
                 .query(
                     indoc! {"
-                        SELECT key, ordinal, ident, def_column_name, pinned_domaintable_key, key_column_name
+                        SELECT
+                            key,
+                            ordinal,
+                            ident,
+                            def_column_name,
+                            pinned_domaintable_key,
+                            key_column_name,
+                            index_type
                         FROM m6mreg.edgecardinal
                         WHERE domaintable_key = $1
                         ORDER BY ordinal
@@ -293,11 +300,16 @@ async fn migrate_domain_edges_steps<'t>(
                     let def_col_name: Option<Box<str>> = row.get(3);
                     let pinned_domaintable_key: Option<PgRegKey> = row.get(4);
                     let key_col_name: Option<Box<str>> = row.get(5);
+                    let index_type: Option<PgIndexType> = row.get(6);
 
-                    let pinned_domaintable_def_id = pinned_domaintable_key.map(|key|
-                        *pg_domain.datatables.iter().find(|(_, dt)| dt.key == key).unwrap()
+                    let pinned_domaintable_def_id = pinned_domaintable_key.map(|key| {
+                        *pg_domain
+                            .datatables
+                            .iter()
+                            .find(|(_, dt)| dt.key == key)
+                            .unwrap()
                             .0
-                    );
+                    });
 
                     Ok((
                         CardinalIdx(ordinal.try_into()?),
@@ -308,11 +320,14 @@ async fn migrate_domain_edges_steps<'t>(
                                 (Some(key_col_name), Some(pinned_domaintable_def_id), None) => {
                                     PgEdgeCardinalKind::PinnedDef {
                                         def_id: pinned_domaintable_def_id,
-                                        key_col_name
+                                        key_col_name,
                                     }
                                 }
                                 (Some(key_col_name), None, Some(def_col_name)) => {
-                                    PgEdgeCardinalKind::Dynamic { def_col_name, key_col_name }
+                                    PgEdgeCardinalKind::Dynamic {
+                                        def_col_name,
+                                        key_col_name,
+                                    }
                                 }
                                 (None, None, None) => {
                                     // updated below
@@ -321,7 +336,8 @@ async fn migrate_domain_edges_steps<'t>(
                                 _ => {
                                     unreachable!()
                                 }
-                            }
+                            },
+                            index_type,
                         },
                     ))
                 })
@@ -345,6 +361,7 @@ async fn migrate_domain_edges_steps<'t>(
         for (index, cardinal) in edge_info.cardinals.iter().enumerate() {
             let index = CardinalIdx(index.try_into()?);
             let ident = format!("cardinal{index}").into_boxed_str();
+            let mut index_type: Option<PgIndexType> = None;
 
             let edge_cardinal_kind = if cardinal.flags.contains(EdgeCardinalFlags::ENTITY) {
                 // FIXME: ontology must provide human readable name for cardinal
@@ -356,6 +373,12 @@ async fn migrate_domain_edges_steps<'t>(
                         def_id: *cardinal.target.iter().next().unwrap(),
                     }
                 } else {
+                    index_type = Some(if cardinal.flags.contains(EdgeCardinalFlags::UNIQUE) {
+                        PgIndexType::Unique
+                    } else {
+                        PgIndexType::BTree
+                    });
+
                     let def_col_name = format!("_def{index}").into_boxed_str();
                     PgEdgeCardinalKind::Dynamic {
                         key_col_name,
@@ -401,6 +424,10 @@ async fn migrate_domain_edges_steps<'t>(
                         return Err(anyhow!("TODO: cardinal change detected"));
                     }
                 }
+
+                if deployed_pg_cardinal.index_type != index_type {
+                    return Err(anyhow!("TODO: change index type for edge cardinal"));
+                }
             } else {
                 ctx.steps.push((
                     domain_ids,
@@ -409,7 +436,7 @@ async fn migrate_domain_edges_steps<'t>(
                         index,
                         ident,
                         kind: edge_cardinal_kind,
-                        index_type: None,
+                        index_type,
                     },
                 ));
             }

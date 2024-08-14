@@ -334,10 +334,13 @@ bitflags::bitflags! {
     pub struct EdgeCardinalFlags: u8 {
         /// Whether the values in this edge cardinal references an entity
         const ENTITY = 0b00000001;
+        /// Whether each linked vertex can only appear once in this cardinal for this edge.
+        const UNIQUE = 0b00000010;
         /// Whether the link represented by this cardinal can only
         /// ever link to just one entity/vertex def.
         /// The reason can be that parts of the edge represents direct properties in the vertex.
-        const PINNED_DEF = 0b00000010;
+        /// Implies UNIQUE.
+        const PINNED_DEF = 0b00000100;
     }
 }
 

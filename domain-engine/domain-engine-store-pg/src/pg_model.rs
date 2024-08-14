@@ -276,6 +276,7 @@ pub struct PgEdgeCardinal {
     #[allow(unused)]
     pub ident: Box<str>,
     pub kind: PgEdgeCardinalKind,
+    pub index_type: Option<PgIndexType>,
 }
 
 impl PgEdgeCardinal {

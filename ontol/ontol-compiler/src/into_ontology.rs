@@ -16,6 +16,7 @@ use ontol_runtime::{
         ontol::{OntolDomainMeta, TextConstant, TextLikeType},
         Ontology,
     },
+    property::ValueCardinality,
     rustdoc::RustDoc,
     DefId, DefIdSet, EdgeId, PackageId, RelId,
 };
@@ -596,9 +597,16 @@ impl<'m> Compiler<'m> {
                 if edge_info.cardinals.is_empty() {
                     // initialize edge cardinals first
                     for i in 0_u8..2 {
-                        let flags = EdgeCardinalFlags::ENTITY;
+                        let mut flags = EdgeCardinalFlags::ENTITY;
 
                         if i == edge_projection.subject.0 {
+                            if matches!(
+                                meta.relationship.subject_cardinality.1,
+                                ValueCardinality::Unit
+                            ) {
+                                flags.insert(EdgeCardinalFlags::UNIQUE);
+                            }
+
                             edge_info.cardinals.push(EdgeCardinal {
                                 target: DefIdSet::from_iter([
                                     self.identifier_to_vertex_def_id(source_def_id)
@@ -606,6 +614,13 @@ impl<'m> Compiler<'m> {
                                 flags,
                             });
                         } else {
+                            if matches!(
+                                meta.relationship.object_cardinality.1,
+                                ValueCardinality::Unit
+                            ) {
+                                flags.insert(EdgeCardinalFlags::UNIQUE);
+                            }
+
                             edge_info.cardinals.push(EdgeCardinal {
                                 target: DefIdSet::from_iter([
                                     self.identifier_to_vertex_def_id(target_def_id)

@@ -5,7 +5,7 @@ use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::{domain::DefKind, Ontology},
     tuple::CardinalIdx,
-    DefId, DefRelTag, PackageId,
+    DefId, DefRelTag, EdgeId, PackageId,
 };
 use tokio_postgres::{Client, Transaction};
 use tracing::{debug_span, info, Instrument};
@@ -148,13 +148,31 @@ pub async fn migrate(
         .await
         .context("perform migration")?;
 
-    // sanity check
+    // sanity checks
     {
         assert_eq!(ctx.current_version, ctx.deployed_version);
         assert_eq!(
             ctx.current_version,
             query_domain_migration_version(&txn).await?
         );
+
+        // check edge cardinals for multiple unique indexes (not handled)
+        for (pkg_id, pg_domain) in &ctx.domains {
+            for (edge_tag, edgetable) in &pg_domain.edgetables {
+                let unique_count = edgetable
+                    .edge_cardinals
+                    .values()
+                    .filter(|c| matches!(c.index_type, Some(PgIndexType::Unique)))
+                    .count();
+
+                if unique_count > 1 {
+                    let edge_id = EdgeId(*pkg_id, *edge_tag);
+                    return Err(anyhow!(
+                        "edge {edge_id:?} has more than one unique cardinal, which doesn't work yet"
+                    ));
+                }
+            }
+        }
     }
 
     txn.commit().await?;
