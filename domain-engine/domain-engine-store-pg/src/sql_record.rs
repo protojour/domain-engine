@@ -99,19 +99,19 @@ fn decode_record_field<'b>(buf: &mut &'b [u8], layout: &Layout) -> CodecResult<S
     }
 }
 
-pub struct SqlColumnStream<'b> {
-    row: &'b Row,
+pub struct SqlColumnStream<'a> {
+    row: &'a Row,
     index: usize,
 }
 
-impl<'b> SqlColumnStream<'b> {
-    pub fn new(row: &'b Row) -> Self {
+impl<'a> SqlColumnStream<'a> {
+    pub fn new(row: &'a Row) -> Self {
         Self { row, index: 0 }
     }
 }
 
-impl<'b> SqlRecordIterator<'b> for SqlColumnStream<'b> {
-    fn next_field(&mut self, layout: &Layout) -> CodecResult<SqlVal<'b>> {
+impl<'a> SqlRecordIterator<'a> for SqlColumnStream<'a> {
+    fn next_field(&mut self, layout: &Layout) -> CodecResult<SqlVal<'a>> {
         if self.index >= self.row.columns().len() {
             Err(CodecError(
                 format!("no column at index {}", self.index).into(),

@@ -98,6 +98,7 @@ impl<'a> TransactCtx<'a> {
 
         // TODO: prepared statement for each entity type/select
         let mut insert = sql::Insert {
+            with: None,
             into: TableName(
                 &pg_domain.schema_name,
                 &analyzed.root_attrs.datatable.table_name,

@@ -51,17 +51,17 @@ pub struct PgEdgeProjection<'a> {
 }
 
 #[derive(Default)]
-pub struct EdgeUnionSelectBuilder<'d> {
-    pub union_exprs: Vec<sql::Expr<'d>>,
+pub struct EdgeUnionSelectBuilder<'a> {
+    pub union_exprs: Vec<sql::Expr<'a>>,
 }
 
 #[derive(Default)]
-pub struct EdgeUnionVariantSelectBuilder<'d> {
-    cardinals: Vec<EdgeUnionCardinalVariantSelect<'d>>,
+pub struct EdgeUnionVariantSelectBuilder<'a> {
+    cardinals: Vec<EdgeUnionCardinalVariantSelect<'a>>,
 }
 
-impl<'d> EdgeUnionVariantSelectBuilder<'d> {
-    fn append(&self, cardinal_variant: EdgeUnionCardinalVariantSelect<'d>) -> Self {
+impl<'a> EdgeUnionVariantSelectBuilder<'a> {
+    fn append(&self, cardinal_variant: EdgeUnionCardinalVariantSelect<'a>) -> Self {
         let mut cardinals = self.cardinals.clone();
         cardinals.push(cardinal_variant);
         Self { cardinals }
@@ -69,15 +69,15 @@ impl<'d> EdgeUnionVariantSelectBuilder<'d> {
 }
 
 #[derive(Clone)]
-pub enum EdgeUnionCardinalVariantSelect<'d> {
+pub enum EdgeUnionCardinalVariantSelect<'a> {
     Vertex {
-        expr: sql::Expr<'d>,
-        from: sql::FromItem<'d>,
-        join_condition: sql::Expr<'d>,
-        where_condition: Option<sql::Expr<'d>>,
+        expr: sql::Expr<'a>,
+        from: sql::FromItem<'a>,
+        join_condition: sql::Expr<'a>,
+        where_condition: Option<sql::Expr<'a>>,
     },
     #[allow(unused)]
-    Parameters { expr: sql::Expr<'d> },
+    Parameters { expr: sql::Expr<'a> },
 }
 
 impl<'a> TransactCtx<'a> {
@@ -306,12 +306,12 @@ impl<'a> TransactCtx<'a> {
     }
 }
 
-pub fn edge_join_condition<'d>(
-    edge_path: sql::Path<'d>,
-    cardinal: &'d PgEdgeCardinal,
-    data: &'d PgTable,
-    data_key_expr: sql::Expr<'d>,
-) -> sql::Expr<'d> {
+pub fn edge_join_condition<'a>(
+    edge_path: sql::Path<'a>,
+    cardinal: &'a PgEdgeCardinal,
+    data: &'a PgTable,
+    data_key_expr: sql::Expr<'a>,
+) -> sql::Expr<'a> {
     match &cardinal.kind {
         PgEdgeCardinalKind::Dynamic {
             def_col_name,

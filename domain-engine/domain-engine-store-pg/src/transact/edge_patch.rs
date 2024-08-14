@@ -138,6 +138,7 @@ impl<'a> TransactCtx<'a> {
         let pg_edge = self.pg_model.pg_domain_edgetable(&edge_id)?;
 
         let mut sql_insert = sql::Insert {
+            with: None,
             into: pg_edge.table_name(),
             column_names: vec![],
             on_conflict: None,
@@ -623,6 +624,7 @@ impl<'a> TransactCtx<'a> {
                         // TODO: It might actually be better to do SELECT + optional INSERT.
                         // this approach (DO UPDATE SET) always re-appends the row.
                         sql::Insert {
+                            with: None,
                             into: pg.table_name(),
                             column_names: vec![&pg_id_field.col_name],
                             on_conflict: Some(sql::OnConflict {
