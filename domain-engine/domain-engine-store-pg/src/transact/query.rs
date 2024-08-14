@@ -19,7 +19,7 @@ use tracing::{debug, trace};
 use crate::{
     pg_error::{PgError, PgInputError, PgModelError},
     pg_model::{PgDataKey, PgDomainTable, PgEdgeCardinalKind, PgTable, PgTableKey, PgType},
-    sql::{self},
+    sql,
     sql_record::{SqlColumnStream, SqlRecord, SqlRecordIterator},
     sql_value::{Layout, SqlVal},
 };
@@ -68,9 +68,9 @@ pub enum QuerySelect<'a> {
     Field(RelId),
 }
 
-pub enum QueryContext {
-    Select,
-    Insert,
+pub enum IncludeEdgeAttrs {
+    Yes,
+    No,
 }
 
 impl<'a> TransactCtx<'a> {
@@ -130,13 +130,9 @@ impl<'a> TransactCtx<'a> {
             }
 
             let (from, _alias, tail_expressions) = match query_select {
-                Some(QuerySelect::Struct(properties)) => self.sql_select_expressions(
-                    def_id,
-                    properties,
-                    QueryContext::Select,
-                    pg,
-                    &mut ctx,
-                )?,
+                Some(QuerySelect::Struct(properties)) => {
+                    self.sql_select_vertex_expressions(def_id, properties, pg, &mut ctx)?
+                }
                 Some(QuerySelect::Field(rel_id)) => {
                     let mut fields: Vec<_> = self.initial_standard_data_fields(pg).into();
                     fields.push(sql::Expr::path1(pg.table.field(&rel_id)?.col_name.as_ref()));
@@ -202,7 +198,7 @@ impl<'a> TransactCtx<'a> {
                 }
 
                 if observed_rows < limit {
-                    let row_value = self.read_row_value_as_vertex(row_iter, query_select, DataOperation::Queried)?;
+                    let row_value = self.read_row_value_as_vertex(row_iter, query_select, IncludeEdgeAttrs::Yes, DataOperation::Queried)?;
                     yield QueryFrame::Row(row_value);
 
                     observed_values += 1;
@@ -234,11 +230,10 @@ impl<'a> TransactCtx<'a> {
         })
     }
 
-    pub(super) fn sql_select_expressions(
+    pub(super) fn sql_select_vertex_expressions(
         &self,
         def_id: DefId,
         properties: &FnvHashMap<RelId, Select>,
-        query_context: QueryContext,
         pg: PgDomainTable<'a>,
         ctx: &mut QueryBuildCtx<'a>,
     ) -> DomainResult<(sql::FromItem<'a>, sql::Alias, Vec<sql::Expr<'a>>)> {
@@ -246,21 +241,34 @@ impl<'a> TransactCtx<'a> {
 
         // select data properties
         let mut sql_expressions = vec![];
-        let data_alias = match query_context {
-            QueryContext::Select => {
-                let data_alias = self.select_inherent_fields_as_alias(def, pg, ctx)?;
-                sql_expressions.push(sql::Expr::path2(data_alias, sql::PathSegment::Asterisk));
-                data_alias
-            }
-            QueryContext::Insert => {
-                let alias = ctx.with_def_aliases.get(&def_id).unwrap();
-                sql_expressions.extend(self.initial_standard_data_fields(pg));
-                self.select_inherent_struct_fields(def, pg.table, &mut sql_expressions, None)?;
-                *alias
-            }
-        };
+        let data_alias = self.select_inherent_fields_as_alias(def, pg, ctx)?;
+        sql_expressions.push(sql::Expr::path2(data_alias, sql::PathSegment::Asterisk));
 
-        // select edges
+        self.sql_select_edge_properties(
+            def,
+            data_alias,
+            properties,
+            pg,
+            ctx,
+            &mut sql_expressions,
+        )?;
+
+        Ok((
+            sql::FromItem::Alias(data_alias),
+            data_alias,
+            sql_expressions,
+        ))
+    }
+
+    pub fn sql_select_edge_properties(
+        &self,
+        def: &Def,
+        data_alias: sql::Alias,
+        properties: &FnvHashMap<RelId, Select>,
+        pg: PgDomainTable<'a>,
+        ctx: &mut QueryBuildCtx<'a>,
+        output: &mut Vec<sql::Expr<'a>>,
+    ) -> DomainResult<()> {
         for (rel_id, select) in properties {
             let Some(rel_info) = def.data_relationships.get(rel_id) else {
                 continue;
@@ -313,7 +321,7 @@ impl<'a> TransactCtx<'a> {
 
                 match rel_info.cardinality.1 {
                     ValueCardinality::Unit => {
-                        sql_expressions.push(sql::Expr::paren(sql::Expr::Limit(
+                        output.push(sql::Expr::paren(sql::Expr::Limit(
                             Box::new(union_expr),
                             sql::Limit {
                                 limit: Some(1),
@@ -322,17 +330,13 @@ impl<'a> TransactCtx<'a> {
                         )));
                     }
                     ValueCardinality::IndexSet | ValueCardinality::List => {
-                        sql_expressions.push(sql::Expr::array(union_expr));
+                        output.push(sql::Expr::array(union_expr));
                     }
                 }
             }
         }
 
-        Ok((
-            sql::FromItem::Alias(data_alias),
-            data_alias,
-            sql_expressions,
-        ))
+        Ok(())
     }
 
     fn select_inherent_fields_as_alias(
@@ -373,6 +377,7 @@ impl<'a> TransactCtx<'a> {
         &self,
         mut iterator: impl SqlRecordIterator<'b>,
         query_select: Option<QuerySelect>,
+        include_edge_attrs: IncludeEdgeAttrs,
         op: DataOperation,
     ) -> DomainResult<RowValue> {
         let def = {
@@ -402,69 +407,8 @@ impl<'a> TransactCtx<'a> {
                 // retrieve data properties
                 self.read_inherent_struct_fields(def, &mut iterator, &mut attrs)?;
 
-                // retrieve edges
-                for (rel_id, select) in properties {
-                    let Some(rel_info) = def.data_relationships.get(rel_id) else {
-                        continue;
-                    };
-                    let DataRelationshipKind::Edge(proj) = &rel_info.kind else {
-                        continue;
-                    };
-
-                    let pg_edge = self.pg_model.edgetable(&proj.id)?;
-
-                    match rel_info.cardinality.1 {
-                        ValueCardinality::Unit => {
-                            if let Some(sql_edge_tuple) =
-                                iterator.next_field(&Layout::Record)?.null_filter()
-                            {
-                                let sql_edge_tuple = sql_edge_tuple.into_record()?;
-                                let attr =
-                                    self.read_edge_tuple_as_attr(sql_edge_tuple, select, pg_edge)?;
-                                attrs.insert(*rel_id, attr);
-                            }
-                        }
-                        ValueCardinality::IndexSet | ValueCardinality::List => {
-                            let sql_array = iterator.next_field(&Layout::Array)?.into_array()?;
-
-                            let mut matrix = AttrMatrix::default();
-                            matrix.columns.push(Default::default());
-
-                            for result in sql_array.elements(&Layout::Record) {
-                                let sql_edge_tuple = result?.into_record()?;
-
-                                match self.read_edge_tuple_as_attr(
-                                    sql_edge_tuple,
-                                    select,
-                                    pg_edge,
-                                )? {
-                                    Attr::Unit(value) => {
-                                        matrix.columns[0].push(value);
-                                    }
-                                    Attr::Tuple(tuple) => {
-                                        let mut tuple_iter = tuple.elements.into_iter();
-                                        matrix.columns[0].push(tuple_iter.next().unwrap());
-
-                                        let mut column_index: usize = 1;
-
-                                        for value in tuple_iter {
-                                            if matrix.columns.len() <= column_index {
-                                                matrix.columns.push(Default::default());
-                                            }
-
-                                            matrix.columns[column_index].push(value);
-                                            column_index += 1;
-                                        }
-                                    }
-                                    Attr::Matrix(_) => {
-                                        return Err(PgInputError::MatrixInMatrix.into())
-                                    }
-                                }
-                            }
-
-                            attrs.insert(*rel_id, Attr::Matrix(matrix));
-                        }
-                    }
+                if matches!(&include_edge_attrs, IncludeEdgeAttrs::Yes) {
+                    self.read_edge_attributes(&mut iterator, def, properties, &mut attrs)?;
                 }
 
                 let value = Value::Struct(Box::new(attrs), def.id.into());
@@ -497,6 +441,73 @@ impl<'a> TransactCtx<'a> {
                 op,
             }),
         }
+    }
+
+    pub fn read_edge_attributes<'b>(
+        &self,
+        record_iter: &mut impl SqlRecordIterator<'b>,
+        def: &Def,
+        properties: &FnvHashMap<RelId, Select>,
+        attrs: &mut FnvHashMap<RelId, Attr>,
+    ) -> DomainResult<()> {
+        for (rel_id, select) in properties {
+            let Some(rel_info) = def.data_relationships.get(rel_id) else {
+                continue;
+            };
+            let DataRelationshipKind::Edge(proj) = &rel_info.kind else {
+                continue;
+            };
+
+            let pg_edge = self.pg_model.edgetable(&proj.id)?;
+
+            match rel_info.cardinality.1 {
+                ValueCardinality::Unit => {
+                    if let Some(sql_edge_tuple) =
+                        record_iter.next_field(&Layout::Record)?.null_filter()
+                    {
+                        let sql_edge_tuple = sql_edge_tuple.into_record()?;
+                        let attr = self.read_edge_tuple_as_attr(sql_edge_tuple, select, pg_edge)?;
+                        attrs.insert(*rel_id, attr);
+                    }
+                }
+                ValueCardinality::IndexSet | ValueCardinality::List => {
+                    let sql_array = record_iter.next_field(&Layout::Array)?.into_array()?;
+
+                    let mut matrix = AttrMatrix::default();
+                    matrix.columns.push(Default::default());
+
+                    for result in sql_array.elements(&Layout::Record) {
+                        let sql_edge_tuple = result?.into_record()?;
+
+                        match self.read_edge_tuple_as_attr(sql_edge_tuple, select, pg_edge)? {
+                            Attr::Unit(value) => {
+                                matrix.columns[0].push(value);
+                            }
+                            Attr::Tuple(tuple) => {
+                                let mut tuple_iter = tuple.elements.into_iter();
+                                matrix.columns[0].push(tuple_iter.next().unwrap());
+
+                                let mut column_index: usize = 1;
+
+                                for value in tuple_iter {
+                                    if matrix.columns.len() <= column_index {
+                                        matrix.columns.push(Default::default());
+                                    }
+
+                                    matrix.columns[column_index].push(value);
+                                    column_index += 1;
+                                }
+                            }
+                            Attr::Matrix(_) => return Err(PgInputError::MatrixInMatrix.into()),
+                        }
+                    }
+
+                    attrs.insert(*rel_id, Attr::Matrix(matrix));
+                }
+            }
+        }
+
+        Ok(())
     }
 
     fn read_edge_tuple_as_attr(
@@ -597,6 +608,7 @@ impl<'a> TransactCtx<'a> {
         let row_value = self.read_row_value_as_vertex(
             sql_record.fields(),
             Some(QuerySelect::Struct(select_properties)),
+            IncludeEdgeAttrs::Yes,
             DataOperation::Queried,
         )?;
 

@@ -19,22 +19,28 @@ use tracing::{debug, warn};
 
 use crate::{
     pg_error::{map_row_error, PgError, PgInputError},
-    pg_model::{InDomain, PgType},
+    pg_model::InDomain,
     sql::{self},
     sql_record::SqlColumnStream,
-    sql_value::Layout,
+    sql_value::SqlVal,
+    transact::query::IncludeEdgeAttrs,
 };
 
 use super::{
     data::{Data, RowValue, ScalarAttrs},
     edge_patch::{EdgeEndoTuplePatch, EdgePatches},
-    query::{QueryBuildCtx, QueryContext, QuerySelect},
+    query::{QueryBuildCtx, QuerySelect},
     InsertMode, MutationMode, TransactCtx,
 };
 
-pub struct AnalyzedStruct<'m, 'b> {
+struct AnalyzedStruct<'m, 'b> {
     pub root_attrs: ScalarAttrs<'m, 'b>,
     pub edges: EdgePatches,
+}
+
+struct InsertQueries {
+    inherent_sql: String,
+    edge_select_sql: Option<String>,
 }
 
 impl<'a> TransactCtx<'a> {
@@ -59,17 +65,21 @@ impl<'a> TransactCtx<'a> {
         mode: InsertMode,
         select: &'a Select,
     ) -> DomainResult<RowValue> {
+        let def_id = value.value.type_def_id();
+
         self.preprocess_insert_value(mode, &mut value.value)?;
 
-        let mut layout = vec![];
-        let (sql, analyzed, query_select) =
-            self.prepare_insert_query(value, select, &mut layout)?;
-        debug!("{sql}");
+        let (insert_queries, analyzed, query_select) =
+            self.prepare_insert_queries(value, select)?;
+        debug!("{}", insert_queries.inherent_sql);
 
         let row = {
             let stream = self
                 .client()
-                .query_raw(&sql, analyzed.root_attrs.as_params())
+                .query_raw(
+                    &insert_queries.inherent_sql,
+                    analyzed.root_attrs.as_params(),
+                )
                 .await
                 .map_err(PgError::InsertQuery)?;
             pin_mut!(stream);
@@ -99,9 +109,10 @@ impl<'a> TransactCtx<'a> {
             row
         };
 
-        let row_value = self.read_row_value_as_vertex(
+        let mut row_value = self.read_row_value_as_vertex(
             SqlColumnStream::new(&row),
             Some(query_select),
+            IncludeEdgeAttrs::No,
             DataOperation::Inserted,
         )?;
 
@@ -111,6 +122,27 @@ impl<'a> TransactCtx<'a> {
             analyzed.edges,
         )
         .await?;
+
+        if let (Some(edge_select_sql), QuerySelect::Struct(properties)) =
+            (insert_queries.edge_select_sql, query_select)
+        {
+            debug!("{edge_select_sql}");
+
+            let row = self
+                .client()
+                .query_one(&edge_select_sql, &[&SqlVal::I64(row_value.data_key)])
+                .await
+                .map_err(PgError::InsertEdgeFetch)?;
+
+            let mut column_stream = SqlColumnStream::new(&row);
+            let def = self.ontology.def(def_id);
+
+            let Value::Struct(attrs, _) = &mut row_value.value else {
+                unreachable!();
+            };
+
+            self.read_edge_attributes(&mut column_stream, def, properties, attrs.as_mut())?;
+        }
 
         Ok(row_value)
     }
@@ -152,12 +184,11 @@ impl<'a> TransactCtx<'a> {
     }
 
     // TODO: This should not depend on the value
-    fn prepare_insert_query(
+    fn prepare_insert_queries(
         &self,
         value: InDomain<Value>,
         select: &'a Select,
-        layout: &mut Vec<Layout>,
-    ) -> DomainResult<(String, AnalyzedStruct, QuerySelect<'a>)> {
+    ) -> DomainResult<(InsertQueries, AnalyzedStruct, QuerySelect<'a>)> {
         let def_id = value.type_def_id();
         let def = self.ontology.def(def_id);
         let entity = def.entity().ok_or_else(|| {
@@ -173,31 +204,57 @@ impl<'a> TransactCtx<'a> {
         let root_alias = ctx.alias;
         ctx.with_def_aliases.insert(def_id, root_alias);
 
-        let mut returning = vec![];
+        let mut edge_select_sql: Option<String> = None;
+
+        let mut insert_returning = vec![];
 
         let query_select = match select {
             Select::EntityId => {
                 let id_rel_tag = entity.id_relationship_id.tag();
                 if let Some(field) = analyzed.root_attrs.datatable.data_fields.get(&id_rel_tag) {
-                    returning.extend(self.initial_standard_data_fields(pg));
-                    returning.push(sql::Expr::path1(field.col_name.as_ref()));
-                    layout.extend([
-                        Layout::Scalar(PgType::Integer),
-                        Layout::Scalar(PgType::BigInt),
-                        Layout::Scalar(field.pg_type),
-                    ]);
+                    insert_returning.extend(self.initial_standard_data_fields(pg));
+                    insert_returning.push(sql::Expr::path1(field.col_name.as_ref()));
                 }
                 QuerySelect::Field(entity.id_relationship_id)
             }
             Select::Struct(sel) => {
-                let (.., expressions) = self.sql_select_expressions(
-                    def_id,
-                    &sel.properties,
-                    QueryContext::Insert,
-                    pg,
-                    &mut ctx,
-                )?;
-                returning.extend(expressions);
+                insert_returning.extend(self.initial_standard_data_fields(pg));
+                let select_stats =
+                    self.select_inherent_struct_fields(def, pg.table, &mut insert_returning, None)?;
+
+                if select_stats.edge_count > 0 {
+                    let mut ctx = QueryBuildCtx::default();
+                    let root_alias = ctx.alias;
+                    let mut select_sql = sql::Select {
+                        with: None,
+                        expressions: sql::Expressions {
+                            items: vec![],
+                            multiline: true,
+                        },
+                        from: vec![sql::FromItem::TableNameAs(
+                            pg.table_name(),
+                            sql::Name::Alias(root_alias),
+                        )],
+                        where_: Some(sql::Expr::eq(sql::Expr::path1("_key"), sql::Expr::param(0))),
+                        limit: sql::Limit {
+                            limit: Some(1),
+                            offset: None,
+                        },
+                    };
+
+                    self.sql_select_edge_properties(
+                        def,
+                        root_alias,
+                        &sel.properties,
+                        pg,
+                        &mut ctx,
+                        &mut select_sql.expressions.items,
+                    )?;
+                    select_sql.with = ctx.with();
+
+                    edge_select_sql = Some(select_sql.to_string());
+                }
+
                 QuerySelect::Struct(&sel.properties)
             }
             _ => {
@@ -209,20 +266,23 @@ impl<'a> TransactCtx<'a> {
         let insert = sql::Insert {
             with: ctx.with(),
             into: pg.table_name(),
-            as_: Some(root_alias),
+            as_: None,
             column_names: analyzed.root_attrs.column_selection()?,
             on_conflict: None,
-            returning,
+            returning: insert_returning,
         };
 
-        Ok((insert.to_string(), analyzed, query_select))
+        Ok((
+            InsertQueries {
+                inherent_sql: insert.to_string(),
+                edge_select_sql,
+            },
+            analyzed,
+            query_select,
+        ))
     }
 
-    pub(super) fn analyze_struct(
-        &self,
-        value: InDomain<Value>,
-        def: &Def,
-    ) -> DomainResult<AnalyzedStruct> {
+    fn analyze_struct(&self, value: InDomain<Value>, def: &Def) -> DomainResult<AnalyzedStruct> {
         let datatable = self.pg_model.datatable(value.pkg_id, value.type_def_id())?;
 
         let Value::Struct(attrs, _struct_tag) = value.value else {

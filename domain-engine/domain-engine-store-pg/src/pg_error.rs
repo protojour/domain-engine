@@ -48,6 +48,8 @@ pub enum PgError {
     SelectRow(tokio_postgres::Error),
     /// insert
     InsertQuery(tokio_postgres::Error),
+    /// insert edge fetch
+    InsertEdgeFetch(tokio_postgres::Error),
     /// insertion problem
     InsertRowStreamNotClosed(tokio_postgres::Error),
     /// nothing inserted

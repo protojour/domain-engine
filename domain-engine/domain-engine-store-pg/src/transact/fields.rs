@@ -17,6 +17,11 @@ use crate::{
 
 use super::TransactCtx;
 
+#[derive(Default)]
+pub struct SelectStats {
+    pub edge_count: usize,
+}
+
 impl<'a> TransactCtx<'a> {
     pub fn initial_standard_data_fields(&self, pg: PgDomainTable<'a>) -> [sql::Expr<'a>; 2] {
         [
@@ -36,7 +41,9 @@ impl<'a> TransactCtx<'a> {
         pg_datatable: &'a PgTable,
         output: &mut Vec<sql::Expr<'a>>,
         table_alias: Option<sql::Alias>,
-    ) -> DomainResult<()> {
+    ) -> DomainResult<SelectStats> {
+        let mut stats = SelectStats { edge_count: 0 };
+
         for (rel_id, rel) in &def.data_relationships {
             match &rel.kind {
                 DataRelationshipKind::Id | DataRelationshipKind::Tree => {
@@ -48,11 +55,13 @@ impl<'a> TransactCtx<'a> {
                         output.push(sql::Expr::path1(data_field.col_name.as_ref()));
                     }
                 }
-                DataRelationshipKind::Edge(_) => {}
+                DataRelationshipKind::Edge(_) => {
+                    stats.edge_count += 1;
+                }
             }
         }
 
-        Ok(())
+        Ok(stats)
     }
 
     /// Read the columns in the order of the data relationships in the Def.

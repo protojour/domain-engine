@@ -11,7 +11,6 @@ use crate::{
     pg_error::{ds_err, PgInputError},
     pg_model::{PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgTable},
     sql::{self, Path},
-    transact::query::QueryContext,
 };
 
 use super::{query::QueryBuildCtx, TransactCtx};
@@ -180,13 +179,13 @@ impl<'a> TransactCtx<'a> {
                             let target_def_id = struct_select.def_id;
                             let pg_def = self.lookup_def(struct_select.def_id)?;
 
-                            let (from, vertex_alias, expressions) = self.sql_select_expressions(
-                                target_def_id,
-                                &struct_select.properties,
-                                QueryContext::Select,
-                                pg_def.pg,
-                                ctx,
-                            )?;
+                            let (from, vertex_alias, expressions) = self
+                                .sql_select_vertex_expressions(
+                                    target_def_id,
+                                    &struct_select.properties,
+                                    pg_def.pg,
+                                    ctx,
+                                )?;
                             self.sql_select_edge_cardinals(
                                 next_cardinal_idx(cardinal_idx),
                                 pg_proj,
