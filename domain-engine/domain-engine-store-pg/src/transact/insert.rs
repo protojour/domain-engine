@@ -9,17 +9,17 @@ use domain_engine_core::{
 use futures_util::{future::BoxFuture, TryStreamExt};
 use ontol_runtime::{
     attr::Attr,
-    ontology::domain::{DataRelationshipInfo, DataRelationshipKind, Def},
+    ontology::domain::{DataRelationshipKind, Def},
     query::select::Select,
     value::Value,
-    RelId,
+    DefId, PackageId,
 };
 use pin_utils::pin_mut;
 use tracing::{debug, warn};
 
 use crate::{
     pg_error::{map_row_error, PgError, PgInputError},
-    pg_model::InDomain,
+    pg_model::{InDomain, PgTable},
     sql::{self},
     sql_record::SqlColumnStream,
     sql_value::SqlVal,
@@ -27,14 +27,14 @@ use crate::{
 };
 
 use super::{
-    data::{Data, RowValue, ScalarAttrs},
+    data::{Data, RowValue},
     edge_patch::{EdgeEndoTuplePatch, EdgePatches},
     query::{QueryBuildCtx, QuerySelect},
     InsertMode, MutationMode, TransactCtx,
 };
 
-struct AnalyzedStruct<'m, 'b> {
-    pub root_attrs: ScalarAttrs<'m, 'b>,
+struct AnalyzedInput<'b> {
+    pub field_buf: Vec<SqlVal<'b>>,
     pub edges: EdgePatches,
 }
 
@@ -65,21 +65,20 @@ impl<'a> TransactCtx<'a> {
         mode: InsertMode,
         select: &'a Select,
     ) -> DomainResult<RowValue> {
-        let def_id = value.value.type_def_id();
+        let (insert_queries, query_select) =
+            self.prepare_insert_queries(value.pkg_id, value.value.type_def_id(), select)?;
 
         self.preprocess_insert_value(mode, &mut value.value)?;
 
-        let (insert_queries, analyzed, query_select) =
-            self.prepare_insert_queries(value, select)?;
-        debug!("{}", insert_queries.inherent_sql);
+        let def = self.ontology.def(value.value.type_def_id());
+        let (analyzed, pg_table) = self.analyze_input(value, def)?;
 
         let row = {
+            debug!("{}", insert_queries.inherent_sql);
+
             let stream = self
                 .client()
-                .query_raw(
-                    &insert_queries.inherent_sql,
-                    analyzed.root_attrs.as_params(),
-                )
+                .query_raw(&insert_queries.inherent_sql, &analyzed.field_buf)
                 .await
                 .map_err(PgError::InsertQuery)?;
             pin_mut!(stream);
@@ -116,12 +115,8 @@ impl<'a> TransactCtx<'a> {
             DataOperation::Inserted,
         )?;
 
-        self.patch_edges(
-            analyzed.root_attrs.datatable,
-            row_value.data_key,
-            analyzed.edges,
-        )
-        .await?;
+        self.patch_edges(pg_table, row_value.data_key, analyzed.edges)
+            .await?;
 
         if let (Some(edge_select_sql), QuerySelect::Struct(properties)) =
             (insert_queries.edge_select_sql, query_select)
@@ -135,7 +130,6 @@ impl<'a> TransactCtx<'a> {
                 .map_err(PgError::InsertEdgeFetch)?;
 
             let mut column_stream = SqlColumnStream::new(&row);
-            let def = self.ontology.def(def_id);
 
             let Value::Struct(attrs, _) = &mut row_value.value else {
                 unreachable!();
@@ -186,19 +180,17 @@ impl<'a> TransactCtx<'a> {
     // TODO: This should not depend on the value
     fn prepare_insert_queries(
         &self,
-        value: InDomain<Value>,
+        pkg_id: PackageId,
+        def_id: DefId,
         select: &'a Select,
-    ) -> DomainResult<(InsertQueries, AnalyzedStruct, QuerySelect<'a>)> {
-        let def_id = value.type_def_id();
+    ) -> DomainResult<(InsertQueries, QuerySelect<'a>)> {
         let def = self.ontology.def(def_id);
         let entity = def.entity().ok_or_else(|| {
             warn!("not an entity");
-            DomainErrorKind::NotAnEntity(value.type_def_id()).into_error()
+            DomainErrorKind::NotAnEntity(def_id).into_error()
         })?;
 
-        let pkg_id = value.pkg_id;
         let pg = self.pg_model.pg_domain_datatable(pkg_id, def_id)?;
-        let analyzed = self.analyze_struct(value, def)?;
 
         let mut ctx = QueryBuildCtx::default();
         let root_alias = ctx.alias;
@@ -207,11 +199,27 @@ impl<'a> TransactCtx<'a> {
         let mut edge_select_sql: Option<String> = None;
 
         let mut insert_returning = vec![];
+        let mut column_names = vec![];
 
+        // insert columns in the order of data relationships
+        for (rel_id, rel_info) in &def.data_relationships {
+            if matches!(
+                &rel_info.kind,
+                DataRelationshipKind::Id | DataRelationshipKind::Tree
+            ) {
+                if let Some(pg_field) = pg.table.data_fields.get(&rel_id.1) {
+                    if !pg_field.pg_type.skip_insert() {
+                        column_names.push(pg_field.col_name.as_ref());
+                    }
+                }
+            }
+        }
+
+        // RETURNING is based on select, etc
         let query_select = match select {
             Select::EntityId => {
                 let id_rel_tag = entity.id_relationship_id.tag();
-                if let Some(field) = analyzed.root_attrs.datatable.data_fields.get(&id_rel_tag) {
+                if let Some(field) = pg.table.data_fields.get(&id_rel_tag) {
                     insert_returning.extend(self.initial_standard_data_fields(pg));
                     insert_returning.push(sql::Expr::path1(field.col_name.as_ref()));
                 }
@@ -274,7 +282,7 @@ impl<'a> TransactCtx<'a> {
             with: ctx.with(),
             into: pg.table_name(),
             as_: None,
-            column_names: analyzed.root_attrs.column_selection()?,
+            column_names,
             on_conflict: None,
             returning: insert_returning,
         };
@@ -284,44 +292,56 @@ impl<'a> TransactCtx<'a> {
                 inherent_sql: insert.to_string(),
                 edge_select_sql,
             },
-            analyzed,
             query_select,
         ))
     }
 
-    fn analyze_struct(&self, value: InDomain<Value>, def: &Def) -> DomainResult<AnalyzedStruct> {
-        let datatable = self.pg_model.datatable(value.pkg_id, value.type_def_id())?;
+    fn analyze_input(
+        &self,
+        value: InDomain<Value>,
+        def: &Def,
+    ) -> DomainResult<(AnalyzedInput, &PgTable)> {
+        let pg_table = self.pg_model.datatable(value.pkg_id, value.type_def_id())?;
 
-        let Value::Struct(attrs, _struct_tag) = value.value else {
+        let Value::Struct(mut attrs, _struct_tag) = value.value else {
             return Err(DomainErrorKind::EntityMustBeStruct.into_error());
         };
 
-        let mut root_attrs = ScalarAttrs {
-            map: Default::default(),
-            datatable,
-        };
-
+        let mut field_buf: Vec<SqlVal> = vec![];
         let mut edge_patches = EdgePatches::default();
 
-        for (rel_id, attr) in *attrs {
-            let rel_info = find_data_relationship(def, &rel_id)?;
+        for (rel_id, rel_info) in &def.data_relationships {
+            match rel_info.kind {
+                DataRelationshipKind::Id | DataRelationshipKind::Tree => {
+                    let Some(pg_field) = pg_table.data_fields.get(&rel_id.1) else {
+                        continue;
+                    };
+                    if pg_field.pg_type.skip_insert() {
+                        continue;
+                    }
 
-            match (rel_info.kind, attr) {
-                (DataRelationshipKind::Id | DataRelationshipKind::Tree, Attr::Unit(value)) => {
-                    match self.data_from_value(value)? {
-                        Data::Sql(scalar) => {
-                            root_attrs.map.insert(rel_id, scalar);
+                    match attrs.remove(rel_id) {
+                        Some(Attr::Unit(value)) => match self.data_from_value(value)? {
+                            Data::Sql(scalar) => {
+                                field_buf.push(scalar);
+                            }
+                            Data::Compound(comp) => {
+                                todo!("compound: {comp:?}");
+                            }
+                        },
+                        None => {
+                            field_buf.push(SqlVal::Null);
                         }
-                        Data::Compound(comp) => {
-                            todo!("compound: {comp:?}");
+                        Some(_) => {
+                            debug!("edge ignored");
                         }
                     }
                 }
-                (DataRelationshipKind::Edge(proj), attr) => {
+                DataRelationshipKind::Edge(proj) => {
                     let patch = edge_patches.patch(proj.id, proj.subject);
 
-                    match attr {
-                        Attr::Unit(value) => {
+                    match attrs.remove(rel_id) {
+                        Some(Attr::Unit(value)) => {
                             if patch.tuples.is_empty() {
                                 patch.tuples.push(EdgeEndoTuplePatch { elements: vec![] });
                             }
@@ -331,7 +351,7 @@ impl<'a> TransactCtx<'a> {
                                 MutationMode::insert(),
                             )?;
                         }
-                        Attr::Tuple(tuple) => {
+                        Some(Attr::Tuple(tuple)) => {
                             patch.tuples.push(EdgeEndoTuplePatch::from_tuple(
                                 tuple
                                     .elements
@@ -339,7 +359,7 @@ impl<'a> TransactCtx<'a> {
                                     .map(|val| (val, MutationMode::insert())),
                             ));
                         }
-                        Attr::Matrix(matrix) => {
+                        Some(Attr::Matrix(matrix)) => {
                             patch.tuples.extend(matrix.into_rows().map(|tuple| {
                                 EdgeEndoTuplePatch::from_tuple(
                                     tuple
@@ -349,27 +369,18 @@ impl<'a> TransactCtx<'a> {
                                 )
                             }))
                         }
+                        None => {}
                     }
-                }
-                _ => {
-                    debug!("edge ignored");
                 }
             }
         }
 
-        Ok(AnalyzedStruct {
-            root_attrs,
-            edges: edge_patches,
-        })
+        Ok((
+            AnalyzedInput {
+                field_buf,
+                edges: edge_patches,
+            },
+            pg_table,
+        ))
     }
-}
-
-fn find_data_relationship<'d>(
-    def: &'d Def,
-    rel_id: &RelId,
-) -> DomainResult<&'d DataRelationshipInfo> {
-    Ok(def
-        .data_relationships
-        .get(rel_id)
-        .ok_or(PgInputError::DataRelationshipNotFound(*rel_id))?)
 }

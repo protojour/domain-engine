@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 
 use domain_engine_core::{transact::DataOperation, DomainResult};
 use fnv::FnvHashMap;
-use itertools::Itertools;
 use ontol_runtime::{
     attr::Attr,
     ontology::domain::{DefKind, DefRepr},
@@ -15,7 +14,7 @@ use tracing::trace;
 
 use crate::{
     pg_error::{ds_bad_req, ds_err},
-    pg_model::{PgDataKey, PgRegKey, PgTable},
+    pg_model::{PgDataKey, PgRegKey},
     sql_value::SqlVal,
 };
 
@@ -139,28 +138,5 @@ impl<'a> TransactCtx<'a> {
             (Value::DeleteRelationship(tag), _) => Ok(Compound::DeleteRelationship(tag).into()),
             (Value::Filter(f, tag), _) => Ok(Compound::Filter(f, tag).into()),
         }
-    }
-}
-
-pub struct ScalarAttrs<'m, 'b> {
-    pub map: FnvHashMap<RelId, SqlVal<'b>>,
-    pub datatable: &'m PgTable,
-}
-
-impl<'m, 'b> ScalarAttrs<'m, 'b> {
-    pub(super) fn column_selection(&self) -> DomainResult<Vec<&'m str>> {
-        let datatable = self.datatable;
-
-        self.map
-            .keys()
-            .map(|rel_id| {
-                let field = datatable.field(rel_id)?;
-                Ok(field.col_name.as_ref())
-            })
-            .try_collect()
-    }
-
-    pub(super) fn as_params(&self) -> impl ExactSizeIterator<Item = &SqlVal> {
-        self.map.values()
     }
 }

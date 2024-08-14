@@ -144,7 +144,7 @@ async fn execute_migration_step<'t>(
                     schema = sql::Ident(&pg_domain.schema_name),
                     table = sql::Ident(&pg_table.table_name),
                     column = sql::Ident(&column_name),
-                    type = sql::Ident(&type_ident)
+                    type = &type_ident
                 ),
                 &[],
             )

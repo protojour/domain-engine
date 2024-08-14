@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, ops::Deref};
 
-use domain_engine_core::{DomainError, DomainResult};
+use domain_engine_core::DomainResult;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::{
@@ -343,7 +343,7 @@ impl PgType {
         };
 
         match def_repr {
-            DefRepr::Unit => Err(DomainError::data_store("TODO: ignore unit column")),
+            DefRepr::Unit => Ok(None),
             DefRepr::I64 => Ok(Some(PgType::BigInt)),
             DefRepr::F64 => Ok(Some(PgType::DoublePrecision)),
             DefRepr::Serial => Ok(Some(PgType::Bigserial)),
@@ -359,5 +359,9 @@ impl PgType {
             DefRepr::Union(..) => todo!("union"),
             DefRepr::Unknown => Err(PgModelError::UnhandledRepr)?,
         }
+    }
+
+    pub fn skip_insert(&self) -> bool {
+        matches!(self, Self::Bigserial)
     }
 }

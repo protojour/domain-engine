@@ -47,12 +47,13 @@ impl<'a> TransactCtx<'a> {
         for (rel_id, rel) in &def.data_relationships {
             match &rel.kind {
                 DataRelationshipKind::Id | DataRelationshipKind::Tree => {
-                    let data_field = pg_datatable.data_fields.get(&rel_id.tag()).unwrap();
-
-                    if let Some(table_alias) = table_alias {
-                        output.push(sql::Expr::path2(table_alias, data_field.col_name.as_ref()));
-                    } else {
-                        output.push(sql::Expr::path1(data_field.col_name.as_ref()));
+                    if let Some(data_field) = pg_datatable.data_fields.get(&rel_id.tag()) {
+                        if let Some(table_alias) = table_alias {
+                            output
+                                .push(sql::Expr::path2(table_alias, data_field.col_name.as_ref()));
+                        } else {
+                            output.push(sql::Expr::path1(data_field.col_name.as_ref()));
+                        }
                     }
                 }
                 DataRelationshipKind::Edge(_) => {
