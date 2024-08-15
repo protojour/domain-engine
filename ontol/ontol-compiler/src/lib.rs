@@ -3,7 +3,7 @@
 use edge::EdgeCtx;
 use entity::entity_ctx::EntityCtx;
 pub use error::*;
-use fnv::FnvHashMap;
+use fnv::{FnvHashMap, FnvHashSet};
 use lowering::context::LoweringOutcome;
 use misc::MiscCtx;
 use properties::PropCtx;
@@ -167,6 +167,7 @@ struct Compiler<'m> {
     packages: Packages,
     package_names: Vec<(PackageId, TextConstant)>,
 
+    domain_dep_graph: FnvHashMap<PackageId, FnvHashSet<PackageId>>,
     namespaces: Namespaces<'m>,
     defs: Defs<'m>,
     package_def_ids: FnvHashMap<PackageId, DefId>,
@@ -208,6 +209,7 @@ impl<'m> Compiler<'m> {
             sources,
             packages: Default::default(),
             package_names: Default::default(),
+            domain_dep_graph: Default::default(),
             namespaces: Default::default(),
             defs,
             package_def_ids: Default::default(),

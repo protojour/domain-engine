@@ -55,6 +55,8 @@ pub enum CompileError {
     NumberParse(String),
     /// package not found
     PackageNotFound(PackageReference),
+    /// persisted domain is missing domain header
+    PersistedDomainIsMissingDomainHeader,
     /// using `.` requires a contextual block
     WildcardNeedsContextualBlock,
     /// invalid expression

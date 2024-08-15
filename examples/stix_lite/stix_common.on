@@ -1,3 +1,5 @@
+domain 01J5C5GB45Q3C0E4YYRPP8SN4R ()
+
 /// The string data type represents a finite-length string of valid characters from the Unicode coded character set [ISO10646]. Unicode incorporates ASCII and the characters of many other international character sets.
 ///
 /// The JSON MTI serialization uses the JSON String type [RFC8259], which mandates the UTF-8 encoding for supporting Unicode.

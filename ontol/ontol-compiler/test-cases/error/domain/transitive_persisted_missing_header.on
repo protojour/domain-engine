@@ -1,0 +1,8 @@
+domain 01J5C6Q5DPM8A3GWX310BYXV1R ()
+use 'dep' as dep
+def foo (
+    rel. 'id': (rel* is: serial)
+)
+
+//@ src_name=dep
+def @private foo () // ERROR persisted domain is missing domain header

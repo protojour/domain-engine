@@ -1,4 +1,4 @@
- // ERROR TODO: persisted domain is missing domain header
+ // ERROR persisted domain is missing domain header
 def foo (
     rel. 'id': (rel* is: serial)
 )

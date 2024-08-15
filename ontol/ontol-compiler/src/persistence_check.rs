@@ -1,10 +1,12 @@
+use std::collections::BTreeSet;
+
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_parser::U32Span;
 use ontol_runtime::{
     ontology::map::MapLossiness, resolve_path::ResolverGraph, DefId, MapDirection, PackageId,
 };
 
-use crate::{CompileError, Compiler, SourceSpan};
+use crate::{package::ONTOL_PKG, CompileError, Compiler, SourceSpan};
 
 impl<'m> Compiler<'m> {
     pub(super) fn persistence_check(&mut self) {
@@ -42,24 +44,46 @@ impl<'m> Compiler<'m> {
             }
         }
 
-        for persistent_pkg_id in non_mapped_entities_by_pkg_id.keys() {
-            let domain_id = self.domain_ids.get(persistent_pkg_id).unwrap();
+        let mut persistent_domains: BTreeSet<PackageId> = Default::default();
+
+        // expand "entry level" persistent domains with all transitive, upstream domains,
+        // except ONTOL_PKG
+        {
+            let mut working_set: FnvHashSet<PackageId> =
+                non_mapped_entities_by_pkg_id.keys().copied().collect();
+
+            while !working_set.is_empty() {
+                for pkg_id in std::mem::take(&mut working_set) {
+                    if pkg_id == ONTOL_PKG {
+                        continue;
+                    }
+
+                    if persistent_domains.insert(pkg_id) {
+                        if let Some(deps) = self.domain_dep_graph.get(&pkg_id) {
+                            for dep in deps {
+                                working_set.insert(*dep);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        for pkg_id in persistent_domains.iter().copied() {
+            let domain_id = self.domain_ids.get(&pkg_id).unwrap();
 
             if !domain_id.stable {
                 let span = SourceSpan {
-                    source_id: self
-                        .sources
-                        .source_id_for_package(*persistent_pkg_id)
-                        .unwrap(),
+                    source_id: self.sources.source_id_for_package(pkg_id).unwrap(),
                     span: U32Span { start: 0, end: 0 },
                 };
 
-                CompileError::TODO("persisted domain is missing domain header")
+                CompileError::PersistedDomainIsMissingDomainHeader
                     .span(span)
                     .report(self);
             }
-
-            self.persistent_domains.insert(*persistent_pkg_id);
         }
+
+        self.persistent_domains = persistent_domains;
     }
 }

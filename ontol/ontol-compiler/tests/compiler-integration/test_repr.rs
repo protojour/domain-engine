@@ -21,7 +21,13 @@ fn test_repr_valid_mesh1() {
             )
             ",
         ),
-        (src_name("si"), "def meters (rel* is: number)"),
+        (
+            src_name("si"),
+            "
+            domain 22222222222TEST22222222222 ()
+            def meters (rel* is: number)
+            ",
+        ),
     ])
     .compile_then(|test| {
         let [meters, length] = test.bind(["si.meters", "length"]);

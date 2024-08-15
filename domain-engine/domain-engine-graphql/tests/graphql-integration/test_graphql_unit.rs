@@ -1567,6 +1567,7 @@ async fn test_extension_and_member_from_foreign_domain() {
         (
             src_name("helper"),
             "
+            domain 22222222222TEST22222222222 ()
             def ext (rel* 'ext-field': text)
             def member (rel* 'member-field': text)
             ",

@@ -228,6 +228,14 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     return None;
                 };
 
+                // insert entry into domain dep graph
+                self.ctx
+                    .compiler
+                    .domain_dep_graph
+                    .entry(self.ctx.package_id)
+                    .or_default()
+                    .insert(used_package_def_id.package_id());
+
                 let type_namespace = self
                     .ctx
                     .compiler

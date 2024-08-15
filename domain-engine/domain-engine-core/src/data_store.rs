@@ -49,6 +49,11 @@ impl DataStore {
 /// Trait for creating data store APIs
 #[async_trait::async_trait]
 pub trait DataStoreFactory {
+    /// Create a new data store, potentially migrating it.
+    ///
+    /// The set of persisted packages is sorted, so passed in the order compiled by the compiler.
+    /// This means that the database can be migrated in that order, with upstream domains
+    /// being migrated before downstream domains.
     async fn new_api(
         &self,
         persisted: &BTreeSet<PackageId>,
