@@ -130,47 +130,44 @@ impl<'a> TransactCtx<'a> {
                             .get(cardinal_idx.0 as usize)
                             .unwrap();
 
-                        if edge_cardinal.target.len() != 1 {
-                            todo!("union leaf");
-                        };
+                        for target_def_id in edge_cardinal.target.iter() {
+                            let pg_def = self.lookup_def(*target_def_id)?;
 
-                        let target_def_id = *edge_cardinal.target.iter().next().unwrap();
-                        let pg_def = self.lookup_def(target_def_id)?;
+                            let Some(target_entity) = pg_def.def.entity() else {
+                                return Err(PgInputError::NotAnEntity.into());
+                            };
 
-                        let Some(target_entity) = pg_def.def.entity() else {
-                            return Err(PgInputError::NotAnEntity.into());
-                        };
+                            let pg_id = pg_def.pg.table.field(&target_entity.id_relationship_id)?;
+                            let leaf_alias = ctx.alias.incr();
 
-                        let pg_id = pg_def.pg.table.field(&target_entity.id_relationship_id)?;
-                        let leaf_alias = ctx.alias.incr();
-
-                        self.sql_select_edge_cardinals(
-                            next_cardinal_idx(cardinal_idx),
-                            pg_proj,
-                            select,
-                            variant_builder.append(EdgeUnionCardinalVariantSelect::Vertex {
-                                expr: sql::Expr::Row(vec![
-                                    sql::Expr::LiteralInt(pg_def.pg.table.key),
-                                    sql::Expr::path2(leaf_alias, pg_id.col_name.as_ref()),
-                                ]),
-                                // expr: sql::Expr::path2(leaf_alias, pg_id.col_name.as_ref()),
-                                from: pg_def.pg.table_name().as_(leaf_alias),
-                                join_condition: edge_join_condition(
-                                    Path::from_iter([pg_proj.edge_alias.into()]),
-                                    pg_cardinal,
-                                    pg_def.pg.table,
-                                    sql::Expr::path2(leaf_alias, "_key"),
-                                ),
-                                where_condition: Some(sql::Expr::arc(edge_join_condition(
-                                    Path::from_iter([pg_proj.edge_alias.into()]),
-                                    pg_proj.pg_subj_cardinal,
-                                    pg_proj.pg_subj_data.table,
-                                    sql::Expr::path2(pg_proj.subj_alias, "_key"),
-                                ))),
-                            }),
-                            union_builder,
-                            ctx,
-                        )?;
+                            self.sql_select_edge_cardinals(
+                                next_cardinal_idx(cardinal_idx),
+                                pg_proj,
+                                select,
+                                variant_builder.append(EdgeUnionCardinalVariantSelect::Vertex {
+                                    expr: sql::Expr::Row(vec![
+                                        sql::Expr::LiteralInt(pg_def.pg.table.key),
+                                        sql::Expr::path2(leaf_alias, pg_id.col_name.as_ref()),
+                                    ]),
+                                    // expr: sql::Expr::path2(leaf_alias, pg_id.col_name.as_ref()),
+                                    from: pg_def.pg.table_name().as_(leaf_alias),
+                                    join_condition: edge_join_condition(
+                                        Path::from_iter([pg_proj.edge_alias.into()]),
+                                        pg_cardinal,
+                                        pg_def.pg.table,
+                                        sql::Expr::path2(leaf_alias, "_key"),
+                                    ),
+                                    where_condition: Some(sql::Expr::arc(edge_join_condition(
+                                        Path::from_iter([pg_proj.edge_alias.into()]),
+                                        pg_proj.pg_subj_cardinal,
+                                        pg_proj.pg_subj_data.table,
+                                        sql::Expr::path2(pg_proj.subj_alias, "_key"),
+                                    ))),
+                                }),
+                                union_builder,
+                                ctx,
+                            )?;
+                        }
                     }
                     CardinalSelect::StructUnion(union) => {
                         let cardinal_idx = pg_proj.object_index;
