@@ -50,7 +50,6 @@ pub enum SqlVal<'b> {
 /// Layout of Sql data
 #[derive(Debug)]
 pub enum Layout {
-    Ignore,
     Scalar(PgType),
     Array,
     Record,
@@ -106,7 +105,6 @@ impl<'b> SqlVal<'b> {
         };
 
         match layout {
-            Layout::Ignore => Ok(Self::Null),
             Layout::Scalar(PgType::Integer) => {
                 Ok(SqlVal::I32(postgres_protocol::types::int4_from_sql(raw)?))
             }

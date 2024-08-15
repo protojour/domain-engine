@@ -47,12 +47,14 @@ impl<'a> TransactCtx<'a> {
         for (rel_id, rel) in &def.data_relationships {
             match &rel.kind {
                 DataRelationshipKind::Id | DataRelationshipKind::Tree => {
-                    if let Some(data_field) = pg_datatable.data_fields.get(&rel_id.tag()) {
+                    if let Some(pg_data_field) = pg_datatable.data_fields.get(&rel_id.tag()) {
                         if let Some(table_alias) = table_alias {
-                            output
-                                .push(sql::Expr::path2(table_alias, data_field.col_name.as_ref()));
+                            output.push(sql::Expr::path2(
+                                table_alias,
+                                pg_data_field.col_name.as_ref(),
+                            ));
                         } else {
-                            output.push(sql::Expr::path1(data_field.col_name.as_ref()));
+                            output.push(sql::Expr::path1(pg_data_field.col_name.as_ref()));
                         }
                     }
                 }
@@ -100,18 +102,18 @@ impl<'a> TransactCtx<'a> {
             }
         };
 
-        let sql_val = record_iter.next_field(
-            &PgType::from_def_id(target_def_id, self.ontology)?
-                .map(Layout::Scalar)
-                .unwrap_or(Layout::Ignore),
-        )?;
+        if let Some(pg_type) = PgType::from_def_id(target_def_id, self.ontology)? {
+            let sql_val = record_iter.next_field(&Layout::Scalar(pg_type))?;
 
-        if let Some(sql_val) = sql_val.null_filter() {
-            match rel_info.target {
-                DataRelationshipTarget::Unambiguous(def_id) => {
-                    Ok(Some(self.deserialize_sql(def_id, sql_val)?))
+            if let Some(sql_val) = sql_val.null_filter() {
+                match rel_info.target {
+                    DataRelationshipTarget::Unambiguous(def_id) => {
+                        Ok(Some(self.deserialize_sql(def_id, sql_val)?))
+                    }
+                    DataRelationshipTarget::Union(_) => Ok(None),
                 }
-                DataRelationshipTarget::Union(_) => Ok(None),
+            } else {
+                Ok(None)
             }
         } else {
             Ok(None)
