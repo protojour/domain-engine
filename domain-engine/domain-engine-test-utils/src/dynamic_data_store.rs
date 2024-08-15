@@ -95,7 +95,7 @@ impl DataStoreFactorySync for DynamicDataStoreFactory {
 }
 
 mod arango {
-    use std::collections::BTreeSet;
+    use std::{collections::BTreeSet, env};
 
     use domain_engine_core::{DomainResult, Session};
     use domain_engine_store_arango::ArangoDatabaseHandle;
@@ -117,8 +117,12 @@ mod arango {
             system: domain_engine_core::system::ArcSystemApi,
         ) -> DomainResult<Box<dyn domain_engine_core::data_store::DataStoreAPI + Send + Sync>>
         {
+            let host = match env::var("DOMAIN_ENGINE_TEST_ARANGO_HOST") {
+                Ok(host) => host,
+                Err(_) => "localhost".to_string(),
+            };
             let client = domain_engine_store_arango::ArangoClient::new(
-                "http://localhost:8529",
+                &format!("http://{host}:8529"),
                 reqwest_middleware::ClientWithMiddleware::new(reqwest::Client::new(), vec![]),
             );
             let test_name = super::detect_test_name("::ds_arango");
@@ -138,6 +142,7 @@ mod arango {
 
 mod pg {
     use std::collections::BTreeSet;
+    use std::env;
     use std::sync::{Arc, OnceLock};
 
     use domain_engine_core::data_store::DataStoreAPI;
@@ -265,8 +270,13 @@ mod pg {
 
     fn test_pg_config(dbname: &str) -> tokio_postgres::Config {
         let mut config = tokio_postgres::Config::default();
+        let host = match env::var("DOMAIN_ENGINE_TEST_PG_HOST") {
+            Ok(host) => host,
+            Err(_) => "localhost".to_string(),
+        };
+
         config
-            .host("localhost")
+            .host(host)
             .port(5432)
             .dbname(dbname)
             .user("postgres")
