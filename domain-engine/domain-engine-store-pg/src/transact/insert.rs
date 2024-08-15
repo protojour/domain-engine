@@ -1,4 +1,4 @@
-use std::collections::hash_map::Entry;
+use std::{collections::hash_map::Entry, ops::Deref};
 
 use domain_engine_core::{
     domain_error::DomainErrorKind,
@@ -23,6 +23,7 @@ use crate::{
     sql::{self},
     sql_record::SqlColumnStream,
     sql_value::SqlVal,
+    statement::{Prepare, PreparedStatement},
     transact::query::IncludeEdgeAttrs,
 };
 
@@ -33,14 +34,15 @@ use super::{
     InsertMode, MutationMode, TransactCtx,
 };
 
+pub struct PreparedInsert<'a> {
+    inherent_stmt: PreparedStatement,
+    edge_select_stmt: Option<PreparedStatement>,
+    query_select: QuerySelect<'a>,
+}
+
 struct AnalyzedInput<'b> {
     pub field_buf: Vec<SqlVal<'b>>,
     pub edges: EdgePatches,
-}
-
-struct InsertQueries {
-    inherent_sql: String,
-    edge_select_sql: Option<String>,
 }
 
 impl<'a> TransactCtx<'a> {
@@ -65,8 +67,9 @@ impl<'a> TransactCtx<'a> {
         mode: InsertMode,
         select: &'a Select,
     ) -> DomainResult<RowValue> {
-        let (insert_queries, query_select) =
-            self.prepare_insert_queries(value.pkg_id, value.value.type_def_id(), select)?;
+        let (prepared, query_select) = self
+            .prepare_insert(value.pkg_id, value.value.type_def_id(), select)
+            .await?;
 
         self.preprocess_insert_value(mode, &mut value.value)?;
 
@@ -74,11 +77,11 @@ impl<'a> TransactCtx<'a> {
         let (analyzed, pg_table) = self.analyze_input(value, def)?;
 
         let row = {
-            debug!("{}", insert_queries.inherent_sql);
+            debug!("{}", prepared.inherent_stmt);
 
             let stream = self
                 .client()
-                .query_raw(&insert_queries.inherent_sql, &analyzed.field_buf)
+                .query_raw(prepared.inherent_stmt.deref(), &analyzed.field_buf)
                 .await
                 .map_err(PgError::InsertQuery)?;
             pin_mut!(stream);
@@ -119,13 +122,13 @@ impl<'a> TransactCtx<'a> {
             .await?;
 
         if let (Some(edge_select_sql), QuerySelect::Struct(properties)) =
-            (insert_queries.edge_select_sql, query_select)
+            (prepared.edge_select_stmt, query_select)
         {
             debug!("{edge_select_sql}");
 
             let row = self
                 .client()
-                .query_one(&edge_select_sql, &[&SqlVal::I64(row_value.data_key)])
+                .query_one(edge_select_sql.deref(), &[&SqlVal::I64(row_value.data_key)])
                 .await
                 .map_err(PgError::InsertEdgeFetch)?;
 
@@ -177,13 +180,12 @@ impl<'a> TransactCtx<'a> {
         Ok(())
     }
 
-    // TODO: This should not depend on the value
-    fn prepare_insert_queries(
+    pub async fn prepare_insert(
         &self,
         pkg_id: PackageId,
         def_id: DefId,
         select: &'a Select,
-    ) -> DomainResult<(InsertQueries, QuerySelect<'a>)> {
+    ) -> DomainResult<(PreparedInsert, QuerySelect<'a>)> {
         let def = self.ontology.def(def_id);
         let entity = def.entity().ok_or_else(|| {
             warn!("not an entity");
@@ -196,7 +198,7 @@ impl<'a> TransactCtx<'a> {
         let root_alias = ctx.alias;
         ctx.with_def_aliases.insert(def_id, root_alias);
 
-        let mut edge_select_sql: Option<String> = None;
+        let mut edge_select_stmt: Option<PreparedStatement> = None;
 
         let mut insert_returning = vec![];
         let mut column_names = vec![];
@@ -248,7 +250,7 @@ impl<'a> TransactCtx<'a> {
                     )?;
 
                     if !expressions.items.is_empty() {
-                        edge_select_sql = Some(
+                        edge_select_stmt = Some(
                             sql::Select {
                                 with: ctx.with(),
                                 expressions,
@@ -265,7 +267,9 @@ impl<'a> TransactCtx<'a> {
                                     offset: None,
                                 },
                             }
-                            .to_string(),
+                            .to_string()
+                            .prepare(self.client())
+                            .await?,
                         );
                     }
                 }
@@ -288,9 +292,10 @@ impl<'a> TransactCtx<'a> {
         };
 
         Ok((
-            InsertQueries {
-                inherent_sql: insert.to_string(),
-                edge_select_sql,
+            PreparedInsert {
+                inherent_stmt: insert.to_string().prepare(self.client()).await?,
+                edge_select_stmt,
+                query_select,
             },
             query_select,
         ))

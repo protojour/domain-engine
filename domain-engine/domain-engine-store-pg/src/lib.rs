@@ -20,6 +20,7 @@ mod pg_model;
 mod sql;
 mod sql_record;
 mod sql_value;
+mod statement;
 mod transact;
 
 pub use deadpool_postgres;

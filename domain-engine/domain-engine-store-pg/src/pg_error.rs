@@ -84,6 +84,8 @@ pub enum PgError {
     UnionField,
     /// edge parameters missing
     EdgeParametersMissing,
+    /// statement preparation
+    PrepareStatement(String, tokio_postgres::Error),
 }
 
 impl From<PgError> for DomainError {
