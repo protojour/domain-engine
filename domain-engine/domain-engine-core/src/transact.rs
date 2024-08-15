@@ -19,7 +19,7 @@ use crate::{
 };
 
 /// The kind of data store transaction
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub enum TransactionMode {
     /// Different queries might see different data states (caused by concurrent mutations).
     ReadOnly,
