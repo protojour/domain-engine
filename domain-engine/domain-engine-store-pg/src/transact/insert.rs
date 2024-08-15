@@ -213,8 +213,11 @@ impl<'a> TransactCtx<'a> {
 
         let mut edge_select_stmt: Option<PreparedStatement> = None;
 
-        let mut insert_returning = vec![];
         let mut column_names = vec![];
+        let mut values = vec![];
+        let mut insert_returning = vec![];
+
+        let mut param_idx = 0;
 
         // insert columns in the order of data relationships
         for (rel_id, rel_info) in &def.data_relationships {
@@ -223,8 +226,12 @@ impl<'a> TransactCtx<'a> {
                 DataRelationshipKind::Id | DataRelationshipKind::Tree
             ) {
                 if let Some(pg_field) = pg.table.data_fields.get(&rel_id.1) {
-                    if !pg_field.pg_type.skip_insert() {
-                        column_names.push(pg_field.col_name.as_ref());
+                    column_names.push(pg_field.col_name.as_ref());
+                    if pg_field.pg_type.insert_default() {
+                        values.push(sql::Expr::Default);
+                    } else {
+                        values.push(sql::Expr::param(param_idx));
+                        param_idx += 1;
                     }
                 }
             }
@@ -296,6 +303,7 @@ impl<'a> TransactCtx<'a> {
             into: pg.table_name(),
             as_: None,
             column_names,
+            values,
             on_conflict: None,
             returning: insert_returning,
         };
@@ -327,7 +335,7 @@ impl<'a> TransactCtx<'a> {
                     let Some(pg_field) = pg_table.data_fields.get(&rel_id.1) else {
                         continue;
                     };
-                    if pg_field.pg_type.skip_insert() {
+                    if pg_field.pg_type.insert_default() {
                         continue;
                     }
 

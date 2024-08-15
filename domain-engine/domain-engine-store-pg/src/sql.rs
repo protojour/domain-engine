@@ -61,6 +61,7 @@ pub struct Insert<'a> {
     pub into: TableName<'a>,
     pub as_: Option<Alias>,
     pub column_names: Vec<&'a str>,
+    pub values: Vec<Expr<'a>>,
     pub on_conflict: Option<OnConflict<'a>>,
     pub returning: Vec<Expr<'a>>,
 }
@@ -149,6 +150,7 @@ pub enum Expr<'a> {
     Path(Path<'a>),
     /// input parameter
     Param(Param),
+    Default,
     Paren(Box<Expr<'a>>),
     LiteralInt(i32),
     Select(Box<Select<'a>>),
@@ -326,7 +328,7 @@ impl<'a> Display for Insert<'a> {
             f,
             " ({columns}) VALUES ({values})",
             columns = self.column_names.iter().map(Ident).format(","),
-            values = (0..self.column_names.len()).map(Param).format(","),
+            values = self.values.iter().format(","),
         )?;
 
         if let Some(on_conflict) = &self.on_conflict {
@@ -489,6 +491,7 @@ impl<'a> Display for Expr<'a> {
         match self {
             Self::Path(path) => write!(f, "{path}"),
             Self::Param(param) => write!(f, "{param}"),
+            Self::Default => write!(f, "DEFAULT"),
             Self::Paren(expr) => write!(f, "({expr})"),
             Self::LiteralInt(i) => write!(f, "{i}"),
             Self::Select(select) => write!(f, "{select}"),

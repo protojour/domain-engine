@@ -361,7 +361,7 @@ impl PgType {
         }
     }
 
-    pub fn skip_insert(&self) -> bool {
+    pub fn insert_default(&self) -> bool {
         matches!(self, Self::Bigserial)
     }
 }

@@ -157,6 +157,7 @@ impl<'a> TransactCtx<'a> {
             into: pg_edge.table_name(),
             as_: None,
             column_names: vec![],
+            values: vec![],
             on_conflict: None,
             returning: vec![],
         };
@@ -174,6 +175,10 @@ impl<'a> TransactCtx<'a> {
                     sql_insert
                         .column_names
                         .extend([def_col_name.as_ref(), key_col_name]);
+                    sql_insert.values.extend([
+                        sql::Expr::param(param_index),
+                        sql::Expr::param(param_index + 1),
+                    ]);
                     let dynamic = Dynamic::Yes { def_col_name };
                     analysis
                         .projected_cardinals
@@ -198,6 +203,7 @@ impl<'a> TransactCtx<'a> {
                 }
                 PgEdgeCardinalKind::PinnedDef { key_col_name, .. } => {
                     sql_insert.column_names.push(key_col_name);
+                    sql_insert.values.push(sql::Expr::param(param_index));
                     analysis
                         .projected_cardinals
                         .push(if *index == subject_index {
@@ -223,6 +229,7 @@ impl<'a> TransactCtx<'a> {
                                 DataRelationshipTarget::Unambiguous(def_id) => {
                                     let pg_field = pg_edge.table.field(rel_id)?;
                                     sql_insert.column_names.push(&pg_field.col_name);
+                                    sql_insert.values.push(sql::Expr::param(param_index));
                                     analysis.param_order.insert((*rel_id, *def_id));
                                     param_index += 1;
                                 }
@@ -751,6 +758,7 @@ impl<'a> TransactCtx<'a> {
                                 into: pg.table_name(),
                                 as_: None,
                                 column_names: vec![&pg_id_field.col_name],
+                                values: vec![sql::Expr::param(0)],
                                 on_conflict: Some(sql::OnConflict {
                                     target: Some(sql::ConflictTarget::Columns(vec![
                                         &pg_id_field.col_name,
