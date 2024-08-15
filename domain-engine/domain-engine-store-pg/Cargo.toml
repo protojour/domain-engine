@@ -16,6 +16,7 @@ tokio = { workspace = true, features = ["sync"] }
 futures-util = "0.3"
 async-stream = "0.3"
 deadpool-postgres = { version = "0.14", features = ["rt_tokio_1"] }
+deadpool = "0.12"
 tokio-postgres = { version = "0.7", features = ["with-serde_json-1", "with-chrono-0_4"] }
 postgres-protocol = "0.6"
 postgres-types = { version = "0.2", features = ["derive"] }

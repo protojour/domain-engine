@@ -5,7 +5,7 @@ use std::sync::Arc;
 use context::{SchemaCtx, SchemaType, ServiceCtx};
 use domain_engine_core::{
     domain_error::DomainErrorKind,
-    transact::{AccumulateSequences, ReqMessage},
+    transact::{AccumulateSequences, ReqMessage, TransactionMode},
     DomainResult,
 };
 use futures_util::{StreamExt, TryStreamExt};
@@ -241,6 +241,7 @@ async fn mutation(
             let response_sequences: Vec<_> = service_ctx
                 .domain_engine
                 .transact(
+                    TransactionMode::ReadWriteAtomic,
                     futures_util::stream::iter(req_messages).boxed(),
                     service_ctx.session.clone(),
                 )

@@ -14,8 +14,9 @@ use axum_extra::extract::JsonLines;
 use bytes::Bytes;
 use content_type::JsonContentType;
 use domain_engine_core::{
-    domain_error::DomainErrorKind, transact::ReqMessage, DomainEngine, DomainError, DomainResult,
-    Session,
+    domain_error::DomainErrorKind,
+    transact::{ReqMessage, TransactionMode},
+    DomainEngine, DomainError, DomainResult, Session,
 };
 use futures_util::{stream::StreamExt, TryStreamExt};
 use http_error::domain_error_to_response;
@@ -152,7 +153,11 @@ where
 
     let result = endpoint
         .engine
-        .transact(transaction_msg_stream, session.clone())
+        .transact(
+            TransactionMode::ReadWriteAtomic,
+            transaction_msg_stream,
+            session.clone(),
+        )
         .await;
 
     let stream = match result {

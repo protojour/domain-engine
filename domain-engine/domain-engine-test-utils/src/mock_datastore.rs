@@ -1,6 +1,6 @@
 use domain_engine_core::{
     data_store::DataStoreAPI,
-    transact::{DataOperation, ReqMessage, RespMessage},
+    transact::{DataOperation, ReqMessage, RespMessage, TransactionMode},
     DomainResult, Session,
 };
 use futures_util::{stream::BoxStream, StreamExt};
@@ -13,6 +13,7 @@ use unimock::{matching, MockFn, Unimock};
 pub trait LinearTransact {
     async fn transact<'a>(
         &self,
+        mode: TransactionMode,
         messages: Vec<DomainResult<ReqMessage>>,
         session: Session,
     ) -> DomainResult<Vec<DomainResult<RespMessage>>>;
@@ -20,7 +21,11 @@ pub trait LinearTransact {
 
 pub fn mock_data_store_query_entities_empty() -> impl unimock::Clause {
     LinearTransactMock::transact
-        .next_call(matching!([Ok(ReqMessage::Query(0, _))], _session))
+        .next_call(matching!(
+            TransactionMode::ReadOnly,
+            [Ok(ReqMessage::Query(0, _))],
+            _session
+        ))
         .returns(Ok(vec![
             Ok(RespMessage::SequenceStart(0)),
             Ok(RespMessage::SequenceEnd(0, None)),
@@ -63,11 +68,13 @@ impl LinearDataStoreAdapter {
 impl DataStoreAPI for LinearDataStoreAdapter {
     async fn transact(
         &self,
+        mode: TransactionMode,
         messages: BoxStream<'static, DomainResult<ReqMessage>>,
         session: Session,
     ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
         let messages: Vec<_> = messages.collect().await;
-        let responses = <Unimock as LinearTransact>::transact(&self.0, messages, session).await?;
+        let responses =
+            <Unimock as LinearTransact>::transact(&self.0, mode, messages, session).await?;
 
         Ok(futures_util::stream::iter(responses).boxed())
     }

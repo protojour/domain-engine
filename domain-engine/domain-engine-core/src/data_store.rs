@@ -9,7 +9,7 @@ use ontol_runtime::{
 use crate::{
     domain_error::DomainResult,
     system::ArcSystemApi,
-    transact::{ReqMessage, RespMessage},
+    transact::{ReqMessage, RespMessage, TransactionMode},
     Session,
 };
 
@@ -21,6 +21,7 @@ pub trait DataStoreAPI {
     /// as they are executed on the data store.
     async fn transact(
         &self,
+        mode: TransactionMode,
         messages: BoxStream<'static, DomainResult<ReqMessage>>,
         session: Session,
     ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>>;

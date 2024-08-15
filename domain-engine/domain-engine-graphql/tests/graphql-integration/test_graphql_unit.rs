@@ -1,6 +1,6 @@
 //! GraphQL "unit" tests, i.e. only mocked datastore
 
-use domain_engine_core::transact::{DataOperation, ReqMessage, RespMessage};
+use domain_engine_core::transact::{DataOperation, ReqMessage, RespMessage, TransactionMode};
 use domain_engine_graphql::{
     context::ServiceCtx,
     gql_scalar::GqlScalar,
@@ -188,7 +188,11 @@ async fn int_scalars() {
     );
 
     let store_entity_mock = LinearTransactMock::transact
-        .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+        .next_call(matching!(
+            TransactionMode::ReadWriteAtomic,
+            [Ok(ReqMessage::Insert(..)), ..],
+            _session
+        ))
         .returns(respond_inserted([foo
             .entity_builder(
                 json!("my_id"),
@@ -272,7 +276,7 @@ async fn non_entity_set_mutation() {
                 &test,
                 &[root()],
                 LinearTransactMock::transact
-                    .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+                    .next_call(matching!(_, [Ok(ReqMessage::Insert(..)), ..], _session))
                     .returns(respond_inserted([foo
                         .entity_builder(
                             json!("my_id"),
@@ -383,8 +387,8 @@ async fn basic_pagination() {
                 &test,
                 &[root()],
                 LinearTransactMock::transact
-                    .next_call(matching!([Ok(ReqMessage::Query(..))], _session))
-                    .answers(&|_, req_messages, _| {
+                    .next_call(matching!(_, [Ok(ReqMessage::Query(..))], _session))
+                    .answers(&|_, _, req_messages, _| {
                         let Ok(ReqMessage::Query(_, entity_select)) = req_messages.first().unwrap()
                         else {
                             panic!();
@@ -435,8 +439,8 @@ async fn basic_pagination() {
                 &test,
                 &[root()],
                 LinearTransactMock::transact
-                    .next_call(matching!([Ok(ReqMessage::Query(0, _))], _session))
-                    .answers(&|_, req_messages, _| {
+                    .next_call(matching!(_, [Ok(ReqMessage::Query(0, _))], _session))
+                    .answers(&|_, _, req_messages, _| {
                         let Ok(ReqMessage::Query(_, entity_select)) = req_messages.first().unwrap()
                         else {
                             panic!();
@@ -488,7 +492,11 @@ async fn nodes() {
 
     let [foo] = test.bind(["foo"]);
     let query_mock = LinearTransactMock::transact
-        .next_call(matching!([Ok(ReqMessage::Query(..))], _))
+        .next_call(matching!(
+            TransactionMode::ReadOnly,
+            [Ok(ReqMessage::Query(..))],
+            _
+        ))
         .returns(respond_queried([foo
             .entity_builder(json!("id"), json!({}))
             .into()]));
@@ -590,7 +598,7 @@ async fn inner_struct() {
     );
 
     let store_entity_mock = LinearTransactMock::transact
-        .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+        .next_call(matching!(_, [Ok(ReqMessage::Insert(..)), ..], _session))
         .returns(respond_inserted([foo
             .entity_builder(
                 json!("my_id"),
@@ -737,7 +745,7 @@ async fn artist_and_instrument_connections() {
                 &test,
                 &[root()],
                 LinearTransactMock::transact
-                    .next_call(matching!([Ok(ReqMessage::Query(0, _))], _session))
+                    .next_call(matching!(_, [Ok(ReqMessage::Query(0, _))], _session))
                     .returns(respond_queried([ziggy.clone()]))
             )
         )
@@ -830,7 +838,7 @@ async fn artist_and_instrument_connections() {
                 &test,
                 &[root()],
                 LinearTransactMock::transact
-                    .next_call(matching!([Ok(ReqMessage::Insert(0, _)), ..], _session))
+                    .next_call(matching!(_, [Ok(ReqMessage::Insert(0, _)), ..], _session))
                     .returns(respond_inserted([ziggy]))
             )
         )
@@ -908,7 +916,7 @@ async fn unified_mutation_create() {
                 &test,
                 &[root()],
                 LinearTransactMock::transact
-                    .next_call(matching!([Ok(ReqMessage::Insert(0, _)), ..], _session))
+                    .next_call(matching!(_, [Ok(ReqMessage::Insert(0, _)), ..], _session))
                     .returns(respond_inserted([ziggy]))
             )
         )
@@ -979,7 +987,7 @@ async fn create_through_mapped_domain() {
                 &test,
                 &[ARTIST_AND_INSTRUMENT.0],
                 LinearTransactMock::transact
-                    .next_call(matching!([Ok(ReqMessage::Insert(0, _)), ..], _session))
+                    .next_call(matching!(_, [Ok(ReqMessage::Insert(0, _)), ..], _session))
                     .returns(respond_inserted([ziggy]))
             )
         )
@@ -1060,7 +1068,7 @@ async fn create_through_three_domains() {
                 &test,
                 &[ARTIST_AND_INSTRUMENT.0],
                 LinearTransactMock::transact
-                    .next_call(matching!([Ok(ReqMessage::Insert(0, _)), ..], _session))
+                    .next_call(matching!(_, [Ok(ReqMessage::Insert(0, _)), ..], _session))
                     .returns(respond_inserted([ziggy]))
             )
         )
@@ -1085,7 +1093,7 @@ async fn guitar_synth_union_selection() {
     let [artist] = test.bind(["artist"]);
 
     let query_mock = LinearTransactMock::transact
-        .next_call(matching!([Ok(ReqMessage::Query(0, _))], _session))
+        .next_call(matching!(_, [Ok(ReqMessage::Query(0, _))], _session))
         .returns(Ok(vec![
             Ok(RespMessage::SequenceStart(0)),
             Ok(RespMessage::Element(
@@ -1194,7 +1202,7 @@ async fn graphql_guitar_synth_union_input_exec() {
     let (test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema();
     let [artist] = test.bind(["artist"]);
     let store_entity_mock = LinearTransactMock::transact
-        .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+        .next_call(matching!(_, [Ok(ReqMessage::Insert(..)), ..], _session))
         .returns(respond_inserted([artist
             .entity_builder(
                 json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
@@ -1376,7 +1384,7 @@ async fn municipalities_named_query() {
     );
 
     let query_mock = LinearTransactMock::transact
-        .next_call(matching!([Ok(ReqMessage::Query(..))], _session))
+        .next_call(matching!(_, [Ok(ReqMessage::Query(..))], _session))
         .returns(Ok(vec![
             Ok(RespMessage::SequenceStart(0)),
             Ok(RespMessage::Element(
@@ -1452,7 +1460,7 @@ async fn open_data() {
     .compile_single_schema();
     let [foo] = test.bind(["foo"]);
     let store_entity_mock = LinearTransactMock::transact
-        .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+        .next_call(matching!(_, [Ok(ReqMessage::Insert(..)), ..], _session))
         .returns(respond_inserted([foo
             .entity_builder(json!("the-id"), json!({}))
             .with_open_data(json!({ "foo": "bar" }))
@@ -1514,7 +1522,7 @@ async fn open_data_disabled() {
     );
 
     let store_entity_mock = LinearTransactMock::transact
-        .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+        .next_call(matching!(_, [Ok(ReqMessage::Insert(..)), ..], _session))
         .returns(respond_inserted([foo
             .entity_builder(json!("the-id"), json!({}))
             .into()]));
@@ -1636,7 +1644,7 @@ async fn test_constant_index_panic() {
     let [event] = test.bind(["events_db.event"]);
 
     let store_entity_mock = LinearTransactMock::transact
-        .next_call(matching!([Ok(ReqMessage::Query(..)), ..], _session))
+        .next_call(matching!(_, [Ok(ReqMessage::Query(..)), ..], _session))
         .returns(respond_queried([event
             .entity_builder(json!("0"), json!({ "_class": "event" }))
             .into()]));
@@ -1709,7 +1717,7 @@ async fn flattened_union_entity() {
     let [foo] = test.bind(["foo"]);
 
     let store_entity_mock = LinearTransactMock::transact
-        .next_call(matching!([Ok(ReqMessage::Insert(..)), ..], _session))
+        .next_call(matching!(_, [Ok(ReqMessage::Insert(..)), ..], _session))
         .returns(respond_inserted([foo
             .entity_builder(
                 json!("id"),

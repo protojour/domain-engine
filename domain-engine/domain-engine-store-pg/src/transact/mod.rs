@@ -3,7 +3,7 @@ use std::sync::Arc;
 use domain_engine_core::{
     object_generator::ObjectGenerator,
     system::SystemAPI,
-    transact::{DataOperation, OpSequence, ReqMessage, RespMessage},
+    transact::{DataOperation, OpSequence, ReqMessage, RespMessage, TransactionMode},
     DomainError, DomainResult,
 };
 use futures_util::{stream::BoxStream, StreamExt};
@@ -58,6 +58,7 @@ struct TransactCtx<'a> {
 impl<'a> TransactCtx<'a> {
     pub fn client(&self) -> &tokio_postgres::Client {
         match &self.connection_state {
+            ConnectionState::NonAtomic(conn) => conn,
             ConnectionState::Transaction(txn) => txn.client(),
         }
     }
@@ -78,16 +79,6 @@ enum State {
     Update(OpSequence, Select),
     Upsert(OpSequence, Select),
     Delete(OpSequence, DefId),
-}
-
-/// TODO: support out-of-transaction statements by expanding ReqMessage
-/// with an explicit Start/End Transaction
-///
-/// Since a transaction needs a &mut Client,
-/// there seems to be no other way to dynamically support
-/// this than re-acquire the connection every time the state needs to be changed.
-enum ConnectionState<'a> {
-    Transaction(deadpool_postgres::Transaction<'a>),
 }
 
 fn write_state(
@@ -114,30 +105,46 @@ fn write_state(
     messages
 }
 
+enum ConnectionState<'a> {
+    NonAtomic(deadpool::managed::Object<deadpool_postgres::Manager>),
+    Transaction(deadpool_postgres::Transaction<'a>),
+}
+
 pub async fn transact(
     store: Arc<PostgresDataStore>,
+    mode: TransactionMode,
     messages: BoxStream<'static, DomainResult<ReqMessage>>,
 ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
-    let mut pg_client = store
+    let mut connection = store
         .pool
         .get()
         .await
         .map_err(|e| PgError::DbConnectionAcquire(e.into()))?;
 
     Ok(async_stream::try_stream! {
+        let connection_state = match mode {
+            TransactionMode::ReadOnly | TransactionMode::ReadWrite => {
+                ConnectionState::NonAtomic(connection)
+            }
+            TransactionMode::ReadOnlyAtomic | TransactionMode::ReadWriteAtomic => {
+                ConnectionState::Transaction(
+                    connection
+                        .build_transaction()
+                        .deferrable(false)
+                        .isolation_level(IsolationLevel::ReadCommitted)
+                        .read_only(matches!(mode, TransactionMode::ReadOnly | TransactionMode::ReadOnlyAtomic))
+                        .start()
+                        .await
+                        .map_err(PgError::BeginTransaction)?,
+                )
+            }
+        };
+
         let ctx = TransactCtx {
             pg_model: &store.pg_model,
             ontology: &store.ontology,
             system: store.system.as_ref(),
-            connection_state: ConnectionState::Transaction(
-                pg_client
-                    .build_transaction()
-                    .deferrable(false)
-                    .isolation_level(IsolationLevel::ReadCommitted)
-                    .start()
-                    .await
-                    .map_err(PgError::BeginTransaction)?
-            )
+            connection_state
         };
 
         let mut state: Option<State> = None;
@@ -217,13 +224,10 @@ pub async fn transact(
             }
         }
 
-        match ctx.connection_state {
-            ConnectionState::Transaction(txn) => {
-                txn.commit().await.map_err(PgError::CommitTransaction)?;
-                trace!("COMMIT OK");
-            }
+        if let ConnectionState::Transaction(txn) = ctx.connection_state {
+            txn.commit().await.map_err(PgError::CommitTransaction)?;
+            trace!("COMMIT OK");
         }
-
     }
     .boxed())
 }

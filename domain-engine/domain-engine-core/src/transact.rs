@@ -18,6 +18,19 @@ use crate::{
     DomainEngine, DomainError, DomainResult, Session,
 };
 
+/// The kind of data store transaction
+#[derive(Clone, Copy)]
+pub enum TransactionMode {
+    /// Different queries might see different data states (caused by concurrent mutations).
+    ReadOnly,
+    /// Different queries will see the same data state.
+    ReadOnlyAtomic,
+    /// Like ReadOnly, but supports writing to data store.
+    ReadWrite,
+    /// Like ReadOnlyAtomic, but supports writing.
+    ReadWriteAtomic,
+}
+
 /// Operation sequence number (within one transaction)
 pub type OpSequence = u32;
 

@@ -4,7 +4,7 @@ use domain_engine_core::{
     data_store::DataStoreAPI,
     domain_error::DomainErrorKind,
     object_generator::ObjectGenerator,
-    transact::{DataOperation, OpSequence, ReqMessage, RespMessage},
+    transact::{DataOperation, OpSequence, ReqMessage, RespMessage, TransactionMode},
     DomainError, DomainResult, Session,
 };
 use futures_util::{stream::BoxStream, StreamExt};
@@ -438,17 +438,9 @@ impl ArangoDatabase {
 
 #[async_trait::async_trait]
 impl DataStoreAPI for ArangoDatabaseHandle {
-    // async fn execute(&self, request: Request, _session: Session) -> DomainResult<Response> {
-    //     match request {
-    //         Request::Query(entity_select) => Ok(Response::Query(self.query(entity_select).await?)),
-    //         Request::BatchWrite(requests) => {
-    //             Ok(Response::BatchWrite(self.batch_write(requests).await?))
-    //         }
-    //     }
-    // }
-
     async fn transact(
         &self,
+        _mode: TransactionMode,
         messages: BoxStream<'static, DomainResult<ReqMessage>>,
         _session: Session,
     ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {

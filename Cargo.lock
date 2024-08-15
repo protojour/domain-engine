@@ -1032,6 +1032,7 @@ dependencies = [
  "byteorder",
  "bytes",
  "chrono",
+ "deadpool",
  "deadpool-postgres",
  "displaydoc",
  "domain-engine-core",

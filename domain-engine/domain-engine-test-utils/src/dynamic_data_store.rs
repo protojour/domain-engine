@@ -142,7 +142,7 @@ mod pg {
 
     use domain_engine_core::data_store::DataStoreAPI;
     use domain_engine_core::domain_error::DomainErrorContext;
-    use domain_engine_core::transact::{ReqMessage, RespMessage};
+    use domain_engine_core::transact::{ReqMessage, RespMessage, TransactionMode};
     use domain_engine_core::{DomainError, DomainResult, Session};
     use domain_engine_store_pg::{connect_and_migrate, recreate_database, PostgresHandle};
     use domain_engine_store_pg::{deadpool_postgres, tokio_postgres, PostgresDataStore};
@@ -198,10 +198,11 @@ mod pg {
     impl DataStoreAPI for PgTestDatastore {
         async fn transact(
             &self,
+            mode: TransactionMode,
             messages: BoxStream<'static, Result<ReqMessage, DomainError>>,
             session: Session,
         ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
-            self.handle.transact(messages, session).await
+            self.handle.transact(mode, messages, session).await
         }
     }
 

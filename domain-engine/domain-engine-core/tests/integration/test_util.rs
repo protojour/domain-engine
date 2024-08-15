@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use domain_engine_core::{
-    transact::{AccumulateSequences, ReqMessage, RespMessage},
+    transact::{AccumulateSequences, ReqMessage, RespMessage, TransactionMode},
     DomainEngine, DomainResult, Session,
 };
 use futures_util::{StreamExt, TryStreamExt};
@@ -17,6 +17,7 @@ pub async fn insert_entity_select_entityid(
 ) -> DomainResult<Value> {
     let response_messages: Vec<_> = engine
         .transact(
+            TransactionMode::ReadWriteAtomic,
             futures_util::stream::iter(vec![
                 Ok(ReqMessage::Insert(0, Select::EntityId)),
                 Ok(ReqMessage::Argument(entity)),
@@ -43,6 +44,7 @@ pub async fn query_entities(
 ) -> DomainResult<Sequence<Value>> {
     let responses: Vec<_> = engine
         .transact(
+            TransactionMode::ReadOnly,
             futures_util::stream::iter(vec![Ok(ReqMessage::Query(0, select))]).boxed(),
             Session::default(),
         )

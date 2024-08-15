@@ -24,7 +24,7 @@ use crate::{
     domain_error::{DomainErrorContext, DomainErrorKind, DomainResult},
     select_data_flow::translate_entity_select,
     system::{ArcSystemApi, SystemAPI},
-    transact::{AccumulateSequences, ReqMessage, RespMessage, UpMap},
+    transact::{AccumulateSequences, ReqMessage, RespMessage, TransactionMode, UpMap},
     DomainError, FindEntitySelect, MaybeSelect, Session,
 };
 
@@ -64,6 +64,7 @@ impl DomainEngine {
 
     pub async fn transact(
         self: &Arc<Self>,
+        mode: TransactionMode,
         messages: BoxStream<'static, DomainResult<ReqMessage>>,
         session: Session,
     ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
@@ -74,7 +75,10 @@ impl DomainEngine {
             .map_req_messages(messages, upmaps_tx, session.clone());
 
         let data_store = self.get_data_store()?;
-        let responses = data_store.api().transact(messages, session.clone()).await?;
+        let responses = data_store
+            .api()
+            .transact(mode, messages, session.clone())
+            .await?;
 
         Ok(self
             .clone()
@@ -273,6 +277,7 @@ impl DomainEngine {
         let sequences: Vec<_> = self
             .clone()
             .transact(
+                TransactionMode::ReadOnly,
                 futures_util::stream::iter([Ok(ReqMessage::Query(0, entity_select.clone()))])
                     .boxed(),
                 session.clone(),

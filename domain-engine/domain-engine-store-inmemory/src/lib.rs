@@ -7,7 +7,9 @@ use std::sync::Arc;
 use domain_engine_core::data_store::{DataStoreFactory, DataStoreFactorySync};
 use domain_engine_core::object_generator::ObjectGenerator;
 use domain_engine_core::system::ArcSystemApi;
-use domain_engine_core::transact::{DataOperation, OpSequence, ReqMessage, RespMessage};
+use domain_engine_core::transact::{
+    DataOperation, OpSequence, ReqMessage, RespMessage, TransactionMode,
+};
 use domain_engine_core::{DomainError, Session};
 use fnv::{FnvHashMap, FnvHashSet};
 use futures_util::stream::BoxStream;
@@ -40,6 +42,7 @@ pub struct InMemoryDb {
 impl DataStoreAPI for InMemoryDb {
     async fn transact(
         &self,
+        _mode: TransactionMode,
         messages: BoxStream<'static, DomainResult<ReqMessage>>,
         _session: Session,
     ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {

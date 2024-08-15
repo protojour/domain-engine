@@ -5,7 +5,7 @@ use std::{collections::BTreeSet, sync::Arc};
 use domain_engine_core::{
     data_store::DataStoreAPI,
     system::ArcSystemApi,
-    transact::{ReqMessage, RespMessage},
+    transact::{ReqMessage, RespMessage, TransactionMode},
     DomainResult, Session,
 };
 use futures_util::stream::BoxStream;
@@ -93,10 +93,11 @@ pub async fn connect_and_migrate(
 impl DataStoreAPI for PostgresHandle {
     async fn transact(
         &self,
+        mode: TransactionMode,
         messages: BoxStream<'static, DomainResult<ReqMessage>>,
         _session: Session,
     ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
-        transact::transact(self.store.clone(), messages).await
+        transact::transact(self.store.clone(), mode, messages).await
     }
 }
 
