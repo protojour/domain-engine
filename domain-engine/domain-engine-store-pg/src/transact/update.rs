@@ -31,6 +31,9 @@ enum UpdateCondition {
 }
 
 impl<'a> TransactCtx<'a> {
+    /// Note: updates are not cached statements currently.
+    /// Unsure if it's possible to cache a generic update statement, since every update
+    /// can touch different fields.
     pub async fn update_vertex_with_select<'s>(
         &'s self,
         value: InDomain<Value>,

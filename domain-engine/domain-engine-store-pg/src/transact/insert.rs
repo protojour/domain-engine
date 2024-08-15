@@ -131,14 +131,17 @@ impl<'a> TransactCtx<'a> {
         self.patch_edges(pg_table, row_value.data_key, analyzed.edges)
             .await?;
 
-        if let (Some(edge_select_sql), QuerySelect::Struct(properties)) =
+        if let (Some(edge_select_stmt), QuerySelect::Struct(properties)) =
             (prepared.edge_select_stmt, analyzed.query_select)
         {
-            debug!("{edge_select_sql}");
+            debug!("{edge_select_stmt}");
 
             let row = self
                 .client()
-                .query_one(edge_select_sql.deref(), &[&SqlVal::I64(row_value.data_key)])
+                .query_one(
+                    edge_select_stmt.deref(),
+                    &[&SqlVal::I64(row_value.data_key)],
+                )
                 .await
                 .map_err(PgError::InsertEdgeFetch)?;
 
@@ -288,7 +291,6 @@ impl<'a> TransactCtx<'a> {
             }
         };
 
-        // TODO: prepared statement for each entity type/select
         let insert = sql::Insert {
             with: ctx.with(),
             into: pg.table_name(),
