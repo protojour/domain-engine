@@ -149,7 +149,7 @@ async fn test_guitar_synth_union_mutation_and_query(ds: &str) {
 }
 
 /// FIXME: implement for arango
-#[datastore_test(tokio::test, ignore("arango"))]
+#[datastore_test(tokio::test)]
 async fn test_entity_subtype(ds: &str) {
     let (test, [derived_schema, db_schema]) =
         TestPackages::with_static_sources([entity_subtype::DERIVED, entity_subtype::DB])
@@ -266,7 +266,7 @@ async fn sym_edge_simple(ds: &str) {
 }
 
 /// FIXME: implement for arango
-#[datastore_test(tokio::test, ignore("arango"))]
+#[datastore_test(tokio::test)]
 async fn edge_entity_simple_happy_path(ds: &str) {
     let (test, [schema]) = TestPackages::with_static_sources([EDGE_ENTITY_SIMPLE])
         .compile_schemas([EDGE_ENTITY_SIMPLE.0]);
@@ -343,7 +343,7 @@ async fn edge_entity_simple_happy_path(ds: &str) {
     );
 }
 
-#[datastore_test(tokio::test, ignore("arango"))]
+#[datastore_test(tokio::test)]
 async fn edge_entity_simple_foreign_violation(ds: &str) {
     let (test, [schema]) = TestPackages::with_static_sources([EDGE_ENTITY_SIMPLE])
         .compile_schemas([EDGE_ENTITY_SIMPLE.0]);
@@ -365,7 +365,7 @@ async fn edge_entity_simple_foreign_violation(ds: &str) {
 }
 
 /// FIXME: implement for arango
-#[datastore_test(tokio::test, ignore("arango"))]
+#[datastore_test(tokio::test)]
 async fn edge_entity_union_happy_path(ds: &str) {
     let (test, [schema]) = TestPackages::with_static_sources([EDGE_ENTITY_UNION])
         .compile_schemas([EDGE_ENTITY_UNION.0]);
@@ -459,7 +459,7 @@ async fn edge_entity_union_happy_path(ds: &str) {
     );
 }
 
-#[datastore_test(tokio::test, ignore("arango"))]
+#[datastore_test(tokio::test)]
 async fn edge_entity_union_foreign_violation(ds: &str) {
     let (test, [schema]) = TestPackages::with_static_sources([EDGE_ENTITY_UNION])
         .compile_schemas([EDGE_ENTITY_UNION.0]);
