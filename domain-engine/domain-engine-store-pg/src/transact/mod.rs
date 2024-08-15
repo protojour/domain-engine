@@ -161,7 +161,7 @@ pub async fn transact(
         for await message in messages {
             match message? {
                 ReqMessage::Query(op_seq, entity_select) => {
-                    ctx.stmt_cache.lock().unwrap().clear();
+                    ctx.stmt_cache.lock().unwrap().clear_select_dependent();
                     state = None;
                     let stream = ctx.query_vertex(&entity_select).await?;
 
@@ -179,25 +179,25 @@ pub async fn transact(
                     }
                 }
                 ReqMessage::Insert(op_seq, select) => {
-                    ctx.stmt_cache.lock().unwrap().clear();
+                    ctx.stmt_cache.lock().unwrap().clear_select_dependent();
                     for msg in write_state(op_seq, State::Insert(op_seq, select), &mut state) {
                         yield msg;
                     }
                 }
                 ReqMessage::Update(op_seq, select) => {
-                    ctx.stmt_cache.lock().unwrap().clear();
+                    ctx.stmt_cache.lock().unwrap().clear_select_dependent();
                     for msg in write_state(op_seq, State::Update(op_seq, select), &mut state) {
                         yield msg;
                     }
                 }
                 ReqMessage::Upsert(op_seq, select) => {
-                    ctx.stmt_cache.lock().unwrap().clear();
+                    ctx.stmt_cache.lock().unwrap().clear_select_dependent();
                     for msg in write_state(op_seq, State::Upsert(op_seq, select), &mut state) {
                         yield msg;
                     }
                 }
                 ReqMessage::Delete(op_seq, def_id) => {
-                    ctx.stmt_cache.lock().unwrap().clear();
+                    ctx.stmt_cache.lock().unwrap().clear_select_dependent();
                     for msg in write_state(op_seq, State::Delete(op_seq, def_id), &mut state) {
                         yield msg;
                     }

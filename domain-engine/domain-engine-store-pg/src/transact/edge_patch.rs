@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ops::Deref,
+};
 
 use domain_engine_core::{domain_error::DomainErrorKind, DomainError, DomainResult};
 use futures_util::{TryFutureExt, TryStreamExt};
@@ -21,6 +24,7 @@ use crate::{
     },
     sql::{self, WhereExt},
     sql_value::SqlVal,
+    statement::Prepare,
     transact::{data::Data, edge_query::edge_join_condition},
     CountRows, IgnoreRows,
 };
@@ -689,50 +693,80 @@ impl<'a> TransactCtx<'a> {
                     return Err(ds_bad_req("compound foreign key"));
                 };
 
-                let sql = match id_resolve_mode {
-                    IdResolveMode::Plain => sql::Select {
-                        expressions: sql::Expressions {
-                            items: vec![sql::Expr::path1("_key")],
-                            multiline: false,
-                        },
-                        from: vec![pg.table_name().into()],
-                        where_: Some(sql::Expr::eq(
-                            sql::Expr::path1(pg_id_field.col_name.as_ref()),
-                            sql::Expr::param(0),
-                        )),
-                        ..Default::default()
-                    }
-                    .to_string(),
-                    IdResolveMode::SelfIdentifying => {
-                        // upsert
-                        // TODO: It might actually be better to do SELECT + optional INSERT.
-                        // this approach (DO UPDATE SET) always re-appends the row.
-                        sql::Insert {
-                            with: None,
-                            into: pg.table_name(),
-                            as_: None,
-                            column_names: vec![&pg_id_field.col_name],
-                            on_conflict: Some(sql::OnConflict {
-                                target: Some(sql::ConflictTarget::Columns(vec![
-                                    &pg_id_field.col_name,
-                                ])),
-                                action: sql::ConflictAction::DoUpdateSet(vec![sql::UpdateColumn(
-                                    &pg_id_field.col_name,
+                let stmt = match id_resolve_mode {
+                    IdResolveMode::Plain => {
+                        let stmt_key = (vertex_def_id, id_rel_id);
+                        if let Some(stmt) =
+                            self.stmt_cache_locked(|c| c.key_by_id.get(&stmt_key).cloned())
+                        {
+                            stmt
+                        } else {
+                            let stmt = sql::Select {
+                                expressions: sql::Expressions {
+                                    items: vec![sql::Expr::path1("_key")],
+                                    multiline: false,
+                                },
+                                from: vec![pg.table_name().into()],
+                                where_: Some(sql::Expr::eq(
+                                    sql::Expr::path1(pg_id_field.col_name.as_ref()),
                                     sql::Expr::param(0),
-                                )]),
-                            }),
-                            returning: vec![sql::Expr::path1("_key")],
+                                )),
+                                ..Default::default()
+                            }
+                            .to_string()
+                            .prepare(&self.client())
+                            .await?;
+
+                            self.stmt_cache_locked(|c| c.key_by_id.insert(stmt_key, stmt.clone()));
+                            stmt
                         }
-                        .to_string()
+                    }
+                    IdResolveMode::SelfIdentifying => {
+                        let stmt_key = vertex_def_id;
+                        if let Some(stmt) = self.stmt_cache_locked(|c| {
+                            c.upsert_self_identifying.get(&stmt_key).cloned()
+                        }) {
+                            stmt
+                        } else {
+                            // upsert
+                            // TODO: It might actually be better to do SELECT + optional INSERT.
+                            // this approach (DO UPDATE SET) always re-appends the row.
+                            let stmt = sql::Insert {
+                                with: None,
+                                into: pg.table_name(),
+                                as_: None,
+                                column_names: vec![&pg_id_field.col_name],
+                                on_conflict: Some(sql::OnConflict {
+                                    target: Some(sql::ConflictTarget::Columns(vec![
+                                        &pg_id_field.col_name,
+                                    ])),
+                                    action: sql::ConflictAction::DoUpdateSet(vec![
+                                        sql::UpdateColumn(
+                                            &pg_id_field.col_name,
+                                            sql::Expr::param(0),
+                                        ),
+                                    ]),
+                                }),
+                                returning: vec![sql::Expr::path1("_key")],
+                            }
+                            .to_string()
+                            .prepare(&self.client())
+                            .await?;
+
+                            self.stmt_cache_locked(|c| {
+                                c.upsert_self_identifying.insert(stmt_key, stmt.clone())
+                            });
+                            stmt
+                        }
                     }
                 };
 
-                debug!("{sql}");
+                debug!("{stmt}");
                 trace!("resolve linked vertex {:?}", [&id_param]);
 
                 let row = self
                     .client()
-                    .query_opt(&sql, &[&id_param])
+                    .query_opt(stmt.deref(), &[&id_param])
                     .await
                     .map_err(PgError::ForeignKeyLookup)?
                     .ok_or_else(|| {
