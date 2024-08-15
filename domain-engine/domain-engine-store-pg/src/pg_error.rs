@@ -154,6 +154,8 @@ pub enum PgModelError {
     InvalidTransactionState,
     /// invalid unique cardinal
     InvalidUniqueCardinal,
+    /// data type not supported
+    DataTypeNotSupported(&'static str),
 }
 
 impl From<PgModelError> for DomainError {
@@ -162,3 +164,27 @@ impl From<PgModelError> for DomainError {
         DomainErrorKind::DataStore(format!("{value}")).into_error()
     }
 }
+
+/// public facing postgres errors about model invariant violations
+#[derive(displaydoc::Display, Debug)]
+pub enum PgMigrationError {
+    /// cardinal change detected
+    CardinalChangeDetected,
+    /// change index type not implemented
+    ChangeIndexTypeNotImplemented,
+    /// ambiguous edge cardinal
+    AmbiguousEdgeCardinal,
+    /// union target
+    UnionTarget(RelId),
+    /// ambiguous ID
+    AmbiguousId(DefId),
+}
+
+impl From<PgMigrationError> for DomainError {
+    fn from(value: PgMigrationError) -> Self {
+        error!("pg model error: {value:?}");
+        DomainErrorKind::DataStore(format!("{value}")).into_error()
+    }
+}
+
+impl std::error::Error for PgMigrationError {}

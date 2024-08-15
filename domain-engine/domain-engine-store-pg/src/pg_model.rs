@@ -354,10 +354,12 @@ impl PgType {
             DefRepr::FmtStruct(Some((_rel_id, def_id))) => Self::from_def_id(*def_id, ontology),
             DefRepr::FmtStruct(None) => Ok(None),
             DefRepr::Seq => todo!("seq"),
-            DefRepr::Struct => todo!("struct"),
-            DefRepr::Intersection(_) => todo!("intersection"),
-            DefRepr::Union(..) => todo!("union"),
-            DefRepr::Unknown => Err(PgModelError::UnhandledRepr)?,
+            DefRepr::Struct => Err(PgModelError::DataTypeNotSupported("struct").into()),
+            DefRepr::Intersection(_) => {
+                Err(PgModelError::DataTypeNotSupported("intersection").into())
+            }
+            DefRepr::Union(..) => Err(PgModelError::DataTypeNotSupported("union").into()),
+            DefRepr::Unknown => Err(PgModelError::DataTypeNotSupported("unknown").into()),
         }
     }
 

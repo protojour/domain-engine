@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use fnv::FnvHashMap;
 use indoc::indoc;
 use itertools::Itertools;
@@ -12,13 +12,14 @@ use ontol_runtime::{
         Ontology,
     },
     tuple::CardinalIdx,
-    DefId, DefRelTag, EdgeId, PackageId,
+    DefId, DefRelTag, EdgeId, PackageId, RelId,
 };
 use tokio_postgres::Transaction;
-use tracing::info;
+use tracing::{info, trace_span, Instrument};
 
 use crate::{
     migrate::{MigrationStep, PgDomain},
+    pg_error::PgMigrationError,
     pg_model::{
         PgDataField, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexData, PgIndexType, PgRegKey,
         PgTable, PgTableIdUnion, PgType,
@@ -143,7 +144,9 @@ pub async fn migrate_domain_steps<'t>(
             continue;
         };
 
-        migrate_vertex_steps(domain_ids, def.id, def, entity, ontology, txn, ctx).await?;
+        migrate_vertex_steps(domain_ids, def.id, def, entity, ontology, txn, ctx)
+            .instrument(trace_span!("vtx", name = &ontology[entity.name]))
+            .await?;
     }
 
     migrate_domain_edges_steps(pkg_id, domain, domain_ids, ontology, txn, ctx).await?;
@@ -387,7 +390,7 @@ async fn migrate_domain_edges_steps<'t>(
                 }
             } else {
                 if cardinal.target.len() != 1 {
-                    return Err(anyhow!("data cardinal should have unambiguous DefId"));
+                    Err(PgMigrationError::AmbiguousEdgeCardinal)?;
                 }
                 let param_def_id = *cardinal.target.iter().next().unwrap();
 
@@ -421,12 +424,12 @@ async fn migrate_domain_edges_steps<'t>(
                         *param_def_id = *generated_param_def_id;
                     }
                     _ => {
-                        return Err(anyhow!("TODO: cardinal change detected"));
+                        Err(PgMigrationError::CardinalChangeDetected)?;
                     }
                 }
 
                 if deployed_pg_cardinal.index_type != index_type {
-                    return Err(anyhow!("TODO: change index type for edge cardinal"));
+                    Err(PgMigrationError::ChangeIndexTypeNotImplemented)?;
                 }
             } else {
                 ctx.steps.push((
@@ -487,7 +490,7 @@ fn migrate_datafields_steps(
 
         let pg_type = match rel_info.target {
             DataRelationshipTarget::Unambiguous(def_id) => {
-                match PgType::from_def_id(def_id, ontology).map_err(|err| anyhow!("{err:?}"))? {
+                match PgType::from_def_id(def_id, ontology)? {
                     Some(pg_type) => pg_type,
                     None => {
                         // This is a unit type, does not need to be represented
@@ -496,7 +499,7 @@ fn migrate_datafields_steps(
                 }
             }
             DataRelationshipTarget::Union(_) => {
-                return Err(anyhow!("FIXME: union target for {rel_tag:?}"));
+                return Err(PgMigrationError::UnionTarget(RelId(def.id, *rel_tag)).into());
             }
         };
 
@@ -525,7 +528,7 @@ fn migrate_datafields_steps(
             let index_type = PgIndexType::Unique;
 
             let DataRelationshipTarget::Unambiguous(def_id) = rel_info.target else {
-                return Err(anyhow!("the ID must be unambiguously typed"));
+                return Err(PgMigrationError::AmbiguousId(def.id).into());
             };
 
             let pg_datatable = pg_domain.get_table(&table_id);

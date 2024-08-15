@@ -213,8 +213,8 @@ impl<'a> TransactCtx<'a> {
 
         let mut edge_select_stmt: Option<PreparedStatement> = None;
 
-        let mut column_names = vec![];
-        let mut values = vec![];
+        let mut column_names = vec!["_key"];
+        let mut values = vec![sql::Expr::Default];
         let mut insert_returning = vec![];
 
         let mut param_idx = 0;

@@ -63,6 +63,8 @@ impl Display for DomainError {
     }
 }
 
+impl std::error::Error for DomainError {}
+
 pub trait DomainErrorContext {
     fn with_context<S: Into<String>>(self, context: impl FnOnce() -> S) -> Self;
 }
