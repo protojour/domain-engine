@@ -1,12 +1,13 @@
-use std::{fmt::Display, ops::Deref};
+use std::{fmt::Display, ops::Deref, sync::Arc};
 
 use domain_engine_core::DomainResult;
 
 use crate::pg_error::PgError;
 
+#[derive(Clone)]
 pub struct PreparedStatement {
     statement: tokio_postgres::Statement,
-    src: String,
+    src: Arc<String>,
 }
 
 impl Deref for PreparedStatement {
@@ -36,7 +37,7 @@ impl Prepare for String {
 
         Ok(PreparedStatement {
             statement,
-            src: self,
+            src: Arc::new(self),
         })
     }
 }

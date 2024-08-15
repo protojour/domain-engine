@@ -1,5 +1,6 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
+use cache::StatementCache;
 use domain_engine_core::{
     object_generator::ObjectGenerator,
     system::SystemAPI,
@@ -20,6 +21,7 @@ use crate::{
     PgModel, PostgresDataStore,
 };
 
+mod cache;
 mod data;
 mod delete;
 mod edge_patch;
@@ -52,6 +54,7 @@ struct TransactCtx<'a> {
     pg_model: &'a PgModel,
     ontology: &'a Ontology,
     system: &'a (dyn SystemAPI + Send + Sync),
+    stmt_cache: Mutex<StatementCache>,
     connection_state: ConnectionState<'a>,
 }
 
@@ -61,6 +64,11 @@ impl<'a> TransactCtx<'a> {
             ConnectionState::NonAtomic(conn) => conn,
             ConnectionState::Transaction(txn) => txn.client(),
         }
+    }
+
+    pub fn stmt_cache_locked<T>(&self, func: impl FnOnce(&mut StatementCache) -> T) -> T {
+        let mut lock = self.stmt_cache.lock().unwrap();
+        func(&mut lock)
     }
 
     /// Look up ontology def and PG data for the given def_id
@@ -144,6 +152,7 @@ pub async fn transact(
             pg_model: &store.pg_model,
             ontology: &store.ontology,
             system: store.system.as_ref(),
+            stmt_cache: Mutex::new(StatementCache::default()),
             connection_state
         };
 
@@ -152,6 +161,7 @@ pub async fn transact(
         for await message in messages {
             match message? {
                 ReqMessage::Query(op_seq, entity_select) => {
+                    ctx.stmt_cache.lock().unwrap().clear();
                     state = None;
                     let stream = ctx.query_vertex(&entity_select).await?;
 
@@ -169,21 +179,25 @@ pub async fn transact(
                     }
                 }
                 ReqMessage::Insert(op_seq, select) => {
+                    ctx.stmt_cache.lock().unwrap().clear();
                     for msg in write_state(op_seq, State::Insert(op_seq, select), &mut state) {
                         yield msg;
                     }
                 }
                 ReqMessage::Update(op_seq, select) => {
+                    ctx.stmt_cache.lock().unwrap().clear();
                     for msg in write_state(op_seq, State::Update(op_seq, select), &mut state) {
                         yield msg;
                     }
                 }
                 ReqMessage::Upsert(op_seq, select) => {
+                    ctx.stmt_cache.lock().unwrap().clear();
                     for msg in write_state(op_seq, State::Upsert(op_seq, select), &mut state) {
                         yield msg;
                     }
                 }
                 ReqMessage::Delete(op_seq, def_id) => {
+                    ctx.stmt_cache.lock().unwrap().clear();
                     for msg in write_state(op_seq, State::Delete(op_seq, def_id), &mut state) {
                         yield msg;
                     }

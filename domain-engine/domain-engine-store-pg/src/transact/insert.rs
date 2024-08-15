@@ -34,15 +34,16 @@ use super::{
     InsertMode, MutationMode, TransactCtx,
 };
 
-pub struct PreparedInsert<'a> {
+#[derive(Clone)]
+pub struct PreparedInsert {
     inherent_stmt: PreparedStatement,
     edge_select_stmt: Option<PreparedStatement>,
-    query_select: QuerySelect<'a>,
 }
 
-struct AnalyzedInput<'b> {
+struct AnalyzedInput<'a, 'b> {
     pub field_buf: Vec<SqlVal<'b>>,
     pub edges: EdgePatches,
+    pub query_select: QuerySelect<'a>,
 }
 
 impl<'a> TransactCtx<'a> {
@@ -67,14 +68,23 @@ impl<'a> TransactCtx<'a> {
         mode: InsertMode,
         select: &'a Select,
     ) -> DomainResult<RowValue> {
-        let (prepared, query_select) = self
-            .prepare_insert(value.pkg_id, value.value.type_def_id(), select)
-            .await?;
+        let pkg_id = value.pkg_id;
+        let def_id = value.value.type_def_id();
+
+        let prepared = if let Some(prepared) =
+            self.stmt_cache_locked(|c| c.insert.get(&(pkg_id, def_id)).cloned())
+        {
+            prepared
+        } else {
+            let prepared = self.prepare_insert(pkg_id, def_id, select).await?;
+            self.stmt_cache_locked(|c| c.insert.insert((pkg_id, def_id), prepared.clone()));
+            prepared
+        };
 
         self.preprocess_insert_value(mode, &mut value.value)?;
 
         let def = self.ontology.def(value.value.type_def_id());
-        let (analyzed, pg_table) = self.analyze_input(value, def)?;
+        let (analyzed, pg_table) = self.analyze_input(value, def, select)?;
 
         let row = {
             debug!("{}", prepared.inherent_stmt);
@@ -113,7 +123,7 @@ impl<'a> TransactCtx<'a> {
 
         let mut row_value = self.read_row_value_as_vertex(
             SqlColumnStream::new(&row),
-            Some(query_select),
+            Some(analyzed.query_select),
             IncludeEdgeAttrs::No,
             DataOperation::Inserted,
         )?;
@@ -122,7 +132,7 @@ impl<'a> TransactCtx<'a> {
             .await?;
 
         if let (Some(edge_select_sql), QuerySelect::Struct(properties)) =
-            (prepared.edge_select_stmt, query_select)
+            (prepared.edge_select_stmt, analyzed.query_select)
         {
             debug!("{edge_select_sql}");
 
@@ -185,7 +195,7 @@ impl<'a> TransactCtx<'a> {
         pkg_id: PackageId,
         def_id: DefId,
         select: &'a Select,
-    ) -> DomainResult<(PreparedInsert, QuerySelect<'a>)> {
+    ) -> DomainResult<PreparedInsert> {
         let def = self.ontology.def(def_id);
         let entity = def.entity().ok_or_else(|| {
             warn!("not an entity");
@@ -218,14 +228,13 @@ impl<'a> TransactCtx<'a> {
         }
 
         // RETURNING is based on select, etc
-        let query_select = match select {
+        match select {
             Select::EntityId => {
                 let id_rel_tag = entity.id_relationship_id.tag();
                 if let Some(field) = pg.table.data_fields.get(&id_rel_tag) {
                     insert_returning.extend(self.initial_standard_data_fields(pg));
                     insert_returning.push(sql::Expr::path1(field.col_name.as_ref()));
                 }
-                QuerySelect::Field(entity.id_relationship_id)
             }
             Select::Struct(sel) => {
                 insert_returning.extend(self.initial_standard_data_fields(pg));
@@ -273,8 +282,6 @@ impl<'a> TransactCtx<'a> {
                         );
                     }
                 }
-
-                QuerySelect::Struct(&sel.properties)
             }
             _ => {
                 todo!()
@@ -291,21 +298,18 @@ impl<'a> TransactCtx<'a> {
             returning: insert_returning,
         };
 
-        Ok((
-            PreparedInsert {
-                inherent_stmt: insert.to_string().prepare(self.client()).await?,
-                edge_select_stmt,
-                query_select,
-            },
-            query_select,
-        ))
+        Ok(PreparedInsert {
+            inherent_stmt: insert.to_string().prepare(self.client()).await?,
+            edge_select_stmt,
+        })
     }
 
     fn analyze_input(
         &self,
         value: InDomain<Value>,
         def: &Def,
-    ) -> DomainResult<(AnalyzedInput, &PgTable)> {
+        select: &'a Select,
+    ) -> DomainResult<(AnalyzedInput<'a, '_>, &PgTable)> {
         let pg_table = self.pg_model.datatable(value.pkg_id, value.type_def_id())?;
 
         let Value::Struct(mut attrs, _struct_tag) = value.value else {
@@ -380,10 +384,24 @@ impl<'a> TransactCtx<'a> {
             }
         }
 
+        let query_select = match select {
+            Select::EntityId => {
+                let entity = def.entity().ok_or_else(|| {
+                    warn!("not an entity");
+                    DomainErrorKind::NotAnEntity(def.id).into_error()
+                })?;
+
+                QuerySelect::Field(entity.id_relationship_id)
+            }
+            Select::Struct(sel) => QuerySelect::Struct(&sel.properties),
+            _ => todo!(),
+        };
+
         Ok((
             AnalyzedInput {
                 field_buf,
                 edges: edge_patches,
+                query_select,
             },
             pg_table,
         ))
