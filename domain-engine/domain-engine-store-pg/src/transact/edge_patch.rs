@@ -24,7 +24,7 @@ use crate::{
     },
     sql::{self, WhereExt},
     sql_value::SqlVal,
-    statement::Prepare,
+    statement::{Prepare, PreparedStatement},
     transact::{data::Data, edge_query::edge_join_condition},
     CountRows, IgnoreRows,
 };
@@ -567,30 +567,35 @@ impl<'a> TransactCtx<'a> {
             }
         }
 
-        let sql = if !sql_update.set.is_empty() {
-            sql_update.to_string()
-        } else {
-            // nothing to update, but it should be proven that the edge exists.
-            debug!("nothing to update");
-            let sql_select = sql::Select {
-                with: None,
-                expressions: vec![sql::Expr::LiteralInt(0)].into(),
-                from: vec![pg_edge.table_name().into()],
-                where_: sql_update.where_,
-                limit: sql::Limit {
-                    limit: Some(1),
-                    offset: None,
-                },
-            };
-            sql_select.to_string()
-        };
+        let stmt = self
+            .edge_update_stmt_cached(if !sql_update.set.is_empty() {
+                sql_update.to_string()
+            } else {
+                // nothing to update, but it should be proven that the edge exists.
+                debug!("nothing to update");
+                let sql_select = sql::Select {
+                    with: None,
+                    expressions: vec![sql::Expr::LiteralInt(0)].into(),
+                    from: vec![pg_edge.table_name().into()],
+                    where_: sql_update.where_,
+                    limit: sql::Limit {
+                        limit: Some(1),
+                        offset: None,
+                    },
+                };
+                sql_select.to_string()
+            })
+            .await?;
 
-        debug!("{sql}");
+        debug!("{stmt}");
         trace!("{param_buf:?}");
 
         let count = self
             .client()
-            .query_raw(&sql, param_buf.iter().map(|param| param as &dyn ToSql))
+            .query_raw(
+                stmt.deref(),
+                param_buf.iter().map(|param| param as &dyn ToSql),
+            )
             .await
             .map_err(PgError::EdgeUpdate)?
             .try_collect::<CountRows>()
@@ -601,6 +606,16 @@ impl<'a> TransactCtx<'a> {
             Ok(())
         } else {
             Err(DomainErrorKind::EdgeNotFound.into_error())
+        }
+    }
+
+    async fn edge_update_stmt_cached(&self, sql: String) -> DomainResult<PreparedStatement> {
+        if let Some(stmt) = self.stmt_cache_locked(|c| c.edge_update.get(&sql).cloned()) {
+            Ok(stmt)
+        } else {
+            let stmt = sql.prepare(self.client()).await?;
+            self.stmt_cache_locked(|c| c.edge_update.insert(stmt.src().clone(), stmt.clone()));
+            Ok(stmt)
         }
     }
 
@@ -714,7 +729,7 @@ impl<'a> TransactCtx<'a> {
                                 ..Default::default()
                             }
                             .to_string()
-                            .prepare(&self.client())
+                            .prepare(self.client())
                             .await?;
 
                             self.stmt_cache_locked(|c| c.key_by_id.insert(stmt_key, stmt.clone()));
@@ -750,7 +765,7 @@ impl<'a> TransactCtx<'a> {
                                 returning: vec![sql::Expr::path1("_key")],
                             }
                             .to_string()
-                            .prepare(&self.client())
+                            .prepare(self.client())
                             .await?;
 
                             self.stmt_cache_locked(|c| {

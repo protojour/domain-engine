@@ -6,15 +6,21 @@ use crate::pg_error::PgError;
 
 #[derive(Clone)]
 pub struct PreparedStatement {
-    statement: tokio_postgres::Statement,
+    prepared: tokio_postgres::Statement,
     src: Arc<String>,
+}
+
+impl PreparedStatement {
+    pub fn src(&self) -> &Arc<String> {
+        &self.src
+    }
 }
 
 impl Deref for PreparedStatement {
     type Target = tokio_postgres::Statement;
 
     fn deref(&self) -> &Self::Target {
-        &self.statement
+        &self.prepared
     }
 }
 
@@ -28,7 +34,7 @@ pub trait Prepare {
     async fn prepare(self, client: &tokio_postgres::Client) -> DomainResult<PreparedStatement>;
 }
 
-impl Prepare for String {
+impl Prepare for Arc<String> {
     async fn prepare(self, client: &tokio_postgres::Client) -> DomainResult<PreparedStatement> {
         let statement = client
             .prepare(&self)
@@ -36,8 +42,14 @@ impl Prepare for String {
             .map_err(|e| PgError::PrepareStatement(self.clone(), e))?;
 
         Ok(PreparedStatement {
-            statement,
-            src: Arc::new(self),
+            prepared: statement,
+            src: self,
         })
+    }
+}
+
+impl Prepare for String {
+    async fn prepare(self, client: &tokio_postgres::Client) -> DomainResult<PreparedStatement> {
+        Arc::new(self).prepare(client).await
     }
 }

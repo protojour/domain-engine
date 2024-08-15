@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use domain_engine_core::{domain_error::DomainErrorKind, DomainError};
 use ontol_runtime::{tuple::CardinalIdx, DefId, EdgeId, PackageId, RelId};
 use tracing::{error, info, warn};
@@ -85,7 +87,7 @@ pub enum PgError {
     /// edge parameters missing
     EdgeParametersMissing,
     /// statement preparation
-    PrepareStatement(String, tokio_postgres::Error),
+    PrepareStatement(Arc<String>, tokio_postgres::Error),
 }
 
 impl From<PgError> for DomainError {
