@@ -1,0 +1,21 @@
+def foo (
+    rel* is: m1
+)
+
+def @macro m1 (
+    rel* is: m2
+    rel* is: m3
+)
+
+def @macro m2 (
+    rel* is: m3
+)
+
+def @macro m3 (
+    /// included twice
+    rel* 'list'?: {bar}
+)
+
+def bar (
+    rel* 'prop': text
+)

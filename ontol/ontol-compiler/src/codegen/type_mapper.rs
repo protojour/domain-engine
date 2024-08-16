@@ -43,7 +43,7 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
         let anonymous = matches!(ty, Type::Anonymous(_));
 
         match ty {
-            Type::Domain(def_id) | Type::Anonymous(def_id) => {
+            Type::DomainDef(def_id) | Type::Anonymous(def_id) => {
                 let repr = self.repr_ctx.get_repr_kind(def_id).unwrap();
 
                 match repr {

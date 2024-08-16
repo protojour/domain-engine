@@ -374,11 +374,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
     fn alloc_def_type_operator(&mut self, def: SerdeDef) -> Option<OperatorAllocation> {
         match self.get_def_type(def.def_id) {
-            Some(Type::Domain(def_id) | Type::Anonymous(def_id)) => {
+            Some(Type::DomainDef(def_id) | Type::Anonymous(def_id)) => {
                 let properties = self.prop_ctx.properties_by_def_id.get(def_id);
                 let typename = self.str_ctx.intern_constant(self.get_typename(*def_id));
                 self.alloc_domain_type_serde_operator(def.with_def(*def_id), typename, properties)
             }
+            Some(Type::MacroDef(_)) => None,
             Some(type_ref) => match def.modifier {
                 SerdeModifier::NONE => self.alloc_ontol_type_serde_operator(def, type_ref),
                 _ => Some(OperatorAllocation::Redirect(SerdeDef::new(
@@ -483,8 +484,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             Type::Option(_) => {
                 panic!("Option not handled here")
             }
-            Type::Domain(_) => {
-                panic!("Domain not handled here")
+            Type::DomainDef(_) => {
+                panic!("DomainDef not handled here")
+            }
+            Type::MacroDef(_) => {
+                panic!("MacroDef not handled here")
             }
             Type::Function(_)
             | Type::Anonymous(..)
@@ -688,7 +692,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     unreachable!("{:?}: {constructor:?}: repr {repr:?}", def.def_id)
                 }
             },
-            ReprKind::Extern => None,
+            ReprKind::Extern | ReprKind::Macro => None,
         }
     }
 

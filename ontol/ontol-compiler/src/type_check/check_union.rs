@@ -232,7 +232,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     });
                 }
             },
-            Type::Domain(domain_def_id) | Type::Anonymous(domain_def_id) => {
+            Type::DomainDef(domain_def_id) | Type::Anonymous(domain_def_id) => {
                 match self.find_domain_type_match_data(*domain_def_id) {
                     Ok(DomainTypeMatchData::Struct(property_set)) => {
                         self.add_property_set_to_discriminator(

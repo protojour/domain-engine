@@ -251,7 +251,7 @@ def sdo_sco_identifier (
 )
 
 /// Type providing the `created_by_ref` property
-def created_by_interface (
+def @macro created_by_interface (
     /// The **created_by_ref** property specifies the **id** property of the `identity` object that describes the entity that created this object.
     ///
     /// If this attribute is omitted, the source of this information is undefined. This may be used by object creators who wish to remain anonymous.
@@ -281,7 +281,7 @@ def granular-marking (
     rel* 'selectors': {common.string}
 )
 
-def markings_interface (
+def @macro markings_interface (
     /// The **object_marking_refs** property specifies a list of id properties of marking-definition objects that apply to this object.
     ///
     /// In some cases, though uncommon, marking definitions themselves may be marked with sharing or handling guidance.
@@ -304,7 +304,7 @@ def markings_interface (
 /// Each of these objects corresponds to a concept commonly used in CTI.
 ///
 /// STIX Domain Objects are defined in section 4.
-def SDO_interface (
+def @macro SDO_interface (
     rel* is: interface.spec_version
     rel* is: interface.created
     rel* is: interface.modified
@@ -324,7 +324,7 @@ def SDO_interface (
 /// Property information, relationship information, and examples are provided for each SRO defined below.
 /// Property information includes common properties as well as properties that are specific to each SRO.
 /// Because SROs cannot be the source or target of other SROs, relationship information is included but only to describe embedded relationships (e.g., `created_by_ref`).
-def SRO_interface (
+def @macro SRO_interface (
     rel* is: interface.spec_version
     rel* is: interface.created
     rel* is: interface.modified

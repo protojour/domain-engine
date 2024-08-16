@@ -40,6 +40,7 @@ pub enum ReprKind {
     // StructUnion(Vec<(DefId, SourceSpan)>),
     Union(Vec<(DefId, SourceSpan)>, UnionBound),
     Extern,
+    Macro,
 }
 
 #[derive(Eq, PartialEq, Debug)]
@@ -80,6 +81,7 @@ impl ReprKind {
                     UnionBound::Fmt => DefReprUnionBound::Fmt,
                 },
             ),
+            ReprKind::Macro => DefRepr::Macro,
             ReprKind::Extern => DefRepr::Unknown,
         }
     }

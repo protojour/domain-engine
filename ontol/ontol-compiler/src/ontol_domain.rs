@@ -84,7 +84,7 @@ impl<'m> Compiler<'m> {
                         let symbol_literal_def_id =
                             self.defs.def_text_literal(ident, &mut self.str_ctx);
 
-                        self.register_type(def_id, Type::Domain);
+                        self.register_type(def_id, Type::DomainDef);
 
                         self.is(
                             def_id,

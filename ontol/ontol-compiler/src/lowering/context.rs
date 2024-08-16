@@ -73,6 +73,7 @@ pub enum Coinage {
 pub struct Open(pub Option<U32Span>);
 pub struct Private(pub Option<U32Span>);
 pub struct Extern(pub Option<U32Span>);
+pub struct Macro(pub Option<U32Span>);
 
 #[derive(Clone, Copy)]
 pub enum RelationKey {
@@ -208,13 +209,16 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
         private: Private,
         open: Open,
         extern_: Extern,
+        macro_: Macro,
     ) -> Result<DefId, LoweringError> {
         let (def_id, coinage) = self.named_def_id(Space::Type, ident, ident_span)?;
         if matches!(coinage, Coinage::New) {
             let ident = self.compiler.str_ctx.intern(ident);
             debug!("{def_id:?}: `{}`", ident);
 
-            let kind = if extern_.0.is_some() {
+            let kind = if macro_.0.is_some() {
+                DefKind::Macro(ident)
+            } else if extern_.0.is_some() {
                 DefKind::Extern(ident)
             } else {
                 let mut flags = TypeDefFlags::CONCRETE | TypeDefFlags::PUBLIC;

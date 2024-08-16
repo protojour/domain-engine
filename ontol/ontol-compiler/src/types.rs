@@ -42,7 +42,8 @@ pub enum Type<'m> {
     Option(TypeRef<'m>),
     Function(FunctionType),
     // User-defined data type from a domain:
-    Domain(DefId),
+    DomainDef(DefId),
+    MacroDef(DefId),
     Anonymous(DefId),
     // A builtin function for generating values
     ValueGenerator(DefId),
@@ -71,7 +72,8 @@ impl<'m> Type<'m> {
             Self::Matrix(_) => None,
             Self::Option(ty) => ty.get_single_def_id(),
             Self::Function(_) => None,
-            Self::Domain(def_id) => Some(*def_id),
+            Self::DomainDef(def_id) => Some(*def_id),
+            Self::MacroDef(def_id) => Some(*def_id),
             Self::Anonymous(def_id) => Some(*def_id),
             Self::ValueGenerator(def_id) => Some(*def_id),
             Self::Package => None,
@@ -87,7 +89,11 @@ impl<'m> Type<'m> {
     }
 
     pub fn is_domain_specific(&self) -> bool {
-        matches!(self, Self::Domain(_) | Self::Anonymous(_))
+        matches!(self, Self::DomainDef(_) | Self::Anonymous(_))
+    }
+
+    pub fn is_macro_def(&self) -> bool {
+        matches!(self, Self::MacroDef(_))
     }
 
     pub fn matrix_column_type(&self, column_idx: usize, type_ctx: &mut TypeCtx<'m>) -> TypeRef<'m> {
@@ -355,9 +361,13 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
                 write!(f, "{tick}{}?{tick}", self.child(ty))
             }
             Type::Function(_) => write!(f, "function"),
-            Type::Domain(def_id) => {
+            Type::DomainDef(def_id) => {
                 let ident = self.defs.def_kind(*def_id).opt_identifier().unwrap();
                 write!(f, "{tick}{ident}{tick}")
+            }
+            Type::MacroDef(def_id) => {
+                let ident = self.defs.def_kind(*def_id).opt_identifier().unwrap();
+                write!(f, "@macro{tick}{ident}{tick}")
             }
             Type::Anonymous(_) => {
                 write!(f, "anonymous type")

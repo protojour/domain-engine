@@ -1,0 +1,7 @@
+def obj (
+    rel* is: props
+)
+
+def @macro props (
+    rel* 'prop': text
+)

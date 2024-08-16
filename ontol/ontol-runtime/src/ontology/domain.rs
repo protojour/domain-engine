@@ -198,7 +198,7 @@ pub struct BasicDef {
     pub repr: DefRepr,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub enum DefRepr {
     Unit,
     I64,
@@ -215,10 +215,11 @@ pub enum DefRepr {
     /// FIXME: not sure if this should exist as a separate DefRepr:
     /// It exists as a simplification for now:
     FmtStruct(Option<(RelId, DefId)>),
+    Macro,
     Unknown,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub enum DefReprUnionBound {
     Any,
     Struct,

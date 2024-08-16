@@ -211,7 +211,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     } => {
                         let struct_ty = self.check_def(*path_def_id);
                         match struct_ty {
-                            Type::Domain(def_id) => {
+                            Type::DomainDef(def_id) => {
                                 assert_eq!(*def_id, *path_def_id);
                             }
                             _ => {
@@ -257,7 +257,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let meta = *ctx.hir_arena[node].meta();
                 match expected_ty {
                     Some((Type::Infer(_), _)) => node,
-                    Some((expected_ty @ (Type::Domain(def_id) | Type::Anonymous(def_id)), _)) => {
+                    Some((
+                        expected_ty @ (Type::DomainDef(def_id) | Type::Anonymous(def_id)),
+                        _,
+                    )) => {
                         match self.repr_ctx.get_repr_kind(def_id) {
                             Some(ReprKind::Union(members, _)) => {
                                 let hir_def_id = meta
@@ -295,7 +298,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             _ => node,
                         }
                     }
-                    Some((Type::Option(Type::Domain(_)), _)) => {
+                    Some((Type::Option(Type::DomainDef(_)), _)) => {
                         *ctx.hir_arena[node].meta_mut() = Meta {
                             ty: self.type_ctx.intern(Type::Option(meta.ty)),
                             span: meta.span,
@@ -536,7 +539,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             // Need to map:
                             Err(err @ TypeError::Mismatch(type_eq)) => {
                                 match (&type_eq.actual, &type_eq.expected) {
-                                    ((Type::Domain(_), _), (Type::Domain(_), _)) => {
+                                    ((Type::DomainDef(_), _), (Type::DomainDef(_), _)) => {
                                         panic!("Should not happen anymore");
                                     }
 

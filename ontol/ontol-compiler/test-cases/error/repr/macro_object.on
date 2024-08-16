@@ -1,0 +1,5 @@
+def foo (
+    rel* 'prop': bar // ERROR object must be a data type
+)
+
+def @macro bar ()

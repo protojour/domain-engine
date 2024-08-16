@@ -37,7 +37,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             DefKind::Type(TypeDef {
                 ident: Some(_ident),
                 ..
-            }) => self.type_ctx.intern(Type::Domain(def_id)),
+            }) => self.type_ctx.intern(Type::DomainDef(def_id)),
             DefKind::Type(TypeDef { ident: None, .. }) => {
                 self.type_ctx.intern(Type::Anonymous(def_id))
             }
@@ -52,6 +52,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
                 self.type_ctx.intern(Type::Anonymous(def_id))
             }
+            DefKind::Macro(_ident) => self.type_ctx.intern(Type::MacroDef(def_id)),
             DefKind::TextLiteral(_) => self.type_ctx.intern(Type::TextConstant(def_id)),
             DefKind::Regex(_) => self.type_ctx.intern(Type::Regex(def_id)),
             DefKind::Edge => self.type_ctx.intern(Type::Tautology),

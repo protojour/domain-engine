@@ -18,9 +18,13 @@ use crate::{
 use super::TypeCheck;
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    pub fn check_rel(&mut self, rel_id: RelId) {
+    pub fn check_rel(
+        &mut self,
+        rel_id: RelId,
+        rel_expansions: Option<&mut Vec<(Relationship, SourceSpan)>>,
+    ) {
         let spanned = self.rel_ctx.spanned_relationship_by_id(rel_id);
-        self.check_relationship(rel_id, spanned.value, spanned.span);
+        self.check_relationship(rel_id, spanned.value, spanned.span, rel_expansions);
     }
 
     fn check_relationship(
@@ -28,6 +32,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         rel_id: RelId,
         relationship: &Relationship,
         span: &SourceSpan,
+        rel_expansions: Option<&mut Vec<(Relationship, SourceSpan)>>,
     ) -> TypeRef<'m> {
         let relation_def_kind = &self.defs.def_kind(relationship.relation_def_id);
 
@@ -43,7 +48,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_named_relation(rel_id, edge_id, relationship);
             }
             DefKind::BuiltinRelType(kind, _) => {
-                self.check_builtin_relation(rel_id, relationship, kind, span);
+                self.check_builtin_relation(rel_id, relationship, kind, span, rel_expansions);
             }
             _ => {
                 panic!()
@@ -123,6 +128,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         relationship: &Relationship,
         relation: &BuiltinRelationKind,
         span: &SourceSpan,
+        rel_expansions: Option<&mut Vec<(Relationship, SourceSpan)>>,
     ) -> TypeRef<'m> {
         let subject = &relationship.subject;
         let object = &relationship.object;
@@ -134,24 +140,56 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let subject_ty = self.check_def(subject.0);
                 let object_ty = self.check_def(object.0);
 
-                self.check_subject_data_type(subject_ty, &subject.1);
-                self.check_object_data_type(object_ty, &object.1);
-
-                // Ensure properties
-                self.prop_ctx.properties_by_def_id_mut(subject.0);
-
-                if !self.thesaurus.insert_domain_is(
-                    subject.0,
-                    match relationship.subject_cardinality.0 {
-                        PropertyCardinality::Mandatory => TypeRelation::Super,
-                        PropertyCardinality::Optional => TypeRelation::SubVariant,
-                    },
-                    object.0,
-                    *span,
-                ) {
-                    CompileError::DuplicateAnonymousRelationship
+                if subject_ty.is_macro_def() && !object_ty.is_macro_def() {
+                    return CompileError::TODO("macro def can only use other macro defs")
                         .span(*span)
-                        .report(self);
+                        .report_ty(self);
+                }
+
+                if let Type::MacroDef(_macro_def_id) = object_ty {
+                    self.check_subject_data_type(subject_ty, &subject.1);
+
+                    if let Some(rel_expansions) = rel_expansions {
+                        for (macro_rel, span) in self.rel_ctx.relationships_by_subject(object.0) {
+                            rel_expansions.push((
+                                Relationship {
+                                    relation_def_id: macro_rel.relation_def_id,
+                                    projection: macro_rel.projection,
+                                    relation_span: macro_rel.relation_span,
+                                    subject: *subject,
+                                    subject_cardinality: macro_rel.subject_cardinality,
+                                    object: macro_rel.object,
+                                    object_cardinality: macro_rel.object_cardinality,
+                                    rel_params: macro_rel.rel_params.clone(),
+                                },
+                                span,
+                            ));
+                        }
+                    } else {
+                        return CompileError::TODO("cannot use a macro here")
+                            .span(*span)
+                            .report_ty(self);
+                    }
+                } else {
+                    self.check_subject_data_type(subject_ty, &subject.1);
+                    self.check_object_data_type(object_ty, &object.1);
+
+                    // Ensure properties
+                    self.prop_ctx.properties_by_def_id_mut(subject.0);
+
+                    if !self.thesaurus.insert_domain_is(
+                        subject.0,
+                        match relationship.subject_cardinality.0 {
+                            PropertyCardinality::Mandatory => TypeRelation::Super,
+                            PropertyCardinality::Optional => TypeRelation::SubVariant,
+                        },
+                        object.0,
+                        *span,
+                    ) {
+                        CompileError::DuplicateAnonymousRelationship
+                            .span(*span)
+                            .report(self);
+                    }
                 }
 
                 object_ty
@@ -393,12 +431,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let Some(def_id) = ty.get_single_def_id() else {
             CompileError::SubjectMustBeDomainType
                 .span(*span)
-                .report_ty(self);
+                .report(self);
             return;
         };
 
         match self.defs.def_kind(def_id) {
-            DefKind::Primitive(..) | DefKind::Type(_) | DefKind::Extern(_) => {
+            DefKind::Primitive(..) | DefKind::Type(_) | DefKind::Extern(_) | DefKind::Macro(_) => {
                 self.check_not_sealed(ty, span);
             }
             _ => {
@@ -417,6 +455,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             | Type::Package
             | Type::Infer(_)
             | Type::ValueGenerator(_)
+            | Type::MacroDef(_)
             | Type::Error => {
                 CompileError::ObjectMustBeDataType.span(*span).report(self);
             }

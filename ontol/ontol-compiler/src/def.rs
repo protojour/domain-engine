@@ -41,6 +41,7 @@ pub enum DefKind<'m> {
     Regex(&'m str),
     /// A type definition in some domain:
     Type(TypeDef<'m>),
+    Macro(&'m str),
     InlineUnion(BTreeSet<DefId>),
     BuiltinRelType(BuiltinRelationKind, Option<&'static str>),
     Edge,
@@ -71,6 +72,7 @@ impl<'m> DefKind<'m> {
             Self::EmptySequence => None,
             Self::Fn(_) => None,
             Self::Type(domain_type) => domain_type.ident.map(|ident| ident.into()),
+            Self::Macro(ident) => Some((*ident).into()),
             Self::InlineUnion(_) => None,
             Self::BuiltinRelType(_, ident) => ident.map(|ident| ident.into()),
             Self::Edge => None,
@@ -108,7 +110,7 @@ bitflags::bitflags! {
         const OPEN           = 0b00000010;
         /// for now: Every user-domain defined type is concrete.
         const CONCRETE       = 0b00000100;
-        /// Whether the defintion is a ontol-builtin symbol
+        /// Whether the definition is a ontol-builtin symbol
         const BUILTIN_SYMBOL = 0b00001000;
     }
 }

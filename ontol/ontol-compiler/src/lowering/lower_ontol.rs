@@ -24,7 +24,7 @@ use crate::{
 };
 
 use super::context::{
-    BlockContext, CstLowering, Extern, LoweringCtx, LoweringOutcome, Open, Private, RootDefs,
+    BlockContext, CstLowering, Extern, LoweringCtx, LoweringOutcome, Macro, Open, Private, RootDefs,
 };
 
 enum PreDefinedStmt<V> {
@@ -134,7 +134,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             insp::Statement::UseStatement(_use_stmt) => None,
             insp::Statement::DefStatement(def_stmt) => {
                 let ident_token = def_stmt.ident_path()?.symbols().next()?;
-                let (private, open, extern_) = self.read_def_modifiers(def_stmt.modifiers());
+                let (private, open, extern_, macro_) =
+                    self.read_def_modifiers(def_stmt.modifiers());
 
                 let def_id = self.catch(|zelf| {
                     zelf.ctx.coin_type_definition(
@@ -143,6 +144,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                         private,
                         open,
                         extern_,
+                        macro_,
                     )
                 })?;
                 let mut root_defs: RootDefs = [def_id].into();
@@ -251,7 +253,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             }
             insp::Statement::DefStatement(def_stmt) => {
                 let ident_token = def_stmt.ident_path()?.symbols().next()?;
-                let (private, open, extern_) = self.read_def_modifiers(def_stmt.modifiers());
+                let (private, open, extern_, macro_) =
+                    self.read_def_modifiers(def_stmt.modifiers());
 
                 let def_id = self.catch(|zelf| {
                     zelf.ctx.coin_type_definition(
@@ -260,6 +263,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                         private,
                         open,
                         extern_,
+                        macro_,
                     )
                 })?;
 
@@ -493,10 +497,11 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     pub(super) fn read_def_modifiers(
         &mut self,
         modifiers: impl Iterator<Item = V::Token>,
-    ) -> (Private, Open, Extern) {
+    ) -> (Private, Open, Extern, Macro) {
         let mut private = Private(None);
         let mut open = Open(None);
         let mut extern_ = Extern(None);
+        let mut macro_ = Macro(None);
 
         for modifier in modifiers {
             match modifier.slice() {
@@ -509,13 +514,16 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 "@extern" => {
                     extern_.0 = Some(modifier.span());
                 }
+                "@macro" => {
+                    macro_.0 = Some(modifier.span());
+                }
                 _ => {
                     CompileError::InvalidModifier.span_report(modifier.span(), &mut self.ctx);
                 }
             }
         }
 
-        (private, open, extern_)
+        (private, open, extern_, macro_)
     }
 }
 

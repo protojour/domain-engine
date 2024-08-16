@@ -57,6 +57,16 @@ impl RelCtx {
         self.table.get_mut(&rel_id).map(|(rel, _)| rel)
     }
 
+    pub fn relationships_by_subject(
+        &self,
+        subject_def_id: DefId,
+    ) -> impl Iterator<Item = (&Relationship, SourceSpan)> + '_ {
+        self.table
+            .iter()
+            .filter(move |(rel_id, _)| rel_id.0 == subject_def_id)
+            .map(|(_, (relationship, span))| (relationship, *span))
+    }
+
     pub fn iter_rel_ids(&self, def_id: DefId) -> impl Iterator<Item = RelId> {
         let max_tag = self
             .allocators

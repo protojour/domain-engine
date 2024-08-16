@@ -360,6 +360,7 @@ impl PgType {
                 Err(PgModelError::DataTypeNotSupported("intersection").into())
             }
             DefRepr::Union(..) => Err(PgModelError::DataTypeNotSupported("union").into()),
+            DefRepr::Macro => Ok(None),
             DefRepr::Unknown => Err(PgModelError::DataTypeNotSupported("unknown").into()),
         }
     }

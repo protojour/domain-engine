@@ -474,6 +474,9 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 DefKind::Extern(_) => {
                     self.merge_repr(&mut builder, leaf_def_id, ReprKind::Extern, def_id, data);
                 }
+                DefKind::Macro(_) => {
+                    self.merge_repr(&mut builder, leaf_def_id, ReprKind::Macro, def_id, data);
+                }
                 _ => {}
             }
 

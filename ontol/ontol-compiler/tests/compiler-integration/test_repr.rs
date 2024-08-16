@@ -1,4 +1,5 @@
 use ontol_macros::test;
+use ontol_runtime::ontology::domain::DefRepr;
 use ontol_test_utils::{src_name, TestCompile, TestPackages};
 
 #[test]
@@ -40,5 +41,38 @@ fn test_repr_valid_mesh1() {
             length.def.operator_addr.is_some(),
             "length is a concrete type"
         );
+    });
+}
+
+#[test]
+fn test_macro_repr() {
+    "
+    def @macro m (
+        rel* 'prop': text
+    )
+    "
+    .compile_then(|test| {
+        let [m] = test.bind(["m"]);
+        let Some(DefRepr::Macro) = m.def.repr() else {
+            panic!("should be DefRepr::Macro");
+        };
+    });
+}
+
+#[test]
+fn test_macro_in_macro_repr() {
+    "
+    def foo (rel* is: m1)
+    def @macro m2 (rel* 'prop': text)
+    def @macro m1 (rel* is: m2)
+    "
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        let (rel_id, _rel_info) = foo
+            .def
+            .data_relationship_by_name("prop", test.ontology())
+            .unwrap();
+
+        assert_eq!(rel_id.0, foo.def_id());
     });
 }

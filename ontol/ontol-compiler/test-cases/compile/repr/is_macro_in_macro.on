@@ -1,0 +1,11 @@
+def foo (
+    rel* is: bar
+)
+
+def @macro bar (
+    rel* is: baz
+)
+
+def @macro baz (
+    rel* 'prop': text
+)

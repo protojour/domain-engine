@@ -88,6 +88,8 @@ impl<'m> Compiler<'m> {
             }
         }
 
+        let mut expanded_rels = vec![];
+
         // commit relationships from outcome
         {
             let mut rel_ids = Vec::with_capacity(
@@ -106,7 +108,25 @@ impl<'m> Compiler<'m> {
 
             let mut type_check = self.type_check();
             for rel_id in rel_ids {
-                type_check.check_rel(rel_id);
+                type_check.check_rel(rel_id, Some(&mut expanded_rels));
+            }
+        }
+
+        // expanded rels from macros
+        while !expanded_rels.is_empty() {
+            let mut rel_ids = Vec::with_capacity(expanded_rels.len());
+
+            for (relationship, span) in std::mem::take(&mut expanded_rels) {
+                debug!("expanded rel: {relationship:?}");
+                let rel_id = self.rel_ctx.alloc_rel_id(relationship.subject.0);
+                rel_ids.push(rel_id);
+                self.rel_ctx.commit_rel(rel_id, relationship, span)
+            }
+
+            let mut type_check = self.type_check();
+
+            for rel_id in rel_ids {
+                type_check.check_rel(rel_id, Some(&mut expanded_rels));
             }
         }
     }
@@ -264,7 +284,7 @@ impl<'m> Compiler<'m> {
                         type_check.check_def(def_id);
                     }
                     for rel_id in outcome.new_rels {
-                        type_check.check_rel(rel_id);
+                        type_check.check_rel(rel_id, None);
                     }
                 }
 
