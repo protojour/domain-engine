@@ -151,6 +151,14 @@ impl Def {
         }
     }
 
+    pub fn repr(&self) -> Option<&DefRepr> {
+        match &self.kind {
+            DefKind::Entity(_) => Some(&DefRepr::Struct),
+            DefKind::Data(basic_def) => Some(&basic_def.repr),
+            _ => None,
+        }
+    }
+
     pub fn edge_relationships(
         &self,
     ) -> impl Iterator<Item = (&RelId, &DataRelationshipInfo, EdgeCardinalProjection)> {

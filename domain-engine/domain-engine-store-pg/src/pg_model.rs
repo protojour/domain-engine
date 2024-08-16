@@ -194,6 +194,7 @@ pub enum PgTableIdUnion {
 pub struct PgTable {
     pub key: PgRegKey,
     pub table_name: Box<str>,
+    pub has_fkey: bool,
     pub data_fields: FnvHashMap<DefRelTag, PgDataField>,
     pub edge_cardinals: BTreeMap<CardinalIdx, PgEdgeCardinal>,
     pub datafield_indexes: FnvHashMap<(DefId, PgIndexType), PgIndexData>,

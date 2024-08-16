@@ -1,4 +1,4 @@
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use indoc::indoc;
 use itertools::Itertools;
 use tokio_postgres::Transaction;
@@ -68,7 +68,9 @@ async fn execute_migration_step<'t>(
             let vertex_def_tag = vertex_def_id.1 as i32;
             let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
 
-            txn.query(
+            let key_column = "_key";
+
+            txn.execute(
                 &format!(
                     "CREATE TABLE {schema}.{table} (_key bigserial PRIMARY KEY)",
                     schema = sql::Ident(&pg_domain.schema_name),
@@ -96,7 +98,7 @@ async fn execute_migration_step<'t>(
                         &pg_domain.key,
                         &vertex_def_tag,
                         &table_name,
-                        &"_key",
+                        &key_column,
                     ],
                 )
                 .await
@@ -108,11 +110,53 @@ async fn execute_migration_step<'t>(
                 PgTable {
                     key: domaintable_key,
                     table_name,
+                    has_fkey: false,
                     data_fields: Default::default(),
                     datafield_indexes: Default::default(),
                     edge_cardinals: Default::default(),
                 },
             );
+        }
+        MigrationStep::DeployVertexFKey { vertex_def_id } => {
+            let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
+            let pg_table = pg_domain.datatables.get_mut(&vertex_def_id).unwrap();
+
+            let (fdef, fkey) = ("_fdef", "_fkey");
+
+            txn.execute(
+                &format!(
+                    "ALTER TABLE {schema}.{table} ADD COLUMN {fdef} int NOT NULL, ADD COLUMN {fkey} bigint NOT NULL",
+                    schema = sql::Ident(&pg_domain.schema_name),
+                    table = sql::Ident(&pg_table.table_name),
+                    fdef = sql::Ident(fdef),
+                    fkey = sql::Ident(fkey),
+                ),
+                &[],
+            )
+            .await
+            .context("alter table add fkey")?;
+
+            txn.execute(
+                &format!(
+                    "CREATE INDEX ON {schema}.{table} ({fdef}, {fkey})",
+                    schema = sql::Ident(&pg_domain.schema_name),
+                    table = sql::Ident(&pg_table.table_name),
+                    fdef = sql::Ident(fdef),
+                    fkey = sql::Ident(fkey),
+                ),
+                &[],
+            )
+            .await
+            .context("create fkey index")?;
+
+            txn.query_one(
+                "UPDATE m6mreg.domaintable SET fdef_column = $1, fkey_column = $2 WHERE key = $3 RETURNING 0",
+                &[&fdef, &fkey, &pg_table.key],
+            )
+            .await
+            .context("update domaintable fkey")?;
+
+            pg_table.has_fkey = true;
         }
         MigrationStep::DeployDataField {
             table_id,
@@ -138,7 +182,7 @@ async fn execute_migration_step<'t>(
                 PgType::Bigserial => "bigserial",
             };
 
-            txn.query(
+            txn.execute(
                 &format!(
                     "ALTER TABLE {schema}.{table} ADD COLUMN {column} {type}",
                     schema = sql::Ident(&pg_domain.schema_name),
@@ -168,7 +212,7 @@ async fn execute_migration_step<'t>(
                 .context("create datafield")?
                 .get(0);
 
-            pg_table.data_fields.insert(
+            let existing = pg_table.data_fields.insert(
                 rel_tag,
                 PgDataField {
                     key,
@@ -176,6 +220,10 @@ async fn execute_migration_step<'t>(
                     pg_type,
                 },
             );
+
+            if existing.is_some() {
+                return Err(anyhow!("{rel_tag:?} already a field in {table_id:?}"));
+            }
         }
         MigrationStep::DeployDataIndex {
             table_id,
@@ -191,7 +239,7 @@ async fn execute_migration_step<'t>(
                 .map(|rel_tag| pg_table.data_fields.get(rel_tag).unwrap())
                 .collect();
 
-            txn.query(
+            txn.execute(
                 &format!(
                     "CREATE {index} ON {schema}.{table} ({columns})",
                     index = match index_type {
@@ -240,7 +288,7 @@ async fn execute_migration_step<'t>(
             table_name,
         } => {
             let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
-            txn.query(
+            txn.execute(
                 &format!(
                     "CREATE TABLE {schema}.{table} ()",
                     schema = sql::Ident(&pg_domain.schema_name),
@@ -273,6 +321,7 @@ async fn execute_migration_step<'t>(
                 PgTable {
                     key,
                     table_name,
+                    has_fkey: false,
                     data_fields: Default::default(),
                     edge_cardinals: Default::default(),
                     datafield_indexes: Default::default(),
@@ -294,7 +343,7 @@ async fn execute_migration_step<'t>(
                     def_col_name,
                     key_col_name,
                 } => {
-                    txn.query(
+                    txn.execute(
                         &format!(
                             "ALTER TABLE {schema}.{table} ADD COLUMN {column} integer",
                             schema = sql::Ident(&pg_edge_domain.schema_name),
@@ -306,7 +355,7 @@ async fn execute_migration_step<'t>(
                     .await
                     .context("alter table add def column")?;
 
-                    txn.query(
+                    txn.execute(
                         &format!(
                             "ALTER TABLE {schema}.{table} ADD COLUMN {column} bigint",
                             schema = sql::Ident(&pg_edge_domain.schema_name),
@@ -319,7 +368,7 @@ async fn execute_migration_step<'t>(
                     .context("alter table add key column")?;
 
                     if let Some(index_type) = &index_type {
-                        txn.query(
+                        txn.execute(
                             &format!(
                                 "CREATE {index} ON {schema}.{table} ({columns})",
                                 index = match index_type {
@@ -346,7 +395,7 @@ async fn execute_migration_step<'t>(
                     let pg_target_domain = ctx.domains.get(&def_id.package_id()).unwrap();
                     let pg_target_datatable = pg_target_domain.datatables.get(def_id).unwrap();
 
-                    txn.query(
+                    txn.execute(
                         &format!(
                             indoc! { "
                                 ALTER TABLE {schema}.{table}
@@ -441,7 +490,7 @@ async fn execute_migration_step<'t>(
             let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
             let domain_key = pg_domain.key.unwrap();
 
-            txn.query(
+            txn.execute(
                 &format!(
                     "ALTER SCHEMA {old} RENAME TO {new}",
                     old = sql::Ident(&old),
@@ -451,7 +500,7 @@ async fn execute_migration_step<'t>(
             )
             .await?;
 
-            txn.query(
+            txn.execute(
                 "UPDATE m6mreg.domain SET(schema_name = $1) WHERE (key = $2)",
                 &[&new, &domain_key],
             )
@@ -469,7 +518,7 @@ async fn execute_migration_step<'t>(
             let domain_key = pg_domain.key.unwrap();
             let pg_datatable = pg_domain.datatables.get_mut(&def_id).unwrap();
 
-            txn.query(
+            txn.execute(
                 &format!(
                     "ALTER TABLE {schema}.{old} RENAME TO {schema}.{new}",
                     schema = sql::Ident(&pg_domain.schema_name),
@@ -480,7 +529,7 @@ async fn execute_migration_step<'t>(
             )
             .await?;
 
-            txn.query(
+            txn.execute(
                 "UPDATE m6mreg.domaintable SET(table_name = $1) WHERE domain_key = $2 AND def_tag = $3",
                 &[&new_table, &domain_key, &(def_id.1 as i32)],
             )

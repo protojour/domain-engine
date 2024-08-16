@@ -51,6 +51,9 @@ enum MigrationStep {
         vertex_def_id: DefId,
         table_name: Box<str>,
     },
+    DeployVertexFKey {
+        vertex_def_id: DefId,
+    },
     DeployDataField {
         table_id: PgTableIdUnion,
         rel_tag: DefRelTag,

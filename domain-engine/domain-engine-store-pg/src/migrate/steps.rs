@@ -1,21 +1,21 @@
 use std::collections::BTreeMap;
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use fnv::FnvHashMap;
 use indoc::indoc;
 use itertools::Itertools;
 use ontol_runtime::{
     ontology::{
         domain::{
-            DataRelationshipKind, DataRelationshipTarget, Def, Domain, EdgeCardinalFlags, Entity,
+            DataRelationshipKind, DataRelationshipTarget, Def, DefRepr, Domain, EdgeCardinalFlags,
         },
         Ontology,
     },
     tuple::CardinalIdx,
-    DefId, DefRelTag, EdgeId, PackageId, RelId,
+    DefId, DefRelTag, EdgeId, PackageId,
 };
 use tokio_postgres::Transaction;
-use tracing::{info, trace_span, Instrument};
+use tracing::{info, trace_span, warn, Instrument};
 
 use crate::{
     migrate::{MigrationStep, PgDomain},
@@ -62,10 +62,17 @@ pub async fn migrate_domain_steps<'t>(
         for row in txn
             .query(
                 indoc! {"
-                SELECT key, def_domain_key, def_tag, edge_tag, table_name
-                FROM m6mreg.domaintable
-                WHERE domain_key = $1
-            "},
+                    SELECT
+                        key,
+                        def_domain_key,
+                        def_tag,
+                        edge_tag,
+                        table_name,
+                        fdef_column,
+                        fkey_column
+                    FROM m6mreg.domaintable
+                    WHERE domain_key = $1
+                "},
                 &[&domain_key],
             )
             .await?
@@ -81,10 +88,13 @@ pub async fn migrate_domain_steps<'t>(
                 .map(|tag: i32| tag.try_into())
                 .transpose()?;
             let table_name: Box<str> = row.get(4);
+            let fdef_column: Option<Box<str>> = row.get(5);
+            let fkey_column: Option<Box<str>> = row.get(6);
 
             let pg_table = PgTable {
                 key,
                 table_name,
+                has_fkey: fdef_column.is_some() && fkey_column.is_some(),
                 data_fields: Default::default(),
                 edge_cardinals: Default::default(),
                 datafield_indexes: Default::default(),
@@ -140,12 +150,18 @@ pub async fn migrate_domain_steps<'t>(
     };
 
     for def in domain.defs() {
-        let Some(entity) = def.entity() else {
+        match def.repr() {
+            // Struct means vertex in this context
+            Some(DefRepr::Struct) => {}
+            _ => continue,
+        }
+        let Some(name) = def.name() else {
             continue;
         };
+        let name = &ontology[name];
 
-        migrate_vertex_steps(domain_ids, def.id, def, entity, ontology, txn, ctx)
-            .instrument(trace_span!("vtx", name = &ontology[entity.name]))
+        migrate_vertex_steps(domain_ids, def.id, def, name, ontology, txn, ctx)
+            .instrument(trace_span!("vtx", name))
             .await?;
     }
 
@@ -158,16 +174,15 @@ async fn migrate_vertex_steps<'t>(
     domain_ids: PgDomainIds,
     vertex_def_id: DefId,
     def: &Def,
-    entity: &Entity,
+    name: &str,
     ontology: &Ontology,
     txn: &Transaction<'t>,
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
-    let name = &ontology[entity.name];
     let table_name = format!("v_{}", name).into_boxed_str();
     let pg_domain = ctx.domains.get_mut(&domain_ids.pkg_id).unwrap();
 
-    if let Some(datatable) = pg_domain.datatables.get_mut(&vertex_def_id) {
+    let exists = if let Some(datatable) = pg_domain.datatables.get_mut(&vertex_def_id) {
         let pg_fields = txn
             .query(
                 indoc! {"
@@ -241,6 +256,7 @@ async fn migrate_vertex_steps<'t>(
 
         datatable.data_fields = pg_fields;
         datatable.datafield_indexes = pg_indexes;
+        true
     } else {
         ctx.steps.push((
             domain_ids,
@@ -248,6 +264,20 @@ async fn migrate_vertex_steps<'t>(
                 vertex_def_id,
                 table_name: table_name.clone(),
             },
+        ));
+        false
+    };
+
+    let id_count = def
+        .data_relationships
+        .values()
+        .filter(|rel_info| matches!(&rel_info.kind, DataRelationshipKind::Id))
+        .count();
+    let has_fkey = id_count == 0;
+    if !exists && has_fkey {
+        ctx.steps.push((
+            domain_ids,
+            MigrationStep::DeployVertexFKey { vertex_def_id },
         ));
     }
 
@@ -258,6 +288,13 @@ async fn migrate_vertex_steps<'t>(
         ontology,
         ctx,
     )?;
+
+    let pg_domain = ctx.domains.get(&domain_ids.pkg_id).unwrap();
+    if let Some(pg_table) = pg_domain.datatables.get(&vertex_def_id) {
+        if pg_table.has_fkey != has_fkey {
+            return Err(anyhow!("fkey state has changed"));
+        }
+    }
 
     Ok(())
 }
@@ -490,16 +527,21 @@ fn migrate_datafields_steps(
 
         let pg_type = match rel_info.target {
             DataRelationshipTarget::Unambiguous(def_id) => {
-                match PgType::from_def_id(def_id, ontology)? {
-                    Some(pg_type) => pg_type,
-                    None => {
+                match PgType::from_def_id(def_id, ontology) {
+                    Ok(Some(pg_type)) => pg_type,
+                    Ok(None) => {
                         // This is a unit type, does not need to be represented
+                        continue;
+                    }
+                    Err(err) => {
+                        warn!("pg type error: {err:?}");
                         continue;
                     }
                 }
             }
             DataRelationshipTarget::Union(_) => {
-                return Err(PgMigrationError::UnionTarget(RelId(def.id, *rel_tag)).into());
+                continue;
+                // return Err(PgMigrationError::UnionTarget(RelId(def.id, *rel_tag)).into());
             }
         };
 
