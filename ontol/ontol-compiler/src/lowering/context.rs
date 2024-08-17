@@ -285,6 +285,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                     object: (ident_literal, span),
                     object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),
                     rel_params: RelParams::Unit,
+                    macro_source: None,
                 },
                 self.source_span(ident_span),
             );

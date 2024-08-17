@@ -148,9 +148,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 if let Type::MacroDef(_macro_def_id) = object_ty {
                     self.check_subject_data_type(subject_ty, &subject.1);
+                    debug!("is macro {relationship_id:?}");
 
                     if let Some(rel_expansions) = rel_expansions {
-                        for (macro_rel, span) in self.rel_ctx.relationships_by_subject(object.0) {
+                        for (macro_rel_id, macro_rel, span) in
+                            self.rel_ctx.relationships_by_subject(object.0)
+                        {
+                            debug!("    found macro rel {macro_rel_id:?}: {macro_rel:?}");
                             rel_expansions.push((
                                 Relationship {
                                     relation_def_id: macro_rel.relation_def_id,
@@ -161,6 +165,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     object: macro_rel.object,
                                     object_cardinality: macro_rel.object_cardinality,
                                     rel_params: macro_rel.rel_params.clone(),
+                                    macro_source: Some(
+                                        macro_rel.macro_source.unwrap_or(relationship_id),
+                                    ),
                                 },
                                 span,
                             ));

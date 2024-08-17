@@ -1,6 +1,9 @@
 //! context and data types for raw relationships (`rel`)
 
-use std::{collections::BTreeSet, ops::Range};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ops::Range,
+};
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
@@ -21,7 +24,8 @@ use crate::{
 #[derive(Default)]
 pub struct RelCtx {
     allocators: FnvHashMap<DefId, DefRelTag>,
-    table: FnvHashMap<RelId, (Relationship, SourceSpan)>,
+    // table: FnvHashMap<RelId, (Relationship, SourceSpan)>,
+    table: BTreeMap<RelId, (Relationship, SourceSpan)>,
 }
 
 impl RelCtx {
@@ -38,6 +42,18 @@ impl RelCtx {
 
     pub fn commit_rel(&mut self, rel_id: RelId, relationship: Relationship, span: SourceSpan) {
         self.table.insert(rel_id, (relationship, span));
+    }
+
+    pub fn rel_with_macro_source_exists(&self, def_id: DefId, macro_source: RelId) -> bool {
+        self.table
+            .range(def_rel_range(def_id))
+            .any(|(_, (relationship, _))| {
+                if let Some(rel_macro_source) = relationship.macro_source {
+                    rel_macro_source == macro_source
+                } else {
+                    false
+                }
+            })
     }
 
     pub fn span(&self, rel_id: RelId) -> SourceSpan {
@@ -60,11 +76,11 @@ impl RelCtx {
     pub fn relationships_by_subject(
         &self,
         subject_def_id: DefId,
-    ) -> impl Iterator<Item = (&Relationship, SourceSpan)> + '_ {
+    ) -> impl Iterator<Item = (RelId, &Relationship, SourceSpan)> + '_ {
         self.table
             .iter()
             .filter(move |(rel_id, _)| rel_id.0 == subject_def_id)
-            .map(|(_, (relationship, span))| (relationship, *span))
+            .map(|(rel_id, (relationship, span))| (*rel_id, relationship, *span))
     }
 
     pub fn iter_rel_ids(&self, def_id: DefId) -> impl Iterator<Item = RelId> {
@@ -76,6 +92,10 @@ impl RelCtx {
 
         (0..max_tag.0).map(move |tag| RelId(def_id, DefRelTag(tag)))
     }
+}
+
+fn def_rel_range(def_id: DefId) -> Range<RelId> {
+    RelId(def_id, DefRelTag(0))..RelId(DefId(def_id.package_id(), def_id.1 + 1), DefRelTag(0))
 }
 
 /// This definition expresses that a relation is a relationship between a subject and an object
@@ -94,6 +114,7 @@ pub struct Relationship {
     pub object_cardinality: Cardinality,
 
     pub rel_params: RelParams,
+    pub macro_source: Option<RelId>,
 }
 
 impl Relationship {

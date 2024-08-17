@@ -128,6 +128,7 @@ impl<'m> Compiler<'m> {
                 object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),
                 rel_params: RelParams::Unit,
                 relation_span: span,
+                macro_source: None,
             },
             span,
         );

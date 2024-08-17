@@ -100,6 +100,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 object: (subject_ty.def_id, self.ctx.source_span(subject_ty.span)),
                 object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),
                 rel_params: RelParams::Unit,
+                macro_source: None,
             };
 
             let rel_id = self.ctx.compiler.rel_ctx.alloc_rel_id(subject_ty.def_id);
@@ -307,6 +308,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 object: (object_ty.def_id, self.ctx.source_span(object_ty.span)),
                 object_cardinality,
                 rel_params: rel_params.clone(),
+                macro_source: None,
             }
         };
 
@@ -326,6 +328,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 object: relationship0.subject,
                 object_cardinality: relationship0.subject_cardinality,
                 rel_params,
+                macro_source: None,
             };
 
             let rel_id = self.ctx.compiler.rel_ctx.alloc_rel_id(object_ty.def_id);
@@ -352,6 +355,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 object: relationship0.subject,
                 object_cardinality: relationship0.subject_cardinality,
                 rel_params: relationship0.rel_params,
+                macro_source: None,
             };
         }
 
@@ -423,6 +427,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 object: (object_ty.def_id, self.ctx.source_span(object_ty.span)),
                 object_cardinality,
                 rel_params: RelParams::Unit,
+                macro_source: None,
             }
         };
 

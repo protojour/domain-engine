@@ -34,6 +34,7 @@ const MOCK_RELATIONSHIP: Relationship = Relationship {
     object: (DefId::unit(), NO_SPAN),
     object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),
     rel_params: RelParams::Unit,
+    macro_source: None,
 };
 const MOCK_RELATION: DefKind = DefKind::TextLiteral("mock-relation");
 

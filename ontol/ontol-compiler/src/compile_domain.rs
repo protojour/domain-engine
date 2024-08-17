@@ -117,10 +117,19 @@ impl<'m> Compiler<'m> {
             let mut rel_ids = Vec::with_capacity(expanded_rels.len());
 
             for (relationship, span) in std::mem::take(&mut expanded_rels) {
-                debug!("expanded rel: {relationship:?}");
-                let rel_id = self.rel_ctx.alloc_rel_id(relationship.subject.0);
-                rel_ids.push(rel_id);
-                self.rel_ctx.commit_rel(rel_id, relationship, span)
+                let macro_source = relationship
+                    .macro_source
+                    .expect("expanded relationship has no macro source");
+
+                if !self
+                    .rel_ctx
+                    .rel_with_macro_source_exists(relationship.subject.0, macro_source)
+                {
+                    debug!("expanded rel: {relationship:?}");
+                    let rel_id = self.rel_ctx.alloc_rel_id(relationship.subject.0);
+                    rel_ids.push(rel_id);
+                    self.rel_ctx.commit_rel(rel_id, relationship, span);
+                }
             }
 
             let mut type_check = self.type_check();

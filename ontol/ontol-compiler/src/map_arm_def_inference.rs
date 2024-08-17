@@ -187,6 +187,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                             ValueCardinality::Unit,
                         ),
                         rel_params: RelParams::Unit,
+                        macro_source: None,
                     };
 
                     debug!("new rel for {parent_def_id:?}");
