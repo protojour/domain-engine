@@ -1,3 +1,4 @@
+use core::str;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -824,21 +825,20 @@ async fn feed_public_no_query_selection(ds: &str) {
                     _
                 ))
                 .answers(&|_, _, _, input| {
-                    // The query does not select `items` in the channel,
-                    // so that query output ("items") should be empty, even if the datastore contains
-                    // an article for "teh_user":
-                    assert_eq!(
-                    input.as_slice(),
-                    br#"{"link":"http://blogs.com/teh_user/feed","username":"teh_user","items":[]}"#
-                );
+                    // previously, it was assumed that the data flow analysis was smart enough
+                    // to not select "items", and leave it empty, since it's empty from the GraphQL PoV.
+                    // But there are many factors that complicates this:
+                    // 1. Since an outer (which is external!) mapping is used in the query, the compiler has no knowledge about the data flow.
+                    // 2. We should probably not try to be very clever about messing with GraphQL selection.
+                    assert!(input.windows(6).any(|subslice| subslice == b"\"guid\""));
 
                     // Inject "title"
                     Ok(br#"{
-                    "title": "http",
-                    "link": "",
-                    "username": "",
-                    "items": []
-                }"#
+                        "title": "http",
+                        "link": "",
+                        "username": "",
+                        "items": []
+                    }"#
                     .to_vec())
                 }),
         ),
@@ -884,14 +884,14 @@ async fn feed_public_with_items_query(ds: &str) {
 
                     // Inject "title"
                     Ok(br#"{
-                    "title": "http",
-                    "link": "",
-                    "username": "",
-                    "items": [{
-                        "guid": "11111111-2222-3333-4444-555555555555",
-                        "title": "pwned"
-                    }]
-                }"#
+                        "title": "http",
+                        "link": "",
+                        "username": "",
+                        "items": [{
+                            "guid": "11111111-2222-3333-4444-555555555555",
+                            "title": "pwned"
+                        }]
+                    }"#
                     .to_vec())
                 }),
         ),

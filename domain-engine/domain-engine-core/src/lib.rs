@@ -36,21 +36,21 @@ impl Default for Session {
 /// Information about whether the domain engine needs to perform a selection.
 ///
 /// A reason it might not be interested is that a GraphQL query has not selected any of its output properties.
-pub enum MaybeSelect {
-    Select(EntitySelect),
-    Skip(DefId),
+pub enum SelectMode {
+    Dynamic(EntitySelect),
+    Static(DefId),
 }
 
 pub trait FindEntitySelect {
-    fn find_select(&mut self, match_var: Var, condition: &Condition) -> MaybeSelect;
+    fn find_select(&mut self, match_var: Var, condition: &Condition) -> SelectMode;
 }
 
 impl<A: BuildHasher> FindEntitySelect for HashMap<Var, EntitySelect, A> {
-    fn find_select(&mut self, match_var: Var, condition: &Condition) -> MaybeSelect {
+    fn find_select(&mut self, match_var: Var, condition: &Condition) -> SelectMode {
         match self.remove(&match_var) {
-            Some(entity_select) => MaybeSelect::Select(entity_select),
+            Some(entity_select) => SelectMode::Dynamic(entity_select),
             None => match condition.root_def_id() {
-                Some(def_id) => MaybeSelect::Skip(def_id),
+                Some(def_id) => SelectMode::Static(def_id),
                 None => panic!("No information about what to default-select"),
             },
         }

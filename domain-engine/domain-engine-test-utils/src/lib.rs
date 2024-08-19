@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use domain_engine_core::{DomainEngine, MaybeSelect, Session};
+use domain_engine_core::{DomainEngine, SelectMode, Session};
 use ontol_runtime::{
     attr::AttrRef,
     interface::serde::processor::ProcessorMode,
@@ -126,12 +126,12 @@ impl Default for TestFindQuery {
 }
 
 impl domain_engine_core::FindEntitySelect for TestFindQuery {
-    fn find_select(&mut self, _match_var: Var, condition: &Condition) -> MaybeSelect {
+    fn find_select(&mut self, _match_var: Var, condition: &Condition) -> SelectMode {
         let def_id = condition
             .root_def_id()
             .expect("Unable to detect an entity being queried");
 
-        MaybeSelect::Select(EntitySelect {
+        SelectMode::Dynamic(EntitySelect {
             source: StructOrUnionSelect::Struct(StructSelect {
                 def_id,
                 properties: Default::default(),

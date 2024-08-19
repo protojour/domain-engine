@@ -86,10 +86,10 @@ fn field_order() {
         rel* 'subjects'::'obj_2' {subject}
     )
 
-    def a(rel* 'a': text)
-    def b(rel* 'b': text)
-    def c(rel* 'c': text)
-    def d(rel* 'd': text)
+    def @macro a(rel* 'a': text)
+    def @macro b(rel* 'b': text)
+    def @macro c(rel* 'c': text)
+    def @macro d(rel* 'd': text)
     "
     .compile_single_schema();
 
@@ -104,10 +104,10 @@ fn field_order() {
     expect_eq!(
         actual = field_names,
         expected = vec![
-            "id",
-            "field",
             "a",
             "b",
+            "id",
+            "field",
             "c",
             "d",
             // collections are placed after regular fields:
@@ -1568,7 +1568,7 @@ async fn test_extension_and_member_from_foreign_domain() {
             src_name("helper"),
             "
             domain 22222222222TEST22222222222 ()
-            def ext (rel* 'ext-field': text)
+            def @macro ext (rel* 'ext-field': text)
             def member (rel* 'member-field': text)
             ",
         ),

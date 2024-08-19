@@ -4,11 +4,13 @@ use futures_util::{stream::BoxStream, StreamExt, TryStreamExt};
 use ontol_runtime::{
     attr::AttrRef,
     interface::serde::processor::ProcessorMode,
-    ontology::{config::data_store_backed_domains, map::Extern, Ontology},
+    ontology::{
+        config::data_store_backed_domains, domain::DataRelationshipKind, map::Extern, Ontology,
+    },
     property::ValueCardinality,
     query::{
         condition::Condition,
-        select::{EntitySelect, StructOrUnionSelect},
+        select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     },
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolverGraph},
     sequence::Sequence,
@@ -25,7 +27,7 @@ use crate::{
     select_data_flow::translate_entity_select,
     system::{ArcSystemApi, SystemAPI},
     transact::{AccumulateSequences, ReqMessage, RespMessage, TransactionMode, UpMap},
-    DomainError, FindEntitySelect, MaybeSelect, Session,
+    DomainError, FindEntitySelect, SelectMode, Session,
 };
 
 pub struct DomainEngine {
@@ -132,7 +134,7 @@ impl DomainEngine {
             Yield::Match(match_var, value_cardinality, filter) => {
                 if let Some(selects) = selects {
                     match selects.find_select(match_var, filter.condition()) {
-                        MaybeSelect::Select(mut entity_select) => {
+                        SelectMode::Dynamic(mut entity_select) => {
                             // Merge the filter into the select
                             assert!(entity_select.filter.condition().expansions().is_empty());
                             entity_select.filter = filter;
@@ -140,12 +142,43 @@ impl DomainEngine {
                             self.exec_map_query(value_cardinality, entity_select, session.clone())
                                 .await
                         }
-                        MaybeSelect::Skip(def_id) => {
-                            debug!("skipping selection");
-                            match value_cardinality {
-                                ValueCardinality::Unit => Ok(Value::unit()),
-                                ValueCardinality::IndexSet | ValueCardinality::List => {
-                                    Ok(Value::Sequence(Sequence::default(), def_id.into()))
+                        SelectMode::Static(def_id) => {
+                            let def = self.ontology.def(def_id);
+                            if def.entity().is_some() {
+                                let mut struct_select = StructSelect {
+                                    def_id,
+                                    properties: Default::default(),
+                                };
+
+                                for (prop_id, rel_info) in &def.data_relationships {
+                                    match &rel_info.kind {
+                                        DataRelationshipKind::Id | DataRelationshipKind::Tree => {
+                                            struct_select.properties.insert(*prop_id, Select::Leaf);
+                                        }
+                                        DataRelationshipKind::Edge(_) => {}
+                                    }
+                                }
+
+                                let entity_select = EntitySelect {
+                                    source: StructOrUnionSelect::Struct(struct_select),
+                                    filter,
+                                    after_cursor: None,
+                                    limit: self.system().default_query_limit(),
+                                    include_total_len: false,
+                                };
+
+                                self.exec_map_query(
+                                    value_cardinality,
+                                    entity_select,
+                                    session.clone(),
+                                )
+                                .await
+                            } else {
+                                match value_cardinality {
+                                    ValueCardinality::Unit => Ok(Value::unit()),
+                                    ValueCardinality::IndexSet | ValueCardinality::List => {
+                                        Ok(Value::Sequence(Sequence::default(), def_id.into()))
+                                    }
                                 }
                             }
                         }
@@ -186,8 +219,6 @@ impl DomainEngine {
                             .system
                             .call_http_json_hook(url, session.clone(), input_json)
                             .await?;
-
-                        debug!("output json: `{output_json:?}`");
 
                         let output_attr = self
                             .ontology
