@@ -47,14 +47,12 @@ pub struct CstLowering<'c, 'm, V: NodeView> {
 
 pub type LoweringError = (CompileError, U32Span);
 pub type Res<T> = Result<T, LoweringError>;
+pub type LoweredRel = (DefRelTag, Relationship, SourceSpan, Option<ArcStr>);
 
 #[derive(Default)]
 pub struct LoweringOutcome {
     pub root_defs: Vec<DefId>,
-    pub rels2: BTreeMap<
-        PackageId,
-        BTreeMap<u16, Vec<(DefRelTag, Relationship, SourceSpan, Option<ArcStr>)>>,
-    >,
+    pub rels: BTreeMap<PackageId, BTreeMap<u16, Vec<LoweredRel>>>,
     pub fmt_chains: Vec<(DefId, FmtChain)>,
 }
 
@@ -68,7 +66,7 @@ impl LoweringOutcome {
     ) {
         let RelId(DefId(pkg_id, def_tag), rel_tag) = rel_id;
 
-        self.rels2
+        self.rels
             .entry(pkg_id)
             .or_default()
             .entry(def_tag)

@@ -138,6 +138,45 @@ fn test_analyze_ssa2() {
     );
 }
 
+// FIXME FIXME FIXME: This is nonsensical since the output struct is enclosed in a (map).
+// So the exposed properties are actually "lying".
+// It should be the properties of the _mapped_ type that are exposed.
+// But to do that, the algorithm would need to analyze the flow of that map!
+#[test]
+fn test_analyze_opaque_outer_map() {
+    let data_flow = analyze(
+        "$c",
+        "
+        (block
+            (let-prop $a ($c p@2:9:0))
+            (map
+                (struct ($d)
+                    (prop! $d p@2:2:1 $a)
+                    (prop! $d p@2:2:2
+                        (block
+                            (let $k
+                                (match-struct ($h)
+                                    (let-cond-var $e $h)
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+        ",
+    );
+
+    expect_eq!(
+        actual = data_flow,
+        expected = vec![
+            prop_flow("p@2:2:1", dependent_on("p@2:9:0")),
+            prop_flow("p@2:2:2", PropertyFlowData::Match("$h".parse().unwrap())),
+            prop_flow("p@2:9:0", default_cardinality())
+        ],
+    );
+}
+
 #[test]
 fn test_analyze_seq1() {
     let data_flow = analyze(

@@ -277,6 +277,11 @@ impl<'a, L: Lang> Parser<'a, L> {
                 let (src, next) = parse_dollar_var(next)?;
                 Ok((self.make_node(Kind::MoveRestAttrs(dest, src)), next))
             }
+            ("let-cond-var", next) => {
+                let (a, next) = parse_dollar_var(next)?;
+                let (b, next) = parse_dollar_var(next)?;
+                Ok((self.make_node(Kind::LetCondVar(a, b)), next))
+            }
             (sym, _) => Err(Error::InvalidSymbol(sym)),
         }
     }

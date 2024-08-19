@@ -99,7 +99,7 @@ impl<'m> Compiler<'m> {
 
         // handle relationships in macros first, they have to be ready before other relationships
         for macro_def_id in macro_defs {
-            if let Some(pkg_rels) = outcome.rels2.get_mut(&macro_def_id.0) {
+            if let Some(pkg_rels) = outcome.rels.get_mut(&macro_def_id.0) {
                 if let Some(macro_rels) = pkg_rels.remove(&macro_def_id.1) {
                     let mut macro_items: Vec<MacroItem> = vec![];
 
@@ -152,7 +152,7 @@ impl<'m> Compiler<'m> {
         {
             let mut rel_ids = vec![];
 
-            for (pkg_id, rel_map) in outcome.rels2 {
+            for (pkg_id, rel_map) in outcome.rels {
                 for (def_tag, rels) in rel_map {
                     for (rel_tag, relationship, span, docs) in rels {
                         let rel_id = RelId(DefId(pkg_id, def_tag), rel_tag);

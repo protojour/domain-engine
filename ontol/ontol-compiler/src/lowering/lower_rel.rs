@@ -288,7 +288,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     if let Some(mut defs) = self.lower_statement(
                         statement,
                         BlockContext::RelParams {
-                            def_fn: &|| DefId::unit(),
+                            def_fn: &DefId::unit,
                             relation_modifiers: &mut relation_modifiers,
                         },
                     ) {
