@@ -57,12 +57,12 @@ impl<'m> Compiler<'m> {
             match self.defs.def_kind(def_id) {
                 DefKind::Primitive(kind, _ident) => {
                     if let Some(field_docs) = PrimitiveKind::get_field_rustdoc(kind) {
-                        docs_table.insert(DocId::Def(def_id), field_docs.to_string());
+                        docs_table.insert(DocId::Def(def_id), field_docs);
                     }
                 }
                 DefKind::BuiltinRelType(kind, _ident) => {
                     if let Some(field_docs) = BuiltinRelationKind::get_field_rustdoc(kind) {
-                        docs_table.insert(DocId::Def(def_id), field_docs.to_string());
+                        docs_table.insert(DocId::Def(def_id), field_docs);
                     }
                 }
                 DefKind::Type(type_def) => {
@@ -83,11 +83,12 @@ impl<'m> Compiler<'m> {
                                     "
                                 },
                                 ident = ident
-                            ),
+                            )
+                            .into(),
                         );
                     } else if let Some(slt) = self.defs.text_like_types.get(&def_id) {
                         if let Some(field_docs) = TextLikeType::get_field_rustdoc(slt) {
-                            docs_table.insert(DocId::Def(def_id), field_docs.to_string());
+                            docs_table.insert(DocId::Def(def_id), field_docs);
                         }
                     }
                 }
@@ -383,16 +384,15 @@ impl<'m> Compiler<'m> {
             .collect();
 
         let mut def_docs = FnvHashMap::default();
-        let mut rel_docs = FnvHashMap::default();
+        // let mut rel_docs = FnvHashMap::default();
+        let mut prop_docs = FnvHashMap::default();
 
-        for (doc_id, docs) in docs_table {
+        for (doc_id, docs) in &docs_table {
             match doc_id {
                 DocId::Def(def_id) => {
-                    def_docs.insert(def_id, str_ctx.intern_constant(&docs));
+                    def_docs.insert(*def_id, str_ctx.intern_constant(&docs));
                 }
-                DocId::Rel(rel_id) => {
-                    rel_docs.insert(rel_id, str_ctx.intern_constant(&docs));
-                }
+                DocId::Rel(_rel_id) => {}
             }
         }
 
@@ -404,6 +404,10 @@ impl<'m> Compiler<'m> {
                         self.misc_ctx.value_generators.remove(&property.rel_id)
                     {
                         value_generators.insert(*prop_id, value_generator);
+                    }
+
+                    if let Some(docs) = docs_table.get(&DocId::Rel(property.rel_id)) {
+                        prop_docs.insert(*prop_id, str_ctx.intern_constant(&docs));
                     }
                 }
             }
@@ -432,7 +436,7 @@ impl<'m> Compiler<'m> {
             .extended_entity_info(self.entity_ctx.entities)
             .lib(self.code_ctx.result_lib)
             .def_docs(def_docs)
-            .rel_docs(rel_docs)
+            .prop_docs(prop_docs)
             .const_procs(self.code_ctx.result_const_procs)
             .map_meta_table(map_meta_table)
             .static_conditions(self.code_ctx.result_static_conditions)

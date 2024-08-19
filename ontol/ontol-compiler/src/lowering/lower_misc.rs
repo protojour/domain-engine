@@ -3,6 +3,7 @@ use std::{
     ops::Range,
 };
 
+use arcstr::ArcStr;
 use ontol_parser::{
     cst::{
         inspect as insp,
@@ -296,12 +297,16 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         }
     }
 
-    pub(super) fn append_documentation(&mut self, doc_id: DocId, node_view: V) {
+    pub(super) fn extract_documentation(node_view: V) -> Option<ArcStr> {
         let doc_comments = node_view
             .local_tokens_filter(Kind::DocComment)
             .map(|token| token.slice().strip_prefix("///").unwrap().to_string());
 
-        let Some(docs) = ontol_parser::join_doc_lines(doc_comments) else {
+        ontol_parser::join_doc_lines(doc_comments).map(|s| s.into())
+    }
+
+    pub(super) fn append_documentation(&mut self, doc_id: DocId, node_view: V) {
+        let Some(docs) = Self::extract_documentation(node_view) else {
             return;
         };
 
@@ -310,8 +315,12 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 vacant.insert(docs);
             }
             Entry::Occupied(mut occupied) => {
-                occupied.get_mut().push_str("\n\n");
-                occupied.get_mut().push_str(&docs);
+                let mut string = occupied.get().to_string();
+
+                string.push_str("\n\n");
+                string.push_str(&docs);
+
+                *occupied.get_mut() = string.into();
             }
         }
     }

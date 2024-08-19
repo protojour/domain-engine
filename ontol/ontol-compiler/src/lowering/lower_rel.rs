@@ -14,7 +14,6 @@ use tracing::debug_span;
 
 use crate::{
     def::{DefKind, RelationContext, TypeDef, TypeDefFlags},
-    namespace::DocId,
     package::ONTOL_PKG,
     relation::{RelParams, Relationship},
     CompileError, SourceSpan,
@@ -115,6 +114,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 rel_id,
                 identifies_relationship,
                 self.ctx.source_span(stmt.view().span()),
+                None,
             );
         }
 
@@ -235,7 +235,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             (rel_id, edge_id)
         };
 
-        self.append_documentation(DocId::Rel(rel_id), rel_stmt.0.clone());
+        let docs = Self::extract_documentation(rel_stmt.0.clone());
 
         let mut relation_modifiers: Vec<(Relationship, SourceSpan)> = Default::default();
 
@@ -378,6 +378,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 rel_id,
                 relationship1,
                 self.ctx.source_span(rel_stmt.0.span()),
+                None,
             );
         }
 
@@ -413,6 +414,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     rel_id,
                     relationship0,
                     self.ctx.source_span(rel_stmt.0.span()),
+                    docs,
                 );
             }
             RelationContext::Rel => match block {
@@ -448,6 +450,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             .symbolic_edges
             .get_mut(&edge_id)
             .unwrap();
+
+        let docs = Self::extract_documentation(rel_stmt.0.clone());
 
         let relationship = {
             let subject_cardinality = (
@@ -500,6 +504,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             rel_id,
             relationship,
             self.ctx.source_span(rel_stmt.0.span()),
+            docs,
         );
 
         Some(vec![])

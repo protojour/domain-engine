@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use arcstr::ArcStr;
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
@@ -79,7 +80,12 @@ pub struct TypeParam {
 }
 
 pub enum MacroItem {
-    Relationship(RelId, Relationship, SourceSpan),
+    Relationship {
+        rel_id: RelId,
+        relationship: Relationship,
+        span: SourceSpan,
+        docs: Option<ArcStr>,
+    },
     UseMacro(DefId),
 }
 

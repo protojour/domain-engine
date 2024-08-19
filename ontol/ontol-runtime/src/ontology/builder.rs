@@ -8,7 +8,7 @@ use crate::{
     },
     query::condition::Condition,
     vm::proc::{Lib, Procedure},
-    DefId, DefIdSet, MapKey, PackageId, PropId, RelId,
+    DefId, DefIdSet, MapKey, PackageId, PropId,
 };
 
 use super::{
@@ -83,8 +83,8 @@ impl OntologyBuilder {
         self
     }
 
-    pub fn rel_docs(mut self, docs: FnvHashMap<RelId, TextConstant>) -> Self {
-        self.data().rel_docs = docs;
+    pub fn prop_docs(mut self, docs: FnvHashMap<PropId, TextConstant>) -> Self {
+        self.data().prop_docs = docs;
         self
     }
 
@@ -179,7 +179,6 @@ pub(super) fn new_builder() -> OntologyBuilder {
                 domain_interfaces: Default::default(),
                 package_config_table: Default::default(),
                 def_docs: Default::default(),
-                rel_docs: Default::default(),
                 prop_docs: Default::default(),
                 lib: Lib::default(),
                 serde_operators: Default::default(),

@@ -24,7 +24,7 @@ use crate::{
         ontol_vm::OntolVm,
         proc::{Lib, Procedure},
     },
-    DefId, DefIdSet, EdgeId, MapKey, PackageId, PropId, RelId,
+    DefId, DefIdSet, EdgeId, MapKey, PackageId, PropId,
 };
 
 use self::{
@@ -71,7 +71,6 @@ pub struct Data {
     domain_interfaces: FnvHashMap<PackageId, Vec<DomainInterface>>,
     package_config_table: FnvHashMap<PackageId, PackageConfig>,
     def_docs: FnvHashMap<DefId, TextConstant>,
-    rel_docs: FnvHashMap<RelId, TextConstant>,
     prop_docs: FnvHashMap<PropId, TextConstant>,
     serde_operators: Vec<SerdeOperator>,
     dynamic_sequence_operator_addr: SerdeOperatorAddr,

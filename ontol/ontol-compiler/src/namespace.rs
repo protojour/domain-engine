@@ -1,3 +1,4 @@
+use arcstr::ArcStr;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{DefId, RelId};
@@ -46,7 +47,7 @@ pub enum DocId {
 #[derive(Default)]
 pub struct Namespaces<'m> {
     pub(crate) namespaces: FnvHashMap<PackageId, Namespace<'m>>,
-    pub(crate) docs: FnvHashMap<DocId, String>,
+    pub(crate) docs: FnvHashMap<DocId, ArcStr>,
 }
 
 impl<'m> Namespaces<'m> {

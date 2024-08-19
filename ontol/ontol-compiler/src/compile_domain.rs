@@ -1,3 +1,4 @@
+use arcstr::ArcStr;
 use fnv::FnvHashSet;
 use ontol_runtime::{
     ontology::{domain::DomainId, ontol::TextConstant},
@@ -12,6 +13,7 @@ use crate::{
     edge::EdgeCtx,
     lowering::context::LoweringOutcome,
     misc::{MacroExpand, MacroItem, MiscCtx},
+    namespace::DocId,
     package::ParsedPackage,
     relation::{RelParams, Relationship},
     repr::repr_model::ReprKind,
@@ -101,7 +103,7 @@ impl<'m> Compiler<'m> {
                 if let Some(macro_rels) = pkg_rels.remove(&macro_def_id.1) {
                     let mut macro_items: Vec<MacroItem> = vec![];
 
-                    for (rel_tag, relationship, span) in macro_rels {
+                    for (rel_tag, relationship, span, docs) in macro_rels {
                         let rel_id = RelId(*macro_def_id, rel_tag);
                         let relation_def_kind = self.defs.def_kind(relationship.relation_def_id);
                         let subject_cardinality = relationship.subject_cardinality;
@@ -122,14 +124,20 @@ impl<'m> Compiler<'m> {
                                         .report(self);
                                 }
                             } else {
-                                macro_items.push(MacroItem::Relationship(
+                                macro_items.push(MacroItem::Relationship {
                                     rel_id,
                                     relationship,
                                     span,
-                                ));
+                                    docs,
+                                });
                             }
                         } else {
-                            macro_items.push(MacroItem::Relationship(rel_id, relationship, span));
+                            macro_items.push(MacroItem::Relationship {
+                                rel_id,
+                                relationship,
+                                span,
+                                docs,
+                            });
                         }
                     }
 
@@ -146,9 +154,14 @@ impl<'m> Compiler<'m> {
 
             for (pkg_id, rel_map) in outcome.rels2 {
                 for (def_tag, rels) in rel_map {
-                    for (rel_tag, relationship, span) in rels {
+                    for (rel_tag, relationship, span, docs) in rels {
                         let rel_id = RelId(DefId(pkg_id, def_tag), rel_tag);
                         self.rel_ctx.commit_rel(rel_id, relationship, span);
+
+                        if let Some(docs) = docs {
+                            self.namespaces.docs.insert(DocId::Rel(rel_id), docs);
+                        }
+
                         rel_ids.push(rel_id);
                     }
                 }
@@ -159,11 +172,15 @@ impl<'m> Compiler<'m> {
                 self.type_check().check_rel(rel_id, Some(&mut macro_expand));
 
                 if let Some(macro_expand) = macro_expand {
-                    for (relationship, span) in
+                    for (relationship, span, docs) in
                         self.expand_macro_rels(rel_id, macro_expand.macro_def_id)
                     {
                         let rel_id = self.rel_ctx.alloc_rel_id(macro_expand.subject);
                         self.rel_ctx.commit_rel(rel_id, relationship, span);
+
+                        if let Some(docs) = docs {
+                            self.namespaces.docs.insert(DocId::Rel(rel_id), docs);
+                        }
 
                         self.type_check().check_rel(rel_id, None);
                     }
@@ -402,12 +419,12 @@ impl<'m> Compiler<'m> {
         &mut self,
         source_rel_id: RelId,
         macro_def_id: DefId,
-    ) -> Vec<(Relationship, SourceSpan)> {
+    ) -> Vec<(Relationship, SourceSpan, Option<ArcStr>)> {
         struct MacroExpandCtx<'a> {
             used_macros: FnvHashSet<DefId>,
             used_rels: FnvHashSet<RelId>,
             misc_ctx: &'a MiscCtx,
-            output: Vec<(Relationship, SourceSpan)>,
+            output: Vec<(Relationship, SourceSpan, Option<ArcStr>)>,
         }
 
         fn expand_inner(source_rel_id: RelId, macro_def_id: DefId, ctx: &mut MacroExpandCtx) {
@@ -421,7 +438,12 @@ impl<'m> Compiler<'m> {
                     MacroItem::UseMacro(inner_macro_def_id) => {
                         expand_inner(source_rel_id, *inner_macro_def_id, ctx);
                     }
-                    MacroItem::Relationship(rel_id, relationship, span) => {
+                    MacroItem::Relationship {
+                        rel_id,
+                        relationship,
+                        span,
+                        docs,
+                    } => {
                         if !ctx.used_rels.contains(rel_id) {
                             ctx.output.push((
                                 Relationship {
@@ -437,6 +459,7 @@ impl<'m> Compiler<'m> {
                                     modifiers: relationship.modifiers.clone(),
                                 },
                                 *span,
+                                docs.clone(),
                             ));
                         }
                     }

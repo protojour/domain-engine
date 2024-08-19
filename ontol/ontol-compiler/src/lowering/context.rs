@@ -5,6 +5,7 @@ use std::{
     marker::PhantomData,
 };
 
+use arcstr::ArcStr;
 use fnv::FnvHashMap;
 use indexmap::map::Entry;
 use ontol_parser::{
@@ -50,12 +51,21 @@ pub type Res<T> = Result<T, LoweringError>;
 #[derive(Default)]
 pub struct LoweringOutcome {
     pub root_defs: Vec<DefId>,
-    pub rels2: BTreeMap<PackageId, BTreeMap<u16, Vec<(DefRelTag, Relationship, SourceSpan)>>>,
+    pub rels2: BTreeMap<
+        PackageId,
+        BTreeMap<u16, Vec<(DefRelTag, Relationship, SourceSpan, Option<ArcStr>)>>,
+    >,
     pub fmt_chains: Vec<(DefId, FmtChain)>,
 }
 
 impl LoweringOutcome {
-    pub fn predefine_rel(&mut self, rel_id: RelId, relationship: Relationship, span: SourceSpan) {
+    pub fn predefine_rel(
+        &mut self,
+        rel_id: RelId,
+        relationship: Relationship,
+        span: SourceSpan,
+        docs: Option<ArcStr>,
+    ) {
         let RelId(DefId(pkg_id, def_tag), rel_tag) = rel_id;
 
         self.rels2
@@ -63,7 +73,7 @@ impl LoweringOutcome {
             .or_default()
             .entry(def_tag)
             .or_default()
-            .push((rel_tag, relationship, span));
+            .push((rel_tag, relationship, span, docs));
     }
 }
 
@@ -307,6 +317,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                     modifiers: vec![],
                 },
                 self.source_span(ident_span),
+                None,
             );
         }
 
