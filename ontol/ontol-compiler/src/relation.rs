@@ -24,7 +24,6 @@ use crate::{
 #[derive(Default)]
 pub struct RelCtx {
     allocators: FnvHashMap<DefId, DefRelTag>,
-    // table: FnvHashMap<RelId, (Relationship, SourceSpan)>,
     table: BTreeMap<RelId, (Relationship, SourceSpan)>,
 }
 
@@ -44,18 +43,6 @@ impl RelCtx {
         self.table.insert(rel_id, (relationship, span));
     }
 
-    pub fn rel_with_macro_source_exists(&self, def_id: DefId, macro_source: RelId) -> bool {
-        self.table
-            .range(def_rel_range(def_id))
-            .any(|(_, (relationship, _))| {
-                if let Some(rel_macro_source) = relationship.macro_source {
-                    rel_macro_source == macro_source
-                } else {
-                    false
-                }
-            })
-    }
-
     pub fn span(&self, rel_id: RelId) -> SourceSpan {
         self.table.get(&rel_id).unwrap().1
     }
@@ -73,16 +60,6 @@ impl RelCtx {
         self.table.get_mut(&rel_id).map(|(rel, _)| rel)
     }
 
-    pub fn relationships_by_subject(
-        &self,
-        subject_def_id: DefId,
-    ) -> impl Iterator<Item = (RelId, &Relationship, SourceSpan)> + '_ {
-        self.table
-            .iter()
-            .filter(move |(rel_id, _)| rel_id.0 == subject_def_id)
-            .map(|(rel_id, (relationship, span))| (*rel_id, relationship, *span))
-    }
-
     pub fn iter_rel_ids(&self, def_id: DefId) -> impl Iterator<Item = RelId> {
         let max_tag = self
             .allocators
@@ -92,10 +69,6 @@ impl RelCtx {
 
         (0..max_tag.0).map(move |tag| RelId(def_id, DefRelTag(tag)))
     }
-}
-
-fn def_rel_range(def_id: DefId) -> Range<RelId> {
-    RelId(def_id, DefRelTag(0))..RelId(DefId(def_id.package_id(), def_id.1 + 1), DefRelTag(0))
 }
 
 /// This definition expresses that a relation is a relationship between a subject and an object

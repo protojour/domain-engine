@@ -17,7 +17,7 @@ fn test_stix_lite() {
         serde_create(&attack_pattern).to_value(json!({
             "type": "attack-pattern",
         })),
-        r#"missing properties, expected all of "name", "spec_version", "created", "modified" at line 1 column 25"#
+        r#"missing properties, expected all of "spec_version", "created", "modified", "name" at line 1 column 25"#
     );
 
     // can create through concrete type

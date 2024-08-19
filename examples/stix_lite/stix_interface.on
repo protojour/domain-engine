@@ -92,6 +92,8 @@ def @macro lang (
 
 /// Type providing the `external_references` property
 def @macro external_references (
+    /// A list of external references which refer to non-STIX information.
+    ///
     /// The **external_references** property specifies a list of external references which refers to non-STIX information.
     /// This property is used to provide one or more URLs, descriptions, or IDs to records in other systems.
     rel* 'external_references'?: {common.external-reference}

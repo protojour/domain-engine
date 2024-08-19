@@ -98,7 +98,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             // Check that the same relation_def_id is not reused for subject properties
             if !subject_relation_set.insert(meta.relationship.relation_def_id) {
                 CompileError::UnionInNamedRelationshipNotSupported
-                    .span(self.rel_ctx.span(meta.rel_id))
+                    .span(meta.relationship.relation_span)
                     .report(&mut self.errors);
             }
 

@@ -16,7 +16,7 @@ use ontol_runtime::{
     property::{PropertyCardinality, ValueCardinality},
     tuple::CardinalIdx,
     var::{Var, VarAllocator},
-    DefId, PackageId, RelId,
+    DefId, DefRelTag, PackageId, RelId,
 };
 use tracing::debug;
 
@@ -50,16 +50,20 @@ pub type Res<T> = Result<T, LoweringError>;
 #[derive(Default)]
 pub struct LoweringOutcome {
     pub root_defs: Vec<DefId>,
-    pub rels: BTreeMap<PackageId, Vec<(RelId, Relationship, SourceSpan)>>,
+    pub rels2: BTreeMap<PackageId, BTreeMap<u16, Vec<(DefRelTag, Relationship, SourceSpan)>>>,
     pub fmt_chains: Vec<(DefId, FmtChain)>,
 }
 
 impl LoweringOutcome {
     pub fn predefine_rel(&mut self, rel_id: RelId, relationship: Relationship, span: SourceSpan) {
-        self.rels
-            .entry(rel_id.0.package_id())
+        let RelId(DefId(pkg_id, def_tag), rel_tag) = rel_id;
+
+        self.rels2
+            .entry(pkg_id)
             .or_default()
-            .push((rel_id, relationship, span));
+            .entry(def_tag)
+            .or_default()
+            .push((rel_tag, relationship, span));
     }
 }
 

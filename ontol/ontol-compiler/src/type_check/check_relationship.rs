@@ -5,7 +5,7 @@ use crate::{
     def::{BuiltinRelationKind, DefKind, TypeDef},
     error::CompileError,
     mem::Intern,
-    misc::TypeParam,
+    misc::{MacroExpand, TypeParam},
     package::ONTOL_PKG,
     properties::{Constructor, Property},
     relation::Relationship,
@@ -18,13 +18,9 @@ use crate::{
 use super::TypeCheck;
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    pub fn check_rel(
-        &mut self,
-        rel_id: RelId,
-        rel_expansions: Option<&mut Vec<(Relationship, SourceSpan)>>,
-    ) {
+    pub fn check_rel(&mut self, rel_id: RelId, macro_expand: Option<&mut Option<MacroExpand>>) {
         let spanned = self.rel_ctx.spanned_relationship_by_id(rel_id);
-        self.check_relationship(rel_id, spanned.value, spanned.span, rel_expansions);
+        self.check_relationship(rel_id, spanned.value, spanned.span, macro_expand);
     }
 
     fn check_relationship(
@@ -32,7 +28,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         rel_id: RelId,
         relationship: &Relationship,
         span: &SourceSpan,
-        rel_expansions: Option<&mut Vec<(Relationship, SourceSpan)>>,
+        macro_expand: Option<&mut Option<MacroExpand>>,
     ) -> TypeRef<'m> {
         let relation_def_kind = &self.defs.def_kind(relationship.relation_def_id);
 
@@ -48,7 +44,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_named_relation(rel_id, edge_id, relationship);
             }
             DefKind::BuiltinRelType(kind, _) => {
-                self.check_builtin_relation(rel_id, relationship, kind, span, rel_expansions);
+                self.check_builtin_relation(rel_id, relationship, kind, span, macro_expand);
             }
             _ => {
                 panic!()
@@ -126,7 +122,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         relationship: &Relationship,
         relation: &BuiltinRelationKind,
         span: &SourceSpan,
-        rel_expansions: Option<&mut Vec<(Relationship, SourceSpan)>>,
+        macro_expand: Option<&mut Option<MacroExpand>>,
     ) -> TypeRef<'m> {
         let subject = &relationship.subject;
         let object = &relationship.object;
@@ -144,32 +140,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         .report_ty(self);
                 }
 
-                if let Type::MacroDef(_macro_def_id) = object_ty {
+                if let Type::MacroDef(macro_def_id) = object_ty {
                     self.check_subject_data_type(subject_ty, &subject.1);
                     debug!("is macro {relationship_id:?}");
 
-                    if let Some(rel_expansions) = rel_expansions {
-                        for (macro_rel_id, macro_rel, span) in
-                            self.rel_ctx.relationships_by_subject(object.0)
-                        {
-                            debug!("    found macro rel {macro_rel_id:?}: {macro_rel:?}");
-                            rel_expansions.push((
-                                Relationship {
-                                    relation_def_id: macro_rel.relation_def_id,
-                                    projection: macro_rel.projection,
-                                    relation_span: macro_rel.relation_span,
-                                    subject: *subject,
-                                    subject_cardinality: macro_rel.subject_cardinality,
-                                    object: macro_rel.object,
-                                    object_cardinality: macro_rel.object_cardinality,
-                                    rel_params: macro_rel.rel_params.clone(),
-                                    macro_source: Some(
-                                        macro_rel.macro_source.unwrap_or(relationship_id),
-                                    ),
-                                },
-                                span,
-                            ));
-                        }
+                    if let Some(macro_expand) = macro_expand {
+                        *macro_expand = Some(MacroExpand {
+                            subject: relationship.subject.0,
+                            macro_def_id: *macro_def_id,
+                        });
                     } else {
                         return CompileError::TODO("cannot use a macro here")
                             .span(*span)

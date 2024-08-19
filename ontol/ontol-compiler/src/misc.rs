@@ -7,7 +7,7 @@ use ontol_runtime::{
     PropId, RelId,
 };
 
-use crate::SourceSpan;
+use crate::{relation::Relationship, SourceSpan};
 
 #[derive(Default)]
 pub struct MiscCtx {
@@ -32,6 +32,8 @@ pub struct MiscCtx {
     pub type_params: FnvHashMap<DefId, IndexMap<DefId, TypeParam>>,
 
     pub rel_type_constraints: FnvHashMap<DefId, RelTypeConstraints>,
+
+    pub def_macro_items: FnvHashMap<DefId, Vec<MacroItem>>,
 }
 
 #[derive(Debug)]
@@ -74,4 +76,14 @@ pub struct TypeParam {
     pub object: DefId,
     pub definition_site: PackageId,
     pub span: SourceSpan,
+}
+
+pub enum MacroItem {
+    Relationship(RelId, Relationship, SourceSpan),
+    UseMacro(DefId),
+}
+
+pub struct MacroExpand {
+    pub subject: DefId,
+    pub macro_def_id: DefId,
 }

@@ -1,21 +1,24 @@
 use fnv::FnvHashSet;
 use ontol_runtime::{
     ontology::{domain::DomainId, ontol::TextConstant},
-    DefId, EdgeId, PackageId,
+    property::{PropertyCardinality, ValueCardinality},
+    DefId, EdgeId, PackageId, RelId,
 };
 use tracing::{debug, debug_span, info};
 use ulid::Ulid;
 
 use crate::{
-    def::DefKind,
+    def::{BuiltinRelationKind, DefKind},
     edge::EdgeCtx,
     lowering::context::LoweringOutcome,
+    misc::{MacroExpand, MacroItem, MiscCtx},
     package::ParsedPackage,
-    relation::RelParams,
+    relation::{RelParams, Relationship},
     repr::repr_model::ReprKind,
     thesaurus::{Thesaurus, TypeRelation},
     type_check::MapArmsKind,
-    CompileError, Compiler, Session, Src, UnifiedCompileError,
+    types::Type,
+    CompileError, Compiler, Session, SourceSpan, Src, UnifiedCompileError,
 };
 
 impl<'m> Compiler<'m> {
@@ -75,9 +78,13 @@ impl<'m> Compiler<'m> {
         self.check_error()
     }
 
-    fn handle_lowering_outcome(&mut self, outcome: LoweringOutcome) {
+    fn handle_lowering_outcome(&mut self, mut outcome: LoweringOutcome) {
+        let mut macro_defs = vec![];
+
         for def_id in outcome.root_defs {
-            self.type_check().check_def(def_id);
+            if let Type::MacroDef(macro_def_id) = self.type_check().check_def(def_id) {
+                macro_defs.push(macro_def_id);
+            }
         }
 
         {
@@ -88,31 +95,84 @@ impl<'m> Compiler<'m> {
             }
         }
 
-        let mut expanded_rels = vec![];
+        // handle relationships in macros first, they have to be ready before other relationships
+        for macro_def_id in macro_defs {
+            if let Some(pkg_rels) = outcome.rels2.get_mut(&macro_def_id.0) {
+                if let Some(macro_rels) = pkg_rels.remove(&macro_def_id.1) {
+                    let mut macro_items: Vec<MacroItem> = vec![];
+
+                    for (rel_tag, relationship, span) in macro_rels {
+                        let rel_id = RelId(*macro_def_id, rel_tag);
+                        let relation_def_kind = self.defs.def_kind(relationship.relation_def_id);
+                        let subject_cardinality = relationship.subject_cardinality;
+
+                        if let DefKind::BuiltinRelType(BuiltinRelationKind::Is, _) =
+                            relation_def_kind
+                        {
+                            if matches!(
+                                subject_cardinality,
+                                (PropertyCardinality::Mandatory, ValueCardinality::Unit)
+                            ) {
+                                let object_def_kind = self.defs.def_kind(relationship.object.0);
+                                if let DefKind::Macro(_macro_ident) = object_def_kind {
+                                    macro_items.push(MacroItem::UseMacro(relationship.object.0));
+                                } else {
+                                    CompileError::TODO("must be a macro")
+                                        .span(span)
+                                        .report(self);
+                                }
+                            } else {
+                                macro_items.push(MacroItem::Relationship(
+                                    rel_id,
+                                    relationship,
+                                    span,
+                                ));
+                            }
+                        } else {
+                            macro_items.push(MacroItem::Relationship(rel_id, relationship, span));
+                        }
+                    }
+
+                    self.misc_ctx
+                        .def_macro_items
+                        .insert(*macro_def_id, macro_items);
+                }
+            }
+        }
 
         // commit relationships from outcome
         {
-            let mut rel_ids = Vec::with_capacity(
-                outcome
-                    .rels
-                    .iter()
-                    .fold(0, |sum, (_, rels)| sum + rels.len()),
-            );
+            let mut rel_ids = vec![];
 
-            for (_pkg_id, rels) in outcome.rels.into_iter().rev() {
-                for (rel_id, relationship, span) in rels {
-                    self.rel_ctx.commit_rel(rel_id, relationship, span);
-                    rel_ids.push(rel_id);
+            for (pkg_id, rel_map) in outcome.rels2 {
+                for (def_tag, rels) in rel_map {
+                    for (rel_tag, relationship, span) in rels {
+                        let rel_id = RelId(DefId(pkg_id, def_tag), rel_tag);
+                        self.rel_ctx.commit_rel(rel_id, relationship, span);
+                        rel_ids.push(rel_id);
+                    }
                 }
             }
 
-            let mut type_check = self.type_check();
             for rel_id in rel_ids {
-                type_check.check_rel(rel_id, Some(&mut expanded_rels));
+                let mut macro_expand: Option<MacroExpand> = None;
+                self.type_check().check_rel(rel_id, Some(&mut macro_expand));
+
+                if let Some(macro_expand) = macro_expand {
+                    for (relationship, span) in
+                        self.expand_macro_rels(rel_id, macro_expand.macro_def_id)
+                    {
+                        let rel_id = self.rel_ctx.alloc_rel_id(macro_expand.subject);
+                        self.rel_ctx.commit_rel(rel_id, relationship, span);
+
+                        self.type_check().check_rel(rel_id, None);
+                    }
+                }
             }
         }
 
         // expanded rels from macros
+        /*
         while !expanded_rels.is_empty() {
             let mut rel_ids = Vec::with_capacity(expanded_rels.len());
 
@@ -138,6 +198,7 @@ impl<'m> Compiler<'m> {
                 type_check.check_rel(rel_id, Some(&mut expanded_rels));
             }
         }
+        */
     }
 
     /// Do all the (remaining) checks and generations for the package/domain and seal it
@@ -335,6 +396,63 @@ impl<'m> Compiler<'m> {
                 }
             }
         }
+    }
+
+    fn expand_macro_rels(
+        &mut self,
+        source_rel_id: RelId,
+        macro_def_id: DefId,
+    ) -> Vec<(Relationship, SourceSpan)> {
+        struct MacroExpandCtx<'a> {
+            used_macros: FnvHashSet<DefId>,
+            used_rels: FnvHashSet<RelId>,
+            misc_ctx: &'a MiscCtx,
+            output: Vec<(Relationship, SourceSpan)>,
+        }
+
+        fn expand_inner(source_rel_id: RelId, macro_def_id: DefId, ctx: &mut MacroExpandCtx) {
+            if !ctx.used_macros.insert(macro_def_id) {
+                return;
+            }
+
+            let macro_items = ctx.misc_ctx.def_macro_items.get(&macro_def_id).unwrap();
+            for item in macro_items {
+                match item {
+                    MacroItem::UseMacro(inner_macro_def_id) => {
+                        expand_inner(source_rel_id, *inner_macro_def_id, ctx);
+                    }
+                    MacroItem::Relationship(rel_id, relationship, span) => {
+                        if !ctx.used_rels.contains(rel_id) {
+                            ctx.output.push((
+                                Relationship {
+                                    relation_def_id: relationship.relation_def_id,
+                                    projection: relationship.projection,
+                                    relation_span: relationship.relation_span,
+                                    subject: (source_rel_id.0, relationship.subject.1),
+                                    subject_cardinality: relationship.subject_cardinality,
+                                    object: relationship.object,
+                                    object_cardinality: relationship.object_cardinality,
+                                    rel_params: relationship.rel_params.clone(),
+                                    macro_source: Some(*rel_id),
+                                },
+                                *span,
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut ctx = MacroExpandCtx {
+            used_macros: Default::default(),
+            used_rels: Default::default(),
+            misc_ctx: &self.misc_ctx,
+            output: vec![],
+        };
+
+        expand_inner(source_rel_id, macro_def_id, &mut ctx);
+
+        ctx.output
     }
 }
 

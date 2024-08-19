@@ -1124,10 +1124,11 @@ def vulnerability (
     rel* type: 'vulnerability'
     rel. id[rel* gen: auto]: vulnerability-id
 
-    /// A list of external references which refer to non-STIX information.
-    /// This property MAY be used to provide one or more Vulnerability identifiers, such as a CVE ID [CVE].
-    /// When specifying a CVE ID, the source_name property of the external reference MUST be set to cve and the external_id property MUST be the exact CVE identifier.
-    rel* 'external_references'?: {common.external-reference}
+    // A list of external references which refer to non-STIX information.
+    // This property MAY be used to provide one or more Vulnerability identifiers, such as a CVE ID [CVE].
+    // When specifying a CVE ID, the source_name property of the external reference MUST be set to cve and the external_id property MUST be the exact CVE identifier.
+    // FIXME: The comment above is an _override_ for the field supplied by a macro
+    // rel* 'external_references'?: {common.external-reference}
 
     /// A name used to identify the Vulnerability.
     rel* 'name': common.string
