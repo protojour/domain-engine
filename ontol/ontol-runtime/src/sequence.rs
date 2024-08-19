@@ -326,7 +326,7 @@ mod tests {
     use crate::{
         attr::Attr,
         value::{Value, ValueTag},
-        DefId, DefRelTag, PackageId, RelId,
+        DefId, DefPropTag, PackageId, PropId,
     };
 
     use super::*;
@@ -421,7 +421,7 @@ mod tests {
     fn struct_value(iter: impl IntoIterator<Item = (u16, Value)>) -> Value {
         let attrs = iter.into_iter().map(|(tag, val)| {
             (
-                RelId(DefId(PackageId(42), 42), DefRelTag(tag)),
+                PropId(DefId(PackageId(42), 42), DefPropTag(tag)),
                 Attr::Unit(val),
             )
         });
@@ -439,7 +439,7 @@ mod tests {
                     let value = Value::I64(i as i64, def(42));
 
                     (
-                        RelId(DefId(PackageId(42), 42), DefRelTag(tag)),
+                        PropId(DefId(PackageId(42), 42), DefPropTag(tag)),
                         Attr::Unit(value),
                     )
                 })

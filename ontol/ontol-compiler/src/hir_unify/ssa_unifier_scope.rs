@@ -5,7 +5,7 @@ use ontol_hir::{
 };
 use ontol_runtime::{
     var::{Var, VarSet},
-    MapDirection, RelId,
+    MapDirection, PropId,
 };
 use smallvec::smallvec;
 use thin_vec::{thin_vec, ThinVec};
@@ -338,8 +338,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 }
                 Ok(Binding::Binder(*binder))
             }
-            Kind::Prop(flags, var, rel_id, variant) => self.traverse_prop(
-                (*flags, *var, *rel_id),
+            Kind::Prop(flags, var, prop_id, variant) => self.traverse_prop(
+                (*flags, *var, *prop_id),
                 variant,
                 node_ref.span(),
                 scoped,
@@ -452,7 +452,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
     fn traverse_prop(
         &mut self,
-        (flags, var, rel_id): (PropFlags, Var, RelId),
+        (flags, var, prop_id): (PropFlags, Var, PropId),
         variant: &ontol_hir::PropVariant,
         span: SourceSpan,
         scoped: Scoped,
@@ -544,13 +544,13 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                     .collect();
 
                                 self.push_let(
-                                    Let::PropDefault(pack, (var, rel_id), defaults),
+                                    Let::PropDefault(pack, (var, prop_id), defaults),
                                     span,
                                     scoped,
                                     lets,
                                 );
                             } else {
-                                self.push_let(Let::Prop(pack, (var, rel_id)), span, scoped, lets);
+                                self.push_let(Let::Prop(pack, (var, prop_id)), span, scoped, lets);
                             }
                         } else {
                             return Err(UnifierError::PatternRequiresIteratedVariable(span));
@@ -566,7 +566,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                         self.push_let(
                             Let::PropDefault(
                                 Pack::Unit(binding),
-                                (var, rel_id),
+                                (var, prop_id),
                                 thin_vec![default],
                             ),
                             span,
@@ -584,7 +584,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                         let binding = self.traverse(*node, next_scoped, &mut sub_lets)?;
 
                         self.push_let(
-                            Let::Prop(Pack::Unit(binding), (var, rel_id)),
+                            Let::Prop(Pack::Unit(binding), (var, prop_id)),
                             span,
                             scoped,
                             lets,
@@ -610,7 +610,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                         );
 
                         self.push_let(
-                            Let::PropDefault(bind_pack, (var, rel_id), default),
+                            Let::PropDefault(bind_pack, (var, prop_id), default),
                             span,
                             scoped,
                             lets,
@@ -629,7 +629,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                 .collect::<Result<_, _>>()?,
                         );
 
-                        self.push_let(Let::Prop(bind_pack, (var, rel_id)), span, scoped, lets);
+                        self.push_let(Let::Prop(bind_pack, (var, prop_id)), span, scoped, lets);
                     }
                 };
             }

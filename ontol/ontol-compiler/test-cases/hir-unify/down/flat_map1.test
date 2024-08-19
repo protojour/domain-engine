@@ -1,35 +1,35 @@
 (struct ($c)
-    (prop! $c rel@1:0:0
+    (prop! $c p@1:0:0
         (matrix
             (.. @d
                 (struct ($e)
-                    (prop! $e rel@1:0:2 $a)
+                    (prop! $e p@1:0:2 $a)
                 )
             )
         )
     )
-    (prop! $c rel@1:0:1 $b)
+    (prop! $c p@1:0:1 $b)
 )
 
 (matrix
     (.. @d
         (struct ($f)
-            (prop! $f rel@2:0:0 $a)
-            (prop! $f rel@2:0:1 $b)
+            (prop! $f p@2:0:0 $a)
+            (prop! $f p@2:0:1 $b)
         )
     )
 )
 
 |$c| (block
-    (let-prop [$d] ($c rel@1:0:0))
-    (let-prop $b ($c rel@1:0:1))
+    (let-prop [$d] ($c p@1:0:0))
+    (let-prop $b ($c p@1:0:1))
     (make-matrix ($g)
         (for-each $d ($e)
-            (let-prop $a ($e rel@1:0:2))
+            (let-prop $a ($e p@1:0:2))
             (insert $g
                 (struct ($f)
-                    (prop! $f rel@2:0:0 $a)
-                    (prop! $f rel@2:0:1 $b)
+                    (prop! $f p@2:0:0 $a)
+                    (prop! $f p@2:0:1 $b)
                 )
             )
         )

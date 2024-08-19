@@ -30,8 +30,8 @@ impl AqlQuery {
 
         match &entity {
             Value::Struct(struct_map, _) => {
-                for (rel_id, attr) in struct_map.iter() {
-                    if let Some(rel_info) = def.data_relationships.get(rel_id) {
+                for (prop_id, attr) in struct_map.iter() {
+                    if let Some(rel_info) = def.data_relationships.get(prop_id) {
                         match rel_info.kind {
                             DataRelationshipKind::Tree | DataRelationshipKind::Id => {}
                             DataRelationshipKind::Edge(_) => {
@@ -91,8 +91,8 @@ impl<'a> MetaQuery<'a> {
 
                 match value {
                     Value::Struct(struct_map, _tag) => {
-                        for (rel_id, attr) in struct_map.iter() {
-                            if let Some(rel_info) = runtime_def.data_relationships.get(rel_id) {
+                        for (prop_id, attr) in struct_map.iter() {
+                            if let Some(rel_info) = runtime_def.data_relationships.get(prop_id) {
                                 if let DataRelationshipKind::Edge(_) = rel_info.kind {
                                     self.prequery_relation(attr.as_ref(), rel_info)?;
                                 }

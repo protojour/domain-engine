@@ -16,7 +16,7 @@ use ontol_runtime::{
     },
     value::Value,
     var::Var,
-    DefId, DefRelTag, MapKey, RelId,
+    DefId, DefPropTag, MapKey, PropId,
 };
 use tracing::{debug, error, trace};
 
@@ -26,7 +26,7 @@ use crate::{
 };
 
 pub(crate) struct KeyedPropertySelection {
-    pub key: RelId,
+    pub key: PropId,
     pub select: Select,
 }
 
@@ -83,7 +83,7 @@ impl<'a> SelectAnalyzer<'a> {
         look_ahead: juniper::executor::LookAheadSelection<GqlScalar>,
         map_key: MapKey,
         input_arg: &MapInputArg,
-        map_queries: &FnvHashMap<RelId, Var>,
+        map_queries: &FnvHashMap<PropId, Var>,
         field_data: &FieldData,
     ) -> Result<AnalyzedQuery, juniper::FieldError<GqlScalar>> {
         let input = ArgsWrapper::new(look_ahead)
@@ -118,10 +118,10 @@ impl<'a> SelectAnalyzer<'a> {
         &self,
         look_ahead: juniper::executor::LookAheadSelection<GqlScalar>,
         field_data: &FieldData,
-        parent_property: RelId,
-        input_queries: &FnvHashMap<RelId, Var>,
+        parent_property: PropId,
+        input_queries: &FnvHashMap<PropId, Var>,
         output_selects: &mut FnvHashMap<Var, EntitySelect>,
-        recursion_guard: &mut FnvHashSet<RelId>,
+        recursion_guard: &mut FnvHashSet<PropId>,
     ) -> Result<(), FieldError<GqlScalar>> {
         if !recursion_guard.insert(parent_property) {
             return Ok(());
@@ -273,7 +273,7 @@ impl<'a> SelectAnalyzer<'a> {
                     ..
                 }),
             ) => Ok(Some(KeyedPropertySelection {
-                key: field.rel_id,
+                key: field.prop_id,
                 select: self.analyze_connection(
                     look_ahead,
                     &field.first_arg,
@@ -352,7 +352,7 @@ impl<'a> SelectAnalyzer<'a> {
             })),
             (FieldKind::Id(id_property_data), Err(_scalar_ref)) => {
                 Ok(Some(KeyedPropertySelection {
-                    key: id_property_data.relationship_id,
+                    key: id_property_data.prop_id,
                     select: Select::Leaf,
                 }))
             }
@@ -421,7 +421,7 @@ impl<'a> SelectAnalyzer<'a> {
                 self.analyze_object_data(look_ahead_children, object_data)
             }
             TypeKind::Union(union_data) => {
-                let mut union_map: FnvHashMap<DefId, FnvHashMap<RelId, Select>> =
+                let mut union_map: FnvHashMap<DefId, FnvHashMap<PropId, Select>> =
                     FnvHashMap::default();
 
                 for field_look_ahead in look_ahead_children {
@@ -484,7 +484,7 @@ impl<'a> SelectAnalyzer<'a> {
     ) -> Result<Select, FieldError<GqlScalar>> {
         match &object_data.kind {
             ObjectKind::Node(node_data) => {
-                let mut properties: FnvHashMap<RelId, Select> = FnvHashMap::default();
+                let mut properties: FnvHashMap<PropId, Select> = FnvHashMap::default();
 
                 for field_look_ahead in look_ahead_children {
                     let field_name = field_look_ahead.field_original_name();
@@ -632,8 +632,8 @@ impl<'a> SelectAnalyzer<'a> {
     }
 }
 
-const fn unit_property() -> RelId {
-    RelId(DefId::unit(), DefRelTag(0))
+const fn unit_property() -> PropId {
+    PropId(DefId::unit(), DefPropTag(0))
 }
 
 fn merge_selects(existing: &mut Select, new: Select) {

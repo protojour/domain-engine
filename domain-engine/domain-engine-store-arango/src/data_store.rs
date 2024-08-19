@@ -394,12 +394,9 @@ impl ArangoDatabase {
 
     async fn delete(&self, value: Value, def_id: DefId) -> DomainResult<Value> {
         let def = self.ontology.def(def_id);
-        let rel_id = def
-            .entity()
-            .expect("type should be an entity")
-            .id_relationship_id;
+        let prop_id = def.entity().expect("type should be an entity").id_prop;
         let mut struct_map = BTreeMap::new();
-        struct_map.insert(rel_id, Attr::Unit(value));
+        struct_map.insert(prop_id, Attr::Unit(value));
         let entity = Value::new_struct(struct_map, def_id.into());
         let select = Select::EntityId;
 

@@ -9,7 +9,7 @@ use ontol_runtime::{
     sequence::SubSequence,
     tuple::{CardinalIdx, EndoTuple},
     value::Value,
-    DefId, RelId,
+    DefId, PropId,
 };
 use pin_utils::pin_mut;
 use serde::{Deserialize, Serialize};
@@ -64,8 +64,8 @@ pub enum Cursor {
 
 #[derive(Clone, Copy)]
 pub enum QuerySelect<'a> {
-    Struct(&'a FnvHashMap<RelId, Select>),
-    Field(RelId),
+    Struct(&'a FnvHashMap<PropId, Select>),
+    Field(PropId),
 }
 
 pub enum IncludeEdgeAttrs {
@@ -133,9 +133,11 @@ impl<'a> TransactCtx<'a> {
                 Some(QuerySelect::Struct(properties)) => {
                     self.sql_select_vertex_expressions(def_id, properties, pg, &mut ctx)?
                 }
-                Some(QuerySelect::Field(rel_id)) => {
+                Some(QuerySelect::Field(prop_id)) => {
                     let mut fields: Vec<_> = self.initial_standard_data_fields(pg).into();
-                    fields.push(sql::Expr::path1(pg.table.field(&rel_id)?.col_name.as_ref()));
+                    fields.push(sql::Expr::path1(
+                        pg.table.field(&prop_id)?.col_name.as_ref(),
+                    ));
 
                     (pg.table_name().into(), sql::Alias(0), fields)
                 }
@@ -233,7 +235,7 @@ impl<'a> TransactCtx<'a> {
     pub(super) fn sql_select_vertex_expressions(
         &self,
         def_id: DefId,
-        properties: &FnvHashMap<RelId, Select>,
+        properties: &FnvHashMap<PropId, Select>,
         pg: PgDomainTable<'a>,
         ctx: &mut QueryBuildCtx<'a>,
     ) -> DomainResult<(sql::FromItem<'a>, sql::Alias, Vec<sql::Expr<'a>>)> {
@@ -264,13 +266,13 @@ impl<'a> TransactCtx<'a> {
         &self,
         def: &Def,
         data_alias: sql::Alias,
-        properties: &FnvHashMap<RelId, Select>,
+        properties: &FnvHashMap<PropId, Select>,
         pg: PgDomainTable<'a>,
         ctx: &mut QueryBuildCtx<'a>,
         output: &mut Vec<sql::Expr<'a>>,
     ) -> DomainResult<()> {
-        for (rel_id, select) in properties {
-            let Some(rel_info) = def.data_relationships.get(rel_id) else {
+        for (prop_id, select) in properties {
+            let Some(rel_info) = def.data_relationships.get(prop_id) else {
                 continue;
             };
             let DataRelationshipKind::Edge(proj) = &rel_info.kind else {
@@ -399,7 +401,7 @@ impl<'a> TransactCtx<'a> {
 
         match query_select {
             Some(QuerySelect::Struct(properties)) => {
-                let mut attrs: FnvHashMap<RelId, Attr> = FnvHashMap::with_capacity_and_hasher(
+                let mut attrs: FnvHashMap<PropId, Attr> = FnvHashMap::with_capacity_and_hasher(
                     def.data_relationships.len(),
                     Default::default(),
                 );
@@ -420,15 +422,15 @@ impl<'a> TransactCtx<'a> {
                     op,
                 })
             }
-            Some(QuerySelect::Field(rel_id)) => {
+            Some(QuerySelect::Field(prop_id)) => {
                 let field_value = self
                     .read_field(
                         def.data_relationships
-                            .get(&rel_id)
-                            .ok_or(PgModelError::NonExistentField(rel_id))?,
+                            .get(&prop_id)
+                            .ok_or(PgModelError::NonExistentField(prop_id))?,
                         &mut iterator,
                     )?
-                    .ok_or(PgError::MissingField(rel_id))?;
+                    .ok_or(PgError::MissingField(prop_id))?;
 
                 Ok(RowValue {
                     value: field_value,
@@ -450,11 +452,11 @@ impl<'a> TransactCtx<'a> {
         &self,
         record_iter: &mut impl SqlRecordIterator<'b>,
         def: &Def,
-        properties: &FnvHashMap<RelId, Select>,
-        attrs: &mut FnvHashMap<RelId, Attr>,
+        properties: &FnvHashMap<PropId, Select>,
+        attrs: &mut FnvHashMap<PropId, Attr>,
     ) -> DomainResult<()> {
-        for (rel_id, select) in properties {
-            let Some(rel_info) = def.data_relationships.get(rel_id) else {
+        for (prop_id, select) in properties {
+            let Some(rel_info) = def.data_relationships.get(prop_id) else {
                 continue;
             };
             let DataRelationshipKind::Edge(proj) = &rel_info.kind else {
@@ -470,7 +472,7 @@ impl<'a> TransactCtx<'a> {
                     {
                         let sql_edge_tuple = sql_edge_tuple.into_record()?;
                         let attr = self.read_edge_tuple_as_attr(sql_edge_tuple, select, pg_edge)?;
-                        attrs.insert(*rel_id, attr);
+                        attrs.insert(*prop_id, attr);
                     }
                 }
                 ValueCardinality::IndexSet | ValueCardinality::List => {
@@ -505,7 +507,7 @@ impl<'a> TransactCtx<'a> {
                         }
                     }
 
-                    attrs.insert(*rel_id, Attr::Matrix(matrix));
+                    attrs.insert(*prop_id, Attr::Matrix(matrix));
                 }
             }
         }
@@ -531,7 +533,7 @@ impl<'a> TransactCtx<'a> {
             for cardinal in pg_edge.edge_cardinals.values() {
                 if let PgEdgeCardinalKind::Parameters(def_id) = &cardinal.kind {
                     let def = self.ontology.def(*def_id);
-                    let mut attrs: FnvHashMap<RelId, Attr> = FnvHashMap::with_capacity_and_hasher(
+                    let mut attrs: FnvHashMap<PropId, Attr> = FnvHashMap::with_capacity_and_hasher(
                         def.data_relationships.len(),
                         Default::default(),
                     );
@@ -568,7 +570,7 @@ impl<'a> TransactCtx<'a> {
                     return Err(PgInputError::NotAnEntity.into());
                 };
 
-                let pg_id = pg_def.pg.table.field(&entity.id_relationship_id)?;
+                let pg_id = pg_def.pg.table.field(&entity.id_prop)?;
                 let mut fields = sql_record.fields();
                 fields.next_field(&Layout::Scalar(PgType::Integer))?;
                 let sql_field = fields.next_field(&Layout::Scalar(pg_id.pg_type))?;
@@ -606,7 +608,7 @@ impl<'a> TransactCtx<'a> {
     fn read_record_as_struct(
         &self,
         sql_record: SqlRecord,
-        select_properties: &FnvHashMap<RelId, Select>,
+        select_properties: &FnvHashMap<PropId, Select>,
     ) -> DomainResult<Value> {
         let row_value = self.read_row_value_as_vertex(
             sql_record.fields(),

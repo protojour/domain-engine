@@ -13,12 +13,12 @@ use ontol_runtime::{
             EdgeCardinalProjection, EdgeInfo, Entity,
         },
         map::MapMeta,
-        ontol::{OntolDomainMeta, TextConstant, TextLikeType},
+        ontol::{OntolDomainMeta, TextConstant, TextLikeType, ValueGenerator},
         Ontology,
     },
     property::ValueCardinality,
     rustdoc::RustDoc,
-    DefId, DefIdSet, EdgeId, PackageId, RelId,
+    DefId, DefIdSet, EdgeId, PackageId, PropId, RelId,
 };
 use std::{
     collections::{BTreeSet, HashMap},
@@ -396,6 +396,19 @@ impl<'m> Compiler<'m> {
             }
         }
 
+        let mut value_generators: FnvHashMap<PropId, ValueGenerator> = Default::default();
+        for properties in self.prop_ctx.properties_by_def_id.values() {
+            if let Some(table) = &properties.table {
+                for (prop_id, property) in table {
+                    if let Some(value_generator) =
+                        self.misc_ctx.value_generators.remove(&property.rel_id)
+                    {
+                        value_generators.insert(*prop_id, value_generator);
+                    }
+                }
+            }
+        }
+
         builder
             .text_constants(str_ctx.into_arcstr_vec())
             .ontol_domain_meta(OntolDomainMeta {
@@ -430,7 +443,7 @@ impl<'m> Compiler<'m> {
             .text_like_types(self.defs.text_like_types)
             .text_patterns(self.text_patterns.text_patterns)
             .externs(self.def_ty_ctx.ontology_externs)
-            .value_generators(self.misc_ctx.value_generators)
+            .value_generators(value_generators)
             .domain_interfaces(domain_interfaces)
             .build()
     }
@@ -441,7 +454,7 @@ impl<'m> Compiler<'m> {
         union_member_cache: &UnionMemberCache,
         edges: &mut FnvHashMap<PackageId, FnvHashMap<EdgeId, EdgeInfo>>,
         str_ctx: &mut StringCtx<'m>,
-    ) -> FnvHashMap<RelId, DataRelationshipInfo> {
+    ) -> FnvHashMap<PropId, DataRelationshipInfo> {
         let mut relationships = FnvHashMap::default();
         self.collect_inherent_relationships_and_edges(
             type_def_id,
@@ -472,9 +485,10 @@ impl<'m> Compiler<'m> {
                     continue;
                 };
 
-                for property_id in table.keys() {
+                for (prop_id, property) in table.iter() {
                     self.collect_prop_relationship_and_edge(
-                        *property_id,
+                        *prop_id,
+                        property.rel_id,
                         DataRelationshipSource::ByUnionProxy,
                         &mut relationships,
                         edges,
@@ -490,7 +504,7 @@ impl<'m> Compiler<'m> {
     fn collect_inherent_relationships_and_edges(
         &self,
         type_def_id: DefId,
-        relationships: &mut FnvHashMap<RelId, DataRelationshipInfo>,
+        relationships: &mut FnvHashMap<PropId, DataRelationshipInfo>,
         edges: &mut FnvHashMap<PackageId, FnvHashMap<EdgeId, EdgeInfo>>,
         str_ctx: &mut StringCtx<'m>,
     ) {
@@ -498,9 +512,10 @@ impl<'m> Compiler<'m> {
             return;
         };
         if let Some(table) = &properties.table {
-            for rel_id in table.keys() {
+            for (prop_id, property) in table.iter() {
                 self.collect_prop_relationship_and_edge(
-                    *rel_id,
+                    *prop_id,
+                    property.rel_id,
                     DataRelationshipSource::Inherent,
                     relationships,
                     edges,
@@ -512,9 +527,10 @@ impl<'m> Compiler<'m> {
 
     fn collect_prop_relationship_and_edge(
         &self,
+        prop_id: PropId,
         rel_id: RelId,
         source: DataRelationshipSource,
-        relationships: &mut FnvHashMap<RelId, DataRelationshipInfo>,
+        relationships: &mut FnvHashMap<PropId, DataRelationshipInfo>,
         edges: &mut FnvHashMap<PackageId, FnvHashMap<EdgeId, EdgeInfo>>,
         str_ctx: &mut StringCtx<'m>,
     ) {
@@ -660,7 +676,7 @@ impl<'m> Compiler<'m> {
 
         // collect relationship
         relationships.insert(
-            rel_id,
+            prop_id,
             DataRelationshipInfo {
                 name,
                 kind: data_relationship_kind,
@@ -731,7 +747,7 @@ impl<'m> Compiler<'m> {
         type_def_id: DefId,
         name: TextConstant,
         serde_generator: &mut SerdeGenerator,
-        data_relationships: &FnvHashMap<RelId, DataRelationshipInfo>,
+        data_relationships: &FnvHashMap<PropId, DataRelationshipInfo>,
     ) -> Option<Entity> {
         let properties = self.prop_ctx.properties_by_def_id(type_def_id)?;
         let id_relationship_id = properties.identified_by?;
@@ -752,23 +768,24 @@ impl<'m> Compiler<'m> {
 
         let inherent_primary_id_meta = self.find_inherent_primary_id(type_def_id, properties);
 
-        let id_value_generator = if let Some(inherent_primary_id_meta) = &inherent_primary_id_meta {
-            self.misc_ctx
-                .value_generators
-                .get(&inherent_primary_id_meta.rel_id)
-                .cloned()
-        } else {
-            None
-        };
+        let id_value_generator =
+            if let Some((_, inherent_primary_id_meta)) = &inherent_primary_id_meta {
+                self.misc_ctx
+                    .value_generators
+                    .get(&inherent_primary_id_meta.rel_id)
+                    .cloned()
+            } else {
+                None
+            };
 
         Some(Entity {
             name,
             // The entity is self-identifying if it has an inherent primary_id and that is its only inherent property.
             // TODO: Is the entity still self-identifying if it has only an external primary id (i.e. it is a unit type)?
             is_self_identifying: inherent_primary_id_meta.is_some() && inherent_property_count <= 1,
-            id_relationship_id: match inherent_primary_id_meta {
-                Some(inherent_meta) => inherent_meta.rel_id,
-                None => id_relationship_id,
+            id_prop: match inherent_primary_id_meta {
+                Some((prop_id, _)) => prop_id,
+                None => todo!(),
             },
             id_value_def_id: identifies_meta.relationship.subject.0,
             id_value_generator,
@@ -796,17 +813,20 @@ impl<'m> Compiler<'m> {
         &self,
         _entity_id: DefId,
         properties: &Properties,
-    ) -> Option<RelDefMeta<'_, 'm>> {
+    ) -> Option<(PropId, RelDefMeta<'_, 'm>)> {
         let id_relationship_id = properties.identified_by?;
-        let inherent_id = self
+        let inherent_prop_id = self
             .misc_ctx
             .inherent_id_map
             .get(&id_relationship_id)
             .cloned()?;
         let map = properties.table.as_ref()?;
-        let _property = map.get(&inherent_id)?;
+        let property = map.get(&inherent_prop_id)?;
 
-        Some(rel_def_meta(inherent_id, &self.rel_ctx, &self.defs))
+        Some((
+            inherent_prop_id,
+            rel_def_meta(property.rel_id, &self.rel_ctx, &self.defs),
+        ))
     }
 
     fn unique_domain_names(&self) -> FnvHashMap<PackageId, TextConstant> {

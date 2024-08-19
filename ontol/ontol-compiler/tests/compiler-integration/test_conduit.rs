@@ -136,9 +136,9 @@ fn test_map_match_conduit_blog_post_cond_clauses() {
                     eq!(&Literal(indoc! { r#"
                         (root $a)
                         (is-entity $a def@2:11)
-                        (match-prop $a rel@2:11:13 (element-in $c))
+                        (match-prop $a p@2:11:10 (element-in $c))
                         (is-entity $b def@2:10)
-                        (match-prop $b rel@2:10:2 (element-in $d))
+                        (match-prop $b p@2:10:1 (element-in $d))
                         (member $c (_ $b))
                         (member $d (_ 'someone'))
                         (order 'by_date')
@@ -182,9 +182,9 @@ fn test_conduit_feed_public() {
                     eq!(&Literal(indoc! { r#"
                         (root $a)
                         (is-entity $a def@2:11)
-                        (match-prop $a rel@2:11:13 (element-in $c))
+                        (match-prop $a p@2:11:10 (element-in $c))
                         (is-entity $b def@2:10)
-                        (match-prop $b rel@2:10:2 (element-in $d))
+                        (match-prop $b p@2:10:1 (element-in $d))
                         (member $c (_ $b))
                         (member $d (_ 'foobar'))
                         (order 'by_date')

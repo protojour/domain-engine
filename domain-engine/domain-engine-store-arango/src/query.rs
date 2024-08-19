@@ -87,8 +87,8 @@ impl<'a> MetaQuery<'a> {
                     ..Default::default()
                 }));
 
-                for (rel_id, select) in &struct_select.properties {
-                    if let Some(rel_info) = def.data_relationships.get(rel_id) {
+                for (prop_id, select) in &struct_select.properties {
+                    if let Some(rel_info) = def.data_relationships.get(prop_id) {
                         if let DataRelationshipKind::Edge(_) = rel_info.kind {
                             self.query_relation(select, rel_info, &struct_select.def_id)?;
                         }
@@ -103,8 +103,8 @@ impl<'a> MetaQuery<'a> {
                     StructOrUnionSelect::Union(_, variants) => {
                         for struct_select in variants {
                             let def = self.ontology.def(struct_select.def_id);
-                            for (rel_id, select) in &struct_select.properties {
-                                if let Some(rel_info) = def.data_relationships.get(rel_id) {
+                            for (prop_id, select) in &struct_select.properties {
+                                if let Some(rel_info) = def.data_relationships.get(prop_id) {
                                     if let DataRelationshipKind::Edge(_) = rel_info.kind {
                                         self.query_relation(
                                             select,
@@ -138,8 +138,8 @@ impl<'a> MetaQuery<'a> {
             Select::StructUnion(_, selects) => {
                 for struct_select in selects {
                     let def = self.ontology.def(struct_select.def_id);
-                    for (rel_id, select) in &struct_select.properties {
-                        if let Some(rel_info) = def.data_relationships.get(rel_id) {
+                    for (prop_id, select) in &struct_select.properties {
+                        if let Some(rel_info) = def.data_relationships.get(prop_id) {
                             if let DataRelationshipKind::Edge(_) = rel_info.kind {
                                 self.query_relation(select, rel_info, &struct_select.def_id)?;
                             }
@@ -331,9 +331,9 @@ pub fn apply_select(attr: AttrMut, select: &Select, ontology: &Ontology) -> Doma
                 let entity_info = def
                     .entity()
                     .ok_or(DomainErrorKind::NotAnEntity(def_id).into_error())?;
-                let id_rel_id = entity_info.id_relationship_id;
+                let id_prop_id = entity_info.id_prop;
                 *val = attr_map
-                    .get(&id_rel_id)
+                    .get(&id_prop_id)
                     .expect("entity should have an id")
                     .clone()
                     .into_unit()
@@ -343,15 +343,15 @@ pub fn apply_select(attr: AttrMut, select: &Select, ontology: &Ontology) -> Doma
         (AttrMut::Unit(Value::Struct(attr_map, _)), Select::Struct(struct_select)) => {
             let def = ontology.def(struct_select.def_id);
 
-            for (rel_id, select) in &struct_select.properties {
+            for (prop_id, select) in &struct_select.properties {
                 let rel_info = def
                     .data_relationships
-                    .get(rel_id)
+                    .get(prop_id)
                     .expect("property not found in type info");
                 if let DataRelationshipKind::Edge(_) = rel_info.kind {
                     let def_id = match &rel_info.target {
                         DataRelationshipTarget::Unambiguous(def_id) => *def_id,
-                        DataRelationshipTarget::Union { .. } => match attr_map.get(rel_id) {
+                        DataRelationshipTarget::Union { .. } => match attr_map.get(prop_id) {
                             Some(Attr::Unit(val)) => val.type_def_id(),
                             Some(Attr::Tuple(tuple)) => tuple.elements[0].type_def_id(),
                             Some(Attr::Matrix(matrix)) => matrix
@@ -364,19 +364,19 @@ pub fn apply_select(attr: AttrMut, select: &Select, ontology: &Ontology) -> Doma
                     match &select {
                         Select::StructUnion(_, ref selects) => {
                             if selects.iter().any(|s| s.def_id == def_id) {
-                                if let Some(attr) = attr_map.get_mut(rel_id) {
+                                if let Some(attr) = attr_map.get_mut(prop_id) {
                                     if !apply_select(AttrMut::from_attr(attr), select, ontology)? {
-                                        attr_map.remove(rel_id);
+                                        attr_map.remove(prop_id);
                                     }
                                 }
                             } else {
-                                attr_map.remove(rel_id);
+                                attr_map.remove(prop_id);
                             }
                         }
                         _ => {
-                            if let Some(attr) = attr_map.get_mut(rel_id) {
+                            if let Some(attr) = attr_map.get_mut(prop_id) {
                                 if !apply_select(AttrMut::from_attr(attr), select, ontology)? {
-                                    attr_map.remove(rel_id);
+                                    attr_map.remove(prop_id);
                                 }
                             }
                         }

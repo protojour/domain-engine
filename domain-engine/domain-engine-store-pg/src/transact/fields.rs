@@ -4,7 +4,7 @@ use ontol_runtime::{
     attr::Attr,
     ontology::domain::{DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget, Def},
     value::Value,
-    RelId,
+    PropId,
 };
 
 use crate::{
@@ -44,10 +44,10 @@ impl<'a> TransactCtx<'a> {
     ) -> DomainResult<SelectStats> {
         let mut stats = SelectStats { edge_count: 0 };
 
-        for (rel_id, rel) in &def.data_relationships {
+        for (prop_id, rel) in &def.data_relationships {
             match &rel.kind {
                 DataRelationshipKind::Id | DataRelationshipKind::Tree => {
-                    if let Some(pg_data_field) = pg_datatable.data_fields.get(&rel_id.tag()) {
+                    if let Some(pg_data_field) = pg_datatable.data_fields.get(&prop_id.tag()) {
                         if let Some(table_alias) = table_alias {
                             output.push(sql::Expr::path2(
                                 table_alias,
@@ -72,13 +72,13 @@ impl<'a> TransactCtx<'a> {
         &self,
         def: &Def,
         record_iter: &mut impl SqlRecordIterator<'b>,
-        attrs: &mut FnvHashMap<RelId, Attr>,
+        attrs: &mut FnvHashMap<PropId, Attr>,
     ) -> DomainResult<()> {
-        for (rel_id, rel_info) in &def.data_relationships {
+        for (prop_id, rel_info) in &def.data_relationships {
             match &rel_info.kind {
                 DataRelationshipKind::Id | DataRelationshipKind::Tree => {
                     if let Some(value) = self.read_field(rel_info, record_iter)? {
-                        attrs.insert(*rel_id, Attr::Unit(value));
+                        attrs.insert(*prop_id, Attr::Unit(value));
                     }
                 }
                 DataRelationshipKind::Edge(_) => {}

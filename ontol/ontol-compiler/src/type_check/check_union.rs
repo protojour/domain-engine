@@ -5,7 +5,7 @@ use indexmap::{IndexMap, IndexSet};
 use ontol_runtime::{
     interface::discriminator::{Discriminant, LeafDiscriminant},
     ontology::ontol::TextConstant,
-    DefId, RelId,
+    DefId, PropId,
 };
 use patricia_tree::PatriciaMap;
 use tracing::{debug, debug_span};
@@ -78,12 +78,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                     let name = strings.intern_constant(&name);
 
+                    let table = properties.table.as_ref().unwrap();
+                    let (id_prop_id, _) = table.iter().find(|(_, prop)| prop.is_entity_id).unwrap();
+
                     self.add_variant_to_builder(
                         &mut entity_id_builder,
                         VariantKey::IdProperty {
                             entity_id: variant_def_id,
                             name,
-                            rel_id: *id_relationship_id,
+                            prop_id: *id_prop_id,
                         },
                         identifies_meta.relationship.subject.0,
                         &mut error_set,
@@ -320,7 +323,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &self,
         discriminator_builder: &mut DiscriminatorBuilder,
         variant_def: DefId,
-        property_set: &IndexMap<RelId, Property>,
+        property_set: &IndexMap<PropId, Property>,
         span: &SourceSpan,
         error_set: &mut ErrorSet,
         strings: &mut StringCtx<'m>,
@@ -330,8 +333,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             property_candidates: vec![],
         };
 
-        for (rel_id, _cardinality) in property_set {
-            let meta = rel_def_meta(*rel_id, self.rel_ctx, self.defs);
+        for (prop_id, property) in property_set {
+            let meta = rel_def_meta(property.rel_id, self.rel_ctx, self.defs);
 
             let (object_def_id, _) = meta.relationship.object;
             let object_ty = self.def_ty_ctx.def_table.get(&object_def_id).unwrap();
@@ -357,7 +360,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         PropertyDiscriminatorCandidate {
                             relation_def_id: meta.relationship.relation_def_id,
                             discriminant: Discriminant::HasAttribute(
-                                *rel_id,
+                                *prop_id,
                                 strings.intern_constant(property_name),
                                 LeafDiscriminant::IsTextLiteral(
                                     strings.intern_constant(string_literal),
@@ -570,8 +573,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         }
                         (
                             DiscriminatorType::Identification,
-                            VariantKey::IdProperty { name, rel_id, .. },
-                        ) => Discriminant::HasAttribute(rel_id, name, leaf_discriminant),
+                            VariantKey::IdProperty { name, prop_id, .. },
+                        ) => Discriminant::HasAttribute(prop_id, name, leaf_discriminant),
                         (DiscriminatorType::Identification, _) => {
                             Discriminant::MatchesLeaf(leaf_discriminant)
                         }
@@ -661,7 +664,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 }
 
 enum DomainTypeMatchData<'a> {
-    Struct(&'a IndexMap<RelId, Property>),
+    Struct(&'a IndexMap<PropId, Property>),
     #[allow(dead_code)]
     Sequence(&'a Sequence),
     ConstructorStringPattern(&'a TextPatternSegment),
@@ -741,7 +744,7 @@ enum VariantKey {
     IdProperty {
         entity_id: DefId,
         name: TextConstant,
-        rel_id: RelId,
+        prop_id: PropId,
     },
 }
 

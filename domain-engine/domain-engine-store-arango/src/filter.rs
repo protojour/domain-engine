@@ -65,8 +65,8 @@ impl<'a> MetaQuery<'a> {
             for field_path in order.tuple.iter() {
                 let mut path = vec![self.var.to_string()];
 
-                for rel_id in field_path.0.iter() {
-                    if let Some(rel_info) = def.data_relationships.get(rel_id) {
+                for prop_id in field_path.0.iter() {
+                    if let Some(rel_info) = def.data_relationships.get(prop_id) {
                         let prop_name = self.ontology[rel_info.name].to_string();
                         path.push(prop_name);
                     }
@@ -118,13 +118,13 @@ impl<'a> MetaQuery<'a> {
                         ..Default::default()
                     }));
                 }
-                Clause::MatchProp(rel_id, set_op, set_var) => {
+                Clause::MatchProp(prop_id, set_op, set_var) => {
                     let def = self.ontology.def(filter.def_id);
-                    let rel_info = def.data_relationships.get(rel_id).unwrap_or_else(|| {
+                    let rel_info = def.data_relationships.get(prop_id).unwrap_or_else(|| {
                         error!("data relationships: {:?}", def.data_relationships.keys());
 
                         //
-                        panic!("rel id {rel_id:?} should belong to type")
+                        panic!("prop id {prop_id:?} should belong to type")
                     });
 
                     if let DataRelationshipKind::Edge(_projection) = rel_info.kind {
@@ -134,8 +134,8 @@ impl<'a> MetaQuery<'a> {
                         };
                     };
 
-                    let id_relationship_id = def.entity().unwrap().id_relationship_id;
-                    if id_relationship_id == *rel_id {
+                    let id_prop = def.entity().unwrap().id_prop;
+                    if id_prop == *prop_id {
                         filter.prop = "_key".to_string();
                     } else {
                         filter.prop = self.ontology[rel_info.name].to_string();

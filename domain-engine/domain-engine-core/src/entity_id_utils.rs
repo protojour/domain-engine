@@ -9,7 +9,7 @@ use ontol_runtime::{
         Ontology,
     },
     value::Value,
-    DefId, RelId,
+    DefId, PropId,
 };
 
 use crate::{domain_error::DomainErrorKind, system::SystemAPI, DomainError, DomainResult};
@@ -29,7 +29,7 @@ pub fn find_inherent_entity_id(
         _ => return Err(DomainErrorKind::EntityMustBeStruct.into_error()),
     };
 
-    match struct_map.get(&entity.id_relationship_id) {
+    match struct_map.get(&entity.id_prop) {
         Some(attr) => Ok(attr.as_unit().cloned()),
         None => Ok(None),
     }
@@ -42,15 +42,15 @@ pub enum GeneratedId {
 
 pub enum GeneratedIdContainer {
     Raw,
-    SingletonStruct(DefId, RelId),
+    SingletonStruct(DefId, PropId),
 }
 
 impl GeneratedIdContainer {
     pub fn wrap(self, id: Value) -> Value {
         match self {
             Self::Raw => id,
-            Self::SingletonStruct(def_id, rel_id) => Value::Struct(
-                Box::new(FnvHashMap::from_iter([(rel_id, id.into())])),
+            Self::SingletonStruct(def_id, prop_id) => Value::Struct(
+                Box::new(FnvHashMap::from_iter([(prop_id, id.into())])),
                 def_id.into(),
             ),
         }
@@ -97,7 +97,7 @@ pub fn try_generate_entity_id(
 
                 Ok((
                     generated_id,
-                    GeneratedIdContainer::SingletonStruct(*def_id, property.rel_id),
+                    GeneratedIdContainer::SingletonStruct(*def_id, property.prop_id),
                 ))
             } else {
                 Err(DomainErrorKind::TypeCannotBeUsedForIdGeneration.into_error())

@@ -24,7 +24,7 @@ use crate::{
         ontol_vm::OntolVm,
         proc::{Lib, Procedure},
     },
-    DefId, DefIdSet, EdgeId, MapKey, PackageId, RelId,
+    DefId, DefIdSet, EdgeId, MapKey, PackageId, PropId, RelId,
 };
 
 use self::{
@@ -72,9 +72,10 @@ pub struct Data {
     package_config_table: FnvHashMap<PackageId, PackageConfig>,
     def_docs: FnvHashMap<DefId, TextConstant>,
     rel_docs: FnvHashMap<RelId, TextConstant>,
+    prop_docs: FnvHashMap<PropId, TextConstant>,
     serde_operators: Vec<SerdeOperator>,
     dynamic_sequence_operator_addr: SerdeOperatorAddr,
-    value_generators: FnvHashMap<RelId, ValueGenerator>,
+    value_generators: FnvHashMap<PropId, ValueGenerator>,
     property_flows: Vec<PropertyFlow>,
 }
 
@@ -135,8 +136,8 @@ impl Ontology {
         self.data.def_docs.get(&def_id).copied()
     }
 
-    pub fn get_rel_docs(&self, rel_id: RelId) -> Option<TextConstant> {
-        self.data.rel_docs.get(&rel_id).copied()
+    pub fn get_prop_docs(&self, prop_id: PropId) -> Option<TextConstant> {
+        self.data.prop_docs.get(&prop_id).copied()
     }
 
     pub fn get_text_pattern(&self, def_id: DefId) -> Option<&TextPattern> {
@@ -253,8 +254,8 @@ impl Ontology {
         self.data.dynamic_sequence_operator_addr
     }
 
-    pub fn get_value_generator(&self, relationship_id: RelId) -> Option<&ValueGenerator> {
-        self.data.value_generators.get(&relationship_id)
+    pub fn get_value_generator(&self, prop_id: PropId) -> Option<&ValueGenerator> {
+        self.data.value_generators.get(&prop_id)
     }
 
     pub fn get_extern(&self, def_id: DefId) -> Option<&Extern> {

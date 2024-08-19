@@ -166,7 +166,7 @@ impl<'a> TransactCtx<'a> {
         })?;
 
         if let Value::Struct(map, _) = value {
-            if let Entry::Vacant(vacant) = map.entry(entity.id_relationship_id) {
+            if let Entry::Vacant(vacant) = map.entry(entity.id_prop) {
                 match mode {
                     InsertMode::Insert => {
                         let value_generator = entity
@@ -220,12 +220,12 @@ impl<'a> TransactCtx<'a> {
         let mut param_idx = 0;
 
         // insert columns in the order of data relationships
-        for (rel_id, rel_info) in &def.data_relationships {
+        for (prop_id, rel_info) in &def.data_relationships {
             if matches!(
                 &rel_info.kind,
                 DataRelationshipKind::Id | DataRelationshipKind::Tree
             ) {
-                if let Some(pg_field) = pg.table.data_fields.get(&rel_id.1) {
+                if let Some(pg_field) = pg.table.data_fields.get(&prop_id.1) {
                     column_names.push(pg_field.col_name.as_ref());
                     if pg_field.pg_type.insert_default() {
                         values.push(sql::Expr::Default);
@@ -240,8 +240,8 @@ impl<'a> TransactCtx<'a> {
         // RETURNING is based on select, etc
         match select {
             Select::EntityId => {
-                let id_rel_tag = entity.id_relationship_id.tag();
-                if let Some(field) = pg.table.data_fields.get(&id_rel_tag) {
+                let id_prop_tag = entity.id_prop.tag();
+                if let Some(field) = pg.table.data_fields.get(&id_prop_tag) {
                     insert_returning.extend(self.initial_standard_data_fields(pg));
                     insert_returning.push(sql::Expr::path1(field.col_name.as_ref()));
                 }
@@ -329,17 +329,17 @@ impl<'a> TransactCtx<'a> {
         let mut field_buf: Vec<SqlVal> = vec![];
         let mut edge_patches = EdgePatches::default();
 
-        for (rel_id, rel_info) in &def.data_relationships {
+        for (prop_id, rel_info) in &def.data_relationships {
             match rel_info.kind {
                 DataRelationshipKind::Id | DataRelationshipKind::Tree => {
-                    let Some(pg_field) = pg_table.data_fields.get(&rel_id.1) else {
+                    let Some(pg_field) = pg_table.data_fields.get(&prop_id.1) else {
                         continue;
                     };
                     if pg_field.pg_type.insert_default() {
                         continue;
                     }
 
-                    match attrs.remove(rel_id) {
+                    match attrs.remove(prop_id) {
                         Some(Attr::Unit(value)) => match self.data_from_value(value)? {
                             Data::Sql(scalar) => {
                                 field_buf.push(scalar);
@@ -359,7 +359,7 @@ impl<'a> TransactCtx<'a> {
                 DataRelationshipKind::Edge(proj) => {
                     let patch = edge_patches.patch(proj.id, proj.subject);
 
-                    match attrs.remove(rel_id) {
+                    match attrs.remove(prop_id) {
                         Some(Attr::Unit(value)) => {
                             if patch.tuples.is_empty() {
                                 patch.tuples.push(EdgeEndoTuplePatch { elements: vec![] });
@@ -401,7 +401,7 @@ impl<'a> TransactCtx<'a> {
                     DomainErrorKind::NotAnEntity(def.id).into_error()
                 })?;
 
-                QuerySelect::Field(entity.id_relationship_id)
+                QuerySelect::Field(entity.id_prop)
             }
             Select::Struct(sel) => QuerySelect::Struct(&sel.properties),
             _ => todo!(),

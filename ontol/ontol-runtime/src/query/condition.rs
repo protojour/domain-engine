@@ -9,7 +9,7 @@ use crate::{
     impl_ontol_debug,
     value::{Value, ValueDebug},
     var::Var,
-    DefId, RelId,
+    DefId, PropId,
 };
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -164,7 +164,7 @@ pub enum Clause<V, Term> {
     IsEntity(DefId),
     /// The left variable is connected via a property to the right variable.
     /// The right variable represents a set of values for the property.
-    MatchProp(RelId, SetOperator, V),
+    MatchProp(PropId, SetOperator, V),
     /// An attribute (rel, val) is a member of the set
     Member(Term, Term),
 }

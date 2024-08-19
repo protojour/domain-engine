@@ -5,7 +5,7 @@ use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::{domain::DefKind, Ontology},
     tuple::CardinalIdx,
-    DefId, DefRelTag, EdgeId, PackageId,
+    DefId, DefPropTag, EdgeId, PackageId,
 };
 use tokio_postgres::{Client, Transaction};
 use tracing::{debug_span, info, Instrument};
@@ -56,7 +56,7 @@ enum MigrationStep {
     },
     DeployDataField {
         table_id: PgTableIdUnion,
-        rel_tag: DefRelTag,
+        prop_tag: DefPropTag,
         column_name: Box<str>,
         pg_type: PgType,
     },
@@ -64,7 +64,7 @@ enum MigrationStep {
         table_id: PgTableIdUnion,
         index_def_id: DefId,
         index_type: PgIndexType,
-        field_tuple: Vec<DefRelTag>,
+        field_tuple: Vec<DefPropTag>,
     },
     DeployEdge {
         edge_tag: u16,

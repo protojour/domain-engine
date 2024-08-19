@@ -8,7 +8,7 @@ use ontol_runtime::{
     query::filter::Filter,
     sequence::Sequence,
     value::{Serial, Value, ValueTag},
-    DefId, RelId,
+    DefId, PropId,
 };
 use tracing::trace;
 
@@ -48,7 +48,7 @@ impl<'a> From<Compound> for Data<'a> {
 #[derive(Debug)]
 #[allow(unused)]
 pub enum Compound {
-    Struct(Box<FnvHashMap<RelId, Attr>>, ValueTag),
+    Struct(Box<FnvHashMap<PropId, Attr>>, ValueTag),
     Dict(BTreeMap<smartstring::alias::String, Value>, ValueTag),
     Sequence(Sequence<Value>, ValueTag),
     DeleteRelationship(ValueTag),
@@ -62,11 +62,11 @@ impl<'a> TransactCtx<'a> {
 
         match &self.ontology.def(def_id).kind {
             DefKind::Data(basic) => match (sql_val, &basic.repr) {
-                (sql_val, DefRepr::FmtStruct(Some((attr_rel_id, attr_def_id)))) => {
+                (sql_val, DefRepr::FmtStruct(Some((attr_prop_id, attr_def_id)))) => {
                     Ok(Value::Struct(
                         Box::new(
                             [(
-                                *attr_rel_id,
+                                *attr_prop_id,
                                 Attr::Unit(self.deserialize_sql(*attr_def_id, sql_val)?),
                             )]
                             .into_iter()

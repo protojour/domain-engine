@@ -11,7 +11,7 @@ use ontol_runtime::{
     query::select::Select,
     tuple::CardinalIdx,
     value::Value,
-    DefId, EdgeId, RelId,
+    DefId, EdgeId, PropId,
 };
 use postgres_types::ToSql;
 use tracing::{debug, trace};
@@ -112,7 +112,7 @@ enum Dynamic<'a> {
 
 #[derive(Default)]
 struct EdgeAnalysis<'a> {
-    param_order: BTreeSet<(RelId, DefId)>,
+    param_order: BTreeSet<(PropId, DefId)>,
     projected_cardinals: Vec<ProjectedEdgeCardinal<'a>>,
 }
 
@@ -223,14 +223,14 @@ impl<'a> TransactCtx<'a> {
                 }
                 PgEdgeCardinalKind::Parameters(params_def_id) => {
                     let def = self.ontology.def(*params_def_id);
-                    for (rel_id, rel_info) in &def.data_relationships {
+                    for (prop_id, rel_info) in &def.data_relationships {
                         if let DataRelationshipKind::Tree = &rel_info.kind {
                             match &rel_info.target {
                                 DataRelationshipTarget::Unambiguous(def_id) => {
-                                    let pg_field = pg_edge.table.field(rel_id)?;
+                                    let pg_field = pg_edge.table.field(prop_id)?;
                                     sql_insert.column_names.push(&pg_field.col_name);
                                     sql_insert.values.push(sql::Expr::param(param_index));
-                                    analysis.param_order.insert((*rel_id, *def_id));
+                                    analysis.param_order.insert((*prop_id, *def_id));
                                     param_index += 1;
                                 }
                                 DataRelationshipTarget::Union(_) => {
@@ -365,7 +365,7 @@ impl<'a> TransactCtx<'a> {
                     }
                 };
 
-                let pg_foreign_id = pg_foreign.table.field(&foreign_entity.id_relationship_id)?;
+                let pg_foreign_id = pg_foreign.table.field(&foreign_entity.id_prop)?;
 
                 sql_delete.where_and(sql::Expr::in_(
                     sql::Expr::path1(key_col_name.as_ref()),
@@ -435,8 +435,8 @@ impl<'a> TransactCtx<'a> {
                         return Err(ds_bad_req("edge params must be a struct"));
                     };
 
-                    for (rel_id, _def_id) in &analysis.param_order {
-                        let data = match map.remove(rel_id) {
+                    for (prop_id, _def_id) in &analysis.param_order {
+                        let data = match map.remove(prop_id) {
                             Some(Attr::Unit(value)) => self.data_from_value(value)?,
                             Some(_) => {
                                 return Err(ds_bad_req("non-scalar attribute in edge parameter"))
@@ -547,8 +547,8 @@ impl<'a> TransactCtx<'a> {
                         return Err(ds_bad_req("edge params must be a struct"));
                     };
 
-                    for (rel_id, _def_id) in &analysis.param_order {
-                        let data = match map.remove(rel_id) {
+                    for (prop_id, _def_id) in &analysis.param_order {
+                        let data = match map.remove(prop_id) {
                             Some(Attr::Unit(value)) => self.data_from_value(value)?,
                             Some(_) => {
                                 return Err(ds_bad_req("non-scalar attribute in edge parameter"))
@@ -558,7 +558,7 @@ impl<'a> TransactCtx<'a> {
 
                         match data {
                             Data::Sql(sql_val) => {
-                                let field = pg_edge.table.field(rel_id)?;
+                                let field = pg_edge.table.field(prop_id)?;
                                 sql_update.set.push(sql::UpdateColumn(
                                     &field.col_name,
                                     sql::Expr::param(param_buf.len()),
@@ -636,7 +636,7 @@ impl<'a> TransactCtx<'a> {
 
         enum ResolveMode {
             VertexData,
-            Id(RelId, IdResolveMode),
+            Id(PropId, IdResolveMode),
         }
 
         enum IdResolveMode {
@@ -655,12 +655,12 @@ impl<'a> TransactCtx<'a> {
                 let Value::Struct(mut map, _) = value else {
                     return Err(ds_bad_req("must be a struct"));
                 };
-                let Some(Attr::Unit(id)) = map.remove(&entity.id_relationship_id) else {
+                let Some(Attr::Unit(id)) = map.remove(&entity.id_prop) else {
                     return Err(ds_bad_req("self-identifying vertex without id"));
                 };
 
                 (
-                    ResolveMode::Id(entity.id_relationship_id, IdResolveMode::SelfIdentifying),
+                    ResolveMode::Id(entity.id_prop, IdResolveMode::SelfIdentifying),
                     def_id,
                     id,
                 )
@@ -669,7 +669,7 @@ impl<'a> TransactCtx<'a> {
             }
         } else if let Some(vertex_def_id) = self.pg_model.entity_id_to_entity.get(&def_id) {
             let entity = self.ontology.def(*vertex_def_id).entity().unwrap();
-            let id_rel_id = entity.id_relationship_id;
+            let id_prop_id = entity.id_prop;
             let id_resolve_mode = if entity.is_self_identifying {
                 IdResolveMode::SelfIdentifying
             } else {
@@ -677,7 +677,7 @@ impl<'a> TransactCtx<'a> {
             };
 
             (
-                ResolveMode::Id(id_rel_id, id_resolve_mode),
+                ResolveMode::Id(id_prop_id, id_resolve_mode),
                 *vertex_def_id,
                 value,
             )
@@ -704,12 +704,12 @@ impl<'a> TransactCtx<'a> {
 
                 Ok((def_id, row_value.def_key, row_value.data_key))
             }
-            ResolveMode::Id(id_rel_id, id_resolve_mode) => {
+            ResolveMode::Id(id_prop_id, id_resolve_mode) => {
                 let pg = self
                     .pg_model
                     .pg_domain_datatable(vertex_def_id.package_id(), vertex_def_id)?;
 
-                let pg_id_field = pg.table.field(&id_rel_id)?;
+                let pg_id_field = pg.table.field(&id_prop_id)?;
 
                 let Data::Sql(id_param) = self.data_from_value(value)? else {
                     return Err(ds_bad_req("compound foreign key"));
@@ -717,7 +717,7 @@ impl<'a> TransactCtx<'a> {
 
                 let stmt = match id_resolve_mode {
                     IdResolveMode::Plain => {
-                        let stmt_key = (vertex_def_id, id_rel_id);
+                        let stmt_key = (vertex_def_id, id_prop_id);
                         if let Some(stmt) =
                             self.stmt_cache_locked(|c| c.key_by_id.get(&stmt_key).cloned())
                         {

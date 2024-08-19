@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
-use ontol_runtime::{property::Cardinality, DefId, RelId};
+use ontol_runtime::{property::Cardinality, DefId, DefPropTag, PropId, RelId};
 use tracing::warn;
 
 use crate::{
@@ -16,14 +16,25 @@ pub struct PropCtx {
 }
 
 impl PropCtx {
+    pub fn property_by_id(&self, prop_id: PropId) -> Option<&Property> {
+        self.properties_table_by_def_id(prop_id.0)?.get(&prop_id)
+    }
+
     pub fn properties_by_def_id(&self, domain_type_id: DefId) -> Option<&Properties> {
         self.properties_by_def_id.get(&domain_type_id)
+    }
+
+    pub fn alloc_prop_id(&mut self, def_id: DefId) -> PropId {
+        let properties = self.properties_by_def_id_mut(def_id);
+        let tag = properties.next_prop_tag;
+        properties.next_prop_tag += 1;
+        PropId(def_id, DefPropTag(tag))
     }
 
     pub fn properties_table_by_def_id(
         &self,
         domain_type_id: DefId,
-    ) -> Option<&IndexMap<RelId, Property>> {
+    ) -> Option<&IndexMap<PropId, Property>> {
         self.properties_by_def_id
             .get(&domain_type_id)
             .and_then(|properties| properties.table.as_ref())
@@ -31,6 +42,14 @@ impl PropCtx {
 
     pub fn properties_by_def_id_mut(&mut self, domain_type_id: DefId) -> &mut Properties {
         self.properties_by_def_id.entry(domain_type_id).or_default()
+    }
+
+    pub fn append_prop(&mut self, def_id: DefId, property: Property) -> PropId {
+        let prop_id = self.alloc_prop_id(def_id);
+        let properties = self.properties_by_def_id_mut(def_id);
+        let table = properties.table.get_or_insert_with(Default::default);
+        table.insert(prop_id, property);
+        prop_id
     }
 
     pub fn identified_by(&self, domain_type_id: DefId) -> Option<RelId> {
@@ -54,8 +73,9 @@ impl PropCtx {
 
 #[derive(Default, Debug)]
 pub struct Properties {
+    next_prop_tag: u16,
     pub constructor: Constructor,
-    pub table: Option<IndexMap<RelId, Property>>,
+    pub table: Option<IndexMap<PropId, Property>>,
     pub identifies: Option<RelId>,
     pub identified_by: Option<RelId>,
 }
@@ -66,13 +86,14 @@ impl Properties {
     }
 
     /// Get the property table, create it if None
-    pub fn table_mut(&mut self) -> &mut IndexMap<RelId, Property> {
+    pub fn table_mut(&mut self) -> &mut IndexMap<PropId, Property> {
         self.table.get_or_insert_with(Default::default)
     }
 }
 
 #[derive(Debug)]
 pub struct Property {
+    pub rel_id: RelId,
     pub cardinality: Cardinality,
     pub is_entity_id: bool,
     /// supplies only partial information to an edge,

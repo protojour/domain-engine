@@ -20,7 +20,7 @@ use ontol_runtime::{
     },
     sequence::{Sequence, SubSequence},
     value::{Value, ValueTag},
-    RelId,
+    PropId,
 };
 use serde::Serialize;
 use tracing::{trace, trace_span, warn};
@@ -342,7 +342,7 @@ impl<'v> AttributeType<'v> {
                     .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap();
 
-                match attrs.get(&field.rel_id) {
+                match attrs.get(&field.prop_id) {
                     Some(attr) => resolve_schema_type_field(
                         AttributeType {
                             attr: attr.as_ref(),
@@ -366,7 +366,7 @@ impl<'v> AttributeType<'v> {
             (AttrRef::Unit(Value::Struct(attrs, _)), FieldKind::Id(id_property_data)) => {
                 resolve_property(
                     attrs,
-                    id_property_data.relationship_id,
+                    id_property_data.prop_id,
                     field_type,
                     schema_ctx,
                     executor,
@@ -384,7 +384,7 @@ impl<'v> AttributeType<'v> {
                     ));
                 }
 
-                match attrs.get(&schema_ctx.ontology.ontol_domain_meta().open_data_rel_id()) {
+                match attrs.get(&schema_ctx.ontology.ontol_domain_meta().open_data_prop_id()) {
                     Some(Attr::Unit(open_data_value)) => Ok(serialize_raw(
                         open_data_value,
                         &schema_ctx.ontology,
@@ -483,13 +483,13 @@ impl<'v> AttributeType<'v> {
 }
 
 fn resolve_property(
-    map: &FnvHashMap<RelId, Attr>,
-    rel_id: RelId,
+    map: &FnvHashMap<PropId, Attr>,
+    prop_id: PropId,
     type_ref: TypeRef,
     schema_ctx: &Arc<SchemaCtx>,
     executor: &juniper::Executor<ServiceCtx, crate::gql_scalar::GqlScalar>,
 ) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
-    let Some(attr) = map.get(&rel_id) else {
+    let Some(attr) = map.get(&prop_id) else {
         return Ok(graphql_value!(None));
     };
 

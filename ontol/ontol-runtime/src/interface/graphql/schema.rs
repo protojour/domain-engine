@@ -8,7 +8,7 @@ use crate::{
     },
     ontology::OntologyInit,
     phf::PhfMap,
-    DefId, PackageId, RelId,
+    DefId, PackageId, PropId,
 };
 
 use super::data::{TypeAddr, TypeData};
@@ -31,7 +31,7 @@ pub struct GraphqlSchema {
 #[derive(Serialize, Deserialize)]
 pub struct InterfaceImplementor {
     pub addr: TypeAddr,
-    pub attribute_predicate: Box<[(RelId, DefId)]>,
+    pub attribute_predicate: Box<[(PropId, DefId)]>,
 }
 
 impl GraphqlSchema {

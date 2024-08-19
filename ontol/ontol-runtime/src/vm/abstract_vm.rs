@@ -12,7 +12,7 @@ use crate::{
     query::condition::ClausePair,
     var::Var,
     vm::proc::{BuiltinProc, Local, OpCode, Predicate, Procedure},
-    DefId, RelId,
+    DefId, PropId,
 };
 
 /// Abstract virtual machine for executing ONTOL procedures.
@@ -59,13 +59,13 @@ pub trait Processor {
     fn get_attr(
         &mut self,
         source: Local,
-        key: RelId,
+        key: PropId,
         arity: u8,
         flags: GetAttrFlags,
     ) -> VmResult<()>;
-    fn put_attr_unit(&mut self, target: Local, key: RelId) -> VmResult<()>;
-    fn put_attr_tuple(&mut self, target: Local, arity: u8, key: RelId) -> VmResult<()>;
-    fn put_attr_matrix(&mut self, target: Local, arity: u8, key: RelId) -> VmResult<()>;
+    fn put_attr_unit(&mut self, target: Local, key: PropId) -> VmResult<()>;
+    fn put_attr_tuple(&mut self, target: Local, arity: u8, key: PropId) -> VmResult<()>;
+    fn put_attr_matrix(&mut self, target: Local, arity: u8, key: PropId) -> VmResult<()>;
     fn move_rest_attrs(&mut self, target: Local, source: Local) -> VmResult<()>;
     fn push_i64(&mut self, k: i64, result_type: DefId) -> VmResult<()>;
     fn push_f64(&mut self, k: f64, result_type: DefId) -> VmResult<()>;
@@ -198,20 +198,20 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                         processor.yield_call_extern(*extern_def_id, *output_def_id)?,
                     ));
                 }
-                OpCode::GetAttr(local, rel_id, arity, flags) => {
-                    processor.get_attr(*local, *rel_id, *arity, *flags)?;
+                OpCode::GetAttr(local, prop_id, arity, flags) => {
+                    processor.get_attr(*local, *prop_id, *arity, *flags)?;
                     self.program_counter += 1;
                 }
-                OpCode::PutAttrUnit(target, rel_id) => {
-                    processor.put_attr_unit(*target, *rel_id)?;
+                OpCode::PutAttrUnit(target, prop_id) => {
+                    processor.put_attr_unit(*target, *prop_id)?;
                     self.program_counter += 1;
                 }
-                OpCode::PutAttrTup(target, arity, rel_id) => {
-                    processor.put_attr_tuple(*target, *arity, *rel_id)?;
+                OpCode::PutAttrTup(target, arity, prop_id) => {
+                    processor.put_attr_tuple(*target, *arity, *prop_id)?;
                     self.program_counter += 1;
                 }
-                OpCode::PutAttrMat(target, arity, rel_id) => {
-                    processor.put_attr_matrix(*target, *arity, *rel_id)?;
+                OpCode::PutAttrMat(target, arity, prop_id) => {
+                    processor.put_attr_matrix(*target, *arity, *prop_id)?;
                     self.program_counter += 1;
                 }
                 OpCode::MoveRestAttrs(target, source) => {

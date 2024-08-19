@@ -5,7 +5,7 @@ use ontol_runtime::{
     property::{PropertyCardinality, ValueCardinality},
     tuple::CardinalIdx,
     var::Var,
-    DefId, RelId,
+    DefId, PropId, RelId,
 };
 use tracing::{debug, info};
 
@@ -353,7 +353,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
         pattern: &Pattern,
         attr_relation_id: DefId,
         flags: VarFlags,
-        (parent_def_id, parent_table): (DefId, &IndexMap<RelId, Property>),
+        (parent_def_id, parent_table): (DefId, &IndexMap<PropId, Property>),
         output: &mut FnvHashMap<Var, Vec<VarRelationship>>,
     ) {
         if attr_relation_id == self.primitives.relations.order {
@@ -403,16 +403,16 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                     self.scan_source_variables(pattern, flags, output);
                 }
                 PatternKind::Variable(pat_var) => {
-                    let found = parent_table.iter().find_map(|(rel_id, _property)| {
-                        let meta = rel_def_meta(*rel_id, self.rel_ctx, self.defs);
+                    let found = parent_table.iter().find_map(|(prop_id, property)| {
+                        let meta = rel_def_meta(property.rel_id, self.rel_ctx, self.defs);
                         if meta.relationship.relation_def_id == attr_relation_id {
-                            Some((*rel_id, meta))
+                            Some((*prop_id, meta))
                         } else {
                             None
                         }
                     });
 
-                    if let Some((_rel_id, found_relationship_meta)) = found {
+                    if let Some((_prop_id, found_relationship_meta)) = found {
                         let (val_def_id, _cardinality, _) =
                             found_relationship_meta.relationship.object();
 

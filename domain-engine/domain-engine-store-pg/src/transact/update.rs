@@ -5,7 +5,7 @@ use domain_engine_core::{
 use futures_util::{Stream, StreamExt, TryFutureExt, TryStreamExt};
 use ontol_runtime::{
     attr::Attr, ontology::domain::DataRelationshipKind, query::select::Select, tuple::EndoTuple,
-    value::Value, RelId,
+    value::Value, PropId,
 };
 use postgres_types::ToSql;
 use tracing::{debug, trace, warn};
@@ -25,7 +25,7 @@ use super::{
 };
 
 enum UpdateCondition {
-    FieldEq(RelId, Value),
+    FieldEq(PropId, Value),
     #[allow(unused)]
     PgKey(PgDataKey),
 }
@@ -50,15 +50,12 @@ impl<'a> TransactCtx<'a> {
             .ok_or_else(|| DomainErrorKind::EntityNotFound.into_error())?;
 
         let key = self
-            .update_datatable(
-                value,
-                UpdateCondition::FieldEq(entity.id_relationship_id, entity_id),
-            )
+            .update_datatable(value, UpdateCondition::FieldEq(entity.id_prop, entity_id))
             .await?;
 
         let query_select = match select {
             Select::Struct(sel) => QuerySelect::Struct(&sel.properties),
-            Select::Leaf | Select::EntityId => QuerySelect::Field(entity.id_relationship_id),
+            Select::Leaf | Select::EntityId => QuerySelect::Field(entity.id_prop),
             _ => todo!(),
         };
 
@@ -89,8 +86,8 @@ impl<'a> TransactCtx<'a> {
         let mut update_params: Vec<SqlVal> = vec![];
 
         match update_condition {
-            UpdateCondition::FieldEq(rel_id, value) => {
-                let pg_field = pg.table.field(&rel_id)?;
+            UpdateCondition::FieldEq(prop_id, value) => {
+                let pg_field = pg.table.field(&prop_id)?;
                 where_ = Some(sql::Expr::eq(
                     sql::Expr::path1(pg_field.col_name.as_ref()),
                     sql::Expr::param(0),
@@ -112,18 +109,18 @@ impl<'a> TransactCtx<'a> {
 
         let mut edge_patches = EdgePatches::default();
 
-        for (rel_id, attr) in *data_struct {
+        for (prop_id, attr) in *data_struct {
             let rel_info = def
                 .data_relationships
-                .get(&rel_id)
-                .ok_or(PgInputError::DataRelationshipNotFound(rel_id))?;
+                .get(&prop_id)
+                .ok_or(PgInputError::DataRelationshipNotFound(prop_id))?;
 
             match rel_info.kind {
                 DataRelationshipKind::Id => {
                     trace!("skipping ID for update");
                 }
                 DataRelationshipKind::Tree => {
-                    let pg_field = pg.table.field(&rel_id)?;
+                    let pg_field = pg.table.field(&prop_id)?;
                     let param_index = update_params.len();
 
                     set.push(sql::UpdateColumn(

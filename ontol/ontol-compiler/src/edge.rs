@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::{
-    ontology::ontol::TextConstant, tuple::CardinalIdx, DefId, EdgeId, PackageId, RelId,
+    ontology::ontol::TextConstant, tuple::CardinalIdx, DefId, EdgeId, PackageId, PropId,
 };
 use tracing::{debug, error};
 
@@ -77,7 +77,7 @@ pub struct Slot {
 pub struct SymbolicEdgeVariable {
     pub span: SourceSpan,
     /// Defs participating in this variable.
-    pub members: FnvHashMap<DefId, BTreeSet<RelId>>,
+    pub members: FnvHashMap<DefId, BTreeSet<PropId>>,
     pub one_to_one_count: usize,
 }
 
@@ -111,38 +111,39 @@ impl<'m> Compiler<'m> {
                 debug!("raw participants: {:?}", var.members);
 
                 // step 1: resolve unions
-                for (def_id, rel_set) in std::mem::take(&mut var.members) {
+                for (def_id, prop_set) in std::mem::take(&mut var.members) {
                     match self.repr_ctx.get_repr_kind(&def_id) {
                         Some(ReprKind::Union(members, _)) => {
                             for (member, _span) in members {
-                                var.members.entry(*member).or_default().extend(&rel_set);
+                                var.members.entry(*member).or_default().extend(&prop_set);
                             }
                         }
                         _ => {
-                            var.members.entry(def_id).or_default().extend(&rel_set);
+                            var.members.entry(def_id).or_default().extend(&prop_set);
                         }
                     }
                 }
 
                 // step 2: resolve identifier types
-                for (def_id, rel_set) in std::mem::take(&mut var.members) {
+                for (def_id, prop_set) in std::mem::take(&mut var.members) {
                     if let Some(properties) = self.prop_ctx.properties_by_def_id(def_id) {
                         if let Some(identifies_rel_id) = properties.identifies {
                             let meta = rel_def_meta(identifies_rel_id, &self.rel_ctx, &self.defs);
 
-                            var.members.insert(meta.relationship.object.0, rel_set);
+                            var.members.insert(meta.relationship.object.0, prop_set);
                         } else {
-                            var.members.insert(def_id, rel_set);
+                            var.members.insert(def_id, prop_set);
                         }
                     }
                 }
 
                 // step 3: edge entity check
-                for (def_id, rel_set) in &var.members {
+                for (def_id, prop_set) in &var.members {
                     if !self.entity_ctx.entities.contains_key(def_id) {
-                        let rel_id = rel_set.first().unwrap();
+                        let prop_id = prop_set.first().unwrap();
+                        let property = self.prop_ctx.property_by_id(*prop_id).unwrap();
                         CompileError::TODO("must be entity to participate in edge")
-                            .span(self.rel_ctx.span(*rel_id))
+                            .span(self.rel_ctx.span(property.rel_id))
                             .report(&mut self.errors);
                     }
                 }
@@ -160,9 +161,10 @@ impl<'m> Compiler<'m> {
                 Default::default();
 
             for var in edge.variables.values() {
-                for (member_id, rel_ids) in &var.members {
-                    for rel_id in rel_ids {
-                        let meta = rel_def_meta(*rel_id, &self.rel_ctx, &self.defs);
+                for (member_id, prop_ids) in &var.members {
+                    for prop_id in prop_ids {
+                        let property = self.prop_ctx.property_by_id(*prop_id).unwrap();
+                        let meta = rel_def_meta(property.rel_id, &self.rel_ctx, &self.defs);
 
                         if &meta.relationship.subject.0 == member_id {
                             let slot_set = slot_set_per_member.entry(*member_id).or_default();
@@ -185,23 +187,30 @@ impl<'m> Compiler<'m> {
 
                 debug!("{member_id:?} has partial participation: {slot_set:?}");
 
-                let properties = self.prop_ctx.properties_by_def_id_mut(member_id);
-                let Some(table) = &mut properties.table else {
+                if self
+                    .prop_ctx
+                    .properties_table_by_def_id(member_id)
+                    .is_none()
+                {
                     continue;
-                };
+                }
 
                 // collect relationships again
                 for var in edge.variables.values() {
-                    for rel_ids in var.members.values() {
-                        for rel_id in rel_ids {
-                            let meta = rel_def_meta(*rel_id, &self.rel_ctx, &self.defs);
+                    for prop_ids in var.members.values() {
+                        for prop_id in prop_ids {
+                            let property = self.prop_ctx.property_by_id(*prop_id).unwrap();
+                            let meta = rel_def_meta(property.rel_id, &self.rel_ctx, &self.defs);
 
                             if meta.relationship.subject.0 == member_id {
-                                if let Some(property) = table.get_mut(rel_id) {
+                                let properties = self.prop_ctx.properties_by_def_id_mut(member_id);
+                                let table = properties.table.as_mut().unwrap();
+
+                                if let Some(property) = table.get_mut(prop_id) {
                                     property.is_edge_partial = true;
                                 } else {
                                     error!(
-                                        "property {member_id:?}.{rel_id:?} not found in {keys:?}",
+                                        "property {member_id:?}.{prop_id:?} not found in {keys:?}",
                                         keys = table.keys()
                                     );
                                 }

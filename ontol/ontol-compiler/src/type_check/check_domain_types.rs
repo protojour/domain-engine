@@ -2,7 +2,7 @@ use fnv::FnvHashSet;
 use ontol_runtime::{
     ontology::ontol::{TextLikeType, ValueGenerator},
     property::{PropertyCardinality, ValueCardinality},
-    DefId, RelId,
+    DefId, PropId, RelId,
 };
 use tracing::{debug, instrument, trace};
 
@@ -23,10 +23,11 @@ use super::TypeCheck;
 #[derive(Debug)]
 enum Action {
     /// Many(*) value cardinality between two entities are always considered optional
-    AdjustEntityPropertyCardinality(DefId, RelId),
+    AdjustEntityPropertyCardinality(DefId, PropId),
     RedefineAsPrimaryId {
         def_id: DefId,
-        inherent_property_id: RelId,
+        inherent_prop_id: PropId,
+        inherent_rel_id: RelId,
         identifies_relationship_id: RelId,
     },
     CheckValueGenerator {
@@ -45,10 +46,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let mut actions = vec![];
 
-        for (rel_id, property) in table {
-            trace!("check pre-repr {def_id:?} {rel_id:?} {property:?}");
+        for (prop_id, property) in table {
+            trace!("check pre-repr {def_id:?} {prop_id:?} {property:?}");
 
-            let meta = rel_def_meta(*rel_id, self.rel_ctx, self.defs);
+            let meta = rel_def_meta(property.rel_id, self.rel_ctx, self.defs);
 
             let object_properties = self
                 .prop_ctx
@@ -62,12 +63,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 if id_meta.relationship.object.0 == def_id {
                     debug!(
                         "redefine as primary id: {id_relationship_id:?} <-> inherent {:?}",
-                        rel_id
+                        prop_id
                     );
 
                     actions.push(Action::RedefineAsPrimaryId {
                         def_id,
-                        inherent_property_id: *rel_id,
+                        inherent_prop_id: *prop_id,
+                        inherent_rel_id: property.rel_id,
                         identifies_relationship_id: id_relationship_id,
                     });
                 }
@@ -88,10 +90,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let mut actions = vec![];
         let mut subject_relation_set: FnvHashSet<DefId> = Default::default();
 
-        for (rel_id, property) in table {
-            trace!("check post-repr {def_id:?} {rel_id:?} {property:?}");
+        for (prop_id, property) in table {
+            trace!("check post-repr {def_id:?} {prop_id:?} {property:?}");
 
-            let meta = rel_def_meta(*rel_id, self.rel_ctx, self.defs);
+            let meta = rel_def_meta(property.rel_id, self.rel_ctx, self.defs);
 
             // Check that the same relation_def_id is not reused for subject properties
             if !subject_relation_set.insert(meta.relationship.relation_def_id) {
@@ -113,14 +115,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         .report(&mut self.errors);
                 }
 
-                actions.push(Action::AdjustEntityPropertyCardinality(def_id, *rel_id));
+                actions.push(Action::AdjustEntityPropertyCardinality(def_id, *prop_id));
             }
 
-            if let Some((generator_def_id, gen_span)) =
-                self.misc_ctx.value_generators_unchecked.remove(rel_id)
+            if let Some((generator_def_id, gen_span)) = self
+                .misc_ctx
+                .value_generators_unchecked
+                .remove(&property.rel_id)
             {
                 actions.push(Action::CheckValueGenerator {
-                    relationship_id: *rel_id,
+                    relationship_id: property.rel_id,
                     generator_def_id,
                     object_def_id: meta.relationship.object.0,
                     span: gen_span,
@@ -170,18 +174,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
                 Action::RedefineAsPrimaryId {
                     def_id,
-                    inherent_property_id,
+                    inherent_prop_id,
+                    inherent_rel_id,
                     identifies_relationship_id,
                 } => {
                     self.misc_ctx
                         .inherent_id_map
-                        .insert(identifies_relationship_id, inherent_property_id);
+                        .insert(identifies_relationship_id, inherent_prop_id);
                     let properties = self.prop_ctx.properties_by_def_id_mut(def_id);
 
                     if let Some(table) = &mut properties.table {
                         table.insert(
-                            inherent_property_id,
+                            inherent_prop_id,
                             Property {
+                                rel_id: inherent_rel_id,
                                 cardinality: (
                                     PropertyCardinality::Mandatory,
                                     ValueCardinality::Unit,

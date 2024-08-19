@@ -68,14 +68,14 @@ impl AqlQuery {
 
         match entity {
             Value::Struct(ref mut struct_map, _) => {
-                for (rel_id, attr) in struct_map.clone().iter() {
+                for (prop_id, attr) in struct_map.clone().iter() {
                     let rel_info = def
                         .data_relationships
-                        .get(rel_id)
+                        .get(prop_id)
                         .expect("property not found in type info");
                     if let DataRelationshipKind::Edge(_) = rel_info.kind {
                         meta.write_relation(mode, attr.clone(), rel_info, 0)?;
-                        struct_map.remove(rel_id); // TODO: verify
+                        struct_map.remove(prop_id); // TODO: verify
                     }
                 }
             }
@@ -418,7 +418,7 @@ fn generate_id(
     match &mut entity {
         Value::Struct(ref mut struct_map, _) => {
             if let Some(id) = &id {
-                struct_map.insert(entity_info.id_relationship_id, id.clone().into());
+                struct_map.insert(entity_info.id_prop, id.clone().into());
             }
         }
         _ => return Err(DomainErrorKind::EntityMustBeStruct.into_error()),
@@ -597,10 +597,10 @@ impl<'a> MetaQuery<'a> {
 
                 let mut sub_meta =
                     MetaQuery::from(var_name.clone().to_var(), self.ontology, self.database);
-                for (rel_id, attr) in struct_map.clone().iter() {
+                for (prop_id, attr) in struct_map.clone().iter() {
                     let rel_info = def
                         .data_relationships
-                        .get(rel_id)
+                        .get(prop_id)
                         .expect("property not found in type info");
                     if let DataRelationshipKind::Edge(_) = rel_info.kind {
                         match &rel_info.target {
@@ -950,10 +950,10 @@ impl<'a> MetaQuery<'a> {
                     None => Expr::complex(format!("{}[0]", self.var)),
                 };
 
-                for (rel_id, sub_select) in &selection {
+                for (prop_id, sub_select) in &selection {
                     let rel_info = def
                         .data_relationships
-                        .get(rel_id)
+                        .get(prop_id)
                         .expect("property not found in type info");
                     if let DataRelationshipKind::Edge(_) = rel_info.kind {
                         let rel_name = rel_info.name;

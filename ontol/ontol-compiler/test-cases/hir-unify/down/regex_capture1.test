@@ -1,20 +1,20 @@
 (struct ($b)
-    (prop! $b rel@1:0:0
+    (prop! $b p@1:0:0
         (regex def@0:0 ((1 $a)))
     )
 )
 
 (struct ($c)
-    (prop! $c rel@2:0:0 $a)
+    (prop! $c p@2:0:0 $a)
 )
 
 |$b| (block
-    (let-prop $d ($b rel@1:0:0))
+    (let-prop $d ($b p@1:0:0))
     (let-regex ((1 $a)) def@0:0 $d)
     (struct ($c)
         (catch (@e)
             (try? @e $a)
-            (prop! $c rel@2:0:0 $a)
+            (prop! $c p@2:0:0 $a)
         )
         (move-rest-attrs $c $b)
     )

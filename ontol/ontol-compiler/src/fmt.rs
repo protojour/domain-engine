@@ -1,16 +1,9 @@
-use ontol_runtime::{
-    ontology::domain::EdgeCardinalProjection,
-    property::{PropertyCardinality, ValueCardinality},
-    tuple::CardinalIdx,
-    DefId, EdgeId, RelId,
-};
+use ontol_runtime::{DefId, DefPropTag, PropId};
 
 use crate::{
     def::DefKind,
-    package::ONTOL_PKG,
     primitive::PrimitiveKind,
     properties::{Constructor, Properties},
-    relation::{RelParams, Relationship},
     text_patterns::TextPatternSegment,
     CompileError, Compiler, SourceSpan,
 };
@@ -72,16 +65,13 @@ impl<'m> Compiler<'m> {
                     .hir
                     .clone(),
             )),
-            DefKind::Primitive(PrimitiveKind::Serial, _) => {
-                let rel_id = self.make_relationship(fmt_def_id, transition_def_id, span);
-                Ok(TextPatternSegment::Attribute {
-                    rel_id,
-                    type_def_id: transition_def_id,
-                    segment: Box::new(TextPatternSegment::Serial { radix: 10 }),
-                })
-            }
+            DefKind::Primitive(PrimitiveKind::Serial, _) => Ok(TextPatternSegment::Attribute {
+                prop_id: PropId(fmt_def_id, DefPropTag(0)),
+                type_def_id: transition_def_id,
+                segment: Box::new(TextPatternSegment::Serial { radix: 10 }),
+            }),
             _ => {
-                let rel_id = self.make_relationship(fmt_def_id, transition_def_id, span);
+                // let rel_id = self.make_prop_relationship(fmt_def_id, transition_def_id, span);
 
                 let constructor = self
                     .prop_ctx
@@ -90,7 +80,7 @@ impl<'m> Compiler<'m> {
 
                 match constructor {
                     Some(Constructor::TextFmt(rel_segment)) => Ok(TextPatternSegment::Attribute {
-                        rel_id,
+                        prop_id: PropId(fmt_def_id, DefPropTag(0)),
                         type_def_id: transition_def_id,
                         segment: Box::new(rel_segment.clone()),
                     }),
@@ -103,36 +93,5 @@ impl<'m> Compiler<'m> {
                 }
             }
         }
-    }
-
-    fn make_relationship(
-        &mut self,
-        fmt_def_id: DefId,
-        transition_def_id: DefId,
-        span: SourceSpan,
-    ) -> RelId {
-        let rel_id = self.rel_ctx.alloc_rel_id(fmt_def_id);
-        self.rel_ctx.commit_rel(
-            rel_id,
-            Relationship {
-                relation_def_id: transition_def_id,
-                projection: EdgeCardinalProjection {
-                    id: EdgeId(ONTOL_PKG, 0),
-                    subject: CardinalIdx(0),
-                    object: CardinalIdx(0),
-                    one_to_one: false,
-                },
-                subject: (fmt_def_id, span),
-                object: (transition_def_id, span),
-                subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),
-                object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),
-                rel_params: RelParams::Unit,
-                relation_span: span,
-                macro_source: None,
-            },
-            span,
-        );
-
-        rel_id
     }
 }

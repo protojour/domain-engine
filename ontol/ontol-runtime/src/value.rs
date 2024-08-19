@@ -17,7 +17,7 @@ use crate::{
     query::filter::Filter,
     sequence::Sequence,
     tuple::EndoTupleElements,
-    DefId, PackageId, RelId,
+    DefId, PackageId, PropId,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -37,7 +37,7 @@ pub enum Value {
     ChronoTime(chrono::NaiveTime, ValueTag),
 
     /// A collection of attributes keyed by property.
-    Struct(Box<FnvHashMap<RelId, Attr>>, ValueTag),
+    Struct(Box<FnvHashMap<PropId, Attr>>, ValueTag),
 
     /// A collection of arbitrary values keyed by strings.
     Dict(Box<BTreeMap<String, Value>>, ValueTag),
@@ -60,7 +60,7 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn new_struct(props: impl IntoIterator<Item = (RelId, Attr)>, tag: ValueTag) -> Self {
+    pub fn new_struct(props: impl IntoIterator<Item = (PropId, Attr)>, tag: ValueTag) -> Self {
         Self::Struct(Box::new(FnvHashMap::from_iter(props)), tag)
     }
 
@@ -144,15 +144,15 @@ impl Value {
         }
     }
 
-    pub fn get_attribute(&self, rel_id: RelId) -> Option<&Attr> {
+    pub fn get_attribute(&self, prop_id: PropId) -> Option<&Attr> {
         match self {
-            Self::Struct(map, _) => map.get(&rel_id),
+            Self::Struct(map, _) => map.get(&prop_id),
             _ => None,
         }
     }
 
-    pub fn get_attribute_value(&self, rel_id: RelId) -> Option<&Value> {
-        match self.get_attribute(rel_id)? {
+    pub fn get_attribute_value(&self, prop_id: PropId) -> Option<&Value> {
+        match self.get_attribute(prop_id)? {
             Attr::Unit(value) => Some(value),
             _ => None,
         }

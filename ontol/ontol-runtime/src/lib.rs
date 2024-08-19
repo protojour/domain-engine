@@ -268,6 +268,78 @@ impl FromStr for RelId {
     }
 }
 
+/// The tag of a relationship belonging to a specific Def.
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+pub struct DefPropTag(pub u16);
+
+impl DefPropTag {
+    pub const fn order() -> Self {
+        DefPropTag(65535)
+    }
+
+    pub const fn direction() -> Self {
+        DefPropTag(65534)
+    }
+
+    pub const fn open_data() -> Self {
+        DefPropTag(65533)
+    }
+
+    pub const fn flat_union() -> Self {
+        DefPropTag(65532)
+    }
+}
+
+impl ::std::fmt::Debug for DefPropTag {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "p@{}", self.0)
+    }
+}
+
+/// The id of a property
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+pub struct PropId(pub DefId, pub DefPropTag);
+
+impl PropId {
+    pub fn tag(&self) -> DefPropTag {
+        self.1
+    }
+}
+
+/// This forces single-line output even when pretty-printed
+impl ::std::fmt::Debug for PropId {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "p@{}:{}:{}", self.0 .0 .0, self.0 .1, self.1 .0)
+    }
+}
+
+impl ::std::fmt::Display for PropId {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "p@{}:{}:{}", self.0 .0 .0, self.0 .1, self.1 .0)
+    }
+}
+
+impl_ontol_debug!(PropId);
+
+impl FromStr for PropId {
+    type Err = ();
+
+    fn from_str(mut s: &str) -> Result<Self, Self::Err> {
+        s = s.strip_prefix("p@").ok_or(())?;
+
+        let mut iterator = s.split(':');
+        let package_id = PackageId(iterator.next().ok_or(())?.parse().map_err(|_| ())?);
+        let def_idx: u16 = iterator.next().ok_or(())?.parse().map_err(|_| ())?;
+        let def_rel_tag: u16 = iterator.next().ok_or(())?.parse().map_err(|_| ())?;
+
+        if iterator.next().is_some() {
+            return Err(());
+        }
+
+        Ok(PropId(DefId(package_id, def_idx), DefPropTag(def_rel_tag)))
+    }
+}
+
 /// The ID of some relationship between ONTOL types.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct EdgeId(pub PackageId, pub u16);

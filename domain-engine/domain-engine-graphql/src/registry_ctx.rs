@@ -25,7 +25,7 @@ use ontol_runtime::{
     },
     ontology::domain::{DataRelationshipKind, Def},
     tuple::CardinalIdx,
-    RelId,
+    PropId,
 };
 use tracing::{debug, trace, trace_span};
 
@@ -100,10 +100,10 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 let field = juniper::meta::Field {
                     name: name.string.as_str().into(),
                     description: match &field_data.kind {
-                        FieldKind::Property { id: rel_id, .. } => self
+                        FieldKind::Property { id, .. } => self
                             .schema_ctx
                             .ontology
-                            .get_rel_docs(*rel_id)
+                            .get_prop_docs(*id)
                             .map(|docs_constant| self.schema_ctx.ontology[docs_constant].into()),
                         _ => None,
                     },
@@ -155,7 +155,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     if !self.filter_argument_property(
                         struct_info,
                         key.arc_str(),
-                        Some(property.rel_id),
+                        Some(property.id),
                         &filter,
                         &mut control_flow,
                         output,
@@ -219,8 +219,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         }
                     };
 
-                    if let Some(docs_constant) =
-                        self.schema_ctx.ontology.get_rel_docs(property.rel_id)
+                    if let Some(docs_constant) = self.schema_ctx.ontology.get_prop_docs(property.id)
                     {
                         argument = argument.description(&self.schema_ctx.ontology[docs_constant]);
                     }
@@ -323,7 +322,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         &self,
         subject_info: &Def,
         name: &str,
-        rel_id: Option<RelId>,
+        prop_id: Option<PropId>,
         filter: &ArgumentFilter,
         control_flow: &mut ControlFlow<(), CardinalIdx>,
         output: &Vec<juniper::meta::Argument<GqlScalar>>,
@@ -336,8 +335,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             }
         }
 
-        if let Some(rel_id) = rel_id {
-            if let Some(data_relationship) = subject_info.data_relationships.get(&rel_id) {
+        if let Some(prop_id) = prop_id {
+            if let Some(data_relationship) = subject_info.data_relationships.get(&prop_id) {
                 if let DataRelationshipKind::Edge(cardinal_id) = &data_relationship.kind {
                     match cardinal_id.subject.cmp(&filter.edge_cardinal_idx) {
                         Ordering::Less => {

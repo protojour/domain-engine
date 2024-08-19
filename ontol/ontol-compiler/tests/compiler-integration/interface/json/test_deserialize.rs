@@ -410,7 +410,7 @@ fn test_deserialize_open_data() {
         };
 
         let open_data = &map
-            .get(&test.ontology().ontol_domain_meta().open_data_rel_id())
+            .get(&test.ontology().ontol_domain_meta().open_data_prop_id())
             .unwrap()
             .as_unit()
             .unwrap();

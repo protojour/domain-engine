@@ -9,7 +9,7 @@ use ontol_runtime::{
     },
     tuple::CardinalIdx,
     value::Value,
-    DefId, DefRelTag, EdgeId, PackageId, RelId,
+    DefId, DefPropTag, EdgeId, PackageId, PropId,
 };
 use postgres_types::ToSql;
 use tokio_postgres::types::FromSql;
@@ -195,7 +195,7 @@ pub struct PgTable {
     pub key: PgRegKey,
     pub table_name: Box<str>,
     pub has_fkey: bool,
-    pub data_fields: FnvHashMap<DefRelTag, PgDataField>,
+    pub data_fields: FnvHashMap<DefPropTag, PgDataField>,
     pub edge_cardinals: BTreeMap<CardinalIdx, PgEdgeCardinal>,
     pub datafield_indexes: FnvHashMap<(DefId, PgIndexType), PgIndexData>,
 }
@@ -210,11 +210,11 @@ impl PgDomain {
 }
 
 impl PgTable {
-    pub fn field(&self, rel_id: &RelId) -> DomainResult<&PgDataField> {
-        self.data_fields.get(&rel_id.tag()).ok_or_else(|| {
+    pub fn field(&self, prop_id: &PropId) -> DomainResult<&PgDataField> {
+        self.data_fields.get(&prop_id.tag()).ok_or_else(|| {
             debug!("field not found in {:?}", self.data_fields);
 
-            PgModelError::FieldNotFound(self.table_name.clone(), *rel_id).into()
+            PgModelError::FieldNotFound(self.table_name.clone(), *prop_id).into()
         })
     }
 
@@ -352,7 +352,7 @@ impl PgType {
             DefRepr::Text => Ok(Some(PgType::Text)),
             DefRepr::Octets => Ok(Some(PgType::Bytea)),
             DefRepr::DateTime => Ok(Some(PgType::TimestampTz)),
-            DefRepr::FmtStruct(Some((_rel_id, def_id))) => Self::from_def_id(*def_id, ontology),
+            DefRepr::FmtStruct(Some((_prop_id, def_id))) => Self::from_def_id(*def_id, ontology),
             DefRepr::FmtStruct(None) => Ok(None),
             DefRepr::Seq => todo!("seq"),
             DefRepr::Struct => Err(PgModelError::DataTypeNotSupported("struct").into()),

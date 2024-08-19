@@ -3,7 +3,7 @@
 use ::serde::{Deserialize, Serialize};
 use ontol_macros::OntolDebug;
 
-use crate::{ontology::ontol::TextConstant, DefId, RelId};
+use crate::{ontology::ontol::TextConstant, DefId, PropId};
 
 #[derive(Clone, Serialize, Deserialize, OntolDebug, Debug)]
 pub struct VariantDiscriminator {
@@ -26,7 +26,7 @@ pub enum Discriminant {
     MatchesLeaf(LeafDiscriminant),
     /// Has _any_ struct attribute that matches discriminant
     /// (it is implied that the value must a map/object!)
-    HasAttribute(RelId, TextConstant, LeafDiscriminant),
+    HasAttribute(PropId, TextConstant, LeafDiscriminant),
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]

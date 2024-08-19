@@ -5,7 +5,7 @@ use ontol_runtime::{
     query::condition::{Clause, CondTerm, Condition, SetOperator},
     value::Value,
     var::Var,
-    DefId, RelId,
+    DefId, PropId,
 };
 
 use domain_engine_core::{
@@ -23,7 +23,7 @@ pub(super) enum FilterVal<'d> {
     Struct {
         type_def_id: DefId,
         dynamic_key: Option<&'d DynamicKey>,
-        prop_tree: &'d FnvHashMap<RelId, Attr>,
+        prop_tree: &'d FnvHashMap<PropId, Attr>,
     },
     #[allow(unused)]
     Sequence(&'d [Value]),
@@ -37,7 +37,7 @@ pub(super) enum FilterAttr<'d> {
 }
 
 impl<'d> FilterVal<'d> {
-    fn from_entity(entity_key: &'d VertexKey, prop_tree: &'d FnvHashMap<RelId, Attr>) -> Self {
+    fn from_entity(entity_key: &'d VertexKey, prop_tree: &'d FnvHashMap<PropId, Attr>) -> Self {
         Self::Struct {
             type_def_id: entity_key.type_def_id,
             dynamic_key: Some(&entity_key.dynamic_key),

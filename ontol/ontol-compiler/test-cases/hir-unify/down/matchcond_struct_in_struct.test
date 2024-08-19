@@ -1,21 +1,21 @@
 (struct ($c)
-    (prop! $c rel@1:0:0 $a)
-    (prop! $c rel@1:0:1 $b)
+    (prop! $c p@1:0:0 $a)
+    (prop! $c p@1:0:1 $b)
 )
 
 (matrix (.. @f
     (match-struct ($d)
-        (prop! $d rel@2:0:0
+        (prop! $d p@2:0:0
             (struct ($e)
-                (prop! $e rel@3:0:0 [$a $b])
+                (prop! $e p@3:0:0 [$a $b])
             )
         )
     )
 ))
 
 |$c| (block
-    (let-prop $a ($c rel@1:0:0))
-    (let-prop $b ($c rel@1:0:1))
+    (let-prop $a ($c p@1:0:0))
+    (let-prop $b ($c p@1:0:1))
     (match-struct ($g)
         (let-cond-var $d $g)
         (push-cond-clauses $g
@@ -24,12 +24,12 @@
         (let-cond-var $e $g)
         (let-cond-var $i $g)
         (push-cond-clauses $g
-            (match-prop '$d rel@2:0:0 element-in '$i)
+            (match-prop '$d p@2:0:0 element-in '$i)
             (member '$i (_ '$e))
         )
         (let-cond-var $h $g)
         (push-cond-clauses $g
-            (match-prop '$e rel@3:0:0 element-in '$h)
+            (match-prop '$e p@3:0:0 element-in '$h)
             (member '$h ($b $a))
         )
     )

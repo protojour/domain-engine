@@ -4,15 +4,15 @@ use domain_engine_core::{DomainError, DomainResult};
 use fnv::FnvHashMap;
 use itertools::Itertools;
 use ontol_runtime::{
-    attr::Attr, ontology::domain::EntityOrder, query::filter::Filter, value::Value, DefId, RelId,
+    attr::Attr, ontology::domain::EntityOrder, query::filter::Filter, value::Value, DefId, PropId,
 };
 
 use crate::core::{DbContext, DynamicKey};
 
-type Attrs = FnvHashMap<RelId, Attr>;
+type Attrs = FnvHashMap<PropId, Attr>;
 
 pub(super) fn sort_props_vec(
-    raw_props_slice: &mut [(&DynamicKey, FnvHashMap<RelId, Attr>)],
+    raw_props_slice: &mut [(&DynamicKey, FnvHashMap<PropId, Attr>)],
     def_id: DefId,
     filter: &Filter,
     ctx: &DbContext,
@@ -81,7 +81,7 @@ fn compare_entity_order(a: &Attrs, b: &Attrs, order: &EntityOrder) -> DomainResu
     Ok(Ordering::Equal)
 }
 
-fn attr_by_path<'v>(attrs: &'v Attrs, path: &[RelId]) -> DomainResult<&'v Attr> {
+fn attr_by_path<'v>(attrs: &'v Attrs, path: &[PropId]) -> DomainResult<&'v Attr> {
     let property_id = path.first().unwrap();
 
     let attr = attrs

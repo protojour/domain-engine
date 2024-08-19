@@ -2,7 +2,7 @@ use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
 
 use super::filter::Filter;
-use crate::{DefId, RelId};
+use crate::{DefId, PropId};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Select {
@@ -46,7 +46,7 @@ pub struct StructSelect {
     pub def_id: DefId,
     /// TODO: It should be possible to select ONTOL attributes,
     /// and attributes may be multivalued.
-    pub properties: FnvHashMap<RelId, Select>,
+    pub properties: FnvHashMap<PropId, Select>,
 }
 
 impl StructSelect {

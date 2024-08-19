@@ -16,7 +16,7 @@ use crate::{
     },
     ontology::ontol::text_pattern::{FormatPattern, TextPatternConstantPart},
     value::{FormatValueAsText, Value},
-    DefId, RelId,
+    DefId, PropId,
 };
 
 use super::{
@@ -276,7 +276,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
                 match pattern_property {
                     Some(pattern_property) => {
-                        let attr = attrs.get(&pattern_property.rel_id).ok_or_else(|| {
+                        let attr = attrs.get(&pattern_property.prop_id).ok_or_else(|| {
                             S::Error::custom("property not present in pattern struct")
                         })?;
                         let Attr::Unit(value) = attr else { panic!() };
@@ -473,7 +473,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 .contains(ProcessorProfileFlags::SERIALIZE_OPEN_DATA)
         {
             if let Some(open_data_attr) =
-                attributes.get(&self.ontology.ontol_domain_meta().open_data_rel_id())
+                attributes.get(&self.ontology.ontol_domain_meta().open_data_prop_id())
             {
                 let Some(Value::Dict(dict, _)) = &open_data_attr.as_unit() else {
                     panic!("Open data must be a dict");
@@ -501,7 +501,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         &self,
         struct_op: &StructOperator,
         value: &Value,
-        attrs: &FnvHashMap<RelId, Attr>,
+        attrs: &FnvHashMap<PropId, Attr>,
         rel_params: Option<&Value>,
         overridden_id_property_key: Option<&str>,
         map: &mut S::SerializeMap,
@@ -513,7 +513,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 self.serialize_rel_params::<S>(phf_key.arc_str(), rel_params, map)?;
             } else {
                 let unit_attr = UNIT_ATTR;
-                let attr = match attrs.get(&serde_prop.rel_id) {
+                let attr = match attrs.get(&serde_prop.id) {
                     Some(attr) => attr,
                     None => {
                         if serde_prop.is_optional_for(self.mode, &self.profile.flags) {
@@ -559,7 +559,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                                         serde_prop.value_addr,
                                         SubProcessorContext {
                                             is_update: false,
-                                            parent_property_id: Some(serde_prop.rel_id),
+                                            parent_property_id: Some(serde_prop.id),
                                             parent_property_flags: serde_prop.flags,
                                             rel_params_addr: *rel_params_addr,
                                         },

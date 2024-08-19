@@ -16,7 +16,7 @@ use ontol_runtime::{
     query::{filter::Filter, select::Select},
     tuple::{CardinalIdx, EndoTuple},
     value::{Serial, Value, ValueDebug},
-    DefId, EdgeId, RelId,
+    DefId, EdgeId, PropId,
 };
 use tracing::{debug, debug_span};
 
@@ -110,7 +110,7 @@ impl InMemoryStore {
             return Err(DomainErrorKind::EntityNotFound.into_error());
         }
 
-        let mut raw_props_update: BTreeMap<RelId, Attr> = Default::default();
+        let mut raw_props_update: BTreeMap<PropId, Attr> = Default::default();
 
         let Value::Struct(data_struct, _) = value else {
             return Err(
@@ -123,8 +123,8 @@ impl InMemoryStore {
             BTreeMap<CardinalIdx, (EdgeWriteMode, EdgeData<VertexKey>)>,
         > = Default::default();
 
-        for (rel_id, attr) in *data_struct {
-            let data_relationship = find_data_relationship(def, &rel_id)?;
+        for (prop_id, attr) in *data_struct {
+            let data_relationship = find_data_relationship(def, &prop_id)?;
 
             match (
                 data_relationship.kind,
@@ -135,7 +135,7 @@ impl InMemoryStore {
                     debug!("Skipping ID for update");
                 }
                 (DataRelationshipKind::Tree, attr, _) => {
-                    raw_props_update.insert(rel_id, attr);
+                    raw_props_update.insert(prop_id, attr);
                 }
                 (
                     DataRelationshipKind::Edge(projection),
@@ -286,10 +286,10 @@ impl InMemoryStore {
         };
 
         if id_generated {
-            struct_map.insert(entity.id_relationship_id, id.clone().into());
+            struct_map.insert(entity.id_prop, id.clone().into());
         }
 
-        let mut raw_props: FnvHashMap<RelId, Attr> = Default::default();
+        let mut raw_props: FnvHashMap<PropId, Attr> = Default::default();
 
         let vertex_key = VertexKey {
             type_def_id: def.id,
@@ -303,8 +303,8 @@ impl InMemoryStore {
             BTreeMap<CardinalIdx, (EdgeWriteMode, EdgeData<VertexKey>)>,
         > = Default::default();
 
-        for (rel_id, attr) in *struct_map {
-            let data_relationship = find_data_relationship(def, &rel_id)?;
+        for (prop_id, attr) in *struct_map {
+            let data_relationship = find_data_relationship(def, &prop_id)?;
 
             match (
                 data_relationship.kind,
@@ -312,7 +312,7 @@ impl InMemoryStore {
                 data_relationship.cardinality.1,
             ) {
                 (DataRelationshipKind::Tree | DataRelationshipKind::Id, attr, _) => {
-                    raw_props.insert(rel_id, attr);
+                    raw_props.insert(prop_id, attr);
                 }
                 (
                     DataRelationshipKind::Edge(projection),
@@ -632,8 +632,7 @@ impl InMemoryStore {
             // This type has UPSERT semantics.
             // Synthesize the entity, write it and move on..
 
-            let entity_data =
-                FnvHashMap::from_iter([(entity.id_relationship_id, Attr::from(id_value))]);
+            let entity_data = FnvHashMap::from_iter([(entity.id_prop, Attr::from(id_value))]);
             self.write_new_vertex_inner(
                 Value::Struct(Box::new(entity_data), foreign_entity_def_id.into()),
                 ctx,

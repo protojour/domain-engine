@@ -16,7 +16,7 @@ use ontol_runtime::{
     query::select::{Select, StructSelect},
     tuple::EndoTuple,
     value::Value,
-    DefId, PackageId, RelId,
+    DefId, PackageId, PropId,
 };
 use serde::de::DeserializeSeed;
 use tracing::{debug, trace, warn};
@@ -145,7 +145,7 @@ impl<'on> DefBinding<'on> {
         self.def.operator_addr.expect("No serde operator addr")
     }
 
-    pub fn find_property(&self, prop: &str) -> Option<RelId> {
+    pub fn find_property(&self, prop: &str) -> Option<PropId> {
         self.ontology
             .new_serde_processor(self.serde_operator_addr(), ProcessorMode::Create)
             .find_property(prop)
@@ -201,8 +201,8 @@ impl<'t, 'on> From<ValueBuilder<'t, 'on>> for Attr {
 
 impl<'t, 'on> ValueBuilder<'t, 'on> {
     pub fn relationship(self, name: &str, attr: Attr) -> Self {
-        let rel_id = self.binding.find_property(name).expect("unknown property");
-        self.merge_attribute(rel_id, attr)
+        let prop_id = self.binding.find_property(name).expect("unknown property");
+        self.merge_attribute(prop_id, attr)
     }
 
     pub fn to_unit_attr(self) -> Attr {
@@ -246,7 +246,7 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
             ))
             .unwrap();
 
-        self.merge_attribute(entity.id_relationship_id, id)
+        self.merge_attribute(entity.id_prop, id)
     }
 
     pub fn with_open_data(self, json: serde_json::Value) -> Self {
@@ -256,17 +256,21 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
             &mut serde_json::Deserializer::from_str(&serde_json::to_string(&json).unwrap()),
         )
         .unwrap();
-        let rel_id = self.binding.ontology.ontol_domain_meta().open_data_rel_id();
+        let rel_id = self
+            .binding
+            .ontology
+            .ontol_domain_meta()
+            .open_data_prop_id();
         self.merge_attribute(rel_id, value.into())
     }
 
-    fn merge_attribute(mut self, rel_id: RelId, attr: Attr) -> Self {
+    fn merge_attribute(mut self, prop_id: PropId, attr: Attr) -> Self {
         match &mut self.value {
             Value::Struct(attrs, _) => {
-                attrs.insert(rel_id, attr);
+                attrs.insert(prop_id, attr);
             }
             Value::Unit(def_id) => {
-                self.value = Value::new_struct([(rel_id, attr)], *def_id);
+                self.value = Value::new_struct([(prop_id, attr)], *def_id);
             }
             other => {
                 panic!("Value data was not a map/unit, but {other:?}.")

@@ -4,7 +4,7 @@ use ontol_runtime::{
     property::{Cardinality, PropertyCardinality, ValueCardinality},
     query::condition::SetOperator,
     var::Var,
-    DefId, DefRelTag, RelId,
+    DefId, DefPropTag, DefRelTag, PropId, RelId,
 };
 use smallvec::smallvec;
 use tracing::{debug, info};
@@ -38,6 +38,7 @@ pub(super) struct UnpackerInfo<'m> {
 }
 
 struct MatchAttribute {
+    prop_id: PropId,
     rel_id: RelId,
     cardinality: Cardinality,
     rel_params_def: Option<DefId>,
@@ -246,11 +247,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     /// the relations defined on the type. Compute `MatchAttributes`:
     fn collect_named_match_attributes(
         &self,
-        property_set: &IndexMap<RelId, Property>,
+        property_set: &IndexMap<PropId, Property>,
         match_attributes: &mut IndexMap<MatchAttributeKey<'m>, MatchAttribute>,
     ) {
-        for (rel_id, _property) in property_set {
-            self.collect_match_attribute(*rel_id, match_attributes);
+        for (prop_id, property) in property_set {
+            self.collect_match_attribute(*prop_id, property, match_attributes);
         }
     }
 
@@ -279,10 +280,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn collect_match_attribute(
         &self,
-        rel_id: RelId,
+        prop_id: PropId,
+        property: &Property,
         match_attributes: &mut IndexMap<MatchAttributeKey<'m>, MatchAttribute>,
     ) {
-        let meta = rel_def_meta(rel_id, self.rel_ctx, self.defs);
+        let meta = rel_def_meta(property.rel_id, self.rel_ctx, self.defs);
         let match_key = match meta.relation_def_kind.value {
             DefKind::TextLiteral(lit) => Some(MatchAttributeKey::Named(lit)),
             _ => Some(MatchAttributeKey::Def(meta.relationship.relation_def_id)),
@@ -294,7 +296,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             match_attributes.insert(
                 match_key,
                 MatchAttribute {
-                    rel_id,
+                    prop_id,
+                    rel_id: property.rel_id,
                     cardinality: owner_cardinality,
                     rel_params_def: match &meta.relationship.rel_params {
                         RelParams::Type(def_id) => Some(*def_id),
@@ -326,7 +329,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 match_attributes.insert(
                     MatchAttributeKey::Def(self.primitives.relations.order),
                     MatchAttribute {
-                        rel_id: RelId(self.primitives.relations.order, DefRelTag::order()),
+                        prop_id: PropId(self.primitives.relations.order, DefPropTag::order()),
+                        rel_id: RelId(DefId::unit(), DefRelTag(0)),
                         cardinality: (PropertyCardinality::Optional, ValueCardinality::IndexSet),
                         rel_params_def: None,
                         value_def: order_union_def_id,
@@ -338,7 +342,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             match_attributes.insert(
                 MatchAttributeKey::Def(self.primitives.relations.direction),
                 MatchAttribute {
-                    rel_id: RelId(self.primitives.relations.direction, DefRelTag::direction()),
+                    prop_id: PropId(self.primitives.relations.direction, DefPropTag::direction()),
+                    rel_id: RelId(DefId::unit(), DefRelTag(0)),
                     cardinality: (PropertyCardinality::Optional, ValueCardinality::Unit),
                     rel_params_def: None,
                     value_def: self.primitives.direction_union,
@@ -589,7 +594,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ontol_hir::Kind::Prop(
                         flags,
                         struct_binder_var,
-                        match_attribute.rel_id,
+                        match_attribute.prop_id,
                         prop_variant,
                     ),
                     Meta {
@@ -647,7 +652,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ontol_hir::Kind::Prop(
                         flags | PropFlags::REL_UP_OPTIONAL | PropFlags::REL_DOWN_OPTIONAL, // TODO
                         struct_binder_var,
-                        match_attribute.rel_id,
+                        match_attribute.prop_id,
                         prop_variant,
                     ),
                     Meta {
@@ -757,7 +762,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         ontol_hir::Kind::Prop(
                             ontol_hir::PropFlags::empty(),
                             struct_binder_var,
-                            match_attr.rel_id,
+                            match_attr.prop_id,
                             ontol_hir::PropVariant::Unit(value),
                         ),
                         Meta::unit(NO_SPAN),

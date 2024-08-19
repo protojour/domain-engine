@@ -14,7 +14,7 @@ use ontol_runtime::{
     },
     tuple::CardinalIdx,
     value::{Serial, Value},
-    DefId, EdgeId, RelId,
+    DefId, EdgeId, PropId,
 };
 use smallvec::SmallVec;
 use tracing::{debug, warn};
@@ -48,7 +48,7 @@ impl AsRef<DynamicKey> for DynamicKey {
     }
 }
 
-pub type VertexTable<K> = IndexMap<K, FnvHashMap<RelId, Attr>>;
+pub type VertexTable<K> = IndexMap<K, FnvHashMap<PropId, Attr>>;
 
 #[derive(Debug)]
 pub(super) struct HyperEdgeTable {
@@ -202,23 +202,23 @@ impl InMemoryStore {
         &self,
         def_id: DefId,
         dynamic_key: &DynamicKey,
-    ) -> Option<&FnvHashMap<RelId, Attr>> {
+    ) -> Option<&FnvHashMap<PropId, Attr>> {
         self.vertices.get(&def_id)?.get(dynamic_key)
     }
 }
 
 pub(crate) fn find_data_relationship<'a>(
     def: &'a Def,
-    rel_id: &RelId,
+    prop_id: &PropId,
 ) -> DomainResult<&'a DataRelationshipInfo> {
-    def.data_relationships.get(rel_id).ok_or_else(|| {
+    def.data_relationships.get(prop_id).ok_or_else(|| {
         warn!(
-            "data relationship {rel_id:?} not found in {keys:?}",
+            "data relationship {prop_id:?} not found in {keys:?}",
             keys = def.data_relationships.keys()
         );
 
         DomainError::data_store_bad_request(format!(
-            "data relationship {def_id:?} -> {rel_id} does not exist",
+            "data relationship {def_id:?} -> {prop_id} does not exist",
             def_id = def.id
         ))
     })

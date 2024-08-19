@@ -1,6 +1,6 @@
 use ontol_compiler::package::ONTOL_PKG;
 use ontol_macros::test;
-use ontol_runtime::{interface::serde::operator::SerdeOperator, RelId};
+use ontol_runtime::{interface::serde::operator::SerdeOperator, PropId};
 use ontol_test_utils::{
     assert_json_io_matches, def_binding::DefBinding, expect_eq, serde_helper::serde_create,
     src_name, OntolTest, TestCompile, TestPackages,
@@ -46,7 +46,7 @@ fn test_relations_are_distinct_for_different_domains() {
             expected = "other"
         );
 
-        fn extract_prop_rel_id(binding: &DefBinding, test: &OntolTest) -> RelId {
+        fn extract_prop_rel_id(binding: &DefBinding, test: &OntolTest) -> PropId {
             let operator = &test.ontology()[binding.serde_operator_addr()];
 
             match operator {
@@ -57,7 +57,7 @@ fn test_relations_are_distinct_for_different_domains() {
                         .map(|(_key, property)| property)
                         .find(|property| !property.is_rel_params())
                         .unwrap()
-                        .rel_id
+                        .id
                 }
                 _ => panic!(),
             }

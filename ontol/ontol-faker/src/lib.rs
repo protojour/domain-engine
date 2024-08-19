@@ -249,7 +249,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 let def = processor.ontology().def(struct_op.def.def_id);
 
                 for (_, property) in struct_op.properties.iter() {
-                    if let Some(data_relationship) = def.data_relationships.get(&property.rel_id) {
+                    if let Some(data_relationship) = def.data_relationships.get(&property.id) {
                         if let DataRelationshipKind::Edge(projection) = data_relationship.kind {
                             // FIXME: Probably can't skip when the relationship is required
                             if self.edge_saturation.contains(&projection.id) {
@@ -261,7 +261,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     }
 
                     let attr = self.fake_attribute(processor.new_child(property.value_addr)?)?;
-                    attrs.insert(property.rel_id, attr);
+                    attrs.insert(property.id, attr);
                 }
 
                 Value::Struct(Box::new(attrs), struct_op.def.def_id.into())

@@ -6,7 +6,7 @@ use crate::{
     debug::OntolDebug,
     format_utils::{Backticks, CommaSeparated, DoubleQuote},
     ontology::Ontology,
-    DefId, RelId,
+    DefId, PropId,
 };
 
 use super::operator::{AppliedVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags};
@@ -123,11 +123,11 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         }
     }
 
-    pub fn find_property(&self, prop: &str) -> Option<RelId> {
+    pub fn find_property(&self, prop: &str) -> Option<PropId> {
         self.search_property(prop, self.value_operator)
     }
 
-    fn search_property(&self, prop: &str, operator: &'on SerdeOperator) -> Option<RelId> {
+    fn search_property(&self, prop: &str, operator: &'on SerdeOperator) -> Option<PropId> {
         match operator {
             SerdeOperator::Union(union_op) => {
                 match union_op.applied_deserialize_variants(self.mode, self.level) {
@@ -148,7 +148,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             SerdeOperator::Struct(struct_op) => struct_op
                 .properties
                 .get(prop)
-                .map(|serde_property| serde_property.rel_id),
+                .map(|serde_property| serde_property.id),
             _ => None,
         }
     }
@@ -338,7 +338,7 @@ impl RecursionLimitError {
 #[derive(Clone, Copy, Default, OntolDebug)]
 pub struct SubProcessorContext {
     pub is_update: bool,
-    pub parent_property_id: Option<RelId>,
+    pub parent_property_id: Option<PropId>,
     pub parent_property_flags: SerdePropertyFlags,
 
     /// The edge properties used for (de)serializing the _edge data_

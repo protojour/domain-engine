@@ -12,7 +12,7 @@ use ontol_runtime::{
         Ontology,
     },
     tuple::CardinalIdx,
-    DefId, DefRelTag, EdgeId, PackageId,
+    DefId, DefPropTag, EdgeId, PackageId,
 };
 use tokio_postgres::Transaction;
 use tracing::{info, trace_span, warn, Instrument};
@@ -186,7 +186,7 @@ async fn migrate_vertex_steps<'t>(
         let pg_fields = txn
             .query(
                 indoc! {"
-                    SELECT key, rel_tag, pg_type, column_name
+                    SELECT key, prop_tag, pg_type, column_name
                     FROM m6mreg.datafield
                     WHERE domaintable_key = $1
                 "},
@@ -197,12 +197,12 @@ async fn migrate_vertex_steps<'t>(
             .into_iter()
             .map(|row| -> anyhow::Result<_> {
                 let key: PgRegKey = row.get(0);
-                let rel_tag = DefRelTag(row.get::<_, i32>(1).try_into()?);
+                let prop_tag = DefPropTag(row.get::<_, i32>(1).try_into()?);
                 let pg_type = row.get(2);
                 let col_name: Box<str> = row.get(3);
 
                 Ok((
-                    rel_tag,
+                    prop_tag,
                     PgDataField {
                         key,
                         col_name,
@@ -507,19 +507,21 @@ fn migrate_datafields_steps(
     let mut tree_relationships: Vec<_> = def
         .data_relationships
         .iter()
-        .filter_map(|(rel_id, rel)| match &rel.kind {
-            DataRelationshipKind::Id | DataRelationshipKind::Tree => Some((rel_id.tag(), rel)),
+        .filter_map(|(prop_id, rel_info)| match &rel_info.kind {
+            DataRelationshipKind::Id | DataRelationshipKind::Tree => {
+                Some((prop_id.tag(), rel_info))
+            }
             DataRelationshipKind::Edge(_) => None,
         })
         .collect_vec();
 
-    tree_relationships.sort_by_key(|(rel_tag, _)| rel_tag.0);
+    tree_relationships.sort_by_key(|(prop_tag, _)| prop_tag.0);
 
     // fields
-    for (rel_tag, rel_info) in &tree_relationships {
+    for (prop_tag, rel_info) in &tree_relationships {
         let pg_data_field = pg_domain
             .get_table(&table_id)
-            .and_then(|datatable| datatable.data_fields.get(rel_tag));
+            .and_then(|datatable| datatable.data_fields.get(prop_tag));
 
         // FIXME: should mix columns on the root _and_ child structures,
         // so there needs to be some disambiguation in place
@@ -556,7 +558,7 @@ fn migrate_datafields_steps(
                 domain_ids,
                 MigrationStep::DeployDataField {
                     table_id,
-                    rel_tag: *rel_tag,
+                    prop_tag: *prop_tag,
                     pg_type,
                     column_name,
                 },
@@ -565,7 +567,7 @@ fn migrate_datafields_steps(
     }
 
     // indexes
-    for (rel_tag, rel_info) in &tree_relationships {
+    for (prop_tag, rel_info) in &tree_relationships {
         if let DataRelationshipKind::Id = &rel_info.kind {
             let index_type = PgIndexType::Unique;
 
@@ -592,7 +594,7 @@ fn migrate_datafields_steps(
                             table_id,
                             index_def_id: def_id,
                             index_type,
-                            field_tuple: vec![*rel_tag],
+                            field_tuple: vec![*prop_tag],
                         },
                     ));
                 }

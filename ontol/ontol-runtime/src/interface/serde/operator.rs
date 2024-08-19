@@ -16,7 +16,7 @@ use crate::{
         OntologyInit,
     },
     phf::{PhfIndexMap, PhfKey},
-    DefId, RelId,
+    DefId, PropId,
 };
 
 use super::{
@@ -352,7 +352,7 @@ impl StructOperator {
     pub fn filter_properties(
         &self,
         mode: ProcessorMode,
-        parent_property_id: Option<RelId>,
+        parent_property_id: Option<PropId>,
         profile_flags: ProcessorProfileFlags,
     ) -> impl Iterator<Item = (&PhfKey, &SerdeProperty)> {
         self.properties.iter().filter(move |(_, property)| {
@@ -365,7 +365,7 @@ impl StructOperator {
     pub fn required_count(
         &self,
         mode: ProcessorMode,
-        parent_property_id: Option<RelId>,
+        parent_property_id: Option<PropId>,
         profile_flags: ProcessorProfileFlags,
     ) -> usize {
         if profile_flags.contains(ProcessorProfileFlags::ALL_PROPS_OPTIONAL) {
@@ -382,7 +382,7 @@ impl StructOperator {
     pub fn required_props_bitset(
         &self,
         mode: ProcessorMode,
-        parent_property_id: Option<RelId>,
+        parent_property_id: Option<PropId>,
         profile_flags: ProcessorProfileFlags,
     ) -> BitSet {
         if profile_flags.contains(ProcessorProfileFlags::ALL_PROPS_OPTIONAL) {
@@ -410,7 +410,7 @@ impl StructOperator {
 #[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub struct SerdeProperty {
     /// The ID of this property
-    pub rel_id: RelId,
+    pub id: PropId,
 
     /// The operator addr for the value of this property
     pub value_addr: SerdeOperatorAddr,
@@ -468,7 +468,7 @@ impl SerdeProperty {
     pub fn filter(
         &self,
         mode: ProcessorMode,
-        parent_property_id: Option<RelId>,
+        parent_property_id: Option<PropId>,
         profile_flags: ProcessorProfileFlags,
     ) -> Option<&Self> {
         match mode {
@@ -491,7 +491,7 @@ impl SerdeProperty {
         if false {
             if let Some(parent_property_id) = parent_property_id {
                 // Filter out if this property is the mirrored property of the parent property
-                if self.rel_id == parent_property_id
+                if self.id == parent_property_id
                 // && self.property_id.role != parent_property_id.role
                 && !profile_flags.contains(ProcessorProfileFlags::ALLOW_STRUCTURALLY_CIRCULAR_PROPS)
                 {

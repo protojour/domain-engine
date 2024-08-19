@@ -3,7 +3,7 @@ use ontol_runtime::{
     ontology::ontol::text_pattern::{
         Regex, TextPattern, TextPatternConstantPart, TextPatternProperty,
     },
-    DefId, DefRelTag, RelId,
+    DefId, DefPropTag, PropId,
 };
 use regex_syntax::hir::{Capture, Hir, Look};
 use std::fmt::Write;
@@ -34,7 +34,7 @@ pub enum TextPatternSegment {
     },
     Regex(Hir),
     Attribute {
-        rel_id: RelId,
+        prop_id: PropId,
         type_def_id: DefId,
         segment: Box<TextPatternSegment>,
     },
@@ -154,22 +154,22 @@ impl TextPatternSegment {
 
     pub fn collect_attributes(
         &self,
-        output: &mut FnvHashSet<(RelId, DefId)>,
+        output: &mut FnvHashSet<(PropId, DefId)>,
         primitives: &Primitives,
     ) {
         match self {
             Self::Attribute {
-                rel_id,
+                prop_id,
                 type_def_id,
                 segment,
             } => {
-                output.insert((*rel_id, *type_def_id));
+                output.insert((*prop_id, *type_def_id));
                 segment.collect_attributes(output, primitives);
             }
             Self::AnyString => {
                 // note: should match what ontol-runtime/../text_matcher.rs does
-                let rel_id = RelId(primitives.text, DefRelTag(0));
-                output.insert((rel_id, primitives.text));
+                let prop_id = PropId(primitives.text, DefPropTag(0));
+                output.insert((prop_id, primitives.text));
             }
             Self::Concat(segments) | Self::Alternation(segments) => {
                 for segment in segments {
@@ -207,13 +207,13 @@ impl TextPatternSegment {
                 }
             }
             Self::Attribute {
-                rel_id,
+                prop_id,
                 type_def_id,
                 ..
             } => {
                 let index = capture_cursor.increment();
                 parts.push(TextPatternConstantPart::Property(TextPatternProperty {
-                    rel_id: *rel_id,
+                    prop_id: *prop_id,
                     type_def_id: *type_def_id,
                     capture_group: index as usize,
                 }));

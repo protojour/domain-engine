@@ -2,7 +2,7 @@
 
 use ontol_runtime::{
     ontology::{domain, map::MapMeta, ontol::TextConstant},
-    DefId, MapKey, RelId,
+    DefId, MapKey, PropId,
 };
 
 use super::{gql_rel, Ctx};
@@ -36,8 +36,8 @@ pub struct NamedMap {
 }
 
 struct PropertyFlow {
-    source: RelId,
-    target: RelId,
+    source: PropId,
+    target: PropId,
     kind: PropertyFlowKind,
 }
 
@@ -84,7 +84,7 @@ impl Def {
         ctx.def(self.id)
             .data_relationships
             .iter()
-            .map(|(rel_id, dri)| {
+            .map(|(prop_id, dri)| {
                 let (kind, edge_projection) = match dri.kind {
                     ontol_runtime::ontology::domain::DataRelationshipKind::Id => {
                         (gql_rel::RelationshipKind::Id, None)
@@ -99,7 +99,7 @@ impl Def {
                 gql_rel::DataRelationshipInfo {
                     kind,
                     def_id: self.id,
-                    rel_id: *rel_id,
+                    prop_id: *prop_id,
                     edge_projection,
                 }
             })

@@ -10,7 +10,7 @@ use ontol_runtime::{
     },
     property::{PropertyCardinality, ValueCardinality},
     query::select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
-    DefId, MapKey, PackageId, RelId,
+    DefId, MapKey, PackageId, PropId,
 };
 use tracing::{debug, trace};
 
@@ -80,8 +80,8 @@ fn translate_struct_select(struct_select: &mut StructSelect, key: &MapKey, ontol
     debug!("Input select (after auto select): {struct_select:#?}");
 
     let select_props = std::mem::take(&mut struct_select.properties);
-    for (rel_id, select) in select_props {
-        processor.translate_property(rel_id, select, IsDep(false), &mut struct_select.properties)
+    for (prop_id, select) in select_props {
+        processor.translate_property(prop_id, select, IsDep(false), &mut struct_select.properties)
     }
 
     debug!("Translated select: {struct_select:#?}");
@@ -96,11 +96,11 @@ impl<'on> SelectFlowProcessor<'on> {
     fn autoselect_output_properties(
         &self,
         output_package_id: PackageId,
-        target: &mut FnvHashMap<RelId, Select>,
+        target: &mut FnvHashMap<PropId, Select>,
     ) {
-        for (rel_id, flows) in &self.prop_flow_slice.iter().group_by(|flow| flow.id) {
+        for (prop_id, flows) in &self.prop_flow_slice.iter().group_by(|flow| flow.id) {
             // Only consider output properties:
-            if rel_id.0.package_id() != output_package_id {
+            if prop_id.0.package_id() != output_package_id {
                 continue;
             }
 
@@ -117,7 +117,7 @@ impl<'on> SelectFlowProcessor<'on> {
                         },
                     ),
                     PropertyFlowData::UnitType(_) | PropertyFlowData::DependentOn(_) => {
-                        if self.depends_on_mandatory_entity(rel_id, IsDep(false)) {
+                        if self.depends_on_mandatory_entity(prop_id, IsDep(false)) {
                             target.insert(property_flow.id, Select::Leaf);
                         }
                     }
@@ -129,14 +129,14 @@ impl<'on> SelectFlowProcessor<'on> {
 
     fn translate_property(
         &self,
-        rel_id: RelId,
+        prop_id: PropId,
         select: Select,
         is_dep: IsDep,
-        target: &mut FnvHashMap<RelId, Select>,
+        target: &mut FnvHashMap<PropId, Select>,
     ) {
         let mut has_parent = false;
 
-        for property_flow in self.property_flows_for(rel_id) {
+        for property_flow in self.property_flows_for(prop_id) {
             match &property_flow.data {
                 PropertyFlowData::DependentOn(dependent_property_id) => {
                     if is_dep.0 {
@@ -179,29 +179,29 @@ impl<'on> SelectFlowProcessor<'on> {
         }
 
         if !has_parent && is_dep.0 {
-            target.insert(rel_id, Select::Leaf);
+            target.insert(prop_id, Select::Leaf);
         }
     }
 
     fn with_parent_select(
         &self,
-        rel_id: RelId,
-        target: &mut FnvHashMap<RelId, Select>,
-        parent_predicate: &dyn Fn(RelId) -> bool,
-        child_func: &dyn Fn(&mut FnvHashMap<RelId, Select>),
+        prop_id: PropId,
+        target: &mut FnvHashMap<PropId, Select>,
+        parent_predicate: &dyn Fn(PropId) -> bool,
+        child_func: &dyn Fn(&mut FnvHashMap<PropId, Select>),
     ) {
         fn handle_child_select(
-            target: &mut FnvHashMap<RelId, Select>,
-            rel_id: RelId,
+            target: &mut FnvHashMap<PropId, Select>,
+            prop_id: PropId,
             parent_def_id: DefId,
-            parent_predicate: impl Fn(RelId) -> bool,
-            child_func: impl Fn(&mut FnvHashMap<RelId, Select>),
+            parent_predicate: impl Fn(PropId) -> bool,
+            child_func: impl Fn(&mut FnvHashMap<PropId, Select>),
         ) {
-            if !parent_predicate(rel_id) {
+            if !parent_predicate(prop_id) {
                 return;
             }
 
-            let child_select = target.entry(rel_id).or_insert_with(|| {
+            let child_select = target.entry(prop_id).or_insert_with(|| {
                 Select::Struct(StructSelect {
                     def_id: parent_def_id,
                     properties: Default::default(),
@@ -213,10 +213,10 @@ impl<'on> SelectFlowProcessor<'on> {
             });
         }
 
-        let def_id = self.find_def_id(rel_id).unwrap();
+        let def_id = self.find_def_id(prop_id).unwrap();
         let mut is_root = true;
 
-        for property_flow in self.property_flows_for(rel_id) {
+        for property_flow in self.property_flows_for(prop_id) {
             if let PropertyFlowData::ChildOf(parent_property_id) = &property_flow.data {
                 is_root = false;
                 self.with_parent_select(
@@ -226,7 +226,7 @@ impl<'on> SelectFlowProcessor<'on> {
                     &|child_properties| {
                         handle_child_select(
                             child_properties,
-                            rel_id,
+                            prop_id,
                             def_id,
                             parent_predicate,
                             child_func,
@@ -237,15 +237,15 @@ impl<'on> SelectFlowProcessor<'on> {
         }
 
         if is_root {
-            handle_child_select(target, rel_id, def_id, parent_predicate, child_func);
+            handle_child_select(target, prop_id, def_id, parent_predicate, child_func);
         }
     }
 
-    fn depends_on_mandatory_entity(&self, rel_id: RelId, is_dep: IsDep) -> bool {
+    fn depends_on_mandatory_entity(&self, prop_id: PropId, is_dep: IsDep) -> bool {
         let mut is_entity = false;
         let mut is_required = false;
 
-        for flow in self.property_flows_for(rel_id) {
+        for flow in self.property_flows_for(prop_id) {
             match &flow.data {
                 PropertyFlowData::DependentOn(dependent_property_id) => {
                     if self.depends_on_mandatory_entity(*dependent_property_id, IsDep(true)) {
@@ -271,13 +271,13 @@ impl<'on> SelectFlowProcessor<'on> {
             }
         }
 
-        trace!("rel_id {rel_id} depends on mandatory entity: {is_entity}, {is_required}");
+        trace!("prop_id {prop_id} depends on mandatory entity: {is_entity}, {is_required}");
 
         is_entity && is_required
     }
 
-    fn find_def_id(&self, rel_id: RelId) -> Option<DefId> {
-        self.property_flows_for(rel_id)
+    fn find_def_id(&self, prop_id: PropId) -> Option<DefId> {
+        self.property_flows_for(prop_id)
             .find_map(|property_flow| match &property_flow.data {
                 PropertyFlowData::UnitType(def_id) => Some(*def_id),
                 PropertyFlowData::TupleType(0, def_id) => Some(*def_id),
@@ -285,11 +285,11 @@ impl<'on> SelectFlowProcessor<'on> {
             })
     }
 
-    fn property_flows_for(&self, rel_id: RelId) -> impl Iterator<Item = &PropertyFlow> {
+    fn property_flows_for(&self, prop_id: PropId) -> impl Iterator<Item = &PropertyFlow> {
         // "fast forward" to the first property flow for the given property_id:
         let lower_bound = self
             .prop_flow_slice
-            .binary_search_by(|flow| match flow.id.cmp(&rel_id) {
+            .binary_search_by(|flow| match flow.id.cmp(&prop_id) {
                 Ordering::Equal => Ordering::Greater,
                 ord => ord,
             })
@@ -297,6 +297,6 @@ impl<'on> SelectFlowProcessor<'on> {
 
         self.prop_flow_slice[lower_bound..]
             .iter()
-            .take_while(move |flow| flow.id == rel_id)
+            .take_while(move |flow| flow.id == prop_id)
     }
 }

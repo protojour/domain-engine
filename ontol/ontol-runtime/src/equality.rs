@@ -4,7 +4,7 @@ use ahash::AHasher;
 use fnv::FnvHashMap;
 use ordered_float::NotNan;
 
-use crate::{attr::Attr, sequence::Sequence, tuple::EndoTupleElements, value::Value, RelId};
+use crate::{attr::Attr, sequence::Sequence, tuple::EndoTupleElements, value::Value, PropId};
 
 /// Determine ONTOL equality.
 ///
@@ -205,14 +205,14 @@ impl OntolHash for Value {
     }
 }
 
-type PropertyMap = FnvHashMap<RelId, Attr>;
+type PropertyMap = FnvHashMap<PropId, Attr>;
 
 fn property_map_equals(a: &PropertyMap, b: &PropertyMap) -> bool {
     if a.len() != b.len() {
         return false;
     }
 
-    fn sort_properties(iter: impl Iterator<Item = RelId>) -> Vec<RelId> {
+    fn sort_properties(iter: impl Iterator<Item = PropId>) -> Vec<PropId> {
         let mut properties: Vec<_> = iter.collect();
         properties.sort_unstable();
         properties
@@ -225,11 +225,11 @@ fn property_map_equals(a: &PropertyMap, b: &PropertyMap) -> bool {
         return false;
     }
 
-    for rel_id in props_a {
+    for prop_id in props_a {
         if !a
-            .get(&rel_id)
+            .get(&prop_id)
             .unwrap()
-            .ontol_equals(b.get(&rel_id).unwrap())
+            .ontol_equals(b.get(&prop_id).unwrap())
         {
             return false;
         }

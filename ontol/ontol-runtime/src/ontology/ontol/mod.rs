@@ -11,7 +11,7 @@ pub use text::TextConstant;
 pub use text_like_types::{ParseError, TextLikeType};
 pub use value_generator::ValueGenerator;
 
-use crate::{DefId, RelId};
+use crate::{DefId, PropId};
 
 #[derive(Serialize, Deserialize)]
 pub struct OntolDomainMeta {
@@ -30,8 +30,8 @@ pub struct OntolDomainMeta {
 }
 
 impl OntolDomainMeta {
-    pub fn open_data_rel_id(&self) -> RelId {
-        RelId(self.open_data_relationship, crate::DefRelTag(0))
+    pub fn open_data_prop_id(&self) -> PropId {
+        PropId(self.open_data_relationship, crate::DefPropTag(0))
     }
 }
 

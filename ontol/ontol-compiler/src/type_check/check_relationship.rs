@@ -84,17 +84,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         self.check_subject_data_type(subject_ty, &subject.1);
         self.check_object_data_type(object_ty, &object.1);
 
-        self.prop_ctx
-            .properties_by_def_id_mut(subject.0)
-            .table_mut()
-            .insert(
+        let prop_id = self.prop_ctx.append_prop(
+            subject.0,
+            Property {
                 rel_id,
-                Property {
-                    cardinality: relationship.subject_cardinality,
-                    is_entity_id: false,
-                    is_edge_partial: false,
-                },
-            );
+                cardinality: relationship.subject_cardinality,
+                is_entity_id: false,
+                is_edge_partial: false,
+            },
+        );
 
         // Ensure properties in object
         self.prop_ctx.properties_by_def_id_mut(object.0);
@@ -109,14 +107,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 .members
                 .entry(subject.0)
                 .or_default()
-                .insert(rel_id);
+                .insert(prop_id);
             edge.variables
                 .get_mut(&slot.right)
                 .unwrap()
                 .members
                 .entry(object.0)
                 .or_default()
-                .insert(rel_id);
+                .insert(prop_id);
         }
 
         object_ty

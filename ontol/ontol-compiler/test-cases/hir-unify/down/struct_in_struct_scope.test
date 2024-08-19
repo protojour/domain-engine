@@ -1,20 +1,20 @@
 (struct ($c)
-    (prop! $c rel@1:0:0
+    (prop! $c p@1:0:0
         (struct ($d)
-            (prop! $d rel@2:0:0 $a)
+            (prop! $d p@2:0:0 $a)
         )
     )
 )
 
 (struct ($d)
-    (prop! $d rel@3:0:0 $a)
+    (prop! $d p@3:0:0 $a)
 )
 
 |$c| (block
-    (let-prop $d ($c rel@1:0:0))
-    (let-prop $a ($d rel@2:0:0))
+    (let-prop $d ($c p@1:0:0))
+    (let-prop $a ($d p@2:0:0))
     (struct ($d)
-        (prop! $d rel@3:0:0 $a)
+        (prop! $d p@3:0:0 $a)
         (move-rest-attrs $d $c)
     )
 )

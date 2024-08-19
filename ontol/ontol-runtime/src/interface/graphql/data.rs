@@ -7,7 +7,7 @@ use crate::{
     ontology::{ontol::TextConstant, Ontology, OntologyInit},
     phf::PhfIndexMap,
     var::Var,
-    DefId, MapKey, RelId,
+    DefId, MapKey, PropId,
 };
 
 use super::argument::{self};
@@ -264,24 +264,24 @@ impl FieldData {
 pub enum FieldKind {
     /// A normal property of a node
     Property {
-        id: RelId,
+        id: PropId,
         addr: SerdeOperatorAddr,
     },
     /// A flattened union property discriminator accessed through a proxy.
     /// This property is part of interfaces, since it's always present regardless of union variant.
     FlattenedPropertyDiscriminator {
-        proxy: RelId,
-        resolvers: Box<FnvHashMap<DefId, RelId>>,
+        proxy: PropId,
+        resolvers: Box<FnvHashMap<DefId, PropId>>,
     },
     /// A flattened property accessed through a "proxy"
     FlattenedProperty {
-        proxy: RelId,
-        id: RelId,
+        proxy: PropId,
+        id: PropId,
         addr: SerdeOperatorAddr,
     },
     /// The (incoming/"rel params") edge property of a node
     EdgeProperty {
-        id: RelId,
+        id: PropId,
         addr: SerdeOperatorAddr,
     },
     /// The _id field of a node
@@ -312,7 +312,7 @@ pub enum FieldKind {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ConnectionPropertyField {
-    pub rel_id: RelId,
+    pub prop_id: PropId,
     pub first_arg: argument::FirstArg,
     pub after_arg: argument::AfterArg,
 }
@@ -320,7 +320,7 @@ pub struct ConnectionPropertyField {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct MapConnectionField {
     pub map_key: MapKey,
-    pub queries: FnvHashMap<RelId, Var>,
+    pub queries: FnvHashMap<PropId, Var>,
     pub input_arg: argument::MapInputArg,
     pub first_arg: argument::FirstArg,
     pub after_arg: argument::AfterArg,
@@ -329,7 +329,7 @@ pub struct MapConnectionField {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct MapFindField {
     pub map_key: MapKey,
-    pub queries: FnvHashMap<RelId, Var>,
+    pub queries: FnvHashMap<PropId, Var>,
     pub input_arg: argument::MapInputArg,
 }
 
@@ -344,7 +344,7 @@ pub struct EntityMutationField {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct IdPropertyData {
-    pub relationship_id: RelId,
+    pub prop_id: PropId,
     pub operator_addr: SerdeOperatorAddr,
 }
 

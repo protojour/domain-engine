@@ -17,7 +17,7 @@ use ontol_runtime::{
     },
     ontology::ontol::{TextConstant, ValueGenerator},
     phf::PhfKey,
-    DefId, DefRelTag, RelId,
+    DefId, DefPropTag, PropId,
 };
 use tracing::{debug, debug_span, warn};
 
@@ -69,7 +69,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 };
 
                 for (rel_id, property) in table {
-                    let meta = rel_def_meta(*rel_id, self.rel_ctx, self.defs);
+                    let meta = rel_def_meta(property.rel_id, self.rel_ctx, self.defs);
 
                     if meta.relationship.subject.0 == *union_def_id {
                         self.add_struct_op_property(
@@ -96,7 +96,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             (
                 self.str_ctx.make_phf_key(EDGE_PROPERTY),
                 SerdeProperty {
-                    rel_id: RelId(DefId::unit(), DefRelTag(0)),
+                    id: PropId(DefId::unit(), DefPropTag(0)),
                     flags: SerdePropertyFlags::REL_PARAMS | SerdePropertyFlags::OPTIONAL,
                     value_addr: SerdeOperatorAddr(0),
                     value_generator: None,
@@ -137,14 +137,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
     fn add_struct_op_property(
         &mut self,
-        rel_id: RelId,
+        id: PropId,
         property: &Property,
         modifier: SerdeModifier,
         struct_flags: &mut SerdeStructFlags,
         output: &mut IndexMap<String, (PhfKey, SerdeProperty)>,
         must_flatten_unions: &mut bool,
     ) {
-        let meta = rel_repr_meta(rel_id, self.rel_ctx, self.defs, self.repr_ctx);
+        let meta = rel_repr_meta(property.rel_id, self.rel_ctx, self.defs, self.repr_ctx);
         let (value_type_def_id, ..) = meta.relationship.object();
 
         let (property_cardinality, value_addr) = self.get_property_operator(
@@ -168,7 +168,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             }
             ReprKind::Unit => {
                 return self.add_flattened_union_properties(
-                    rel_id,
+                    id,
                     modifier,
                     meta,
                     output,
@@ -193,7 +193,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             value_generator = Some(ValueGenerator::DefaultProc(proc.address));
         }
 
-        if let Some(explicit_value_generator) = self.misc_ctx.value_generators.get(&rel_id) {
+        if let Some(explicit_value_generator) = self.misc_ctx.value_generators.get(&property.rel_id)
+        {
             flags |= SerdePropertyFlags::READ_ONLY | SerdePropertyFlags::GENERATOR;
             if value_generator.is_some() {
                 panic!("BUG: Cannot have both a default value and a generator. Solve this in type check.");
@@ -231,7 +232,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             output,
             prop_key.as_ref(),
             SerdeProperty {
-                rel_id,
+                id,
                 value_addr,
                 flags,
                 value_generator,
@@ -244,7 +245,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
     fn add_flattened_union_properties(
         &mut self,
-        rel_id: RelId,
+        id: PropId,
         modifier: SerdeModifier,
         meta: RelReprMeta,
         output: &mut IndexMap<String, (PhfKey, SerdeProperty)>,
@@ -322,7 +323,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             output,
             &entrypoint_prop_name.clone(),
             SerdeProperty {
-                rel_id,
+                id,
                 value_addr: union_addr,
                 flags: SerdePropertyFlags::empty(),
                 value_generator: None,
@@ -349,7 +350,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     (
                         self.str_ctx.make_phf_key(&key),
                         SerdeProperty {
-                            rel_id: RelId(DefId::unit(), DefRelTag::flat_union()),
+                            id: PropId(DefId::unit(), DefPropTag::flat_union()),
                             value_addr,
                             flags: SerdePropertyFlags::OPTIONAL,
                             value_generator: None,
@@ -396,10 +397,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         // avoid duplicated properties, since some properties may already be "imported" from unions in which
         // the types are members,
-        let mut dedup: FnvHashSet<RelId> = Default::default();
+        let mut dedup: FnvHashSet<PropId> = Default::default();
 
         for (_, serde_property) in new_operator.properties.iter() {
-            dedup.insert(serde_property.rel_id);
+            dedup.insert(serde_property.id);
         }
 
         let mut properties: IndexMap<String, (PhfKey, SerdeProperty)> = Default::default();
@@ -424,7 +425,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 find_unambiguous_struct_operator(*next_addr, &self.operators_by_addr)
             {
                 for (key, serde_property) in next_map_type.properties.iter() {
-                    if dedup.insert(serde_property.rel_id) {
+                    if dedup.insert(serde_property.id) {
                         insert_property(
                             &mut properties,
                             key.arc_str().as_str(),
@@ -537,6 +538,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             return Err("no address for ID");
         };
 
+        let Some((prop_id, _)) = properties
+            .table
+            .as_ref()
+            .and_then(|table| table.iter().find(|(_, prop)| prop.is_entity_id))
+        else {
+            return Err("entity id property not found");
+        };
+
         let identifies_meta = rel_def_meta(identifies_relationship_id, self.rel_ctx, self.defs);
 
         let (id_property_name, id_leaf_discriminant) =
@@ -560,7 +569,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let id_variant = SerdeUnionVariant {
             discriminator: VariantDiscriminator {
                 discriminant: Discriminant::HasAttribute(
-                    identifies_relationship_id,
+                    *prop_id,
                     id_property_name,
                     id_leaf_discriminant,
                 ),

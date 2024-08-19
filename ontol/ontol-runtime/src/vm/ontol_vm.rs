@@ -24,7 +24,7 @@ use crate::{
         proc::{BuiltinProc, Local, Procedure},
         VmError,
     },
-    DefId, RelId,
+    DefId, PropId,
 };
 
 use super::{
@@ -155,7 +155,7 @@ impl<'o> Processor for OntolProcessor<'o> {
     fn get_attr(
         &mut self,
         source: Local,
-        key: RelId,
+        key: PropId,
         arity: u8,
         flags: super::proc::GetAttrFlags,
     ) -> VmResult<()> {
@@ -199,7 +199,7 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn put_attr_unit(&mut self, target: Local, key: RelId) -> VmResult<()> {
+    fn put_attr_unit(&mut self, target: Local, key: PropId) -> VmResult<()> {
         let value = self.stack.pop().unwrap();
         if !matches!(value, Value::Unit(_) | Value::Void(_)) {
             match &mut self.stack[target.0 as usize] {
@@ -228,7 +228,7 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn put_attr_tuple(&mut self, target: Local, arity: u8, key: RelId) -> VmResult<()> {
+    fn put_attr_tuple(&mut self, target: Local, arity: u8, key: PropId) -> VmResult<()> {
         let mut elements: SmallVec<Value, 1> = SmallVec::with_capacity(arity as usize);
 
         for _ in 0..arity {
@@ -242,7 +242,7 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn put_attr_matrix(&mut self, target: Local, arity: u8, key: RelId) -> VmResult<()> {
+    fn put_attr_matrix(&mut self, target: Local, arity: u8, key: PropId) -> VmResult<()> {
         let mut columns: EndoTupleElements<Sequence<Value>> =
             EndoTupleElements::with_capacity(arity as usize);
 
@@ -578,7 +578,7 @@ impl<'o> OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn struct_local_mut(&mut self, local: Local) -> VmResult<&mut FnvHashMap<RelId, Attr>> {
+    fn struct_local_mut(&mut self, local: Local) -> VmResult<&mut FnvHashMap<PropId, Attr>> {
         match self.local_mut(local) {
             Value::Struct(attrs, _) => Ok(attrs.as_mut()),
             _ => Err(VmError::InvalidType(local)),
@@ -683,20 +683,10 @@ mod tests {
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(42)),
-                OpCode::GetAttr(
-                    Local(0),
-                    "rel@0:0:1".parse().unwrap(),
-                    1,
-                    GetAttrFlags::TAKE,
-                ),
-                OpCode::PutAttrUnit(Local(1), "rel@0:0:3".parse().unwrap()),
-                OpCode::GetAttr(
-                    Local(0),
-                    "rel@0:0:2".parse().unwrap(),
-                    1,
-                    GetAttrFlags::TAKE,
-                ),
-                OpCode::PutAttrUnit(Local(1), "rel@0:0:4".parse().unwrap()),
+                OpCode::GetAttr(Local(0), "p@0:0:1".parse().unwrap(), 1, GetAttrFlags::TAKE),
+                OpCode::PutAttrUnit(Local(1), "p@0:0:3".parse().unwrap()),
+                OpCode::GetAttr(Local(0), "p@0:0:2".parse().unwrap(), 1, GetAttrFlags::TAKE),
+                OpCode::PutAttrUnit(Local(1), "p@0:0:4".parse().unwrap()),
                 OpCode::PopUntil(Local(1)),
                 OpCode::Return,
             ],
@@ -707,11 +697,11 @@ mod tests {
             .run([Value::new_struct(
                 [
                     (
-                        "rel@0:0:1".parse().unwrap(),
+                        "p@0:0:1".parse().unwrap(),
                         Value::Text("foo".into(), ValueTag::unit()).into(),
                     ),
                     (
-                        "rel@0:0:2".parse().unwrap(),
+                        "p@0:0:2".parse().unwrap(),
                         Value::Text("bar".into(), ValueTag::unit()).into(),
                     ),
                 ],
@@ -725,7 +715,7 @@ mod tests {
         };
         let properties = attrs.keys().cloned().collect::<FnvHashSet<_>>();
         assert_eq!(
-            FnvHashSet::from_iter(["rel@0:0:3".parse().unwrap(), "rel@0:0:4".parse().unwrap(),]),
+            FnvHashSet::from_iter(["p@0:0:3".parse().unwrap(), "p@0:0:4".parse().unwrap(),]),
             properties
         );
     }
@@ -754,32 +744,17 @@ mod tests {
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(0)),
                 // 2, 3:
-                OpCode::GetAttr(
-                    Local(0),
-                    "rel@0:0:1".parse().unwrap(),
-                    1,
-                    GetAttrFlags::TAKE,
-                ),
+                OpCode::GetAttr(Local(0), "p@0:0:1".parse().unwrap(), 1, GetAttrFlags::TAKE),
                 OpCode::Call(double),
-                OpCode::PutAttrUnit(Local(1), "rel@0:0:4".parse().unwrap()),
+                OpCode::PutAttrUnit(Local(1), "p@0:0:4".parse().unwrap()),
                 // 3, 4:
-                OpCode::GetAttr(
-                    Local(0),
-                    "rel@0:0:2".parse().unwrap(),
-                    1,
-                    GetAttrFlags::TAKE,
-                ),
+                OpCode::GetAttr(Local(0), "p@0:0:2".parse().unwrap(), 1, GetAttrFlags::TAKE),
                 // 5, 6:
-                OpCode::GetAttr(
-                    Local(0),
-                    "rel@0:0:3".parse().unwrap(),
-                    1,
-                    GetAttrFlags::TAKE,
-                ),
+                OpCode::GetAttr(Local(0), "p@0:0:3".parse().unwrap(), 1, GetAttrFlags::TAKE),
                 OpCode::Clone(Local(2)),
                 // pop(6, 7):
                 OpCode::Call(add_then_double),
-                OpCode::PutAttrUnit(Local(1), "rel@0:0:5".parse().unwrap()),
+                OpCode::PutAttrUnit(Local(1), "p@0:0:5".parse().unwrap()),
                 OpCode::PopUntil(Local(1)),
                 OpCode::Return,
             ],
@@ -790,15 +765,15 @@ mod tests {
             .run([Value::new_struct(
                 [
                     (
-                        "rel@0:0:1".parse().unwrap(),
+                        "p@0:1".parse().unwrap(),
                         Value::I64(333, ValueTag::unit()).into(),
                     ),
                     (
-                        "rel@0:0:2".parse().unwrap(),
+                        "p@0:0:2".parse().unwrap(),
                         Value::I64(10, ValueTag::unit()).into(),
                     ),
                     (
-                        "rel@0:0:3".parse().unwrap(),
+                        "p@0:0:3".parse().unwrap(),
                         Value::I64(11, ValueTag::unit()).into(),
                     ),
                 ],
@@ -811,14 +786,14 @@ mod tests {
             panic!();
         };
         let Value::I64(a, _) = attrs
-            .remove(&"rel@0:0:4".parse().unwrap())
+            .remove(&"p@0:0:4".parse().unwrap())
             .unwrap()
             .unwrap_unit()
         else {
             panic!();
         };
         let Value::I64(b, _) = attrs
-            .remove(&"rel@0:0:5".parse().unwrap())
+            .remove(&"p@0:0:5".parse().unwrap())
             .unwrap()
             .unwrap_unit()
         else {
@@ -877,8 +852,8 @@ mod tests {
     fn flat_map_object() {
         let mut lib = Lib::default();
 
-        let prop_a: RelId = "rel@0:0:0".parse().unwrap();
-        let prop_b: RelId = "rel@0:0:1".parse().unwrap();
+        let prop_a: PropId = "p@0:0:0".parse().unwrap();
+        let prop_b: PropId = "p@0:0:1".parse().unwrap();
 
         let proc = lib.append_procedure(
             NParams(1),
@@ -928,7 +903,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            "[{rel@0:0:1 -> 'b0', rel@0:0:0 -> 'a'}, {rel@0:0:1 -> 'b1', rel@0:0:0 -> 'a'}]",
+            "[{p@0:0:1 -> 'b0', p@0:0:0 -> 'a'}, {p@0:0:1 -> 'b1', p@0:0:0 -> 'a'}]",
             format!("{}", ValueDebug(&output))
         );
     }
@@ -937,7 +912,7 @@ mod tests {
     fn discriminant_cond() {
         let mut lib = Lib::default();
 
-        let prop: RelId = "rel@0:0:42".parse().unwrap();
+        let prop: PropId = "p@0:0:42".parse().unwrap();
         let inner_tag = ValueTag::from(def_id(100));
 
         let proc = lib.append_procedure(
@@ -994,7 +969,7 @@ mod tests {
         );
 
         assert_eq!(
-            "{rel@0:0:42 -> int(666)}",
+            "{p@0:0:42 -> int(666)}",
             format!(
                 "{}",
                 ValueDebug(

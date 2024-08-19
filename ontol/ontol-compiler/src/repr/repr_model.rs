@@ -4,7 +4,7 @@ use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
     ontology::domain::{DefRepr, DefReprUnionBound},
-    DefId, RelId,
+    DefId, PropId,
 };
 use ordered_float::NotNan;
 use smallvec::SmallVec;
@@ -28,7 +28,7 @@ pub enum ReprKind {
     Scalar(DefId, ReprScalarKind, SourceSpan),
     /// struct variant, from fmt constructors with 1 allowed scalar property (for now).
     /// Possibly generalize this later
-    FmtStruct(Option<(RelId, DefId)>),
+    FmtStruct(Option<(PropId, DefId)>),
     /// Sequence
     Seq,
     /// Just a plain old struct, no `is` business

@@ -13,7 +13,7 @@ use crate::{
         Ontology,
     },
     value::{Value, ValueTag},
-    DefId, DefRelTag, RelId,
+    DefId, DefPropTag, PropId,
 };
 
 use super::ValueMatcher;
@@ -119,13 +119,13 @@ impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
                                 .deserialize(StrDeserializer::<serde_json::Error>::new(str))
                                 .map_err(|_| ())?;
 
-                            attrs.insert(property.rel_id, attribute);
+                            attrs.insert(property.prop_id, attribute);
                         }
                         TextPatternConstantPart::AnyString { .. } => {
                             let text_tag: ValueTag = self.ontology.ontol_domain_meta().text.into();
-                            let rel_id = RelId(text_tag.def_id(), DefRelTag(0));
+                            let prop_id = PropId(text_tag.def_id(), DefPropTag(0));
 
-                            attrs.insert(rel_id, Attr::Unit(Value::Text(str.into(), text_tag)));
+                            attrs.insert(prop_id, Attr::Unit(Value::Text(str.into(), text_tag)));
                         }
                         TextPatternConstantPart::Literal(_) => {}
                     }

@@ -185,8 +185,8 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         // traverse members (i.e. properties)
         if let Some(properties) = properties {
             if let Some(table) = &properties.table {
-                for (rel_id, _property) in table {
-                    self.traverse_property(*rel_id);
+                for property in table.values() {
+                    self.traverse_property(property.rel_id);
                 }
             }
 

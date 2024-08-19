@@ -7,7 +7,7 @@ use ontol_runtime::{
     },
     ontology::{domain::Def, ontol::ValueGenerator, Ontology},
     value::{Value, ValueTag},
-    DefId, RelId,
+    DefId, PropId,
 };
 
 use crate::system::SystemAPI;
@@ -74,12 +74,12 @@ impl<'e> ObjectGenerator<'e> {
 
     fn generate_struct_relationships(
         &self,
-        struct_map: &mut FnvHashMap<RelId, Attr>,
+        struct_map: &mut FnvHashMap<PropId, Attr>,
         def: &Def,
         addr: SerdeOperatorAddr,
     ) {
         let operator = &self.ontology[addr];
-        let id_relationship = def.entity().map(|entity| entity.id_relationship_id);
+        let id_prop = def.entity().map(|entity| entity.id_prop);
 
         match operator {
             SerdeOperator::Struct(struct_op) => {
@@ -89,15 +89,15 @@ impl<'e> ObjectGenerator<'e> {
                     }
 
                     // Don't mess with IDs here, this is the responsibility of the data store:
-                    if Some(property.rel_id) == id_relationship {
+                    if Some(property.id) == id_prop {
                         continue;
                     }
 
-                    match self.ontology.get_value_generator(property.rel_id) {
+                    match self.ontology.get_value_generator(property.id) {
                         Some(ValueGenerator::DefaultProc(_)) => {}
                         Some(ValueGenerator::Uuid) => {
                             struct_map.insert(
-                                property.rel_id,
+                                property.id,
                                 Value::OctetSequence(
                                     self.system
                                         .generate_uuid()
@@ -117,7 +117,7 @@ impl<'e> ObjectGenerator<'e> {
                             // FIXME: upsert semantics!
                             if matches!(self.mode, ProcessorMode::Create) {
                                 struct_map.insert(
-                                    property.rel_id,
+                                    property.id,
                                     Value::ChronoDateTime(
                                         self.current_time,
                                         self.property_tag(property),
@@ -128,7 +128,7 @@ impl<'e> ObjectGenerator<'e> {
                         }
                         Some(ValueGenerator::UpdatedAtTime) => {
                             struct_map.insert(
-                                property.rel_id,
+                                property.id,
                                 Value::ChronoDateTime(
                                     self.current_time,
                                     self.property_tag(property),

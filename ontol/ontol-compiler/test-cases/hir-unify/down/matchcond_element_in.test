@@ -1,24 +1,24 @@
 (struct ($c)
-    (prop $c rel@1:0:0
+    (prop $c p@1:0:0
         (matrix (.. @e $a #u))
     )
-    (prop $c rel@1:0:1
+    (prop $c p@1:0:1
         (matrix (.. @f $b #u))
     )
 )
 
 (matrix (.. @g
     (match-struct ($d)
-        (prop $d rel@2:0:0 element-in
+        (prop $d p@2:0:0 element-in
             (matrix
                 (.. @e
                     (struct ($q)
-                        (prop $q rel@3:0:0 $a)
+                        (prop $q p@3:0:0 $a)
                     )
                 )
                 (.. @f
                     (struct ($r)
-                        (prop $r rel@3:0:1 $b)
+                        (prop $r p@3:0:1 $b)
                     )
                 )
             )
@@ -27,8 +27,8 @@
 ))
 
 |$c| (block
-    (let-prop-default [$e $s] ($c rel@1:0:0) (make-seq) (make-seq))
-    (let-prop-default [$f $t] ($c rel@1:0:1) (make-seq) (make-seq))
+    (let-prop-default [$e $s] ($c p@1:0:0) (make-seq) (make-seq))
+    (let-prop-default [$f $t] ($c p@1:0:1) (make-seq) (make-seq))
     (match-struct ($u)
         (let-cond-var $d $u)
         (push-cond-clauses $u
@@ -36,7 +36,7 @@
         )
         (let-cond-var $v $u)
         (push-cond-clauses $u
-            (match-prop '$d rel@2:0:0 element-in '$v)
+            (match-prop '$d p@2:0:0 element-in '$v)
         )
         (for-each $e $s ($a $_)
             (let-cond-var $q $u)
@@ -45,7 +45,7 @@
             )
             (let-cond-var $w $u)
             (push-cond-clauses $u
-                (match-prop '$q rel@3:0:0 element-in '$w)
+                (match-prop '$q p@3:0:0 element-in '$w)
                 (member '$w (_ $a))
             )
         )
@@ -56,7 +56,7 @@
             )
             (let-cond-var $x $u)
             (push-cond-clauses $u
-                (match-prop '$r rel@3:0:1 element-in '$x)
+                (match-prop '$r p@3:0:1 element-in '$x)
                 (member '$x (_ $b))
             )
         )

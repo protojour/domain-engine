@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use domain_engine_core::{domain_error::DomainErrorKind, DomainError};
-use ontol_runtime::{tuple::CardinalIdx, DefId, EdgeId, PackageId, RelId};
+use ontol_runtime::{tuple::CardinalIdx, DefId, EdgeId, PackageId, PropId};
 use tracing::{error, info, warn};
 
 use crate::pg_model::PgRegKey;
@@ -81,7 +81,7 @@ pub enum PgError {
     /// invalid type
     ExpectedType(&'static str),
     /// field missing in datastore
-    MissingField(RelId),
+    MissingField(PropId),
     /// union field
     UnionField,
     /// edge parameters missing
@@ -105,7 +105,7 @@ pub enum PgInputError {
     /// vertex must be a struct
     VertexMustBeStruct,
     /// invalid data relationship
-    DataRelationshipNotFound(RelId),
+    DataRelationshipNotFound(PropId),
     /// missing value without generator
     MissingValueWithoutGenerator,
     /// compound foreign key
@@ -141,7 +141,7 @@ pub enum PgModelError {
     /// edge not found for {0:?}
     EdgeNotFound(EdgeId),
     /// field not found for {1} in {0}
-    FieldNotFound(Box<str>, RelId),
+    FieldNotFound(Box<str>, PropId),
     /// edge cardinal {0} not found
     EdgeCardinalNotFound(CardinalIdx),
     /// unhandled repr
@@ -149,7 +149,7 @@ pub enum PgModelError {
     /// duplicate edge cardinal
     DuplicateEdgeCardinal(usize),
     /// non-existent field
-    NonExistentField(RelId),
+    NonExistentField(PropId),
     /// invalid transaction state
     InvalidTransactionState,
     /// invalid unique cardinal
@@ -175,7 +175,7 @@ pub enum PgMigrationError {
     /// ambiguous edge cardinal
     AmbiguousEdgeCardinal,
     /// union target
-    UnionTarget(RelId),
+    UnionTarget(PropId),
     /// ambiguous ID
     AmbiguousId(DefId),
 }

@@ -11,7 +11,7 @@ use ontol_runtime::{
     },
     sequence::{Sequence, SubSequence},
     value::Value,
-    DefId, RelId,
+    DefId, PropId,
 };
 use tracing::{debug, debug_span, error};
 
@@ -163,19 +163,19 @@ impl InMemoryStore {
         &self,
         def: &Def,
         vertex_key: VertexKey<&DynamicKey>,
-        mut properties: FnvHashMap<RelId, Attr>,
+        mut properties: FnvHashMap<PropId, Attr>,
         struct_def_id: DefId,
-        select_properties: &FnvHashMap<RelId, Select>,
+        select_properties: &FnvHashMap<PropId, Select>,
         ctx: &DbContext,
     ) -> DomainResult<Value> {
         let _entered = debug_span!("struct_sel", id = ?struct_def_id).entered();
 
-        for (rel_id, subselect) in select_properties {
-            if properties.contains_key(rel_id) {
+        for (prop_id, subselect) in select_properties {
+            if properties.contains_key(prop_id) {
                 continue;
             }
 
-            let data_relationship = find_data_relationship(def, rel_id)?;
+            let data_relationship = find_data_relationship(def, prop_id)?;
 
             let DataRelationshipKind::Edge(projection) = data_relationship.kind else {
                 continue;
@@ -186,13 +186,13 @@ impl InMemoryStore {
                     let matrix =
                         self.sub_query_edge(projection, subselect, vertex_key, false, ctx)?;
                     if let Some(row) = matrix.into_rows().next() {
-                        properties.insert(*rel_id, row.into());
+                        properties.insert(*prop_id, row.into());
                     }
                 }
                 ValueCardinality::IndexSet | ValueCardinality::List => {
                     let matrix =
                         self.sub_query_edge(projection, subselect, vertex_key, true, ctx)?;
-                    properties.insert(*rel_id, Attr::Matrix(matrix));
+                    properties.insert(*prop_id, Attr::Matrix(matrix));
                 }
             }
         }
@@ -300,7 +300,7 @@ impl InMemoryStore {
         match select {
             Select::Leaf => {
                 // Entity leaf only includes the ID of that entity, not its other fields
-                let id_attr = properties.get(&entity.id_relationship_id).unwrap();
+                let id_attr = properties.get(&entity.id_prop).unwrap();
                 Ok(Some(id_attr.as_unit().unwrap().clone()))
             }
             Select::Struct(struct_select) => Some(self.apply_struct_select(

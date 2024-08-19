@@ -6,7 +6,7 @@ use ontol_runtime::{
         ProcessorProfileFlags, SpecialProperty,
     },
     value::Value,
-    DefId, RelId,
+    DefId, PropId,
 };
 use serde::de::DeserializeSeed;
 use tracing::error;
@@ -83,7 +83,7 @@ impl<'b, 'on, 'p> SerdeHelper<'b, 'on, 'p> {
     pub fn to_value_map(
         &self,
         json: serde_json::Value,
-    ) -> Result<FnvHashMap<RelId, Attr>, serde_json::Error> {
+    ) -> Result<FnvHashMap<PropId, Attr>, serde_json::Error> {
         let Attr::Unit(value) = self.to_attr_nocheck(json)? else {
             panic!("not a unit attr");
         };

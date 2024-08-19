@@ -12,7 +12,7 @@ use crate::{
     query::{condition::ClausePair, filter::Filter},
     value::Value,
     var::Var,
-    DefId, RelId,
+    DefId, PropId,
 };
 
 /// A complete ONTOL code library consisting of procedures.
@@ -85,13 +85,13 @@ pub enum OpCode {
     Iter(Local, u8, Local, AddressOffset),
     /// Get an attribute from a struct.
     /// See GetAttrFlags for different semantic variations.
-    GetAttr(Local, RelId, u8, GetAttrFlags),
+    GetAttr(Local, PropId, u8, GetAttrFlags),
     /// Pop 1 value from stack, and move it into the specified local struct. Sets the attribute parameter to unit.
-    PutAttrUnit(Local, RelId),
+    PutAttrUnit(Local, PropId),
     /// Pop n stack values, insert them as a tuple attribute in reverse order
-    PutAttrTup(Local, u8, RelId),
+    PutAttrTup(Local, u8, PropId),
     /// Pop n stack values which must be sequence-typed, insert them as columns in a matrix-valued attribute in reverse order
-    PutAttrMat(Local, u8, RelId),
+    PutAttrMat(Local, u8, PropId),
     /// Move rest attrs from the second local into the first local.
     MoveRestAttrs(Local, Local),
     /// Pop N stack values, push each of those consecutively into N different contiguous sequences

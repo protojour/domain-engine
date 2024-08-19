@@ -160,7 +160,7 @@ async fn execute_migration_step<'t>(
         }
         MigrationStep::DeployDataField {
             table_id,
-            rel_tag,
+            prop_tag,
             pg_type,
             column_name,
         } => {
@@ -200,20 +200,20 @@ async fn execute_migration_step<'t>(
                     indoc! { "
                     INSERT INTO m6mreg.datafield (
                         domaintable_key,
-                        rel_tag,
+                        prop_tag,
                         pg_type,
                         column_name
                     ) VALUES($1, $2, $3, $4)
                     RETURNING key
                 "},
-                    &[&pg_table.key, &(rel_tag.0 as i32), &pg_type, &column_name],
+                    &[&pg_table.key, &(prop_tag.0 as i32), &pg_type, &column_name],
                 )
                 .await
                 .context("create datafield")?
                 .get(0);
 
             let existing = pg_table.data_fields.insert(
-                rel_tag,
+                prop_tag,
                 PgDataField {
                     key,
                     col_name: column_name,
@@ -222,7 +222,7 @@ async fn execute_migration_step<'t>(
             );
 
             if existing.is_some() {
-                return Err(anyhow!("{rel_tag:?} already a field in {table_id:?}"));
+                return Err(anyhow!("{prop_tag:?} already a field in {table_id:?}"));
             }
         }
         MigrationStep::DeployDataIndex {
@@ -236,7 +236,7 @@ async fn execute_migration_step<'t>(
 
             let datafield_tuple: Vec<_> = field_tuple
                 .iter()
-                .map(|rel_tag| pg_table.data_fields.get(rel_tag).unwrap())
+                .map(|prop_tag| pg_table.data_fields.get(prop_tag).unwrap())
                 .collect();
 
             txn.execute(

@@ -36,8 +36,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let mut extern_builder = ExternBuilder { url: None };
 
-        for rel_id in table.keys() {
-            let meta = rel_def_meta(*rel_id, self.rel_ctx, self.defs);
+        for property in table.values() {
+            let meta = rel_def_meta(property.rel_id, self.rel_ctx, self.defs);
             let (value_type_def_id, ..) = meta.relationship.object();
 
             match meta.relation_def_kind.value {

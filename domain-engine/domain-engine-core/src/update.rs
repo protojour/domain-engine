@@ -1,5 +1,5 @@
 use fnv::FnvHashMap;
-use ontol_runtime::{attr::Attr, value::Value, RelId};
+use ontol_runtime::{attr::Attr, value::Value, PropId};
 
 /// Sanitize something that is known to be a data store update
 /// after it has gone through domain translation.
@@ -15,7 +15,7 @@ pub fn sanitize_update(update: &mut Value) {
     *update = value;
 }
 
-fn remove_none_attrs(attrs: &mut FnvHashMap<RelId, Attr>) {
+fn remove_none_attrs(attrs: &mut FnvHashMap<PropId, Attr>) {
     attrs.retain(|_, attr| attr_exists(attr))
 }
 

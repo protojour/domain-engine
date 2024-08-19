@@ -48,9 +48,9 @@ CREATE TABLE m6mreg.domaintable
     -- the def tag within the def domain
     def_tag integer,
     edge_tag integer,
-    -- a path of relationships in the case of child tables.
+    -- a path of properties in the case of child tables.
     -- the root is always 'root'
-    relpath ltree NOT NULL DEFAULT 'root',
+    proppath ltree NOT NULL DEFAULT 'root',
     -- the name of the table within the owning domain's schema
     table_name text NOT NULL,
     -- the name of the key column, if specified
@@ -92,7 +92,7 @@ CREATE TABLE m6mreg.datafield
 (
     key serial PRIMARY KEY,
     domaintable_key integer NOT NULL REFERENCES m6mreg.domaintable(key),
-    rel_tag integer NOT NULL,
+    prop_tag integer NOT NULL,
     pg_type m6m_pg_type NOT NULL,
     column_name text NOT NULL
 );

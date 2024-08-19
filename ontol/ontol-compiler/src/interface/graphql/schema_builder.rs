@@ -1,10 +1,6 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    interface::serde::{
-        operator::{SerdeOperator, SerdeOperatorAddr},
-        SerdeDef,
-    },
     interface::{
         graphql::{
             argument::{self, DefaultArg, MapInputArg},
@@ -16,7 +12,10 @@ use ontol_runtime::{
             },
             schema::{GraphqlSchema, QueryLevel},
         },
-        serde::SerdeModifier,
+        serde::{
+            operator::{SerdeOperator, SerdeOperatorAddr},
+            SerdeDef, SerdeModifier,
+        },
     },
     ontology::{
         map::{PropertyFlow, PropertyFlowData},
@@ -25,7 +24,7 @@ use ontol_runtime::{
     },
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolverGraph},
     var::Var,
-    DefId, MapDefFlags, MapKey, PackageId, RelId,
+    DefId, MapDefFlags, MapKey, PackageId, PropId,
 };
 use thin_vec::thin_vec;
 
@@ -84,20 +83,20 @@ pub(super) enum LazyTask {
 #[derive(Clone, Copy)]
 pub(super) enum PropertyFieldProducer {
     Property,
-    FlattenedProperty(RelId),
+    FlattenedProperty(PropId),
     EdgeProperty,
 }
 
 impl PropertyFieldProducer {
-    pub fn make_property(&self, rel_id: RelId, addr: SerdeOperatorAddr) -> FieldKind {
+    pub fn make_property(&self, prop_id: PropId, addr: SerdeOperatorAddr) -> FieldKind {
         match self {
-            Self::Property => FieldKind::Property { id: rel_id, addr },
+            Self::Property => FieldKind::Property { id: prop_id, addr },
             Self::FlattenedProperty(proxy_id) => FieldKind::FlattenedProperty {
                 proxy: *proxy_id,
-                id: rel_id,
+                id: prop_id,
                 addr,
             },
-            Self::EdgeProperty => FieldKind::EdgeProperty { id: rel_id, addr },
+            Self::EdgeProperty => FieldKind::EdgeProperty { id: prop_id, addr },
         }
     }
 }
@@ -353,7 +352,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         let input_operator_addr = self.serde_gen.gen_addr_greedy(input_serde_key).unwrap();
 
-        let queries: FnvHashMap<RelId, Var> = prop_flow
+        let queries: FnvHashMap<PropId, Var> = prop_flow
             .iter()
             .filter_map(|prop_flow| {
                 if let PropertyFlowData::Match(var) = &prop_flow.data {

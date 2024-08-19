@@ -7,7 +7,7 @@ use ontol_hir::{
 use ontol_runtime::{
     query::condition::{Clause, ClausePair, SetOperator},
     var::{Var, VarAllocator, VarSet},
-    MapDirection, MapFlags, RelId,
+    MapDirection, MapFlags, PropId,
 };
 use smallvec::{smallvec, SmallVec};
 use thin_vec::thin_vec;
@@ -338,8 +338,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     }
                 }
             }
-            Kind::Prop(flags, var, rel_id, variant) => {
-                self.write_prop_expr((*flags, *var, *rel_id), variant, node_ref.meta(), mode)
+            Kind::Prop(flags, var, prop_id, variant) => {
+                self.write_prop_expr((*flags, *var, *prop_id), variant, node_ref.meta(), mode)
             }
             Kind::Regex(_seq_label, regex_def_id, capture_group_alternation) => {
                 let regex_meta = self
@@ -412,7 +412,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
     fn write_prop_expr(
         &mut self,
-        (flags, struct_var, rel_id): (PropFlags, Var, RelId),
+        (flags, struct_var, prop_id): (PropFlags, Var, PropId),
         variant: &PropVariant,
         meta: &Meta<'m>,
         mode: ExprMode,
@@ -425,7 +425,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 match_level,
                 ..
             } => {
-                if rel_id.0 == builtin_rels.order || rel_id.0 == builtin_rels.direction {
+                if prop_id.0 == builtin_rels.order || prop_id.0 == builtin_rels.direction {
                     if match_level != 0 {
                         CompileError::TODO("order/direction at incorrect location")
                             .span(meta.span)
@@ -455,7 +455,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     let val = zelf.write_one_expr(*val, applied_mode)?;
 
                     Ok(smallvec![zelf.mk_node(
-                        Kind::Prop(flags, struct_var, rel_id, PropVariant::Unit(val),),
+                        Kind::Prop(flags, struct_var, prop_id, PropVariant::Unit(val),),
                         *meta,
                     )])
                 })
@@ -470,7 +470,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     );
 
                     Ok(smallvec![zelf.mk_node(
-                        Kind::Prop(flags, struct_var, rel_id, variant,),
+                        Kind::Prop(flags, struct_var, prop_id, variant,),
                         *meta,
                     )])
                 })
@@ -537,7 +537,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                         ClausePair(
                                             struct_var,
                                             Clause::MatchProp(
-                                                rel_id,
+                                                prop_id,
                                                 SetOperator::ElementIn,
                                                 set_var,
                                             )
@@ -562,7 +562,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                 thin_vec![
                                     ClausePair(
                                         struct_var,
-                                        Clause::MatchProp(rel_id, SetOperator::ElementIn, set_var,)
+                                        Clause::MatchProp(prop_id, SetOperator::ElementIn, set_var,)
                                     ),
                                     ClausePair(set_var, clause)
                                 ],
@@ -590,7 +590,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             match_var,
                             thin_vec![ClausePair(
                                 struct_var,
-                                Clause::MatchProp(rel_id, *operator, set_cond_var)
+                                Clause::MatchProp(prop_id, *operator, set_cond_var)
                             )],
                         ),
                         Meta::new(&UNIT_TYPE, meta.span),

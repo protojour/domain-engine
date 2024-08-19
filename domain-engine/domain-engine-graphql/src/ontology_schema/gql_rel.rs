@@ -4,7 +4,7 @@ use crate::juniper;
 
 use ontol_runtime::{
     ontology::domain::{self, EdgeCardinalProjection},
-    property, DefId, EdgeId, RelId,
+    property, DefId, EdgeId, PropId,
 };
 
 use super::{gql_def, Ctx};
@@ -12,7 +12,7 @@ use super::{gql_def, Ctx};
 pub struct DataRelationshipInfo {
     pub def_id: DefId,
     pub kind: RelationshipKind,
-    pub rel_id: RelId,
+    pub prop_id: PropId,
     pub edge_projection: Option<EdgeCardinalProjection>,
 }
 
@@ -69,12 +69,12 @@ enum ValueCardinality {
 #[juniper::graphql_object]
 #[graphql(context = Ctx)]
 impl DataRelationshipInfo {
-    fn relationship_id(&self) -> String {
-        self.rel_id.to_string()
+    fn prop_id(&self) -> String {
+        self.prop_id.to_string()
     }
     fn source(&self, ctx: &Ctx) -> DataRelationshipSource {
         let def = ctx.def(self.def_id);
-        let data_relationship = def.data_relationships.get(&self.rel_id).unwrap();
+        let data_relationship = def.data_relationships.get(&self.prop_id).unwrap();
         match data_relationship.source {
             ontol_runtime::ontology::domain::DataRelationshipSource::Inherent => {
                 DataRelationshipSource::Inherent
@@ -86,7 +86,7 @@ impl DataRelationshipInfo {
     }
     fn target(&self, ctx: &Ctx) -> gql_def::Def {
         let def = ctx.def(self.def_id);
-        let data_relationship = def.data_relationships.get(&self.rel_id).unwrap();
+        let data_relationship = def.data_relationships.get(&self.prop_id).unwrap();
         let target_def_id = match data_relationship.target {
             ontol_runtime::ontology::domain::DataRelationshipTarget::Unambiguous(def_id) => def_id,
             ontol_runtime::ontology::domain::DataRelationshipTarget::Union(def_id) => def_id,
@@ -95,12 +95,12 @@ impl DataRelationshipInfo {
     }
     fn name(&self, ctx: &Ctx) -> String {
         let def = ctx.def(self.def_id);
-        let data_relationship = def.data_relationships.get(&self.rel_id).unwrap();
+        let data_relationship = def.data_relationships.get(&self.prop_id).unwrap();
         ctx[data_relationship.name].into()
     }
     fn cardinality(&self, ctx: &Ctx) -> Cardinality {
         let def = ctx.def(self.def_id);
-        let data_relationship = def.data_relationships.get(&self.rel_id).unwrap();
+        let data_relationship = def.data_relationships.get(&self.prop_id).unwrap();
         Cardinality::from(data_relationship.cardinality)
     }
     fn kind(&self) -> RelationshipKind {

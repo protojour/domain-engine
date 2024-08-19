@@ -4,15 +4,15 @@ use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
     interface::discriminator::Discriminant, ontology::ontol::ValueGenerator, DefId, PackageId,
-    RelId,
+    PropId, RelId,
 };
 
 use crate::SourceSpan;
 
 #[derive(Default)]
 pub struct MiscCtx {
-    /// A map from "idenfities" relationship to named relationship:
-    pub inherent_id_map: FnvHashMap<RelId, RelId>,
+    /// A map from "idenfities" relationship to property:
+    pub inherent_id_map: FnvHashMap<RelId, PropId>,
 
     pub text_pattern_constructors: FnvHashSet<DefId>,
     pub union_discriminators: FnvHashMap<DefId, UnionDiscriminator>,

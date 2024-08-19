@@ -17,7 +17,7 @@ use crate::{
     phf::PhfIndexMap,
     value::{Value, ValueTag},
     vm::proc::{NParams, Procedure},
-    DefId, RelId,
+    DefId, PropId,
 };
 
 use super::{
@@ -37,7 +37,7 @@ use super::{
 /// The output of the struct deserializer.
 /// Requires some post-processing before it can become an Attribute.
 pub struct Struct {
-    pub attributes: FnvHashMap<RelId, Attr>,
+    pub attributes: FnvHashMap<PropId, Attr>,
     pub id: Option<Value>,
     pub rel_params: Value,
 
@@ -47,7 +47,7 @@ pub struct Struct {
     observed_props_bitset: BitSet,
 
     /// Pre-discriminated flattened unions
-    flattened_union_ops: FnvHashMap<RelId, SerdeOperatorAddr>,
+    flattened_union_ops: FnvHashMap<PropId, SerdeOperatorAddr>,
 
     /// serde properties that may later be deserialized by the flattened unions above
     flattened_union_tmp_data: HashMap<Box<str>, serde_value::Value>,
@@ -244,7 +244,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                     serde_property.value_addr,
                     SubProcessorContext {
                         is_update: false,
-                        parent_property_id: Some(serde_property.rel_id),
+                        parent_property_id: Some(serde_property.id),
                         parent_property_flags: serde_property.flags,
                         rel_params_addr: None,
                     },
@@ -257,7 +257,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             if let Some(serde_value) = all_attrs.remove(key.arc_str().as_str()) {
                 let attr = property_processor
                     .deserialize(serde_value::ValueDeserializer::<E>::new(serde_value))?;
-                output.attributes.insert(serde_property.rel_id, attr);
+                output.attributes.insert(serde_property.id, attr);
                 output.observed_props_bitset.insert(prop_idx);
             } else if !is_optional {
                 return Err(serde::de::Error::custom(format!(
@@ -343,7 +343,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                 PropKind::Property(prop_idx, serde_property, rel_params_addr) => {
                     let _entered = trace_span!(
                         "prop",
-                        rel = ?serde_property.rel_id,
+                        id = ?serde_property.id,
                         addr = serde_property.value_addr.0
                     )
                     .entered();
@@ -354,7 +354,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                             serde_property.value_addr,
                             SubProcessorContext {
                                 is_update: false,
-                                parent_property_id: Some(serde_property.rel_id),
+                                parent_property_id: Some(serde_property.id),
                                 parent_property_flags: serde_property.flags,
                                 rel_params_addr: rel_params_addr.0,
                             },
@@ -369,18 +369,14 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                         if let Some(attr) =
                             map.next_value_seed(property_processor.to_option_processor())?
                         {
-                            output.attributes.insert(serde_property.rel_id, attr);
+                            output.attributes.insert(serde_property.id, attr);
                         }
                     } else {
-                        output.attributes.insert(
-                            serde_property.rel_id,
-                            map.next_value_seed(property_processor)?,
-                        );
+                        output
+                            .attributes
+                            .insert(serde_property.id, map.next_value_seed(property_processor)?);
 
-                        trace!(
-                            "observe required prop {prop_idx} {:?}",
-                            serde_property.rel_id
-                        );
+                        trace!("observe required prop {prop_idx} {:?}", serde_property.id);
                     }
                 }
                 PropKind::FlatUnionDiscriminator(prop_idx, key, serde_property, union_addr) => {
@@ -424,7 +420,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
 
                     output
                         .flattened_union_ops
-                        .insert(serde_property.rel_id, match_ok.addr);
+                        .insert(serde_property.id, match_ok.addr);
                     output.flattened_union_tmp_data.extend(buffer);
                     output.observed_props_bitset.insert(prop_idx);
                 }
@@ -510,13 +506,13 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             return Ok(IdOrStruct::Struct(output));
         }
 
-        let (rel_id, _) = output.attributes.iter().next().unwrap();
+        let (prop_id, _) = output.attributes.iter().next().unwrap();
         let def = self.processor.ontology.def(self.type_def_id);
 
         let DefKind::Entity(entity) = &def.kind else {
             return Ok(IdOrStruct::Struct(output));
         };
-        if *rel_id != entity.id_relationship_id {
+        if *prop_id != entity.id_prop {
             return Ok(IdOrStruct::Struct(output));
         }
 
@@ -554,7 +550,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             // Only _default values_ are handled in the deserializer:
             if let Some(ValueGenerator::DefaultProc(address)) = property.value_generator {
                 if !property.is_optional_for(self.processor.mode, &self.processor.profile.flags)
-                    && !output.attributes.contains_key(&property.rel_id)
+                    && !output.attributes.contains_key(&property.id)
                 {
                     let procedure = Procedure {
                         address,
@@ -569,7 +565,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                         .unwrap();
 
                     // BUG: No support for rel_params:
-                    output.attributes.insert(property.rel_id, value.into());
+                    output.attributes.insert(property.id, value.into());
                     output.observed_props_bitset.insert(prop_idx);
                 }
             }
@@ -604,7 +600,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         for (key, prop) in self.properties.raw_map().iter() {
             debug!(
                 "    prop {:?}('{}') {:?} visible={} optional={}",
-                prop.rel_id,
+                prop.id,
                 key.arc_str(),
                 prop.flags,
                 prop.filter(
@@ -621,7 +617,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             .properties
             .iter()
             .filter(|(_, property)| {
-                !output.attributes.contains_key(&property.rel_id)
+                !output.attributes.contains_key(&property.id)
                     && property
                         .filter(
                             self.processor.mode,
@@ -671,7 +667,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                 self.processor
                     .ontology
                     .ontol_domain_meta()
-                    .open_data_rel_id(),
+                    .open_data_prop_id(),
                 Value::Dict(Box::new(open_dict), ValueTag::unit()).into(),
             );
         }

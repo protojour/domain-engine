@@ -5,13 +5,13 @@ use fnv::FnvHashMap;
 use ontol_hir::{Binding, EvalCondTerm, Node, OverloadFunc, Pack, PropVariant, StructFlags};
 use ontol_runtime::{
     ontology::map::MapLossiness,
-    property::ValueCardinality,
+    property::{Cardinality, PropertyCardinality, ValueCardinality},
     query::condition::{Clause, ClausePair},
     var::{Var, VarSet},
     vm::proc::{
         BuiltinProc, GetAttrFlags, Local, NParams, OpCode, OpCodeCondTerm, Predicate, Procedure,
     },
-    DefId, MapDirection, MapFlags, MapKey,
+    DefId, MapDirection, MapFlags, MapKey, PropId,
 };
 use thin_vec::ThinVec;
 use tracing::debug;
@@ -22,9 +22,11 @@ use crate::{
         ir::{BlockLabel, BlockOffset, Terminator},
         proc_builder::Delta,
     },
+    def::Defs,
     error::CompileError,
     primitive::Primitives,
-    relation::rel_def_meta,
+    properties::PropCtx,
+    relation::{rel_def_meta, RelCtx},
     repr::{
         repr_ctx::ReprCtx,
         repr_model::{ReprKind, ReprScalarKind},
@@ -102,8 +104,29 @@ pub(super) fn map_codegen<'m>(
         None => MapLossiness::Complete,
     };
 
-    let data_flow = DataFlowAnalyzer::new(&compiler.defs, &compiler.rel_ctx, &rel_def_meta)
-        .analyze(func.arg.0.var, body.as_ref());
+    fn get_subject_cardinality<'c>(
+        prop_id: PropId,
+        rel_ctx: &'c RelCtx,
+        prop_ctx: &'c PropCtx,
+        defs: &'c Defs,
+    ) -> Cardinality {
+        match prop_ctx.property_by_id(prop_id) {
+            Some(property) => {
+                rel_def_meta(property.rel_id, rel_ctx, defs)
+                    .relationship
+                    .subject_cardinality
+            }
+            None => (PropertyCardinality::Mandatory, ValueCardinality::Unit),
+        }
+    }
+
+    let data_flow = DataFlowAnalyzer::new(
+        &compiler.defs,
+        &compiler.rel_ctx,
+        &compiler.prop_ctx,
+        &get_subject_cardinality,
+    )
+    .analyze(func.arg.0.var, body.as_ref());
 
     let return_ty = body.data().ty();
 
@@ -294,7 +317,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     self.builder,
                 );
             }
-            ontol_hir::Kind::LetProp(bind_pack, (struct_var, rel_id)) => {
+            ontol_hir::Kind::LetProp(bind_pack, (struct_var, prop_id)) => {
                 let Ok(struct_local) = self.var_local(*struct_var, &span) else {
                     return;
                 };
@@ -331,14 +354,14 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 if delta > 0 {
                     block.op(
-                        OpCode::GetAttr(struct_local, *rel_id, len, GetAttrFlags::TAKE),
+                        OpCode::GetAttr(struct_local, *prop_id, len, GetAttrFlags::TAKE),
                         Delta(delta as i32),
                         span,
                         self.builder,
                     );
                 }
             }
-            ontol_hir::Kind::LetPropDefault(bind_pack, (struct_var, rel_id), default) => {
+            ontol_hir::Kind::LetPropDefault(bind_pack, (struct_var, prop_id), default) => {
                 let Ok(struct_local) = self.var_local(*struct_var, &span) else {
                     return;
                 };
@@ -381,7 +404,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 }
 
                 block.op(
-                    OpCode::GetAttr(struct_local, *rel_id, len, GetAttrFlags::empty()),
+                    OpCode::GetAttr(struct_local, *prop_id, len, GetAttrFlags::empty()),
                     Delta(delta as i32),
                     span,
                     self.builder,
@@ -752,7 +775,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     self.scope.remove(&binder.hir().var);
                 }
             }
-            ontol_hir::Kind::Prop(_, struct_var, rel_id, PropVariant::Unit(unit_node)) => {
+            ontol_hir::Kind::Prop(_, struct_var, prop_id, PropVariant::Unit(unit_node)) => {
                 let Ok(struct_local) = self.var_local(*struct_var, &span) else {
                     return;
                 };
@@ -796,7 +819,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                         }
 
                         block.op(
-                            OpCode::PutAttrMat(struct_local, columns.len() as u8, *rel_id),
+                            OpCode::PutAttrMat(struct_local, columns.len() as u8, *prop_id),
                             Delta(-(columns.len() as i32)),
                             span,
                             self.builder,
@@ -804,7 +827,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     } else if elements.len() == 1 {
                         self.gen_node(unit_ref, block);
                         block.op(
-                            OpCode::PutAttrMat(struct_local, 1, *rel_id),
+                            OpCode::PutAttrMat(struct_local, 1, *prop_id),
                             Delta(-1),
                             span,
                             self.builder,
@@ -815,14 +838,14 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 } else {
                     self.gen_node(unit_ref, block);
                     block.op(
-                        OpCode::PutAttrUnit(struct_local, *rel_id),
+                        OpCode::PutAttrUnit(struct_local, *prop_id),
                         Delta(-1),
                         span,
                         self.builder,
                     );
                 }
             }
-            ontol_hir::Kind::Prop(_, struct_var, rel_id, PropVariant::Tuple(tup)) => {
+            ontol_hir::Kind::Prop(_, struct_var, prop_id, PropVariant::Tuple(tup)) => {
                 let Ok(struct_local) = self.var_local(*struct_var, &span) else {
                     return;
                 };
@@ -841,7 +864,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 }
 
                 block.op(
-                    OpCode::PutAttrTup(struct_local, tup.len() as u8, *rel_id),
+                    OpCode::PutAttrTup(struct_local, tup.len() as u8, *prop_id),
                     Delta(-(tup.len() as i32)),
                     span,
                     self.builder,
@@ -1031,11 +1054,11 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     let vm_clause_op = match clause_op {
                         Clause::Root => Clause::Root,
                         Clause::IsEntity(def_id) => Clause::IsEntity(*def_id),
-                        Clause::MatchProp(rel_id, set_operator, set_var) => {
+                        Clause::MatchProp(prop_id, set_operator, set_var) => {
                             let Ok(set_local) = self.var_local(*set_var, &span) else {
                                 return;
                             };
-                            Clause::MatchProp(*rel_id, *set_operator, set_local)
+                            Clause::MatchProp(*prop_id, *set_operator, set_local)
                         }
                         Clause::Member(rel, val) => {
                             let rel = self.gen_eval_cond_term(rel, arena, span, block);

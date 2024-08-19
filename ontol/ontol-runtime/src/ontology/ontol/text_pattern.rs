@@ -10,7 +10,7 @@ use crate::{
     interface::serde::processor::ProcessorMode,
     ontology::Ontology,
     value::{FormatValueAsText, Value},
-    DefId, DefRelTag, RelId,
+    DefId, DefPropTag, PropId,
 };
 
 use super::{text_like_types::ParseError, TextConstant};
@@ -80,7 +80,7 @@ impl TextPattern {
                         let text_def_id = ontology.ontol_domain_meta().text;
 
                         attrs.insert(
-                            RelId(text_def_id, DefRelTag(0)),
+                            PropId(text_def_id, DefPropTag(0)),
                             Attr::Unit(Value::Text(text.into(), text_def_id.into())),
                         );
                     }
@@ -109,7 +109,7 @@ impl TextPattern {
                                 ))
                             })?;
 
-                        attrs.insert(property.rel_id, attribute);
+                        attrs.insert(property.prop_id, attribute);
                     }
                 }
             }
@@ -128,7 +128,7 @@ pub enum TextPatternConstantPart {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TextPatternProperty {
-    pub rel_id: RelId,
+    pub prop_id: PropId,
     pub type_def_id: DefId,
     pub capture_group: usize,
 }
@@ -144,9 +144,11 @@ impl<'d, 'o> Display for FormatPattern<'d, 'o> {
         for constant_part in &self.pattern.constant_parts {
             match (constant_part, self.value) {
                 (TextPatternConstantPart::AnyString { .. }, Value::Struct(attrs, _)) => {
-                    let rel_id = RelId(self.ontology.ontol_domain_meta().text, DefRelTag(0));
-                    let Some(attribute) = attrs.get(&rel_id) else {
-                        error!("Attribute {rel_id} missing when formatting capturing text pattern");
+                    let prop_id = PropId(self.ontology.ontol_domain_meta().text, DefPropTag(0));
+                    let Some(attribute) = attrs.get(&prop_id) else {
+                        error!(
+                            "Attribute {prop_id} missing when formatting capturing text pattern"
+                        );
                         return Err(std::fmt::Error);
                     };
                     match attribute {
@@ -158,14 +160,16 @@ impl<'d, 'o> Display for FormatPattern<'d, 'o> {
                 }
                 (
                     TextPatternConstantPart::Property(TextPatternProperty {
-                        rel_id,
+                        prop_id,
                         type_def_id,
                         ..
                     }),
                     Value::Struct(attrs, _),
                 ) => {
-                    let Some(attribute) = attrs.get(rel_id) else {
-                        error!("Attribute {rel_id} missing when formatting capturing text pattern");
+                    let Some(attribute) = attrs.get(prop_id) else {
+                        error!(
+                            "Attribute {prop_id} missing when formatting capturing text pattern"
+                        );
                         return Err(std::fmt::Error);
                     };
                     let Attr::Unit(value) = attribute else {

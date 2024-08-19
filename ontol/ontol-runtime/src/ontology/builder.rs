@@ -8,7 +8,7 @@ use crate::{
     },
     query::condition::Condition,
     vm::proc::{Lib, Procedure},
-    DefId, DefIdSet, MapKey, PackageId, RelId,
+    DefId, DefIdSet, MapKey, PackageId, PropId, RelId,
 };
 
 use super::{
@@ -146,7 +146,7 @@ impl OntologyBuilder {
         self
     }
 
-    pub fn value_generators(mut self, generators: FnvHashMap<RelId, ValueGenerator>) -> Self {
+    pub fn value_generators(mut self, generators: FnvHashMap<PropId, ValueGenerator>) -> Self {
         self.data().value_generators = generators;
         self
     }
@@ -180,6 +180,7 @@ pub(super) fn new_builder() -> OntologyBuilder {
                 package_config_table: Default::default(),
                 def_docs: Default::default(),
                 rel_docs: Default::default(),
+                prop_docs: Default::default(),
                 lib: Lib::default(),
                 serde_operators: Default::default(),
                 dynamic_sequence_operator_addr: SerdeOperatorAddr(u32::MAX),
