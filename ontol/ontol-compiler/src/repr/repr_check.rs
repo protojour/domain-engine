@@ -561,6 +561,15 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 builder.kind = Some(next);
             }
             (Super, None | Some(ReprKind::Struct), ReprKind::Struct) => {
+                if let Some(table) = self.prop_ctx.properties_table_by_def_id(repr_def_id) {
+                    if !table.is_empty() {
+                        CompileError::TODO("macro must be used here")
+                            .span(data.rel_span)
+                            .report(self);
+                        return;
+                    }
+                }
+
                 builder.kind = Some(ReprKind::StructIntersection(
                     [(next_def_id, data.rel_span)].into(),
                 ));

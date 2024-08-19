@@ -30,6 +30,11 @@ pub struct ResolvedType {
     pub span: U32Span,
 }
 
+pub enum ReportError {
+    Yes,
+    No,
+}
+
 impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     pub(super) fn catch<T>(&mut self, f: impl FnOnce(&mut Self) -> Res<T>) -> Option<T> {
         match f(self) {
@@ -46,6 +51,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         type_quant: insp::TypeQuant<V>,
         block_context: &BlockContext,
         root_defs: Option<&mut RootDefs>,
+        report_error: ReportError,
     ) -> Option<ResolvedType> {
         let span = type_quant.view().span();
         let resolved_type = match type_quant {
@@ -53,18 +59,21 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 unit.type_ref()?,
                 ValueCardinality::Unit,
                 block_context,
+                report_error,
                 root_defs,
             ),
             insp::TypeQuant::TypeQuantSet(set) => self.resolve_type_reference(
                 set.type_ref()?,
                 ValueCardinality::IndexSet,
                 block_context,
+                report_error,
                 root_defs,
             ),
             insp::TypeQuant::TypeQuantList(list) => self.resolve_type_reference(
                 list.type_ref()?,
                 ValueCardinality::List,
                 block_context,
+                report_error,
                 root_defs,
             ),
         }?;
@@ -82,16 +91,23 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         type_ref: insp::TypeRef<V>,
         mut syntax_cardinality: ValueCardinality,
         block_context: &BlockContext,
+        report_error: ReportError,
         root_defs: Option<&mut RootDefs>,
     ) -> Option<ResolvedType> {
         let span = type_ref.view().span();
 
         let def_id = match (type_ref, block_context) {
-            (insp::TypeRef::IdentPath(path), _) => self.lookup_path(&path),
-            (insp::TypeRef::ThisUnit(_), BlockContext::Context(func)) => Some(func()),
-            (insp::TypeRef::ThisSet(_), BlockContext::Context(func)) => {
+            (insp::TypeRef::IdentPath(path), _) => self.lookup_path(&path, report_error),
+            (
+                insp::TypeRef::ThisUnit(_),
+                BlockContext::SubDef(def_fn) | BlockContext::RelParams { def_fn, .. },
+            ) => Some(def_fn()),
+            (
+                insp::TypeRef::ThisSet(_),
+                BlockContext::SubDef(def_fn) | BlockContext::RelParams { def_fn, .. },
+            ) => {
                 syntax_cardinality = ValueCardinality::IndexSet;
-                Some(func())
+                Some(def_fn())
             }
             (insp::TypeRef::ThisUnit(_) | insp::TypeRef::ThisSet(_), BlockContext::NoContext) => {
                 CompileError::WildcardNeedsContextualBlock.span_report(span, &mut self.ctx);
@@ -170,7 +186,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
                 for statement in body.statements() {
                     if let Some(mut defs) =
-                        self.lower_statement(statement, BlockContext::Context(&context_fn))
+                        self.lower_statement(statement, BlockContext::SubDef(&context_fn))
                     {
                         root_defs.append(&mut defs);
                     }
@@ -188,7 +204,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
                 for type_ref in type_union.members() {
                     if let insp::TypeRef::IdentPath(path) = type_ref {
-                        if let Some(member_def_id) = self.lookup_path(&path) {
+                        if let Some(member_def_id) = self.lookup_path(&path, ReportError::Yes) {
                             members.insert(member_def_id);
                         }
                     } else {
@@ -245,11 +261,21 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         }
     }
 
-    pub(super) fn lookup_path(&mut self, ident_path: &insp::IdentPath<V>) -> Option<DefId> {
-        self.catch(|zelf| {
-            zelf.ctx
+    pub(super) fn lookup_path(
+        &mut self,
+        ident_path: &insp::IdentPath<V>,
+        report_error: ReportError,
+    ) -> Option<DefId> {
+        match report_error {
+            ReportError::Yes => self.catch(|zelf| {
+                zelf.ctx
+                    .lookup_path::<V>(ident_path.symbols(), ident_path.0.span())
+            }),
+            ReportError::No => self
+                .ctx
                 .lookup_path::<V>(ident_path.symbols(), ident_path.0.span())
-        })
+                .ok(),
+        }
     }
 
     pub(super) fn lower_u16_range(&mut self, range: insp::NumberRange<V>) -> Range<Option<u16>> {

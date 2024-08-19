@@ -114,11 +114,25 @@ impl MapVarTable {
     }
 }
 
-#[derive(Clone, Copy)]
 pub enum BlockContext<'a> {
     NoContext,
-    Context(&'a dyn Fn() -> DefId),
+    SubDef(&'a dyn Fn() -> DefId),
+    RelParams {
+        def_fn: &'a dyn Fn() -> DefId,
+        relation_modifiers: &'a mut Vec<(Relationship, SourceSpan)>,
+    },
     FmtLeading,
+}
+
+impl<'a> BlockContext<'a> {
+    pub fn def_func(&self) -> Option<&'a dyn Fn() -> DefId> {
+        match self {
+            BlockContext::NoContext => None,
+            BlockContext::SubDef(f) => Some(*f),
+            BlockContext::RelParams { def_fn, .. } => Some(*def_fn),
+            BlockContext::FmtLeading => None,
+        }
+    }
 }
 
 impl<'c, 'm> LoweringCtx<'c, 'm> {
@@ -290,6 +304,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                     object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),
                     rel_params: RelParams::Unit,
                     macro_source: None,
+                    modifiers: vec![],
                 },
                 self.source_span(ident_span),
             );

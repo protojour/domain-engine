@@ -186,6 +186,31 @@ pub enum BuiltinRelationKind {
     FmtTransition,
 }
 
+impl BuiltinRelationKind {
+    pub fn context(&self) -> RelationContext {
+        match self {
+            BuiltinRelationKind::Is => RelationContext::Def,
+            BuiltinRelationKind::Identifies => RelationContext::Def,
+            BuiltinRelationKind::Id => RelationContext::Def,
+            BuiltinRelationKind::Indexed => RelationContext::Def,
+            BuiltinRelationKind::StoreKey => RelationContext::Def,
+            BuiltinRelationKind::Min => RelationContext::Def,
+            BuiltinRelationKind::Max => RelationContext::Def,
+            BuiltinRelationKind::Default => RelationContext::Rel,
+            BuiltinRelationKind::Gen => RelationContext::Rel,
+            BuiltinRelationKind::Order => RelationContext::Def,
+            BuiltinRelationKind::Direction => RelationContext::Def,
+            BuiltinRelationKind::Example => RelationContext::Def,
+            BuiltinRelationKind::FmtTransition => RelationContext::Def,
+        }
+    }
+}
+
+pub enum RelationContext {
+    Def,
+    Rel,
+}
+
 pub struct Defs<'m> {
     def_id_allocators: FnvHashMap<PackageId, u16>,
     pub(crate) table: FnvHashMap<DefId, Def<'m>>,

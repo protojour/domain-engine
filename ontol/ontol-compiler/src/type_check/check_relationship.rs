@@ -2,7 +2,7 @@ use ontol_runtime::{property::PropertyCardinality, EdgeId, RelId};
 use tracing::debug;
 
 use crate::{
-    def::{BuiltinRelationKind, DefKind, TypeDef},
+    def::{BuiltinRelationKind, DefKind},
     error::CompileError,
     mem::Intern,
     misc::{MacroExpand, TypeParam},
@@ -11,7 +11,7 @@ use crate::{
     relation::Relationship,
     sequence::Sequence,
     thesaurus::TypeRelation,
-    types::{FormatType, Type, TypeRef},
+    types::{FormatType, Type, TypeRef, ERROR_TYPE},
     SourceSpan,
 };
 
@@ -20,7 +20,7 @@ use super::TypeCheck;
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_rel(&mut self, rel_id: RelId, macro_expand: Option<&mut Option<MacroExpand>>) {
         let spanned = self.rel_ctx.spanned_relationship_by_id(rel_id);
-        self.check_relationship(rel_id, spanned.value, spanned.span, macro_expand);
+        self.check_relationship(rel_id, spanned.value, spanned.span, macro_expand, None);
     }
 
     fn check_relationship(
@@ -29,6 +29,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         relationship: &Relationship,
         span: &SourceSpan,
         macro_expand: Option<&mut Option<MacroExpand>>,
+        parent_relationship: Option<&Relationship>,
     ) -> TypeRef<'m> {
         let relation_def_kind = &self.defs.def_kind(relationship.relation_def_id);
 
@@ -44,11 +45,28 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_named_relation(rel_id, edge_id, relationship);
             }
             DefKind::BuiltinRelType(kind, _) => {
-                self.check_builtin_relation(rel_id, relationship, kind, span, macro_expand);
+                self.check_builtin_relation(
+                    rel_id,
+                    relationship,
+                    kind,
+                    span,
+                    macro_expand,
+                    parent_relationship,
+                );
             }
             _ => {
                 panic!()
             }
+        }
+
+        for (modifier_relationship, span) in &relationship.modifiers {
+            self.check_relationship(
+                rel_id,
+                modifier_relationship,
+                span,
+                None,
+                Some(relationship),
+            );
         }
 
         self.type_ctx.intern(Type::Tautology)
@@ -118,11 +136,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn check_builtin_relation(
         &mut self,
-        relationship_id: RelId,
+        rel_id: RelId,
         relationship: &Relationship,
         relation: &BuiltinRelationKind,
         span: &SourceSpan,
         macro_expand: Option<&mut Option<MacroExpand>>,
+        parent_relationship: Option<&Relationship>,
     ) -> TypeRef<'m> {
         let subject = &relationship.subject;
         let object = &relationship.object;
@@ -142,7 +161,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 if let Type::MacroDef(macro_def_id) = object_ty {
                     self.check_subject_data_type(subject_ty, &subject.1);
-                    debug!("is macro {relationship_id:?}");
+                    debug!("is macro {rel_id:?}");
 
                     if let Some(macro_expand) = macro_expand {
                         *macro_expand = Some(MacroExpand {
@@ -197,7 +216,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         .report_ty(self);
                 }
 
-                properties.identifies = Some(relationship_id);
+                properties.identifies = Some(rel_id);
                 let object_properties = self.prop_ctx.properties_by_def_id_mut(object.0);
                 match object_properties.identified_by {
                     Some(id) => {
@@ -207,7 +226,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         );
                         return CompileError::AlreadyIdentified.span(*span).report_ty(self);
                     }
-                    None => object_properties.identified_by = Some(relationship_id),
+                    None => object_properties.identified_by = Some(rel_id),
                 }
 
                 object_ty
@@ -253,7 +272,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         let mut sequence = Sequence::default();
 
                         if let Err(error) =
-                            sequence.define_relationship(&relationship.rel_params, relationship_id)
+                            sequence.define_relationship(&relationship.rel_params, rel_id)
                         {
                             return error.span(*span).report_ty(self);
                         }
@@ -262,7 +281,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                     (None, Constructor::Sequence(sequence)) => {
                         if let Err(error) =
-                            sequence.define_relationship(&relationship.rel_params, relationship_id)
+                            sequence.define_relationship(&relationship.rel_params, rel_id)
                         {
                             return error.span(*span).report_ty(self);
                         }
@@ -277,25 +296,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 object_ty
             }
             BuiltinRelationKind::Default => {
-                let _subject_ty = self.check_def(subject.0);
-                let subject_def_kind = self.defs.def_kind(subject.0);
-
-                let DefKind::Type(TypeDef {
-                    rel_type_for: Some(outer_relationship_id),
-                    ..
-                }) = subject_def_kind
-                else {
-                    return CompileError::TODO(
-                        "default not supported here, must be on a relation type",
-                    )
-                    .span(*span)
-                    .report_ty(self);
+                let Some(parent_relationship) = parent_relationship else {
+                    return &ERROR_TYPE;
                 };
+
+                let _subject_ty = self.check_def(subject.0);
 
                 let Relationship {
                     object: outer_object,
                     ..
-                } = self.rel_ctx.relationship_by_id(*outer_relationship_id);
+                } = parent_relationship;
 
                 let Some(object_ty) = self.def_ty_ctx.def_table.get(&outer_object.0).cloned()
                 else {
@@ -311,38 +321,27 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 let _object_ty = self.check_def(object.0);
 
-                self.misc_ctx
-                    .default_const_objects
-                    .insert(*outer_relationship_id, object.0);
+                self.misc_ctx.default_const_objects.insert(rel_id, object.0);
 
                 object_ty
             }
             BuiltinRelationKind::Gen => {
+                let Some(parent_relationship) = parent_relationship else {
+                    return &ERROR_TYPE;
+                };
+
                 let _subject_ty = self.check_def(subject.0);
                 let object_ty = self.check_def(object.0);
-
-                let subject_def_kind = self.defs.def_kind(subject.0);
 
                 let Type::ValueGenerator(value_generator_def_id) = object_ty else {
                     return CompileError::TODO("Not a value generator")
                         .span(object.1)
                         .report_ty(self);
                 };
-                let DefKind::Type(TypeDef {
-                    rel_type_for: Some(outer_relationship_id),
-                    ..
-                }) = subject_def_kind
-                else {
-                    return CompileError::TODO(
-                        "gen not supported here, must be on a relation type",
-                    )
-                    .span(*span)
-                    .report_ty(self);
-                };
                 let Relationship {
                     object: outer_object,
                     ..
-                } = self.rel_ctx.relationship_by_id(*outer_relationship_id);
+                } = parent_relationship;
 
                 let Some(_) = self.def_ty_ctx.def_table.get(&outer_object.0) else {
                     return CompileError::TODO("the type of the gen relation has not been checked")
@@ -352,7 +351,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 self.misc_ctx
                     .value_generators_unchecked
-                    .insert(*outer_relationship_id, (*value_generator_def_id, *span));
+                    .insert(rel_id, (*value_generator_def_id, *span));
                 object_ty
             }
             BuiltinRelationKind::Min | BuiltinRelationKind::Max | BuiltinRelationKind::Example => {
@@ -366,7 +365,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .insert(
                         relationship.relation_def_id,
                         TypeParam {
-                            definition_site: relationship_id.0.package_id(),
+                            definition_site: rel_id.0.package_id(),
                             object: object.0,
                             span: *span,
                         },
@@ -386,7 +385,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .order_relationships
                     .entry(subject.0)
                     .or_default()
-                    .push(relationship_id);
+                    .push(rel_id);
 
                 object_ty
             }
@@ -397,7 +396,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 if self
                     .misc_ctx
                     .direction_relationships
-                    .insert(subject.0, (relationship_id, object.0))
+                    .insert(subject.0, (rel_id, object.0))
                     .is_some()
                 {
                     return CompileError::TODO("duplicate `direction` relationship")

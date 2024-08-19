@@ -7,6 +7,7 @@ use tracing::{debug, debug_span};
 
 use crate::{
     fmt::{FmtChain, FmtTransition},
+    lowering::lower_misc::ReportError,
     CompileError,
 };
 
@@ -31,6 +32,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 origin.type_ref()?,
                 ValueCardinality::Unit,
                 &BlockContext::NoContext,
+                ReportError::Yes,
                 None,
             )?
             .def_id;
@@ -55,6 +57,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     transition.type_ref()?,
                     ValueCardinality::Unit,
                     &BlockContext::FmtLeading,
+                    ReportError::Yes,
                     None,
                 )?
                 .def_id;
@@ -86,6 +89,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 final_transition.type_ref()?,
                 ValueCardinality::Unit,
                 &block,
+                ReportError::Yes,
                 None,
             )?
             .def_id;

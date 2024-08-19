@@ -179,7 +179,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
             for statement in body.statements() {
                 if let Some(mut defs) =
-                    self.lower_statement(statement, BlockContext::Context(&context_fn))
+                    self.lower_statement(statement, BlockContext::SubDef(&context_fn))
                 {
                     root_defs.append(&mut defs);
                 }

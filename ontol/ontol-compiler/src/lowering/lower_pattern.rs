@@ -18,7 +18,10 @@ use crate::{
     CompileError, SourceSpan,
 };
 
-use super::context::{BlockContext, CstLowering, MapVarTable, SetElement};
+use super::{
+    context::{BlockContext, CstLowering, MapVarTable, SetElement},
+    lower_misc::ReportError,
+};
 
 enum LoweredStructPatternParams {
     Attrs {
@@ -54,7 +57,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     ) -> Pattern {
         let span = pat_struct.0.span();
         let type_path = match pat_struct.ident_path() {
-            Some(ident_path) => match self.lookup_path(&ident_path) {
+            Some(ident_path) => match self.lookup_path(&ident_path, ReportError::Yes) {
                 Some(def_id) => TypePath::Specified {
                     def_id,
                     span: self.ctx.source_span(ident_path.0.span()),
@@ -200,6 +203,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 relation.type_ref()?,
                 ValueCardinality::Unit,
                 &BlockContext::NoContext,
+                ReportError::Yes,
                 None,
             )?
             .def_id;
@@ -318,7 +322,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     ) -> Pattern {
         let seq_type = pat_set
             .ident_path()
-            .and_then(|ident_path| self.lookup_path(&ident_path));
+            .and_then(|ident_path| self.lookup_path(&ident_path, ReportError::Yes));
 
         let mut pattern_elements = vec![];
         for element in pat_set.elements() {

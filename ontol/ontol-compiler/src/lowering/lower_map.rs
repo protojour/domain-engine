@@ -24,7 +24,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
         for modifier in stmt.modifiers() {
             if modifier.slice() == "@abstract" {
-                if matches!(block_context, BlockContext::Context(_)) {
+                if matches!(block_context, BlockContext::SubDef(_)) {
                     CompileError::TODO("extern map cannot be abstract")
                         .span_report(modifier.span(), &mut self.ctx);
                 }
@@ -61,19 +61,18 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 ident,
                 arms: [first, second],
                 var_alloc: var_table.into_allocator(),
-                extern_def_id: match block_context {
-                    BlockContext::NoContext | BlockContext::FmtLeading => None,
-                    BlockContext::Context(context_fn) => {
-                        let context_def_id = context_fn();
-                        if matches!(
-                            self.ctx.compiler.defs.def_kind(context_def_id),
-                            DefKind::Extern(_)
-                        ) {
-                            Some(context_def_id)
-                        } else {
-                            None
-                        }
+                extern_def_id: if let Some(def_func) = block_context.def_func() {
+                    let context_def_id = (*def_func)();
+                    if matches!(
+                        self.ctx.compiler.defs.def_kind(context_def_id),
+                        DefKind::Extern(_)
+                    ) {
+                        Some(context_def_id)
+                    } else {
+                        None
                     }
+                } else {
+                    None
                 },
                 is_abstract,
             },

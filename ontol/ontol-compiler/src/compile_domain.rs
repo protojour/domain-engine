@@ -434,6 +434,7 @@ impl<'m> Compiler<'m> {
                                     object_cardinality: relationship.object_cardinality,
                                     rel_params: relationship.rel_params.clone(),
                                     macro_source: Some(*rel_id),
+                                    modifiers: relationship.modifiers.clone(),
                                 },
                                 *span,
                             ));

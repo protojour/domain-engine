@@ -47,10 +47,6 @@ impl RelCtx {
         self.table.get(&rel_id).unwrap().1
     }
 
-    pub fn relationship_by_id(&self, rel_id: RelId) -> &Relationship {
-        &self.table.get(&rel_id).unwrap().0
-    }
-
     pub fn spanned_relationship_by_id(&self, rel_id: RelId) -> SpannedBorrow<Relationship> {
         let (value, span) = &self.table.get(&rel_id).unwrap();
         SpannedBorrow { value, span }
@@ -72,7 +68,7 @@ impl RelCtx {
 }
 
 /// This definition expresses that a relation is a relationship between a subject and an object
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Relationship {
     pub relation_def_id: DefId,
     pub projection: EdgeCardinalProjection,
@@ -87,6 +83,7 @@ pub struct Relationship {
     pub object_cardinality: Cardinality,
 
     pub rel_params: RelParams,
+    pub modifiers: Vec<(Relationship, SourceSpan)>,
     pub macro_source: Option<RelId>,
 }
 

@@ -8,27 +8,28 @@ use ontol_runtime::{
     ontology::domain::EdgeCardinalProjection,
     property::{PropertyCardinality, ValueCardinality},
     tuple::CardinalIdx,
-    DefId, EdgeId,
+    DefId, DefRelTag, EdgeId, RelId,
 };
 use tracing::debug_span;
 
 use crate::{
-    def::{DefKind, TypeDef, TypeDefFlags},
+    def::{DefKind, RelationContext, TypeDef, TypeDefFlags},
     namespace::DocId,
+    package::ONTOL_PKG,
     relation::{RelParams, Relationship},
-    CompileError,
+    CompileError, SourceSpan,
 };
 
 use super::{
     context::{BlockContext, CstLowering, MapVarTable, RelationKey, RootDefs},
-    lower_misc::ResolvedType,
+    lower_misc::{ReportError, ResolvedType},
 };
 
 impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     pub(super) fn lower_rel_statement(
         &mut self,
         stmt: insp::RelStatement<V>,
-        block: BlockContext,
+        mut block: BlockContext,
     ) -> Option<RootDefs> {
         let rel_subject = stmt.subject()?;
         let fwd_set = stmt.fwd_set()?;
@@ -40,11 +41,15 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             rel_subject.type_quant()?,
             &block,
             Some(&mut root_defs),
+            ReportError::Yes,
         )?;
         let object_ty = match rel_object.type_quant_or_pattern()? {
-            insp::TypeQuantOrPattern::TypeQuant(type_quant) => {
-                self.resolve_quant_type_reference(type_quant, &block, Some(&mut root_defs))?
-            }
+            insp::TypeQuantOrPattern::TypeQuant(type_quant) => self.resolve_quant_type_reference(
+                type_quant,
+                &block,
+                Some(&mut root_defs),
+                ReportError::Yes,
+            )?,
             insp::TypeQuantOrPattern::Pattern(pattern) => {
                 let span = pattern.view().span();
                 let mut var_table = MapVarTable::default();
@@ -73,6 +78,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     None
                 },
                 stmt.clone(),
+                &mut block,
             ) {
                 root_defs.append(&mut defs);
             }
@@ -101,6 +107,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),
                 rel_params: RelParams::Unit,
                 macro_source: None,
+                modifiers: vec![],
             };
 
             let rel_id = self.ctx.compiler.rel_ctx.alloc_rel_id(subject_ty.def_id);
@@ -122,6 +129,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         object_ty: ResolvedType,
         backward_relation: Option<insp::RelBackwdSet<V>>,
         rel_stmt: insp::RelStatement<V>,
+        block: &mut BlockContext,
     ) -> Option<RootDefs> {
         let mut root_defs = RootDefs::new();
 
@@ -139,6 +147,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                             type_quant.clone(),
                             &BlockContext::NoContext,
                             Some(&mut root_defs),
+                            ReportError::Yes,
                         )?
                         .def_id;
                     let span = type_quant.view().span();
@@ -186,6 +195,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             object_ty,
             backward_relation,
             rel_stmt,
+            block,
         )
     }
 
@@ -202,6 +212,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         object_ty: ResolvedType,
         backward_relation: Option<insp::RelBackwdSet<V>>,
         rel_stmt: insp::RelStatement<V>,
+        block: &mut BlockContext,
     ) -> Option<RootDefs> {
         let mut root_defs = RootDefs::new();
 
@@ -210,8 +221,23 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         // This syntax just defines the relation the first time it's used
         let relation_def_id = self.ctx.define_relation_if_undefined(key);
 
-        let rel_id = self.ctx.compiler.rel_ctx.alloc_rel_id(subject_ty.def_id);
+        let (rel_id, edge_id) = if subject_ty.def_id == DefId::unit() {
+            // a parent relation modifier
+            (RelId(DefId::unit(), DefRelTag(0)), EdgeId(ONTOL_PKG, 0))
+        } else {
+            let rel_id = self.ctx.compiler.rel_ctx.alloc_rel_id(subject_ty.def_id);
+            // Fake edge id
+            let edge_id = self
+                .ctx
+                .compiler
+                .edge_ctx
+                .alloc_edge_id(self.ctx.package_id);
+            (rel_id, edge_id)
+        };
+
         self.append_documentation(DocId::Rel(rel_id), rel_stmt.0.clone());
+
+        let mut relation_modifiers: Vec<(Relationship, SourceSpan)> = Default::default();
 
         let rel_params = if let Some(index_range_rel_params) = index_range_rel_params {
             if let Some(rp) = relation.rel_params() {
@@ -223,44 +249,58 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             RelParams::IndexRange(index_range_rel_params)
         } else if let Some(rp) = relation.rel_params() {
             let _entered = debug_span!("rel_params").entered();
+            let scan = self.scan_rel_params(rp.clone());
 
-            let rel_def_id = self.ctx.define_anonymous_type(
-                TypeDef {
-                    ident: None,
-                    rel_type_for: Some(rel_id),
-                    flags: TypeDefFlags::CONCRETE,
-                },
-                rp.0.span(),
-            );
-            let context_fn = || rel_def_id;
+            if scan.has_def_receiver {
+                let rel_def_id = self.ctx.define_anonymous_type(
+                    TypeDef {
+                        ident: None,
+                        rel_type_for: Some(rel_id),
+                        flags: TypeDefFlags::CONCRETE,
+                    },
+                    rp.0.span(),
+                );
+                let context_fn = || rel_def_id;
 
-            root_defs.push(rel_def_id);
+                root_defs.push(rel_def_id);
 
-            // This type needs to be part of the anonymous part of the namespace
-            self.ctx
-                .compiler
-                .namespaces
-                .add_anonymous(self.ctx.package_id, rel_def_id);
+                // This type needs to be part of the anonymous part of the namespace
+                self.ctx
+                    .compiler
+                    .namespaces
+                    .add_anonymous(self.ctx.package_id, rel_def_id);
 
-            for statement in rp.statements() {
-                if let Some(mut defs) =
-                    self.lower_statement(statement, BlockContext::Context(&context_fn))
-                {
-                    root_defs.append(&mut defs);
+                for statement in rp.statements() {
+                    if let Some(mut defs) = self.lower_statement(
+                        statement,
+                        BlockContext::RelParams {
+                            def_fn: &context_fn,
+                            relation_modifiers: &mut relation_modifiers,
+                        },
+                    ) {
+                        root_defs.append(&mut defs);
+                    }
                 }
-            }
 
-            RelParams::Type(rel_def_id)
+                RelParams::Type(rel_def_id)
+            } else {
+                for statement in rp.statements() {
+                    if let Some(mut defs) = self.lower_statement(
+                        statement,
+                        BlockContext::RelParams {
+                            def_fn: &|| DefId::unit(),
+                            relation_modifiers: &mut relation_modifiers,
+                        },
+                    ) {
+                        root_defs.append(&mut defs);
+                    }
+                }
+
+                RelParams::Unit
+            }
         } else {
             RelParams::Unit
         };
-
-        // Fake edge id
-        let edge_id = self
-            .ctx
-            .compiler
-            .edge_ctx
-            .alloc_edge_id(self.ctx.package_id);
 
         let object_prop = backward_relation
             .clone()
@@ -309,6 +349,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 object_cardinality,
                 rel_params: rel_params.clone(),
                 macro_source: None,
+                modifiers: relation_modifiers,
             }
         };
 
@@ -329,6 +370,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 object_cardinality: relationship0.subject_cardinality,
                 rel_params,
                 macro_source: None,
+                modifiers: vec![],
             };
 
             let rel_id = self.ctx.compiler.rel_ctx.alloc_rel_id(object_ty.def_id);
@@ -356,14 +398,35 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 object_cardinality: relationship0.subject_cardinality,
                 rel_params: relationship0.rel_params,
                 macro_source: None,
+                modifiers: relationship0.modifiers,
             };
         }
 
-        self.ctx.outcome.predefine_rel(
-            rel_id,
-            relationship0,
-            self.ctx.source_span(rel_stmt.0.span()),
-        );
+        let rel_context = match self.ctx.compiler.defs.def_kind(relation_def_id) {
+            DefKind::BuiltinRelType(kind, _) => kind.context(),
+            _ => RelationContext::Def,
+        };
+
+        match rel_context {
+            RelationContext::Def => {
+                self.ctx.outcome.predefine_rel(
+                    rel_id,
+                    relationship0,
+                    self.ctx.source_span(rel_stmt.0.span()),
+                );
+            }
+            RelationContext::Rel => match block {
+                BlockContext::RelParams {
+                    relation_modifiers, ..
+                } => {
+                    relation_modifiers
+                        .push((relationship0, self.ctx.source_span(rel_stmt.0.span())));
+                }
+                _ => {
+                    todo!("report error");
+                }
+            },
+        }
 
         Some(root_defs)
     }
@@ -428,6 +491,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 object_cardinality,
                 rel_params: RelParams::Unit,
                 macro_source: None,
+                modifiers: vec![],
             }
         };
 
@@ -440,6 +504,54 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
         Some(vec![])
     }
+
+    fn scan_rel_params(&mut self, rp: insp::RelParams<V>) -> RelParamsScan {
+        let mut has_def_receiver = false;
+        let mut has_rel_receiver = false;
+
+        for statement in rp.statements() {
+            if let insp::Statement::RelStatement(rel_statement) = statement {
+                if let Some(rel_fwd_set) = rel_statement.fwd_set() {
+                    for relation in rel_fwd_set.relations() {
+                        if let Some(type_quant) = relation.relation_type() {
+                            if let Some(resolved_type) = self.resolve_quant_type_reference(
+                                type_quant,
+                                &BlockContext::NoContext,
+                                Some(&mut vec![]),
+                                ReportError::No,
+                            ) {
+                                if let DefKind::BuiltinRelType(kind, _) =
+                                    self.ctx.compiler.defs.def_kind(resolved_type.def_id)
+                                {
+                                    match kind.context() {
+                                        RelationContext::Def => {
+                                            has_def_receiver = true;
+                                        }
+                                        RelationContext::Rel => {
+                                            has_rel_receiver = true;
+                                        }
+                                    }
+                                } else {
+                                    has_def_receiver = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        RelParamsScan {
+            has_def_receiver,
+            has_rel_receiver,
+        }
+    }
+}
+
+struct RelParamsScan {
+    has_def_receiver: bool,
+    #[allow(unused)]
+    has_rel_receiver: bool,
 }
 
 fn property_cardinality<V: NodeView>(
