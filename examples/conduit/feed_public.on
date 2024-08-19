@@ -3,10 +3,14 @@ use 'conduit_db' as db
 /// An RRS-like channel
 def channel (
     rel* 'title': text
-    rel* is: channel_base
+    rel* is: channel_common
 )
 
 def @private channel_base (
+    rel* is: channel_common
+)
+
+def @macro channel_common (
     rel* 'link': text
     rel* 'username': text
     rel* 'items': {item}

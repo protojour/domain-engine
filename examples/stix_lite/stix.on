@@ -339,7 +339,7 @@ def @macro SRO_interface (
 )
 
 /// STIX Cyber Observable Object (SCO)
-def SCO_interface (
+def @macro SCO_interface (
     rel* is: interface.defanged
 
     rel* is: markings_interface
