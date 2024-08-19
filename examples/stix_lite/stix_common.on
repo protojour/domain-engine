@@ -122,6 +122,13 @@ def kill-chain-phase (
     rel* 'phase_name': string
 )
 
+/// The Statement marking type defines the representation of a textual marking statement (e.g., copyright, terms of use, etc.) in a definition.
+/// The value of the definition_type property MUST be statement when using this marking type. Statement markings are generally not machine-readable, and this specification does not define any behavior or actions based on their values.
+def marking-object (
+    /// A Statement (e.g., copyright, terms of use) applied to the content marked by this marking definition.
+    rel* 'statement': string
+)
+
 /// The binary data type represents a sequence of bytes. In order to allow pattern matching on custom objects, for all properties that use the binary type, the property name MUST end with '_bin'.
 ///
 /// The JSON MTI serialization represents this as a base64-­encoded string as specified in

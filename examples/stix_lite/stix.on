@@ -2021,7 +2021,6 @@ def marking-definition (
     rel* is: interface.created
     rel* is: interface.external_references
     rel* is: created_by_interface
-    rel* is: markings_interface
     rel {stix-object} is?: *
 
     rel* type: 'marking-definition'
@@ -2030,5 +2029,6 @@ def marking-definition (
     /// A name used to identify the Marking Definition.
     rel* 'name'?: common.string
 
-    // TODO: deprecated properties `definition_type` and `definition`
+    rel* 'definition_type'?: common.string
+    rel* 'definition'?: common.marking-object
 )
