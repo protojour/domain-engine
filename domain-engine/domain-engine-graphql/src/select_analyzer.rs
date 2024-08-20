@@ -581,6 +581,7 @@ impl<'a> SelectAnalyzer<'a> {
 
         loop {
             match inner_select {
+                Select::Unit => return Ok(Select::Unit),
                 Select::Struct(object) => {
                     return Ok(Select::Entity(EntitySelect {
                         source: StructOrUnionSelect::Struct(object),

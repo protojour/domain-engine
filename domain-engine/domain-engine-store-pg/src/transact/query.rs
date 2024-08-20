@@ -64,6 +64,7 @@ pub enum Cursor {
 
 #[derive(Clone, Copy)]
 pub enum QuerySelect<'a> {
+    Unit,
     Struct(&'a FnvHashMap<PropId, Select>),
     Field(PropId),
 }
@@ -141,7 +142,7 @@ impl<'a> TransactCtx<'a> {
 
                     (pg.table_name().into(), sql::Alias(0), fields)
                 }
-                None => {
+                Some(QuerySelect::Unit) | None => {
                     let fields: Vec<_> = self.initial_standard_data_fields(pg).into();
                     (pg.table_name().into(), sql::Alias(0), fields)
                 }
@@ -400,6 +401,12 @@ impl<'a> TransactCtx<'a> {
             .into_i64()?;
 
         match query_select {
+            Some(QuerySelect::Unit) => Ok(RowValue {
+                value: Value::unit(),
+                def_key,
+                data_key,
+                op,
+            }),
             Some(QuerySelect::Struct(properties)) => {
                 let mut attrs: FnvHashMap<PropId, Attr> = FnvHashMap::with_capacity_and_hasher(
                     def.data_relationships.len(),

@@ -24,6 +24,7 @@ pub enum CardinalSelect<'a> {
 impl<'a> CardinalSelect<'a> {
     pub fn from_select(select: &'a Select) -> Self {
         match select {
+            Select::Unit => Self::Leaf,
             Select::EntityId => Self::Leaf,
             Select::Leaf => Self::Leaf,
             Select::Struct(s) => Self::StructUnion(std::slice::from_ref(s)),

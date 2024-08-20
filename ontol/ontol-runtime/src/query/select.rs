@@ -6,6 +6,7 @@ use crate::{DefId, PropId};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Select {
+    Unit,
     EntityId,
     Leaf,
     Struct(StructSelect),

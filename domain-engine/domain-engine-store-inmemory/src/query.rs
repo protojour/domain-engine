@@ -291,6 +291,7 @@ impl InMemoryStore {
             .ok_or(DomainErrorKind::NotAnEntity(vertex_key.type_def_id).into_error())?;
 
         match select {
+            Select::Unit => Ok(Some(Value::unit())),
             Select::Leaf => {
                 if let Some(properties) =
                     self.look_up_vertex(vertex_key.type_def_id, vertex_key.dynamic_key)

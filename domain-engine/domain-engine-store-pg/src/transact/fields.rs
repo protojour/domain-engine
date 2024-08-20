@@ -8,7 +8,6 @@ use ontol_runtime::{
 };
 
 use crate::{
-    pg_error::PgError,
     pg_model::{PgDomainTable, PgTable, PgType},
     sql,
     sql_record::SqlRecordIterator,
@@ -98,7 +97,7 @@ impl<'a> TransactCtx<'a> {
         let target_def_id = match rel_info.target {
             DataRelationshipTarget::Unambiguous(def_id) => def_id,
             DataRelationshipTarget::Union(_) => {
-                return Err(PgError::UnionField.into());
+                return Ok(None);
             }
         };
 

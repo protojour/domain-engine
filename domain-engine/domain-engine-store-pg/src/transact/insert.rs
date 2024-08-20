@@ -9,17 +9,17 @@ use domain_engine_core::{
 use futures_util::{future::BoxFuture, TryStreamExt};
 use ontol_runtime::{
     attr::Attr,
-    ontology::domain::{DataRelationshipKind, Def},
+    ontology::domain::{DataRelationshipKind, DataRelationshipTarget, Def, DefRepr},
     query::select::Select,
     value::Value,
-    DefId, PackageId,
+    DefId, PackageId, PropId,
 };
 use pin_utils::pin_mut;
 use tracing::{debug, warn};
 
 use crate::{
     pg_error::{map_row_error, PgError, PgInputError},
-    pg_model::{InDomain, PgTable},
+    pg_model::{InDomain, PgDataKey, PgTable},
     sql::{self},
     sql_record::SqlColumnStream,
     sql_value::SqlVal,
@@ -43,6 +43,7 @@ pub struct PreparedInsert {
 struct AnalyzedInput<'a, 'b> {
     pub field_buf: Vec<SqlVal<'b>>,
     pub edges: EdgePatches,
+    pub sub_values: Vec<(PropId, Value)>,
     pub query_select: QuerySelect<'a>,
 }
 
@@ -84,52 +85,23 @@ impl<'a> TransactCtx<'a> {
         self.preprocess_insert_value(mode, &mut value.value)?;
 
         let def = self.ontology.def(value.value.type_def_id());
-        let (analyzed, pg_table) = self.analyze_input(value, def, select)?;
+        let (analyzed, pg_table) = self.analyze_input(None, def, value, select)?;
 
-        let row = {
-            debug!("{}", prepared.inherent_stmt);
-
-            let stream = self
-                .client()
-                .query_raw(prepared.inherent_stmt.deref(), &analyzed.field_buf)
-                .await
-                .map_err(PgError::InsertQuery)?;
-            pin_mut!(stream);
-
-            let row = stream
-                .try_next()
-                .await
-                .map_err(map_row_error)?
-                .ok_or(PgError::NothingInserted)?;
-
-            stream
-                .try_next()
-                .await
-                .map_err(PgError::InsertRowStreamNotClosed)?;
-
-            match stream.rows_affected() {
-                Some(affected) => {
-                    if affected != 1 {
-                        return Err(PgError::InsertIncorrectAffectCount.into());
-                    }
-                }
-                None => {
-                    return Err(PgError::InsertNoRowsAffected.into());
-                }
-            }
-
-            row
-        };
-
-        let mut row_value = self.read_row_value_as_vertex(
-            SqlColumnStream::new(&row),
-            Some(analyzed.query_select),
-            IncludeEdgeAttrs::No,
-            DataOperation::Inserted,
-        )?;
+        let mut row_value = self
+            .insert_row(
+                &prepared.inherent_stmt,
+                &analyzed.field_buf,
+                analyzed.query_select,
+            )
+            .await?;
 
         self.patch_edges(pg_table, row_value.data_key, analyzed.edges)
             .await?;
+
+        for (prop_id, value) in analyzed.sub_values {
+            self.insert_sub_value((prop_id, row_value.data_key), value)
+                .await?;
+        }
 
         if let (Some(edge_select_stmt), QuerySelect::Struct(properties)) =
             (prepared.edge_select_stmt, analyzed.query_select)
@@ -155,6 +127,55 @@ impl<'a> TransactCtx<'a> {
         }
 
         Ok(row_value)
+    }
+
+    fn insert_sub_value(
+        &self,
+        parent: (PropId, PgDataKey),
+        value: Value,
+    ) -> BoxFuture<'_, DomainResult<()>> {
+        Box::pin(self.insert_sub_value_impl(parent, value))
+    }
+
+    async fn insert_sub_value_impl(
+        &self,
+        parent: (PropId, PgDataKey),
+        value: Value,
+    ) -> DomainResult<()> {
+        let pkg_id = value.type_def_id().0;
+        let def_id = value.type_def_id();
+
+        let prepared = if let Some(prepared) =
+            self.stmt_cache_locked(|c| c.insert.get(&(pkg_id, def_id)).cloned())
+        {
+            prepared
+        } else {
+            let prepared = self.prepare_insert(pkg_id, def_id, &Select::Unit).await?;
+            self.stmt_cache_locked(|c| c.insert.insert((pkg_id, def_id), prepared.clone()));
+            prepared
+        };
+
+        let def = self.ontology.def(def_id);
+        let (analyzed, pg_table) =
+            self.analyze_input(Some(parent), def, InDomain { pkg_id, value }, &Select::Unit)?;
+
+        let row_value = self
+            .insert_row(
+                &prepared.inherent_stmt,
+                &analyzed.field_buf,
+                analyzed.query_select,
+            )
+            .await?;
+
+        self.patch_edges(pg_table, row_value.data_key, analyzed.edges)
+            .await?;
+
+        for (prop_id, value) in analyzed.sub_values {
+            self.insert_sub_value((prop_id, row_value.data_key), value)
+                .await?;
+        }
+
+        Ok(())
     }
 
     fn preprocess_insert_value(&self, mode: InsertMode, value: &mut Value) -> DomainResult<()> {
@@ -200,11 +221,6 @@ impl<'a> TransactCtx<'a> {
         select: &'a Select,
     ) -> DomainResult<PreparedInsert> {
         let def = self.ontology.def(def_id);
-        let entity = def.entity().ok_or_else(|| {
-            warn!("not an entity");
-            DomainErrorKind::NotAnEntity(def_id).into_error()
-        })?;
-
         let pg = self.pg_model.pg_domain_datatable(pkg_id, def_id)?;
 
         let mut ctx = QueryBuildCtx::default();
@@ -218,6 +234,12 @@ impl<'a> TransactCtx<'a> {
         let mut insert_returning = vec![];
 
         let mut param_idx = 0;
+
+        if pg.table.has_fkey {
+            column_names.extend(["_fdef", "_fkey"]);
+            values.extend([sql::Expr::param(0), sql::Expr::param(1)]);
+            param_idx += 2;
+        }
 
         // insert columns in the order of data relationships
         for (prop_id, rel_info) in &def.data_relationships {
@@ -240,6 +262,11 @@ impl<'a> TransactCtx<'a> {
         // RETURNING is based on select, etc
         match select {
             Select::EntityId => {
+                let entity = def.entity().ok_or_else(|| {
+                    warn!("not an entity");
+                    DomainErrorKind::NotAnEntity(def_id).into_error()
+                })?;
+
                 let id_prop_tag = entity.id_prop.tag();
                 if let Some(field) = pg.table.data_fields.get(&id_prop_tag) {
                     insert_returning.extend(self.initial_standard_data_fields(pg));
@@ -293,8 +320,11 @@ impl<'a> TransactCtx<'a> {
                     }
                 }
             }
-            _ => {
-                todo!()
+            Select::Unit => {
+                insert_returning.extend(self.initial_standard_data_fields(pg));
+            }
+            select => {
+                todo!("{select:?}")
             }
         };
 
@@ -316,8 +346,9 @@ impl<'a> TransactCtx<'a> {
 
     fn analyze_input(
         &self,
-        value: InDomain<Value>,
+        parent: Option<(PropId, PgDataKey)>,
         def: &Def,
+        value: InDomain<Value>,
         select: &'a Select,
     ) -> DomainResult<(AnalyzedInput<'a, '_>, &PgTable)> {
         let pg_table = self.pg_model.datatable(value.pkg_id, value.type_def_id())?;
@@ -328,38 +359,28 @@ impl<'a> TransactCtx<'a> {
 
         let mut field_buf: Vec<SqlVal> = vec![];
         let mut edge_patches = EdgePatches::default();
+        let mut sub_values: Vec<(PropId, Value)> = vec![];
+
+        if pg_table.has_fkey {
+            let Some((parent_prop_id, parent_key)) = parent else {
+                panic!();
+            };
+
+            let parent_pg_table = self
+                .pg_model
+                .datatable(parent_prop_id.0.package_id(), parent_prop_id.0)?;
+
+            field_buf.extend([SqlVal::I32(parent_pg_table.key), SqlVal::I64(parent_key)]);
+        }
 
         for (prop_id, rel_info) in &def.data_relationships {
-            match rel_info.kind {
-                DataRelationshipKind::Id | DataRelationshipKind::Tree => {
-                    let Some(pg_field) = pg_table.data_fields.get(&prop_id.1) else {
-                        continue;
-                    };
-                    if pg_field.pg_type.insert_default() {
-                        continue;
-                    }
+            let attr = attrs.remove(prop_id);
 
-                    match attrs.remove(prop_id) {
-                        Some(Attr::Unit(value)) => match self.data_from_value(value)? {
-                            Data::Sql(scalar) => {
-                                field_buf.push(scalar);
-                            }
-                            Data::Compound(comp) => {
-                                todo!("compound: {comp:?}");
-                            }
-                        },
-                        None => {
-                            field_buf.push(SqlVal::Null);
-                        }
-                        Some(_) => {
-                            debug!("edge ignored");
-                        }
-                    }
-                }
-                DataRelationshipKind::Edge(proj) => {
+            match (rel_info.kind, pg_table.data_fields.get(&prop_id.1)) {
+                (DataRelationshipKind::Edge(proj), _) => {
                     let patch = edge_patches.patch(proj.id, proj.subject);
 
-                    match attrs.remove(prop_id) {
+                    match attr {
                         Some(Attr::Unit(value)) => {
                             if patch.tuples.is_empty() {
                                 patch.tuples.push(EdgeEndoTuplePatch { elements: vec![] });
@@ -391,6 +412,59 @@ impl<'a> TransactCtx<'a> {
                         None => {}
                     }
                 }
+                (_, Some(pg_field)) => {
+                    if pg_field.pg_type.insert_default() {
+                        continue;
+                    }
+
+                    match attr {
+                        Some(Attr::Unit(value)) => match self.data_from_value(value)? {
+                            Data::Sql(scalar) => {
+                                field_buf.push(scalar);
+                            }
+                            Data::Compound(comp) => {
+                                todo!("compound: {comp:?}");
+                            }
+                        },
+                        None => {
+                            field_buf.push(SqlVal::Null);
+                        }
+                        Some(_) => {
+                            debug!("edge ignored");
+                        }
+                    }
+                }
+                _ => {
+                    match &rel_info.target {
+                        DataRelationshipTarget::Unambiguous(def_id) => {
+                            match self.ontology.def(*def_id).repr() {
+                                Some(DefRepr::Unit) | None => continue,
+                                _ => {}
+                            }
+                        }
+                        DataRelationshipTarget::Union(_) => {}
+                    };
+
+                    match attr {
+                        Some(Attr::Unit(value)) => {
+                            sub_values.push((*prop_id, value));
+                        }
+                        Some(Attr::Tuple(_tuple)) => {
+                            return Err(PgInputError::MultivaluedSubValue(*prop_id).into());
+                        }
+                        Some(Attr::Matrix(matrix)) => {
+                            if matrix.columns.len() == 1 {
+                                for row in matrix.into_rows() {
+                                    let value = row.elements.into_iter().next().unwrap();
+                                    sub_values.push((*prop_id, value));
+                                }
+                            } else {
+                                return Err(PgInputError::MultivaluedSubValue(*prop_id).into());
+                            }
+                        }
+                        None => {}
+                    }
+                }
             }
         }
 
@@ -404,16 +478,66 @@ impl<'a> TransactCtx<'a> {
                 QuerySelect::Field(entity.id_prop)
             }
             Select::Struct(sel) => QuerySelect::Struct(&sel.properties),
-            _ => todo!(),
+            Select::Unit => QuerySelect::Unit,
+            select => todo!("{select:?}"),
         };
 
         Ok((
             AnalyzedInput {
                 field_buf,
                 edges: edge_patches,
+                sub_values,
                 query_select,
             },
             pg_table,
         ))
+    }
+
+    async fn insert_row(
+        &self,
+        prepared_inherent_insert: &PreparedStatement,
+        field_buf: &[SqlVal<'a>],
+        query_select: QuerySelect<'a>,
+    ) -> DomainResult<RowValue> {
+        let row = {
+            debug!("{}", prepared_inherent_insert);
+
+            let stream = self
+                .client()
+                .query_raw(prepared_inherent_insert.deref(), field_buf)
+                .await
+                .map_err(PgError::InsertQuery)?;
+            pin_mut!(stream);
+
+            let row = stream
+                .try_next()
+                .await
+                .map_err(map_row_error)?
+                .ok_or(PgError::NothingInserted)?;
+
+            stream
+                .try_next()
+                .await
+                .map_err(PgError::InsertRowStreamNotClosed)?;
+
+            match stream.rows_affected() {
+                Some(affected) => {
+                    if affected != 1 {
+                        return Err(PgError::InsertIncorrectAffectCount.into());
+                    }
+                }
+                None => {
+                    return Err(PgError::InsertNoRowsAffected.into());
+                }
+            }
+
+            row
+        };
+        self.read_row_value_as_vertex(
+            SqlColumnStream::new(&row),
+            Some(query_select),
+            IncludeEdgeAttrs::No,
+            DataOperation::Inserted,
+        )
     }
 }

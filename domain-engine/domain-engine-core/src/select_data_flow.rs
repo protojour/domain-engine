@@ -19,6 +19,7 @@ struct IsDep(bool);
 
 pub fn translate_select(select: &mut Select, key: &MapKey, ontology: &Ontology) {
     match select {
+        Select::Unit => {}
         Select::Entity(entity_select) => {
             translate_entity_select(entity_select, key, ontology);
         }

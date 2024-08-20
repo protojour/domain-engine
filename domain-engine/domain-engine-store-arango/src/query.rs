@@ -66,6 +66,7 @@ impl<'a> MetaQuery<'a> {
     /// Add a Select to MetaQuery
     pub fn query_select(&mut self, select: &Select) -> DomainResult<()> {
         match select {
+            Select::Unit => {}
             Select::EntityId => {
                 self.return_var = Expr::complex(format!("{}[0]", self.var));
             }

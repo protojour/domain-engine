@@ -92,7 +92,7 @@ pub enum PgError {
 
 impl From<PgError> for DomainError {
     fn from(value: PgError) -> Self {
-        warn!("pg data error: {value:?}");
+        warn!("pg error: {value:?}");
         DomainErrorKind::DataStore(format!("{value}")).into_error()
     }
 }
@@ -120,6 +120,8 @@ pub enum PgInputError {
     UnionTopLevelQuery,
     /// bad cursor
     BadCursor(anyhow::Error),
+    /// non-unit sub-value
+    MultivaluedSubValue(PropId),
 }
 
 impl From<PgInputError> for DomainError {

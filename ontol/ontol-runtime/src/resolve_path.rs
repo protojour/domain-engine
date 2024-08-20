@@ -128,6 +128,7 @@ impl ResolverGraph {
         filter: ProbeFilter,
     ) -> Option<ResolvePath> {
         match select {
+            Select::Unit => None,
             Select::Entity(
                 EntitySelect {
                     source: StructOrUnionSelect::Struct(struct_select),
