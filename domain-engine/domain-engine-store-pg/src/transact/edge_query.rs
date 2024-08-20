@@ -178,7 +178,7 @@ impl<'a> TransactCtx<'a> {
                             let pg_def = self.lookup_def(struct_select.def_id)?;
 
                             let (from, vertex_alias, expressions) = self
-                                .sql_select_vertex_expressions(
+                                .sql_select_vertex_expressions_with_alias(
                                     target_def_id,
                                     &struct_select.properties,
                                     pg_def.pg,

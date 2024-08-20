@@ -3,7 +3,7 @@ use fnv::FnvHashMap;
 use futures_util::Stream;
 use ontol_runtime::{
     attr::{Attr, AttrMatrix},
-    ontology::domain::{DataRelationshipKind, Def},
+    ontology::domain::{DataRelationshipKind, DataRelationshipTarget, Def},
     property::ValueCardinality,
     query::select::{EntitySelect, Select, StructOrUnionSelect},
     sequence::SubSequence,
@@ -19,7 +19,7 @@ use tracing::{debug, trace};
 use crate::{
     pg_error::{PgError, PgInputError, PgModelError},
     pg_model::{PgDataKey, PgDomainTable, PgEdgeCardinalKind, PgTable, PgTableKey, PgType},
-    sql,
+    sql::{self, FromItem},
     sql_record::{SqlColumnStream, SqlRecord, SqlRecordIterator},
     sql_value::{Layout, SqlVal},
 };
@@ -69,7 +69,7 @@ pub enum QuerySelect<'a> {
     Field(PropId),
 }
 
-pub enum IncludeEdgeAttrs {
+pub enum IncludeJoinedAttrs {
     Yes,
     No,
 }
@@ -132,7 +132,7 @@ impl<'a> TransactCtx<'a> {
 
             let (from, _alias, tail_expressions) = match query_select {
                 Some(QuerySelect::Struct(properties)) => {
-                    self.sql_select_vertex_expressions(def_id, properties, pg, &mut ctx)?
+                    self.sql_select_vertex_expressions_with_alias(def_id, properties, pg, &mut ctx)?
                 }
                 Some(QuerySelect::Field(prop_id)) => {
                     let mut fields: Vec<_> = self.initial_standard_data_fields(pg).into();
@@ -201,7 +201,8 @@ impl<'a> TransactCtx<'a> {
                 }
 
                 if observed_rows < limit {
-                    let row_value = self.read_row_value_as_vertex(row_iter, query_select, IncludeEdgeAttrs::Yes, DataOperation::Queried)?;
+                    let row_value = self.read_row_value_as_vertex(row_iter, query_select, IncludeJoinedAttrs::Yes, DataOperation::Queried)?;
+                    trace!("query returned row value {:?}", row_value.value);
                     yield QueryFrame::Row(row_value);
 
                     observed_values += 1;
@@ -233,7 +234,7 @@ impl<'a> TransactCtx<'a> {
         })
     }
 
-    pub(super) fn sql_select_vertex_expressions(
+    pub(super) fn sql_select_vertex_expressions_with_alias(
         &self,
         def_id: DefId,
         properties: &FnvHashMap<PropId, Select>,
@@ -246,6 +247,15 @@ impl<'a> TransactCtx<'a> {
         let mut sql_expressions = vec![];
         let data_alias = self.select_inherent_fields_as_alias(def, pg, ctx)?;
         sql_expressions.push(sql::Expr::path2(data_alias, sql::PathSegment::Asterisk));
+
+        self.sql_select_abstract_properties(
+            def,
+            data_alias,
+            properties,
+            pg,
+            ctx,
+            &mut sql_expressions,
+        )?;
 
         self.sql_select_edge_properties(
             def,
@@ -261,6 +271,113 @@ impl<'a> TransactCtx<'a> {
             data_alias,
             sql_expressions,
         ))
+    }
+
+    fn sql_select_abstract_properties(
+        &self,
+        def: &Def,
+        parent_alias: sql::Alias,
+        // currently abstract properties are selected unconditionally
+        _properties: &FnvHashMap<PropId, Select>,
+        pg: PgDomainTable<'a>,
+        ctx: &mut QueryBuildCtx<'a>,
+        output: &mut Vec<sql::Expr<'a>>,
+    ) -> DomainResult<()> {
+        // TODO: The abstract props can be cached in PgTable
+        for (prop_id, rel) in &def.data_relationships {
+            match &rel.kind {
+                DataRelationshipKind::Id | DataRelationshipKind::Tree => {
+                    let Some(prop_key) = pg.table.find_abstract_property(prop_id) else {
+                        continue;
+                    };
+
+                    let sub_def_ids = match &rel.target {
+                        DataRelationshipTarget::Unambiguous(def_id) => std::slice::from_ref(def_id),
+                        DataRelationshipTarget::Union(union_def_id) => {
+                            self.ontology.union_variants(*union_def_id)
+                        }
+                    };
+
+                    let mut union_operands: Vec<sql::Expr> = vec![];
+
+                    for sub_def_id in sub_def_ids.iter().copied() {
+                        let sub_def = self.ontology.def(sub_def_id);
+                        let sub_pg = self
+                            .pg_model
+                            .pg_domain_datatable(sub_def_id.package_id(), sub_def_id)?;
+                        let sub_alias = ctx.alias.incr();
+
+                        let mut record_items: Vec<_> =
+                            self.initial_standard_data_fields(sub_pg).into();
+
+                        self.select_inherent_struct_fields(
+                            sub_def,
+                            sub_pg.table,
+                            &mut record_items,
+                            Some(sub_alias),
+                        )?;
+
+                        self.sql_select_abstract_properties(
+                            sub_def,
+                            sub_alias,
+                            &Default::default(),
+                            sub_pg,
+                            ctx,
+                            &mut record_items,
+                        )?;
+
+                        union_operands.push(
+                            sql::Select {
+                                with: None,
+                                expressions: sql::Expressions {
+                                    items: vec![sql::Expr::Row(record_items)],
+                                    multiline: false,
+                                },
+                                from: vec![FromItem::TableNameAs(
+                                    sub_pg.table_name(),
+                                    sql::Name::Alias(sub_alias),
+                                )],
+                                where_: Some(sql::Expr::And(vec![
+                                    sql::Expr::eq(
+                                        sql::Expr::path2(sub_alias, "_fprop"),
+                                        sql::Expr::LiteralInt(prop_key),
+                                    ),
+                                    sql::Expr::eq(
+                                        sql::Expr::path2(sub_alias, "_fkey"),
+                                        sql::Expr::path2(parent_alias, "_key"),
+                                    ),
+                                ])),
+                                ..Default::default()
+                            }
+                            .into(),
+                        );
+                    }
+
+                    let mut union_iter = union_operands.into_iter();
+                    if let Some(mut union_expr) = union_iter.next() {
+                        for next in union_iter {
+                            union_expr = sql::Expr::Union(Box::new(sql::Union {
+                                first: union_expr,
+                                all: true,
+                                second: next,
+                            }));
+                        }
+
+                        output.push(sql::Expr::paren(sql::Expr::Limit(
+                            Box::new(union_expr),
+                            sql::Limit {
+                                // TODO: Only limit if it's not "matrix"?
+                                limit: Some(1),
+                                offset: None,
+                            },
+                        )));
+                    }
+                }
+                DataRelationshipKind::Edge(_) => {}
+            }
+        }
+
+        Ok(())
     }
 
     pub fn sql_select_edge_properties(
@@ -380,21 +497,19 @@ impl<'a> TransactCtx<'a> {
         &self,
         mut iterator: impl SqlRecordIterator<'b>,
         query_select: Option<QuerySelect>,
-        include_edge_attrs: IncludeEdgeAttrs,
+        include_joined_attrs: IncludeJoinedAttrs,
         op: DataOperation,
     ) -> DomainResult<RowValue> {
         let def_key = iterator
             .next_field(&Layout::Scalar(PgType::Integer))?
             .into_i32()?;
 
-        let def = {
-            let Some(PgTableKey::Data { pkg_id: _, def_id }) =
-                self.pg_model.reg_key_to_table_key.get(&def_key)
-            else {
-                return Err(PgError::InvalidDynamicDataType(def_key).into());
-            };
-            self.ontology.def(*def_id)
+        let Some(PgTableKey::Data { pkg_id, def_id }) =
+            self.pg_model.reg_key_to_table_key.get(&def_key)
+        else {
+            return Err(PgError::InvalidDynamicDataType(def_key).into());
         };
+        let def = self.ontology.def(*def_id);
 
         let data_key = iterator
             .next_field(&Layout::Scalar(PgType::BigInt))?
@@ -416,7 +531,35 @@ impl<'a> TransactCtx<'a> {
                 // retrieve data properties
                 self.read_inherent_struct_fields(def, &mut iterator, &mut attrs)?;
 
-                if matches!(&include_edge_attrs, IncludeEdgeAttrs::Yes) {
+                if matches!(&include_joined_attrs, IncludeJoinedAttrs::Yes) {
+                    // retrieve abstract properties
+                    let pg = self.pg_model.pg_domain_datatable(*pkg_id, *def_id)?;
+
+                    for (prop_id, rel) in &def.data_relationships {
+                        match &rel.kind {
+                            DataRelationshipKind::Id | DataRelationshipKind::Tree => {
+                                if pg.table.find_abstract_property(prop_id).is_none() {
+                                    continue;
+                                }
+
+                                if let Some(sql_val) =
+                                    iterator.next_field(&Layout::Record)?.null_filter()
+                                {
+                                    let sql_record = sql_val.into_record()?;
+                                    let row_value = self.read_row_value_as_vertex(
+                                        sql_record.fields(),
+                                        Some(QuerySelect::Struct(&Default::default())),
+                                        IncludeJoinedAttrs::Yes,
+                                        DataOperation::Queried,
+                                    )?;
+
+                                    attrs.insert(*prop_id, Attr::Unit(row_value.value));
+                                }
+                            }
+                            DataRelationshipKind::Edge(_) => {}
+                        }
+                    }
+
                     self.read_edge_attributes(&mut iterator, def, properties, &mut attrs)?;
                 }
 
@@ -620,7 +763,7 @@ impl<'a> TransactCtx<'a> {
         let row_value = self.read_row_value_as_vertex(
             sql_record.fields(),
             Some(QuerySelect::Struct(select_properties)),
-            IncludeEdgeAttrs::Yes,
+            IncludeJoinedAttrs::Yes,
             DataOperation::Queried,
         )?;
 

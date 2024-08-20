@@ -24,7 +24,7 @@ use crate::{
     sql_record::SqlColumnStream,
     sql_value::SqlVal,
     statement::{Prepare, PreparedStatement},
-    transact::query::IncludeEdgeAttrs,
+    transact::query::IncludeJoinedAttrs,
 };
 
 use super::{
@@ -536,7 +536,7 @@ impl<'a> TransactCtx<'a> {
         self.read_row_value_as_vertex(
             SqlColumnStream::new(&row),
             Some(query_select),
-            IncludeEdgeAttrs::No,
+            IncludeJoinedAttrs::No,
             DataOperation::Inserted,
         )
     }
