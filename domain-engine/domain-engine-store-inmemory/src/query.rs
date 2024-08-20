@@ -285,13 +285,6 @@ impl InMemoryStore {
             }
         }
 
-        let properties = self
-            .vertices
-            .get(&vertex_key.type_def_id)
-            .ok_or(DomainErrorKind::InherentIdNotFound.into_error())?
-            .get(vertex_key.dynamic_key)
-            .ok_or(DomainErrorKind::InherentIdNotFound.into_error())?;
-
         let def = ctx.ontology.def(vertex_key.type_def_id);
         let entity = def
             .entity()
@@ -299,22 +292,45 @@ impl InMemoryStore {
 
         match select {
             Select::Leaf => {
-                // Entity leaf only includes the ID of that entity, not its other fields
-                let id_attr = properties.get(&entity.id_prop).unwrap();
-                Ok(Some(id_attr.as_unit().unwrap().clone()))
+                if let Some(properties) =
+                    self.look_up_vertex(vertex_key.type_def_id, vertex_key.dynamic_key)
+                {
+                    // Entity leaf only includes the ID of that entity, not its other fields
+                    let id_attr = properties.get(&entity.id_prop).unwrap();
+                    Ok(Some(id_attr.as_unit().unwrap().clone()))
+                } else if let Some(id_value) = ctx
+                    .check
+                    .get_foreign_deferred(vertex_key.type_def_id, vertex_key.dynamic_key)
+                {
+                    // it's a "tentative vertex", but we have its id and can return a value for it for now.
+                    // The check is deferred for later.
+                    Ok(Some(id_value.clone()))
+                } else {
+                    Err(DomainErrorKind::InherentIdNotFound.into_error())
+                }
             }
-            Select::Struct(struct_select) => Some(self.apply_struct_select(
-                def,
-                vertex_key,
-                properties.clone(),
-                vertex_key.type_def_id,
-                &struct_select.properties,
-                ctx,
-            ))
-            .transpose(),
+            Select::Struct(struct_select) => {
+                let properties = self
+                    .look_up_vertex(vertex_key.type_def_id, vertex_key.dynamic_key)
+                    .ok_or(DomainErrorKind::InherentIdNotFound.into_error())?;
+
+                Some(self.apply_struct_select(
+                    def,
+                    vertex_key,
+                    properties.clone(),
+                    vertex_key.type_def_id,
+                    &struct_select.properties,
+                    ctx,
+                ))
+                .transpose()
+            }
             Select::StructUnion(_, variant_selects) => {
                 for variant_select in variant_selects {
                     if variant_select.def_id == def.id {
+                        let properties = self
+                            .look_up_vertex(vertex_key.type_def_id, vertex_key.dynamic_key)
+                            .ok_or(DomainErrorKind::InherentIdNotFound.into_error())?;
+
                         return Some(self.apply_struct_select(
                             def,
                             vertex_key,
@@ -332,6 +348,10 @@ impl InMemoryStore {
             Select::EntityId => Err(DomainError::data_store("entity id")),
             Select::Entity(entity_select) => match &entity_select.source {
                 StructOrUnionSelect::Struct(struct_select) => {
+                    let properties = self
+                        .look_up_vertex(vertex_key.type_def_id, vertex_key.dynamic_key)
+                        .ok_or(DomainErrorKind::InherentIdNotFound.into_error())?;
+
                     let value = self.apply_struct_select(
                         def,
                         vertex_key,
@@ -345,6 +365,10 @@ impl InMemoryStore {
                 StructOrUnionSelect::Union(_, candidates) => {
                     for variant_select in candidates {
                         if variant_select.def_id == def.id {
+                            let properties = self
+                                .look_up_vertex(vertex_key.type_def_id, vertex_key.dynamic_key)
+                                .ok_or(DomainErrorKind::InherentIdNotFound.into_error())?;
+
                             return Some(self.apply_struct_select(
                                 def,
                                 vertex_key,

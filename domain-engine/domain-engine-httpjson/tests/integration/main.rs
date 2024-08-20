@@ -57,28 +57,27 @@ fn jsonlines_body(documents: Vec<serde_json::Value>) -> axum::body::Body {
     )))
 }
 
-async fn assert_status(
+async fn fetch_body_assert_status(
     response: http::Response<Body>,
     expected: StatusCode,
-) -> Result<http::Response<Body>, String> {
+) -> Result<String, String> {
     let status = response.status();
 
+    use http_body_util::BodyExt;
+    let binary_body = response
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes()
+        .to_vec();
+    let string_body = std::str::from_utf8(&binary_body).unwrap().to_string();
+
     if status != expected {
-        use http_body_util::BodyExt;
-
-        let binary_body = response
-            .into_body()
-            .collect()
-            .await
-            .unwrap()
-            .to_bytes()
-            .to_vec();
-        let string_body = std::str::from_utf8(&binary_body).unwrap();
-
         return Err(format!("expected {expected}, was {status}: {string_body}"));
     }
 
-    Ok(response)
+    Ok(string_body)
 }
 
 async fn make_domain_engine(ontology: Arc<Ontology>, datastore: &str) -> Arc<DomainEngine> {

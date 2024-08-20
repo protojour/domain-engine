@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeSet, HashSet},
-    sync::Arc,
-};
+use std::collections::{BTreeSet, HashSet};
 
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
@@ -20,8 +17,10 @@ use smallvec::SmallVec;
 use tracing::{debug, warn};
 
 use domain_engine_core::{
-    domain_error::DomainErrorKind, system::ArcSystemApi, DomainError, DomainResult,
+    domain_error::DomainErrorKind, system::SystemAPI, DomainError, DomainResult,
 };
+
+use crate::constraint::ConstraintCheck;
 
 pub(super) struct InMemoryStore {
     pub vertices: FnvHashMap<DefId, VertexTable<DynamicKey>>,
@@ -29,10 +28,10 @@ pub(super) struct InMemoryStore {
     pub serial_counter: u64,
 }
 
-#[derive(Clone)]
-pub(super) struct DbContext {
-    pub ontology: Arc<Ontology>,
-    pub system: ArcSystemApi,
+pub(super) struct DbContext<'a> {
+    pub ontology: &'a Ontology,
+    pub system: &'a dyn SystemAPI,
+    pub check: ConstraintCheck,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]

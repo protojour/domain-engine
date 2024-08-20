@@ -21,11 +21,13 @@ use ontol_runtime::query::select::Select;
 use ontol_runtime::{DefId, EdgeId, PackageId};
 use tokio::sync::RwLock;
 
+use constraint::ConstraintCheck;
 use domain_engine_core::{data_store::DataStoreAPI, DomainResult};
 use tracing::debug;
 
 use crate::core::{DynamicKey, HyperEdgeTable, InMemoryStore, VertexTable};
 
+mod constraint;
 mod core;
 mod filter;
 mod query;
@@ -35,18 +37,19 @@ mod write;
 #[derive(Clone)]
 pub struct InMemoryDb {
     store: Arc<RwLock<InMemoryStore>>,
-    context: DbContext,
+    ontology: Arc<Ontology>,
+    system: ArcSystemApi,
 }
 
 #[async_trait::async_trait]
 impl DataStoreAPI for InMemoryDb {
     async fn transact(
         &self,
-        _mode: TransactionMode,
+        mode: TransactionMode,
         messages: BoxStream<'static, DomainResult<ReqMessage>>,
         _session: Session,
     ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
-        self.clone().transact_inner(messages).await
+        self.clone().transact_inner(mode, messages).await
     }
 }
 
@@ -107,12 +110,14 @@ impl InMemoryDb {
                 edges: hyper_edges,
                 serial_counter: 0,
             })),
-            context: DbContext { ontology, system },
+            ontology,
+            system,
         }
     }
 
     async fn transact_inner(
         self,
+        mode: TransactionMode,
         messages: BoxStream<'static, DomainResult<ReqMessage>>,
     ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
         enum State {
@@ -149,12 +154,21 @@ impl InMemoryDb {
         let mut state: Option<State> = None;
 
         Ok(async_stream::try_stream! {
+            let mut ctx = DbContext {
+                ontology: &self.ontology,
+                system: self.system.as_ref(),
+                check: match mode {
+                    TransactionMode::ReadOnly | TransactionMode::ReadWrite => ConstraintCheck::Disabled,
+                    TransactionMode::ReadOnlyAtomic | TransactionMode::ReadWriteAtomic => ConstraintCheck::Deferred(Default::default()),
+                }
+            };
+
             for await req in messages {
                 match req? {
                     ReqMessage::Query(op_seq, select) => {
                         state = None;
                         let store = self.store.read().await;
-                        let sequence = store.query_entities(&select, &self.context)?;
+                        let sequence = store.query_entities(&select, &ctx)?;
 
                         let (elements, sub_sequence) = sequence.split();
 
@@ -194,15 +208,15 @@ impl InMemoryDb {
                             Some(State::Insert(_, select)) => {
                                 ObjectGenerator::new(
                                     ProcessorMode::Create,
-                                    &self.context.ontology,
-                                    self.context.system.as_ref(),
+                                    &self.ontology,
+                                    self.system.as_ref(),
                                 )
                                 .generate_objects(&mut value);
 
                                 let value = store.write_new_entity(
                                     value,
                                     select,
-                                    &self.context,
+                                    &mut ctx
                                 )?;
 
                                 yield RespMessage::Element(value, DataOperation::Inserted);
@@ -210,15 +224,15 @@ impl InMemoryDb {
                             Some(State::Update(_, select)) => {
                                 ObjectGenerator::new(
                                     ProcessorMode::Update,
-                                    &self.context.ontology,
-                                    self.context.system.as_ref(),
+                                    &self.ontology,
+                                    self.system.as_ref(),
                                 )
                                 .generate_objects(&mut value);
 
                                 let value = store.update_entity(
                                     value,
                                     select,
-                                    &self.context,
+                                    &mut ctx
                                 )?;
 
                                 yield RespMessage::Element(value, DataOperation::Updated);
@@ -226,15 +240,15 @@ impl InMemoryDb {
                             Some(State::Upsert(_, select)) => {
                                 ObjectGenerator::new(
                                     ProcessorMode::Create,
-                                    &self.context.ontology,
-                                    self.context.system.as_ref(),
+                                    &self.ontology,
+                                    self.system.as_ref(),
                                 )
                                 .generate_objects(&mut value);
 
                                 let (value, reason) = store.upsert_entity(
                                     value,
                                     select,
-                                    &self.context,
+                                    &mut ctx,
                                 )?;
                                 yield RespMessage::Element(value, reason);
                             }
@@ -242,7 +256,7 @@ impl InMemoryDb {
                                 let deleted = store.delete_entities(vec![value], *def_id)?;
 
                                 for deleted in deleted {
-                                    yield RespMessage::Element(self.context.ontology.bool_value(deleted), DataOperation::Deleted);
+                                    yield RespMessage::Element(self.ontology.bool_value(deleted), DataOperation::Deleted);
                                 }
                             }
                             None => {
@@ -252,6 +266,9 @@ impl InMemoryDb {
                     }
                 }
             }
+
+            let store = self.store.read().await;
+            ctx.check.check_deferred(&store, &self.ontology)?;
         }
         .boxed())
     }

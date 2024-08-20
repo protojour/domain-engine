@@ -48,9 +48,9 @@ impl InMemoryStore {
         &mut self,
         value: Value,
         select: &Select,
-        ctx: &DbContext,
+        ctx: &mut DbContext,
     ) -> DomainResult<(Value, DataOperation)> {
-        let entity_id = find_inherent_entity_id(&value, &ctx.ontology)?
+        let entity_id = find_inherent_entity_id(&value, ctx.ontology)?
             .ok_or_else(|| DomainErrorKind::EntityNotFound.into_error())?;
         let def = ctx.ontology.def(value.type_def_id());
         let dynamic_key = Self::extract_dynamic_key(&entity_id)?;
@@ -77,7 +77,7 @@ impl InMemoryStore {
         &mut self,
         value: Value,
         select: &Select,
-        ctx: &DbContext,
+        ctx: &mut DbContext,
     ) -> DomainResult<Value> {
         let entity_id = self.write_new_vertex_inner(value, ctx)?;
         self.post_write_select(entity_id, select, ctx)
@@ -87,13 +87,13 @@ impl InMemoryStore {
         &mut self,
         value: Value,
         select: &Select,
-        ctx: &DbContext,
+        ctx: &mut DbContext,
     ) -> DomainResult<Value> {
         let _entered = debug_span!("upd_vtx", id = ?value.type_def_id()).entered();
 
         debug!("update entity: {:#?}", value);
 
-        let entity_id = find_inherent_entity_id(&value, &ctx.ontology)?
+        let entity_id = find_inherent_entity_id(&value, ctx.ontology)?
             .ok_or_else(|| DomainErrorKind::EntityNotFound.into_error())?;
         let def = ctx.ontology.def(value.type_def_id());
         let vertex_key = VertexKey {
@@ -237,7 +237,7 @@ impl InMemoryStore {
                 )?;
 
                 for value in entity_seq.into_elements() {
-                    let id = find_inherent_entity_id(&value, &ctx.ontology)?;
+                    let id = find_inherent_entity_id(&value, ctx.ontology)?;
                     if let Some(id) = id {
                         let dynamic_key = Self::extract_dynamic_key(&id)?;
 
@@ -257,7 +257,11 @@ impl InMemoryStore {
     }
 
     /// Returns the entity ID
-    fn write_new_vertex_inner(&mut self, vertex: Value, ctx: &DbContext) -> DomainResult<Value> {
+    fn write_new_vertex_inner(
+        &mut self,
+        vertex: Value,
+        ctx: &mut DbContext,
+    ) -> DomainResult<Value> {
         let _entered = debug_span!("wr_vtx", id = ?vertex.type_def_id()).entered();
 
         debug!("value: {}", ValueDebug(&vertex));
@@ -267,7 +271,7 @@ impl InMemoryStore {
             .entity()
             .ok_or(DomainErrorKind::NotAnEntity(vertex.type_def_id()).into_error())?;
 
-        let (id, id_generated) = match find_inherent_entity_id(&vertex, &ctx.ontology)? {
+        let (id, id_generated) = match find_inherent_entity_id(&vertex, ctx.ontology)? {
             Some(id) => (id, false),
             None => {
                 let value_generator = entity.id_value_generator.ok_or_else(|| {
@@ -395,7 +399,7 @@ impl InMemoryStore {
         &mut self,
         edge_id: EdgeId,
         input: BTreeMap<CardinalIdx, (EdgeWriteMode, EdgeData<VertexKey>)>,
-        ctx: &DbContext,
+        ctx: &mut DbContext,
     ) -> DomainResult<()> {
         let _entered = debug_span!("wr_edge", id = ?edge_id).entered();
 
@@ -557,7 +561,7 @@ impl InMemoryStore {
         projection: EdgeCardinalProjection,
         foreign_id: Value,
         data_relationship: &DataRelationshipInfo,
-        ctx: &DbContext,
+        ctx: &mut DbContext,
     ) -> DomainResult<()> {
         let foreign_key = match &data_relationship.target {
             DataRelationshipTarget::Unambiguous(entity_def_id) => self
@@ -623,7 +627,7 @@ impl InMemoryStore {
         foreign_entity_def_id: DefId,
         entity: &Entity,
         id_value: Value,
-        ctx: &DbContext,
+        ctx: &mut DbContext,
     ) -> DomainResult<VertexKey> {
         let foreign_key = Self::extract_dynamic_key(&id_value)?;
         let entity_data = self.look_up_vertex(foreign_entity_def_id, &foreign_key);
@@ -638,10 +642,12 @@ impl InMemoryStore {
                 ctx,
             )?;
         } else if entity_data.is_none() {
-            return Err(DomainErrorKind::UnresolvedForeignKey(
-                ctx.ontology.format_value(&id_value),
-            )
-            .into_error());
+            ctx.check.unresolved_foreign_key(
+                foreign_entity_def_id,
+                foreign_key.clone(),
+                id_value,
+                ctx.ontology,
+            )?;
         }
 
         Ok(VertexKey {
@@ -656,12 +662,8 @@ impl InMemoryStore {
         value_generator: ValueGenerator,
         ctx: &DbContext,
     ) -> DomainResult<Value> {
-        let (generated_id, container) = try_generate_entity_id(
-            id_operator_addr,
-            value_generator,
-            &ctx.ontology,
-            ctx.system.as_ref(),
-        )?;
+        let (generated_id, container) =
+            try_generate_entity_id(id_operator_addr, value_generator, ctx.ontology, ctx.system)?;
 
         Ok(container.wrap(match generated_id {
             GeneratedId::Generated(value) => value,
