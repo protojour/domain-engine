@@ -6,8 +6,8 @@ use tracing::{info, info_span, Instrument};
 
 use crate::{
     pg_model::{
-        PgDataField, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexType, PgRegKey, PgTable,
-        PgTableIdUnion, PgType,
+        PgColumn, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexType, PgProperty, PgPropertyData,
+        PgRegKey, PgTable, PgTableIdUnion, PgType,
     },
     sql::{self},
 };
@@ -111,8 +111,8 @@ async fn execute_migration_step<'t>(
                     key: domaintable_key,
                     table_name,
                     has_fkey: false,
-                    data_fields: Default::default(),
-                    datafield_indexes: Default::default(),
+                    properties: Default::default(),
+                    property_indexes: Default::default(),
                     edge_cardinals: Default::default(),
                 },
             );
@@ -158,11 +158,10 @@ async fn execute_migration_step<'t>(
 
             pg_table.has_fkey = true;
         }
-        MigrationStep::DeployDataField {
+        MigrationStep::DeployProperty {
             table_id,
             prop_tag,
-            pg_type,
-            column_name,
+            data,
         } => {
             let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
             let pg_table = match table_id {
@@ -171,34 +170,41 @@ async fn execute_migration_step<'t>(
             }
             .unwrap();
 
-            let type_ident = match pg_type {
-                PgType::Boolean => "boolean",
-                PgType::Integer => "integer",
-                PgType::BigInt => "bigint",
-                PgType::DoublePrecision => "double precision",
-                PgType::Text => "text",
-                PgType::Bytea => "bytea",
-                PgType::TimestampTz => "timestamptz",
-                PgType::Bigserial => "bigserial",
-            };
+            if let PgPropertyData::Column { col_name, pg_type } = &data {
+                let type_ident = match pg_type {
+                    PgType::Boolean => "boolean",
+                    PgType::Integer => "integer",
+                    PgType::BigInt => "bigint",
+                    PgType::DoublePrecision => "double precision",
+                    PgType::Text => "text",
+                    PgType::Bytea => "bytea",
+                    PgType::TimestampTz => "timestamptz",
+                    PgType::Bigserial => "bigserial",
+                };
 
-            txn.execute(
-                &format!(
-                    "ALTER TABLE {schema}.{table} ADD COLUMN {column} {type}",
-                    schema = sql::Ident(&pg_domain.schema_name),
-                    table = sql::Ident(&pg_table.table_name),
-                    column = sql::Ident(&column_name),
-                    type = &type_ident
-                ),
-                &[],
-            )
-            .await
-            .context("alter table add column")?;
+                txn.execute(
+                    &format!(
+                        "ALTER TABLE {schema}.{table} ADD COLUMN {column} {type}",
+                        schema = sql::Ident(&pg_domain.schema_name),
+                        table = sql::Ident(&pg_table.table_name),
+                        column = sql::Ident(&col_name),
+                        type = &type_ident
+                    ),
+                    &[],
+                )
+                .await
+                .context("alter table add column")?;
+            }
+
+            let (pg_type, column_name) = match &data {
+                PgPropertyData::Column { col_name, pg_type } => (Some(pg_type), Some(col_name)),
+                PgPropertyData::Abstract => (None, None),
+            };
 
             let key = txn
                 .query_one(
                     indoc! { "
-                    INSERT INTO m6mreg.datafield (
+                    INSERT INTO m6mreg.property (
                         domaintable_key,
                         prop_tag,
                         pg_type,
@@ -209,15 +215,18 @@ async fn execute_migration_step<'t>(
                     &[&pg_table.key, &(prop_tag.0 as i32), &pg_type, &column_name],
                 )
                 .await
-                .context("create datafield")?
+                .context("create property")?
                 .get(0);
 
-            let existing = pg_table.data_fields.insert(
+            let existing = pg_table.properties.insert(
                 prop_tag,
-                PgDataField {
-                    key,
-                    col_name: column_name,
-                    pg_type,
+                match data {
+                    PgPropertyData::Column { col_name, pg_type } => PgProperty::Column(PgColumn {
+                        key,
+                        col_name,
+                        pg_type,
+                    }),
+                    PgPropertyData::Abstract => PgProperty::Abstract(key),
                 },
             );
 
@@ -225,7 +234,7 @@ async fn execute_migration_step<'t>(
                 return Err(anyhow!("{prop_tag:?} already a field in {table_id:?}"));
             }
         }
-        MigrationStep::DeployDataIndex {
+        MigrationStep::DeployPropertyIndex {
             table_id,
             index_def_id,
             index_type,
@@ -234,9 +243,16 @@ async fn execute_migration_step<'t>(
             let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
             let pg_table = pg_domain.get_table(&table_id).unwrap();
 
-            let datafield_tuple: Vec<_> = field_tuple
+            let column_tuple: Vec<_> = field_tuple
                 .iter()
-                .map(|prop_tag| pg_table.data_fields.get(prop_tag).unwrap())
+                .map(|prop_tag| {
+                    pg_table
+                        .properties
+                        .get(prop_tag)
+                        .unwrap()
+                        .as_column()
+                        .unwrap()
+                })
                 .collect();
 
             txn.execute(
@@ -248,9 +264,9 @@ async fn execute_migration_step<'t>(
                     },
                     schema = sql::Ident(&pg_domain.schema_name),
                     table = sql::Ident(&pg_table.table_name),
-                    columns = datafield_tuple
+                    columns = column_tuple
                         .iter()
-                        .map(|pg_datafield| pg_datafield.col_name.as_ref())
+                        .map(|pg_column| pg_column.col_name.as_ref())
                         .map(sql::Ident)
                         .format(","),
                 ),
@@ -266,7 +282,7 @@ async fn execute_migration_step<'t>(
                         def_domain_key,
                         def_tag,
                         index_type,
-                        datafield_keys
+                        property_keys
                     ) VALUES($1, $2, $3, $4, $5)
                 "},
                 &[
@@ -274,14 +290,14 @@ async fn execute_migration_step<'t>(
                     &pg_domain.key,
                     &(index_def_id.1 as i32),
                     &index_type,
-                    &datafield_tuple
+                    &column_tuple
                         .iter()
                         .map(|datafield| datafield.key)
                         .collect_vec(),
                 ],
             )
             .await
-            .context("update datafield")?;
+            .context("update domaintable_index")?;
         }
         MigrationStep::DeployEdge {
             edge_tag,
@@ -322,9 +338,9 @@ async fn execute_migration_step<'t>(
                     key,
                     table_name,
                     has_fkey: false,
-                    data_fields: Default::default(),
+                    properties: Default::default(),
                     edge_cardinals: Default::default(),
-                    datafield_indexes: Default::default(),
+                    property_indexes: Default::default(),
                 },
             );
         }

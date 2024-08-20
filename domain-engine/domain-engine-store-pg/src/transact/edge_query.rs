@@ -138,7 +138,7 @@ impl<'a> TransactCtx<'a> {
                                 return Err(PgInputError::NotAnEntity.into());
                             };
 
-                            let pg_id = pg_def.pg.table.field(&target_entity.id_prop)?;
+                            let pg_id = pg_def.pg.table.column(&target_entity.id_prop)?;
                             let leaf_alias = ctx.alias.incr();
 
                             self.sql_select_edge_cardinals(

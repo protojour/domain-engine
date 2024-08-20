@@ -227,8 +227,8 @@ impl<'a> TransactCtx<'a> {
                         if let DataRelationshipKind::Tree = &rel_info.kind {
                             match &rel_info.target {
                                 DataRelationshipTarget::Unambiguous(def_id) => {
-                                    let pg_field = pg_edge.table.field(prop_id)?;
-                                    sql_insert.column_names.push(&pg_field.col_name);
+                                    let pg_column = pg_edge.table.column(prop_id)?;
+                                    sql_insert.column_names.push(&pg_column.col_name);
                                     sql_insert.values.push(sql::Expr::param(param_index));
                                     analysis.param_order.insert((*prop_id, *def_id));
                                     param_index += 1;
@@ -365,7 +365,7 @@ impl<'a> TransactCtx<'a> {
                     }
                 };
 
-                let pg_foreign_id = pg_foreign.table.field(&foreign_entity.id_prop)?;
+                let pg_foreign_id = pg_foreign.table.column(&foreign_entity.id_prop)?;
 
                 sql_delete.where_and(sql::Expr::in_(
                     sql::Expr::path1(key_col_name.as_ref()),
@@ -558,7 +558,7 @@ impl<'a> TransactCtx<'a> {
 
                         match data {
                             Data::Sql(sql_val) => {
-                                let field = pg_edge.table.field(prop_id)?;
+                                let field = pg_edge.table.column(prop_id)?;
                                 sql_update.set.push(sql::UpdateColumn(
                                     &field.col_name,
                                     sql::Expr::param(param_buf.len()),
@@ -709,7 +709,7 @@ impl<'a> TransactCtx<'a> {
                     .pg_model
                     .pg_domain_datatable(vertex_def_id.package_id(), vertex_def_id)?;
 
-                let pg_id_field = pg.table.field(&id_prop_id)?;
+                let pg_id_field = pg.table.column(&id_prop_id)?;
 
                 let Data::Sql(id_param) = self.data_from_value(value)? else {
                     return Err(ds_bad_req("compound foreign key"));

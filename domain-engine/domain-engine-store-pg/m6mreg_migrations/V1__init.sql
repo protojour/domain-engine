@@ -81,20 +81,25 @@ CREATE TABLE m6mreg.domaintable_index
     def_tag integer NOT NULL,
     -- the type of the index
     index_type m6m_pg_index_type NOT NULL,
-    -- datafield participating in the index. Must be fields of the domaintable key
-    datafield_keys integer[] NOT NULL,
+    -- properties participating in the index. Must be properties of the domaintable key
+    property_keys integer[] NOT NULL,
 
     UNIQUE (domaintable_key, def_domain_key, def_tag, index_type)
 );
 
--- The set of keys per domaintable
-CREATE TABLE m6mreg.datafield
+-- The set of properties per domaintable
+CREATE TABLE m6mreg.property
 (
     key serial PRIMARY KEY,
     domaintable_key integer NOT NULL REFERENCES m6mreg.domaintable(key),
     prop_tag integer NOT NULL,
-    pg_type m6m_pg_type NOT NULL,
-    column_name text NOT NULL
+
+    -- if these are null, the property data is found in another table
+    column_name text,
+    pg_type m6m_pg_type,
+
+    CHECK ((pg_type IS NULL) = (column_name IS NULL)),
+    UNIQUE (domaintable_key, prop_tag)
 );
 
 -- Registry of edge cardinals

@@ -137,7 +137,7 @@ impl<'a> TransactCtx<'a> {
                 Some(QuerySelect::Field(prop_id)) => {
                     let mut fields: Vec<_> = self.initial_standard_data_fields(pg).into();
                     fields.push(sql::Expr::path1(
-                        pg.table.field(&prop_id)?.col_name.as_ref(),
+                        pg.table.column(&prop_id)?.col_name.as_ref(),
                     ));
 
                     (pg.table_name().into(), sql::Alias(0), fields)
@@ -577,7 +577,7 @@ impl<'a> TransactCtx<'a> {
                     return Err(PgInputError::NotAnEntity.into());
                 };
 
-                let pg_id = pg_def.pg.table.field(&entity.id_prop)?;
+                let pg_id = pg_def.pg.table.column(&entity.id_prop)?;
                 let mut fields = sql_record.fields();
                 fields.next_field(&Layout::Scalar(PgType::Integer))?;
                 let sql_field = fields.next_field(&Layout::Scalar(pg_id.pg_type))?;

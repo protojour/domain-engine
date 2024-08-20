@@ -12,7 +12,7 @@ use ontol_runtime::{
         Ontology,
     },
     tuple::CardinalIdx,
-    DefId, DefPropTag, EdgeId, PackageId,
+    DefId, DefPropTag, EdgeId, PackageId, PropId,
 };
 use tokio_postgres::Transaction;
 use tracing::{info, trace_span, warn, Instrument};
@@ -21,8 +21,8 @@ use crate::{
     migrate::{MigrationStep, PgDomain},
     pg_error::PgMigrationError,
     pg_model::{
-        PgDataField, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexData, PgIndexType, PgRegKey,
-        PgTable, PgTableIdUnion, PgType,
+        PgColumn, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexData, PgIndexType, PgProperty,
+        PgPropertyData, PgRegKey, PgTable, PgTableIdUnion, PgType,
     },
 };
 
@@ -95,9 +95,9 @@ pub async fn migrate_domain_steps<'t>(
                 key,
                 table_name,
                 has_fkey: fdef_column.is_some() && fkey_column.is_some(),
-                data_fields: Default::default(),
+                properties: Default::default(),
                 edge_cardinals: Default::default(),
-                datafield_indexes: Default::default(),
+                property_indexes: Default::default(),
             };
 
             match (def_domain_key, def_tag, edge_tag) {
@@ -183,30 +183,34 @@ async fn migrate_vertex_steps<'t>(
     let pg_domain = ctx.domains.get_mut(&domain_ids.pkg_id).unwrap();
 
     let exists = if let Some(datatable) = pg_domain.datatables.get_mut(&vertex_def_id) {
-        let pg_fields = txn
+        let pg_properties = txn
             .query(
                 indoc! {"
-                    SELECT key, prop_tag, pg_type, column_name
-                    FROM m6mreg.datafield
+                    SELECT key, prop_tag, column_name, pg_type
+                    FROM m6mreg.property
                     WHERE domaintable_key = $1
                 "},
                 &[&datatable.key],
             )
             .await
-            .context("read data fields")?
+            .context("read properties")?
             .into_iter()
             .map(|row| -> anyhow::Result<_> {
                 let key: PgRegKey = row.get(0);
                 let prop_tag = DefPropTag(row.get::<_, i32>(1).try_into()?);
-                let pg_type = row.get(2);
-                let col_name: Box<str> = row.get(3);
+                let col_name: Option<Box<str>> = row.get(2);
+                let pg_type: Option<PgType> = row.get(3);
 
                 Ok((
                     prop_tag,
-                    PgDataField {
-                        key,
-                        col_name,
-                        pg_type,
+                    match (col_name, pg_type) {
+                        (Some(col_name), Some(pg_type)) => PgProperty::Column(PgColumn {
+                            key,
+                            col_name,
+                            pg_type,
+                        }),
+                        (None, None) => PgProperty::Abstract(key),
+                        _ => unreachable!(),
                     },
                 ))
             })
@@ -220,7 +224,7 @@ async fn migrate_vertex_steps<'t>(
                         def_domain_key,
                         def_tag,
                         index_type,
-                        datafield_keys
+                        property_keys
                     FROM m6mreg.domaintable_index
                     WHERE domaintable_key = $1
                 "},
@@ -234,12 +238,12 @@ async fn migrate_vertex_steps<'t>(
                 let def_domain_key: PgRegKey = row.get(1);
                 let def_tag: u16 = row.get::<_, i32>(2).try_into()?;
                 let index_type: PgIndexType = row.get(3);
-                let datafield_keys: Vec<PgRegKey> = row.get(4);
+                let property_keys: Vec<PgRegKey> = row.get(4);
 
                 assert_eq!(def_domain_key, pg_domain.key.unwrap());
                 let index_def_id = DefId(def.id.package_id(), def_tag);
 
-                Ok(((index_def_id, index_type), PgIndexData { datafield_keys }))
+                Ok(((index_def_id, index_type), PgIndexData { property_keys }))
             })
             .try_collect()?;
 
@@ -254,8 +258,8 @@ async fn migrate_vertex_steps<'t>(
             ));
         }
 
-        datatable.data_fields = pg_fields;
-        datatable.datafield_indexes = pg_indexes;
+        datatable.properties = pg_properties;
+        datatable.property_indexes = pg_indexes;
         true
     } else {
         ctx.steps.push((
@@ -517,20 +521,19 @@ fn migrate_datafields_steps(
 
     tree_relationships.sort_by_key(|(prop_tag, _)| prop_tag.0);
 
-    // fields
+    // properties
     for (prop_tag, rel_info) in &tree_relationships {
-        let pg_data_field = pg_domain
-            .get_table(&table_id)
-            .and_then(|datatable| datatable.data_fields.get(prop_tag));
-
         // FIXME: should mix columns on the root _and_ child structures,
         // so there needs to be some disambiguation in place
-        let column_name = ontology[rel_info.name].to_string().into_boxed_str();
+        let column_name = &ontology[rel_info.name];
 
-        let pg_type = match rel_info.target {
+        let data = match rel_info.target {
             DataRelationshipTarget::Unambiguous(def_id) => {
                 match PgType::from_def_id(def_id, ontology) {
-                    Ok(Some(pg_type)) => pg_type,
+                    Ok(Some(pg_type)) => PgPropertyData::Column {
+                        col_name: column_name.to_string().into_boxed_str(),
+                        pg_type,
+                    },
                     Ok(None) => {
                         // This is a unit type, does not need to be represented
                         continue;
@@ -541,28 +544,38 @@ fn migrate_datafields_steps(
                     }
                 }
             }
-            DataRelationshipTarget::Union(_) => {
-                continue;
-                // return Err(PgMigrationError::UnionTarget(RelId(def.id, *rel_tag)).into());
-            }
+            DataRelationshipTarget::Union(_) => PgPropertyData::Abstract,
         };
 
-        if let Some(pg_data_field) = pg_data_field {
-            assert_eq!(pg_data_field.col_name, column_name, "TODO: rename column");
-            assert_eq!(
-                pg_data_field.pg_type, pg_type,
-                "TODO: change data field pg_type",
-            );
-        } else {
-            ctx.steps.push((
-                domain_ids,
-                MigrationStep::DeployDataField {
-                    table_id,
-                    prop_tag: *prop_tag,
-                    pg_type,
-                    column_name,
-                },
-            ));
+        match (
+            pg_domain
+                .get_table(&table_id)
+                .and_then(|datatable| datatable.properties.get(prop_tag)),
+            data,
+        ) {
+            (Some(PgProperty::Column(pg_column)), PgPropertyData::Column { col_name, pg_type }) => {
+                assert_eq!(pg_column.col_name, col_name, "TODO: rename column");
+                assert_eq!(
+                    pg_column.pg_type, pg_type,
+                    "TODO: change data field pg_type",
+                );
+            }
+            (Some(PgProperty::Abstract(_)), PgPropertyData::Abstract) => {}
+            (None, data) => {
+                ctx.steps.push((
+                    domain_ids,
+                    MigrationStep::DeployProperty {
+                        table_id,
+                        prop_tag: *prop_tag,
+                        data,
+                    },
+                ));
+            }
+            _ => {
+                return Err(
+                    PgMigrationError::IncompatibleProperty(PropId(def.id, *prop_tag)).into(),
+                );
+            }
         }
     }
 
@@ -578,19 +591,19 @@ fn migrate_datafields_steps(
             let pg_datatable = pg_domain.get_table(&table_id);
 
             let pg_index_data = pg_datatable
-                .and_then(|datatable| datatable.datafield_indexes.get(&(def_id, index_type)));
+                .and_then(|datatable| datatable.property_indexes.get(&(def_id, index_type)));
 
             match pg_index_data {
                 Some(pg_index_data) => {
                     let pg_datatable = &pg_domain.get_table(&table_id).unwrap();
-                    for datafield_key in &pg_index_data.datafield_keys {
-                        assert!(pg_datatable.field_by_key(*datafield_key).is_some());
+                    for property_key in &pg_index_data.property_keys {
+                        assert!(pg_datatable.column_by_key(*property_key).is_some());
                     }
                 }
                 None => {
                     ctx.steps.push((
                         domain_ids,
-                        MigrationStep::DeployDataIndex {
+                        MigrationStep::DeployPropertyIndex {
                             table_id,
                             index_def_id: def_id,
                             index_type,

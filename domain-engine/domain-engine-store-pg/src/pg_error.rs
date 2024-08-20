@@ -180,6 +180,8 @@ pub enum PgMigrationError {
     UnionTarget(PropId),
     /// ambiguous ID
     AmbiguousId(DefId),
+    /// incompatible property
+    IncompatibleProperty(PropId),
 }
 
 impl From<PgMigrationError> for DomainError {

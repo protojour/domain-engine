@@ -247,9 +247,9 @@ impl<'a> TransactCtx<'a> {
                 &rel_info.kind,
                 DataRelationshipKind::Id | DataRelationshipKind::Tree
             ) {
-                if let Some(pg_field) = pg.table.data_fields.get(&prop_id.1) {
-                    column_names.push(pg_field.col_name.as_ref());
-                    if pg_field.pg_type.insert_default() {
+                if let Some(pg_column) = pg.table.find_column(prop_id) {
+                    column_names.push(pg_column.col_name.as_ref());
+                    if pg_column.pg_type.insert_default() {
                         values.push(sql::Expr::Default);
                     } else {
                         values.push(sql::Expr::param(param_idx));
@@ -267,8 +267,7 @@ impl<'a> TransactCtx<'a> {
                     DomainErrorKind::NotAnEntity(def_id).into_error()
                 })?;
 
-                let id_prop_tag = entity.id_prop.tag();
-                if let Some(field) = pg.table.data_fields.get(&id_prop_tag) {
+                if let Some(field) = pg.table.find_column(&entity.id_prop) {
                     insert_returning.extend(self.initial_standard_data_fields(pg));
                     insert_returning.push(sql::Expr::path1(field.col_name.as_ref()));
                 }
@@ -376,7 +375,7 @@ impl<'a> TransactCtx<'a> {
         for (prop_id, rel_info) in &def.data_relationships {
             let attr = attrs.remove(prop_id);
 
-            match (rel_info.kind, pg_table.data_fields.get(&prop_id.1)) {
+            match (rel_info.kind, pg_table.find_column(prop_id)) {
                 (DataRelationshipKind::Edge(proj), _) => {
                     let patch = edge_patches.patch(proj.id, proj.subject);
 
@@ -412,8 +411,8 @@ impl<'a> TransactCtx<'a> {
                         None => {}
                     }
                 }
-                (_, Some(pg_field)) => {
-                    if pg_field.pg_type.insert_default() {
+                (_, Some(pg_column)) => {
+                    if pg_column.pg_type.insert_default() {
                         continue;
                     }
 

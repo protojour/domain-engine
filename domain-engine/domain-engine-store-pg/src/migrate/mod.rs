@@ -12,7 +12,8 @@ use tracing::{debug_span, info, Instrument};
 
 use crate::{
     pg_model::{
-        DomainUid, PgDomain, PgEdgeCardinalKind, PgIndexType, PgTableIdUnion, PgType, RegVersion,
+        DomainUid, PgDomain, PgEdgeCardinalKind, PgIndexType, PgPropertyData, PgTableIdUnion,
+        RegVersion,
     },
     PgModel,
 };
@@ -54,13 +55,12 @@ enum MigrationStep {
     DeployVertexFKey {
         vertex_def_id: DefId,
     },
-    DeployDataField {
+    DeployProperty {
         table_id: PgTableIdUnion,
         prop_tag: DefPropTag,
-        column_name: Box<str>,
-        pg_type: PgType,
+        data: PgPropertyData,
     },
-    DeployDataIndex {
+    DeployPropertyIndex {
         table_id: PgTableIdUnion,
         index_def_id: DefId,
         index_type: PgIndexType,

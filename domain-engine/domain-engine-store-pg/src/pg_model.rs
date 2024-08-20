@@ -195,9 +195,9 @@ pub struct PgTable {
     pub key: PgRegKey,
     pub table_name: Box<str>,
     pub has_fkey: bool,
-    pub data_fields: FnvHashMap<DefPropTag, PgDataField>,
+    pub properties: FnvHashMap<DefPropTag, PgProperty>,
     pub edge_cardinals: BTreeMap<CardinalIdx, PgEdgeCardinal>,
-    pub datafield_indexes: FnvHashMap<(DefId, PgIndexType), PgIndexData>,
+    pub property_indexes: FnvHashMap<(DefId, PgIndexType), PgIndexData>,
 }
 
 impl PgDomain {
@@ -210,17 +210,24 @@ impl PgDomain {
 }
 
 impl PgTable {
-    pub fn field(&self, prop_id: &PropId) -> DomainResult<&PgDataField> {
-        self.data_fields.get(&prop_id.tag()).ok_or_else(|| {
-            debug!("field not found in {:?}", self.data_fields);
+    pub fn find_column(&self, prop_id: &PropId) -> Option<&PgColumn> {
+        self.properties
+            .get(&prop_id.tag())
+            .and_then(PgProperty::as_column)
+    }
+
+    pub fn column(&self, prop_id: &PropId) -> DomainResult<&PgColumn> {
+        self.find_column(prop_id).ok_or_else(|| {
+            debug!("field not found in {:?}", self.properties);
 
             PgModelError::FieldNotFound(self.table_name.clone(), *prop_id).into()
         })
     }
 
-    pub fn field_by_key(&self, key: PgRegKey) -> Option<&PgDataField> {
-        self.data_fields
+    pub fn column_by_key(&self, key: PgRegKey) -> Option<&PgColumn> {
+        self.properties
             .values()
+            .filter_map(PgProperty::as_column)
             .find(|datafield| datafield.key == key)
     }
 
@@ -239,7 +246,7 @@ pub struct PgDef<'a> {
 
 #[derive(Clone, Debug)]
 pub struct PgIndexData {
-    pub datafield_keys: Vec<PgRegKey>,
+    pub property_keys: Vec<PgRegKey>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, ToSql, FromSql, Debug)]
@@ -264,7 +271,29 @@ impl<'a> PgDomainTable<'a> {
 }
 
 #[derive(Clone, Debug)]
-pub struct PgDataField {
+pub enum PgProperty {
+    Column(PgColumn),
+    #[allow(unused)]
+    Abstract(PgRegKey),
+}
+
+#[derive(Debug)]
+pub enum PgPropertyData {
+    Column { col_name: Box<str>, pg_type: PgType },
+    Abstract,
+}
+
+impl PgProperty {
+    pub fn as_column(&self) -> Option<&PgColumn> {
+        match self {
+            Self::Column(column) => Some(column),
+            Self::Abstract(_) => None,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct PgColumn {
     pub key: PgRegKey,
     pub col_name: Box<str>,
     pub pg_type: PgType,

@@ -87,9 +87,9 @@ impl<'a> TransactCtx<'a> {
 
         match update_condition {
             UpdateCondition::FieldEq(prop_id, value) => {
-                let pg_field = pg.table.field(&prop_id)?;
+                let pg_column = pg.table.column(&prop_id)?;
                 where_ = Some(sql::Expr::eq(
-                    sql::Expr::path1(pg_field.col_name.as_ref()),
+                    sql::Expr::path1(pg_column.col_name.as_ref()),
                     sql::Expr::param(0),
                 ));
                 let Data::Sql(sql_value) = self.data_from_value(value)? else {
@@ -120,11 +120,11 @@ impl<'a> TransactCtx<'a> {
                     trace!("skipping ID for update");
                 }
                 DataRelationshipKind::Tree => {
-                    let pg_field = pg.table.field(&prop_id)?;
+                    let pg_column = pg.table.column(&prop_id)?;
                     let param_index = update_params.len();
 
                     set.push(sql::UpdateColumn(
-                        &pg_field.col_name,
+                        &pg_column.col_name,
                         sql::Expr::path1(sql::Param(param_index)),
                     ));
                     match attr {
