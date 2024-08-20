@@ -37,7 +37,9 @@ use crate::{
     package::ONTOL_PKG,
     primitive::PrimitiveKind,
     properties::Properties,
-    relation::{rel_def_meta, rel_repr_meta, RelDefMeta, RelParams, UnionMemberCache},
+    relation::{
+        rel_def_meta, rel_repr_meta, RelDefMeta, RelParams, Relationship, UnionMemberCache,
+    },
     repr::repr_model::{ReprKind, ReprScalarKind, UnionBound},
     strings::StringCtx,
     Compiler,
@@ -573,6 +575,7 @@ impl<'m> Compiler<'m> {
                     .map(|(member_def_id, _)| {
                         self.data_relationship_kind_and_target(
                             rel_id,
+                            &meta.relationship,
                             edge_projection,
                             source_def_id,
                             *member_def_id,
@@ -595,6 +598,7 @@ impl<'m> Compiler<'m> {
             }
             _ => self.data_relationship_kind_and_target(
                 rel_id,
+                &meta.relationship,
                 edge_projection,
                 source_def_id,
                 target_def_id,
@@ -694,6 +698,7 @@ impl<'m> Compiler<'m> {
     fn data_relationship_kind_and_target(
         &self,
         rel_id: RelId,
+        relationship: &Relationship,
         edge_projection: EdgeCardinalProjection,
         source_def_id: DefId,
         target_def_id: DefId,
@@ -702,7 +707,7 @@ impl<'m> Compiler<'m> {
 
         if let Some(identifies) = target_properties.and_then(|p| p.identifies) {
             let meta = rel_def_meta(identifies, &self.rel_ctx, &self.defs);
-            if meta.relationship.object.0 == source_def_id {
+            if relationship.can_identify() && meta.relationship.object.0 == source_def_id {
                 (
                     DataRelationshipKind::Id,
                     DataRelationshipTarget::Unambiguous(target_def_id),
@@ -732,9 +737,10 @@ impl<'m> Compiler<'m> {
             )
         } else {
             let source_properties = self.prop_ctx.properties_by_def_id(source_def_id);
-            let is_entity_id = source_properties
-                .map(|properties| properties.identified_by == Some(rel_id))
-                .unwrap_or(false);
+            let is_entity_id = relationship.can_identify()
+                && source_properties
+                    .map(|properties| properties.identified_by == Some(rel_id))
+                    .unwrap_or(false);
 
             let kind = if is_entity_id {
                 DataRelationshipKind::Id

@@ -7,7 +7,9 @@ use std::{
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    ontology::domain::EdgeCardinalProjection, property::Cardinality, DefId, DefRelTag, RelId,
+    ontology::domain::EdgeCardinalProjection,
+    property::{Cardinality, ValueCardinality},
+    DefId, DefRelTag, RelId,
 };
 use tracing::trace;
 
@@ -94,6 +96,10 @@ impl Relationship {
 
     pub fn object(&self) -> (DefId, Cardinality, SourceSpan) {
         (self.object.0, self.object_cardinality, self.object.1)
+    }
+
+    pub fn can_identify(&self) -> bool {
+        matches!(self.object_cardinality.1, ValueCardinality::Unit)
     }
 }
 

@@ -57,10 +57,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 .unwrap();
 
             // Check if the property is the primary id
-            if matches!(
-                meta.relationship.object_cardinality.1,
-                ValueCardinality::Unit
-            ) {
+            if meta.relationship.can_identify() {
                 if let Some(id_relationship_id) = object_properties.identifies {
                     let id_meta = rel_def_meta(id_relationship_id, self.rel_ctx, self.defs);
 
