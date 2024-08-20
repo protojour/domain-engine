@@ -19,7 +19,7 @@ use tracing::{info, trace_span, warn, Instrument};
 
 use crate::{
     migrate::{MigrationStep, PgDomain},
-    pg_error::PgMigrationError,
+    pg_error::{PgMigrationError, PgModelError},
     pg_model::{
         PgColumn, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexData, PgIndexType, PgProperty,
         PgPropertyData, PgRegKey, PgTable, PgTableIdUnion, PgType,
@@ -538,6 +538,7 @@ fn migrate_datafields_steps(
                         // This is a unit type, does not need to be represented
                         continue;
                     }
+                    Err(PgModelError::CompoundType) => PgPropertyData::Abstract,
                     Err(err) => {
                         warn!("pg type error: {err:?}");
                         continue;

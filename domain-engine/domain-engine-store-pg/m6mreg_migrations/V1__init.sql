@@ -84,7 +84,7 @@ CREATE TABLE m6mreg.domaintable_index
     -- properties participating in the index. Must be properties of the domaintable key
     property_keys integer[] NOT NULL,
 
-    UNIQUE (domaintable_key, def_domain_key, def_tag, index_type)
+    UNIQUE (domaintable_key, def_domain_key, def_tag, index_type, property_keys)
 );
 
 -- The set of properties per domaintable

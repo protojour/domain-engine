@@ -378,7 +378,7 @@ pub enum PgType {
 }
 
 impl PgType {
-    pub fn from_def_id(def_id: DefId, ontology: &Ontology) -> DomainResult<Option<PgType>> {
+    pub fn from_def_id(def_id: DefId, ontology: &Ontology) -> Result<Option<PgType>, PgModelError> {
         let def = ontology.get_def(def_id).unwrap();
         let def_repr = match &def.kind {
             DefKind::Data(basic_def) => &basic_def.repr,
@@ -397,13 +397,11 @@ impl PgType {
             DefRepr::FmtStruct(Some((_prop_id, def_id))) => Self::from_def_id(*def_id, ontology),
             DefRepr::FmtStruct(None) => Ok(None),
             DefRepr::Seq => todo!("seq"),
-            DefRepr::Struct => Err(PgModelError::DataTypeNotSupported("struct").into()),
-            DefRepr::Intersection(_) => {
-                Err(PgModelError::DataTypeNotSupported("intersection").into())
-            }
-            DefRepr::Union(..) => Err(PgModelError::DataTypeNotSupported("union").into()),
+            DefRepr::Struct => Err(PgModelError::CompoundType),
+            DefRepr::Intersection(_) => Err(PgModelError::DataTypeNotSupported("intersection")),
+            DefRepr::Union(..) => Err(PgModelError::DataTypeNotSupported("union")),
             DefRepr::Macro => Ok(None),
-            DefRepr::Unknown => Err(PgModelError::DataTypeNotSupported("unknown").into()),
+            DefRepr::Unknown => Err(PgModelError::DataTypeNotSupported("unknown")),
         }
     }
 

@@ -82,7 +82,7 @@ pub fn create_graphql_schema(
         .ok_or(CreateSchemaError::GraphqlInterfaceNotFound)?;
 
     // Don't spam the log system if the schema is very large
-    let should_debug = ontol_interface_schema.types.len() < 100;
+    let should_debug = ontol_interface_schema.types.len() < 50;
 
     let schema_ctx = Arc::new(SchemaCtx {
         schema: ontol_interface_schema.clone(),
