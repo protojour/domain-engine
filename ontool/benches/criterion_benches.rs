@@ -34,7 +34,7 @@ const TINY: (SrcName, &str) = (
     src_name("tiny"),
     indoc! {r#"
         domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
-        def created (
+        def @macro created (
             rel* 'created'[rel* gen: create_time]?: datetime
         )
 

@@ -765,7 +765,7 @@ mod tests {
             .run([Value::new_struct(
                 [
                     (
-                        "p@0:1".parse().unwrap(),
+                        "p@0:0:1".parse().unwrap(),
                         Value::I64(333, ValueTag::unit()).into(),
                     ),
                     (
