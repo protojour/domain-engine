@@ -1092,3 +1092,42 @@ fn test_flattened_union1() {
         );
     });
 }
+
+#[test]
+fn test_union_with_extra_ambiguating_text_pattern() {
+    "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
+    def foo-id (fmt '' => 'foo/' => serial => .)
+    def bar-id (fmt '' => 'bar/' => serial => .)
+
+    def foo (
+        rel. 'id': foo-id
+        rel* 'bar': bar-id
+    )
+    def bar (
+        rel. 'id': bar-id
+        // also a normal, non-identifying field that has `bar-id` type:
+        rel* 'bar': bar-id
+    )
+
+    def foobar (
+        rel* is?: foo
+        rel* is?: bar
+    )
+    "
+    .compile_then(|test| {
+        let [foobar] = test.bind(["foobar"]);
+        assert_error_msg!(
+            serde_create(&foobar).to_value(json!({})),
+            "invalid type, expected `foobar` (`foo` or `bar`) at line 1 column 2"
+        );
+        assert_json_io_matches!(serde_create(&foobar), {
+            "id": "foo/1",
+            "bar": "bar/666",
+        });
+        assert_json_io_matches!(serde_create(&foobar), {
+            "id": "bar/1",
+            "bar": "bar/666",
+        });
+    });
+}

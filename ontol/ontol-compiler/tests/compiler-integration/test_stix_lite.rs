@@ -78,6 +78,32 @@ fn test_stix_lite() {
     });
 }
 
+#[test]
+fn test_stix_object_course_of_action() {
+    let test = stix_bundle().compile();
+
+    let [stix_object] = test.bind(["stix-object"]);
+
+    assert_json_io_matches!(serde_create(&stix_object), {
+        "spec_version": "2.1",
+        "type": "course-of-action",
+        "id": "course-of-action--0beabf44-e8d8-4ae4-9122-ef56369a2564",
+        "created_by_ref": "identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5",
+        "created": "2017-10-25T14:48:51.657Z",
+        "modified": "2018-01-17T12:56:55.080Z",
+        "name": "Use Recent OS Version",
+        "description": "New mobile operating system versions bring not only patches against discovered vulnerabilities but also often bring security architecture improvements that provide resilience against potential vulnerabilities or weaknesses that have not yet been discovered. They may also bring improvements that block use of observed adversary techniques.",
+        "external_references": [
+            {
+                "source_name": "mitre-attack-mobile",
+                "url": "https://attack.mitre.org/mobile/index.php/Mitigation/MOB-M1006",
+                "external_id": "MOB-M1006"
+            }
+        ],
+        "object_marking_refs": ["marking-definition--fa42a846-8d90-4e51-bc29-71d5b4802168"],
+    });
+}
+
 fn stix_ontology_smoke(test: &OntolTest) {
     let [windows_registry_key, user_account] = test.bind(["windows-registry-key", "user-account"]);
 

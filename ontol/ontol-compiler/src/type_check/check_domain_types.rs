@@ -57,21 +57,26 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 .unwrap();
 
             // Check if the property is the primary id
-            if let Some(id_relationship_id) = object_properties.identifies {
-                let id_meta = rel_def_meta(id_relationship_id, self.rel_ctx, self.defs);
+            if matches!(
+                meta.relationship.object_cardinality.1,
+                ValueCardinality::Unit
+            ) {
+                if let Some(id_relationship_id) = object_properties.identifies {
+                    let id_meta = rel_def_meta(id_relationship_id, self.rel_ctx, self.defs);
 
-                if id_meta.relationship.object.0 == def_id {
-                    debug!(
-                        "redefine as primary id: {id_relationship_id:?} <-> inherent {:?}",
-                        prop_id
-                    );
+                    if id_meta.relationship.object.0 == def_id {
+                        debug!(
+                            "redefine as primary id: {id_relationship_id:?} <-> inherent {:?}",
+                            prop_id
+                        );
 
-                    actions.push(Action::RedefineAsPrimaryId {
-                        def_id,
-                        inherent_prop_id: *prop_id,
-                        inherent_rel_id: property.rel_id,
-                        identifies_relationship_id: id_relationship_id,
-                    });
+                        actions.push(Action::RedefineAsPrimaryId {
+                            def_id,
+                            inherent_prop_id: *prop_id,
+                            inherent_rel_id: property.rel_id,
+                            identifies_relationship_id: id_relationship_id,
+                        });
+                    }
                 }
             }
         }
@@ -184,6 +189,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     let properties = self.prop_ctx.properties_by_def_id_mut(def_id);
 
                     if let Some(table) = &mut properties.table {
+                        if table.values().any(|property| property.is_entity_id) {
+                            // sanity check:
+                            panic!("already identified: {def_id:?} {inherent_prop_id:?}");
+                        }
+
                         table.insert(
                             inherent_prop_id,
                             Property {

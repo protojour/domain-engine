@@ -91,11 +91,9 @@ pub fn domain_error_to_response(error: DomainError) -> http::Response<Body> {
             json_error(format!("bad input format: {err:?}")),
         )
             .into_response(),
-        DomainErrorKind::BadInputData(err) => (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            json_error(format!("bad input: {err:?}")),
-        )
-            .into_response(),
+        DomainErrorKind::BadInputData(err) => {
+            (StatusCode::UNPROCESSABLE_ENTITY, json_error(err)).into_response()
+        }
         DomainErrorKind::UnresolvedForeignKey(key) => (
             StatusCode::UNPROCESSABLE_ENTITY,
             json_error(format!("unresolved foreign key: {key}")),
