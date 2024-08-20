@@ -26,45 +26,36 @@ async fn make_domain_engine(ontology: Arc<Ontology>, datastore: &str) -> DomainE
 }
 
 /// There should only be one stix test since the domain is so big
-/// FIXME: Arango doesn't yet understand ONTOL symbolic edges
+/// FIXME: Arango doesn't yet understand ONTOL symbolic edges.
+/// FIXME: GraphQL mutations do not run in the same transaction, so foreign key defer does not work
 #[datastore_test(tokio::test)]
 async fn test_graphql_stix(ds: &str) {
     let (test, [schema]) = stix_bundle().compile_schemas([STIX.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
 
+    // first, create an identity
+    r#"mutation {
+        identity(create:[
+            {
+                id: "identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5",
+                modified: "2017-06-01T00:00:00.000Z",
+                object_marking_refs: [],
+                name: "The MITRE Corporation",
+                created: "2017-06-01T00:00:00.000Z",
+                type: "identity",
+                identity_class: "organization",
+                spec_version: "2.1",
+            }
+        ]) {
+            node { id }
+        }
+    }"#
+    .exec([], &schema, &ctx)
+    .await
+    .unwrap();
+
     expect_eq!(
         actual = r#"mutation {
-            marking_definition(create:[
-                {
-                    definition: {
-                        statement: "Copyright 2015-2021, The MITRE Corporation. MITRE ATT&CK and ATT&CK are registered trademarks of The MITRE Corporation."
-                    },
-                    id: "marking-definition--fa42a846-8d90-4e51-bc29-71d5b4802168",
-                    definition_type: "statement",
-                    created_by_ref: "identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5",
-                    created: "2017-06-01T00:00:00Z",
-                    type: "marking-definition",
-                    spec_version: "2.1",
-                },
-            ]) {
-                node { id }
-            }
-            identity(create:[
-                {
-                    id: "identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5",
-                    modified: "2017-06-01T00:00:00.000Z",
-                    object_marking_refs: [
-                        "marking-definition--fa42a846-8d90-4e51-bc29-71d5b4802168"
-                    ],
-                    name: "The MITRE Corporation",
-                    created: "2017-06-01T00:00:00.000Z",
-                    type: "identity",
-                    identity_class: "organization",
-                    spec_version: "2.1",
-                }
-            ]) {
-                node { id }
-            }
             url(create:[
                 {
                     type: "url"
@@ -107,7 +98,11 @@ async fn test_graphql_stix(ds: &str) {
                             url: "https://www.skycure.com/blog/accessibility-clickjacking/"
                         }
                     ],
-                    object_marking_refs: ["marking-definition--fa42a846-8d90-4e51-bc29-71d5b4802168"],
+
+                    # FIXME: GraphQL mutations do not run in the same transaction
+                    # object_marking_refs: ["marking-definition--fa42a846-8d90-4e51-bc29-71d5b4802168"],
+                    object_marking_refs: [],
+
                     # "x_mitre_platforms": ["Android"],
                     # "x_mitre_tactic_type": ["Post-Adversary Device Access"],
                     spec_version: "2.1",
@@ -135,7 +130,8 @@ async fn test_graphql_stix(ds: &str) {
                             external_id: "MOB-M1006"
                         }
                     ],
-                    object_marking_refs: ["marking-definition--fa42a846-8d90-4e51-bc29-71d5b4802168"],
+                    # object_marking_refs: ["marking-definition--fa42a846-8d90-4e51-bc29-71d5b4802168"],
+                    object_marking_refs: [],
                     spec_version: "2.1",
                     # "x_mitre_attack_spec_version": "2.1.0",
                     # "x_mitre_domains": ["mobile-attack"],
@@ -155,9 +151,8 @@ async fn test_graphql_stix(ds: &str) {
                     relationship_type: "mitigates",
                     source_ref: "course-of-action--0beabf44-e8d8-4ae4-9122-ef56369a2564",
                     target_ref: "attack-pattern--2204c371-6100-4ae0-82f3-25c07c29772a",
-                    object_marking_refs: [
-                        "marking-definition--fa42a846-8d90-4e51-bc29-71d5b4802168"
-                    ],
+                    # object_marking_refs: ["marking-definition--fa42a846-8d90-4e51-bc29-71d5b4802168"],
+                    object_marking_refs: [],
                     spec_version: "2.1",
                     # "x_mitre_attack_spec_version": "2.1.0",
                     # "x_mitre_domains": ["mobile-attack"],

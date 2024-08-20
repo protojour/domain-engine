@@ -197,7 +197,6 @@ async fn mutation(
                 ctx,
             )?;
             let select = select_analyzer.analyze_select(look_ahead, field_data)?;
-            // let mut batch_write_requests = Vec::with_capacity(entity_mutations.len());
 
             let mut req_messages: Vec<DomainResult<ReqMessage>> = vec![];
             let mut op_seq = 0;
