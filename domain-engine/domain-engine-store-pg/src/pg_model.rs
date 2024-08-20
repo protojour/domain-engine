@@ -216,12 +216,25 @@ impl PgTable {
             .and_then(PgProperty::as_column)
     }
 
+    pub fn find_abstract_property(&self, prop_id: &PropId) -> Option<PgRegKey> {
+        match self.properties.get(&prop_id.tag()) {
+            Some(PgProperty::Abstract(reg_key)) => Some(*reg_key),
+            Some(PgProperty::Column(_)) | None => None,
+        }
+    }
+
     pub fn column(&self, prop_id: &PropId) -> DomainResult<&PgColumn> {
         self.find_column(prop_id).ok_or_else(|| {
             debug!("field not found in {:?}", self.properties);
 
-            PgModelError::FieldNotFound(self.table_name.clone(), *prop_id).into()
+            PgModelError::PropertyNotFound(self.table_name.clone(), *prop_id).into()
         })
+    }
+
+    pub fn abstract_property(&self, prop_id: &PropId) -> DomainResult<PgRegKey> {
+        Ok(self
+            .find_abstract_property(prop_id)
+            .ok_or_else(|| PgModelError::PropertyNotFound(self.table_name.clone(), *prop_id))?)
     }
 
     pub fn column_by_key(&self, key: PgRegKey) -> Option<&PgColumn> {

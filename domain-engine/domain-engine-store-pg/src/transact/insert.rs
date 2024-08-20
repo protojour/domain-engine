@@ -236,7 +236,7 @@ impl<'a> TransactCtx<'a> {
         let mut param_idx = 0;
 
         if pg.table.has_fkey {
-            column_names.extend(["_fdef", "_fkey"]);
+            column_names.extend(["_fprop", "_fkey"]);
             values.extend([sql::Expr::param(0), sql::Expr::param(1)]);
             param_idx += 2;
         }
@@ -362,14 +362,15 @@ impl<'a> TransactCtx<'a> {
 
         if pg_table.has_fkey {
             let Some((parent_prop_id, parent_key)) = parent else {
-                panic!();
+                panic!("missing parent property for fkey");
             };
 
-            let parent_pg_table = self
+            let parent_prop_key = self
                 .pg_model
-                .datatable(parent_prop_id.0.package_id(), parent_prop_id.0)?;
+                .datatable(parent_prop_id.0.package_id(), parent_prop_id.0)?
+                .abstract_property(&parent_prop_id)?;
 
-            field_buf.extend([SqlVal::I32(parent_pg_table.key), SqlVal::I64(parent_key)]);
+            field_buf.extend([SqlVal::I32(parent_prop_key), SqlVal::I64(parent_key)]);
         }
 
         for (prop_id, rel_info) in &def.data_relationships {

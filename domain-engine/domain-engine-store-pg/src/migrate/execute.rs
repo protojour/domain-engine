@@ -121,14 +121,14 @@ async fn execute_migration_step<'t>(
             let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
             let pg_table = pg_domain.datatables.get_mut(&vertex_def_id).unwrap();
 
-            let (fdef, fkey) = ("_fdef", "_fkey");
+            let (fprop, fkey) = ("_fprop", "_fkey");
 
             txn.execute(
                 &format!(
-                    "ALTER TABLE {schema}.{table} ADD COLUMN {fdef} int NOT NULL, ADD COLUMN {fkey} bigint NOT NULL",
+                    "ALTER TABLE {schema}.{table} ADD COLUMN {fprop} int NOT NULL, ADD COLUMN {fkey} bigint NOT NULL",
                     schema = sql::Ident(&pg_domain.schema_name),
                     table = sql::Ident(&pg_table.table_name),
-                    fdef = sql::Ident(fdef),
+                    fprop = sql::Ident(fprop),
                     fkey = sql::Ident(fkey),
                 ),
                 &[],
@@ -138,10 +138,10 @@ async fn execute_migration_step<'t>(
 
             txn.execute(
                 &format!(
-                    "CREATE INDEX ON {schema}.{table} ({fdef}, {fkey})",
+                    "CREATE INDEX ON {schema}.{table} ({fprop}, {fkey})",
                     schema = sql::Ident(&pg_domain.schema_name),
                     table = sql::Ident(&pg_table.table_name),
-                    fdef = sql::Ident(fdef),
+                    fprop = sql::Ident(fprop),
                     fkey = sql::Ident(fkey),
                 ),
                 &[],
@@ -150,8 +150,8 @@ async fn execute_migration_step<'t>(
             .context("create fkey index")?;
 
             txn.query_one(
-                "UPDATE m6mreg.domaintable SET fdef_column = $1, fkey_column = $2 WHERE key = $3 RETURNING 0",
-                &[&fdef, &fkey, &pg_table.key],
+                "UPDATE m6mreg.domaintable SET fprop_column = $1, fkey_column = $2 WHERE key = $3 RETURNING 0",
+                &[&fprop, &fkey, &pg_table.key],
             )
             .await
             .context("update domaintable fkey")?;

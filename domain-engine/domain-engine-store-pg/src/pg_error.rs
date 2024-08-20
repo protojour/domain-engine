@@ -143,7 +143,7 @@ pub enum PgModelError {
     /// edge not found for {0:?}
     EdgeNotFound(EdgeId),
     /// field not found for {1} in {0}
-    FieldNotFound(Box<str>, PropId),
+    PropertyNotFound(Box<str>, PropId),
     /// edge cardinal {0} not found
     EdgeCardinalNotFound(CardinalIdx),
     /// unhandled repr

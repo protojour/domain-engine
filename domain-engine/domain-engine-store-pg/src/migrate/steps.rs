@@ -68,7 +68,7 @@ pub async fn migrate_domain_steps<'t>(
                         def_tag,
                         edge_tag,
                         table_name,
-                        fdef_column,
+                        fprop_column,
                         fkey_column
                     FROM m6mreg.domaintable
                     WHERE domain_key = $1
@@ -88,13 +88,13 @@ pub async fn migrate_domain_steps<'t>(
                 .map(|tag: i32| tag.try_into())
                 .transpose()?;
             let table_name: Box<str> = row.get(4);
-            let fdef_column: Option<Box<str>> = row.get(5);
+            let fprop_column: Option<Box<str>> = row.get(5);
             let fkey_column: Option<Box<str>> = row.get(6);
 
             let pg_table = PgTable {
                 key,
                 table_name,
-                has_fkey: fdef_column.is_some() && fkey_column.is_some(),
+                has_fkey: fprop_column.is_some() && fkey_column.is_some(),
                 properties: Default::default(),
                 edge_cardinals: Default::default(),
                 property_indexes: Default::default(),

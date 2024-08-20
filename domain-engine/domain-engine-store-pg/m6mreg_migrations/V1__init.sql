@@ -55,8 +55,8 @@ CREATE TABLE m6mreg.domaintable
     table_name text NOT NULL,
     -- the name of the key column, if specified
     key_column text,
-    -- the name of the foreign def column, if specified
-    fdef_column text,
+    -- the name of the foreign property column, if specified
+    fprop_column text,
     -- the name of the foreign key column, if specified
     fkey_column text,
 
@@ -66,8 +66,8 @@ CREATE TABLE m6mreg.domaintable
     CHECK ((def_domain_key IS NULL) = (def_tag IS NULL)),
     -- def tables are keyed, edges are not
     CHECK ((def_domain_key IS NULL) = (key_column IS NULL)),
-    -- foreign key consists of fdef AND fkey
-    CHECK ((fdef_column IS NULL) = (fkey_column IS NULL))
+    -- foreign key consists of fprop AND fkey
+    CHECK ((fprop_column IS NULL) = (fkey_column IS NULL))
 );
 
 -- Represents a postgres unique constraint over a field tuple
