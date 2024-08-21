@@ -20,7 +20,7 @@ use ontol_runtime::{
     },
     sequence::Sequence,
     tuple::EndoTuple,
-    value::{Serial, Value, ValueTag},
+    value::{OctetSequence, Serial, Value, ValueTag},
     DefId, EdgeId,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -153,7 +153,9 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                             builder.set_version(uuid::Version::Random);
 
                             Value::OctetSequence(
-                                builder.into_uuid().as_bytes().iter().cloned().collect(),
+                                OctetSequence(
+                                    builder.into_uuid().as_bytes().iter().cloned().collect(),
+                                ),
                                 (*def_id).into(),
                             )
                         }
@@ -163,7 +165,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                             let ulid = Ulid::from_datetime_with_source(time, self.rng);
 
                             Value::OctetSequence(
-                                ulid.to_bytes().into_iter().collect(),
+                                OctetSequence(ulid.to_bytes().into_iter().collect()),
                                 (*def_id).into(),
                             )
                         }

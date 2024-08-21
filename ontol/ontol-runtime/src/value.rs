@@ -31,7 +31,7 @@ pub enum Value {
     Serial(Serial, ValueTag),
     Rational(Box<num::rational::BigRational>, ValueTag),
     Text(String, ValueTag),
-    OctetSequence(ThinVec<u8>, ValueTag),
+    OctetSequence(OctetSequence, ValueTag),
     ChronoDateTime(chrono::DateTime<chrono::Utc>, ValueTag),
     ChronoDate(chrono::NaiveDate, ValueTag),
     ChronoTime(chrono::NaiveTime, ValueTag),
@@ -210,6 +210,19 @@ impl PartialOrd for Value {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Serial(pub u64);
+
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct OctetSequence(pub ThinVec<u8>);
+
+impl Debug for OctetSequence {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for byte in &self.0 {
+            write!(f, "{:02x}", byte)?;
+        }
+
+        Ok(())
+    }
+}
 
 pub struct FormatValueAsText<'d, 'o> {
     pub value: &'d Value,

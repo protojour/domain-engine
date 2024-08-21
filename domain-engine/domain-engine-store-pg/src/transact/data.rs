@@ -79,6 +79,7 @@ impl<'a> TransactCtx<'a> {
                     unreachable!("tried to deserialize an empty FmtStruct (has no data)")
                 }
                 (SqlVal::Unit | SqlVal::Null, _) => Ok(Value::Unit(tag)),
+                (SqlVal::Bool(b), _) => Ok(Value::I64(if b { 1 } else { 0 }, tag)),
                 (SqlVal::I32(i), _) => Ok(Value::I64(i as i64, tag)),
                 (SqlVal::I64(i), DefRepr::Serial) => Ok(Value::Serial(
                     Serial(i.try_into().map_err(|_| ds_err("serial underflow"))?),
@@ -87,7 +88,7 @@ impl<'a> TransactCtx<'a> {
                 (SqlVal::I64(i), _) => Ok(Value::I64(i, tag)),
                 (SqlVal::F64(f), _) => Ok(Value::F64(f, tag)),
                 (SqlVal::Text(string), _) => Ok(Value::Text(string.into(), tag)),
-                (SqlVal::Octets(vec), _) => Ok(Value::OctetSequence(vec.into(), tag)),
+                (SqlVal::Octets(seq), _) => Ok(Value::OctetSequence(seq, tag)),
                 (SqlVal::DateTime(dt), _) => Ok(Value::ChronoDateTime(dt, tag)),
                 (SqlVal::Date(d), _) => Ok(Value::ChronoDate(d, tag)),
                 (SqlVal::Time(t), _) => Ok(Value::ChronoTime(t, tag)),
@@ -104,7 +105,10 @@ impl<'a> TransactCtx<'a> {
 
         match (value, &def.kind) {
             (Value::Unit(_) | Value::Void(_), _) => Ok(SqlVal::Unit.into()),
-            (Value::I64(int, _), _) => Ok(SqlVal::I64(int).into()),
+            (Value::I64(int, _), _) => match def.repr() {
+                Some(DefRepr::Boolean) => Ok(SqlVal::Bool(int > 0).into()),
+                _ => Ok(SqlVal::I64(int).into()),
+            },
             (Value::F64(float, _), _) => Ok(SqlVal::F64(float).into()),
             (Value::Serial(serial, _), _) => {
                 let int: i64 = serial
@@ -116,7 +120,7 @@ impl<'a> TransactCtx<'a> {
             }
             (Value::Rational(_, _), _) => Err(ds_bad_req("rational not supported yet")),
             (Value::Text(s, _), _) => Ok(SqlVal::Text(s.into()).into()),
-            (Value::OctetSequence(vec, _), _) => Ok(SqlVal::Octets(vec.into()).into()),
+            (Value::OctetSequence(seq, _), _) => Ok(SqlVal::Octets(seq).into()),
             (Value::ChronoDateTime(dt, _), _) => Ok(SqlVal::DateTime(dt).into()),
             (Value::ChronoDate(d, _), _) => Ok(SqlVal::Date(d).into()),
             (Value::ChronoTime(t, _), _) => Ok(SqlVal::Time(t).into()),

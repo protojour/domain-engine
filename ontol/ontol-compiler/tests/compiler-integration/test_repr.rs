@@ -1,5 +1,8 @@
 use ontol_macros::test;
-use ontol_runtime::ontology::domain::DefRepr;
+use ontol_runtime::{
+    debug::OntolDebug,
+    ontology::domain::{DefRepr, DefReprUnionBound},
+};
 use ontol_test_utils::{src_name, TestCompile, TestPackages};
 
 #[test]
@@ -74,5 +77,24 @@ fn test_macro_in_macro_repr() {
             .unwrap();
 
         assert_eq!(rel_id.0, foo.def_id());
+    });
+}
+
+#[test]
+fn test_text_constant_union_repr() {
+    "
+    def u (
+        rel* is?: 'A'
+        rel* is?: 'B'
+    )
+    "
+    .compile_then(|test| {
+        let [u] = test.bind(["u"]);
+        let Some(DefRepr::Union(_, DefReprUnionBound::Scalar(inner))) = u.def.repr() else {
+            panic!()
+        };
+        let DefRepr::Text = inner.as_ref() else {
+            panic!("not text: {:?}", inner.debug(test.ontology()));
+        };
     });
 }

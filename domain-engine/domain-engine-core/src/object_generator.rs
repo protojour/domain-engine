@@ -6,7 +6,7 @@ use ontol_runtime::{
         processor::{ProcessorLevel, ProcessorMode},
     },
     ontology::{domain::Def, ontol::ValueGenerator, Ontology},
-    value::{Value, ValueTag},
+    value::{OctetSequence, Value, ValueTag},
     DefId, PropId,
 };
 
@@ -99,12 +99,14 @@ impl<'e> ObjectGenerator<'e> {
                             struct_map.insert(
                                 property.id,
                                 Value::OctetSequence(
-                                    self.system
-                                        .generate_uuid()
-                                        .as_bytes()
-                                        .iter()
-                                        .cloned()
-                                        .collect(),
+                                    OctetSequence(
+                                        self.system
+                                            .generate_uuid()
+                                            .as_bytes()
+                                            .iter()
+                                            .cloned()
+                                            .collect(),
+                                    ),
                                     self.property_tag(property),
                                 )
                                 .into(),

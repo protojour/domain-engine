@@ -222,6 +222,7 @@ pub enum DefRepr {
 #[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub enum DefReprUnionBound {
     Any,
+    Scalar(Box<DefRepr>),
     Struct,
     Fmt,
 }

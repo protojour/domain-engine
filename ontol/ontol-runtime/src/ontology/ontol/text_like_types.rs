@@ -7,7 +7,7 @@ use ulid::Ulid;
 use uuid::Uuid;
 
 use crate::{
-    value::{Value, ValueTagError},
+    value::{OctetSequence, Value, ValueTagError},
     DefId,
 };
 
@@ -46,14 +46,14 @@ impl TextLikeType {
                 let uuid =
                     Uuid::parse_str(str).map_err(|error| ParseError(format!("{}", error)))?;
                 Ok(Value::OctetSequence(
-                    uuid.into_bytes().into_iter().collect(),
+                    OctetSequence(uuid.into_bytes().into_iter().collect()),
                     def_id.into(),
                 ))
             }
             Self::Ulid => {
                 let ulid = Ulid::from_str(str).map_err(|error| ParseError(format!("{}", error)))?;
                 Ok(Value::OctetSequence(
-                    ulid.to_bytes().into_iter().collect(),
+                    OctetSequence(ulid.to_bytes().into_iter().collect()),
                     def_id.into(),
                 ))
             }
@@ -73,21 +73,21 @@ impl TextLikeType {
     }
     pub fn format(&self, value: &Value, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match (self, value) {
-            (Self::Uuid, Value::OctetSequence(octets, _)) => {
-                let uuid = Uuid::from_slice(octets).map_err(|error| {
+            (Self::Uuid, Value::OctetSequence(seq, _)) => {
+                let uuid = Uuid::from_slice(&seq.0).map_err(|error| {
                     error!("Uuid not constructable from octets: {error:?}");
                     std::fmt::Error
                 })?;
 
                 write!(f, "{uuid}")
             }
-            (Self::Ulid, Value::OctetSequence(octets, _)) => {
-                if octets.len() != 16 {
+            (Self::Ulid, Value::OctetSequence(seq, _)) => {
+                if seq.0.len() != 16 {
                     return Err(std::fmt::Error);
                 }
 
                 let mut bytes = [0u8; 16];
-                bytes.clone_from_slice(octets);
+                bytes.clone_from_slice(&seq.0);
                 let ulid = Ulid::from_bytes(bytes);
 
                 write!(f, "{ulid}")

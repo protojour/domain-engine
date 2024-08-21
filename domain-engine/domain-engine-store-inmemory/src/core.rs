@@ -186,9 +186,7 @@ impl InMemoryStore {
                 Self::extract_dynamic_key(value)
             }
             Value::Text(string, _) => Ok(DynamicKey::Text(string.as_str().into())),
-            Value::OctetSequence(octets, _) => {
-                Ok(DynamicKey::Octets(octets.iter().cloned().collect()))
-            }
+            Value::OctetSequence(seq, _) => Ok(DynamicKey::Octets(seq.0.iter().cloned().collect())),
             Value::Serial(Serial(value), _) => Ok(DynamicKey::Serial(*value)),
             other => {
                 warn!("inherent id from {other:?}");

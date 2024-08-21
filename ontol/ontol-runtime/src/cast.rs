@@ -162,7 +162,7 @@ impl Cast<Uuid> for Value {
 
     fn cast_into(self) -> Uuid {
         match self {
-            Value::OctetSequence(seq, _) => Uuid::from_slice(&seq).unwrap(),
+            Value::OctetSequence(seq, _) => Uuid::from_slice(&seq.0).unwrap(),
             _ => panic!("not an uuid"),
         }
     }

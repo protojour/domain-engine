@@ -8,6 +8,7 @@ use ontol_runtime::{
 };
 
 use crate::{
+    pg_error::PgModelError,
     pg_model::{PgDomainTable, PgTable, PgType},
     sql,
     sql_record::SqlRecordIterator,
@@ -93,26 +94,26 @@ impl<'a> TransactCtx<'a> {
         // but is it worth it?
         let target_def_id = match rel_info.target {
             DataRelationshipTarget::Unambiguous(def_id) => def_id,
-            DataRelationshipTarget::Union(_) => {
-                return Ok(None);
-            }
+            DataRelationshipTarget::Union(def_id) => def_id,
         };
 
-        if let Some(pg_type) = PgType::from_def_id(target_def_id, self.ontology)? {
-            let sql_val = record_iter.next_field(&Layout::Scalar(pg_type))?;
+        match PgType::from_def_id(target_def_id, self.ontology) {
+            Ok(Some(pg_type)) => {
+                let sql_val = record_iter.next_field(&Layout::Scalar(pg_type))?;
 
-            if let Some(sql_val) = sql_val.null_filter() {
-                match rel_info.target {
-                    DataRelationshipTarget::Unambiguous(def_id) => {
-                        Ok(Some(self.deserialize_sql(def_id, sql_val)?))
+                if let Some(sql_val) = sql_val.null_filter() {
+                    match rel_info.target {
+                        DataRelationshipTarget::Unambiguous(def_id) => {
+                            Ok(Some(self.deserialize_sql(def_id, sql_val)?))
+                        }
+                        DataRelationshipTarget::Union(_) => Ok(None),
                     }
-                    DataRelationshipTarget::Union(_) => Ok(None),
+                } else {
+                    Ok(None)
                 }
-            } else {
-                Ok(None)
             }
-        } else {
-            Ok(None)
+            Ok(None) | Err(PgModelError::CompoundType) => Ok(None),
+            Err(e) => Err(e.into()),
         }
     }
 }

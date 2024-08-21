@@ -10,6 +10,7 @@ use std::collections::{hash_map::Entry, HashMap};
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
 use ontol_runtime::{ontology::ontol::TextLikeType, DefId, RelId};
+use ordered_float::NotNan;
 use tracing::{debug_span, trace};
 
 use crate::{
@@ -367,11 +368,34 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         }
                     }
                 }
-                DefKind::TextLiteral(_) | DefKind::NumberLiteral(_) => {
+                DefKind::TextLiteral(_) => {
                     self.merge_repr(
                         &mut builder,
                         leaf_def_id,
-                        ReprKind::Scalar(def_id, ReprScalarKind::Other, data.rel_span),
+                        ReprKind::Scalar(
+                            def_id,
+                            ReprScalarKind::TextConstant(def_id),
+                            data.rel_span,
+                        ),
+                        def_id,
+                        data,
+                    );
+                }
+                DefKind::NumberLiteral(lit) => {
+                    self.merge_repr(
+                        &mut builder,
+                        leaf_def_id,
+                        ReprKind::Scalar(
+                            def_id,
+                            if lit.contains('.') {
+                                ReprScalarKind::F64(
+                                    NotNan::new(f64::MIN).unwrap()..=NotNan::new(f64::MAX).unwrap(),
+                                )
+                            } else {
+                                ReprScalarKind::I64(i64::MIN..=i64::MAX)
+                            },
+                            data.rel_span,
+                        ),
                         def_id,
                         data,
                     );
@@ -615,6 +639,14 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     UnionBound::Struct,
                 ));
             }
+            (
+                Sub,
+                Some(ReprKind::Union(variants, UnionBound::Scalar(kind))),
+                ReprKind::Scalar(_, new_kind, _),
+            ) => {
+                *kind = kind.combine(&new_kind);
+                variants.push((next_def_id, data.rel_span));
+            }
             (Sub, Some(ReprKind::Union(variants, UnionBound::Struct)), ReprKind::Struct) => {
                 variants.push((next_def_id, data.rel_span));
             }
@@ -639,6 +671,12 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     variants.push((next_def_id, data.rel_span));
                 }
             }
+            (Sub, None, ReprKind::Scalar(_, kind, _)) => {
+                builder.kind = Some(ReprKind::Union(
+                    vec![(next_def_id, data.rel_span)],
+                    UnionBound::Scalar(kind.saturate()),
+                ));
+            }
             (Sub, None, ReprKind::Struct) => {
                 builder.kind = Some(ReprKind::Union(
                     vec![(next_def_id, data.rel_span)],
@@ -659,12 +697,12 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             }
             (
                 Sub,
-                Some(ReprKind::Scalar(scalar1, _, span1)),
-                ReprKind::Scalar(scalar2, _, span2),
+                Some(ReprKind::Scalar(scalar1, kind1, span1)),
+                ReprKind::Scalar(scalar2, kind2, span2),
             ) => {
                 builder.kind = Some(ReprKind::Union(
                     vec![(*scalar1, *span1), (scalar2, span2)],
-                    UnionBound::Any,
+                    UnionBound::Scalar(kind1.combine(&kind2)),
                 ));
             }
             (

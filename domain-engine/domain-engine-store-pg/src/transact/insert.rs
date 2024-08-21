@@ -15,7 +15,7 @@ use ontol_runtime::{
     DefId, PackageId, PropId,
 };
 use pin_utils::pin_mut;
-use tracing::{debug, warn};
+use tracing::{debug, trace, warn};
 
 use crate::{
     pg_error::{map_row_error, PgError, PgInputError},
@@ -501,6 +501,7 @@ impl<'a> TransactCtx<'a> {
     ) -> DomainResult<RowValue> {
         let row = {
             debug!("{}", prepared_inherent_insert);
+            trace!("{field_buf:?}");
 
             let stream = self
                 .client()

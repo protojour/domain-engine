@@ -527,25 +527,25 @@ fn migrate_datafields_steps(
         // so there needs to be some disambiguation in place
         let column_name = &ontology[rel_info.name];
 
-        let data = match rel_info.target {
-            DataRelationshipTarget::Unambiguous(def_id) => {
-                match PgType::from_def_id(def_id, ontology) {
-                    Ok(Some(pg_type)) => PgPropertyData::Column {
-                        col_name: column_name.to_string().into_boxed_str(),
-                        pg_type,
-                    },
-                    Ok(None) => {
-                        // This is a unit type, does not need to be represented
-                        continue;
-                    }
-                    Err(PgModelError::CompoundType) => PgPropertyData::Abstract,
-                    Err(err) => {
-                        warn!("pg type error: {err:?}");
-                        continue;
-                    }
-                }
+        let target_def_id = match rel_info.target {
+            DataRelationshipTarget::Unambiguous(def_id) => def_id,
+            DataRelationshipTarget::Union(def_id) => def_id,
+        };
+
+        let data = match PgType::from_def_id(target_def_id, ontology) {
+            Ok(Some(pg_type)) => PgPropertyData::Column {
+                col_name: column_name.to_string().into_boxed_str(),
+                pg_type,
+            },
+            Ok(None) => {
+                // This is a unit type, does not need to be represented
+                continue;
             }
-            DataRelationshipTarget::Union(_) => PgPropertyData::Abstract,
+            Err(PgModelError::CompoundType) => PgPropertyData::Abstract,
+            Err(err) => {
+                warn!("pg type error: {err:?}");
+                continue;
+            }
         };
 
         match (

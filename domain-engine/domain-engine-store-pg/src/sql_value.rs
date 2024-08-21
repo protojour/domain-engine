@@ -3,6 +3,7 @@ use std::fmt::Debug;
 use bytes::BytesMut;
 use domain_engine_core::{DomainError, DomainResult};
 use fallible_iterator::FallibleIterator;
+use ontol_runtime::value::OctetSequence;
 use postgres_types::{FromSql, ToSql, Type};
 use tracing::error;
 
@@ -35,11 +36,12 @@ mod wellknown_oid {
 pub enum SqlVal<'b> {
     Null,
     Unit,
+    Bool(bool),
     I32(i32),
     I64(i64),
     F64(f64),
     Text(String),
-    Octets(Vec<u8>),
+    Octets(OctetSequence),
     DateTime(chrono::DateTime<chrono::Utc>),
     Date(chrono::NaiveDate),
     Time(chrono::NaiveTime),
@@ -124,9 +126,9 @@ impl<'b> SqlVal<'b> {
             Layout::Scalar(PgType::Text) => Ok(SqlVal::Text(
                 postgres_protocol::types::text_from_sql(raw)?.to_string(),
             )),
-            Layout::Scalar(PgType::Bytea) => Ok(SqlVal::Octets(
+            Layout::Scalar(PgType::Bytea) => Ok(SqlVal::Octets(OctetSequence(
                 postgres_protocol::types::bytea_from_sql(raw).into(),
-            )),
+            ))),
             Layout::Scalar(PgType::TimestampTz) => Ok(SqlVal::DateTime(FromSql::from_sql(
                 &Type::from_oid(wellknown_oid::TIMESTAMPTZ).unwrap(),
                 raw,
@@ -155,11 +157,12 @@ impl<'b> ToSql for SqlVal<'b> {
     {
         match &self {
             Self::Unit | Self::Null => Option::<i32>::None.to_sql(ty, out),
+            Self::Bool(b) => b.to_sql(ty, out),
             Self::I32(i) => i.to_sql(ty, out),
             Self::I64(i) => i.to_sql(ty, out),
             Self::F64(f) => f.to_sql(ty, out),
             Self::Text(s) => s.as_str().to_sql(ty, out),
-            Self::Octets(s) => s.as_slice().to_sql(ty, out),
+            Self::Octets(s) => s.0.as_slice().to_sql(ty, out),
             Self::DateTime(dt) => dt.to_sql(ty, out),
             Self::Date(d) => d.to_sql(ty, out),
             Self::Time(t) => t.to_sql(ty, out),
@@ -181,11 +184,12 @@ impl<'b> ToSql for SqlVal<'b> {
     ) -> Result<tokio_postgres::types::IsNull, BoxError> {
         match &self {
             Self::Unit | Self::Null => Option::<i32>::None.to_sql_checked(ty, out),
+            Self::Bool(b) => b.to_sql_checked(ty, out),
             Self::I32(i) => i.to_sql_checked(ty, out),
             Self::I64(i) => i.to_sql_checked(ty, out),
             Self::F64(f) => f.to_sql_checked(ty, out),
             Self::Text(s) => s.as_str().to_sql_checked(ty, out),
-            Self::Octets(s) => s.as_slice().to_sql_checked(ty, out),
+            Self::Octets(s) => s.0.as_slice().to_sql_checked(ty, out),
             Self::DateTime(dt) => dt.to_sql_checked(ty, out),
             Self::Date(d) => d.to_sql_checked(ty, out),
             Self::Time(t) => t.to_sql_checked(ty, out),

@@ -4,7 +4,7 @@ use domain_engine_core::DomainResult;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::{
-        domain::{Def, DefKind, DefRepr},
+        domain::{Def, DefKind, DefRepr, DefReprUnionBound},
         Ontology,
     },
     tuple::CardinalIdx,
@@ -385,6 +385,13 @@ impl PgType {
             _ => &DefRepr::Unknown,
         };
 
+        Self::from_def_repr(def_repr, ontology)
+    }
+
+    fn from_def_repr(
+        def_repr: &DefRepr,
+        ontology: &Ontology,
+    ) -> Result<Option<Self>, PgModelError> {
         match def_repr {
             DefRepr::Unit => Ok(None),
             DefRepr::I64 => Ok(Some(PgType::BigInt)),
@@ -399,7 +406,12 @@ impl PgType {
             DefRepr::Seq => todo!("seq"),
             DefRepr::Struct => Err(PgModelError::CompoundType),
             DefRepr::Intersection(_) => Err(PgModelError::DataTypeNotSupported("intersection")),
-            DefRepr::Union(..) => Err(PgModelError::DataTypeNotSupported("union")),
+            DefRepr::Union(_variants, bound) => match bound {
+                DefReprUnionBound::Scalar(scalar_repr) => {
+                    Self::from_def_repr(scalar_repr, ontology)
+                }
+                _ => Err(PgModelError::CompoundType),
+            },
             DefRepr::Macro => Ok(None),
             DefRepr::Unknown => Err(PgModelError::DataTypeNotSupported("unknown")),
         }

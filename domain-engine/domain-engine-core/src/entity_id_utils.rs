@@ -8,7 +8,7 @@ use ontol_runtime::{
         },
         Ontology,
     },
-    value::Value,
+    value::{OctetSequence, Value},
     DefId, PropId,
 };
 
@@ -75,7 +75,7 @@ pub fn try_generate_entity_id(
             match (ontology.get_text_like_type(*def_id), value_generator) {
                 (Some(TextLikeType::Uuid), ValueGenerator::Uuid) => Ok((
                     GeneratedId::Generated(Value::OctetSequence(
-                        system.generate_uuid().as_bytes().iter().cloned().collect(),
+                        OctetSequence(system.generate_uuid().as_bytes().iter().cloned().collect()),
                         (*def_id).into(),
                     )),
                     GeneratedIdContainer::Raw,

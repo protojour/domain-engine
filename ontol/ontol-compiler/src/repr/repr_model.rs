@@ -47,6 +47,8 @@ pub enum ReprKind {
 pub enum UnionBound {
     /// Any kind of union, no recognized uniformity
     Any,
+    /// Scalar union
+    Scalar(ReprScalarKind),
     /// Every member of the union is a struct
     Struct,
     /// Every member of the union is an FmtStruct
@@ -57,15 +59,7 @@ impl ReprKind {
     pub fn to_def_repr(&self) -> DefRepr {
         match self {
             ReprKind::Unit => DefRepr::Unit,
-            ReprKind::Scalar(_, ReprScalarKind::I64(_), _) => DefRepr::I64,
-            ReprKind::Scalar(_, ReprScalarKind::F64(_), _) => DefRepr::F64,
-            ReprKind::Scalar(_, ReprScalarKind::Serial, _) => DefRepr::Serial,
-            ReprKind::Scalar(_, ReprScalarKind::Boolean, _) => DefRepr::Boolean,
-            ReprKind::Scalar(_, ReprScalarKind::Text, _) => DefRepr::Text,
-            ReprKind::Scalar(_, ReprScalarKind::TextConstant(_), _) => DefRepr::Unit,
-            ReprKind::Scalar(_, ReprScalarKind::Octets, _) => DefRepr::Octets,
-            ReprKind::Scalar(_, ReprScalarKind::DateTime, _) => DefRepr::DateTime,
-            ReprKind::Scalar(_, ReprScalarKind::Other, _) => DefRepr::Unknown,
+            ReprKind::Scalar(_, kind, _) => kind.to_def_repr(),
             ReprKind::FmtStruct(opt_attr) => DefRepr::FmtStruct(*opt_attr),
             ReprKind::Seq => DefRepr::Seq,
             ReprKind::Struct => DefRepr::Struct,
@@ -77,6 +71,9 @@ impl ReprKind {
                 defs.iter().map(|(def_id, _)| *def_id).collect(),
                 match bound {
                     UnionBound::Any => DefReprUnionBound::Any,
+                    UnionBound::Scalar(scalar_kind) => {
+                        DefReprUnionBound::Scalar(Box::new(scalar_kind.to_def_repr()))
+                    }
                     UnionBound::Struct => DefReprUnionBound::Struct,
                     UnionBound::Fmt => DefReprUnionBound::Fmt,
                 },
@@ -98,6 +95,50 @@ pub enum ReprScalarKind {
     Octets,
     DateTime,
     Other,
+}
+
+impl ReprScalarKind {
+    pub fn combine(&self, other: &ReprScalarKind) -> Self {
+        match (self, other) {
+            (Self::I64(a), Self::I64(b)) => {
+                Self::I64(*(a.start().min(b.start()))..=*(a.end().max(b.end())))
+            }
+            (Self::F64(a), Self::F64(b)) => {
+                Self::F64(*(a.start().min(b.start()))..=*(a.end().max(b.end())))
+            }
+            (Self::Serial, Self::Serial) => Self::Serial,
+            (Self::Boolean, Self::Boolean) => Self::Boolean,
+            (Self::Text, Self::Text) => Self::Text,
+            (Self::Text, Self::TextConstant(_)) => Self::Text,
+            (Self::TextConstant(_), Self::Text) => Self::Text,
+            (Self::TextConstant(_), Self::TextConstant(_)) => Self::Text,
+            (Self::Octets, Self::Octets) => Self::Octets,
+            (Self::DateTime, Self::DateTime) => Self::DateTime,
+            _ => Self::Other,
+        }
+    }
+
+    fn to_def_repr(&self) -> DefRepr {
+        match self {
+            Self::I64(_) => DefRepr::I64,
+            Self::F64(_) => DefRepr::F64,
+            Self::Serial => DefRepr::Serial,
+            Self::Boolean => DefRepr::Boolean,
+            Self::Text => DefRepr::Text,
+            Self::TextConstant(_) => DefRepr::Unit,
+            Self::Octets => DefRepr::Octets,
+            Self::DateTime => DefRepr::DateTime,
+            Self::Other => DefRepr::Unknown,
+        }
+    }
+
+    /// saturate this scalar so it doesn't turn out to be a Unit
+    pub fn saturate(&self) -> Self {
+        match self {
+            Self::TextConstant(_) => Self::Text,
+            _ => self.clone(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
