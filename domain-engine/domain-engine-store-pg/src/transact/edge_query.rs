@@ -13,7 +13,7 @@ use crate::{
     sql::{self, Path},
 };
 
-use super::{query::QueryBuildCtx, TransactCtx};
+use super::{cache::PgCache, query::QueryBuildCtx, TransactCtx};
 
 #[derive(Clone, Copy, Debug)]
 pub enum CardinalSelect<'a> {
@@ -85,12 +85,12 @@ impl<'a> TransactCtx<'a> {
     /// produces a cartesian product-UNION ALL using recursion
     pub(super) fn sql_select_edge_cardinals(
         &self,
-        cardinal_idx: CardinalIdx,
-        pg_proj: &PgEdgeProjection<'a>,
+        (cardinal_idx, pg_proj): (CardinalIdx, &PgEdgeProjection<'a>),
         select: CardinalSelect,
         variant_builder: EdgeUnionVariantSelectBuilder<'a>,
         union_builder: &mut EdgeUnionSelectBuilder<'a>,
-        ctx: &mut QueryBuildCtx<'a>,
+        query_ctx: &mut QueryBuildCtx<'a>,
+        cache: &mut PgCache,
     ) -> DomainResult<()> {
         let Some(pg_cardinal) = pg_proj.pg_edge.table.edge_cardinals.get(&cardinal_idx) else {
             self.finalize(pg_proj, variant_builder, union_builder);
@@ -114,12 +114,12 @@ impl<'a> TransactCtx<'a> {
                 // FIXME: select more than one non-parameter cardinal, but CardinalSelect model has to improve
                 if cardinal_idx == pg_proj.subject_index || cardinal_idx != pg_proj.object_index {
                     return self.sql_select_edge_cardinals(
-                        next_cardinal_idx(cardinal_idx),
-                        pg_proj,
+                        (next_cardinal_idx(cardinal_idx), pg_proj),
                         select,
                         variant_builder,
                         union_builder,
-                        ctx,
+                        query_ctx,
+                        cache,
                     );
                 }
 
@@ -139,11 +139,10 @@ impl<'a> TransactCtx<'a> {
                             };
 
                             let pg_id = pg_def.pg.table.column(&target_entity.id_prop)?;
-                            let leaf_alias = ctx.alias.incr();
+                            let leaf_alias = query_ctx.alias.incr();
 
                             self.sql_select_edge_cardinals(
-                                next_cardinal_idx(cardinal_idx),
-                                pg_proj,
+                                (next_cardinal_idx(cardinal_idx), pg_proj),
                                 select,
                                 variant_builder.append(EdgeUnionCardinalVariantSelect::Vertex {
                                     expr: sql::Expr::Row(vec![
@@ -166,7 +165,8 @@ impl<'a> TransactCtx<'a> {
                                     ))),
                                 }),
                                 union_builder,
-                                ctx,
+                                query_ctx,
+                                cache,
                             )?;
                         }
                     }
@@ -182,11 +182,11 @@ impl<'a> TransactCtx<'a> {
                                     target_def_id,
                                     &struct_select.properties,
                                     pg_def.pg,
-                                    ctx,
+                                    query_ctx,
+                                    cache,
                                 )?;
                             self.sql_select_edge_cardinals(
-                                next_cardinal_idx(cardinal_idx),
-                                pg_proj,
+                                (next_cardinal_idx(cardinal_idx), pg_proj),
                                 select,
                                 variant_builder.append(EdgeUnionCardinalVariantSelect::Vertex {
                                     expr: sql::Expr::arc(sql::Expr::Row(expressions)),
@@ -205,7 +205,8 @@ impl<'a> TransactCtx<'a> {
                                     ))),
                                 }),
                                 union_builder,
-                                ctx,
+                                query_ctx,
+                                cache,
                             )?;
                         }
                     }
@@ -234,14 +235,14 @@ impl<'a> TransactCtx<'a> {
                 )?;
 
                 return self.sql_select_edge_cardinals(
-                    next_cardinal_idx(cardinal_idx),
-                    pg_proj,
+                    (next_cardinal_idx(cardinal_idx), pg_proj),
                     select,
                     variant_builder.append(EdgeUnionCardinalVariantSelect::Parameters {
                         expr: sql::Expr::arc(sql::Expr::Row(sql_expressions)),
                     }),
                     union_builder,
-                    ctx,
+                    query_ctx,
+                    cache,
                 );
             }
         }

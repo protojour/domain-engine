@@ -19,8 +19,10 @@ use crate::{
 };
 
 use super::{
+    cache::PgCache,
     data::{Data, RowValue},
     edge_patch::{EdgeEndoTuplePatch, EdgePatches},
+    query::Query,
     MutationMode, TransactCtx,
 };
 
@@ -38,6 +40,7 @@ impl<'a> TransactCtx<'a> {
         &'s self,
         value: InDomain<Value>,
         select: &'s Select,
+        cache: &mut PgCache,
     ) -> DomainResult<Value> {
         let def_id = value.type_def_id();
         let def = self.ontology.def(def_id);
@@ -50,7 +53,11 @@ impl<'a> TransactCtx<'a> {
             .ok_or_else(|| DomainErrorKind::EntityNotFound.into_error())?;
 
         let key = self
-            .update_datatable(value, UpdateCondition::FieldEq(entity.id_prop, entity_id))
+            .update_datatable(
+                value,
+                UpdateCondition::FieldEq(entity.id_prop, entity_id),
+                cache,
+            )
             .await?;
 
         let query_select = match select {
@@ -60,8 +67,18 @@ impl<'a> TransactCtx<'a> {
         };
 
         let row = collect_one_row_value(
-            self.query(def_id, false, 1, None, Some(key), Some(query_select))
-                .await?,
+            self.query(
+                def_id,
+                Query {
+                    include_total_len: false,
+                    limit: 1,
+                    after_cursor: None,
+                    native_id_condition: Some(key),
+                },
+                Some(query_select),
+                cache,
+            )
+            .await?,
         )
         .await?;
 
@@ -72,6 +89,7 @@ impl<'a> TransactCtx<'a> {
         &'s self,
         value: InDomain<Value>,
         update_condition: UpdateCondition,
+        cache: &mut PgCache,
     ) -> DomainResult<PgDataKey> {
         let def_id = value.type_def_id();
         let def = self.ontology.def(def_id);
@@ -225,7 +243,7 @@ impl<'a> TransactCtx<'a> {
 
         if key_rows.len() == 1 {
             let key = key_rows[0].get(0);
-            self.patch_edges(pg.table, key, edge_patches).await?;
+            self.patch_edges(pg.table, key, edge_patches, cache).await?;
 
             Ok(key)
         } else {

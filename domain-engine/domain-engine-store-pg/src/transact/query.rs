@@ -25,6 +25,7 @@ use crate::{
 };
 
 use super::{
+    cache::PgCache,
     data::RowValue,
     edge_query::{
         CardinalSelect, EdgeUnionSelectBuilder, EdgeUnionVariantSelectBuilder, PgEdgeProjection,
@@ -74,10 +75,18 @@ pub enum IncludeJoinedAttrs {
     No,
 }
 
+pub struct Query {
+    pub include_total_len: bool,
+    pub limit: usize,
+    pub after_cursor: Option<Cursor>,
+    pub native_id_condition: Option<PgDataKey>,
+}
+
 impl<'a> TransactCtx<'a> {
     pub async fn query_vertex<'s>(
         &'s self,
         entity_select: &'s EntitySelect,
+        cache: &mut PgCache,
     ) -> DomainResult<impl Stream<Item = DomainResult<QueryFrame>> + '_> {
         let struct_select = match &entity_select.source {
             StructOrUnionSelect::Struct(struct_select) => struct_select,
@@ -92,11 +101,14 @@ impl<'a> TransactCtx<'a> {
 
         self.query(
             struct_select.def_id,
-            entity_select.include_total_len,
-            entity_select.limit,
-            after_cursor,
-            None,
+            Query {
+                include_total_len: entity_select.include_total_len,
+                limit: entity_select.limit,
+                after_cursor,
+                native_id_condition: None,
+            },
             Some(QuerySelect::Struct(&struct_select.properties)),
+            cache,
         )
         .await
     }
@@ -104,20 +116,18 @@ impl<'a> TransactCtx<'a> {
     pub async fn query<'s>(
         &'s self,
         def_id: DefId,
-        include_total_len: bool,
-        limit: usize,
-        after_cursor: Option<Cursor>,
-        native_id_condition: Option<PgDataKey>,
+        q: Query,
         query_select: Option<QuerySelect<'s>>,
+        cache: &mut PgCache,
     ) -> DomainResult<impl Stream<Item = DomainResult<QueryFrame>> + 's> {
-        debug!("after cursor: {after_cursor:?}");
+        debug!("after cursor: {:?}", q.after_cursor);
 
         let pg = self
             .pg_model
             .pg_domain_datatable(def_id.package_id(), def_id)?;
 
         let mut row_layout: Vec<Layout> = vec![];
-        let mut ctx = QueryBuildCtx::default();
+        let mut query_ctx = QueryBuildCtx::default();
 
         let mut sql_select = {
             let mut expressions = sql::Expressions {
@@ -125,15 +135,20 @@ impl<'a> TransactCtx<'a> {
                 multiline: true,
             };
 
-            if include_total_len {
+            if q.include_total_len {
                 expressions.items.push(sql::Expr::CountStarOver);
                 row_layout.push(Layout::Scalar(PgType::BigInt));
             }
 
             let (from, _alias, tail_expressions) = match query_select {
-                Some(QuerySelect::Struct(properties)) => {
-                    self.sql_select_vertex_expressions_with_alias(def_id, properties, pg, &mut ctx)?
-                }
+                Some(QuerySelect::Struct(properties)) => self
+                    .sql_select_vertex_expressions_with_alias(
+                        def_id,
+                        properties,
+                        pg,
+                        &mut query_ctx,
+                        cache,
+                    )?,
                 Some(QuerySelect::Field(prop_id)) => {
                     let mut fields: Vec<_> = self.initial_standard_data_fields(pg).into();
                     fields.push(sql::Expr::path1(
@@ -150,13 +165,13 @@ impl<'a> TransactCtx<'a> {
             expressions.items.extend(tail_expressions);
 
             sql::Select {
-                with: ctx.with(),
+                with: query_ctx.with(),
                 expressions,
                 from: vec![from],
                 where_: None,
                 limit: sql::Limit {
-                    limit: Some(limit + 1),
-                    offset: match &after_cursor {
+                    limit: Some(q.limit + 1),
+                    offset: match &q.after_cursor {
                         Some(Cursor::Offset(offset)) => Some(*offset),
                         _ => None,
                     },
@@ -166,7 +181,7 @@ impl<'a> TransactCtx<'a> {
 
         let mut select_params: Vec<SqlVal> = vec![];
 
-        if let Some(native_id_condition) = native_id_condition {
+        if let Some(native_id_condition) = q.native_id_condition {
             sql_select.where_ = Some(sql::Expr::eq(sql::Expr::path1("_key"), sql::Expr::param(0)));
             select_params.push(SqlVal::I64(native_id_condition));
         }
@@ -192,7 +207,7 @@ impl<'a> TransactCtx<'a> {
                 let row = row_result.map_err(PgError::SelectRow)?;
                 let mut row_iter = SqlColumnStream::new(&row);
 
-                if include_total_len {
+                if q.include_total_len {
                     // must read this for every row if include_total_len was true
                     total_len = Some(
                         row_iter
@@ -200,7 +215,7 @@ impl<'a> TransactCtx<'a> {
                     );
                 }
 
-                if observed_rows < limit {
+                if observed_rows < q.limit {
                     let row_value = self.read_row_value_as_vertex(row_iter, query_select, IncludeJoinedAttrs::Yes, DataOperation::Queried)?;
                     trace!("query returned row value {:?}", row_value.value);
                     yield QueryFrame::Row(row_value);
@@ -214,7 +229,7 @@ impl<'a> TransactCtx<'a> {
             }
 
             let end_cursor = if observed_values > 0 {
-                let original_offset = match &after_cursor {
+                let original_offset = match &q.after_cursor {
                     Some(Cursor::Offset(offset)) => *offset,
                     None => 0,
                 };
@@ -239,31 +254,31 @@ impl<'a> TransactCtx<'a> {
         def_id: DefId,
         properties: &FnvHashMap<PropId, Select>,
         pg: PgDomainTable<'a>,
-        ctx: &mut QueryBuildCtx<'a>,
+        query_ctx: &mut QueryBuildCtx<'a>,
+        cache: &mut PgCache,
     ) -> DomainResult<(sql::FromItem<'a>, sql::Alias, Vec<sql::Expr<'a>>)> {
         let def = self.ontology.def(def_id);
 
         // select data properties
         let mut sql_expressions = vec![];
-        let data_alias = self.select_inherent_fields_as_alias(def, pg, ctx)?;
+        let data_alias = self.select_inherent_fields_as_alias((def, pg), query_ctx)?;
         sql_expressions.push(sql::Expr::path2(data_alias, sql::PathSegment::Asterisk));
 
         self.sql_select_abstract_properties(
-            def,
+            (def, pg),
             data_alias,
             properties,
-            pg,
-            ctx,
+            query_ctx,
             &mut sql_expressions,
         )?;
 
         self.sql_select_edge_properties(
-            def,
+            (def, pg),
             data_alias,
             properties,
-            pg,
-            ctx,
+            query_ctx,
             &mut sql_expressions,
+            cache,
         )?;
 
         Ok((
@@ -275,12 +290,11 @@ impl<'a> TransactCtx<'a> {
 
     fn sql_select_abstract_properties(
         &self,
-        def: &Def,
+        (def, pg): (&Def, PgDomainTable<'a>),
         parent_alias: sql::Alias,
         // currently abstract properties are selected unconditionally
         _properties: &FnvHashMap<PropId, Select>,
-        pg: PgDomainTable<'a>,
-        ctx: &mut QueryBuildCtx<'a>,
+        query_ctx: &mut QueryBuildCtx<'a>,
         output: &mut Vec<sql::Expr<'a>>,
     ) -> DomainResult<()> {
         // TODO: The abstract props can be cached in PgTable
@@ -305,7 +319,7 @@ impl<'a> TransactCtx<'a> {
                         let sub_pg = self
                             .pg_model
                             .pg_domain_datatable(sub_def_id.package_id(), sub_def_id)?;
-                        let sub_alias = ctx.alias.incr();
+                        let sub_alias = query_ctx.alias.incr();
 
                         let mut record_items: Vec<_> =
                             self.initial_standard_data_fields(sub_pg).into();
@@ -318,11 +332,10 @@ impl<'a> TransactCtx<'a> {
                         )?;
 
                         self.sql_select_abstract_properties(
-                            sub_def,
+                            (sub_def, sub_pg),
                             sub_alias,
                             &Default::default(),
-                            sub_pg,
-                            ctx,
+                            query_ctx,
                             &mut record_items,
                         )?;
 
@@ -382,12 +395,12 @@ impl<'a> TransactCtx<'a> {
 
     pub fn sql_select_edge_properties(
         &self,
-        def: &Def,
+        (def, pg): (&Def, PgDomainTable<'a>),
         data_alias: sql::Alias,
         properties: &FnvHashMap<PropId, Select>,
-        pg: PgDomainTable<'a>,
-        ctx: &mut QueryBuildCtx<'a>,
+        query_ctx: &mut QueryBuildCtx<'a>,
         output: &mut Vec<sql::Expr<'a>>,
+        cache: &mut PgCache,
     ) -> DomainResult<()> {
         for (prop_id, select) in properties {
             let Some(rel_info) = def.data_relationships.get(prop_id) else {
@@ -397,7 +410,7 @@ impl<'a> TransactCtx<'a> {
                 continue;
             };
 
-            let edge_alias = ctx.alias.incr();
+            let edge_alias = query_ctx.alias.incr();
             let edge_info = self.ontology.find_edge(proj.id).unwrap();
             let pg_edge = self.pg_model.pg_domain_edgetable(&proj.id)?;
             let pg_subj_cardinal = pg_edge.table.edge_cardinal(proj.subject)?;
@@ -418,12 +431,12 @@ impl<'a> TransactCtx<'a> {
             let mut union_builder = EdgeUnionSelectBuilder::default();
 
             self.sql_select_edge_cardinals(
-                CardinalIdx(0),
-                &pg_proj,
+                (CardinalIdx(0), &pg_proj),
                 cardinal_select,
                 EdgeUnionVariantSelectBuilder::default(),
                 &mut union_builder,
-                ctx,
+                query_ctx,
+                cache,
             )?;
 
             let mut union_iter = union_builder.union_exprs.into_iter();
@@ -461,14 +474,13 @@ impl<'a> TransactCtx<'a> {
 
     fn select_inherent_fields_as_alias(
         &self,
-        def: &Def,
-        pg: PgDomainTable<'a>,
-        ctx: &mut QueryBuildCtx<'a>,
+        (def, pg): (&Def, PgDomainTable<'a>),
+        query_ctx: &mut QueryBuildCtx<'a>,
     ) -> DomainResult<sql::Alias> {
-        if let Some(with_alias) = ctx.with_def_aliases.get(&def.id) {
+        if let Some(with_alias) = query_ctx.with_def_aliases.get(&def.id) {
             Ok(*with_alias)
         } else {
-            let with_alias = ctx.alias.incr();
+            let with_alias = query_ctx.alias.incr();
 
             let mut expressions = sql::Expressions {
                 items: self.initial_standard_data_fields(pg).into(),
@@ -477,7 +489,7 @@ impl<'a> TransactCtx<'a> {
 
             self.select_inherent_struct_fields(def, pg.table, &mut expressions.items, None)?;
 
-            ctx.with_queries.push(sql::WithQuery {
+            query_ctx.with_queries.push(sql::WithQuery {
                 name: sql::Name::Alias(with_alias),
                 column_names: vec![],
                 stmt: sql::Stmt::Select(sql::Select {
@@ -487,7 +499,7 @@ impl<'a> TransactCtx<'a> {
                 }),
             });
 
-            ctx.with_def_aliases.insert(def.id, with_alias);
+            query_ctx.with_def_aliases.insert(def.id, with_alias);
 
             Ok(with_alias)
         }

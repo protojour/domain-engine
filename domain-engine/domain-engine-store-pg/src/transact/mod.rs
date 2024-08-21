@@ -1,6 +1,6 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use cache::StatementCache;
+use cache::PgCache;
 use domain_engine_core::{
     object_generator::ObjectGenerator,
     system::SystemAPI,
@@ -54,7 +54,6 @@ struct TransactCtx<'a> {
     pg_model: &'a PgModel,
     ontology: &'a Ontology,
     system: &'a (dyn SystemAPI + Send + Sync),
-    stmt_cache: Mutex<StatementCache>,
     connection_state: ConnectionState<'a>,
 }
 
@@ -66,10 +65,12 @@ impl<'a> TransactCtx<'a> {
         }
     }
 
-    pub fn stmt_cache_locked<T>(&self, func: impl FnOnce(&mut StatementCache) -> T) -> T {
+    /*
+    pub fn stmt_cache_locked<T>(&self, func: impl FnOnce(&mut PgCache) -> T) -> T {
         let mut lock = self.stmt_cache.lock().unwrap();
         func(&mut lock)
     }
+    */
 
     /// Look up ontology def and PG data for the given def_id
     pub fn lookup_def(&self, def_id: DefId) -> DomainResult<PgDef<'a>> {
@@ -130,6 +131,7 @@ pub async fn transact(
         .map_err(|e| PgError::DbConnectionAcquire(e.into()))?;
 
     Ok(async_stream::try_stream! {
+        let mut cache = PgCache::default();
         let connection_state = match mode {
             TransactionMode::ReadOnly | TransactionMode::ReadWrite => {
                 ConnectionState::NonAtomic(connection)
@@ -152,7 +154,6 @@ pub async fn transact(
             pg_model: &store.pg_model,
             ontology: &store.ontology,
             system: store.system.as_ref(),
-            stmt_cache: Mutex::new(StatementCache::default()),
             connection_state
         };
 
@@ -161,9 +162,9 @@ pub async fn transact(
         for await message in messages {
             match message? {
                 ReqMessage::Query(op_seq, entity_select) => {
-                    ctx.stmt_cache.lock().unwrap().clear_select_dependent();
+                    cache.clear_select_dependent();
                     state = None;
-                    let stream = ctx.query_vertex(&entity_select).await?;
+                    let stream = ctx.query_vertex(&entity_select, &mut cache).await?;
 
                     yield RespMessage::SequenceStart(op_seq);
 
@@ -179,25 +180,25 @@ pub async fn transact(
                     }
                 }
                 ReqMessage::Insert(op_seq, select) => {
-                    ctx.stmt_cache.lock().unwrap().clear_select_dependent();
+                    cache.clear_select_dependent();
                     for msg in write_state(op_seq, State::Insert(op_seq, select), &mut state) {
                         yield msg;
                     }
                 }
                 ReqMessage::Update(op_seq, select) => {
-                    ctx.stmt_cache.lock().unwrap().clear_select_dependent();
+                    cache.clear_select_dependent();
                     for msg in write_state(op_seq, State::Update(op_seq, select), &mut state) {
                         yield msg;
                     }
                 }
                 ReqMessage::Upsert(op_seq, select) => {
-                    ctx.stmt_cache.lock().unwrap().clear_select_dependent();
+                    cache.clear_select_dependent();
                     for msg in write_state(op_seq, State::Upsert(op_seq, select), &mut state) {
                         yield msg;
                     }
                 }
                 ReqMessage::Delete(op_seq, def_id) => {
-                    ctx.stmt_cache.lock().unwrap().clear_select_dependent();
+                    cache.clear_select_dependent();
                     for msg in write_state(op_seq, State::Delete(op_seq, def_id), &mut state) {
                         yield msg;
                     }
@@ -208,21 +209,21 @@ pub async fn transact(
                             ObjectGenerator::new(ProcessorMode::Create, ctx.ontology, ctx.system)
                                 .generate_objects(&mut value);
 
-                            let row = ctx.insert_vertex(value.into(), InsertMode::Insert, select).await?;
+                            let row = ctx.insert_vertex(value.into(), InsertMode::Insert, select, &mut cache).await?;
                             yield RespMessage::Element(row.value, row.op);
                         }
                         Some(State::Update(_, select)) => {
                             ObjectGenerator::new(ProcessorMode::Update, ctx.ontology, ctx.system)
                                 .generate_objects(&mut value);
 
-                            let value = ctx.update_vertex_with_select(value.into(), select).await?;
+                            let value = ctx.update_vertex_with_select(value.into(), select, &mut cache).await?;
                             yield RespMessage::Element(value, DataOperation::Updated);
                         }
                         Some(State::Upsert(_, select)) => {
                             ObjectGenerator::new(ProcessorMode::Create, ctx.ontology, ctx.system)
                                 .generate_objects(&mut value);
 
-                            let row = ctx.insert_vertex(value.into(), InsertMode::Upsert, select).await?;
+                            let row = ctx.insert_vertex(value.into(), InsertMode::Upsert, select, &mut cache).await?;
                             yield RespMessage::Element(row.value, row.op);
                         }
                         Some(State::Delete(_, def_id)) => {

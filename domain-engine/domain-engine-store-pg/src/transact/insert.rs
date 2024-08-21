@@ -28,6 +28,7 @@ use crate::{
 };
 
 use super::{
+    cache::PgCache,
     data::{Data, RowValue},
     edge_patch::{EdgeEndoTuplePatch, EdgePatches},
     query::{QueryBuildCtx, QuerySelect},
@@ -49,36 +50,36 @@ struct AnalyzedInput<'a, 'b> {
 
 impl<'a> TransactCtx<'a> {
     /// Returns BoxFuture because of potential recursion
-    pub fn insert_vertex(
-        &self,
+    pub fn insert_vertex<'s>(
+        &'s self,
         value: InDomain<Value>,
         mode: InsertMode,
         select: &'a Select,
+        cache: &'s mut PgCache,
     ) -> BoxFuture<'_, DomainResult<RowValue>> {
         Box::pin(async move {
             let _def_id = value.value.type_def_id();
-            self.insert_vertex_impl(value, mode, select)
+            self.insert_vertex_impl(value, mode, select, cache)
                 // .instrument(debug_span!("ins", id = ?def_id))
                 .await
         })
     }
 
-    async fn insert_vertex_impl(
-        &self,
+    async fn insert_vertex_impl<'s>(
+        &'s self,
         mut value: InDomain<Value>,
         mode: InsertMode,
         select: &'a Select,
+        cache: &'s mut PgCache,
     ) -> DomainResult<RowValue> {
         let pkg_id = value.pkg_id;
         let def_id = value.value.type_def_id();
 
-        let prepared = if let Some(prepared) =
-            self.stmt_cache_locked(|c| c.insert.get(&(pkg_id, def_id)).cloned())
-        {
+        let prepared = if let Some(prepared) = cache.insert.get(&(pkg_id, def_id)).cloned() {
             prepared
         } else {
-            let prepared = self.prepare_insert(pkg_id, def_id, select).await?;
-            self.stmt_cache_locked(|c| c.insert.insert((pkg_id, def_id), prepared.clone()));
+            let prepared = self.prepare_insert(pkg_id, def_id, select, cache).await?;
+            cache.insert.insert((pkg_id, def_id), prepared.clone());
             prepared
         };
 
@@ -95,11 +96,11 @@ impl<'a> TransactCtx<'a> {
             )
             .await?;
 
-        self.patch_edges(pg_table, row_value.data_key, analyzed.edges)
+        self.patch_edges(pg_table, row_value.data_key, analyzed.edges, cache)
             .await?;
 
         for (prop_id, value) in analyzed.sub_values {
-            self.insert_sub_value((prop_id, row_value.data_key), value)
+            self.insert_sub_value((prop_id, row_value.data_key), value, cache)
                 .await?;
         }
 
@@ -129,29 +130,31 @@ impl<'a> TransactCtx<'a> {
         Ok(row_value)
     }
 
-    fn insert_sub_value(
-        &self,
+    fn insert_sub_value<'s>(
+        &'s self,
         parent: (PropId, PgDataKey),
         value: Value,
+        cache: &'s mut PgCache,
     ) -> BoxFuture<'_, DomainResult<()>> {
-        Box::pin(self.insert_sub_value_impl(parent, value))
+        Box::pin(self.insert_sub_value_impl(parent, value, cache))
     }
 
     async fn insert_sub_value_impl(
         &self,
         parent: (PropId, PgDataKey),
         value: Value,
+        cache: &mut PgCache,
     ) -> DomainResult<()> {
         let pkg_id = value.type_def_id().0;
         let def_id = value.type_def_id();
 
-        let prepared = if let Some(prepared) =
-            self.stmt_cache_locked(|c| c.insert.get(&(pkg_id, def_id)).cloned())
-        {
+        let prepared = if let Some(prepared) = cache.insert.get(&(pkg_id, def_id)).cloned() {
             prepared
         } else {
-            let prepared = self.prepare_insert(pkg_id, def_id, &Select::Unit).await?;
-            self.stmt_cache_locked(|c| c.insert.insert((pkg_id, def_id), prepared.clone()));
+            let prepared = self
+                .prepare_insert(pkg_id, def_id, &Select::Unit, cache)
+                .await?;
+            cache.insert.insert((pkg_id, def_id), prepared.clone());
             prepared
         };
 
@@ -167,11 +170,11 @@ impl<'a> TransactCtx<'a> {
             )
             .await?;
 
-        self.patch_edges(pg_table, row_value.data_key, analyzed.edges)
+        self.patch_edges(pg_table, row_value.data_key, analyzed.edges, cache)
             .await?;
 
         for (prop_id, value) in analyzed.sub_values {
-            self.insert_sub_value((prop_id, row_value.data_key), value)
+            self.insert_sub_value((prop_id, row_value.data_key), value, cache)
                 .await?;
         }
 
@@ -219,13 +222,14 @@ impl<'a> TransactCtx<'a> {
         pkg_id: PackageId,
         def_id: DefId,
         select: &'a Select,
+        cache: &mut PgCache,
     ) -> DomainResult<PreparedInsert> {
         let def = self.ontology.def(def_id);
         let pg = self.pg_model.pg_domain_datatable(pkg_id, def_id)?;
 
-        let mut ctx = QueryBuildCtx::default();
-        let root_alias = ctx.alias;
-        ctx.with_def_aliases.insert(def_id, root_alias);
+        let mut query_ctx = QueryBuildCtx::default();
+        let root_alias = query_ctx.alias;
+        query_ctx.with_def_aliases.insert(def_id, root_alias);
 
         let mut edge_select_stmt: Option<PreparedStatement> = None;
 
@@ -286,12 +290,12 @@ impl<'a> TransactCtx<'a> {
                     };
 
                     self.sql_select_edge_properties(
-                        def,
+                        (def, pg),
                         root_alias,
                         &sel.properties,
-                        pg,
                         &mut ctx,
                         &mut expressions.items,
+                        cache,
                     )?;
 
                     if !expressions.items.is_empty() {
@@ -328,7 +332,7 @@ impl<'a> TransactCtx<'a> {
         };
 
         let insert = sql::Insert {
-            with: ctx.with(),
+            with: query_ctx.with(),
             into: pg.table_name(),
             as_: None,
             column_names,

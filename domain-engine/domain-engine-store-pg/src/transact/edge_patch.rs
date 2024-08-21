@@ -29,7 +29,7 @@ use crate::{
     CountRows, IgnoreRows,
 };
 
-use super::{MutationMode, TransactCtx};
+use super::{cache::PgCache, MutationMode, TransactCtx};
 
 #[derive(Default, Debug)]
 pub struct EdgePatches {
@@ -122,11 +122,12 @@ impl<'a> TransactCtx<'a> {
         subject_datatable: &PgTable,
         subject_data_key: PgDataKey,
         patches: EdgePatches,
+        cache: &mut PgCache,
     ) -> DomainResult<()> {
         // debug!("patch edges: {patches:#?}");
 
         for (edge_id, patch) in patches.patches {
-            self.patch_edge(edge_id, subject_datatable, subject_data_key, patch)
+            self.patch_edge(edge_id, subject_datatable, subject_data_key, patch, cache)
                 .await?;
         }
 
@@ -139,6 +140,7 @@ impl<'a> TransactCtx<'a> {
         subject_datatable: &PgTable,
         subject_data_key: PgDataKey,
         patch: ProjectedEdgePatch,
+        cache: &mut PgCache,
     ) -> DomainResult<()> {
         let subject_index = patch.subject;
         let pg_edge = self.pg_model.pg_domain_edgetable(&edge_id)?;
@@ -284,21 +286,21 @@ impl<'a> TransactCtx<'a> {
             }) {
                 self.update_edge(
                     pg_edge,
-                    subject_datatable,
-                    subject_data_key,
+                    (subject_datatable, subject_data_key),
                     &analysis,
                     tuple,
                     &mut param_buf,
+                    cache,
                 )
                 .await?;
             } else {
                 self.insert_edge(
-                    subject_datatable,
-                    subject_data_key,
+                    (subject_datatable, subject_data_key),
                     &analysis,
                     tuple,
                     &mut param_buf,
                     insert_sql.get_or_insert_with(|| sql_insert.to_string()),
+                    cache,
                 )
                 .await?;
             }
@@ -395,12 +397,12 @@ impl<'a> TransactCtx<'a> {
 
     async fn insert_edge<'s>(
         &'s self,
-        subject_datatable: &PgTable,
-        subject_data_key: PgDataKey,
+        (subject_datatable, subject_data_key): (&PgTable, PgDataKey),
         analysis: &EdgeAnalysis<'s>,
         tuple: EdgeEndoTuplePatch,
         param_buf: &mut Vec<SqlVal<'s>>,
         insert_sql: &str,
+        cache: &mut PgCache,
     ) -> DomainResult<()> {
         let mut element_iter = tuple.into_element_ops();
 
@@ -418,7 +420,7 @@ impl<'a> TransactCtx<'a> {
                 ProjectedEdgeCardinal::Object(.., dynamic) => {
                     let (value, mode) = element_iter.next().unwrap();
                     let (foreign_def_id, _, foreign_key) = self
-                        .resolve_linked_vertex(value, mode, Select::EntityId)
+                        .resolve_linked_vertex(value, mode, Select::EntityId, cache)
                         .await?;
 
                     if matches!(dynamic, Dynamic::Yes { .. }) {
@@ -477,11 +479,11 @@ impl<'a> TransactCtx<'a> {
     async fn update_edge<'s>(
         &'s self,
         pg_edge: PgDomainTable<'_>,
-        subject_datatable: &PgTable,
-        subject_data_key: PgDataKey,
+        (subject_datatable, subject_data_key): (&PgTable, PgDataKey),
         analysis: &EdgeAnalysis<'s>,
         tuple: EdgeEndoTuplePatch,
         param_buf: &mut Vec<SqlVal<'s>>,
+        cache: &mut PgCache,
     ) -> DomainResult<()> {
         let mut element_iter = tuple.into_element_ops();
 
@@ -508,7 +510,7 @@ impl<'a> TransactCtx<'a> {
                     // for objects, the edge itself is not updated
                     let (value, mode) = element_iter.next().unwrap();
                     let (foreign_def_id, foreign_def_key, foreign_data_key) = self
-                        .resolve_linked_vertex(value, mode, Select::EntityId)
+                        .resolve_linked_vertex(value, mode, Select::EntityId, cache)
                         .await?;
 
                     match mode {
@@ -575,23 +577,26 @@ impl<'a> TransactCtx<'a> {
         }
 
         let stmt = self
-            .edge_update_stmt_cached(if !sql_update.set.is_empty() {
-                sql_update.to_string()
-            } else {
-                // nothing to update, but it should be proven that the edge exists.
-                debug!("nothing to update");
-                let sql_select = sql::Select {
-                    with: None,
-                    expressions: vec![sql::Expr::LiteralInt(0)].into(),
-                    from: vec![pg_edge.table_name().into()],
-                    where_: sql_update.where_,
-                    limit: sql::Limit {
-                        limit: Some(1),
-                        offset: None,
-                    },
-                };
-                sql_select.to_string()
-            })
+            .edge_update_stmt_cached(
+                if !sql_update.set.is_empty() {
+                    sql_update.to_string()
+                } else {
+                    // nothing to update, but it should be proven that the edge exists.
+                    debug!("nothing to update");
+                    let sql_select = sql::Select {
+                        with: None,
+                        expressions: vec![sql::Expr::LiteralInt(0)].into(),
+                        from: vec![pg_edge.table_name().into()],
+                        where_: sql_update.where_,
+                        limit: sql::Limit {
+                            limit: Some(1),
+                            offset: None,
+                        },
+                    };
+                    sql_select.to_string()
+                },
+                cache,
+            )
             .await?;
 
         debug!("{stmt}");
@@ -616,21 +621,26 @@ impl<'a> TransactCtx<'a> {
         }
     }
 
-    async fn edge_update_stmt_cached(&self, sql: String) -> DomainResult<PreparedStatement> {
-        if let Some(stmt) = self.stmt_cache_locked(|c| c.edge_update.get(&sql).cloned()) {
+    async fn edge_update_stmt_cached(
+        &self,
+        sql: String,
+        cache: &mut PgCache,
+    ) -> DomainResult<PreparedStatement> {
+        if let Some(stmt) = cache.edge_update.get(&sql).cloned() {
             Ok(stmt)
         } else {
             let stmt = sql.prepare(self.client()).await?;
-            self.stmt_cache_locked(|c| c.edge_update.insert(stmt.src().clone(), stmt.clone()));
+            cache.edge_update.insert(stmt.src().clone(), stmt.clone());
             Ok(stmt)
         }
     }
 
-    pub async fn resolve_linked_vertex(
-        &self,
+    pub async fn resolve_linked_vertex<'s>(
+        &'s self,
         value: Value,
         mode: MutationMode,
         select: Select,
+        cache: &mut PgCache,
     ) -> DomainResult<(DefId, PgRegKey, PgDataKey)> {
         let def_id = value.type_def_id();
 
@@ -696,6 +706,7 @@ impl<'a> TransactCtx<'a> {
                             },
                             insert_mode,
                             &select,
+                            cache,
                         )
                         .await?
                     }
@@ -718,9 +729,7 @@ impl<'a> TransactCtx<'a> {
                 let stmt = match id_resolve_mode {
                     IdResolveMode::Plain => {
                         let stmt_key = (vertex_def_id, id_prop_id);
-                        if let Some(stmt) =
-                            self.stmt_cache_locked(|c| c.key_by_id.get(&stmt_key).cloned())
-                        {
+                        if let Some(stmt) = cache.key_by_id.get(&stmt_key).cloned() {
                             stmt
                         } else {
                             let stmt = sql::Select {
@@ -739,15 +748,13 @@ impl<'a> TransactCtx<'a> {
                             .prepare(self.client())
                             .await?;
 
-                            self.stmt_cache_locked(|c| c.key_by_id.insert(stmt_key, stmt.clone()));
+                            cache.key_by_id.insert(stmt_key, stmt.clone());
                             stmt
                         }
                     }
                     IdResolveMode::SelfIdentifying => {
                         let stmt_key = vertex_def_id;
-                        if let Some(stmt) = self.stmt_cache_locked(|c| {
-                            c.upsert_self_identifying.get(&stmt_key).cloned()
-                        }) {
+                        if let Some(stmt) = cache.upsert_self_identifying.get(&stmt_key).cloned() {
                             stmt
                         } else {
                             // upsert
@@ -776,9 +783,7 @@ impl<'a> TransactCtx<'a> {
                             .prepare(self.client())
                             .await?;
 
-                            self.stmt_cache_locked(|c| {
-                                c.upsert_self_identifying.insert(stmt_key, stmt.clone())
-                            });
+                            cache.upsert_self_identifying.insert(stmt_key, stmt.clone());
                             stmt
                         }
                     }
