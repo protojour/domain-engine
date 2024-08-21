@@ -44,7 +44,9 @@ impl<'v> juniper::GraphQLValue<GqlScalar> for PageInfoType<'v> {
                     .and_then(|sub_seq| sub_seq.end_cursor.as_ref());
 
                 let value = match end_cursor {
-                    Some(next_cursor) => juniper::Value::Scalar(serialize_cursor(next_cursor)),
+                    Some(next_cursor) => juniper::Value::Scalar(GqlScalar::String(
+                        serialize_cursor(next_cursor).into(),
+                    )),
                     None => juniper::Value::Null,
                 };
 

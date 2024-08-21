@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use juniper::{graphql_value, LookAheadArgument, LookAheadSelection, LookAheadValue};
+use juniper::{LookAheadArgument, LookAheadSelection, LookAheadValue};
 use ontol_runtime::{
     attr::Attr,
     interface::{
@@ -17,6 +17,7 @@ use serde::{
 
 use crate::{
     context::{SchemaCtx, ServiceCtx},
+    field_error,
     gql_scalar::GqlScalar,
 };
 
@@ -50,12 +51,7 @@ impl<'a> ArgsWrapper<'a> {
             Some(look_ahead_arg) => {
                 let value =
                     Option::<T>::deserialize(LookAheadValueDeserializer::from(look_ahead_arg))
-                        .map_err(|error| {
-                            juniper::FieldError::new(
-                                format!("`{name}`: {error}"),
-                                graphql_value!(None),
-                            )
-                        })?;
+                        .map_err(|error| field_error(format!("`{name}`: {error}")))?;
 
                 Ok(value)
             }
@@ -84,17 +80,13 @@ impl<'a> ArgsWrapper<'a> {
             }
             None => {
                 let unlocated_span = juniper::Span::unlocated();
-                let default_value: juniper::LookAheadValue<GqlScalar> =
-                    match field_arg.default_arg() {
-                        Some(DefaultArg::EmptyList) => LookAheadValue::List(Default::default()),
-                        Some(DefaultArg::EmptyObject) => LookAheadValue::Object(Default::default()),
-                        None => {
-                            return Err(juniper::FieldError::new(
-                                format!("argument `{arg_name}` is missing"),
-                                graphql_value!(None),
-                            ))
-                        }
-                    };
+                let default_value: juniper::LookAheadValue<GqlScalar> = match field_arg
+                    .default_arg()
+                {
+                    Some(DefaultArg::EmptyList) => LookAheadValue::List(Default::default()),
+                    Some(DefaultArg::EmptyObject) => LookAheadValue::Object(Default::default()),
+                    None => return Err(field_error(format!("argument `{arg_name}` is missing"))),
+                };
 
                 serde_processor.deserialize(LookAheadValueDeserializer {
                     value: default_value,
@@ -103,7 +95,7 @@ impl<'a> ArgsWrapper<'a> {
             }
         };
 
-        result.map_err(|error| juniper::FieldError::new(error, graphql_value!(None)))
+        result.map_err(field_error)
     }
 
     pub fn deserialize_entity_mutation_args(

@@ -1,13 +1,7 @@
 use base64::Engine;
 
-use crate::gql_scalar::GqlScalar;
-
-pub fn serialize_cursor(cursor: &[u8]) -> GqlScalar {
-    GqlScalar::String(
-        base64::engine::general_purpose::STANDARD
-            .encode(cursor)
-            .into(),
-    )
+pub fn serialize_cursor(cursor: &[u8]) -> String {
+    base64::engine::general_purpose::STANDARD.encode(cursor)
 }
 
 pub struct GraphQLCursor(pub Box<[u8]>);

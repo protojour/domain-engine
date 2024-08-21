@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use fnv::FnvHashMap;
-use juniper::{graphql_value, FieldError};
+use juniper::graphql_value;
 use ontol_runtime::{
     attr::{Attr, AttrMatrixRef, AttrRef},
     interface::{
@@ -27,6 +27,7 @@ use tracing::{trace, trace_span, warn};
 
 use crate::{
     context::{SchemaCtx, SchemaType},
+    field_error,
     gql_scalar::GqlScalar,
     registry_ctx::RegistryCtx,
     templates::{page_info_type::PageInfoType, resolve_schema_type_field},
@@ -378,9 +379,8 @@ impl<'v> AttributeType<'v> {
                     .serde_processor_profile_flags
                     .contains(ProcessorProfileFlags::SERIALIZE_OPEN_DATA)
                 {
-                    return Err(FieldError::new(
+                    return Err(field_error(
                         "open data is not available in this GraphQL context",
-                        graphql_value!(null),
                     ));
                 }
 

@@ -1,7 +1,8 @@
 #![forbid(unsafe_code)]
 
-use std::sync::Arc;
+use std::{fmt::Display, sync::Arc};
 
+use ::juniper::{graphql_value, FieldError};
 use context::{SchemaCtx, SchemaType, ServiceCtx};
 use domain_engine_core::{
     domain_error::DomainErrorKind,
@@ -267,4 +268,8 @@ async fn mutation(
         }
         _ => panic!(),
     }
+}
+
+fn field_error<S>(msg: impl Display) -> FieldError<S> {
+    FieldError::new(msg, graphql_value!(None))
 }

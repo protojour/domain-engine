@@ -1,14 +1,28 @@
 use std::collections::BTreeMap;
 use std::str::FromStr;
 
-use crate::juniper::{self, graphql_object, graphql_value, FieldError, FieldResult};
+use crate::cursor_util::GraphQLCursor;
+use crate::field_error;
+use crate::juniper::{self, graphql_object, FieldResult};
 
+use domain_engine_core::transact::AccumulateSequences;
+use domain_engine_core::transact::ReqMessage;
+use domain_engine_core::transact::TransactionMode;
+use futures_util::StreamExt;
+use futures_util::TryStreamExt;
+use ontol_runtime::query::filter::Filter;
+use ontol_runtime::query::select::EntitySelect;
+use ontol_runtime::query::select::StructOrUnionSelect;
+use ontol_runtime::query::select::StructSelect;
 use ontol_runtime::DefId;
+use serde::de::value::StringDeserializer;
+use serde::Deserialize;
 
 use super::gql_def;
 use super::gql_dictionary;
 use super::gql_dictionary::DefDictionaryEntry;
 use super::gql_domain;
+use super::gql_vertex;
 use super::Ctx;
 
 #[derive(Default)]
@@ -18,7 +32,7 @@ pub struct Query;
 #[graphql(context = Ctx)]
 impl Query {
     fn api_version() -> &'static str {
-        "1.0"
+        "0.1"
     }
 
     fn domain(name: String, ctx: &Ctx) -> FieldResult<gql_domain::Domain> {
@@ -26,19 +40,18 @@ impl Query {
             .domains()
             .find(|(_, d)| ctx.get_text_constant(d.unique_name()).to_string() == name);
         if let Some((id, _)) = domain {
-            Ok(gql_domain::Domain { id: *id })
+            Ok(gql_domain::Domain { pkg_id: *id })
         } else {
-            Err(FieldError::new(
-                "Domain not found",
-                graphql_value!({"internal_error": "Domain not found"}),
-            ))
+            Err(field_error("Domain not found"))
         }
     }
 
     fn domains(ctx: &Ctx) -> FieldResult<Vec<gql_domain::Domain>> {
         let mut domains = vec![];
         for (package_id, _ontology_domain) in ctx.domains() {
-            let domain = gql_domain::Domain { id: *package_id };
+            let domain = gql_domain::Domain {
+                pkg_id: *package_id,
+            };
             domains.push(domain);
         }
         Ok(domains)
@@ -50,10 +63,7 @@ impl Query {
                 return Ok(gql_def::Def { id: def.id });
             }
         }
-        Err(FieldError::new(
-            "TypeInfo not found",
-            graphql_value!({"internal_error": "TypeInfo not found"}),
-        ))
+        Err(field_error("TypeInfo not found"))
     }
 
     fn def_dictionary(ctx: &Ctx) -> Vec<DefDictionaryEntry> {
@@ -75,5 +85,59 @@ impl Query {
                 definitions: defs,
             })
             .collect()
+    }
+
+    async fn vertices(
+        def_id: String,
+        first: i32,
+        after: Option<String>,
+        ctx: &Ctx,
+    ) -> FieldResult<gql_vertex::VertexConnection> {
+        let data_store = ctx.data_store().map_err(field_error)?;
+        let def_id = DefId::from_str(&def_id).map_err(|_| field_error("invalid def id format"))?;
+        let _def = ctx
+            .get_def(def_id)
+            .ok_or_else(|| field_error("invalid def id"))?;
+
+        let messages = [Ok(ReqMessage::Query(
+            0,
+            EntitySelect {
+                source: StructOrUnionSelect::Struct(StructSelect {
+                    def_id,
+                    properties: Default::default(),
+                }),
+                filter: Filter::default(),
+                limit: first.try_into().map_err(field_error)?,
+                after_cursor: match after {
+                    Some(after) => Some(
+                        GraphQLCursor::deserialize(StringDeserializer::<serde_json::Error>::new(
+                            after,
+                        ))?
+                        .0,
+                    ),
+                    None => None,
+                },
+                include_total_len: false,
+            },
+        ))];
+
+        let sequences: Vec<_> = data_store
+            .api()
+            .transact(
+                TransactionMode::ReadOnly,
+                futures_util::stream::iter(messages).boxed(),
+                ctx.session().clone(),
+            )
+            .await?
+            .accumulate_sequences()
+            .try_collect()
+            .await?;
+
+        let sequence = sequences
+            .into_iter()
+            .next()
+            .ok_or_else(|| field_error("nothing returned"))?;
+
+        gql_vertex::VertexConnection::from_sequence(sequence)
     }
 }

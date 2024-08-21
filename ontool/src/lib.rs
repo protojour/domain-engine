@@ -14,6 +14,8 @@ use crossterm::{
     cursor, queue,
     terminal::{Clear, ClearType},
 };
+use domain_engine_core::{DomainEngine, Session};
+use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use notify_debouncer_full::{
     new_debouncer,
     notify::{RecursiveMode, Watcher},
@@ -23,7 +25,7 @@ use ontol_compiler::{
     mem::Mem,
     ontol_syntax::OntolTreeSyntax,
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage},
-    SourceCodeRegistry, Sources,
+    SourceCodeRegistry, SourceId, Sources,
 };
 use ontol_lsp::Backend;
 use ontol_parser::cst_parse;
@@ -372,43 +374,63 @@ fn print_unified_compile_error(
         let span = err_span.span.start as usize..err_span.span.end as usize;
         let message = error.error.to_string();
 
-        let ontol_source = ontol_sources.get_source(err_span.source_id).unwrap();
-        let literal_source = source_code_registry
-            .registry
-            .get(&err_span.source_id)
-            .unwrap();
+        let (source_name, literal_source) =
+            report_source_name(err_span.source_id, ontol_sources, source_code_registry);
 
-        Report::build(ReportKind::Error, ontol_source.name(), span.start)
+        Report::build(ReportKind::Error, &source_name, span.start)
             .with_label(
-                Label::new((ontol_source.name(), span))
+                Label::new((&source_name, span))
                     .with_message(message)
                     .with_color(colors.next()),
             )
             .finish()
-            .eprint((ontol_source.name(), Source::from(literal_source.as_ref())))?;
+            .eprint((&source_name, Source::from(literal_source.as_ref())))?;
 
         for note in error.notes {
+            let note_span = note.span();
             let span = note.span().span.start as usize..note.span().span.end as usize;
             let message = note.into_note().to_string();
 
-            let ontol_source = ontol_sources.get_source(err_span.source_id).unwrap();
-            let literal_source = source_code_registry
-                .registry
-                .get(&err_span.source_id)
-                .unwrap();
+            let (source_name, literal_source) =
+                report_source_name(note_span.source_id, ontol_sources, source_code_registry);
 
-            Report::build(ReportKind::Advice, ontol_source.name(), span.start)
+            Report::build(ReportKind::Advice, &source_name, span.start)
                 .with_label(
-                    Label::new((ontol_source.name(), span))
+                    Label::new((&source_name, span))
                         .with_message(message)
                         .with_color(colors.next()),
                 )
                 .finish()
-                .eprint((ontol_source.name(), Source::from(literal_source.as_ref())))?;
+                .eprint((&source_name, Source::from(literal_source.as_ref())))?;
         }
     }
 
     Ok(())
+}
+
+fn report_source_name(
+    source_id: SourceId,
+    ontol_sources: &Sources,
+    registry: &SourceCodeRegistry,
+) -> (Rc<String>, Rc<String>) {
+    // FIXME: If the error can't be mapped to a source file,
+    // things will look quite strange. Fix later..
+    match ontol_sources.get_source(source_id) {
+        Some(ontol_source) => {
+            let literal_source = registry.registry.get(&source_id);
+
+            (
+                ontol_source.name.clone(),
+                literal_source
+                    .cloned()
+                    .unwrap_or_else(|| Rc::new("<ontol>".to_string())),
+            )
+        }
+        None => {
+            let ontol = Rc::new("<ontol>".to_string());
+            (ontol.clone(), ontol)
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -520,8 +542,16 @@ struct DynamicRouters {
 
 async fn reload_routes(ontology: Ontology, dyn_routers: &DynamicRouters, base_url: &str) {
     let ontology = Arc::new(ontology);
-    let o = ontology_router(ontology.clone(), &format!("{base_url}/o"));
-    let d = domains_router(ontology, &format!("{base_url}/d")).await;
+    let domain_engine = Arc::new(
+        DomainEngine::builder(ontology.clone())
+            .system(Box::<System>::default())
+            .build(InMemoryDataStoreFactory, Session::default())
+            .await
+            .unwrap(),
+    );
+
+    let o = ontology_router(domain_engine.clone(), &format!("{base_url}/o"));
+    let d = domains_router(domain_engine, &format!("{base_url}/d")).await;
 
     *(dyn_routers.ontology.lock().unwrap()) = Some(o);
     *(dyn_routers.domains.lock().unwrap()) = Some(d);

@@ -15,23 +15,15 @@ use domain_engine_graphql::{
     ontology_schema::{Ctx, OntologySchema},
     CreateSchemaError,
 };
-use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use juniper_axum::extract::JuniperRequest;
-use ontol_runtime::{ontology::Ontology, PackageId};
+use ontol_runtime::PackageId;
 use reqwest::header::HeaderName;
 use tracing::info;
 
 /// All the domains routed by domain name
-pub async fn domains_router(ontology: Arc<Ontology>, base_url: &str) -> axum::Router {
-    let engine = Arc::new(
-        DomainEngine::builder(ontology.clone())
-            .system(Box::<System>::default())
-            .build(InMemoryDataStoreFactory, Session::default())
-            .await
-            .unwrap(),
-    );
-
+pub async fn domains_router(domain_engine: Arc<DomainEngine>, base_url: &str) -> axum::Router {
     let mut router: axum::Router = axum::Router::new();
+    let ontology = domain_engine.ontology();
 
     for (package_id, domain) in ontology
         .domains()
@@ -43,7 +35,7 @@ pub async fn domains_router(ontology: Arc<Ontology>, base_url: &str) -> axum::Ro
         );
         router = router.nest(
             &domain_path,
-            domain_router(engine.clone(), &domain_path, *package_id).unwrap(),
+            domain_router(domain_engine.clone(), &domain_path, *package_id).unwrap(),
         );
 
         info!("Domain {package_id:?} served under {base_url}{domain_path}/graphql");
@@ -51,19 +43,22 @@ pub async fn domains_router(ontology: Arc<Ontology>, base_url: &str) -> axum::Ro
     router.layer(tower_http::trace::TraceLayer::new_for_http())
     // let schema = ontology_schema::new(&ontology);
 }
-pub fn ontology_router(ontology: Arc<Ontology>, base_url: &str) -> axum::Router {
+
+pub fn ontology_router(domain_engine: Arc<DomainEngine>, base_url: &str) -> axum::Router {
     let ontology_schema =
         OntologySchema::new(Default::default(), Default::default(), Default::default());
 
     pub async fn ontology_schema_graphql_handler(
         Extension(schema): Extension<Arc<OntologySchema>>,
-        Extension(context): Extension<Ctx>,
+        Extension(domain_engine): Extension<Arc<DomainEngine>>,
         JuniperRequest(req): JuniperRequest,
     ) -> (
         axum::http::StatusCode,
         axum::Json<juniper::http::GraphQLBatchResponse>,
     ) {
-        let response = req.execute(&schema, &context).await;
+        let response = req
+            .execute(&schema, &Ctx::new(domain_engine, Session::default()))
+            .await;
 
         (
             if response.is_ok() {
@@ -83,7 +78,7 @@ pub fn ontology_router(ontology: Arc<Ontology>, base_url: &str) -> axum::Router 
             post(ontology_schema_graphql_handler).get(graphiql_handler),
         )
         .layer(Extension(Arc::new(ontology_schema)))
-        .layer(Extension(Ctx::from(ontology)))
+        .layer(Extension(domain_engine))
         .layer(tower_http::trace::TraceLayer::new_for_http())
 }
 
