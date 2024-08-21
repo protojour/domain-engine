@@ -139,7 +139,8 @@ async fn test_conduit_db_id_generation(ds: &str) {
 
     expect_eq!(
         actual = format!("{:?}", explicit_user_id),
-        expected = "OctetSequence([103, 229, 80, 68, 16, 177, 66, 111, 146, 71, 187, 104, 14, 95, 224, 200], tag(def@1:1, Some(TagFlags(0x0))))"
+        expected =
+            "OctetSequence(67e5504410b1426f9247bb680e5fe0c8, tag(def@1:1, Some(TagFlags(0x0))))"
     );
 
     let article_id: Uuid = test_util::insert_entity_select_entityid(
