@@ -10,7 +10,7 @@ use ontol_runtime::{
         select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     },
     sequence::{Sequence, SubSequence},
-    value::Value,
+    value::{OctetSequence, Value},
     DefId, PropId,
 };
 use tracing::{debug, debug_span, error};
@@ -169,6 +169,16 @@ impl InMemoryStore {
         ctx: &DbContext,
     ) -> DomainResult<Value> {
         let _entered = debug_span!("struct_sel", id = ?struct_def_id).entered();
+
+        properties.insert(
+            ctx.ontology
+                .ontol_domain_meta()
+                .data_store_address_prop_id(),
+            Attr::Unit(Value::OctetSequence(
+                OctetSequence(bincode::serialize(&vertex_key).unwrap().into()),
+                DefId::unit().into(),
+            )),
+        );
 
         for (prop_id, subselect) in select_properties {
             if properties.contains_key(prop_id) {

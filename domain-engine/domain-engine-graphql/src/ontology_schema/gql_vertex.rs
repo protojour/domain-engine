@@ -1,7 +1,7 @@
 use ::juniper::{FieldResult, GraphQLObject};
 use base64::Engine;
 use fnv::FnvHashMap;
-use ontol_runtime::{attr::Attr, sequence::Sequence, value::Value, DefId, DefPropTag, PropId};
+use ontol_runtime::{attr::Attr, sequence::Sequence, value::Value, DefId, PropId};
 
 use crate::{cursor_util::serialize_cursor, field_error, juniper};
 
@@ -15,9 +15,13 @@ pub struct Vertex {
 #[juniper::graphql_object]
 #[graphql(context = OntologyCtx)]
 impl Vertex {
-    fn id(&self, ctx: &OntologyCtx) -> Option<juniper::ID> {
-        let addr_prop = PropId(ctx.ontol_domain_meta().data_store_address, DefPropTag(0));
-        match self.attrs.get(&addr_prop)?.as_unit()? {
+    /// The data store address of this vertex
+    fn address(&self, ctx: &OntologyCtx) -> Option<juniper::ID> {
+        match self
+            .attrs
+            .get(&ctx.ontol_domain_meta().data_store_address_prop_id())?
+            .as_unit()?
+        {
             Value::OctetSequence(seq, _) => Some(
                 base64::engine::general_purpose::STANDARD
                     .encode(&seq.0)

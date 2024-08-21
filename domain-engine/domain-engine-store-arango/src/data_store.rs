@@ -255,7 +255,7 @@ impl ArangoDatabase {
                     apply_select(
                         AttrMut::from_attr(attr),
                         &Select::Entity(select.clone()),
-                        &self.ontology,
+                        self,
                     )?;
                 }
 
@@ -387,7 +387,7 @@ impl ArangoDatabase {
         }
 
         let mut attr = cursor.result.first().unwrap().clone();
-        apply_select(AttrMut::from_attr(&mut attr), select, &self.ontology)?;
+        apply_select(AttrMut::from_attr(&mut attr), select, self)?;
 
         Ok((attr.into_unit().expect("not a unit"), data_operation))
     }

@@ -10,7 +10,7 @@ use ontol_runtime::{
     property::ValueCardinality,
     query::select::{Select, StructOrUnionSelect},
     sequence::Sequence,
-    value::Value,
+    value::{OctetSequence, Value},
     DefId,
 };
 use tracing::debug;
@@ -314,13 +314,13 @@ impl<'a> AttrMut<'a> {
 
 /// Apply Select to deserialized data from Arango
 /// a false return value means the attribute should be deleted
-pub fn apply_select(attr: AttrMut, select: &Select, ontology: &Ontology) -> DomainResult<bool> {
+pub fn apply_select(attr: AttrMut, select: &Select, db: &ArangoDatabase) -> DomainResult<bool> {
     // debug!("attr {attr:#?} select {select:#?}");
 
     match (attr, select) {
         (AttrMut::Unit(Value::Sequence(seq, _)), select) => {
             for value in seq.elements_mut() {
-                if !apply_select(AttrMut::Unit(value), select, ontology)? {
+                if !apply_select(AttrMut::Unit(value), select, db)? {
                     *value = Value::Void(DefId::unit().into());
                 }
             }
@@ -328,7 +328,7 @@ pub fn apply_select(attr: AttrMut, select: &Select, ontology: &Ontology) -> Doma
         (AttrMut::Unit(val), Select::EntityId | Select::Leaf) => {
             let def_id = val.type_def_id();
             if let Value::Struct(ref mut attr_map, _) = val {
-                let def = ontology.def(def_id);
+                let def = db.ontology.def(def_id);
                 let entity_info = def
                     .entity()
                     .ok_or(DomainErrorKind::NotAnEntity(def_id).into_error())?;
@@ -342,7 +342,28 @@ pub fn apply_select(attr: AttrMut, select: &Select, ontology: &Ontology) -> Doma
             }
         }
         (AttrMut::Unit(Value::Struct(attr_map, _)), Select::Struct(struct_select)) => {
-            let def = ontology.def(struct_select.def_id);
+            let def = db.ontology.def(struct_select.def_id);
+
+            // synthesize database address
+            if let (Some(collection_ident), Some(entity)) =
+                (db.collections.get(&struct_select.def_id), def.entity())
+            {
+                if let Some(Attr::Unit(id)) = attr_map.get(&entity.id_prop) {
+                    let address = format!(
+                        "{}/{}",
+                        collection_ident.raw_str(),
+                        db.ontology.format_value(id)
+                    );
+
+                    attr_map.insert(
+                        db.ontology.ontol_domain_meta().data_store_address_prop_id(),
+                        Attr::Unit(Value::OctetSequence(
+                            OctetSequence(address.into_bytes().into()),
+                            DefId::unit().into(),
+                        )),
+                    );
+                }
+            }
 
             for (prop_id, select) in &struct_select.properties {
                 let rel_info = def
@@ -366,7 +387,7 @@ pub fn apply_select(attr: AttrMut, select: &Select, ontology: &Ontology) -> Doma
                         Select::StructUnion(_, ref selects) => {
                             if selects.iter().any(|s| s.def_id == def_id) {
                                 if let Some(attr) = attr_map.get_mut(prop_id) {
-                                    if !apply_select(AttrMut::from_attr(attr), select, ontology)? {
+                                    if !apply_select(AttrMut::from_attr(attr), select, db)? {
                                         attr_map.remove(prop_id);
                                     }
                                 }
@@ -376,7 +397,7 @@ pub fn apply_select(attr: AttrMut, select: &Select, ontology: &Ontology) -> Doma
                         }
                         _ => {
                             if let Some(attr) = attr_map.get_mut(prop_id) {
-                                if !apply_select(AttrMut::from_attr(attr), select, ontology)? {
+                                if !apply_select(AttrMut::from_attr(attr), select, db)? {
                                     attr_map.remove(prop_id);
                                 }
                             }
@@ -390,7 +411,7 @@ pub fn apply_select(attr: AttrMut, select: &Select, ontology: &Ontology) -> Doma
                 apply_select(
                     AttrMut::Unit(val),
                     &Select::Struct(struct_select.clone()),
-                    ontology,
+                    db,
                 )?;
             }
             StructOrUnionSelect::Union(_, selects) => {
@@ -401,7 +422,7 @@ pub fn apply_select(attr: AttrMut, select: &Select, ontology: &Ontology) -> Doma
                     apply_select(
                         AttrMut::Unit(val),
                         &Select::Struct(struct_select.clone()),
-                        ontology,
+                        db,
                     )?;
                 } else {
                     return Ok(false);
@@ -414,7 +435,7 @@ pub fn apply_select(attr: AttrMut, select: &Select, ontology: &Ontology) -> Doma
                     apply_select(
                         AttrMut::Unit(value),
                         &Select::Struct(struct_select.clone()),
-                        ontology,
+                        db,
                     )?;
                 }
             } else {
@@ -424,7 +445,7 @@ pub fn apply_select(attr: AttrMut, select: &Select, ontology: &Ontology) -> Doma
         (AttrMut::Matrix(columns), select) => {
             if !columns.is_empty() {
                 for value in columns[0].elements_mut() {
-                    apply_select(AttrMut::Unit(value), select, ontology)?;
+                    apply_select(AttrMut::Unit(value), select, db)?;
                 }
             }
         }

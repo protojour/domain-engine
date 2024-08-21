@@ -13,6 +13,7 @@ use ontol_runtime::{
     value::{Serial, Value},
     DefId, EdgeId, PropId,
 };
+use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use tracing::{debug, warn};
 
@@ -34,7 +35,7 @@ pub(super) struct DbContext<'a> {
     pub check: ConstraintCheck,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub(super) enum DynamicKey {
     Text(String),
     Octets(SmallVec<u8, 16>),
@@ -73,7 +74,7 @@ pub(super) enum EdgeVectorData {
     Values(Vec<Value>),
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize, Deserialize)]
 pub(super) struct VertexKey<K: AsRef<DynamicKey> = DynamicKey> {
     pub type_def_id: DefId,
     pub dynamic_key: K,

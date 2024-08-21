@@ -9,7 +9,7 @@ use ontol_runtime::{
     sequence::SubSequence,
     tuple::{CardinalIdx, EndoTuple},
     value::Value,
-    DefId, DefPropTag, PropId,
+    DefId, PropId,
 };
 use pin_utils::pin_mut;
 use serde::{Deserialize, Serialize};
@@ -542,10 +542,9 @@ impl<'a> TransactCtx<'a> {
                 );
 
                 attrs.insert(
-                    PropId(
-                        self.ontology.ontol_domain_meta().data_store_address,
-                        DefPropTag(0),
-                    ),
+                    self.ontology
+                        .ontol_domain_meta()
+                        .data_store_address_prop_id(),
                     Attr::Unit(make_ontol_address(def_key, data_key, self.ontology)),
                 );
 

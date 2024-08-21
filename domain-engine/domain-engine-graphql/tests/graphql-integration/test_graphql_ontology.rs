@@ -11,6 +11,7 @@ use ontol_test_utils::{
     examples::stix::{stix_bundle, STIX},
     expect_eq,
 };
+use tracing::info;
 
 use crate::mk_engine_default;
 
@@ -18,7 +19,7 @@ const VERTICES: &str = r#"
 query vertices($defId: String!) {
     vertices(defId: $defId, first: 100) {
         elements {
-            id
+            address
         }
         pageInfo {
             hasNextPage
@@ -131,9 +132,10 @@ async fn test_stix_ontology(ds: &str) {
             .as_list_value()
             .unwrap();
         let vertex = elements.get(0).unwrap().as_object_value().unwrap();
-        let id: &juniper::Value = vertex.get_field_value("id").unwrap();
-        let juniper::Value::Scalar(juniper::DefaultScalarValue::String(_id)) = id else {
-            panic!("id was not a string: {id:?}");
+        let address: &juniper::Value = vertex.get_field_value("address").unwrap();
+        let juniper::Value::Scalar(juniper::DefaultScalarValue::String(address)) = address else {
+            panic!("address was not a string: {address:?}");
         };
+        info!("address is `{address}`");
     }
 }

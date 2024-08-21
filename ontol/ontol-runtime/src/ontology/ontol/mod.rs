@@ -34,6 +34,10 @@ impl OntolDomainMeta {
     pub fn open_data_prop_id(&self) -> PropId {
         PropId(self.open_data_relationship, crate::DefPropTag(0))
     }
+
+    pub fn data_store_address_prop_id(&self) -> PropId {
+        PropId(self.data_store_address, crate::DefPropTag(0))
+    }
 }
 
 impl Default for OntolDomainMeta {
