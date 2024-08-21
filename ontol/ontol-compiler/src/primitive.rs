@@ -71,8 +71,12 @@ pub enum PrimitiveKind {
     /// rel* is: text
     /// ```
     Text,
+    /// Address of something in a data store
+    DataStoreAddress,
     /// Open relationship to domainless data
     OpenDataRelationship,
+    EdgeRelationship,
+    FlatUnionRelationship,
 }
 
 impl PrimitiveKind {
@@ -105,8 +109,13 @@ pub struct Primitives {
     /// The definition of the ontol domain
     pub ontol_domain: DefId,
 
+    /// The address of something in a data store
+    pub data_store_address: DefId,
+
     /// An open, domainless relationship between some value and arbitrary, quasi-structured data
     pub open_data_relationship: DefId,
+    pub edge_relationship: DefId,
+    pub flat_union_relationship: DefId,
 
     /// Builtin relations
     pub relations: OntolRelations,
@@ -193,7 +202,10 @@ impl Primitives {
                 NO_SPAN,
             ),
             ontol_domain: defs.alloc_def_id(ONTOL_PKG),
+            data_store_address: defs.add_primitive(PrimitiveKind::DataStoreAddress, None),
             open_data_relationship: defs.add_primitive(PrimitiveKind::OpenDataRelationship, None),
+            edge_relationship: defs.add_primitive(PrimitiveKind::EdgeRelationship, None),
+            flat_union_relationship: defs.add_primitive(PrimitiveKind::FlatUnionRelationship, None),
 
             relations: OntolRelations {
                 is: defs.add_builtin_relation(BuiltinRelationKind::Is, Some("is")),

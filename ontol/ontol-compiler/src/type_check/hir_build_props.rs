@@ -329,7 +329,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 match_attributes.insert(
                     MatchAttributeKey::Def(self.primitives.relations.order),
                     MatchAttribute {
-                        prop_id: PropId(self.primitives.relations.order, DefPropTag::order()),
+                        prop_id: PropId(self.primitives.relations.order, DefPropTag(0)),
                         rel_id: RelId(DefId::unit(), DefRelTag(0)),
                         cardinality: (PropertyCardinality::Optional, ValueCardinality::IndexSet),
                         rel_params_def: None,
@@ -342,7 +342,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             match_attributes.insert(
                 MatchAttributeKey::Def(self.primitives.relations.direction),
                 MatchAttribute {
-                    prop_id: PropId(self.primitives.relations.direction, DefPropTag::direction()),
+                    prop_id: PropId(self.primitives.relations.direction, DefPropTag(0)),
                     rel_id: RelId(DefId::unit(), DefRelTag(0)),
                     cardinality: (PropertyCardinality::Optional, ValueCardinality::Unit),
                     rel_params_def: None,

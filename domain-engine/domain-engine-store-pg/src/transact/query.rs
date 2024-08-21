@@ -9,7 +9,7 @@ use ontol_runtime::{
     sequence::SubSequence,
     tuple::{CardinalIdx, EndoTuple},
     value::Value,
-    DefId, PropId,
+    DefId, DefPropTag, PropId,
 };
 use pin_utils::pin_mut;
 use serde::{Deserialize, Serialize};
@@ -17,6 +17,7 @@ use smallvec::smallvec;
 use tracing::{debug, trace};
 
 use crate::{
+    address::make_ontol_address,
     pg_error::{PgError, PgInputError, PgModelError},
     pg_model::{PgDataKey, PgDomainTable, PgEdgeCardinalKind, PgTable, PgTableKey, PgType},
     sql::{self, FromItem},
@@ -538,6 +539,14 @@ impl<'a> TransactCtx<'a> {
                 let mut attrs: FnvHashMap<PropId, Attr> = FnvHashMap::with_capacity_and_hasher(
                     def.data_relationships.len(),
                     Default::default(),
+                );
+
+                attrs.insert(
+                    PropId(
+                        self.ontology.ontol_domain_meta().data_store_address,
+                        DefPropTag(0),
+                    ),
+                    Attr::Unit(make_ontol_address(def_key, data_key, self.ontology)),
                 );
 
                 // retrieve data properties

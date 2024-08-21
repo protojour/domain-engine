@@ -96,7 +96,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             (
                 self.str_ctx.make_phf_key(EDGE_PROPERTY),
                 SerdeProperty {
-                    id: PropId(DefId::unit(), DefPropTag(0)),
+                    id: PropId(self.primitives.edge_relationship, DefPropTag(0)),
                     flags: SerdePropertyFlags::REL_PARAMS | SerdePropertyFlags::OPTIONAL,
                     value_addr: SerdeOperatorAddr(0),
                     value_generator: None,
@@ -350,7 +350,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     (
                         self.str_ctx.make_phf_key(&key),
                         SerdeProperty {
-                            id: PropId(DefId::unit(), DefPropTag::flat_union()),
+                            id: PropId(self.primitives.flat_union_relationship, DefPropTag(0)),
                             value_addr,
                             flags: SerdePropertyFlags::OPTIONAL,
                             value_generator: None,

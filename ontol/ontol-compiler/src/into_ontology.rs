@@ -425,6 +425,7 @@ impl<'m> Compiler<'m> {
                 ascending: self.primitives.symbols.ascending,
                 descending: self.primitives.symbols.descending,
                 open_data_relationship: self.primitives.open_data_relationship,
+                data_store_address: self.primitives.data_store_address,
                 order_relationship: self.primitives.relations.order,
                 direction_relationship: self.primitives.relations.direction,
                 edge_property: EDGE_PROPERTY.into(),

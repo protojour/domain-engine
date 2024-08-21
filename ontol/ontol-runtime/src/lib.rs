@@ -186,24 +186,6 @@ impl From<DefId> for MapDef {
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct DefPropTag(pub u16);
 
-impl DefPropTag {
-    pub const fn order() -> Self {
-        DefPropTag(65535)
-    }
-
-    pub const fn direction() -> Self {
-        DefPropTag(65534)
-    }
-
-    pub const fn open_data() -> Self {
-        DefPropTag(65533)
-    }
-
-    pub const fn flat_union() -> Self {
-        DefPropTag(65532)
-    }
-}
-
 impl ::std::fmt::Debug for DefPropTag {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         write!(f, "p@{}", self.0)

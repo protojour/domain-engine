@@ -46,6 +46,7 @@ impl<'m> Compiler<'m> {
             patterns: &self.text_patterns,
             code_ctx: &self.code_ctx,
             union_member_cache,
+            primitives: &self.primitives,
             lazy_struct_op_tasks: VecDeque::new(),
             lazy_struct_intersection_tasks: VecDeque::new(),
             lazy_union_repr_tasks: VecDeque::new(),
