@@ -212,7 +212,7 @@ pub async fn run() -> Result<(), OntoolError> {
                 })
                 .expect("domain not found");
 
-            let schemas = build_openapi_schemas(&ontology, *package_id, domain);
+            let schemas = build_openapi_schemas(&ontology, package_id, domain);
 
             match args.format {
                 Format::Json => {

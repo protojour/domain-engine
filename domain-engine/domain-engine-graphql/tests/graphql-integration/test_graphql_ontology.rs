@@ -59,29 +59,29 @@ async fn test_stix_ontology(ds: &str) {
         expected = Ok(graphql_value!({
             "domains": [
                 {
-                    "id": "01H7ZZ5KMG538CXJMNJQVTMP9K",
-                    "name": "SI",
-                },
-                {
-                    "id": "01J5C5JJKM7XWR56TTYH9B7VRN",
-                    "name": "stix_open_vocab",
+                    "id": "01GNYFZP30ED0EZ1579TH0D55P",
+                    "name": "ontol",
                 },
                 {
                     "id": "01GZ13EAM0RY693MSJ75XZARHY",
                     "name": "stix",
                 },
                 {
-                    "id": "01GNYFZP30ED0EZ1579TH0D55P",
-                    "name": "ontol",
+                    "id": "01J5C5GB45Q3C0E4YYRPP8SN4R",
+                    "name": "stix_common",
                 },
                 {
                     "id": "01H7ZN6PJ0NHEFMHW2PBN4FEPZ",
                     "name": "stix_interface",
                 },
                 {
-                    "id": "01J5C5GB45Q3C0E4YYRPP8SN4R",
-                    "name": "stix_common",
-                }
+                    "id": "01J5C5JJKM7XWR56TTYH9B7VRN",
+                    "name": "stix_open_vocab",
+                },
+                {
+                    "id": "01H7ZZ5KMG538CXJMNJQVTMP9K",
+                    "name": "SI",
+                },
             ]
         }))
     );

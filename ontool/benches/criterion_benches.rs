@@ -158,7 +158,7 @@ pub fn compile_benchmark(c: &mut Criterion) {
         b.iter(|| {
             domain_engine_graphql::create_graphql_schema(
                 black_box(test.ontology_owned()),
-                black_box(*package_id),
+                black_box(package_id),
             )
             .unwrap()
         });
@@ -186,7 +186,7 @@ pub fn compile_benchmark(c: &mut Criterion) {
             })
             .unwrap();
         let schema =
-            domain_engine_graphql::create_graphql_schema(test.ontology_owned(), *package_id)
+            domain_engine_graphql::create_graphql_schema(test.ontology_owned(), package_id)
                 .unwrap();
         let service_context: ServiceCtx = engine.into();
         b.iter(|| {

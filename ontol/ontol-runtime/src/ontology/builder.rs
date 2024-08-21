@@ -32,15 +32,17 @@ impl OntologyBuilder {
     }
 
     pub fn add_domain(&mut self, package_id: PackageId, domain: Domain) {
-        self.ontology.data.domain_table.insert(package_id, domain);
+        let index = package_id.0 as usize;
+        let domains = &mut self.ontology.data.domains;
+        domains.resize_with(std::cmp::max(domains.len(), index + 1), || None);
+        domains[index] = Some(domain);
     }
 
     pub fn domain_mut(&mut self, package_id: PackageId) -> &mut Domain {
-        self.ontology
-            .data
-            .domain_table
-            .get_mut(&package_id)
-            .unwrap()
+        match &mut self.ontology.data.domains[package_id.0 as usize] {
+            Some(domain) => domain,
+            None => panic!("no domain added for {package_id:?}"),
+        }
     }
 
     pub fn add_package_config(&mut self, package_id: PackageId, config: PackageConfig) {
@@ -173,7 +175,7 @@ pub(super) fn new_builder() -> OntologyBuilder {
                 text_patterns: Default::default(),
                 extern_table: Default::default(),
                 ontol_domain_meta: Default::default(),
-                domain_table: Default::default(),
+                domains: Default::default(),
                 extended_entity_table: Default::default(),
                 union_variants: Default::default(),
                 domain_interfaces: Default::default(),

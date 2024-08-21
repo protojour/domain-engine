@@ -64,7 +64,7 @@ pub struct Data {
     /// (length is stored on the heap) and which makes the vector as dense as possible:
     text_constants: Vec<ArcStr>,
 
-    domain_table: FnvHashMap<PackageId, Domain>,
+    domains: Vec<Option<Domain>>,
     extended_entity_table: FnvHashMap<DefId, ExtendedEntityInfo>,
     ontol_domain_meta: OntolDomainMeta,
     union_variants: FnvHashMap<DefId, DefIdSet>,
@@ -147,8 +147,12 @@ impl Ontology {
         self.data.text_like_types.get(&def_id).cloned()
     }
 
-    pub fn domains(&self) -> impl Iterator<Item = (&PackageId, &Domain)> {
-        self.data.domain_table.iter()
+    pub fn domains(&self) -> impl Iterator<Item = (PackageId, &Domain)> {
+        self.data
+            .domains
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, opt)| opt.as_ref().map(|domain| (PackageId(idx as u16), domain)))
     }
 
     pub fn ontol_domain_meta(&self) -> &OntolDomainMeta {
@@ -156,7 +160,11 @@ impl Ontology {
     }
 
     pub fn find_domain(&self, package_id: PackageId) -> Option<&Domain> {
-        self.data.domain_table.get(&package_id)
+        if let Some(opt) = self.data.domains.get(package_id.0 as usize) {
+            opt.as_ref()
+        } else {
+            None
+        }
     }
 
     /// Get the members of a given union.
@@ -170,7 +178,7 @@ impl Ontology {
     }
 
     pub fn find_edge(&self, id: EdgeId) -> Option<&EdgeInfo> {
-        let domain = self.data.domain_table.get(&id.0)?;
+        let domain = self.find_domain(id.0)?;
         domain.find_edge(id)
     }
 

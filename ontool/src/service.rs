@@ -27,7 +27,7 @@ pub async fn domains_router(domain_engine: Arc<DomainEngine>, base_url: &str) ->
 
     for (package_id, domain) in ontology
         .domains()
-        .filter(|(package_id, _)| **package_id != PackageId::first())
+        .filter(|(package_id, _)| *package_id != PackageId::first())
     {
         let domain_path = format!(
             "/{unique_name}",
@@ -35,7 +35,7 @@ pub async fn domains_router(domain_engine: Arc<DomainEngine>, base_url: &str) ->
         );
         router = router.nest(
             &domain_path,
-            domain_router(domain_engine.clone(), &domain_path, *package_id).unwrap(),
+            domain_router(domain_engine.clone(), &domain_path, package_id).unwrap(),
         );
 
         info!("Domain {package_id:?} served under {base_url}{domain_path}/graphql");
