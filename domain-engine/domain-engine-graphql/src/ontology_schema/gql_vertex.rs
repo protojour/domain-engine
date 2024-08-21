@@ -5,7 +5,7 @@ use ontol_runtime::{attr::Attr, sequence::Sequence, value::Value, DefId, DefProp
 
 use crate::{cursor_util::serialize_cursor, field_error, juniper};
 
-use super::{gql_def, Ctx};
+use super::{gql_def, OntologyCtx};
 
 pub struct Vertex {
     pub def_id: DefId,
@@ -13,9 +13,9 @@ pub struct Vertex {
 }
 
 #[juniper::graphql_object]
-#[graphql(context = Ctx)]
+#[graphql(context = OntologyCtx)]
 impl Vertex {
-    fn id(&self, ctx: &Ctx) -> Option<juniper::ID> {
+    fn id(&self, ctx: &OntologyCtx) -> Option<juniper::ID> {
         let addr_prop = PropId(ctx.ontol_domain_meta().data_store_address, DefPropTag(0));
         match self.attrs.get(&addr_prop)?.as_unit()? {
             Value::OctetSequence(seq, _) => Some(
@@ -33,14 +33,14 @@ impl Vertex {
 }
 
 #[derive(GraphQLObject)]
-#[graphql(context = Ctx)]
+#[graphql(context = OntologyCtx)]
 pub struct VertexConnection {
     pub elements: Vec<Vertex>,
     pub page_info: Option<PageInfo>,
 }
 
 #[derive(GraphQLObject)]
-#[graphql(context = Ctx)]
+#[graphql(context = OntologyCtx)]
 pub struct PageInfo {
     pub has_next_page: bool,
     pub end_cursor: Option<String>,

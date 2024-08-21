@@ -5,7 +5,7 @@ use ontol_runtime::{
     DefId, MapKey, PropId,
 };
 
-use super::{gql_rel, Ctx};
+use super::{gql_rel, OntologyCtx};
 
 #[derive(Clone)]
 pub struct Def {
@@ -48,29 +48,29 @@ enum PropertyFlowKind {
 }
 
 #[juniper::graphql_object]
-#[graphql(context = Ctx)]
+#[graphql(context = OntologyCtx)]
 impl Def {
     fn id(&self) -> String {
         format!("{:?}", self.id)
     }
-    fn name(&self, ctx: &Ctx) -> Option<String> {
+    fn name(&self, ctx: &OntologyCtx) -> Option<String> {
         ctx.def(self.id).name().map(|name| ctx[name].into())
     }
-    fn doc_string(&self, ctx: &Ctx) -> Option<String> {
+    fn doc_string(&self, ctx: &OntologyCtx) -> Option<String> {
         ctx.get_def_docs(self.id)
             .map(|docs_constant| ctx[docs_constant].into())
     }
-    fn entity(&self, ctx: &Ctx) -> Option<Entity> {
+    fn entity(&self, ctx: &OntologyCtx) -> Option<Entity> {
         ctx.def(self.id).entity().map(|_| Entity { id: self.id })
     }
-    fn union_variants(&self, ctx: &Ctx) -> Vec<Def> {
+    fn union_variants(&self, ctx: &OntologyCtx) -> Vec<Def> {
         ctx.union_variants(self.id)
             .iter()
             .copied()
             .map(|id| Def { id })
             .collect()
     }
-    pub fn kind(&self, ctx: &Ctx) -> DefKind {
+    pub fn kind(&self, ctx: &OntologyCtx) -> DefKind {
         match ctx.def(self.id).kind {
             domain::DefKind::Entity(_) => DefKind::Entity,
             domain::DefKind::Data(_) => DefKind::Data,
@@ -80,7 +80,7 @@ impl Def {
             domain::DefKind::Generator(_) => DefKind::Generator,
         }
     }
-    fn data_relationships(&self, ctx: &Ctx) -> Vec<gql_rel::DataRelationshipInfo> {
+    fn data_relationships(&self, ctx: &OntologyCtx) -> Vec<gql_rel::DataRelationshipInfo> {
         ctx.def(self.id)
             .data_relationships
             .iter()
@@ -105,7 +105,7 @@ impl Def {
             })
             .collect()
     }
-    fn maps_to(&self, ctx: &Ctx) -> Vec<MapEdge> {
+    fn maps_to(&self, ctx: &OntologyCtx) -> Vec<MapEdge> {
         ctx.iter_map_meta()
             .filter(|(map_key, _)| map_key.input.def_id == self.id)
             .map(|(key, meta)| MapEdge {
@@ -115,7 +115,7 @@ impl Def {
             .collect()
     }
 
-    fn maps_from(&self, ctx: &Ctx) -> Vec<MapEdge> {
+    fn maps_from(&self, ctx: &OntologyCtx) -> Vec<MapEdge> {
         ctx.iter_map_meta()
             .filter(|(map_key, _)| map_key.output.def_id == self.id)
             .map(|(key, meta)| MapEdge {
@@ -127,15 +127,15 @@ impl Def {
 }
 
 #[juniper::graphql_object]
-#[graphql(context = Ctx)]
+#[graphql(context = OntologyCtx)]
 impl Entity {
-    fn is_self_identifying(&self, ctx: &Ctx) -> bool {
+    fn is_self_identifying(&self, ctx: &OntologyCtx) -> bool {
         ctx.def(self.id).entity().unwrap().is_self_identifying
     }
 }
 
 #[juniper::graphql_object]
-#[graphql(context = Ctx)]
+#[graphql(context = OntologyCtx)]
 impl MapEdge {
     fn output(&self) -> Def {
         Def {
@@ -148,7 +148,7 @@ impl MapEdge {
         }
     }
 
-    fn property_flows(&self, ctx: &Ctx) -> Vec<PropertyFlow> {
+    fn property_flows(&self, ctx: &OntologyCtx) -> Vec<PropertyFlow> {
         ctx.get_prop_flow_slice(&self.meta)
             .unwrap_or(&[])
             .iter()
@@ -174,7 +174,7 @@ impl MapEdge {
 }
 
 #[juniper::graphql_object]
-#[graphql(context = Ctx)]
+#[graphql(context = OntologyCtx)]
 impl PropertyFlow {
     fn source(&self) -> String {
         self.source.to_string()
@@ -188,9 +188,9 @@ impl PropertyFlow {
 }
 
 #[juniper::graphql_object]
-#[graphql(context = Ctx)]
+#[graphql(context = OntologyCtx)]
 impl NamedMap {
-    fn name(&self, context: &Ctx) -> String {
+    fn name(&self, context: &OntologyCtx) -> String {
         context[self.name].to_string()
     }
 }

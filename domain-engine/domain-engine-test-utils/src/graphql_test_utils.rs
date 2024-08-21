@@ -6,7 +6,7 @@ use std::{
 
 use domain_engine_core::{data_store::DataStore, DomainEngine, Session};
 use domain_engine_graphql::{
-    context::ServiceCtx, create_graphql_schema, gql_scalar::GqlScalar, Schema,
+    context::ServiceCtx, create_graphql_schema, gql_scalar::GqlScalar, juniper, Schema,
 };
 use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use juniper::ScalarValue;
@@ -68,12 +68,12 @@ fn compile_schemas_inner<const N: usize>(
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub enum TestError {
+pub enum TestError<S> {
     GraphQL(juniper::GraphQLError),
-    Execution(Vec<juniper::ExecutionError<GqlScalar>>),
+    Execution(Vec<juniper::ExecutionError<S>>),
 }
 
-impl Display for TestError {
+impl Display for TestError<GqlScalar> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::GraphQL(err) => write!(f, "GraphQL: {err}"),
@@ -127,22 +127,33 @@ pub fn gql_ctx_mock_data_store(
 
 #[async_trait::async_trait]
 pub trait Exec {
-    async fn exec(
+    async fn exec<QT, MT, ST, S>(
         self,
-        variables: impl Into<juniper::Variables<GqlScalar>> + Send,
-        schema: &Schema,
-        context: &ServiceCtx,
-    ) -> Result<juniper::Value<GqlScalar>, TestError>;
+        variables: impl Into<juniper::Variables<S>> + Send,
+        schema: &juniper::RootNode<QT, MT, ST, S>,
+        context: &QT::Context,
+    ) -> Result<juniper::Value<S>, TestError<S>>
+    where
+        QT: juniper::GraphQLTypeAsync<S, Context: Sync, TypeInfo: Sync>,
+        MT: juniper::GraphQLTypeAsync<S, Context = QT::Context, TypeInfo: Sync>,
+        ST: juniper::GraphQLType<S, Context = QT::Context, TypeInfo: Sync> + Sync,
+        S: juniper::ScalarValue + Send + Sync;
 }
 
 #[async_trait::async_trait]
 impl Exec for &str {
-    async fn exec(
+    async fn exec<QT, MT, ST, S>(
         self,
-        variables: impl Into<juniper::Variables<GqlScalar>> + Send,
-        schema: &Schema,
-        context: &ServiceCtx,
-    ) -> Result<juniper::Value<GqlScalar>, TestError> {
+        variables: impl Into<juniper::Variables<S>> + Send,
+        schema: &juniper::RootNode<QT, MT, ST, S>,
+        context: &QT::Context,
+    ) -> Result<juniper::Value<S>, TestError<S>>
+    where
+        QT: juniper::GraphQLTypeAsync<S, Context: Sync, TypeInfo: Sync>,
+        MT: juniper::GraphQLTypeAsync<S, Context = QT::Context, TypeInfo: Sync>,
+        ST: juniper::GraphQLType<S, Context = QT::Context, TypeInfo: Sync> + Sync,
+        S: juniper::ScalarValue + Send + Sync,
+    {
         let variables = variables.into();
         match juniper::execute(self, None, schema, &variables, context).await {
             Ok((value, execution_errors)) => {
@@ -162,7 +173,7 @@ pub trait GraphqlTestResultExt {
     fn unwrap_first_exec_error_msg(self) -> String;
 }
 
-impl<T: Debug> GraphqlTestResultExt for Result<T, TestError> {
+impl<T: Debug, S> GraphqlTestResultExt for Result<T, TestError<S>> {
     #[track_caller]
     fn unwrap_first_graphql_error_msg(self) -> String {
         match self.unwrap_err() {
@@ -187,12 +198,12 @@ impl<T: Debug> GraphqlTestResultExt for Result<T, TestError> {
     }
 }
 
-pub trait GraphqlValueResultExt {
-    fn unordered(self) -> Result<UnorderedValue, TestError>;
+pub trait GraphqlValueResultExt<S> {
+    fn unordered(self) -> Result<UnorderedValue, TestError<S>>;
 }
 
-impl GraphqlValueResultExt for Result<juniper::Value<GqlScalar>, TestError> {
-    fn unordered(self) -> Result<UnorderedValue, TestError> {
+impl<S> GraphqlValueResultExt<S> for Result<juniper::Value<GqlScalar>, TestError<S>> {
+    fn unordered(self) -> Result<UnorderedValue, TestError<S>> {
         self.map(|value| value.unordered())
     }
 }

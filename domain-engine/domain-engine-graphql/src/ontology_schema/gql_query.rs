@@ -23,19 +23,19 @@ use super::gql_dictionary;
 use super::gql_dictionary::DefDictionaryEntry;
 use super::gql_domain;
 use super::gql_vertex;
-use super::Ctx;
+use super::OntologyCtx;
 
 #[derive(Default)]
 pub struct Query;
 
 #[graphql_object]
-#[graphql(context = Ctx)]
+#[graphql(context = OntologyCtx)]
 impl Query {
     fn api_version() -> &'static str {
         "0.1"
     }
 
-    fn domain(name: String, ctx: &Ctx) -> FieldResult<gql_domain::Domain> {
+    fn domain(name: String, ctx: &OntologyCtx) -> FieldResult<gql_domain::Domain> {
         let domain = ctx
             .domains()
             .find(|(_, d)| ctx.get_text_constant(d.unique_name()).to_string() == name);
@@ -46,7 +46,7 @@ impl Query {
         }
     }
 
-    fn domains(ctx: &Ctx) -> FieldResult<Vec<gql_domain::Domain>> {
+    fn domains(ctx: &OntologyCtx) -> FieldResult<Vec<gql_domain::Domain>> {
         let mut domains = vec![];
         for (package_id, _ontology_domain) in ctx.domains() {
             let domain = gql_domain::Domain {
@@ -57,7 +57,7 @@ impl Query {
         Ok(domains)
     }
 
-    fn def(def_id: String, ctx: &Ctx) -> FieldResult<gql_def::Def> {
+    fn def(def_id: String, ctx: &OntologyCtx) -> FieldResult<gql_def::Def> {
         if let Ok(def_id) = DefId::from_str(&def_id) {
             if let Some(def) = ctx.get_def(def_id) {
                 return Ok(gql_def::Def { id: def.id });
@@ -66,7 +66,7 @@ impl Query {
         Err(field_error("TypeInfo not found"))
     }
 
-    fn def_dictionary(ctx: &Ctx) -> Vec<DefDictionaryEntry> {
+    fn def_dictionary(ctx: &OntologyCtx) -> Vec<DefDictionaryEntry> {
         let mut dict: BTreeMap<String, Vec<gql_def::Def>> = Default::default();
 
         for (_, domain) in ctx.domains() {
@@ -91,7 +91,7 @@ impl Query {
         def_id: String,
         first: i32,
         after: Option<String>,
-        ctx: &Ctx,
+        ctx: &OntologyCtx,
     ) -> FieldResult<gql_vertex::VertexConnection> {
         let data_store = ctx.data_store().map_err(field_error)?;
         let def_id = DefId::from_str(&def_id).map_err(|_| field_error("invalid def id format"))?;

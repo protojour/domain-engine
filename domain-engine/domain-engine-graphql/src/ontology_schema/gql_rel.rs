@@ -7,7 +7,7 @@ use ontol_runtime::{
     property, DefId, EdgeId, PropId,
 };
 
-use super::{gql_def, Ctx};
+use super::{gql_def, OntologyCtx};
 
 pub struct DataRelationshipInfo {
     pub def_id: DefId,
@@ -67,12 +67,12 @@ enum ValueCardinality {
 }
 
 #[juniper::graphql_object]
-#[graphql(context = Ctx)]
+#[graphql(context = OntologyCtx)]
 impl DataRelationshipInfo {
     fn prop_id(&self) -> String {
         self.prop_id.to_string()
     }
-    fn source(&self, ctx: &Ctx) -> DataRelationshipSource {
+    fn source(&self, ctx: &OntologyCtx) -> DataRelationshipSource {
         let def = ctx.def(self.def_id);
         let data_relationship = def.data_relationships.get(&self.prop_id).unwrap();
         match data_relationship.source {
@@ -84,7 +84,7 @@ impl DataRelationshipInfo {
             }
         }
     }
-    fn target(&self, ctx: &Ctx) -> gql_def::Def {
+    fn target(&self, ctx: &OntologyCtx) -> gql_def::Def {
         let def = ctx.def(self.def_id);
         let data_relationship = def.data_relationships.get(&self.prop_id).unwrap();
         let target_def_id = match data_relationship.target {
@@ -93,12 +93,12 @@ impl DataRelationshipInfo {
         };
         gql_def::Def { id: target_def_id }
     }
-    fn name(&self, ctx: &Ctx) -> String {
+    fn name(&self, ctx: &OntologyCtx) -> String {
         let def = ctx.def(self.def_id);
         let data_relationship = def.data_relationships.get(&self.prop_id).unwrap();
         ctx[data_relationship.name].into()
     }
-    fn cardinality(&self, ctx: &Ctx) -> Cardinality {
+    fn cardinality(&self, ctx: &OntologyCtx) -> Cardinality {
         let def = ctx.def(self.def_id);
         let data_relationship = def.data_relationships.get(&self.prop_id).unwrap();
         Cardinality::from(data_relationship.cardinality)
@@ -113,7 +113,7 @@ impl DataRelationshipInfo {
 }
 
 #[juniper::graphql_object]
-#[graphql(context = Ctx)]
+#[graphql(context = OntologyCtx)]
 impl DataRelationshipEdgeProjection {
     fn subject(&self) -> i32 {
         self.projection.subject.0.into()
@@ -131,13 +131,13 @@ impl DataRelationshipEdgeProjection {
 }
 
 #[juniper::graphql_object]
-#[graphql(context = Ctx)]
+#[graphql(context = OntologyCtx)]
 impl Edge {
     // fn def(&self) -> gql_def::Def {
     //     gql_def::Def { id: self.id.0 }
     // }
 
-    fn cardinals(&self, ctx: &Ctx) -> Vec<EdgeCardinal> {
+    fn cardinals(&self, ctx: &OntologyCtx) -> Vec<EdgeCardinal> {
         let edge = ctx.find_edge(self.id).unwrap();
         edge.cardinals
             .iter()
@@ -151,7 +151,7 @@ impl Edge {
 }
 
 #[juniper::graphql_object]
-#[graphql(context = Ctx)]
+#[graphql(context = OntologyCtx)]
 impl EdgeCardinal {
     fn index(&self) -> i32 {
         self.idx.try_into().unwrap()

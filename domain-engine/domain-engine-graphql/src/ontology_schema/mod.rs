@@ -16,12 +16,12 @@ mod gql_vertex;
 
 /// The Ctx is the source of information for all Ontology GraphQL interactions.
 #[derive(Clone)]
-pub struct Ctx {
+pub struct OntologyCtx {
     domain_engine: Arc<DomainEngine>,
     session: Session,
 }
 
-impl Ctx {
+impl OntologyCtx {
     pub fn new(domain_engine: Arc<DomainEngine>, session: Session) -> Self {
         Self {
             domain_engine,
@@ -38,7 +38,7 @@ impl Ctx {
     }
 }
 
-impl Deref for Ctx {
+impl Deref for OntologyCtx {
     type Target = Ontology;
 
     fn deref(&self) -> &Self::Target {
@@ -46,6 +46,7 @@ impl Deref for Ctx {
     }
 }
 
-impl juniper::Context for Ctx {}
+impl juniper::Context for OntologyCtx {}
 
-pub type OntologySchema = RootNode<'static, Query, EmptyMutation<Ctx>, EmptySubscription<Ctx>>;
+pub type OntologySchema =
+    RootNode<'static, Query, EmptyMutation<OntologyCtx>, EmptySubscription<OntologyCtx>>;

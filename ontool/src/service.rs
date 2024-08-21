@@ -12,7 +12,7 @@ use axum::{extract::FromRequestParts, routing::post, Extension};
 use domain_engine_core::{domain_error::DomainErrorKind, DomainEngine, DomainResult, Session};
 use domain_engine_graphql::{
     juniper,
-    ontology_schema::{Ctx, OntologySchema},
+    ontology_schema::{OntologyCtx, OntologySchema},
     CreateSchemaError,
 };
 use juniper_axum::extract::JuniperRequest;
@@ -57,7 +57,10 @@ pub fn ontology_router(domain_engine: Arc<DomainEngine>, base_url: &str) -> axum
         axum::Json<juniper::http::GraphQLBatchResponse>,
     ) {
         let response = req
-            .execute(&schema, &Ctx::new(domain_engine, Session::default()))
+            .execute(
+                &schema,
+                &OntologyCtx::new(domain_engine, Session::default()),
+            )
             .await;
 
         (

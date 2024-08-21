@@ -1,17 +1,10 @@
-use std::sync::Arc;
-
-use domain_engine_core::{DomainEngine, Session};
 use domain_engine_graphql::{context::ServiceCtx, juniper::graphql_value};
-use domain_engine_test_utils::dynamic_data_store::DynamicDataStoreFactory;
 use domain_engine_test_utils::graphql_test_utils::GraphqlTestResultExt;
 use domain_engine_test_utils::{
     graphql_test_utils::{Exec, GraphqlValueResultExt, TestCompileSchema},
     graphql_value_unordered,
-    system::mock_current_time_monotonic,
-    unimock,
 };
 use ontol_macros::datastore_test;
-use ontol_runtime::ontology::Ontology;
 use ontol_test_utils::examples::EDGE_ENTITY_UNION;
 use ontol_test_utils::{
     examples::{entity_subtype, EDGE_ENTITY_SIMPLE, GUITAR_SYNTH_UNION},
@@ -19,21 +12,13 @@ use ontol_test_utils::{
 };
 use tracing::info;
 
-async fn make_domain_engine(ontology: Arc<Ontology>, datastore: &str) -> DomainEngine {
-    DomainEngine::builder(ontology)
-        .system(Box::new(unimock::Unimock::new(
-            mock_current_time_monotonic(),
-        )))
-        .build(DynamicDataStoreFactory::new(datastore), Session::default())
-        .await
-        .unwrap()
-}
+use crate::mk_engine_default;
 
 #[datastore_test(tokio::test)]
 async fn test_guitar_synth_union_mutation_and_query(ds: &str) {
     let (test, [schema]) = TestPackages::with_static_sources([GUITAR_SYNTH_UNION])
         .compile_schemas([GUITAR_SYNTH_UNION.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
+    let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     expect_eq!(
         actual = r#"mutation {
@@ -154,7 +139,7 @@ async fn test_entity_subtype(ds: &str) {
     let (test, [derived_schema, db_schema]) =
         TestPackages::with_static_sources([entity_subtype::DERIVED, entity_subtype::DB])
             .compile_schemas([entity_subtype::DERIVED.0, entity_subtype::DB.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
+    let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     r#"mutation {
         foo(create: [
@@ -223,7 +208,7 @@ async fn sym_edge_simple(ds: &str) {
     )])
     .compile_schemas([SrcName::default()]);
 
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
+    let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     r#"mutation {
         foo(
@@ -271,7 +256,7 @@ async fn edge_entity_simple_happy_path(ds: &str) {
     let (test, [schema]) = TestPackages::with_static_sources([EDGE_ENTITY_SIMPLE])
         .compile_schemas([EDGE_ENTITY_SIMPLE.0]);
 
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
+    let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     info!("Create 3 vertices");
 
@@ -348,7 +333,7 @@ async fn edge_entity_simple_foreign_violation(ds: &str) {
     let (test, [schema]) = TestPackages::with_static_sources([EDGE_ENTITY_SIMPLE])
         .compile_schemas([EDGE_ENTITY_SIMPLE.0]);
 
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
+    let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     // foo is self-identifying, bar is not
     expect_eq!(
@@ -370,7 +355,7 @@ async fn edge_entity_union_happy_path(ds: &str) {
     let (test, [schema]) = TestPackages::with_static_sources([EDGE_ENTITY_UNION])
         .compile_schemas([EDGE_ENTITY_UNION.0]);
 
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
+    let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     info!("Create 3 vertices");
 
@@ -464,7 +449,7 @@ async fn edge_entity_union_foreign_violation(ds: &str) {
     let (test, [schema]) = TestPackages::with_static_sources([EDGE_ENTITY_UNION])
         .compile_schemas([EDGE_ENTITY_UNION.0]);
 
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
+    let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     // foo is self-identifying, qux is not
     expect_eq!(

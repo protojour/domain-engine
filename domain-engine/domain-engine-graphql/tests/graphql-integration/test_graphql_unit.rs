@@ -1336,7 +1336,7 @@ async fn municipalities_named_query() {
     async fn fetch_osl(
         schema: &Schema,
         ctx: &ServiceCtx,
-    ) -> Result<juniper::Value<GqlScalar>, TestError> {
+    ) -> Result<juniper::Value<GqlScalar>, TestError<GqlScalar>> {
         // NOTE: Here it's apparent that geojson can't be modelled
         // in GraphQL. Geometry is a union where many of the variants
         // have a "coordinates" field of differing types.

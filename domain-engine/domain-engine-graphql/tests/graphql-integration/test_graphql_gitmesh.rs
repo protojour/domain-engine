@@ -1,36 +1,21 @@
-use std::sync::Arc;
-
-use domain_engine_core::{DomainEngine, Session};
 use domain_engine_graphql::{
     context::ServiceCtx,
     juniper::{graphql_value, InputValue},
 };
-use domain_engine_test_utils::{
-    dynamic_data_store::DynamicDataStoreFactory,
-    graphql_test_utils::{gql_ctx_mock_data_store, TestCompileSingletonSchema},
+use domain_engine_test_utils::graphql_test_utils::{
+    gql_ctx_mock_data_store, TestCompileSingletonSchema,
 };
 use domain_engine_test_utils::{
     graphql_test_utils::{
         Exec, GraphqlTestResultExt, GraphqlValueResultExt, TestCompileSchema, ValueExt,
     },
     graphql_value_unordered,
-    system::mock_current_time_monotonic,
-    unimock,
 };
 use ontol_macros::{datastore_test, test};
-use ontol_runtime::ontology::Ontology;
 use ontol_test_utils::{examples::GITMESH, expect_eq, SrcName, TestPackages};
 use tracing::info;
 
-async fn make_domain_engine(ontology: Arc<Ontology>, datastore: &str) -> DomainEngine {
-    DomainEngine::builder(ontology)
-        .system(Box::new(unimock::Unimock::new(
-            mock_current_time_monotonic(),
-        )))
-        .build(DynamicDataStoreFactory::new(datastore), Session::default())
-        .await
-        .unwrap()
-}
+use crate::mk_engine_default;
 
 #[test(tokio::test)]
 async fn gitmesh_id_error() {
@@ -65,7 +50,7 @@ async fn gitmesh_id_error() {
 async fn misc(ds: &str) {
     let (test, [schema]) =
         TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
+    let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     info!("Create two users");
 
@@ -306,7 +291,7 @@ async fn misc(ds: &str) {
 async fn fancy_filters(ds: &str) {
     let (test, [schema]) =
         TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
+    let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     r#"mutation {
         User(
@@ -376,7 +361,7 @@ async fn fancy_filters(ds: &str) {
 async fn update_owner_relation(ds: &str) {
     let (test, [schema]) =
         TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
+    let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     let response = r#"mutation {
         User(
@@ -457,7 +442,7 @@ async fn update_owner_relation(ds: &str) {
 async fn patch_members(ds: &str) {
     let (test, [schema]) =
         TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
+    let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     r#"mutation {
         User(
@@ -602,7 +587,7 @@ async fn patch_members(ds: &str) {
 async fn ownership_transfer(ds: &str) {
     let (test, [schema]) =
         TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), ds).await.into();
+    let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     let response = r#"mutation {
         User(

@@ -1,6 +1,6 @@
 use crate::juniper;
 
-use super::{gql_def::Def, Ctx};
+use super::{gql_def::Def, OntologyCtx};
 
 pub struct DefDictionaryEntry {
     pub name: String,
@@ -9,7 +9,7 @@ pub struct DefDictionaryEntry {
 }
 
 #[juniper::graphql_object]
-#[graphql(context = Ctx)]
+#[graphql(context = OntologyCtx)]
 impl DefDictionaryEntry {
     fn name(&self) -> &str {
         &self.name
