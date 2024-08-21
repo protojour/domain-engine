@@ -17,6 +17,7 @@ use ontol_runtime::query::select::StructSelect;
 use ontol_runtime::DefId;
 use serde::de::value::StringDeserializer;
 use serde::Deserialize;
+use ulid::Ulid;
 
 use super::gql_def;
 use super::gql_dictionary;
@@ -35,10 +36,21 @@ impl Query {
         "0.1"
     }
 
-    fn domain(name: String, ctx: &OntologyCtx) -> FieldResult<gql_domain::Domain> {
-        let domain = ctx
-            .domains()
-            .find(|(_, d)| ctx.get_text_constant(d.unique_name()).to_string() == name);
+    fn domain(
+        id: Option<juniper::ID>,
+        name: Option<String>,
+        ctx: &OntologyCtx,
+    ) -> FieldResult<gql_domain::Domain> {
+        let domain = if let Some(id) = id {
+            let id = Ulid::from_string(&id)?;
+            ctx.domains().find(|(_, d)| d.domain_id().ulid == id)
+        } else if let Some(name) = name {
+            ctx.domains()
+                .find(|(_, d)| ctx.get_text_constant(d.unique_name()).to_string() == name)
+        } else {
+            None
+        };
+
         if let Some((id, _)) = domain {
             Ok(gql_domain::Domain { pkg_id: id })
         } else {

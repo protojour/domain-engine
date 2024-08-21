@@ -30,6 +30,11 @@ impl Domain {
         ctx[self.data(ctx).unique_name()].to_string()
     }
 
+    fn doc(&self, ctx: &OntologyCtx) -> Option<String> {
+        let text_constant = ctx.get_def_docs(self.data(ctx).def_id())?;
+        Some(ctx[text_constant].to_string())
+    }
+
     fn entities(&self, ctx: &OntologyCtx) -> Vec<gql_def::Entity> {
         let mut entities = vec![];
         for def in self.data(ctx).defs() {
