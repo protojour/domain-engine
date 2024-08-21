@@ -6,6 +6,7 @@ use ::serde::{Deserialize, Serialize};
 use ontol_macros::OntolDebug;
 use smallvec::SmallVec;
 use value::{TagFlags, ValueTagError};
+use vec_map::VecMapKey;
 
 pub mod attr;
 pub mod cast;
@@ -22,6 +23,7 @@ pub mod sequence;
 pub mod tuple;
 pub mod value;
 pub mod var;
+pub mod vec_map;
 pub mod vm;
 
 mod equality;
@@ -63,6 +65,12 @@ impl PackageId {
 
     pub const fn id(self) -> u16 {
         self.0
+    }
+}
+
+impl VecMapKey for PackageId {
+    fn index(&self) -> usize {
+        self.0 as usize
     }
 }
 

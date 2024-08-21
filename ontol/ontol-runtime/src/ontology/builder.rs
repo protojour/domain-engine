@@ -32,17 +32,11 @@ impl OntologyBuilder {
     }
 
     pub fn add_domain(&mut self, package_id: PackageId, domain: Domain) {
-        let index = package_id.0 as usize;
-        let domains = &mut self.ontology.data.domains;
-        domains.resize_with(std::cmp::max(domains.len(), index + 1), || None);
-        domains[index] = Some(domain);
+        self.ontology.data.domains.insert(package_id, domain);
     }
 
     pub fn domain_mut(&mut self, package_id: PackageId) -> &mut Domain {
-        match &mut self.ontology.data.domains[package_id.0 as usize] {
-            Some(domain) => domain,
-            None => panic!("no domain added for {package_id:?}"),
-        }
+        self.ontology.data.domains.get_mut(&package_id).unwrap()
     }
 
     pub fn add_package_config(&mut self, package_id: PackageId, config: PackageConfig) {
