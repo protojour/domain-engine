@@ -1,4 +1,4 @@
-use ontol_runtime::{property::PropertyCardinality, EdgeId, RelId};
+use ontol_runtime::{property::PropertyCardinality, EdgeId};
 use tracing::debug;
 
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
     misc::{MacroExpand, TypeParam},
     package::ONTOL_PKG,
     properties::{Constructor, Property},
-    relation::Relationship,
+    relation::{RelId, Relationship},
     sequence::Sequence,
     thesaurus::TypeRelation,
     types::{FormatType, Type, TypeRef, ERROR_TYPE},

@@ -462,7 +462,7 @@ impl<'a> Display for ValueDebug<'a, AttrMatrix> {
 mod tests {
     use std::collections::{BTreeMap, HashMap};
 
-    use crate::RelId;
+    use crate::PropId;
 
     use super::*;
     use num::rational::BigRational;
@@ -481,9 +481,9 @@ mod tests {
     fn value_size() {
         assert_eq!(32, std::mem::size_of::<Value>());
 
-        assert_eq!(24, std::mem::size_of::<BTreeMap<RelId, Value>>());
+        assert_eq!(24, std::mem::size_of::<BTreeMap<PropId, Value>>());
         assert_eq!(24, std::mem::size_of::<Vec<Value>>());
-        assert_eq!(48, std::mem::size_of::<HashMap<RelId, Value>>());
+        assert_eq!(48, std::mem::size_of::<HashMap<PropId, Value>>());
 
         assert_eq!(32, std::mem::size_of::<Attr>());
     }

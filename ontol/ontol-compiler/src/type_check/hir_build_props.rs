@@ -4,7 +4,7 @@ use ontol_runtime::{
     property::{Cardinality, PropertyCardinality, ValueCardinality},
     query::condition::SetOperator,
     var::Var,
-    DefId, DefPropTag, DefRelTag, PropId, RelId,
+    DefId, DefPropTag, PropId,
 };
 use smallvec::smallvec;
 use tracing::{debug, info};
@@ -18,7 +18,7 @@ use crate::{
     },
     primitive::PrimitiveKind,
     properties::Property,
-    relation::{rel_def_meta, RelParams},
+    relation::{rel_def_meta, DefRelTag, RelId, RelParams},
     repr::repr_model::{ReprKind, ReprScalarKind},
     thesaurus::TypeRelation,
     type_check::{ena_inference::Strength, hir_build::NodeInfo, TypeError},

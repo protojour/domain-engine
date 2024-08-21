@@ -5,10 +5,13 @@ use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
     interface::discriminator::Discriminant, ontology::ontol::ValueGenerator, DefId, PackageId,
-    PropId, RelId,
+    PropId,
 };
 
-use crate::{relation::Relationship, SourceSpan};
+use crate::{
+    relation::{RelId, Relationship},
+    SourceSpan,
+};
 
 #[derive(Default)]
 pub struct MiscCtx {

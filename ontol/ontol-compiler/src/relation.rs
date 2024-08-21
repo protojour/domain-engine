@@ -3,13 +3,14 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     ops::Range,
+    str::FromStr,
 };
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::domain::EdgeCardinalProjection,
     property::{Cardinality, ValueCardinality},
-    DefId, DefRelTag, RelId,
+    DefId, PackageId,
 };
 use tracing::trace;
 
@@ -66,6 +67,74 @@ impl RelCtx {
             .unwrap_or(DefRelTag(0));
 
         (0..max_tag.0).map(move |tag| RelId(def_id, DefRelTag(tag)))
+    }
+}
+
+/// The tag of a relationship belonging to a specific Def.
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct DefRelTag(pub u16);
+
+impl ::std::fmt::Debug for DefRelTag {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "rel@{}", self.0)
+    }
+}
+
+impl FromStr for DefRelTag {
+    type Err = ();
+
+    fn from_str(mut s: &str) -> Result<Self, Self::Err> {
+        s = s.strip_prefix("rel@").ok_or(())?;
+
+        let def_rel_tag: u16 = s.parse().map_err(|_| ())?;
+
+        Ok(DefRelTag(def_rel_tag))
+    }
+}
+
+/// The ID of some relationship between ONTOL types.
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct RelId(pub DefId, pub DefRelTag);
+
+impl RelId {
+    pub fn tag(&self) -> DefRelTag {
+        self.1
+    }
+}
+
+/// This forces single-line output even when pretty-printed
+impl ::std::fmt::Debug for RelId {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "rel@{}:{}:{}", self.0 .0.id(), self.0 .1, self.1 .0)
+    }
+}
+
+impl ::std::fmt::Display for RelId {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "rel@{}:{}:{}", self.0 .0.id(), self.0 .1, self.1 .0)
+    }
+}
+
+impl FromStr for RelId {
+    type Err = ();
+
+    fn from_str(mut s: &str) -> Result<Self, Self::Err> {
+        s = s.strip_prefix("rel@").ok_or(())?;
+
+        let mut iterator = s.split(':');
+        let Ok(package_id) =
+            PackageId::from_u16(iterator.next().ok_or(())?.parse().map_err(|_| ())?)
+        else {
+            panic!();
+        };
+        let def_idx: u16 = iterator.next().ok_or(())?.parse().map_err(|_| ())?;
+        let def_rel_tag: u16 = iterator.next().ok_or(())?.parse().map_err(|_| ())?;
+
+        if iterator.next().is_some() {
+            return Err(());
+        }
+
+        Ok(RelId(DefId(package_id, def_idx), DefRelTag(def_rel_tag)))
     }
 }
 

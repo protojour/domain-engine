@@ -2,7 +2,7 @@ use fnv::FnvHashSet;
 use ontol_runtime::{
     ontology::ontol::{TextLikeType, ValueGenerator},
     property::{PropertyCardinality, ValueCardinality},
-    DefId, PropId, RelId,
+    DefId, PropId,
 };
 use tracing::{debug, instrument, trace};
 
@@ -11,7 +11,7 @@ use crate::{
     error::CompileError,
     primitive::PrimitiveKind,
     properties::{Constructor, Property},
-    relation::rel_def_meta,
+    relation::{rel_def_meta, RelId},
     repr::repr_model::{ReprKind, ReprScalarKind, UnionBound},
     text_patterns::TextPatternSegment,
     types::{FormatType, Type},

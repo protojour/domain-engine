@@ -3,7 +3,7 @@ use fnv::FnvHashSet;
 use ontol_runtime::{
     ontology::{domain::DomainId, ontol::TextConstant},
     property::{PropertyCardinality, ValueCardinality},
-    DefId, EdgeId, PackageId, RelId,
+    DefId, EdgeId, PackageId,
 };
 use tracing::{debug, debug_span, info};
 use ulid::Ulid;
@@ -15,7 +15,7 @@ use crate::{
     misc::{MacroExpand, MacroItem, MiscCtx},
     namespace::DocId,
     package::ParsedPackage,
-    relation::{RelParams, Relationship},
+    relation::{RelId, RelParams, Relationship},
     repr::repr_model::ReprKind,
     thesaurus::{Thesaurus, TypeRelation},
     type_check::MapArmsKind,

@@ -1,14 +1,14 @@
 use ontol_runtime::{
     ontology::domain::{EntityOrder, FieldPath},
     query::order::Direction,
-    DefId, PropId, RelId,
+    DefId, PropId,
 };
 use tracing::{debug, info};
 
 use crate::{
     def::DefKind,
     properties::Constructor,
-    relation::{rel_def_meta, RelParams},
+    relation::{rel_def_meta, RelId, RelParams},
     repr::repr_model::{ReprKind, ReprScalarKind},
     thesaurus::TypeRelation,
     CompileError, CompileErrors, Compiler, SourceSpan,

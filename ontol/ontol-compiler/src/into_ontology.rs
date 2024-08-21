@@ -18,7 +18,7 @@ use ontol_runtime::{
     },
     property::ValueCardinality,
     rustdoc::RustDoc,
-    DefId, DefIdSet, EdgeId, PackageId, PropId, RelId,
+    DefId, DefIdSet, EdgeId, PackageId, PropId,
 };
 use std::{
     collections::{BTreeSet, HashMap},
@@ -38,7 +38,7 @@ use crate::{
     primitive::PrimitiveKind,
     properties::Properties,
     relation::{
-        rel_def_meta, rel_repr_meta, RelDefMeta, RelParams, Relationship, UnionMemberCache,
+        rel_def_meta, rel_repr_meta, RelDefMeta, RelId, RelParams, Relationship, UnionMemberCache,
     },
     repr::repr_model::{ReprKind, ReprScalarKind, UnionBound},
     strings::StringCtx,

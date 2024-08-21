@@ -1,9 +1,11 @@
 use std::collections::BTreeMap;
 
-use ontol_runtime::RelId;
 use tracing::debug;
 
-use crate::{error::CompileError, relation::RelParams};
+use crate::{
+    error::CompileError,
+    relation::{RelId, RelParams},
+};
 
 /// A sequence represents both finite tuples and infinite arrays,
 /// where elements may be of different types.

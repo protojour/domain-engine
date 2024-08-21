@@ -17,7 +17,7 @@ use ontol_runtime::{
     property::{PropertyCardinality, ValueCardinality},
     tuple::CardinalIdx,
     var::{Var, VarAllocator},
-    DefId, DefRelTag, PackageId, RelId,
+    DefId, PackageId,
 };
 use tracing::debug;
 
@@ -27,7 +27,7 @@ use crate::{
     namespace::Space,
     package::ONTOL_PKG,
     pattern::{Pattern, PatternKind},
-    relation::{RelParams, Relationship},
+    relation::{DefRelTag, RelId, RelParams, Relationship},
     CompileError, Compiler, SourceId, SourceSpan,
 };
 

@@ -1,9 +1,10 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
-use ontol_runtime::{property::Cardinality, DefId, DefPropTag, PropId, RelId};
+use ontol_runtime::{property::Cardinality, DefId, DefPropTag, PropId};
 use tracing::warn;
 
 use crate::{
+    relation::RelId,
     repr::{repr_ctx::ReprCtx, repr_model::ReprKind},
     sequence::Sequence,
     text_patterns::TextPatternSegment,

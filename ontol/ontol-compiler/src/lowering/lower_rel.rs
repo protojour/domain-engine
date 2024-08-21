@@ -8,14 +8,14 @@ use ontol_runtime::{
     ontology::domain::EdgeCardinalProjection,
     property::{PropertyCardinality, ValueCardinality},
     tuple::CardinalIdx,
-    DefId, DefRelTag, EdgeId, RelId,
+    DefId, EdgeId,
 };
 use tracing::debug_span;
 
 use crate::{
     def::{DefKind, RelationContext, TypeDef, TypeDefFlags},
     package::ONTOL_PKG,
-    relation::{RelParams, Relationship},
+    relation::{DefRelTag, RelId, RelParams, Relationship},
     CompileError, SourceSpan,
 };
 

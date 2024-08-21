@@ -5,7 +5,7 @@ use ontol_runtime::{
     property::{PropertyCardinality, ValueCardinality},
     tuple::CardinalIdx,
     var::Var,
-    DefId, PropId, RelId,
+    DefId, PropId,
 };
 use tracing::{debug, info};
 
@@ -16,7 +16,7 @@ use crate::{
     pattern::{CompoundPatternAttrKind, PatId, Pattern, PatternKind, Patterns, TypePath},
     primitive::Primitives,
     properties::{PropCtx, Property},
-    relation::{rel_def_meta, RelCtx, RelParams, Relationship},
+    relation::{rel_def_meta, RelCtx, RelId, RelParams, Relationship},
     CompileError, CompileErrors, Compiler, SourceSpan,
 };
 

@@ -11,13 +11,13 @@ use ontol_runtime::{
         ontol::TextLikeType,
     },
     var::VarAllocator,
-    DefId, PackageId, RelId,
+    DefId, PackageId,
 };
 
 use crate::{
     mem::Intern, namespace::Space, package::ONTOL_PKG, pattern::PatId, primitive::PrimitiveKind,
-    regex_util::parse_literal_regex, source::SourceSpan, strings::StringCtx, types::Type, Compiler,
-    SpannedBorrow, NO_SPAN,
+    regex_util::parse_literal_regex, relation::RelId, source::SourceSpan, strings::StringCtx,
+    types::Type, Compiler, SpannedBorrow, NO_SPAN,
 };
 use ontol_parser::U32Span;
 

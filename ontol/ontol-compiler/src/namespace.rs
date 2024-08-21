@@ -1,9 +1,9 @@
 use arcstr::ArcStr;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
-use ontol_runtime::{DefId, RelId};
+use ontol_runtime::DefId;
 
-use crate::PackageId;
+use crate::{relation::RelId, PackageId};
 
 /// Namespace disambiguator
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]

@@ -9,7 +9,7 @@ use std::collections::{hash_map::Entry, HashMap};
 
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
-use ontol_runtime::{ontology::ontol::TextLikeType, DefId, RelId};
+use ontol_runtime::{ontology::ontol::TextLikeType, DefId};
 use ordered_float::NotNan;
 use tracing::{debug_span, trace};
 
@@ -20,7 +20,7 @@ use crate::{
     package::ONTOL_PKG,
     primitive::{PrimitiveKind, Primitives},
     properties::{Constructor, PropCtx, Properties},
-    relation::{rel_def_meta, RelCtx, RelParams},
+    relation::{rel_def_meta, RelCtx, RelId, RelParams},
     repr::repr_model::UnionBound,
     thesaurus::{Is, Thesaurus, TypeRelation},
     types::{DefTypeCtx, Type},
