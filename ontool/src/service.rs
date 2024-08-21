@@ -11,6 +11,7 @@ use crate::graphql::{domain_graphql_handler, graphiql_handler, GraphqlService};
 use axum::{extract::FromRequestParts, routing::post, Extension};
 use domain_engine_core::{domain_error::DomainErrorKind, DomainEngine, DomainResult, Session};
 use domain_engine_graphql::{
+    gql_scalar::GqlScalar,
     juniper,
     ontology_schema::{OntologyCtx, OntologySchema},
     CreateSchemaError,
@@ -45,20 +46,23 @@ pub async fn domains_router(domain_engine: Arc<DomainEngine>, base_url: &str) ->
 }
 
 pub fn ontology_router(domain_engine: Arc<DomainEngine>, base_url: &str) -> axum::Router {
-    let ontology_schema =
-        OntologySchema::new(Default::default(), Default::default(), Default::default());
+    let ontology_schema = OntologySchema::new_with_scalar_value(
+        Default::default(),
+        Default::default(),
+        Default::default(),
+    );
 
     pub async fn ontology_schema_graphql_handler(
         Extension(schema): Extension<Arc<OntologySchema>>,
         Extension(domain_engine): Extension<Arc<DomainEngine>>,
-        JuniperRequest(req): JuniperRequest,
+        JuniperRequest(req): JuniperRequest<GqlScalar>,
     ) -> (
         axum::http::StatusCode,
-        axum::Json<juniper::http::GraphQLBatchResponse>,
+        axum::Json<juniper::http::GraphQLBatchResponse<GqlScalar>>,
     ) {
         let response = req
             .execute(
-                &schema,
+                schema.as_ref(),
                 &OntologyCtx::new(domain_engine, Session::default()),
             )
             .await;

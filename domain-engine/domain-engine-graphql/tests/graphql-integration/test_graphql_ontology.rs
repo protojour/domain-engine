@@ -1,6 +1,7 @@
 use domain_engine_core::Session;
 use domain_engine_graphql::{
     context::ServiceCtx,
+    gql_scalar::GqlScalar,
     ontology_schema::{OntologyCtx, OntologySchema},
 };
 use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema};
@@ -34,7 +35,7 @@ struct VerticesParams {
 }
 
 impl VerticesParams {
-    fn to_variables(self) -> juniper::Variables {
+    fn into_variables(self) -> juniper::Variables<GqlScalar> {
         let mut variables = juniper::Variables::default();
         variables.insert("defId".to_string(), format!("{:?}", self.def_id).into());
         variables
@@ -49,8 +50,11 @@ async fn test_stix_ontology(ds: &str) {
     let engine = mk_engine_default(test.ontology_owned(), ds).await;
     let domain_ctx: ServiceCtx = engine.clone().into();
     let ontology_ctx = OntologyCtx::new(engine, Session::default());
-    let ontology_schema =
-        OntologySchema::new(Default::default(), Default::default(), Default::default());
+    let ontology_schema = OntologySchema::new_with_scalar_value(
+        Default::default(),
+        Default::default(),
+        Default::default(),
+    );
 
     expect_eq!(
         actual = r"{ domains { id name } }"
@@ -86,6 +90,7 @@ async fn test_stix_ontology(ds: &str) {
         }))
     );
 
+    // insert Stix "identity" through domain schema
     r#"mutation {
         identity(create:[
             {
@@ -112,7 +117,7 @@ async fn test_stix_ontology(ds: &str) {
                 VerticesParams {
                     def_id: identity.def_id(),
                 }
-                .to_variables(),
+                .into_variables(),
                 &ontology_schema,
                 &ontology_ctx,
             )
@@ -131,9 +136,9 @@ async fn test_stix_ontology(ds: &str) {
             .unwrap()
             .as_list_value()
             .unwrap();
-        let vertex = elements.get(0).unwrap().as_object_value().unwrap();
-        let address: &juniper::Value = vertex.get_field_value("address").unwrap();
-        let juniper::Value::Scalar(juniper::DefaultScalarValue::String(address)) = address else {
+        let vertex = elements.first().unwrap().as_object_value().unwrap();
+        let address: &juniper::Value<GqlScalar> = vertex.get_field_value("address").unwrap();
+        let juniper::Value::Scalar(GqlScalar::String(address)) = address else {
             panic!("address was not a string: {address:?}");
         };
         info!("address is `{address}`");

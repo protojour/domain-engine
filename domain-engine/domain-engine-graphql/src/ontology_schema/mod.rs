@@ -1,6 +1,9 @@
 use std::{ops::Deref, sync::Arc};
 
-use crate::juniper::{self, EmptyMutation, EmptySubscription, RootNode};
+use crate::{
+    gql_scalar::GqlScalar,
+    juniper::{self, EmptyMutation, EmptySubscription, RootNode},
+};
 
 use domain_engine_core::{data_store::DataStore, DomainEngine, DomainResult, Session};
 use ontol_runtime::ontology::Ontology;
@@ -49,4 +52,4 @@ impl Deref for OntologyCtx {
 impl juniper::Context for OntologyCtx {}
 
 pub type OntologySchema =
-    RootNode<'static, Query, EmptyMutation<OntologyCtx>, EmptySubscription<OntologyCtx>>;
+    RootNode<'static, Query, EmptyMutation<OntologyCtx>, EmptySubscription<OntologyCtx>, GqlScalar>;
