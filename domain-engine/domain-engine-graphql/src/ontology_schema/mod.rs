@@ -15,6 +15,7 @@ mod gql_dictionary;
 mod gql_domain;
 mod gql_query;
 mod gql_rel;
+mod gql_value;
 mod gql_vertex;
 
 /// The Ctx is the source of information for all Ontology GraphQL interactions.

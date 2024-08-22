@@ -1,45 +1,17 @@
 use ::juniper::{FieldResult, GraphQLObject};
-use base64::Engine;
-use fnv::FnvHashMap;
-use ontol_runtime::{attr::Attr, sequence::Sequence, value::Value, DefId, PropId};
+use ontol_runtime::{sequence::Sequence, value::Value};
 
-use crate::{cursor_util::serialize_cursor, field_error, juniper};
+use crate::{cursor_util::serialize_cursor, gql_scalar::GqlScalar, juniper};
 
-use super::{gql_def, OntologyCtx};
-
-pub struct Vertex {
-    pub def_id: DefId,
-    pub attrs: FnvHashMap<PropId, Attr>,
-}
-
-#[juniper::graphql_object]
-#[graphql(context = OntologyCtx)]
-impl Vertex {
-    /// The data store address of this vertex
-    fn address(&self, ctx: &OntologyCtx) -> Option<juniper::ID> {
-        match self
-            .attrs
-            .get(&ctx.ontol_domain_meta().data_store_address_prop_id())?
-            .as_unit()?
-        {
-            Value::OctetSequence(seq, _) => Some(
-                base64::engine::general_purpose::STANDARD
-                    .encode(&seq.0)
-                    .into(),
-            ),
-            _ => None,
-        }
-    }
-
-    fn def(&self) -> gql_def::Def {
-        gql_def::Def { id: self.def_id }
-    }
-}
+use super::{
+    gql_value::{self, write_ontol_scalar, OntolValue2, ValueScalarCfg},
+    OntologyCtx,
+};
 
 #[derive(GraphQLObject)]
-#[graphql(context = OntologyCtx)]
+#[graphql(context = OntologyCtx, scalar = GqlScalar)]
 pub struct VertexConnection {
-    pub elements: Vec<Vertex>,
+    pub elements: Vec<gql_value::OntolValue2>,
     pub page_info: Option<PageInfo>,
 }
 
@@ -51,19 +23,28 @@ pub struct PageInfo {
 }
 
 impl VertexConnection {
-    pub fn from_sequence(sequence: Sequence<Value>) -> FieldResult<Self> {
+    pub fn from_sequence(
+        sequence: Sequence<Value>,
+        cfg: ValueScalarCfg,
+        ctx: &OntologyCtx,
+    ) -> FieldResult<Self> {
         let (elements, sub_seq) = sequence.split();
 
         let elements = elements
             .into_iter()
-            .map(|value| match value {
-                Value::Struct(attrs, tag) => Ok(Vertex {
-                    def_id: tag.into(),
-                    attrs: *attrs,
-                }),
-                _ => Err(field_error("vertex must be a struct")),
+            .map(|value| {
+                let mut gobj = juniper::Object::with_capacity(3);
+                write_ontol_scalar(&mut gobj, value, cfg, ctx);
+                OntolValue2(juniper::Value::Object(gobj))
             })
-            .collect::<FieldResult<_>>()?;
+            // .map(|value| match value {
+            //     Value::Struct(attrs, tag) => Ok(gql_value::StructValue {
+            //         def_id: tag.into(),
+            //         attrs: *attrs,
+            //     }),
+            //     _ => Err(field_error("vertex must be a struct")),
+            // })
+            .collect();
 
         Ok(Self {
             elements,

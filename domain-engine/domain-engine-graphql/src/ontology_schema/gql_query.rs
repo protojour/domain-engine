@@ -3,6 +3,7 @@ use std::str::FromStr;
 
 use crate::cursor_util::GraphQLCursor;
 use crate::field_error;
+use crate::gql_scalar::GqlScalar;
 use crate::juniper::{self, graphql_object, FieldResult};
 
 use domain_engine_core::transact::AccumulateSequences;
@@ -23,6 +24,7 @@ use super::gql_def;
 use super::gql_dictionary;
 use super::gql_dictionary::DefDictionaryEntry;
 use super::gql_domain;
+use super::gql_value::ValueScalarCfg;
 use super::gql_vertex;
 use super::OntologyCtx;
 
@@ -30,7 +32,7 @@ use super::OntologyCtx;
 pub struct Query;
 
 #[graphql_object]
-#[graphql(context = OntologyCtx)]
+#[graphql(context = OntologyCtx, scalar = GqlScalar)]
 impl Query {
     fn api_version() -> &'static str {
         "0.1"
@@ -101,6 +103,8 @@ impl Query {
         def_id: String,
         first: i32,
         after: Option<String>,
+        with_address: Option<bool>,
+        with_def_id: Option<bool>,
         ctx: &OntologyCtx,
     ) -> FieldResult<gql_vertex::VertexConnection> {
         let data_store = ctx.data_store().map_err(field_error)?;
@@ -108,6 +112,10 @@ impl Query {
         let _def = ctx
             .get_def(def_id)
             .ok_or_else(|| field_error("invalid def id"))?;
+        let cfg = ValueScalarCfg {
+            with_address: with_address.unwrap_or(true),
+            with_def_id: with_def_id.unwrap_or(true),
+        };
 
         let messages = [Ok(ReqMessage::Query(
             0,
@@ -148,6 +156,6 @@ impl Query {
             .next()
             .ok_or_else(|| field_error("nothing returned"))?;
 
-        gql_vertex::VertexConnection::from_sequence(sequence)
+        gql_vertex::VertexConnection::from_sequence(sequence, cfg, ctx)
     }
 }

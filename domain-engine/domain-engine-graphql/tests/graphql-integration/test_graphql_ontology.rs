@@ -16,20 +16,6 @@ use tracing::info;
 
 use crate::mk_engine_default;
 
-const VERTICES: &str = r#"
-query vertices($defId: String!) {
-    vertices(defId: $defId, first: 100) {
-        elements {
-            address
-        }
-        pageInfo {
-            hasNextPage
-            endCursor
-        }
-    }
-}
-"#;
-
 #[derive(Default)]
 struct Params {
     def_id: Option<DefId>,
@@ -58,6 +44,27 @@ async fn test_stix_ontology(ds: &str) {
         Default::default(),
         Default::default(),
     );
+
+    // insert Stix "identity" through domain schema
+    r#"mutation {
+        identity(create:[
+            {
+                id: "identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5",
+                modified: "2017-06-01T00:00:00.000Z",
+                object_marking_refs: [],
+                name: "The MITRE Corporation",
+                created: "2017-06-01T00:00:00.000Z",
+                type: "identity",
+                identity_class: "organization",
+                spec_version: "2.1",
+            }
+        ]) {
+            node { id }
+        }
+    }"#
+    .exec([], &stix_schema, &domain_ctx)
+    .await
+    .unwrap();
 
     expect_eq!(
         actual = r"{ domains { id name } }"
@@ -143,38 +150,99 @@ async fn test_stix_ontology(ds: &str) {
         }))
     );
 
-    // insert Stix "identity" through domain schema
-    r#"mutation {
-        identity(create:[
-            {
-                id: "identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5",
-                modified: "2017-06-01T00:00:00.000Z",
-                object_marking_refs: [],
-                name: "The MITRE Corporation",
-                created: "2017-06-01T00:00:00.000Z",
-                type: "identity",
-                identity_class: "organization",
-                spec_version: "2.1",
+    expect_eq!(
+        actual = r#"
+            query vertices($defId: String!) {
+                vertices(defId: $defId, first: 100, withAddress: false, withDefId: false) {
+                    elements
+                }
             }
-        ]) {
-            node { id }
-        }
-    }"#
-    .exec([], &stix_schema, &domain_ctx)
-    .await
-    .unwrap();
+            "#
+        .exec(
+            Params {
+                def_id: Some(identity.def_id()),
+            },
+            &ontology_schema,
+            &ontology_ctx,
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "vertices": {
+                "elements": [
+                    {
+                        "type": "struct",
+                        "attrs": [
+                            {
+                                "propId": "p@1:59:0",
+                                "attr": "unit",
+                                "type": "text",
+                                "value": "identity",
+                            },
+                            {
+                                "propId": "p@1:59:1",
+                                "attr": "unit",
+                                "type": "struct",
+                            },
+                            {
+                                "propId": "p@1:59:2",
+                                "attr": "unit",
+                                "type": "text",
+                                "value": "2.1",
+                            },
+                            {
+                                "propId": "p@1:59:3",
+                                "attr": "unit",
+                                "type": "datetime",
+                                "value": "2017-06-01T00:00:00Z",
+                            },
+                            {
+                                "propId": "p@1:59:4",
+                                "attr": "unit",
+                                "type": "datetime",
+                                "value": "2017-06-01T00:00:00Z",
+                            },
+                            {
+                                "propId": "p@1:59:13",
+                                "attr": "unit",
+                                "type": "text",
+                                "value": "The MITRE Corporation"
+                            },
+                            {
+                                "propId": "p@1:59:16",
+                                "attr": "unit",
+                                "type": "text",
+                                "value": "organization"
+                            },
+                        ]
+                    }
+                ]
+            }
+        }))
+    );
 
     {
-        let vertices_response = VERTICES
-            .exec(
-                Params {
-                    def_id: Some(identity.def_id()),
-                },
-                &ontology_schema,
-                &ontology_ctx,
-            )
-            .await
-            .unwrap();
+        let vertices_response = r#"
+            query vertices($defId: String!) {
+                vertices(defId: $defId, first: 100) {
+                    elements {
+                        address
+                    }
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                }
+            }
+            "#
+        .exec(
+            Params {
+                def_id: Some(identity.def_id()),
+            },
+            &ontology_schema,
+            &ontology_ctx,
+        )
+        .await
+        .unwrap();
 
         let vertices = vertices_response
             .as_object_value()
