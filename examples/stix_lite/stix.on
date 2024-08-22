@@ -353,10 +353,10 @@ def @macro SCO_interface (
 
 /// Attack Patterns are a type of TTP that describe ways that adversaries attempt to compromise targets.
 def attack-pattern (
-    rel* is: SDO_interface
-    rel {stix-object} is?: *
     rel* type: 'attack-pattern'
     rel. id[rel* gen: auto]: attack-pattern-id
+    rel* is: SDO_interface
+    rel {stix-object} is?: *
 
     /// A name used to identify the Attack Pattern.
     rel* 'name': common.string
@@ -381,10 +381,10 @@ def attack-pattern (
 /// 
 /// For example, a Campaign could be used to describe a crime syndicate's attack using a specific variant of malware and new C2 servers against the executives of ACME Bank during the summer of 2016 in order to gain secret information about an upcoming merger with another bank.
 def campaign (
-    rel* is: SDO_interface
-    rel {stix-object} is?: *
     rel* type: 'campaign'
     rel. id[rel* gen: auto]: campaign-id
+    rel* is: SDO_interface
+    rel {stix-object} is?: *
 
     /// A name used to identify the Campaign.
     rel* 'name': common.string
@@ -420,10 +420,10 @@ def campaign (
 ///
 /// The CoA includes the encoded content of an action or a reference to an externally defined action identified by the action_type property. 
 def course-of-action (
-    rel* is: SDO_interface
-    rel {stix-object} is?: *
     rel* type: 'course-of-action'
     rel. id[rel* gen: auto]: course-of-action-id
+    rel* is: SDO_interface
+    rel {stix-object} is?: *
 
     /// A name used to identify the Course of Action.
     rel* 'name': common.string
@@ -475,10 +475,10 @@ def course-of-action (
 /// For example, a Grouping could be used to characterize an ongoing investigation into a security event or incident.
 /// A Grouping object could also be used to assert that the referenced STIX Objects are related to an ongoing analysis process, such as when a threat analyst is collaborating with others in their trust community to examine a series of Campaigns and Indicators. The Grouping SDO contains a list of references to SDOs, SCOs, and SROs, along with an explicit statement of the context shared by the content, a textual description, and the name of the grouping.
 def grouping (
-    rel* is: SDO_interface
-    rel {stix-object} is?: *
     rel* type: 'grouping'
     rel. id[rel* gen: auto]: grouping-id
+    rel* is: SDO_interface
+    rel {stix-object} is?: *
 
     /// A name used to identify the Grouping.
     rel* 'name': common.string
@@ -498,10 +498,10 @@ def grouping (
 ///
 /// The Identity SDO can capture basic identifying information, contact information, and the sectors that the Identity belongs to. Identity is used in STIX to represent, among other things, targets of attacks, information sources, object creators, and threat actor identities.
 def identity (
-    rel* is: SDO_interface
-    rel {stix-object} is?: *
     rel* type: 'identity'
     rel. id[rel* gen: auto]: identity-id
+    rel* is: SDO_interface
+    rel {stix-object} is?: *
 
     /// The name of this Identity.
     /// When referring to a specific entity (e.g., an individual or organization), this property SHOULD contain the canonical name of the specific entity.
@@ -528,10 +528,10 @@ def identity (
 )
 
 def indicator (
-    rel* is: SDO_interface
-    rel {stix-object} is?: *
     rel* type: 'indicator'
     rel. id[rel* gen: auto]: indicator-id
+    rel* is: SDO_interface
+    rel {stix-object} is?: *
 
     /// A name used to identify the Indicator.
     ///
@@ -576,10 +576,10 @@ def indicator (
 /// The Infrastructure SDO represents a type of TTP and describes any systems, software services and any associated physical or virtual resources intended to support some purpose (e.g., C2 servers used as part of an attack, device or server that are part of defence, database servers targeted by an attack, etc.).
 /// While elements of an attack can be represented by other SDOs or SCOs, the Infrastructure SDO represents a named group of related data that constitutes the infrastructure.
 def infrastructure (
-    rel* is: SDO_interface
-    rel {stix-object} is?: *
     rel* type: 'infrastructure'
     rel. id[rel* gen: auto]: infrastructure-id
+    rel* is: SDO_interface
+    rel {stix-object} is?: *
 
     /// A name or characterizing text used to identify the Infrastructure.
     rel* 'name': common.string
@@ -616,10 +616,10 @@ def infrastructure (
 /// While sometimes an Intrusion Set is not active, or changes focus, it is usually difficult to know if it has truly disappeared or ended.
 /// Analysts may have varying level of fidelity on attributing an Intrusion Set back to Threat Actors and may be able to only attribute it back to a nation state or perhaps back to an organization within that nation state.
 def intrusion-set (
-    rel* is: SDO_interface
-    rel {stix-object} is?: *
     rel* type: 'intrusion-set'
     rel. id[rel* gen: auto]: intrusion-set-id
+    rel* is: SDO_interface
+    rel {stix-object} is?: *
 
     /// A name used to identify this Intrusion Set.
     rel* 'name': common.string
@@ -695,10 +695,10 @@ def intrusion-set (
 /// Organizations specifying a designated location using latitude and longitude SHOULD specify the precision which is appropriate for the scope of the location being identified.
 /// The scope is defined by the boundary as outlined by the precision around the coordinates.
 def location (
-    rel* is: SDO_interface
-    rel {stix-object} is?: *
     rel* type: 'location'
     rel. id[rel* gen: auto]: location-id
+    rel* is: SDO_interface
+    rel {stix-object} is?: *
 
     /// A name used to identify the Location.
     rel* 'name'?: common.string
@@ -762,10 +762,10 @@ def location (
 ///
 /// To minimize the risk of a consumer compromising their system in parsing malware samples, producers SHOULD consider sharing defanged content (archive and password-protected samples) instead of raw, base64-encoded malware samples.
 def malware (
-    rel* is: SDO_interface
-    rel {stix-object} is?: *
     rel* type: 'malware'
     rel. id[rel* gen: auto]: malware-id
+    rel* is: SDO_interface
+    rel {stix-object} is?: *
 
     /// A name used to identify the malware instance or family, as specified by the producer of the SDO.
     /// For a malware family the name MUST be defined. If a name for a malware instance is not available, the SHA-256 hash value or sample’s filename MAY be used instead.
@@ -832,10 +832,10 @@ def malware (
 /// Malware Analysis captures the metadata and results of a particular static or dynamic analysis performed on a malware instance or family.
 /// One of av_result or analysis_sco_refs MUST be provided.
 def malware-analysis (
-    rel* is: SDO_interface
-    rel {stix-object} is?: *
     rel* type: 'malware-analysis'
     rel. id[rel* gen: auto]: malware-analysis-id
+    rel* is: SDO_interface
+    rel {stix-object} is?: *
 
     /// The name of the analysis engine or product that was used.
     /// Product names SHOULD be all lowercase with words separated by a dash `"-"`.
@@ -857,10 +857,10 @@ def malware-analysis (
 /// Because Notes are typically (though not always) created by human analysts and are comprised of human-oriented text, they contain an additional property to capture the analyst(s) that created the Note.
 /// This is distinct from the created_by_ref property, which is meant to capture the organization that created the object.
 def note (
-    rel* is: SDO_interface
-    rel {stix-object} is?: *
     rel* type: 'note'
     rel. id[rel* gen: auto]: note-id
+    rel* is: SDO_interface
+    rel {stix-object} is?: *
 
     /// A brief summary of the note content.
     rel* 'abstract'?: common.string
@@ -897,10 +897,10 @@ def note (
 /// 
 /// To support backwards compatibility, related SCOs can still be specified using the objects properties, Either the objects property or the object_refs property MUST be provided, but both MUST NOT be present at the same time.
 def observed-data (
-    rel* is: SDO_interface
-    rel {stix-object} is?: *
     rel* type: 'observed-data'
     rel. id[rel* gen: auto]: observed-data-id
+    rel* is: SDO_interface
+    rel {stix-object} is?: *
 
     /// The beginning of the time window during which the data was seen.
     rel* 'first_observed': common.timestamp
@@ -938,10 +938,10 @@ def observed-data (
 /// Because Opinions are typically (though not always) created by human analysts and are comprised of human-oriented text, they contain an additional property to capture the analyst(s) that created the Opinion.
 /// This is distinct from the created_by_ref property, which is meant to capture the organization that created the object.
 def opinion (
-    rel* is: SDO_interface
-    rel {stix-object} is?: *
     rel* type: 'opinion'
     rel. id[rel* gen: auto]: opinion-id
+    rel* is: SDO_interface
+    rel {stix-object} is?: *
 
     /// An explanation of why the producer has this Opinion.
     /// For example, if an Opinion of strongly-disagree is given, the explanation can contain an explanation of why the Opinion producer disagrees and what evidence they have for their disagreement.
@@ -967,10 +967,10 @@ def opinion (
 /// For example, a threat report produced by ACME Defense Corp. discussing the Glass Gazelle campaign should be represented using Report.
 /// The Report itself would contain the narrative of the report while the Campaign SDO and any related SDOs (e.g., Indicators for the Campaign, Malware it uses, and the associated Relationships) would be referenced in the report contents.
 def report (
-    rel* is: SDO_interface
-    rel {stix-object} is?: *
     rel* type: 'report'
     rel. id[rel* gen: auto]: report-id
+    rel* is: SDO_interface
+    rel {stix-object} is?: *
 
     /// A name used to identify the Report.
     rel* 'name': common.string
@@ -999,10 +999,10 @@ def report (
 ///
 /// Threat Actors can be characterized by their motives, capabilities, goals, sophistication level, past activities, resources they have access to, and their role in the organization.
 def threat-actor (
-    rel* is: SDO_interface
-    rel {stix-object} is?: *
     rel* type: 'threat-actor'
     rel. id[rel* gen: auto]: threat-actor-id
+    rel* is: SDO_interface
+    rel {stix-object} is?: *
 
     /// A name used to identify this Threat Actor or Threat Actor group.
     rel* 'name': common.string
@@ -1091,10 +1091,10 @@ def threat-actor (
 /// This SDO MUST NOT be used to characterize malware.
 /// Further, Tool MUST NOT be used to characterise tools used as part of a course of action in response to an attack.
 def tool (
-    rel* is: SDO_interface
-    rel {stix-object} is?: *
     rel* type: 'tool'
     rel. id[rel* gen: auto]: tool-id
+    rel* is: SDO_interface
+    rel {stix-object} is?: *
 
     /// The name used to identify the Tool.
     rel* 'name': common.string
@@ -1125,10 +1125,10 @@ def tool (
 /// Typically, other SDOs assert relationships to Vulnerability objects when a specific vulnerability is targeted and exploited as part of malicious cyber activity.
 /// As such, Vulnerability objects can be used as a linkage to the asset management and compliance process.
 def vulnerability (
-    rel* is: SDO_interface
-    rel {stix-object} is?: *
     rel* type: 'vulnerability'
     rel. id[rel* gen: auto]: vulnerability-id
+    rel* is: SDO_interface
+    rel {stix-object} is?: *
 
     // A list of external references which refer to non-STIX information.
     // This property MAY be used to provide one or more Vulnerability identifiers, such as a CVE ID [CVE].
@@ -1147,10 +1147,10 @@ def vulnerability (
 ///
 /// One of `payload_bin` or `url` MUST be provided. It is incumbent on object creators to ensure that the URL is accessible for downstream consumers.
 def artifact (
-    rel* is: SCO_interface
-    rel {stix-object} is?: *
     rel* type: 'artifact'
     rel. id[rel* gen: auto]: artifact-id
+    rel* is: SCO_interface
+    rel {stix-object} is?: *
 
     /// Whenever feasible, this value SHOULD be one of the values defined in the Template column in the IANA media type registry [Media Types].
     /// Maintaining a comprehensive universal catalog of all extant file types is obviously not possible. When specifying a MIME Type not included in the IANA registry, implementers should use their best judgement so as to facilitate interoperability.
@@ -1185,10 +1185,10 @@ def artifact (
 
 /// The AS object represents the properties of an Autonomous System (AS).
 def autonomous-system (
-    rel* is: SCO_interface
-    rel {stix-object} is?: *
     rel* type: 'autonomous-system'
     rel. id[rel* gen: auto]: autonomous-system-id
+    rel* is: SCO_interface
+    rel {stix-object} is?: *
 
     /// Specifies the number assigned to the AS. Such assignments are typically performed by a Regional Internet Registry (RIR).
     rel* 'number': common.integer
@@ -1202,10 +1202,10 @@ def autonomous-system (
 
 /// The Directory object represents the properties common to a file system directory. 
 def directory (
-    rel* is: SCO_interface
-    rel {stix-object} is?: *
     rel* type: 'directory'
     rel. id[rel* gen: auto]: directory-id
+    rel* is: SCO_interface
+    rel {stix-object} is?: *
 
     /// Specifies the path, as originally observed, to the directory on the file system.
     rel* 'path': common.string
@@ -1236,10 +1236,10 @@ def directory (
 
 /// The Domain Name object represents the properties of a network domain name.
 def domain-name (
-    rel* is: SCO_interface
-    rel {stix-object} is?: *
     rel* type: 'domain-name'
     rel. id[rel* gen: auto]: domain-name-id
+    rel* is: SCO_interface
+    rel {stix-object} is?: *
 
     /// Specifies the value of the domain name.
     /// The value of this property MUST conform to [RFC1034], and each domain and sub-domain contained within the domain name MUST conform to [RFC5890].
@@ -1251,10 +1251,10 @@ def domain-name (
 
 /// The Email Address object represents a single email address.
 def email-addr (
-    rel* is: SCO_interface
-    rel {stix-object} is?: *
     rel* type: 'email-addr'
     rel. id[rel* gen: auto]: email-addr-id
+    rel* is: SCO_interface
+    rel {stix-object} is?: *
 
     /// Specifies the value of the email address. This MUST NOT include the display name.
     ///
@@ -1317,10 +1317,10 @@ def mime-part-type (
 /// Any characters in the encoded value which cannot be decoded into Unicode SHOULD be replaced with the 'REPLACEMENT CHARACTER' (U+FFFD).
 /// If it is necessary to capture the header value as observed, this can be achieved by referencing an Artifact object through the raw_email_ref property.
 def email-message (
-    rel* is: SCO_interface
-    rel {stix-object} is?: *
     rel* type: 'email-message'
     rel. id[rel* gen: auto]: email-message-id
+    rel* is: SCO_interface
+    rel {stix-object} is?: *
 
     /// Indicates whether the email body contains multiple MIME parts.
     rel* 'is_multipart': boolean
@@ -1393,10 +1393,10 @@ def email-message (
 /// The File object represents the properties of a file.
 /// A File object MUST contain at least one of hashes or name.
 def file (
-    rel* is: SCO_interface
-    rel {stix-object} is?: *
     rel* type: 'file'
     rel. id[rel* gen: auto]: file-id
+    rel* is: SCO_interface
+    rel {stix-object} is?: *
 
     /// The File object defines the following extensions. In addition to these, producers MAY create their own.
     ///
@@ -1465,10 +1465,10 @@ def file (
 
 /// The IPv4 Address object represents one or more IPv4 addresses expressed using CIDR notation.
 def ipv4-addr(
-    rel* is: SCO_interface
-    rel {stix-object} is?: *
     rel* type: 'ipv4-addr'
     rel. id[rel* gen: auto]: ipv4-addr-id
+    rel* is: SCO_interface
+    rel {stix-object} is?: *
 
     /// Specifies the values of one or more IPv4 addresses expressed using CIDR notation.
     ///
@@ -1484,10 +1484,10 @@ def ipv4-addr(
 
 /// The IPv6 Address object represents one or more IPv6 addresses expressed using CIDR notation.
 def ipv6-addr(
-    rel* is: SCO_interface
-    rel {stix-object} is?: *
     rel* type: 'ipv6-addr'
     rel. id[rel* gen: auto]: ipv6-addr-id
+    rel* is: SCO_interface
+    rel {stix-object} is?: *
 
     /// Specifies the values of one or more IPv6 addresses expressed using CIDR notation.
     ///
@@ -1500,10 +1500,10 @@ def ipv6-addr(
 
 /// The MAC Address object represents a single Media Access Control (MAC) address.
 def mac-addr (
-    rel* is: SCO_interface
-    rel {stix-object} is?: *
     rel* type: 'mac-addr'
     rel. id[rel* gen: auto]: mac-addr-id
+    rel* is: SCO_interface
+    rel {stix-object} is?: *
 
     /// Specifies the value of a single MAC address.
     ///
@@ -1516,10 +1516,10 @@ def mac-addr (
 
 /// The Mutex object represents the properties of a mutual exclusion (mutex) object.
 def mutex (
-    rel* is: SCO_interface
-    rel {stix-object} is?: *
     rel* type: 'mutex'
     rel. id[rel* gen: auto]: mutex-id
+    rel* is: SCO_interface
+    rel {stix-object} is?: *
 
     /// Specifies the name of the mutex object.
     rel* 'name': common.string
@@ -1532,10 +1532,10 @@ def mutex (
 /// To allow for use cases where a source or destination address may be sensitive and not suitable for sharing, such as addresses that are internal to an organization’s network, the source and destination properties (src_ref and dst_ref, respectively) are defined as optional in the properties table below.
 /// However, a Network Traffic object MUST contain the protocols property and at least one of the src_ref or dst_ref properties and SHOULD contain the src_port and dst_port properties. 
 def network-traffic (
-    rel* is: SCO_interface
-    rel {stix-object} is?: *
     rel* type: 'network-traffic'
     rel. id[rel* gen: auto]: network-traffic-id
+    rel* is: SCO_interface
+    rel {stix-object} is?: *
 
     /// The Network Traffic object defines the following extensions. In addition to these, producers MAY create their own.
     ///
@@ -1663,10 +1663,10 @@ def network-traffic (
 /// The Process object represents common properties of an instance of a computer program as executed on an operating system.
 /// A Process object MUST contain at least one property (other than type) from this object (or one of its extensions).
 def process (
-    rel* is: SCO_interface
-    rel {stix-object} is?: *
     rel* type: 'process'
     rel. id[rel* gen: auto]: process-id
+    rel* is: SCO_interface
+    rel {stix-object} is?: *
 
     /// The Process object defines the following extensions. In addition to these, producers MAY create their own.
     ///
@@ -1726,10 +1726,10 @@ def process (
 
 /// The Software object represents high-level properties associated with software, including software products.
 def software (
-    rel* is: SCO_interface
-    rel {stix-object} is?: *
     rel* type: 'software'
     rel. id[rel* gen: auto]: software-id
+    rel* is: SCO_interface
+    rel {stix-object} is?: *
 
     /// Specifies the name of the software.
     rel* 'name': common.string
@@ -1753,10 +1753,10 @@ def software (
 
 /// The URL object represents the properties of a uniform resource locator (URL).
 def url (
-    rel* is: SCO_interface
-    rel {stix-object} is?: *
     rel* type: 'url'
     rel. id[rel* gen: auto]: url-id
+    rel* is: SCO_interface
+    rel {stix-object} is?: *
 
     /// Specifies the value of the URL.
     /// The value of this property MUST conform to [RFC3986], more specifically section 1.1.3 with reference to the definition for "Uniform Resource Locator".
@@ -1766,10 +1766,10 @@ def url (
 /// The User Account object represents an instance of any type of user account, including but not limited to operating system, device, messaging service, and social media platform accounts.
 /// As all properties of this object are optional, at least one of the properties defined below MUST be included when using this object.
 def user-account (
-    rel* is: SCO_interface
-    rel {stix-object} is?: *
     rel* type: 'user-account'
     rel. id[rel* gen: auto]: user-account-id
+    rel* is: SCO_interface
+    rel {stix-object} is?: *
 
     /// The User Account object defines the following extensions. In addition to these, producers MAY create their own.
     ///
@@ -1847,10 +1847,10 @@ def windows-registry-value-type (
 
 /// The Registry Key object represents the properties of a Windows registry key. As all properties of this object are optional, at least one of the properties defined below MUST be included when using this object.
 def windows-registry-key (
-    rel* is: SCO_interface
-    rel {stix-object} is?: *
     rel* type: 'windows-registry-key'
     rel. id[rel* gen: auto]: windows-registry-key-id
+    rel* is: SCO_interface
+    rel {stix-object} is?: *
 
     /// Specifies the full registry key including the hive.
     ///
@@ -1929,10 +1929,10 @@ def x509-v3-extensions-type(
 /// The X.509 Certificate object represents the properties of an X.509 certificate, as defined by ITU recommendation X.509 [X.509].
 /// An X.509 Certificate object MUST contain at least one property (other than type) from this object.
 def x509-certificate(
-    rel* is: SCO_interface
-    rel {stix-object} is?: *
     rel* type: 'x509-certificate'
     rel. id[rel* gen: auto]: x509-certificate-id
+    rel* is: SCO_interface
+    rel {stix-object} is?: *
 
     /// Specifies whether the certificate is self-signed, i.e., whether it is signed by the same entity whose identity it certifies.
     rel* 'is_self_signed'?: boolean
@@ -1977,10 +1977,10 @@ def x509-certificate(
 )
 
 def relationship (
-    rel* is: SRO_interface
-    rel {stix-object} is?: *
     rel* type: 'relationship'
     rel. id[rel* gen: auto]: relationship-id
+    rel* is: SRO_interface
+    rel {stix-object} is?: *
 
     /// The name used to identify the type of Relationship.
     /// This value SHOULD be an exact value listed in the relationships for the source and target SDO, but MAY be any string.
@@ -2023,14 +2023,14 @@ def relationship (
 ///
 /// The JSON MTI serialization uses the JSON Object type [RFC8259] when representing marking-definition.
 def marking-definition (
+    rel* type: 'marking-definition'
+    rel. id: marking-definition-id
+
     rel* is: interface.spec_version
     rel* is: interface.created
     rel* is: interface.external_references
     rel* is: created_by_interface
     rel {stix-object} is?: *
-
-    rel* type: 'marking-definition'
-    rel. id: marking-definition-id
 
     /// A name used to identify the Marking Definition.
     rel* 'name'?: common.string

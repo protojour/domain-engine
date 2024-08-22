@@ -73,7 +73,7 @@ impl Query {
                 return Ok(gql_def::Def { id: def.id });
             }
         }
-        Err(field_error("TypeInfo not found"))
+        Err(field_error("Def not found"))
     }
 
     fn def_dictionary(ctx: &OntologyCtx) -> Vec<DefDictionaryEntry> {

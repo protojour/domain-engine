@@ -10,7 +10,7 @@ use ulid::Ulid;
 
 use crate::{
     impl_ontol_debug, interface::serde::operator::SerdeOperatorAddr, property::Cardinality,
-    query::order::Direction, tuple::CardinalIdx, DefId, DefIdSet, EdgeId, PropId,
+    query::order::Direction, tuple::CardinalIdx, DefId, DefIdSet, EdgeId, FnvIndexMap, PropId,
 };
 
 use super::{
@@ -33,7 +33,7 @@ pub struct Domain {
     unique_name: TextConstant,
 
     /// Types by DefId.1 (the type's index within the domain)
-    types: Vec<Def>,
+    defs: Vec<Def>,
 
     edges: BTreeMap<EdgeId, EdgeInfo>,
 }
@@ -44,7 +44,7 @@ impl Domain {
             domain_id,
             def_id,
             unique_name,
-            types: Default::default(),
+            defs: Default::default(),
             edges: Default::default(),
         }
     }
@@ -62,19 +62,19 @@ impl Domain {
     }
 
     pub fn type_count(&self) -> usize {
-        self.types.len()
+        self.defs.len()
     }
 
     pub fn def(&self, def_id: DefId) -> &Def {
-        &self.types[def_id.1 as usize]
+        &self.defs[def_id.1 as usize]
     }
 
     pub fn def_option(&self, def_id: DefId) -> Option<&Def> {
-        self.types.get(def_id.1 as usize)
+        self.defs.get(def_id.1 as usize)
     }
 
     pub fn defs(&self) -> impl Iterator<Item = &Def> {
-        self.types.iter()
+        self.defs.iter()
     }
 
     pub fn edges(&self) -> impl Iterator<Item = (&EdgeId, &EdgeInfo)> {
@@ -86,7 +86,7 @@ impl Domain {
     }
 
     pub fn find_def_by_name(&self, name: TextConstant) -> Option<&Def> {
-        self.types.iter().find(|info| info.name() == Some(name))
+        self.defs.iter().find(|info| info.name() == Some(name))
     }
 
     pub fn add_def(&mut self, info: Def) {
@@ -97,8 +97,8 @@ impl Domain {
         let index = info.id.1 as usize;
 
         // pad the vector
-        let new_size = std::cmp::max(self.types.len(), index + 1);
-        self.types.resize_with(new_size, || Def {
+        let new_size = std::cmp::max(self.defs.len(), index + 1);
+        self.defs.resize_with(new_size, || Def {
             id: DefId(info.id.0, 0),
             public: false,
             kind: DefKind::Data(BasicDef {
@@ -110,7 +110,7 @@ impl Domain {
             data_relationships: Default::default(),
         });
 
-        self.types[index] = info;
+        self.defs[index] = info;
     }
 
     pub fn set_edges(&mut self, edges: impl IntoIterator<Item = (EdgeId, EdgeInfo)>) {
@@ -124,11 +124,17 @@ pub struct Def {
     pub id: DefId,
     pub kind: DefKind,
     pub public: bool,
+
     /// The SerdeOperatorAddr used for JSON.
     /// FIXME: This should really be connected to a DomainInterface.
     pub operator_addr: Option<SerdeOperatorAddr>,
     pub store_key: Option<TextConstant>,
-    pub data_relationships: FnvHashMap<PropId, DataRelationshipInfo>,
+
+    /// FIXME: These should be called "properties", because that's what they model?
+    /// FIXME: This should use a VecMap with K=DefPropTag
+    /// when foreign properties are fully banned.
+    /// (https://gitlab.com/protojour/memoriam/domain-engine/-/issues/142)
+    pub data_relationships: FnvIndexMap<PropId, DataRelationshipInfo>,
 }
 
 impl Def {

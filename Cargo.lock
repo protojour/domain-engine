@@ -2344,6 +2344,7 @@ dependencies = [
  "bitflags 2.6.0",
  "chrono",
  "fnv",
+ "indexmap",
  "itertools 0.12.1",
  "num",
  "ontol-macros",

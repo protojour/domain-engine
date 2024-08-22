@@ -30,14 +30,17 @@ query vertices($defId: String!) {
 }
 "#;
 
-struct VerticesParams {
-    def_id: DefId,
+#[derive(Default)]
+struct Params {
+    def_id: Option<DefId>,
 }
 
-impl VerticesParams {
-    fn into_variables(self) -> juniper::Variables<GqlScalar> {
+impl From<Params> for juniper::Variables<GqlScalar> {
+    fn from(value: Params) -> Self {
         let mut variables = juniper::Variables::default();
-        variables.insert("defId".to_string(), format!("{:?}", self.def_id).into());
+        if let Some(def_id) = value.def_id {
+            variables.insert("defId".to_string(), format!("{:?}", def_id).into());
+        }
         variables
     }
 }
@@ -90,6 +93,56 @@ async fn test_stix_ontology(ds: &str) {
         }))
     );
 
+    expect_eq!(
+        actual = r"
+            query def($defId: String!) {
+                def(defId: $defId) {
+                    id
+                    kind
+                    dataRelationships {
+                        propId
+                        name
+                    }
+                }
+            }
+        "
+        .exec(
+            Params {
+                def_id: Some(identity.def_id())
+            },
+            &ontology_schema,
+            &ontology_ctx
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "def": {
+                "id": "def@1:59",
+                "kind": "ENTITY",
+                "dataRelationships": [
+                    { "propId": "p@1:59:0", "name": "type" },
+                    { "propId": "p@1:59:1", "name": "id" },
+                    { "propId": "p@1:59:2", "name": "spec_version" },
+                    { "propId": "p@1:59:3", "name": "created" },
+                    { "propId": "p@1:59:4", "name": "modified" },
+                    { "propId": "p@1:59:5", "name": "confidence" },
+                    { "propId": "p@1:59:6", "name": "revoked" },
+                    { "propId": "p@1:59:7", "name": "labels" },
+                    { "propId": "p@1:59:8", "name": "lang" },
+                    { "propId": "p@1:59:9", "name": "external_references" },
+                    { "propId": "p@1:59:10", "name": "created_by_ref" },
+                    { "propId": "p@1:59:11", "name": "object_marking_refs" },
+                    { "propId": "p@1:59:12", "name": "granular_markings" },
+                    { "propId": "p@1:59:13", "name": "name" },
+                    { "propId": "p@1:59:14", "name": "description" },
+                    { "propId": "p@1:59:15", "name": "roles" },
+                    { "propId": "p@1:59:16", "name": "identity_class" },
+                    { "propId": "p@1:59:17", "name": "sectors" },
+                    { "propId": "p@1:59:18", "name": "contact_information" },
+                ]
+            }
+        }))
+    );
+
     // insert Stix "identity" through domain schema
     r#"mutation {
         identity(create:[
@@ -114,10 +167,9 @@ async fn test_stix_ontology(ds: &str) {
     {
         let vertices_response = VERTICES
             .exec(
-                VerticesParams {
-                    def_id: identity.def_id(),
-                }
-                .into_variables(),
+                Params {
+                    def_id: Some(identity.def_id()),
+                },
                 &ontology_schema,
                 &ontology_ctx,
             )

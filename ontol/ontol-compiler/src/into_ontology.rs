@@ -18,7 +18,7 @@ use ontol_runtime::{
     },
     property::ValueCardinality,
     rustdoc::RustDoc,
-    DefId, DefIdSet, EdgeId, PackageId, PropId,
+    DefId, DefIdSet, EdgeId, FnvIndexMap, PackageId, PropId,
 };
 use std::{
     collections::{BTreeSet, HashMap},
@@ -461,8 +461,8 @@ impl<'m> Compiler<'m> {
         union_member_cache: &UnionMemberCache,
         edges: &mut FnvHashMap<PackageId, FnvHashMap<EdgeId, EdgeInfo>>,
         str_ctx: &mut StringCtx<'m>,
-    ) -> FnvHashMap<PropId, DataRelationshipInfo> {
-        let mut relationships = FnvHashMap::default();
+    ) -> FnvIndexMap<PropId, DataRelationshipInfo> {
+        let mut relationships = FnvIndexMap::default();
         self.collect_inherent_relationships_and_edges(
             type_def_id,
             &mut relationships,
@@ -511,7 +511,7 @@ impl<'m> Compiler<'m> {
     fn collect_inherent_relationships_and_edges(
         &self,
         type_def_id: DefId,
-        relationships: &mut FnvHashMap<PropId, DataRelationshipInfo>,
+        relationships: &mut FnvIndexMap<PropId, DataRelationshipInfo>,
         edges: &mut FnvHashMap<PackageId, FnvHashMap<EdgeId, EdgeInfo>>,
         str_ctx: &mut StringCtx<'m>,
     ) {
@@ -537,7 +537,7 @@ impl<'m> Compiler<'m> {
         prop_id: PropId,
         rel_id: RelId,
         source: DataRelationshipSource,
-        relationships: &mut FnvHashMap<PropId, DataRelationshipInfo>,
+        relationships: &mut FnvIndexMap<PropId, DataRelationshipInfo>,
         edges: &mut FnvHashMap<PackageId, FnvHashMap<EdgeId, EdgeInfo>>,
         str_ctx: &mut StringCtx<'m>,
     ) {
@@ -758,7 +758,7 @@ impl<'m> Compiler<'m> {
         type_def_id: DefId,
         name: TextConstant,
         serde_generator: &mut SerdeGenerator,
-        data_relationships: &FnvHashMap<PropId, DataRelationshipInfo>,
+        data_relationships: &FnvIndexMap<PropId, DataRelationshipInfo>,
     ) -> Option<Entity> {
         let properties = self.prop_ctx.properties_by_def_id(type_def_id)?;
         let id_relationship_id = properties.identified_by?;

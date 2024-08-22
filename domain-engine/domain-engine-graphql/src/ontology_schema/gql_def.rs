@@ -56,7 +56,7 @@ impl Def {
     fn name(&self, ctx: &OntologyCtx) -> Option<String> {
         ctx.def(self.id).name().map(|name| ctx[name].into())
     }
-    fn doc_string(&self, ctx: &OntologyCtx) -> Option<String> {
+    fn doc(&self, ctx: &OntologyCtx) -> Option<String> {
         ctx.get_def_docs(self.id)
             .map(|docs_constant| ctx[docs_constant].into())
     }

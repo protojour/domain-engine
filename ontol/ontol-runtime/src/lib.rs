@@ -3,6 +3,8 @@
 use std::{collections::BTreeSet, fmt::Debug, str::FromStr};
 
 use ::serde::{Deserialize, Serialize};
+use fnv::FnvBuildHasher;
+use indexmap::IndexMap;
 use ontol_macros::OntolDebug;
 use smallvec::SmallVec;
 use value::{TagFlags, ValueTagError};
@@ -308,6 +310,8 @@ impl From<BTreeSet<DefId>> for DefIdSet {
         Self(value.into_iter().collect())
     }
 }
+
+pub type FnvIndexMap<K, V> = IndexMap<K, V, FnvBuildHasher>;
 
 #[cfg(test)]
 mod tests {
