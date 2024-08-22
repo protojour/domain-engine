@@ -2,12 +2,14 @@ use std::fmt::Display;
 
 use base64::Engine;
 use ontol_runtime::{
-    attr::Attr,
+    attr::{Attr, AttrRef},
+    interface::serde::processor::ProcessorMode,
+    ontology::domain::DefRepr,
     value::{FormatValueAsText, Value},
     PropId,
 };
 
-use crate::gql_scalar::GqlScalar;
+use crate::{field_error, gql_scalar::GqlScalar};
 
 use super::OntologyCtx;
 
@@ -84,9 +86,10 @@ pub fn write_ontol_scalar(
     value: Value,
     cfg: ValueScalarCfg,
     ctx: &OntologyCtx,
-) {
+) -> juniper::FieldResult<()> {
+    let def_id = value.type_def_id();
     if cfg.with_def_id {
-        put_string(gobj, DEF_ID, &format!("{:?}", value.type_def_id()));
+        put_string(gobj, DEF_ID, &format!("{:?}", def_id));
     }
 
     match value {
@@ -117,7 +120,7 @@ pub fn write_ontol_scalar(
             put_string(
                 gobj,
                 VALUE,
-                &base64::engine::general_purpose::STANDARD.encode(&s.0),
+                base64::engine::general_purpose::STANDARD.encode(&s.0),
             );
         }
         value @ Value::ChronoDateTime(..) => {
@@ -156,35 +159,58 @@ pub fn write_ontol_scalar(
                 },
             );
         }
-        Value::Struct(attrs, _) => {
-            put_string(gobj, TYPE, "struct");
+        Value::Struct(attrs, tag) => {
+            let def = ctx.def(def_id);
+            match (def.repr(), def.operator_addr) {
+                (Some(DefRepr::FmtStruct(_)), Some(addr)) => {
+                    let processor = ctx.new_serde_processor(addr, ProcessorMode::Read);
+                    let value = Value::Struct(attrs, tag);
+                    let mut json_buf: Vec<u8> = vec![];
+                    processor
+                        .serialize_attr(
+                            AttrRef::Unit(&value),
+                            &mut serde_json::Serializer::new(&mut json_buf),
+                        )
+                        .unwrap();
+                    let text_value = match serde_json::from_slice(&json_buf).map_err(field_error)? {
+                        serde_json::Value::String(string) => string,
+                        _ => return Err(field_error("format error")),
+                    };
 
-            if cfg.with_address {
-                if let Some(Value::OctetSequence(seq, _)) = attrs
-                    .get(&ctx.ontol_domain_meta().data_store_address_prop_id())
-                    .and_then(|attr| attr.as_unit())
-                {
-                    put_string(
-                        gobj,
-                        ADDRESS,
-                        base64::engine::general_purpose::STANDARD.encode(&seq.0),
-                    );
+                    put_string(gobj, TYPE, "text");
+                    put_string(gobj, VALUE, text_value);
+                }
+                _ => {
+                    put_string(gobj, TYPE, "struct");
+
+                    if cfg.with_address {
+                        if let Some(Value::OctetSequence(seq, _)) = attrs
+                            .get(&ctx.ontol_domain_meta().data_store_address_prop_id())
+                            .and_then(|attr| attr.as_unit())
+                        {
+                            put_string(
+                                gobj,
+                                ADDRESS,
+                                base64::engine::general_purpose::STANDARD.encode(&seq.0),
+                            );
+                        }
+                    }
+
+                    let mut sorted: Vec<_> = attrs
+                        .into_iter()
+                        .filter(|(prop_id, _)| prop_id.0.package_id().id() != 0)
+                        .collect();
+                    sorted.sort_by_key(|(prop_id, _)| *prop_id);
+
+                    let mut gattrs = Vec::with_capacity(sorted.len());
+
+                    for (prop_id, attr) in sorted {
+                        gattrs.push(ontol_attr_to_scalar(prop_id, attr, cfg, ctx)?);
+                    }
+
+                    gobj.add_field("attrs", juniper::Value::list(gattrs));
                 }
             }
-
-            let mut sorted: Vec<_> = attrs
-                .into_iter()
-                .filter(|(prop_id, _)| prop_id.0.package_id().id() != 0)
-                .collect();
-            sorted.sort_by_key(|(prop_id, _)| *prop_id);
-
-            let mut gattrs = Vec::with_capacity(sorted.len());
-
-            for (prop_id, attr) in sorted {
-                gattrs.push(ontol_attr_to_scalar(prop_id, attr, cfg, ctx));
-            }
-
-            gobj.add_field("attrs", juniper::Value::list(gattrs));
         }
         Value::Dict(_, _) => todo!(),
         Value::Sequence(_, _) => todo!(),
@@ -192,6 +218,8 @@ pub fn write_ontol_scalar(
             put_string(gobj, TYPE, "error");
         }
     }
+
+    Ok(())
 }
 
 pub fn ontol_attr_to_scalar(
@@ -199,7 +227,7 @@ pub fn ontol_attr_to_scalar(
     attr: Attr,
     cfg: ValueScalarCfg,
     ctx: &OntologyCtx,
-) -> juniper::Value<GqlScalar> {
+) -> juniper::FieldResult<juniper::Value<GqlScalar>> {
     let mut gobj = juniper::Object::with_capacity(0);
 
     put_string(&mut gobj, PROP_ID, prop_id);
@@ -207,7 +235,7 @@ pub fn ontol_attr_to_scalar(
     match attr {
         Attr::Unit(value) => {
             put_string(&mut gobj, ATTR, "unit");
-            write_ontol_scalar(&mut gobj, value, cfg, ctx);
+            write_ontol_scalar(&mut gobj, value, cfg, ctx)?;
         }
         Attr::Tuple(_) => {
             put_string(&mut gobj, ATTR, "tuple");
@@ -217,5 +245,5 @@ pub fn ontol_attr_to_scalar(
         }
     }
 
-    juniper::Value::Object(gobj)
+    Ok(juniper::Value::Object(gobj))
 }

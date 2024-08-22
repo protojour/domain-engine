@@ -34,17 +34,10 @@ impl VertexConnection {
             .into_iter()
             .map(|value| {
                 let mut gobj = juniper::Object::with_capacity(3);
-                write_ontol_scalar(&mut gobj, value, cfg, ctx);
-                OntolValue2(juniper::Value::Object(gobj))
+                write_ontol_scalar(&mut gobj, value, cfg, ctx)
+                    .map(|()| OntolValue2(juniper::Value::Object(gobj)))
             })
-            // .map(|value| match value {
-            //     Value::Struct(attrs, tag) => Ok(gql_value::StructValue {
-            //         def_id: tag.into(),
-            //         attrs: *attrs,
-            //     }),
-            //     _ => Err(field_error("vertex must be a struct")),
-            // })
-            .collect();
+            .collect::<Result<_, _>>()?;
 
         Ok(Self {
             elements,

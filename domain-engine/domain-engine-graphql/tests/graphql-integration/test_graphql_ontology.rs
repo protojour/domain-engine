@@ -181,7 +181,8 @@ async fn test_stix_ontology(ds: &str) {
                             {
                                 "propId": "p@1:59:1",
                                 "attr": "unit",
-                                "type": "struct",
+                                "type": "text",
+                                "value": "identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5",
                             },
                             {
                                 "propId": "p@1:59:2",
@@ -221,12 +222,10 @@ async fn test_stix_ontology(ds: &str) {
     );
 
     {
-        let vertices_response = r#"
+        let vertices_with_address = r#"
             query vertices($defId: String!) {
                 vertices(defId: $defId, first: 100) {
-                    elements {
-                        address
-                    }
+                    elements
                     pageInfo {
                         hasNextPage
                         endCursor
@@ -244,7 +243,7 @@ async fn test_stix_ontology(ds: &str) {
         .await
         .unwrap();
 
-        let vertices = vertices_response
+        let vertices = vertices_with_address
             .as_object_value()
             .unwrap()
             .get_field_value("vertices")
