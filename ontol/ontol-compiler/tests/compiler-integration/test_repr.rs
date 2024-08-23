@@ -81,6 +81,28 @@ fn test_macro_in_macro_repr() {
 }
 
 #[test]
+fn test_text_constant_repr() {
+    "
+    def a (
+        rel* 'b': 'c'
+    )
+    "
+    .compile_then(|test| {
+        let [a] = test.bind(["a"]);
+        let (_, rel_info) = a.def.data_relationships.iter().next().unwrap();
+        let target_def_id = rel_info.target.def_id();
+
+        let target_def = test.ontology().def(target_def_id);
+        let Some(DefRepr::TextConstant(_)) = target_def.repr() else {
+            panic!(
+                "{target_def_id:?} not a text constant, but {:?}",
+                target_def.repr().debug(test.ontology())
+            );
+        };
+    });
+}
+
+#[test]
 fn test_text_constant_union_repr() {
     "
     def u (

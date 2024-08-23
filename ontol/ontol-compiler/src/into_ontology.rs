@@ -9,8 +9,8 @@ use ontol_runtime::{
     ontology::{
         domain::{
             self, BasicDef, DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource,
-            DataRelationshipTarget, Def, DefRepr, Domain, EdgeCardinal, EdgeCardinalFlags,
-            EdgeCardinalProjection, EdgeInfo, Entity,
+            DataRelationshipTarget, Def, DefRepr, DefReprUnionBound, Domain, EdgeCardinal,
+            EdgeCardinalFlags, EdgeCardinalProjection, EdgeInfo, Entity,
         },
         map::MapMeta,
         ontol::{OntolDomainMeta, TextConstant, TextLikeType, ValueGenerator},
@@ -195,7 +195,7 @@ impl<'m> Compiler<'m> {
                             repr: self
                                 .repr_ctx
                                 .get_repr_kind(&type_def_id)
-                                .map(|repr_kind| repr_kind.to_def_repr())
+                                .map(|repr_kind| make_def_repr(repr_kind, &mut serde_gen))
                                 .unwrap_or(DefRepr::Unknown),
                         }),
                     },
@@ -226,7 +226,7 @@ impl<'m> Compiler<'m> {
                             repr: self
                                 .repr_ctx
                                 .get_repr_kind(&type_def_id)
-                                .map(|repr_kind| repr_kind.to_def_repr())
+                                .map(|repr_kind| make_def_repr(repr_kind, &mut serde_gen))
                                 .unwrap_or(DefRepr::Unknown),
                         }),
                     operator_addr: serde_gen.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
@@ -245,12 +245,15 @@ impl<'m> Compiler<'m> {
 
             if package_id == ONTOL_PKG {
                 for def_id in self.defs.text_literals.values().copied() {
+                    let literal = serde_gen.defs.get_string_representation(def_id);
+                    let constant = serde_gen.str_ctx.intern_constant(literal);
+
                     domain.add_def(Def {
                         id: def_id,
                         public: false,
                         kind: domain::DefKind::Data(BasicDef {
                             name: None,
-                            repr: DefRepr::Unit,
+                            repr: DefRepr::TextConstant(constant),
                         }),
                         operator_addr: None,
                         store_key: None,
@@ -859,5 +862,50 @@ impl<'m> Compiler<'m> {
         map.into_iter()
             .map(|(name, package_id)| (package_id, name))
             .collect()
+    }
+}
+
+fn make_def_repr(kind: &ReprKind, serde_gen: &mut SerdeGenerator) -> DefRepr {
+    match kind {
+        ReprKind::Unit => DefRepr::Unit,
+        ReprKind::Scalar(_, kind, _) => make_scalar_def_repr(kind, serde_gen),
+        ReprKind::FmtStruct(opt_attr) => DefRepr::FmtStruct(*opt_attr),
+        ReprKind::Seq => DefRepr::Seq,
+        ReprKind::Struct => DefRepr::Struct,
+        ReprKind::StructIntersection(_) => DefRepr::Struct,
+        ReprKind::Intersection(defs) => {
+            DefRepr::Intersection(defs.iter().map(|(def_id, _)| *def_id).collect())
+        }
+        ReprKind::Union(defs, bound) => DefRepr::Union(
+            defs.iter().map(|(def_id, _)| *def_id).collect(),
+            match bound {
+                UnionBound::Any => DefReprUnionBound::Any,
+                UnionBound::Scalar(scalar_kind) => DefReprUnionBound::Scalar(Box::new(
+                    make_scalar_def_repr(scalar_kind, serde_gen),
+                )),
+                UnionBound::Struct => DefReprUnionBound::Struct,
+                UnionBound::Fmt => DefReprUnionBound::Fmt,
+            },
+        ),
+        ReprKind::Macro => DefRepr::Macro,
+        ReprKind::Extern => DefRepr::Unknown,
+    }
+}
+
+fn make_scalar_def_repr(kind: &ReprScalarKind, serde_gen: &mut SerdeGenerator) -> DefRepr {
+    match kind {
+        &ReprScalarKind::I64(_) => DefRepr::I64,
+        ReprScalarKind::F64(_) => DefRepr::F64,
+        ReprScalarKind::Serial => DefRepr::Serial,
+        ReprScalarKind::Boolean => DefRepr::Boolean,
+        ReprScalarKind::Text => DefRepr::Text,
+        ReprScalarKind::TextConstant(def_id) => {
+            let literal = serde_gen.defs.get_string_representation(*def_id);
+            let constant = serde_gen.str_ctx.intern_constant(literal);
+            DefRepr::TextConstant(constant)
+        }
+        ReprScalarKind::Octets => DefRepr::Octets,
+        ReprScalarKind::DateTime => DefRepr::DateTime,
+        ReprScalarKind::Other => DefRepr::Unknown,
     }
 }

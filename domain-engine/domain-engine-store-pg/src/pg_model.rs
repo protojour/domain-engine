@@ -349,6 +349,57 @@ pub enum PgEdgeCardinalKind {
     Parameters(DefId),
 }
 
+/// How PG will represent an inherent property
+pub enum PgRepr {
+    /// Something that has only one possible value, and therefore doesn't need storage
+    Unit,
+    /// A scalar-like data field that can be stored in a column
+    Column(PgType),
+    /// Something that will be stored in an abstracted manner in "child table"
+    Abstract,
+    /// PG can't represent it (yet?)
+    NotSupported(&'static str),
+}
+
+impl PgRepr {
+    pub fn classify(def_id: DefId, ontology: &Ontology) -> Self {
+        let def = ontology.get_def(def_id).unwrap();
+        let def_repr = match &def.kind {
+            DefKind::Data(basic_def) => &basic_def.repr,
+            _ => &DefRepr::Unknown,
+        };
+
+        Self::classify_def_repr(def_repr, ontology)
+    }
+
+    fn classify_def_repr(def_repr: &DefRepr, ontology: &Ontology) -> Self {
+        match def_repr {
+            DefRepr::Unit => Self::Unit,
+            DefRepr::I64 => Self::Column(PgType::BigInt),
+            DefRepr::F64 => Self::Column(PgType::DoublePrecision),
+            DefRepr::Serial => Self::Column(PgType::Bigserial),
+            DefRepr::Boolean => Self::Column(PgType::Boolean),
+            DefRepr::Text => Self::Column(PgType::Text),
+            DefRepr::TextConstant(_) => Self::Unit,
+            DefRepr::Octets => Self::Column(PgType::Bytea),
+            DefRepr::DateTime => Self::Column(PgType::TimestampTz),
+            DefRepr::FmtStruct(Some((_prop_id, def_id))) => Self::classify(*def_id, ontology),
+            DefRepr::FmtStruct(None) => Self::Unit,
+            DefRepr::Seq => todo!("seq"),
+            DefRepr::Struct => Self::Abstract,
+            DefRepr::Intersection(_) => Self::NotSupported("intersection"),
+            DefRepr::Union(_variants, bound) => match bound {
+                DefReprUnionBound::Scalar(scalar_repr) => {
+                    Self::classify_def_repr(scalar_repr, ontology)
+                }
+                _ => Self::Abstract,
+            },
+            DefRepr::Macro => Self::Unit,
+            DefRepr::Unknown => Self::NotSupported("unknown"),
+        }
+    }
+}
+
 /// NB: Do not change the names of these enum variants.
 /// They are serialized to and deserialized from DB.
 #[derive(Clone, Copy, PartialEq, ToSql, FromSql, Debug)]
@@ -378,45 +429,6 @@ pub enum PgType {
 }
 
 impl PgType {
-    pub fn from_def_id(def_id: DefId, ontology: &Ontology) -> Result<Option<PgType>, PgModelError> {
-        let def = ontology.get_def(def_id).unwrap();
-        let def_repr = match &def.kind {
-            DefKind::Data(basic_def) => &basic_def.repr,
-            _ => &DefRepr::Unknown,
-        };
-
-        Self::from_def_repr(def_repr, ontology)
-    }
-
-    fn from_def_repr(
-        def_repr: &DefRepr,
-        ontology: &Ontology,
-    ) -> Result<Option<Self>, PgModelError> {
-        match def_repr {
-            DefRepr::Unit => Ok(None),
-            DefRepr::I64 => Ok(Some(PgType::BigInt)),
-            DefRepr::F64 => Ok(Some(PgType::DoublePrecision)),
-            DefRepr::Serial => Ok(Some(PgType::Bigserial)),
-            DefRepr::Boolean => Ok(Some(PgType::Boolean)),
-            DefRepr::Text => Ok(Some(PgType::Text)),
-            DefRepr::Octets => Ok(Some(PgType::Bytea)),
-            DefRepr::DateTime => Ok(Some(PgType::TimestampTz)),
-            DefRepr::FmtStruct(Some((_prop_id, def_id))) => Self::from_def_id(*def_id, ontology),
-            DefRepr::FmtStruct(None) => Ok(None),
-            DefRepr::Seq => todo!("seq"),
-            DefRepr::Struct => Err(PgModelError::CompoundType),
-            DefRepr::Intersection(_) => Err(PgModelError::DataTypeNotSupported("intersection")),
-            DefRepr::Union(_variants, bound) => match bound {
-                DefReprUnionBound::Scalar(scalar_repr) => {
-                    Self::from_def_repr(scalar_repr, ontology)
-                }
-                _ => Err(PgModelError::CompoundType),
-            },
-            DefRepr::Macro => Ok(None),
-            DefRepr::Unknown => Err(PgModelError::DataTypeNotSupported("unknown")),
-        }
-    }
-
     pub fn insert_default(&self) -> bool {
         matches!(self, Self::Bigserial)
     }

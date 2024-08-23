@@ -212,6 +212,7 @@ pub enum DefRepr {
     Serial,
     Boolean,
     Text,
+    TextConstant(TextConstant),
     Octets,
     DateTime,
     Seq,

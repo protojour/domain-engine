@@ -156,8 +156,6 @@ pub enum PgModelError {
     InvalidTransactionState,
     /// invalid unique cardinal
     InvalidUniqueCardinal,
-    /// compound type
-    CompoundType,
     /// data type not supported
     DataTypeNotSupported(&'static str),
 }

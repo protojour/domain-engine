@@ -9,7 +9,7 @@ use domain_engine_core::{
 use futures_util::{future::BoxFuture, TryStreamExt};
 use ontol_runtime::{
     attr::Attr,
-    ontology::domain::{DataRelationshipKind, DataRelationshipTarget, Def, DefRepr},
+    ontology::domain::{DataRelationshipKind, DataRelationshipTarget, Def},
     query::select::Select,
     value::Value,
     DefId, PackageId, PropId,
@@ -19,7 +19,7 @@ use tracing::{debug, trace, warn};
 
 use crate::{
     pg_error::{map_row_error, PgError, PgInputError},
-    pg_model::{InDomain, PgDataKey, PgTable},
+    pg_model::{InDomain, PgDataKey, PgRepr, PgTable},
     sql::{self},
     sql_record::SqlColumnStream,
     sql_value::SqlVal,
@@ -441,9 +441,8 @@ impl<'a> TransactCtx<'a> {
                 _ => {
                     match &rel_info.target {
                         DataRelationshipTarget::Unambiguous(def_id) => {
-                            match self.ontology.def(*def_id).repr() {
-                                Some(DefRepr::Unit) | None => continue,
-                                _ => {}
+                            if matches!(PgRepr::classify(*def_id, self.ontology), PgRepr::Unit) {
+                                continue;
                             }
                         }
                         DataRelationshipTarget::Union(_) => {}

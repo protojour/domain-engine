@@ -19,10 +19,10 @@ use tracing::{info, trace_span, warn, Instrument};
 
 use crate::{
     migrate::{MigrationStep, PgDomain},
-    pg_error::{PgMigrationError, PgModelError},
+    pg_error::PgMigrationError,
     pg_model::{
         PgColumn, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexData, PgIndexType, PgProperty,
-        PgPropertyData, PgRegKey, PgTable, PgTableIdUnion, PgType,
+        PgPropertyData, PgRegKey, PgRepr, PgTable, PgTableIdUnion, PgType,
     },
 };
 
@@ -532,18 +532,18 @@ fn migrate_datafields_steps(
             DataRelationshipTarget::Union(def_id) => def_id,
         };
 
-        let data = match PgType::from_def_id(target_def_id, ontology) {
-            Ok(Some(pg_type)) => PgPropertyData::Column {
+        let data = match PgRepr::classify(target_def_id, ontology) {
+            PgRepr::Column(pg_type) => PgPropertyData::Column {
                 col_name: column_name.to_string().into_boxed_str(),
                 pg_type,
             },
-            Ok(None) => {
+            PgRepr::Unit => {
                 // This is a unit type, does not need to be represented
                 continue;
             }
-            Err(PgModelError::CompoundType) => PgPropertyData::Abstract,
-            Err(err) => {
-                warn!("pg type error: {err:?}");
+            PgRepr::Abstract => PgPropertyData::Abstract,
+            PgRepr::NotSupported(msg) => {
+                warn!("pg repr error: `{msg:?}`");
                 continue;
             }
         };

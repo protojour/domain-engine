@@ -282,6 +282,15 @@ impl<'m> Defs<'m> {
         def_id
     }
 
+    pub fn peek_next_def_id(&self, package_id: PackageId) -> DefId {
+        let idx = self
+            .def_id_allocators
+            .get(&package_id)
+            .copied()
+            .unwrap_or(0);
+        DefId(package_id, idx)
+    }
+
     pub fn iter_packages(&self) -> impl Iterator<Item = PackageId> + '_ {
         self.def_id_allocators.keys().copied()
     }

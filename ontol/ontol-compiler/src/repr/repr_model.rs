@@ -2,10 +2,7 @@ use std::ops::RangeInclusive;
 
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
-use ontol_runtime::{
-    ontology::domain::{DefRepr, DefReprUnionBound},
-    DefId, PropId,
-};
+use ontol_runtime::{DefId, PropId};
 use ordered_float::NotNan;
 use smallvec::SmallVec;
 
@@ -55,35 +52,6 @@ pub enum UnionBound {
     Fmt,
 }
 
-impl ReprKind {
-    pub fn to_def_repr(&self) -> DefRepr {
-        match self {
-            ReprKind::Unit => DefRepr::Unit,
-            ReprKind::Scalar(_, kind, _) => kind.to_def_repr(),
-            ReprKind::FmtStruct(opt_attr) => DefRepr::FmtStruct(*opt_attr),
-            ReprKind::Seq => DefRepr::Seq,
-            ReprKind::Struct => DefRepr::Struct,
-            ReprKind::StructIntersection(_) => DefRepr::Struct,
-            ReprKind::Intersection(defs) => {
-                DefRepr::Intersection(defs.iter().map(|(def_id, _)| *def_id).collect())
-            }
-            ReprKind::Union(defs, bound) => DefRepr::Union(
-                defs.iter().map(|(def_id, _)| *def_id).collect(),
-                match bound {
-                    UnionBound::Any => DefReprUnionBound::Any,
-                    UnionBound::Scalar(scalar_kind) => {
-                        DefReprUnionBound::Scalar(Box::new(scalar_kind.to_def_repr()))
-                    }
-                    UnionBound::Struct => DefReprUnionBound::Struct,
-                    UnionBound::Fmt => DefReprUnionBound::Fmt,
-                },
-            ),
-            ReprKind::Macro => DefRepr::Macro,
-            ReprKind::Extern => DefRepr::Unknown,
-        }
-    }
-}
-
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum ReprScalarKind {
     I64(RangeInclusive<i64>),
@@ -115,20 +83,6 @@ impl ReprScalarKind {
             (Self::Octets, Self::Octets) => Self::Octets,
             (Self::DateTime, Self::DateTime) => Self::DateTime,
             _ => Self::Other,
-        }
-    }
-
-    fn to_def_repr(&self) -> DefRepr {
-        match self {
-            Self::I64(_) => DefRepr::I64,
-            Self::F64(_) => DefRepr::F64,
-            Self::Serial => DefRepr::Serial,
-            Self::Boolean => DefRepr::Boolean,
-            Self::Text => DefRepr::Text,
-            Self::TextConstant(_) => DefRepr::Unit,
-            Self::Octets => DefRepr::Octets,
-            Self::DateTime => DefRepr::DateTime,
-            Self::Other => DefRepr::Unknown,
         }
     }
 

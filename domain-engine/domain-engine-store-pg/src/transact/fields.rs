@@ -6,10 +6,11 @@ use ontol_runtime::{
     value::Value,
     PropId,
 };
+use tracing::warn;
 
 use crate::{
     pg_error::PgModelError,
-    pg_model::{PgDomainTable, PgTable, PgType},
+    pg_model::{PgDomainTable, PgRepr, PgTable},
     sql,
     sql_record::SqlRecordIterator,
     sql_value::Layout,
@@ -95,10 +96,10 @@ impl<'a> TransactCtx<'a> {
         // TODO: Might be able to cache this in some way,
         // e.g. a Vec<PgType> for the property columns in each PgTable.
         // But is the increased memory usage worth it?
-        let pg_type_result = PgType::from_def_id(target_def_id, self.ontology);
+        let pg_repr = PgRepr::classify(target_def_id, self.ontology);
 
-        match pg_type_result {
-            Ok(Some(pg_type)) => {
+        match pg_repr {
+            PgRepr::Column(pg_type) => {
                 let sql_val = record_iter.next_field(&Layout::Scalar(pg_type))?;
 
                 Ok(if let Some(sql_val) = sql_val.null_filter() {
@@ -107,8 +108,15 @@ impl<'a> TransactCtx<'a> {
                     None
                 })
             }
-            Ok(None) | Err(PgModelError::CompoundType) => Ok(None),
-            Err(e) => Err(e.into()),
+            PgRepr::Unit => match self.ontology.try_produce_constant(target_def_id) {
+                Some(value) => Ok(Some(value)),
+                None => {
+                    warn!("can't produce a representation of constant unit {target_def_id:?}");
+                    Ok(None)
+                }
+            },
+            PgRepr::Abstract => Ok(None),
+            PgRepr::NotSupported(msg) => Err(PgModelError::DataTypeNotSupported(msg).into()),
         }
     }
 }

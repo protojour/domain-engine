@@ -5,6 +5,7 @@ use std::ops::Index;
 use ::serde::{Deserialize, Serialize};
 use arcstr::ArcStr;
 use bincode::Options;
+use domain::DefRepr;
 use fnv::FnvHashMap;
 use tracing::debug;
 
@@ -313,6 +314,52 @@ impl Ontology {
             String::from(std::str::from_utf8(&buf).unwrap())
         } else {
             "N/A".to_string()
+        }
+    }
+
+    pub fn try_produce_constant(&self, def_id: DefId) -> Option<Value> {
+        let def = self.def(def_id);
+        match def.repr() {
+            Some(DefRepr::TextConstant(constant)) => {
+                Some(Value::Text(self[*constant].into(), def_id.into()))
+            }
+            _ => {
+                let Some(operator_addr) = def.operator_addr else {
+                    debug!("{def_id:?} has no operator addr, no constant can be produced");
+                    return None;
+                };
+                self.try_produce_constant_from_operator(operator_addr)
+            }
+        }
+    }
+
+    fn try_produce_constant_from_operator(&self, addr: SerdeOperatorAddr) -> Option<Value> {
+        let operator = &self.data.serde_operators[addr.0 as usize];
+        match operator {
+            SerdeOperator::AnyPlaceholder => None,
+            SerdeOperator::Unit => Some(Value::unit()),
+            SerdeOperator::True(_) => Some(self.bool_value(true)),
+            SerdeOperator::False(_) => Some(self.bool_value(false)),
+            SerdeOperator::Boolean(_)
+            | SerdeOperator::I32(..)
+            | SerdeOperator::I64(..)
+            | SerdeOperator::F64(..)
+            | SerdeOperator::Serial(_)
+            | SerdeOperator::String(_) => None,
+            SerdeOperator::StringConstant(text_constant, def_id) => {
+                Some(Value::Text(self[*text_constant].into(), (*def_id).into()))
+            }
+            SerdeOperator::TextPattern(_)
+            | SerdeOperator::CapturingTextPattern(_)
+            | SerdeOperator::DynamicSequence
+            | SerdeOperator::RelationList(_)
+            | SerdeOperator::RelationIndexSet(_)
+            | SerdeOperator::ConstructorSequence(_) => None,
+            SerdeOperator::Alias(alias_op) => {
+                self.try_produce_constant_from_operator(alias_op.inner_addr)
+            }
+            SerdeOperator::Union(_) | SerdeOperator::Struct(_) => None,
+            SerdeOperator::IdSingletonStruct(_, _, _) => None,
         }
     }
 }
