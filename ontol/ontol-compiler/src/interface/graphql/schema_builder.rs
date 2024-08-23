@@ -231,7 +231,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                 operator_addr: self
                                     .serde_gen
                                     .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
-                                        self.primitives.bool,
+                                        self.primitives.boolean,
                                         SerdeModifier::NONE,
                                     )))
                                     .unwrap(),

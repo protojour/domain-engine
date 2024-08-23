@@ -185,7 +185,7 @@ pub fn write_ontol_scalar(
 
                     if cfg.with_address {
                         if let Some(Value::OctetSequence(seq, _)) = attrs
-                            .get(&ctx.ontol_domain_meta().data_store_address_prop_id())
+                            .get(&PropId::data_store_address())
                             .and_then(|attr| attr.as_unit())
                         {
                             put_string(

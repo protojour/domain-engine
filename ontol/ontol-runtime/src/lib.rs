@@ -129,7 +129,57 @@ impl_ontol_debug!(DefId);
 impl DefId {
     #[inline]
     pub const fn unit() -> Self {
-        DefId(PackageId(0), 0)
+        DefId(PackageId(0), OntolDefTag::Unit as u16)
+    }
+}
+
+#[repr(u16)]
+#[derive(Clone, Copy)]
+pub enum OntolDefTag {
+    Unit = 0,
+    False = 1,
+    True = 2,
+    Boolean = 3,
+    EmptySequence = 4,
+    EmptyText = 5,
+    Number = 6,
+    Integer = 7,
+    I64 = 8,
+    Float = 9,
+    F32 = 10,
+    F64 = 11,
+    Serial = 12,
+    Text = 13,
+    DirectionUnion = 14,
+    OntolDomain = 15,
+    DataStoreAddress = 16,
+    OpenDataRelationship = 17,
+    EdgeRelationship = 18,
+    FlatUnionRelationship = 19,
+    Is = 20,
+    Identifies = 21,
+    Id = 22,
+    Indexed = 23,
+    StoreKey = 24,
+    Min = 25,
+    Max = 26,
+    Default = 27,
+    Gen = 28,
+    Order = 29,
+    Direction = 30,
+    Example = 31,
+    Ascending = 32,
+    Descending = 33,
+    Auto = 34,
+    CreateTime = 35,
+    UpdateTime = 36,
+    /// This must be the last entry. Update the value accordingly.
+    _LastEntry = 37,
+}
+
+impl OntolDefTag {
+    pub const fn def_id(self) -> DefId {
+        DefId(PackageId(0), self as u16)
     }
 }
 
@@ -207,6 +257,14 @@ impl ::std::fmt::Debug for DefPropTag {
 pub struct PropId(pub DefId, pub DefPropTag);
 
 impl PropId {
+    pub const fn open_data() -> Self {
+        Self(OntolDefTag::OpenDataRelationship.def_id(), DefPropTag(0))
+    }
+
+    pub const fn data_store_address() -> Self {
+        Self(OntolDefTag::DataStoreAddress.def_id(), DefPropTag(0))
+    }
+
     pub fn tag(&self) -> DefPropTag {
         self.1
     }

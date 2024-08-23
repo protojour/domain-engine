@@ -217,7 +217,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                                 operator_addr: self
                                                     .serde_gen
                                                     .gen_addr_lazy(gql_serde_key(
-                                                        self.primitives.bool,
+                                                        self.primitives.boolean,
                                                     ))
                                                     .unwrap(),
                                                 kind: NativeScalarKind::Boolean,

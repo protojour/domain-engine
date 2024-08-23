@@ -15,7 +15,7 @@ use ontol_runtime::{
     DefId, DefPropTag, EdgeId, PackageId, PropId,
 };
 use tokio_postgres::Transaction;
-use tracing::{info, trace_span, warn, Instrument};
+use tracing::{error, info, trace_span, Instrument};
 
 use crate::{
     migrate::{MigrationStep, PgDomain},
@@ -543,7 +543,7 @@ fn migrate_datafields_steps(
             }
             PgRepr::Abstract => PgPropertyData::Abstract,
             PgRepr::NotSupported(msg) => {
-                warn!("pg repr error: `{msg:?}`");
+                error!("pg repr error for {table_id:?}:`{column_name}`: `{msg:?}`");
                 continue;
             }
         };

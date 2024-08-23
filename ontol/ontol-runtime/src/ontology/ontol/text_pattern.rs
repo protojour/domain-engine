@@ -10,7 +10,7 @@ use crate::{
     interface::serde::processor::ProcessorMode,
     ontology::Ontology,
     value::{FormatValueAsText, Value},
-    DefId, DefPropTag, PropId,
+    DefId, DefPropTag, OntolDefTag, PropId,
 };
 
 use super::{text_like_types::ParseError, TextConstant};
@@ -77,7 +77,7 @@ impl TextPattern {
                             .map(|span| &haystack[span.start..span.end])
                             .expect("expected property match");
 
-                        let text_def_id = ontology.ontol_domain_meta().text;
+                        let text_def_id = OntolDefTag::Text.def_id();
 
                         attrs.insert(
                             PropId(text_def_id, DefPropTag(0)),
@@ -144,7 +144,7 @@ impl<'d, 'o> Display for FormatPattern<'d, 'o> {
         for constant_part in &self.pattern.constant_parts {
             match (constant_part, self.value) {
                 (TextPatternConstantPart::AnyString { .. }, Value::Struct(attrs, _)) => {
-                    let prop_id = PropId(self.ontology.ontol_domain_meta().text, DefPropTag(0));
+                    let prop_id = PropId(OntolDefTag::Text.def_id(), DefPropTag(0));
                     let Some(attribute) = attrs.get(&prop_id) else {
                         error!(
                             "Attribute {prop_id} missing when formatting capturing text pattern"

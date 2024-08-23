@@ -11,7 +11,7 @@ use ontol_runtime::{
     query::select::{Select, StructOrUnionSelect},
     sequence::Sequence,
     value::{OctetSequence, Value},
-    DefId,
+    DefId, PropId,
 };
 use tracing::debug;
 
@@ -356,7 +356,7 @@ pub fn apply_select(attr: AttrMut, select: &Select, db: &ArangoDatabase) -> Doma
                     );
 
                     attr_map.insert(
-                        db.ontology.ontol_domain_meta().data_store_address_prop_id(),
+                        PropId::data_store_address(),
                         Attr::Unit(Value::OctetSequence(
                             OctetSequence(address.into_bytes().into()),
                             DefId::unit().into(),

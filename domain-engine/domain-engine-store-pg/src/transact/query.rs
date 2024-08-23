@@ -546,10 +546,8 @@ impl<'a> TransactCtx<'a> {
                 );
 
                 attrs.insert(
-                    self.ontology
-                        .ontol_domain_meta()
-                        .data_store_address_prop_id(),
-                    Attr::Unit(make_ontol_address(def_key, data_key, self.ontology)),
+                    PropId::data_store_address(),
+                    Attr::Unit(make_ontol_address(def_key, data_key)),
                 );
 
                 // retrieve data properties

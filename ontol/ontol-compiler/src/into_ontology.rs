@@ -421,16 +421,6 @@ impl<'m> Compiler<'m> {
         builder
             .text_constants(str_ctx.into_arcstr_vec())
             .ontol_domain_meta(OntolDomainMeta {
-                bool: self.primitives.bool,
-                i64: self.primitives.i64,
-                f64: self.primitives.f64,
-                text: self.primitives.text,
-                ascending: self.primitives.symbols.ascending,
-                descending: self.primitives.symbols.descending,
-                open_data_relationship: self.primitives.open_data_relationship,
-                data_store_address: self.primitives.data_store_address,
-                order_relationship: self.primitives.relations.order,
-                direction_relationship: self.primitives.relations.direction,
                 edge_property: EDGE_PROPERTY.into(),
             })
             .union_variants(

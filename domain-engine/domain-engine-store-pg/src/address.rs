@@ -1,6 +1,6 @@
 use ontol_runtime::{
-    ontology::Ontology,
     value::{OctetSequence, Value},
+    OntolDefTag,
 };
 use serde::{Deserialize, Serialize};
 
@@ -12,7 +12,7 @@ struct Address {
     def_key: PgRegKey,
 }
 
-pub fn make_ontol_address(def_key: PgRegKey, data_key: PgDataKey, ontology: &Ontology) -> Value {
+pub fn make_ontol_address(def_key: PgRegKey, data_key: PgDataKey) -> Value {
     let address = Address { data_key, def_key };
 
     let mut octet_sequence = OctetSequence(Default::default());
@@ -20,6 +20,6 @@ pub fn make_ontol_address(def_key: PgRegKey, data_key: PgDataKey, ontology: &Ont
 
     Value::OctetSequence(
         octet_sequence,
-        ontology.ontol_domain_meta().data_store_address.into(),
+        OntolDefTag::DataStoreAddress.def_id().into(),
     )
 }

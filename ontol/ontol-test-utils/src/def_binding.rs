@@ -256,12 +256,7 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
             &mut serde_json::Deserializer::from_str(&serde_json::to_string(&json).unwrap()),
         )
         .unwrap();
-        let rel_id = self
-            .binding
-            .ontology
-            .ontol_domain_meta()
-            .open_data_prop_id();
-        self.merge_attribute(rel_id, value.into())
+        self.merge_attribute(PropId::open_data(), value.into())
     }
 
     fn merge_attribute(mut self, prop_id: PropId, attr: Attr) -> Self {

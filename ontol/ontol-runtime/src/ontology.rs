@@ -26,7 +26,7 @@ use crate::{
         ontol_vm::OntolVm,
         proc::{Lib, Procedure},
     },
-    DefId, DefIdSet, EdgeId, MapKey, PackageId, PropId,
+    DefId, DefIdSet, EdgeId, MapKey, OntolDefTag, PackageId, PropId,
 };
 
 use self::{
@@ -292,8 +292,10 @@ impl Ontology {
     }
 
     pub fn bool_value(&self, value: bool) -> Value {
-        let bool_def = self.data.ontol_domain_meta.bool;
-        Value::I64(if value { 1 } else { 0 }, bool_def.into())
+        Value::I64(
+            if value { 1 } else { 0 },
+            OntolDefTag::Boolean.def_id().into(),
+        )
     }
 
     /// best-effort formatting of a value

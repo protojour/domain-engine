@@ -11,7 +11,7 @@ use ontol_runtime::{
         ontol::TextLikeType,
     },
     var::VarAllocator,
-    DefId, PackageId,
+    DefId, OntolDefTag, PackageId,
 };
 
 use crate::{
@@ -235,8 +235,11 @@ pub struct RegexMeta<'m> {
 
 impl<'m> Defs<'m> {
     fn new() -> Self {
+        let mut def_id_allocators: FnvHashMap<PackageId, u16> = Default::default();
+        def_id_allocators.insert(ONTOL_PKG, OntolDefTag::_LastEntry as u16);
+
         Self {
-            def_id_allocators: Default::default(),
+            def_id_allocators,
             table: Default::default(),
             text_literals: Default::default(),
             regex_strings: Default::default(),
@@ -320,26 +323,6 @@ impl<'m> Defs<'m> {
         def_id
     }
 
-    pub fn add_builtin_relation(
-        &mut self,
-        kind: BuiltinRelationKind,
-        ident: Option<&'static str>,
-    ) -> DefId {
-        self.add_def(DefKind::BuiltinRelType(kind, ident), ONTOL_PKG, NO_SPAN)
-    }
-
-    pub fn add_builtin_symbol(&mut self, ident: &'static str) -> DefId {
-        self.add_def(
-            DefKind::Type(TypeDef {
-                ident: Some(ident),
-                rel_type_for: None,
-                flags: TypeDefFlags::PUBLIC | TypeDefFlags::CONCRETE | TypeDefFlags::BUILTIN_SYMBOL,
-            }),
-            ONTOL_PKG,
-            NO_SPAN,
-        )
-    }
-
     pub fn def_text_literal(&mut self, lit: &str, strings: &mut StringCtx<'m>) -> DefId {
         match self.text_literals.get(&lit) {
             Some(def_id) => *def_id,
@@ -380,8 +363,47 @@ impl<'m> Defs<'m> {
         }
     }
 
-    pub fn add_primitive(&mut self, kind: PrimitiveKind, ident: Option<&'static str>) -> DefId {
-        self.add_def(DefKind::Primitive(kind, ident), ONTOL_PKG, NO_SPAN)
+    pub fn add_ontol(&mut self, tag: OntolDefTag, kind: DefKind<'m>) -> DefId {
+        let def_id = DefId(ONTOL_PKG, tag as u16);
+        self.table.insert(
+            def_id,
+            Def {
+                id: def_id,
+                package: ONTOL_PKG,
+                kind,
+                span: NO_SPAN,
+            },
+        );
+        def_id
+    }
+
+    pub fn add_primitive(
+        &mut self,
+        tag: OntolDefTag,
+        kind: PrimitiveKind,
+        ident: Option<&'static str>,
+    ) -> DefId {
+        self.add_ontol(tag, DefKind::Primitive(kind, ident))
+    }
+
+    pub fn add_builtin_relation(
+        &mut self,
+        tag: OntolDefTag,
+        kind: BuiltinRelationKind,
+        ident: Option<&'static str>,
+    ) -> DefId {
+        self.add_ontol(tag, DefKind::BuiltinRelType(kind, ident))
+    }
+
+    pub fn add_builtin_symbol(&mut self, tag: OntolDefTag, ident: &'static str) -> DefId {
+        self.add_ontol(
+            tag,
+            DefKind::Type(TypeDef {
+                ident: Some(ident),
+                rel_type_for: None,
+                flags: TypeDefFlags::PUBLIC | TypeDefFlags::CONCRETE | TypeDefFlags::BUILTIN_SYMBOL,
+            }),
+        )
     }
 }
 

@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     format_utils::Literal,
-    ontology::Ontology,
     value::{Value, ValueDebug},
+    OntolDefTag,
 };
 
 use super::{condition::Condition, order::Direction};
@@ -44,17 +44,12 @@ impl Filter {
         };
     }
 
-    pub fn set_direction(
-        &mut self,
-        direction: Value,
-        ontology: &Ontology,
-    ) -> Result<(), InvalidDirection> {
+    pub fn set_direction(&mut self, direction: Value) -> Result<(), InvalidDirection> {
         let def_id = direction.type_def_id();
-        let meta = ontology.ontol_domain_meta();
 
-        if def_id == meta.ascending {
+        if def_id == OntolDefTag::Ascending.def_id() {
             self.direction = Some(Direction::Ascending);
-        } else if def_id == meta.descending {
+        } else if def_id == OntolDefTag::Descending.def_id() {
             self.direction = Some(Direction::Descending);
         } else {
             return Err(InvalidDirection);

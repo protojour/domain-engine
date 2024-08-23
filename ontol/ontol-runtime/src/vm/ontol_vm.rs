@@ -24,7 +24,7 @@ use crate::{
         proc::{BuiltinProc, Local, Procedure},
         VmError,
     },
-    DefId, PropId,
+    DefId, OntolDefTag, PropId,
 };
 
 use super::{
@@ -207,14 +207,13 @@ impl<'o> Processor for OntolProcessor<'o> {
                     attrs.insert(key, Attr::Unit(value));
                 }
                 Value::Filter(filter, _) => {
-                    let meta = self.ontology.ontol_domain_meta();
                     let relationship = key.0;
 
-                    if relationship == meta.order_relationship {
+                    if relationship == OntolDefTag::Order.def_id() {
                         filter.set_order(value);
-                    } else if relationship == meta.direction_relationship {
+                    } else if relationship == OntolDefTag::Direction.def_id() {
                         filter
-                            .set_direction(value, self.ontology)
+                            .set_direction(value)
                             .map_err(|_| VmError::InvalidDirection)?;
                     } else {
                         return Err(VmError::InvalidType(target));
@@ -259,10 +258,9 @@ impl<'o> Processor for OntolProcessor<'o> {
                 attrs.insert(key, Attr::Matrix(AttrMatrix { columns }));
             }
             Value::Filter(filter, _) => {
-                let meta = self.ontology.ontol_domain_meta();
                 let relationship = key.0;
 
-                if relationship == meta.order_relationship && arity == 1 {
+                if relationship == OntolDefTag::Order.def_id() && arity == 1 {
                     filter.set_order(Value::Sequence(
                         columns.into_iter().next().unwrap(),
                         ValueTag::unit(),
@@ -387,11 +385,11 @@ impl<'o> Processor for OntolProcessor<'o> {
                 haystack,
                 &captures,
                 group_filter,
-                self.ontology.ontol_domain_meta().text.into(),
+                OntolDefTag::Text.def_id().into(),
             );
             self.stack.push(Value::Sequence(
                 attributes.into(),
-                self.ontology.ontol_domain_meta().text.into(),
+                OntolDefTag::Text.def_id().into(),
             ));
         } else {
             self.push_void();
@@ -412,7 +410,7 @@ impl<'o> Processor for OntolProcessor<'o> {
         let text_pattern = self.ontology.get_text_pattern(pattern_id).unwrap();
 
         let mut values: ThinVec<Value> = ThinVec::new();
-        let text_tag: ValueTag = self.ontology.ontol_domain_meta().text.into();
+        let text_tag: ValueTag = OntolDefTag::Text.def_id().into();
 
         for captures in text_pattern
             .regex

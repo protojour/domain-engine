@@ -384,7 +384,7 @@ impl<'v> AttributeType<'v> {
                     ));
                 }
 
-                match attrs.get(&schema_ctx.ontology.ontol_domain_meta().open_data_prop_id()) {
+                match attrs.get(&PropId::open_data()) {
                     Some(Attr::Unit(open_data_value)) => Ok(serialize_raw(
                         open_data_value,
                         &schema_ctx.ontology,

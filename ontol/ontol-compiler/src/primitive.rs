@@ -1,11 +1,10 @@
 use ontol_macros::RustDoc;
-use ontol_runtime::{DefId, EdgeId};
+use ontol_runtime::{DefId, EdgeId, OntolDefTag};
 
 use crate::{
     def::{BuiltinRelationKind, DefKind, Defs, TypeDef, TypeDefFlags},
     edge::EdgeCtx,
     package::ONTOL_PKG,
-    NO_SPAN,
 };
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug, RustDoc)]
@@ -93,7 +92,7 @@ pub struct Primitives {
     pub unit: DefId,
     pub false_value: DefId,
     pub true_value: DefId,
-    pub bool: DefId,
+    pub boolean: DefId,
     pub empty_sequence: DefId,
     pub empty_text: DefId,
     pub text: DefId,
@@ -176,51 +175,112 @@ pub struct Generators {
 impl Primitives {
     pub fn new(defs: &mut Defs, edge_ctx: &mut EdgeCtx) -> Self {
         let primitives = Self {
-            unit: defs.add_primitive(PrimitiveKind::Unit, None),
+            unit: defs.add_primitive(OntolDefTag::Unit, PrimitiveKind::Unit, None),
 
-            false_value: defs.add_primitive(PrimitiveKind::False, Some("false")),
-            true_value: defs.add_primitive(PrimitiveKind::True, Some("true")),
-            bool: defs.add_primitive(PrimitiveKind::Boolean, Some("boolean")),
+            false_value: defs.add_primitive(
+                OntolDefTag::False,
+                PrimitiveKind::False,
+                Some("false"),
+            ),
+            true_value: defs.add_primitive(OntolDefTag::True, PrimitiveKind::True, Some("true")),
+            boolean: defs.add_primitive(
+                OntolDefTag::Boolean,
+                PrimitiveKind::Boolean,
+                Some("boolean"),
+            ),
 
-            empty_sequence: defs.add_def(DefKind::EmptySequence, ONTOL_PKG, NO_SPAN),
-            empty_text: defs.add_def(DefKind::TextLiteral(""), ONTOL_PKG, NO_SPAN),
-            number: defs.add_primitive(PrimitiveKind::Number, Some("number")),
-            integer: defs.add_primitive(PrimitiveKind::Integer, Some("integer")),
-            i64: defs.add_primitive(PrimitiveKind::I64, Some("i64")),
-            float: defs.add_primitive(PrimitiveKind::Float, Some("float")),
-            f32: defs.add_primitive(PrimitiveKind::F32, Some("f32")),
-            f64: defs.add_primitive(PrimitiveKind::F64, Some("f64")),
-            serial: defs.add_primitive(PrimitiveKind::Serial, Some("serial")),
-            text: defs.add_primitive(PrimitiveKind::Text, Some("text")),
-            direction_union: defs.add_def(
+            empty_sequence: defs.add_ontol(OntolDefTag::EmptySequence, DefKind::EmptySequence),
+            empty_text: defs.add_ontol(OntolDefTag::EmptyText, DefKind::TextLiteral("")),
+            number: defs.add_primitive(OntolDefTag::Number, PrimitiveKind::Number, Some("number")),
+            integer: defs.add_primitive(
+                OntolDefTag::Integer,
+                PrimitiveKind::Integer,
+                Some("integer"),
+            ),
+            i64: defs.add_primitive(OntolDefTag::I64, PrimitiveKind::I64, Some("i64")),
+            float: defs.add_primitive(OntolDefTag::Float, PrimitiveKind::Float, Some("float")),
+            f32: defs.add_primitive(OntolDefTag::F32, PrimitiveKind::F32, Some("f32")),
+            f64: defs.add_primitive(OntolDefTag::F64, PrimitiveKind::F64, Some("f64")),
+            serial: defs.add_primitive(OntolDefTag::Serial, PrimitiveKind::Serial, Some("serial")),
+            text: defs.add_primitive(OntolDefTag::Text, PrimitiveKind::Text, Some("text")),
+            direction_union: defs.add_ontol(
+                OntolDefTag::DirectionUnion,
                 DefKind::Type(TypeDef {
                     ident: None,
                     rel_type_for: None,
                     flags: TypeDefFlags::CONCRETE | TypeDefFlags::PUBLIC,
                 }),
-                ONTOL_PKG,
-                NO_SPAN,
             ),
-            ontol_domain: defs.alloc_def_id(ONTOL_PKG),
-            data_store_address: defs.add_primitive(PrimitiveKind::DataStoreAddress, None),
-            open_data_relationship: defs.add_primitive(PrimitiveKind::OpenDataRelationship, None),
-            edge_relationship: defs.add_primitive(PrimitiveKind::EdgeRelationship, None),
-            flat_union_relationship: defs.add_primitive(PrimitiveKind::FlatUnionRelationship, None),
+            ontol_domain: DefId(ONTOL_PKG, OntolDefTag::OntolDomain as u16),
+            data_store_address: defs.add_primitive(
+                OntolDefTag::DataStoreAddress,
+                PrimitiveKind::DataStoreAddress,
+                None,
+            ),
+            open_data_relationship: defs.add_primitive(
+                OntolDefTag::OpenDataRelationship,
+                PrimitiveKind::OpenDataRelationship,
+                None,
+            ),
+            edge_relationship: defs.add_primitive(
+                OntolDefTag::EdgeRelationship,
+                PrimitiveKind::EdgeRelationship,
+                None,
+            ),
+            flat_union_relationship: defs.add_primitive(
+                OntolDefTag::FlatUnionRelationship,
+                PrimitiveKind::FlatUnionRelationship,
+                None,
+            ),
 
             relations: OntolRelations {
-                is: defs.add_builtin_relation(BuiltinRelationKind::Is, Some("is")),
-                identifies: defs.add_builtin_relation(BuiltinRelationKind::Identifies, None),
-                id: defs.add_builtin_relation(BuiltinRelationKind::Id, None),
-                indexed: defs.add_builtin_relation(BuiltinRelationKind::Indexed, None),
-                store_key: defs
-                    .add_builtin_relation(BuiltinRelationKind::StoreKey, Some("store_key")),
-                min: defs.add_builtin_relation(BuiltinRelationKind::Min, Some("min")),
-                max: defs.add_builtin_relation(BuiltinRelationKind::Max, Some("max")),
-                default: defs.add_builtin_relation(BuiltinRelationKind::Default, Some("default")),
-                gen: defs.add_builtin_relation(BuiltinRelationKind::Gen, Some("gen")),
-                order: defs.add_builtin_relation(BuiltinRelationKind::Order, Some("order")),
-                direction: defs
-                    .add_builtin_relation(BuiltinRelationKind::Direction, Some("direction")),
+                is: defs.add_builtin_relation(OntolDefTag::Is, BuiltinRelationKind::Is, Some("is")),
+                identifies: defs.add_builtin_relation(
+                    OntolDefTag::Identifies,
+                    BuiltinRelationKind::Identifies,
+                    None,
+                ),
+                id: defs.add_builtin_relation(OntolDefTag::Id, BuiltinRelationKind::Id, None),
+                indexed: defs.add_builtin_relation(
+                    OntolDefTag::Indexed,
+                    BuiltinRelationKind::Indexed,
+                    None,
+                ),
+                store_key: defs.add_builtin_relation(
+                    OntolDefTag::StoreKey,
+                    BuiltinRelationKind::StoreKey,
+                    Some("store_key"),
+                ),
+                min: defs.add_builtin_relation(
+                    OntolDefTag::Min,
+                    BuiltinRelationKind::Min,
+                    Some("min"),
+                ),
+                max: defs.add_builtin_relation(
+                    OntolDefTag::Max,
+                    BuiltinRelationKind::Max,
+                    Some("max"),
+                ),
+                default: defs.add_builtin_relation(
+                    OntolDefTag::Default,
+                    BuiltinRelationKind::Default,
+                    Some("default"),
+                ),
+                gen: defs.add_builtin_relation(
+                    OntolDefTag::Gen,
+                    BuiltinRelationKind::Gen,
+                    Some("gen"),
+                ),
+                order: defs.add_builtin_relation(
+                    OntolDefTag::Order,
+                    BuiltinRelationKind::Order,
+                    Some("order"),
+                ),
+                direction: defs.add_builtin_relation(
+                    OntolDefTag::Direction,
+                    BuiltinRelationKind::Direction,
+                    Some("direction"),
+                ),
             },
             edges: OntolEdges {
                 is: edge_ctx.alloc_edge_id(ONTOL_PKG),
@@ -228,19 +288,22 @@ impl Primitives {
             },
 
             generators: Generators {
-                auto: defs.add_def(DefKind::EmptySequence, ONTOL_PKG, NO_SPAN),
-                create_time: defs.add_def(DefKind::EmptySequence, ONTOL_PKG, NO_SPAN),
-                update_time: defs.add_def(DefKind::EmptySequence, ONTOL_PKG, NO_SPAN),
+                auto: defs.add_ontol(OntolDefTag::Auto, DefKind::EmptySequence),
+                create_time: defs.add_ontol(OntolDefTag::CreateTime, DefKind::EmptySequence),
+                update_time: defs.add_ontol(OntolDefTag::UpdateTime, DefKind::EmptySequence),
             },
 
             symbols: OntolSymbols {
-                ascending: defs.add_builtin_symbol("ascending"),
-                descending: defs.add_builtin_symbol("descending"),
+                ascending: defs.add_builtin_symbol(OntolDefTag::Ascending, "ascending"),
+                descending: defs.add_builtin_symbol(OntolDefTag::Descending, "descending"),
             },
 
             doc: Doc {
-                example_relation: defs
-                    .add_builtin_relation(BuiltinRelationKind::Example, Some("example")),
+                example_relation: defs.add_builtin_relation(
+                    OntolDefTag::Example,
+                    BuiltinRelationKind::Example,
+                    Some("example"),
+                ),
             },
         };
 

@@ -664,10 +664,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             let open_dict = std::mem::take(&mut output.open_dict);
 
             output.attributes.insert(
-                self.processor
-                    .ontology
-                    .ontol_domain_meta()
-                    .open_data_prop_id(),
+                PropId::open_data(),
                 Value::Dict(Box::new(open_dict), ValueTag::unit()).into(),
             );
         }

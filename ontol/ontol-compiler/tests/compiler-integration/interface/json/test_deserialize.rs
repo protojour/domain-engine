@@ -2,7 +2,7 @@
 
 use assert_matches::assert_matches;
 use ontol_macros::test;
-use ontol_runtime::value::Value;
+use ontol_runtime::{value::Value, PropId};
 use ontol_test_utils::{assert_error_msg, serde_helper::*, TestCompile};
 use serde_json::json;
 
@@ -409,11 +409,7 @@ fn test_deserialize_open_data() {
             panic!();
         };
 
-        let open_data = &map
-            .get(&test.ontology().ontol_domain_meta().open_data_prop_id())
-            .unwrap()
-            .as_unit()
-            .unwrap();
+        let open_data = &map.get(&PropId::open_data()).unwrap().as_unit().unwrap();
         let Value::Dict(open_data, _) = &open_data else {
             panic!();
         };

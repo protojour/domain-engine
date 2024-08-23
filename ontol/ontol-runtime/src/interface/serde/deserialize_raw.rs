@@ -9,6 +9,7 @@ use crate::{
     ontology::Ontology,
     sequence::Sequence,
     value::{Value, ValueTag},
+    OntolDefTag,
 };
 
 use super::processor::{ProcessorLevel, RecursionLimitError};
@@ -62,37 +63,31 @@ impl<'o, 'de> Visitor<'de> for RawVisitor<'o> {
     fn visit_bool<E: Error>(self, v: bool) -> Result<Self::Value, E> {
         Ok(Value::I64(
             if v { 1 } else { 0 },
-            self.ontology.ontol_domain_meta().bool.into(),
+            OntolDefTag::Boolean.def_id().into(),
         ))
     }
 
     fn visit_u64<E: Error>(self, v: u64) -> Result<Self::Value, E> {
         Ok(Value::I64(
             v.try_into().map_err(|_| E::custom("integer overflow"))?,
-            self.ontology.ontol_domain_meta().i64.into(),
+            OntolDefTag::I64.def_id().into(),
         ))
     }
 
     fn visit_i64<E: Error>(self, v: i64) -> Result<Self::Value, E> {
-        Ok(Value::I64(v, self.ontology.ontol_domain_meta().i64.into()))
+        Ok(Value::I64(v, OntolDefTag::I64.def_id().into()))
     }
 
     fn visit_f64<E: Error>(self, v: f64) -> Result<Self::Value, E> {
-        Ok(Value::F64(v, self.ontology.ontol_domain_meta().f64.into()))
+        Ok(Value::F64(v, OntolDefTag::F64.def_id().into()))
     }
 
     fn visit_f32<E: Error>(self, v: f32) -> Result<Self::Value, E> {
-        Ok(Value::F64(
-            v as f64,
-            self.ontology.ontol_domain_meta().f64.into(),
-        ))
+        Ok(Value::F64(v as f64, OntolDefTag::F64.def_id().into()))
     }
 
     fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
-        Ok(Value::Text(
-            v.into(),
-            self.ontology.ontol_domain_meta().text.into(),
-        ))
+        Ok(Value::Text(v.into(), OntolDefTag::Text.def_id().into()))
     }
 
     fn visit_seq<A: SeqAccess<'de>>(self, mut seq_access: A) -> Result<Self::Value, A::Error> {

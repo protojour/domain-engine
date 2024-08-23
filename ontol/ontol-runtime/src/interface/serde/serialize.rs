@@ -472,9 +472,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 .flags
                 .contains(ProcessorProfileFlags::SERIALIZE_OPEN_DATA)
         {
-            if let Some(open_data_attr) =
-                attributes.get(&self.ontology.ontol_domain_meta().open_data_prop_id())
-            {
+            if let Some(open_data_attr) = attributes.get(&PropId::open_data()) {
                 let Some(Value::Dict(dict, _)) = &open_data_attr.as_unit() else {
                     panic!("Open data must be a dict");
                 };

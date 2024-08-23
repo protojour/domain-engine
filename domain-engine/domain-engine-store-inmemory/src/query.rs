@@ -171,9 +171,7 @@ impl InMemoryStore {
         let _entered = debug_span!("struct_sel", id = ?struct_def_id).entered();
 
         properties.insert(
-            ctx.ontology
-                .ontol_domain_meta()
-                .data_store_address_prop_id(),
+            PropId::data_store_address(),
             Attr::Unit(Value::OctetSequence(
                 OctetSequence(bincode::serialize(&vertex_key).unwrap().into()),
                 DefId::unit().into(),

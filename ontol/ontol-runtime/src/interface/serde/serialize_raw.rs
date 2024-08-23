@@ -4,7 +4,7 @@ use serde::{
 };
 use tracing::error;
 
-use crate::{ontology::Ontology, value::Value};
+use crate::{ontology::Ontology, value::Value, OntolDefTag};
 
 use super::processor::{ProcessorLevel, RecursionLimitError};
 
@@ -24,7 +24,7 @@ pub fn serialize_raw<S: Serializer>(
     match value {
         Value::Unit(_) => serializer.serialize_unit(),
         Value::I64(int, tag) => {
-            if tag.def_id() == ontology.ontol_domain_meta().bool {
+            if tag.def_id() == OntolDefTag::Boolean.def_id() {
                 if *int == 0 {
                     serializer.serialize_bool(false)
                 } else {

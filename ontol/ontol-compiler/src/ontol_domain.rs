@@ -109,12 +109,12 @@ impl<'m> Compiler<'m> {
         self.is(
             self.primitives.true_value,
             (TypeRelation::Subset, TypeRelation::ImplicitSuper),
-            self.primitives.bool,
+            self.primitives.boolean,
         );
         self.is(
             self.primitives.false_value,
             (TypeRelation::Subset, TypeRelation::ImplicitSuper),
-            self.primitives.bool,
+            self.primitives.boolean,
         );
 
         self.setup_number_system();
