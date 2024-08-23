@@ -241,11 +241,6 @@ async fn test_stix_ontology(ds: &str) {
                                 ]
                             },
                             {
-                                "propId": "p@1:59:12",
-                                "attr": "matrix",
-                                "columns": [[]]
-                            },
-                            {
                                 "propId": "p@1:59:13",
                                 "attr": "unit",
                                 "type": "text",

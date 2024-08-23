@@ -4,7 +4,7 @@ use futures_util::Stream;
 use ontol_runtime::{
     attr::{Attr, AttrMatrix},
     ontology::domain::{DataRelationshipKind, DataRelationshipTarget, Def},
-    property::ValueCardinality,
+    property::{PropertyCardinality, ValueCardinality},
     query::select::{EntitySelect, Select, StructOrUnionSelect},
     sequence::SubSequence,
     tuple::{CardinalIdx, EndoTuple},
@@ -607,7 +607,13 @@ impl<'a> TransactCtx<'a> {
                                             matrix.columns[0].push(row_value.value);
                                         }
 
-                                        attrs.insert(*prop_id, Attr::Matrix(matrix));
+                                        if matches!(
+                                            rel.cardinality.0,
+                                            PropertyCardinality::Mandatory
+                                        ) || !matrix.columns[0].elements().is_empty()
+                                        {
+                                            attrs.insert(*prop_id, Attr::Matrix(matrix));
+                                        }
                                     }
                                 }
                             }
