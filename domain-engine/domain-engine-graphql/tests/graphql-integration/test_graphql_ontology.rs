@@ -212,10 +212,38 @@ async fn test_stix_ontology(ds: &str) {
                             {
                                 "propId": "p@1:59:9",
                                 "attr": "matrix",
+                                "columns": [
+                                    [
+                                        {
+                                            "type": "struct",
+                                            "attrs": [
+                                                {
+                                                    "propId": "p@2:11:0",
+                                                    "attr": "unit",
+                                                    "type": "text",
+                                                    "value": "mitre-mobile-attack"
+                                                },
+                                                {
+                                                    "propId": "p@2:11:2",
+                                                    "attr": "unit",
+                                                    "type": "text",
+                                                    "value": "https://attack.mitre.org/mobile/index.php/Technique/MOB-T1056"
+                                                },
+                                                {
+                                                    "propId": "p@2:11:4",
+                                                    "attr": "unit",
+                                                    "type": "text",
+                                                    "value": "MOB-T1056"
+                                                },
+                                            ]
+                                        }
+                                    ]
+                                ]
                             },
                             {
                                 "propId": "p@1:59:12",
                                 "attr": "matrix",
+                                "columns": [[]]
                             },
                             {
                                 "propId": "p@1:59:13",

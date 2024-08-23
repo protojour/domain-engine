@@ -228,7 +228,7 @@ pub fn ontol_attr_to_scalar(
     cfg: ValueScalarCfg,
     ctx: &OntologyCtx,
 ) -> juniper::FieldResult<juniper::Value<GqlScalar>> {
-    let mut gobj = juniper::Object::with_capacity(0);
+    let mut gobj = juniper::Object::with_capacity(2);
 
     put_string(&mut gobj, PROP_ID, prop_id);
 
@@ -240,8 +240,24 @@ pub fn ontol_attr_to_scalar(
         Attr::Tuple(_) => {
             put_string(&mut gobj, ATTR, "tuple");
         }
-        Attr::Matrix(_) => {
+        Attr::Matrix(matrix) => {
             put_string(&mut gobj, ATTR, "matrix");
+
+            let mut gql_columns = Vec::with_capacity(matrix.columns.len());
+            for column in matrix.columns {
+                let mut gql_column = Vec::with_capacity(column.elements().len());
+
+                let (elements, _) = column.split();
+                for value in elements {
+                    let mut gobj = juniper::Object::with_capacity(3);
+                    write_ontol_scalar(&mut gobj, value, cfg, ctx)?;
+                    gql_column.push(juniper::Value::object(gobj));
+                }
+
+                gql_columns.push(juniper::Value::list(gql_column));
+            }
+
+            gobj.add_field("columns", juniper::Value::list(gql_columns));
         }
     }
 
