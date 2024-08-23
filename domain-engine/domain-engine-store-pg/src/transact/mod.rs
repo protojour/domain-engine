@@ -9,7 +9,8 @@ use domain_engine_core::{
 };
 use futures_util::{stream::BoxStream, StreamExt};
 use ontol_runtime::{
-    interface::serde::processor::ProcessorMode, ontology::Ontology, query::select::Select, DefId,
+    interface::serde::processor::ProcessorMode, ontology::Ontology, query::select::Select,
+    value::Value, DefId,
 };
 use query::QueryFrame;
 use tokio_postgres::IsolationLevel;
@@ -229,7 +230,7 @@ pub async fn transact(
                         Some(State::Delete(_, def_id)) => {
                             let deleted = ctx.delete_vertex(*def_id, value).await?;
 
-                            yield RespMessage::Element(ctx.ontology.bool_value(deleted), DataOperation::Deleted);
+                            yield RespMessage::Element(Value::boolean(deleted), DataOperation::Deleted);
                         }
                         None => {
                             Result::<(), DomainError>::Err(PgModelError::InvalidTransactionState.into())?;

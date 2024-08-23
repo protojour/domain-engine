@@ -17,7 +17,7 @@ use crate::{
     query::filter::Filter,
     sequence::Sequence,
     tuple::EndoTupleElements,
-    DefId, PackageId, PropId,
+    DefId, OntolDefTag, PackageId, PropId,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -62,6 +62,13 @@ pub enum Value {
 impl Value {
     pub fn new_struct(props: impl IntoIterator<Item = (PropId, Attr)>, tag: ValueTag) -> Self {
         Self::Struct(Box::new(FnvHashMap::from_iter(props)), tag)
+    }
+
+    pub fn boolean(value: bool) -> Self {
+        Self::I64(
+            if value { 1 } else { 0 },
+            OntolDefTag::Boolean.def_id().into(),
+        )
     }
 
     pub fn sequence_of(values: impl IntoIterator<Item = Value>) -> Self {

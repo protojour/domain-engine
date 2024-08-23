@@ -26,7 +26,7 @@ use crate::{
         ontol_vm::OntolVm,
         proc::{Lib, Procedure},
     },
-    DefId, DefIdSet, EdgeId, MapKey, OntolDefTag, PackageId, PropId,
+    DefId, DefIdSet, EdgeId, MapKey, PackageId, PropId,
 };
 
 use self::{
@@ -291,13 +291,6 @@ impl Ontology {
             .cloned()
     }
 
-    pub fn bool_value(&self, value: bool) -> Value {
-        Value::I64(
-            if value { 1 } else { 0 },
-            OntolDefTag::Boolean.def_id().into(),
-        )
-    }
-
     /// best-effort formatting of a value
     pub fn format_value(&self, value: &Value) -> String {
         let def = self.def(value.type_def_id());
@@ -340,8 +333,8 @@ impl Ontology {
         match operator {
             SerdeOperator::AnyPlaceholder => None,
             SerdeOperator::Unit => Some(Value::unit()),
-            SerdeOperator::True(_) => Some(self.bool_value(true)),
-            SerdeOperator::False(_) => Some(self.bool_value(false)),
+            SerdeOperator::True(_) => Some(Value::boolean(true)),
+            SerdeOperator::False(_) => Some(Value::boolean(false)),
             SerdeOperator::Boolean(_)
             | SerdeOperator::I32(..)
             | SerdeOperator::I64(..)

@@ -429,7 +429,7 @@ impl ArangoDatabase {
             }
         };
 
-        Ok(self.ontology.bool_value(bool_value))
+        Ok(Value::boolean(bool_value))
     }
 }
 

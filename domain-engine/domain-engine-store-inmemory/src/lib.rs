@@ -18,6 +18,7 @@ use ontol_runtime::interface::serde::processor::ProcessorMode;
 use ontol_runtime::ontology::domain::EdgeCardinalFlags;
 use ontol_runtime::ontology::{config::DataStoreConfig, Ontology};
 use ontol_runtime::query::select::Select;
+use ontol_runtime::value::Value;
 use ontol_runtime::{DefId, EdgeId, PackageId};
 use tokio::sync::RwLock;
 
@@ -256,7 +257,7 @@ impl InMemoryDb {
                                 let deleted = store.delete_entities(vec![value], *def_id)?;
 
                                 for deleted in deleted {
-                                    yield RespMessage::Element(self.ontology.bool_value(deleted), DataOperation::Deleted);
+                                    yield RespMessage::Element(Value::boolean(deleted), DataOperation::Deleted);
                                 }
                             }
                             None => {
