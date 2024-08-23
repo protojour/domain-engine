@@ -2,7 +2,7 @@ use domain_engine_core::DomainResult;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     attr::Attr,
-    ontology::domain::{DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget, Def},
+    ontology::domain::{DataRelationshipInfo, DataRelationshipKind, Def},
     value::Value,
     PropId,
 };
@@ -90,27 +90,22 @@ impl<'a> TransactCtx<'a> {
         rel_info: &DataRelationshipInfo,
         record_iter: &mut impl SqlRecordIterator<'b>,
     ) -> DomainResult<Option<Value>> {
-        // TODO: Might be able to cache this,
-        // but is it worth it?
-        let target_def_id = match rel_info.target {
-            DataRelationshipTarget::Unambiguous(def_id) => def_id,
-            DataRelationshipTarget::Union(def_id) => def_id,
-        };
+        let target_def_id = rel_info.target.def_id();
 
-        match PgType::from_def_id(target_def_id, self.ontology) {
+        // TODO: Might be able to cache this in some way,
+        // e.g. a Vec<PgType> for the property columns in each PgTable.
+        // But is the increased memory usage worth it?
+        let pg_type_result = PgType::from_def_id(target_def_id, self.ontology);
+
+        match pg_type_result {
             Ok(Some(pg_type)) => {
                 let sql_val = record_iter.next_field(&Layout::Scalar(pg_type))?;
 
-                if let Some(sql_val) = sql_val.null_filter() {
-                    match rel_info.target {
-                        DataRelationshipTarget::Unambiguous(def_id) => {
-                            Ok(Some(self.deserialize_sql(def_id, sql_val)?))
-                        }
-                        DataRelationshipTarget::Union(_) => Ok(None),
-                    }
+                Ok(if let Some(sql_val) = sql_val.null_filter() {
+                    Some(self.deserialize_sql(target_def_id, sql_val)?)
                 } else {
-                    Ok(None)
-                }
+                    None
+                })
             }
             Ok(None) | Err(PgModelError::CompoundType) => Ok(None),
             Err(e) => Err(e.into()),
