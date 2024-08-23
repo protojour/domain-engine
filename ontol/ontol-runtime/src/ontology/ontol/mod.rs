@@ -11,16 +11,8 @@ pub use text::TextConstant;
 pub use text_like_types::{ParseError, TextLikeType};
 pub use value_generator::ValueGenerator;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct OntolDomainMeta {
     /// Serde-related: The constant name of the "_edge" property used to deserialize relation parameters
     pub edge_property: String,
-}
-
-impl Default for OntolDomainMeta {
-    fn default() -> Self {
-        Self {
-            edge_property: String::new(),
-        }
-    }
 }
