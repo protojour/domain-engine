@@ -377,14 +377,18 @@ impl<'a> TransactCtx<'a> {
                             }));
                         }
 
-                        output.push(sql::Expr::paren(sql::Expr::Limit(
-                            Box::new(union_expr),
-                            sql::Limit {
-                                // TODO: Only limit if it's not "matrix"?
-                                limit: Some(1),
-                                offset: None,
-                            },
-                        )));
+                        output.push(match rel.cardinality.1 {
+                            ValueCardinality::Unit => sql::Expr::paren(sql::Expr::Limit(
+                                Box::new(union_expr),
+                                sql::Limit {
+                                    limit: Some(1),
+                                    offset: None,
+                                },
+                            )),
+                            ValueCardinality::IndexSet | ValueCardinality::List => {
+                                sql::Expr::array(union_expr)
+                            }
+                        });
                     }
                 }
                 DataRelationshipKind::Edge(_) => {}
@@ -562,18 +566,49 @@ impl<'a> TransactCtx<'a> {
                                     continue;
                                 }
 
-                                if let Some(sql_val) =
-                                    iterator.next_field(&Layout::Record)?.null_filter()
-                                {
-                                    let sql_record = sql_val.into_record()?;
-                                    let row_value = self.read_row_value_as_vertex(
-                                        sql_record.fields(),
-                                        Some(QuerySelect::Struct(&Default::default())),
-                                        IncludeJoinedAttrs::Yes,
-                                        DataOperation::Queried,
-                                    )?;
+                                // FIXME: the datastore clients should send the actual
+                                // inherent fields it's interested in
+                                let sub_query_select_properties = Default::default();
+                                let sub_query_select =
+                                    Some(QuerySelect::Struct(&sub_query_select_properties));
 
-                                    attrs.insert(*prop_id, Attr::Unit(row_value.value));
+                                match rel.cardinality.1 {
+                                    ValueCardinality::Unit => {
+                                        if let Some(sql_val) =
+                                            iterator.next_field(&Layout::Record)?.null_filter()
+                                        {
+                                            let sql_record = sql_val.into_record()?;
+                                            let row_value = self.read_row_value_as_vertex(
+                                                sql_record.fields(),
+                                                sub_query_select,
+                                                IncludeJoinedAttrs::Yes,
+                                                DataOperation::Queried,
+                                            )?;
+
+                                            attrs.insert(*prop_id, Attr::Unit(row_value.value));
+                                        }
+                                    }
+                                    ValueCardinality::IndexSet | ValueCardinality::List => {
+                                        let sql_array =
+                                            iterator.next_field(&Layout::Array)?.into_array()?;
+                                        let mut matrix = AttrMatrix::default();
+                                        matrix.columns.push(Default::default());
+
+                                        for result in sql_array.elements(&Layout::Record) {
+                                            let sql_record = result?.into_record()?;
+
+                                            let row_value = self.read_row_value_as_vertex(
+                                                sql_record.fields(),
+                                                sub_query_select,
+                                                IncludeJoinedAttrs::Yes,
+                                                op,
+                                            )?;
+
+                                            matrix.columns[0].push(row_value.value);
+                                        }
+
+                                        attrs.insert(*prop_id, Attr::Matrix(matrix));
+                                    }
                                 }
                             }
                             DataRelationshipKind::Edge(_) => {}

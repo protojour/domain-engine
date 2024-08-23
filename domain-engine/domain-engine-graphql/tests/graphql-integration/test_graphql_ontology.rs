@@ -57,6 +57,13 @@ async fn test_stix_ontology(ds: &str) {
                 type: "identity",
                 identity_class: "organization",
                 spec_version: "2.1",
+                external_references: [
+                    {
+                        source_name: "mitre-mobile-attack",
+                        url: "https://attack.mitre.org/mobile/index.php/Technique/MOB-T1056",
+                        external_id: "MOB-T1056"
+                    },
+                ],
             }
         ]) {
             node { id }
@@ -201,6 +208,14 @@ async fn test_stix_ontology(ds: &str) {
                                 "attr": "unit",
                                 "type": "datetime",
                                 "value": "2017-06-01T00:00:00Z",
+                            },
+                            {
+                                "propId": "p@1:59:9",
+                                "attr": "matrix",
+                            },
+                            {
+                                "propId": "p@1:59:12",
+                                "attr": "matrix",
                             },
                             {
                                 "propId": "p@1:59:13",

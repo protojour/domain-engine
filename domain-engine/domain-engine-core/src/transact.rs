@@ -60,7 +60,7 @@ pub enum RespMessage {
     SequenceEnd(OpSequence, Option<Box<SubSequence>>),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub enum DataOperation {
     Queried,
     Inserted,
