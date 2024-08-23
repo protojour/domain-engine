@@ -24,7 +24,7 @@ regex-automata.workspace = true
 arcstr.workspace = true
 ordered-float.workspace = true
 itertools.workspace = true
-indexmap.workspace = true
+indexmap = { workspace = true, features = ["serde"] }
 smallvec = { workspace = true, features = ["serde"] }
 smartstring = { version = "1", features = ["serde"] }
 num = { version = "0.4", features = ["serde"] }
