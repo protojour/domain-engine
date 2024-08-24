@@ -162,7 +162,7 @@ pub enum PgModelError {
 
 impl From<PgModelError> for DomainError {
     fn from(value: PgModelError) -> Self {
-        panic!("pg model error: {value:?}");
+        error!("pg model error: {value:?}");
         DomainErrorKind::DataStore(format!("{value}")).into_error()
     }
 }

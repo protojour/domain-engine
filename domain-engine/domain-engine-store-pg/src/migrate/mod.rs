@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{anyhow, Context};
 use fnv::FnvHashMap;
@@ -7,13 +7,14 @@ use ontol_runtime::{
     tuple::CardinalIdx,
     DefId, DefPropTag, EdgeId, OntolDefTag, PackageId,
 };
+use read_registry::read_registry;
 use tokio_postgres::{Client, Transaction};
 use tracing::{debug_span, info, Instrument};
 
 use crate::{
     pg_model::{
         DomainUid, PgDomain, PgEdgeCardinalKind, PgIndexType, PgPropertyData, PgTableIdUnion,
-        RegVersion,
+        PgType, RegVersion,
     },
     PgModel,
 };
@@ -23,6 +24,7 @@ mod registry {
 }
 
 mod execute;
+mod read_registry;
 mod steps;
 
 /// NB: Changing this is likely a bad idea.
@@ -39,7 +41,7 @@ struct MigrationCtx {
     deployed_version: RegVersion,
     domains: FnvHashMap<PackageId, PgDomain>,
     steps: Vec<(PgDomainIds, MigrationStep)>,
-    abstract_scalars: FnvHashMap<PackageId, BTreeSet<OntolDefTag>>,
+    abstract_scalars: FnvHashMap<PackageId, BTreeMap<OntolDefTag, PgType>>,
 }
 
 /// The descructive steps that may be performed by the domain migration
@@ -130,6 +132,8 @@ pub async fn migrate(
 
     let mut entity_id_to_entity = FnvHashMap::<DefId, DefId>::default();
 
+    read_registry(ontology, &mut ctx, &txn).await?;
+
     // collect migration steps
     // this improves separation of concerns while also enabling dry run simulations
     for package_id in persistent_domains {
@@ -137,7 +141,7 @@ pub async fn migrate(
             .find_domain(*package_id)
             .ok_or_else(|| anyhow!("domain does not exist"))?;
 
-        steps::migrate_domain_steps(*package_id, domain, ontology, &mut ctx, &txn)
+        steps::migrate_domain_steps(*package_id, domain, ontology, &mut ctx)
             .instrument(debug_span!("migrate", id = %domain.domain_id().ulid))
             .await
             .context("domain migration steps")?;

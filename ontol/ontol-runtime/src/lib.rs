@@ -134,7 +134,7 @@ impl DefId {
 }
 
 #[repr(u16)]
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, OntolDebug)]
 pub enum OntolDefTag {
     Unit = 0,
     False = 1,

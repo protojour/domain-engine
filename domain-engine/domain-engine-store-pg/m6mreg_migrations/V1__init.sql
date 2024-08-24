@@ -70,10 +70,10 @@ CREATE TABLE m6mreg.domaintable
     CHECK ((fprop_column IS NULL) = (fkey_column IS NULL))
 );
 
--- Represents a postgres unique constraint over a field tuple
+-- Represents a postgres index over a set of column properties
 CREATE TABLE m6mreg.domaintable_index
 (
-    -- the domaintable implied by this unique group
+    -- the domaintable implied by this DB index
     domaintable_key integer NOT NULL REFERENCES m6mreg.domaintable(key),
     -- the domain of the definition that identifies this index
     def_domain_key integer NOT NULL REFERENCES m6mreg.domain(key),
