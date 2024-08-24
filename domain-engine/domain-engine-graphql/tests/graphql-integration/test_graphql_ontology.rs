@@ -57,6 +57,7 @@ async fn test_stix_ontology(ds: &str) {
                 type: "identity",
                 identity_class: "organization",
                 spec_version: "2.1",
+                roles: ["roleA", "roleB"],
                 external_references: [
                     {
                         source_name: "mitre-mobile-attack",

@@ -439,7 +439,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     self.alloc_addr(&def),
                     SerdeOperator::String(def.def_id),
                 )),
-                PrimitiveKind::DataStoreAddress
+                PrimitiveKind::OctetStream
+                | PrimitiveKind::DataStoreAddress
                 | PrimitiveKind::OpenDataRelationship
                 | PrimitiveKind::EdgeRelationship
                 | PrimitiveKind::FlatUnionRelationship => None,

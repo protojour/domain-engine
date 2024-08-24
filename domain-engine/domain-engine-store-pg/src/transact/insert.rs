@@ -9,10 +9,10 @@ use domain_engine_core::{
 use futures_util::{future::BoxFuture, TryStreamExt};
 use ontol_runtime::{
     attr::Attr,
-    ontology::domain::{DataRelationshipKind, DataRelationshipTarget, Def},
+    ontology::domain::{DataRelationshipKind, DataRelationshipTarget, Def, DefRepr},
     query::select::Select,
     value::Value,
-    DefId, PackageId, PropId,
+    DefId, OntolDefTag, PackageId, PropId,
 };
 use pin_utils::pin_mut;
 use tracing::{debug, trace, warn};
@@ -42,7 +42,7 @@ pub struct PreparedInsert {
 }
 
 struct AnalyzedInput<'a, 'b> {
-    pub field_buf: Vec<SqlVal<'b>>,
+    pub sql_params: Vec<SqlVal<'b>>,
     pub edges: EdgePatches,
     pub sub_values: Vec<(PropId, Value)>,
     pub query_select: QuerySelect<'a>,
@@ -91,7 +91,7 @@ impl<'a> TransactCtx<'a> {
         let mut row_value = self
             .insert_row(
                 &prepared.inherent_stmt,
-                &analyzed.field_buf,
+                &analyzed.sql_params,
                 analyzed.query_select,
             )
             .await?;
@@ -145,8 +145,13 @@ impl<'a> TransactCtx<'a> {
         value: Value,
         cache: &mut PgCache,
     ) -> DomainResult<()> {
-        let pkg_id = value.type_def_id().0;
-        let def_id = value.type_def_id();
+        let value_def_id = value.type_def_id();
+        let def = self.ontology.def(value_def_id);
+
+        let (pkg_id, def_id) = match def.repr() {
+            Some(DefRepr::Text) => (value_def_id.package_id(), OntolDefTag::Text.def_id()),
+            _ => (value_def_id.0, value_def_id),
+        };
 
         let prepared = if let Some(prepared) = cache.insert.get(&(pkg_id, def_id)).cloned() {
             prepared
@@ -165,7 +170,7 @@ impl<'a> TransactCtx<'a> {
         let row_value = self
             .insert_row(
                 &prepared.inherent_stmt,
-                &analyzed.field_buf,
+                &analyzed.sql_params,
                 analyzed.query_select,
             )
             .await?;
@@ -360,7 +365,7 @@ impl<'a> TransactCtx<'a> {
             return Err(DomainErrorKind::EntityMustBeStruct.into_error());
         };
 
-        let mut field_buf: Vec<SqlVal> = vec![];
+        let mut sql_params: Vec<SqlVal> = vec![];
         let mut edge_patches = EdgePatches::default();
         let mut sub_values: Vec<(PropId, Value)> = vec![];
 
@@ -374,7 +379,7 @@ impl<'a> TransactCtx<'a> {
                 .datatable(parent_prop_id.0.package_id(), parent_prop_id.0)?
                 .abstract_property(&parent_prop_id)?;
 
-            field_buf.extend([SqlVal::I32(parent_prop_key), SqlVal::I64(parent_key)]);
+            sql_params.extend([SqlVal::I32(parent_prop_key), SqlVal::I64(parent_key)]);
         }
 
         for (prop_id, rel_info) in &def.data_relationships {
@@ -424,14 +429,14 @@ impl<'a> TransactCtx<'a> {
                     match attr {
                         Some(Attr::Unit(value)) => match self.data_from_value(value)? {
                             Data::Sql(scalar) => {
-                                field_buf.push(scalar);
+                                sql_params.push(scalar);
                             }
                             Data::Compound(comp) => {
                                 todo!("compound: {comp:?}");
                             }
                         },
                         None => {
-                            field_buf.push(SqlVal::Null);
+                            sql_params.push(SqlVal::Null);
                         }
                         Some(_) => {
                             debug!("edge ignored");
@@ -487,7 +492,7 @@ impl<'a> TransactCtx<'a> {
 
         Ok((
             AnalyzedInput {
-                field_buf,
+                sql_params,
                 edges: edge_patches,
                 sub_values,
                 query_select,

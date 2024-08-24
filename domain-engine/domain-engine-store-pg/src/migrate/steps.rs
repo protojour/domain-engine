@@ -11,8 +11,9 @@ use ontol_runtime::{
         },
         Ontology,
     },
+    property::ValueCardinality,
     tuple::CardinalIdx,
-    DefId, DefPropTag, EdgeId, PackageId, PropId,
+    DefId, DefPropTag, EdgeId, PackageId,
 };
 use tokio_postgres::Transaction;
 use tracing::{error, info, trace_span, Instrument};
@@ -166,6 +167,10 @@ pub async fn migrate_domain_steps<'t>(
     }
 
     migrate_domain_edges_steps(pkg_id, domain, domain_ids, ontology, txn, ctx).await?;
+
+    if let Some(abstract_scalar_tags) = ctx.abstract_scalars.remove(&pkg_id) {
+        for tag in abstract_scalar_tags {}
+    }
 
     Ok(())
 }
@@ -532,50 +537,99 @@ fn migrate_datafields_steps(
             DataRelationshipTarget::Union(def_id) => def_id,
         };
 
-        let data = match PgRepr::classify(target_def_id, ontology) {
-            PgRepr::Column(pg_type) => PgPropertyData::Column {
-                col_name: column_name.to_string().into_boxed_str(),
-                pg_type,
-            },
-            PgRepr::Unit => {
-                // This is a unit type, does not need to be represented
-                continue;
-            }
-            PgRepr::Abstract => PgPropertyData::Abstract,
-            PgRepr::NotSupported(msg) => {
-                error!("pg repr error for {table_id:?}:`{column_name}`: `{msg:?}`");
-                continue;
-            }
-        };
+        // let data = match PgRepr::classify(target_def_id, ontology) {
+        //     PgRepr::Scalar(pg_type) => PgPropertyData::Scalar {
+        //         col_name: column_name.to_string().into_boxed_str(),
+        //         pg_type,
+        //     },
+        //     PgRepr::Unit => {
+        //         // This is a unit type, does not need to be represented
+        //         continue;
+        //     }
+        //     PgRepr::Abstract => PgPropertyData::Abstract,
+        //     PgRepr::NotSupported(msg) => {
+        //         error!("pg repr error for {table_id:?}:`{column_name}`: `{msg:?}`");
+        //         continue;
+        //     }
+        // };
 
         match (
             pg_domain
                 .get_table(&table_id)
                 .and_then(|datatable| datatable.properties.get(prop_tag)),
-            data,
+            PgRepr::classify(target_def_id, ontology),
+            rel_info.cardinality.1,
         ) {
-            (Some(PgProperty::Column(pg_column)), PgPropertyData::Column { col_name, pg_type }) => {
-                assert_eq!(pg_column.col_name, col_name, "TODO: rename column");
+            (_, PgRepr::Unit, _) => {
+                // This is a unit type, does not need to be represented
+            }
+            (
+                Some(PgProperty::Column(pg_column)),
+                PgRepr::Scalar(pg_type, _),
+                ValueCardinality::Unit,
+            ) => {
+                assert_eq!(
+                    pg_column.col_name.as_ref(),
+                    column_name,
+                    "TODO: rename column"
+                );
                 assert_eq!(
                     pg_column.pg_type, pg_type,
                     "TODO: change data field pg_type",
                 );
             }
-            (Some(PgProperty::Abstract(_)), PgPropertyData::Abstract) => {}
-            (None, data) => {
+            (Some(PgProperty::Abstract(_)), PgRepr::Abstract, _) => {}
+            (Some(_), _, _) => {
+                todo!()
+            }
+            (
+                None,
+                PgRepr::Scalar(_, scalar_tag),
+                ValueCardinality::IndexSet | ValueCardinality::List,
+            ) => {
                 ctx.steps.push((
                     domain_ids,
                     MigrationStep::DeployProperty {
                         table_id,
                         prop_tag: *prop_tag,
-                        data,
+                        data: PgPropertyData::Abstract,
+                    },
+                ));
+                ctx.abstract_scalars
+                    .entry(domain_ids.pkg_id)
+                    .or_default()
+                    .insert(scalar_tag);
+            }
+            (None, PgRepr::Scalar(pg_type, _), _) => {
+                ctx.steps.push((
+                    domain_ids,
+                    MigrationStep::DeployProperty {
+                        table_id,
+                        prop_tag: *prop_tag,
+                        data: PgPropertyData::Scalar {
+                            col_name: column_name.to_string().into_boxed_str(),
+                            pg_type,
+                        },
                     },
                 ));
             }
-            _ => {
-                return Err(
-                    PgMigrationError::IncompatibleProperty(PropId(def.id, *prop_tag)).into(),
-                );
+            (None, PgRepr::Abstract, _) => {
+                ctx.steps.push((
+                    domain_ids,
+                    MigrationStep::DeployProperty {
+                        table_id,
+                        prop_tag: *prop_tag,
+                        data: PgPropertyData::Abstract,
+                    },
+                ));
+            }
+            (_, PgRepr::NotSupported(msg), _) => {
+                error!("pg repr error for {table_id:?}:`{column_name}`: `{msg:?}`");
+                // return Err(PgMigrationError::IncompatibleProperty(
+                //     PropId(def.id, *prop_tag),
+                //     column_name.to_string().into_boxed_str(),
+                // )
+                // .into());
             }
         }
     }

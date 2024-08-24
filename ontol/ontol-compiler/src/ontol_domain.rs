@@ -5,7 +5,7 @@ use std::{ops::Range, str::FromStr};
 use ontol_hir::OverloadFunc;
 use ontol_runtime::{
     ontology::{domain::DomainId, ontol::TextLikeType},
-    DefId, PackageId,
+    DefId, OntolDefTag, PackageId,
 };
 use ulid::Ulid;
 
@@ -48,7 +48,9 @@ impl<'m> Compiler<'m> {
         // pre-process primitive definitions
         let mut named_builtin_relations: Vec<(DefId, &'static str)> = vec![];
         for def_id in self.defs.iter_package_def_ids(ONTOL_PKG) {
-            let def_kind = self.defs.def_kind(def_id);
+            let Some(def_kind) = self.defs.def_kind_option(def_id) else {
+                continue;
+            };
 
             match def_kind {
                 DefKind::Primitive(kind, ident) => {
@@ -258,7 +260,7 @@ impl<'m> Compiler<'m> {
     }
 
     fn def_uuid(&mut self) {
-        let (uuid, _) = self.define_concrete_domain_type("uuid", |def_id| {
+        let (uuid, _) = self.define_concrete_ontol_type(OntolDefTag::Uuid, "uuid", |def_id| {
             Type::TextLike(def_id, TextLikeType::Uuid)
         });
         let segment = TextPatternSegment::Regex(regex_util::well_known::uuid());
@@ -268,7 +270,7 @@ impl<'m> Compiler<'m> {
     }
 
     fn def_ulid(&mut self) {
-        let (ulid, _) = self.define_concrete_domain_type("ulid", |def_id| {
+        let (ulid, _) = self.define_concrete_ontol_type(OntolDefTag::Ulid, "ulid", |def_id| {
             Type::TextLike(def_id, TextLikeType::Ulid)
         });
         let segment = TextPatternSegment::Regex(regex_util::well_known::ulid());
@@ -278,9 +280,10 @@ impl<'m> Compiler<'m> {
     }
 
     fn def_datetime(&mut self) {
-        let (datetime, _) = self.define_concrete_domain_type("datetime", |def_id| {
-            Type::TextLike(def_id, TextLikeType::DateTime)
-        });
+        let (datetime, _) =
+            self.define_concrete_ontol_type(OntolDefTag::DateTime, "datetime", |def_id| {
+                Type::TextLike(def_id, TextLikeType::DateTime)
+            });
         let segment = TextPatternSegment::Regex(regex_util::well_known::datetime_rfc3339());
         store_text_pattern_segment(
             datetime,
@@ -296,19 +299,19 @@ impl<'m> Compiler<'m> {
     }
 
     /// Define an ontol _domain_ type, i.e. not a primitive
-    fn define_concrete_domain_type(
+    fn define_concrete_ontol_type(
         &mut self,
+        tag: OntolDefTag,
         ident: &'static str,
         ty_fn: impl Fn(DefId) -> Type<'m>,
     ) -> (DefId, TypeRef<'m>) {
-        let def_id = self.defs.add_def(
+        let def_id = self.defs.add_ontol(
+            tag,
             DefKind::Type(TypeDef {
                 ident: Some(ident),
                 rel_type_for: None,
                 flags: TypeDefFlags::PUBLIC | TypeDefFlags::CONCRETE,
             }),
-            ONTOL_PKG,
-            NO_SPAN,
         );
         let type_ref = self.register_named_type(def_id, ident, ty_fn);
         (def_id, type_ref)

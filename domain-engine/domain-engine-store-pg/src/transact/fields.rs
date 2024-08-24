@@ -3,6 +3,7 @@ use fnv::FnvHashMap;
 use ontol_runtime::{
     attr::Attr,
     ontology::domain::{DataRelationshipInfo, DataRelationshipKind, Def},
+    property::ValueCardinality,
     value::Value,
     PropId,
 };
@@ -73,13 +74,13 @@ impl<'a> TransactCtx<'a> {
         attrs: &mut FnvHashMap<PropId, Attr>,
     ) -> DomainResult<()> {
         for (prop_id, rel_info) in &def.data_relationships {
-            match &rel_info.kind {
-                DataRelationshipKind::Id | DataRelationshipKind::Tree => {
+            match (&rel_info.kind, &rel_info.cardinality.1) {
+                (DataRelationshipKind::Id | DataRelationshipKind::Tree, ValueCardinality::Unit) => {
                     if let Some(value) = self.read_field(rel_info, record_iter)? {
                         attrs.insert(*prop_id, Attr::Unit(value));
                     }
                 }
-                DataRelationshipKind::Edge(_) => {}
+                _ => {}
             }
         }
 
@@ -99,7 +100,7 @@ impl<'a> TransactCtx<'a> {
         let pg_repr = PgRepr::classify(target_def_id, self.ontology);
 
         match pg_repr {
-            PgRepr::Column(pg_type) => {
+            PgRepr::Scalar(pg_type, _) => {
                 let sql_val = record_iter.next_field(&Layout::Scalar(pg_type))?;
 
                 Ok(if let Some(sql_val) = sql_val.null_filter() {

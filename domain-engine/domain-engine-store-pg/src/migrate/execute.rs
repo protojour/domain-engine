@@ -170,7 +170,7 @@ async fn execute_migration_step<'t>(
             }
             .unwrap();
 
-            if let PgPropertyData::Column { col_name, pg_type } = &data {
+            if let PgPropertyData::Scalar { col_name, pg_type } = &data {
                 let type_ident = match pg_type {
                     PgType::Boolean => "boolean",
                     PgType::Integer => "integer",
@@ -197,7 +197,7 @@ async fn execute_migration_step<'t>(
             }
 
             let (pg_type, column_name) = match &data {
-                PgPropertyData::Column { col_name, pg_type } => (Some(pg_type), Some(col_name)),
+                PgPropertyData::Scalar { col_name, pg_type } => (Some(pg_type), Some(col_name)),
                 PgPropertyData::Abstract => (None, None),
             };
 
@@ -221,7 +221,7 @@ async fn execute_migration_step<'t>(
             let existing = pg_table.properties.insert(
                 prop_tag,
                 match data {
-                    PgPropertyData::Column { col_name, pg_type } => PgProperty::Column(PgColumn {
+                    PgPropertyData::Scalar { col_name, pg_type } => PgProperty::Column(PgColumn {
                         key,
                         col_name,
                         pg_type,

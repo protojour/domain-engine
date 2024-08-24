@@ -1,5 +1,5 @@
 use ontol_macros::test;
-use ontol_runtime::{tuple::CardinalIdx, DefIdSet};
+use ontol_runtime::{debug::OntolDebug, ontology::domain::DefRepr, tuple::CardinalIdx, DefIdSet};
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches, examples::stix::stix_bundle, serde_helper::*,
     OntolTest, TestCompile,
@@ -105,7 +105,9 @@ fn test_stix_object_course_of_action() {
 }
 
 fn stix_ontology_smoke(test: &OntolTest) {
-    let [windows_registry_key, user_account] = test.bind(["windows-registry-key", "user-account"]);
+    let [windows_registry_key, user_account, attack_pattern] =
+        test.bind(["windows-registry-key", "user-account", "attack-pattern"]);
+    let [string] = test.bind(["stix_common.string"]);
 
     let (_, creator_user_ref) = windows_registry_key
         .def
@@ -129,4 +131,18 @@ fn stix_ontology_smoke(test: &OntolTest) {
         &reg_key_user_account_edge_info.cardinals[1].target,
         &DefIdSet::from_iter([user_account.def_id()])
     );
+
+    let (_, aliases) = attack_pattern
+        .def
+        .data_relationship_by_name("aliases", test.ontology())
+        .unwrap();
+    let aliases_def = test.ontology().def(aliases.target.def_id());
+    let aliases_repr = aliases_def.repr();
+    let Some(DefRepr::Text) = aliases_repr else {
+        panic!("aliases_repr was {:?}", aliases_repr.debug(test.ontology()));
+    };
+
+    let Some(DefRepr::Text) = test.ontology().def(string.def_id()).repr() else {
+        panic!("ontol common string was not DefReprText");
+    };
 }

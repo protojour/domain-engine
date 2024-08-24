@@ -70,6 +70,7 @@ pub enum PrimitiveKind {
     /// rel* is: text
     /// ```
     Text,
+    OctetStream,
     /// Address of something in a data store
     DataStoreAddress,
     /// Open relationship to domainless data
@@ -308,6 +309,8 @@ impl Primitives {
         };
 
         assert_eq!(DefId::unit(), primitives.unit);
+
+        defs.add_primitive(OntolDefTag::OctetStream, PrimitiveKind::OctetStream, None);
 
         primitives
     }

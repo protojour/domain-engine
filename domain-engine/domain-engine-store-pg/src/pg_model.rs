@@ -9,7 +9,7 @@ use ontol_runtime::{
     },
     tuple::CardinalIdx,
     value::Value,
-    DefId, DefPropTag, EdgeId, PackageId, PropId,
+    DefId, DefPropTag, EdgeId, OntolDefTag, PackageId, PropId,
 };
 use postgres_types::ToSql;
 use tokio_postgres::types::FromSql;
@@ -292,7 +292,7 @@ pub enum PgProperty {
 
 #[derive(Debug)]
 pub enum PgPropertyData {
-    Column { col_name: Box<str>, pg_type: PgType },
+    Scalar { col_name: Box<str>, pg_type: PgType },
     Abstract,
 }
 
@@ -354,7 +354,7 @@ pub enum PgRepr {
     /// Something that has only one possible value, and therefore doesn't need storage
     Unit,
     /// A scalar-like data field that can be stored in a column
-    Column(PgType),
+    Scalar(PgType, OntolDefTag),
     /// Something that will be stored in an abstracted manner in "child table"
     Abstract,
     /// PG can't represent it (yet?)
@@ -375,14 +375,14 @@ impl PgRepr {
     fn classify_def_repr(def_repr: &DefRepr, ontology: &Ontology) -> Self {
         match def_repr {
             DefRepr::Unit => Self::Unit,
-            DefRepr::I64 => Self::Column(PgType::BigInt),
-            DefRepr::F64 => Self::Column(PgType::DoublePrecision),
-            DefRepr::Serial => Self::Column(PgType::Bigserial),
-            DefRepr::Boolean => Self::Column(PgType::Boolean),
-            DefRepr::Text => Self::Column(PgType::Text),
+            DefRepr::I64 => Self::Scalar(PgType::BigInt, OntolDefTag::I64),
+            DefRepr::F64 => Self::Scalar(PgType::DoublePrecision, OntolDefTag::F64),
+            DefRepr::Serial => Self::Scalar(PgType::Bigserial, OntolDefTag::Serial),
+            DefRepr::Boolean => Self::Scalar(PgType::Boolean, OntolDefTag::Boolean),
+            DefRepr::Text => Self::Scalar(PgType::Text, OntolDefTag::Text),
             DefRepr::TextConstant(_) => Self::Unit,
-            DefRepr::Octets => Self::Column(PgType::Bytea),
-            DefRepr::DateTime => Self::Column(PgType::TimestampTz),
+            DefRepr::Octets => Self::Scalar(PgType::Bytea, OntolDefTag::OctetStream),
+            DefRepr::DateTime => Self::Scalar(PgType::TimestampTz, OntolDefTag::DateTime),
             DefRepr::FmtStruct(Some((_prop_id, def_id))) => Self::classify(*def_id, ontology),
             DefRepr::FmtStruct(None) => Self::Unit,
             DefRepr::Seq => todo!("seq"),

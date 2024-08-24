@@ -5,7 +5,7 @@ use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::{domain::DefKind, Ontology},
     tuple::CardinalIdx,
-    DefId, DefPropTag, EdgeId, PackageId,
+    DefId, DefPropTag, EdgeId, OntolDefTag, PackageId,
 };
 use tokio_postgres::{Client, Transaction};
 use tracing::{debug_span, info, Instrument};
@@ -39,6 +39,7 @@ struct MigrationCtx {
     deployed_version: RegVersion,
     domains: FnvHashMap<PackageId, PgDomain>,
     steps: Vec<(PgDomainIds, MigrationStep)>,
+    abstract_scalars: FnvHashMap<PackageId, BTreeSet<OntolDefTag>>,
 }
 
 /// The descructive steps that may be performed by the domain migration
@@ -111,6 +112,7 @@ pub async fn migrate(
             deployed_version: current_version,
             domains: Default::default(),
             steps: Default::default(),
+            abstract_scalars: Default::default(),
         };
         assert_eq!(RegVersion::current(), ctx.current_version);
         ctx

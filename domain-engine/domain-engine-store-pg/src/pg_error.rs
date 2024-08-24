@@ -162,7 +162,7 @@ pub enum PgModelError {
 
 impl From<PgModelError> for DomainError {
     fn from(value: PgModelError) -> Self {
-        error!("pg model error: {value:?}");
+        panic!("pg model error: {value:?}");
         DomainErrorKind::DataStore(format!("{value}")).into_error()
     }
 }
@@ -180,8 +180,8 @@ pub enum PgMigrationError {
     UnionTarget(PropId),
     /// ambiguous ID
     AmbiguousId(DefId),
-    /// incompatible property
-    IncompatibleProperty(PropId),
+    /// incompatible property `{1}`
+    IncompatibleProperty(PropId, Box<str>),
 }
 
 impl From<PgMigrationError> for DomainError {
