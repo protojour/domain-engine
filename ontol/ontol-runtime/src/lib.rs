@@ -134,7 +134,7 @@ impl DefId {
 }
 
 #[repr(u16)]
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, OntolDebug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum OntolDefTag {
     Unit = 0,
     False = 1,
@@ -180,6 +180,8 @@ pub enum OntolDefTag {
     /// This must be the last entry. Update the value accordingly.
     _LastEntry = 41,
 }
+
+impl_ontol_debug!(OntolDefTag);
 
 impl OntolDefTag {
     pub const fn def_id(self) -> DefId {

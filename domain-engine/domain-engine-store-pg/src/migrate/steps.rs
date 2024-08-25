@@ -376,9 +376,17 @@ fn migrate_datafields_steps(
                     "TODO: change data field pg_type",
                 );
             }
-            (Some(PgProperty::Abstract(_)), PgRepr::Abstract, _) => {}
-            (Some(_), _, _) => {
-                todo!()
+            (Some(PgProperty::Abstract(_)), PgRepr::Abstract, _) => {
+                // OK
+            }
+            (Some(PgProperty::Abstract(_)), PgRepr::Scalar(..), _) => {
+                // OK
+            }
+            (Some(PgProperty::Column(_)), PgRepr::Scalar(..), _) => {
+                // OK
+            }
+            (Some(PgProperty::Column(_)), PgRepr::Abstract, _) => {
+                todo!("migrate from column to abstract")
             }
             (
                 None,

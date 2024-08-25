@@ -14,7 +14,7 @@ use ontol_runtime::{
 use ontol_test_utils::{
     assert_error_msg,
     def_binding::DefBinding,
-    examples::{conduit::CONDUIT_DB, ARTIST_AND_INSTRUMENT},
+    examples::{conduit::CONDUIT_DB, stix::stix_bundle, ARTIST_AND_INSTRUMENT},
     expect_eq,
     json_utils::{json_map, json_prop},
     serde_helper::{serde_create, serde_read},
@@ -48,7 +48,7 @@ async fn make_domain_engine(
 
 #[ontol_macros::datastore_test(tokio::test)]
 async fn test_db_remigrate_noop(ds: &str) {
-    let test = conduit_db().compile();
+    let test = stix_bundle().compile();
     let domain_engine = DomainEngine::builder(test.ontology_owned())
         .system(Box::new(unimock::Unimock::new(())))
         .build(DynamicDataStoreFactory::new(ds), Session::default())

@@ -350,6 +350,7 @@ pub enum PgEdgeCardinalKind {
 }
 
 /// How PG will represent an inherent property
+#[derive(Debug)]
 pub enum PgRepr {
     /// Something that has only one possible value, and therefore doesn't need storage
     Unit,
