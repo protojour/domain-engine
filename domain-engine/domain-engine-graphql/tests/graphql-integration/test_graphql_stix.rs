@@ -59,8 +59,7 @@ async fn test_graphql_stix(ds: &str) {
                     modified: "2018-01-17T12:56:55.080Z",
                     name: "Abuse Accessibility Features",
                     description: "A malicious app could abuse Android's accessibility features to capture sensitive data or perform other malicious actions, as demonstrated in a proof of concept created by Skycure (Citation: Skycure-Accessibility).\n\nPlatforms: Android",
-                    # postgres breaks on this:
-                    # aliases: ["a", "b"],
+                    aliases: ["aliasA", "aliasB"],
                     kill_chain_phases: [
                         {
                             kill_chain_name: "mitre-mobile-attack",
