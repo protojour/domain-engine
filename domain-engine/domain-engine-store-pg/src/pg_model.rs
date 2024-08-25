@@ -372,7 +372,7 @@ impl PgRepr {
         Self::classify_def_repr(def_repr, ontology)
     }
 
-    fn classify_def_repr(def_repr: &DefRepr, ontology: &Ontology) -> Self {
+    pub fn classify_def_repr(def_repr: &DefRepr, ontology: &Ontology) -> Self {
         match def_repr {
             DefRepr::Unit => Self::Unit,
             DefRepr::I64 => Self::Scalar(PgType::BigInt, OntolDefTag::I64),

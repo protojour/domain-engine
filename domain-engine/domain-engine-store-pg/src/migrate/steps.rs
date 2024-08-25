@@ -116,7 +116,7 @@ pub async fn migrate_domain_steps<'t>(
                         table_id: PgTableIdUnion::Def(tag.def_id()),
                         prop_tag: DefPropTag(0),
                         data: PgPropertyData::Scalar {
-                            col_name: "val".to_string().into_boxed_str(),
+                            col_name: "value".to_string().into_boxed_str(),
                             pg_type,
                         },
                     },

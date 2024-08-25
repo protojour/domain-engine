@@ -9,10 +9,10 @@ use domain_engine_core::{
 use futures_util::{future::BoxFuture, TryStreamExt};
 use ontol_runtime::{
     attr::Attr,
-    ontology::domain::{DataRelationshipKind, DataRelationshipTarget, Def, DefRepr},
+    ontology::domain::{DataRelationshipKind, DataRelationshipTarget, Def},
     query::select::Select,
     value::Value,
-    DefId, OntolDefTag, PackageId, PropId,
+    DefId, PackageId, PropId,
 };
 use pin_utils::pin_mut;
 use tracing::{debug, trace, warn};
@@ -46,6 +46,11 @@ struct AnalyzedInput<'a, 'b> {
     pub edges: EdgePatches,
     pub sub_values: Vec<(PropId, Value)>,
     pub query_select: QuerySelect<'a>,
+}
+
+struct ParentProp {
+    prop_id: PropId,
+    key: PgDataKey,
 }
 
 impl<'a> TransactCtx<'a> {
@@ -100,8 +105,15 @@ impl<'a> TransactCtx<'a> {
             .await?;
 
         for (prop_id, value) in analyzed.sub_values {
-            self.insert_sub_value((prop_id, row_value.data_key), value, cache)
-                .await?;
+            self.insert_sub_value(
+                ParentProp {
+                    prop_id,
+                    key: row_value.data_key,
+                },
+                value,
+                cache,
+            )
+            .await?;
         }
 
         if let (Some(edge_select_stmt), QuerySelect::Struct(properties)) =
@@ -132,7 +144,7 @@ impl<'a> TransactCtx<'a> {
 
     fn insert_sub_value<'s>(
         &'s self,
-        parent: (PropId, PgDataKey),
+        parent: ParentProp,
         value: Value,
         cache: &'s mut PgCache,
     ) -> BoxFuture<'_, DomainResult<()>> {
@@ -141,49 +153,88 @@ impl<'a> TransactCtx<'a> {
 
     async fn insert_sub_value_impl(
         &self,
-        parent: (PropId, PgDataKey),
+        parent: ParentProp,
         value: Value,
         cache: &mut PgCache,
     ) -> DomainResult<()> {
         let value_def_id = value.type_def_id();
         let def = self.ontology.def(value_def_id);
 
-        let (pkg_id, def_id) = match def.repr() {
-            Some(DefRepr::Text) => (value_def_id.package_id(), OntolDefTag::Text.def_id()),
-            _ => (value_def_id.0, value_def_id),
-        };
+        if let Some(PgRepr::Scalar(_pg_type, ontol_def_tag)) = def
+            .repr()
+            .map(|r| PgRepr::classify_def_repr(r, self.ontology))
+        {
+            let pkg_id = parent.prop_id.0.package_id();
+            let def_id = ontol_def_tag.def_id();
 
-        let prepared = if let Some(prepared) = cache.insert.get(&(pkg_id, def_id)).cloned() {
-            prepared
+            let prepared = if let Some(prepared) = cache.insert.get(&(pkg_id, def_id)).cloned() {
+                prepared
+            } else {
+                let prepared = self
+                    .prepare_insert(pkg_id, def_id, &Select::Unit, cache)
+                    .await?;
+                cache.insert.insert((pkg_id, def_id), prepared.clone());
+                prepared
+            };
+
+            let parent_prop_key = self
+                .pg_model
+                .datatable(parent.prop_id.0.package_id(), parent.prop_id.0)?
+                .abstract_property(&parent.prop_id)?;
+
+            let Data::Sql(value) = self.data_from_value(value)? else {
+                panic!("value must be a scalar here");
+            };
+
+            let sql_params = vec![SqlVal::I32(parent_prop_key), SqlVal::I64(parent.key), value];
+
+            self.insert_row(&prepared.inherent_stmt, &sql_params, QuerySelect::Unit)
+                .await?;
+
+            Ok(())
         } else {
-            let prepared = self
-                .prepare_insert(pkg_id, def_id, &Select::Unit, cache)
+            let pkg_id = value_def_id.0;
+            let def_id = value_def_id;
+
+            let prepared = if let Some(prepared) = cache.insert.get(&(pkg_id, def_id)).cloned() {
+                prepared
+            } else {
+                let prepared = self
+                    .prepare_insert(pkg_id, def_id, &Select::Unit, cache)
+                    .await?;
+                cache.insert.insert((pkg_id, def_id), prepared.clone());
+                prepared
+            };
+
+            let def = self.ontology.def(def_id);
+            let (analyzed, pg_table) =
+                self.analyze_input(Some(parent), def, InDomain { pkg_id, value }, &Select::Unit)?;
+
+            let row_value = self
+                .insert_row(
+                    &prepared.inherent_stmt,
+                    &analyzed.sql_params,
+                    analyzed.query_select,
+                )
                 .await?;
-            cache.insert.insert((pkg_id, def_id), prepared.clone());
-            prepared
-        };
 
-        let def = self.ontology.def(def_id);
-        let (analyzed, pg_table) =
-            self.analyze_input(Some(parent), def, InDomain { pkg_id, value }, &Select::Unit)?;
-
-        let row_value = self
-            .insert_row(
-                &prepared.inherent_stmt,
-                &analyzed.sql_params,
-                analyzed.query_select,
-            )
-            .await?;
-
-        self.patch_edges(pg_table, row_value.data_key, analyzed.edges, cache)
-            .await?;
-
-        for (prop_id, value) in analyzed.sub_values {
-            self.insert_sub_value((prop_id, row_value.data_key), value, cache)
+            self.patch_edges(pg_table, row_value.data_key, analyzed.edges, cache)
                 .await?;
+
+            for (prop_id, value) in analyzed.sub_values {
+                self.insert_sub_value(
+                    ParentProp {
+                        prop_id,
+                        key: row_value.data_key,
+                    },
+                    value,
+                    cache,
+                )
+                .await?;
+            }
+
+            Ok(())
         }
-
-        Ok(())
     }
 
     fn preprocess_insert_value(&self, mode: InsertMode, value: &mut Value) -> DomainResult<()> {
@@ -250,19 +301,30 @@ impl<'a> TransactCtx<'a> {
             param_idx += 2;
         }
 
-        // insert columns in the order of data relationships
-        for (prop_id, rel_info) in &def.data_relationships {
-            if matches!(
-                &rel_info.kind,
-                DataRelationshipKind::Id | DataRelationshipKind::Tree
-            ) {
-                if let Some(pg_column) = pg.table.find_column(prop_id) {
-                    column_names.push(pg_column.col_name.as_ref());
-                    if pg_column.pg_type.insert_default() {
-                        values.push(sql::Expr::Default);
-                    } else {
-                        values.push(sql::Expr::param(param_idx));
-                        param_idx += 1;
+        match def
+            .repr()
+            .map(|r| PgRepr::classify_def_repr(r, self.ontology))
+        {
+            Some(PgRepr::Scalar(_, _)) => {
+                column_names.push("value");
+                values.push(sql::Expr::param(param_idx));
+            }
+            _ => {
+                // insert columns in the order of data relationships
+                for (prop_id, rel_info) in &def.data_relationships {
+                    if matches!(
+                        &rel_info.kind,
+                        DataRelationshipKind::Id | DataRelationshipKind::Tree
+                    ) {
+                        if let Some(pg_column) = pg.table.find_column(prop_id) {
+                            column_names.push(pg_column.col_name.as_ref());
+                            if pg_column.pg_type.insert_default() {
+                                values.push(sql::Expr::Default);
+                            } else {
+                                values.push(sql::Expr::param(param_idx));
+                                param_idx += 1;
+                            }
+                        }
                     }
                 }
             }
@@ -354,7 +416,7 @@ impl<'a> TransactCtx<'a> {
 
     fn analyze_input(
         &self,
-        parent: Option<(PropId, PgDataKey)>,
+        parent: Option<ParentProp>,
         def: &Def,
         value: InDomain<Value>,
         select: &'a Select,
@@ -370,16 +432,16 @@ impl<'a> TransactCtx<'a> {
         let mut sub_values: Vec<(PropId, Value)> = vec![];
 
         if pg_table.has_fkey {
-            let Some((parent_prop_id, parent_key)) = parent else {
+            let Some(parent) = parent else {
                 panic!("missing parent property for fkey");
             };
 
             let parent_prop_key = self
                 .pg_model
-                .datatable(parent_prop_id.0.package_id(), parent_prop_id.0)?
-                .abstract_property(&parent_prop_id)?;
+                .datatable(parent.prop_id.0.package_id(), parent.prop_id.0)?
+                .abstract_property(&parent.prop_id)?;
 
-            sql_params.extend([SqlVal::I32(parent_prop_key), SqlVal::I64(parent_key)]);
+            sql_params.extend([SqlVal::I32(parent_prop_key), SqlVal::I64(parent.key)]);
         }
 
         for (prop_id, rel_info) in &def.data_relationships {
@@ -504,16 +566,16 @@ impl<'a> TransactCtx<'a> {
     async fn insert_row(
         &self,
         prepared_inherent_insert: &PreparedStatement,
-        field_buf: &[SqlVal<'a>],
+        sql_params: &[SqlVal<'a>],
         query_select: QuerySelect<'a>,
     ) -> DomainResult<RowValue> {
         let row = {
             debug!("{}", prepared_inherent_insert);
-            trace!("{field_buf:?}");
+            trace!("{sql_params:?}");
 
             let stream = self
                 .client()
-                .query_raw(prepared_inherent_insert.deref(), field_buf)
+                .query_raw(prepared_inherent_insert.deref(), sql_params)
                 .await
                 .map_err(PgError::InsertQuery)?;
             pin_mut!(stream);
