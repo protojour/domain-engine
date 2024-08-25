@@ -74,13 +74,12 @@ impl<'a> TransactCtx<'a> {
         attrs: &mut FnvHashMap<PropId, Attr>,
     ) -> DomainResult<()> {
         for (prop_id, rel_info) in &def.data_relationships {
-            match (&rel_info.kind, &rel_info.cardinality.1) {
-                (DataRelationshipKind::Id | DataRelationshipKind::Tree, ValueCardinality::Unit) => {
-                    if let Some(value) = self.read_field(rel_info, record_iter)? {
-                        attrs.insert(*prop_id, Attr::Unit(value));
-                    }
+            if let (DataRelationshipKind::Id | DataRelationshipKind::Tree, ValueCardinality::Unit) =
+                (&rel_info.kind, &rel_info.cardinality.1)
+            {
+                if let Some(value) = self.read_field(rel_info, record_iter)? {
+                    attrs.insert(*prop_id, Attr::Unit(value));
                 }
-                _ => {}
             }
         }
 

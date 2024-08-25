@@ -398,6 +398,10 @@ impl PgRepr {
             DefRepr::Unknown => Self::NotSupported("unknown"),
         }
     }
+
+    pub fn classify_opt_def_repr(def_repr: Option<&DefRepr>, ontology: &Ontology) -> Option<Self> {
+        def_repr.map(|r| Self::classify_def_repr(r, ontology))
+    }
 }
 
 /// NB: Do not change the names of these enum variants.

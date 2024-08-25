@@ -248,6 +248,16 @@ async fn test_stix_ontology(ds: &str) {
                                 "value": "The MITRE Corporation"
                             },
                             {
+                                "propId": "p@1:59:15",
+                                "attr": "matrix",
+                                "columns": [
+                                    [
+                                        { "type": "text", "value": "roleA" },
+                                        { "type": "text", "value": "roleB" },
+                                    ]
+                                ]
+                            },
+                            {
                                 "propId": "p@1:59:16",
                                 "attr": "unit",
                                 "type": "text",

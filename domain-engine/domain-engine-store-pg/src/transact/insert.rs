@@ -44,7 +44,7 @@ pub struct PreparedInsert {
 struct AnalyzedInput<'a, 'b> {
     pub sql_params: Vec<SqlVal<'b>>,
     pub edges: EdgePatches,
-    pub sub_values: Vec<(PropId, Value)>,
+    pub abstract_values: Vec<(PropId, Value)>,
     pub query_select: QuerySelect<'a>,
 }
 
@@ -104,8 +104,8 @@ impl<'a> TransactCtx<'a> {
         self.patch_edges(pg_table, row_value.data_key, analyzed.edges, cache)
             .await?;
 
-        for (prop_id, value) in analyzed.sub_values {
-            self.insert_sub_value(
+        for (prop_id, value) in analyzed.abstract_values {
+            self.insert_abstract_sub_value(
                 ParentProp {
                     prop_id,
                     key: row_value.data_key,
@@ -142,16 +142,16 @@ impl<'a> TransactCtx<'a> {
         Ok(row_value)
     }
 
-    fn insert_sub_value<'s>(
+    fn insert_abstract_sub_value<'s>(
         &'s self,
         parent: ParentProp,
         value: Value,
         cache: &'s mut PgCache,
     ) -> BoxFuture<'_, DomainResult<()>> {
-        Box::pin(self.insert_sub_value_impl(parent, value, cache))
+        Box::pin(self.insert_abstract_sub_value_impl(parent, value, cache))
     }
 
-    async fn insert_sub_value_impl(
+    async fn insert_abstract_sub_value_impl(
         &self,
         parent: ParentProp,
         value: Value,
@@ -160,9 +160,8 @@ impl<'a> TransactCtx<'a> {
         let value_def_id = value.type_def_id();
         let def = self.ontology.def(value_def_id);
 
-        if let Some(PgRepr::Scalar(_pg_type, ontol_def_tag)) = def
-            .repr()
-            .map(|r| PgRepr::classify_def_repr(r, self.ontology))
+        if let Some(PgRepr::Scalar(_pg_type, ontol_def_tag)) =
+            PgRepr::classify_opt_def_repr(def.repr(), self.ontology)
         {
             let pkg_id = parent.prop_id.0.package_id();
             let def_id = ontol_def_tag.def_id();
@@ -221,8 +220,8 @@ impl<'a> TransactCtx<'a> {
             self.patch_edges(pg_table, row_value.data_key, analyzed.edges, cache)
                 .await?;
 
-            for (prop_id, value) in analyzed.sub_values {
-                self.insert_sub_value(
+            for (prop_id, value) in analyzed.abstract_values {
+                self.insert_abstract_sub_value(
                     ParentProp {
                         prop_id,
                         key: row_value.data_key,
@@ -301,10 +300,7 @@ impl<'a> TransactCtx<'a> {
             param_idx += 2;
         }
 
-        match def
-            .repr()
-            .map(|r| PgRepr::classify_def_repr(r, self.ontology))
-        {
+        match PgRepr::classify_opt_def_repr(def.repr(), self.ontology) {
             Some(PgRepr::Scalar(_, _)) => {
                 column_names.push("value");
                 values.push(sql::Expr::param(param_idx));
@@ -429,7 +425,7 @@ impl<'a> TransactCtx<'a> {
 
         let mut sql_params: Vec<SqlVal> = vec![];
         let mut edge_patches = EdgePatches::default();
-        let mut sub_values: Vec<(PropId, Value)> = vec![];
+        let mut abstract_values: Vec<(PropId, Value)> = vec![];
 
         if pg_table.has_fkey {
             let Some(parent) = parent else {
@@ -517,7 +513,7 @@ impl<'a> TransactCtx<'a> {
 
                     match attr {
                         Some(Attr::Unit(value)) => {
-                            sub_values.push((*prop_id, value));
+                            abstract_values.push((*prop_id, value));
                         }
                         Some(Attr::Tuple(_tuple)) => {
                             return Err(PgInputError::MultivaluedSubValue(*prop_id).into());
@@ -526,7 +522,7 @@ impl<'a> TransactCtx<'a> {
                             if matrix.columns.len() == 1 {
                                 for row in matrix.into_rows() {
                                     let value = row.elements.into_iter().next().unwrap();
-                                    sub_values.push((*prop_id, value));
+                                    abstract_values.push((*prop_id, value));
                                 }
                             } else {
                                 return Err(PgInputError::MultivaluedSubValue(*prop_id).into());
@@ -556,7 +552,7 @@ impl<'a> TransactCtx<'a> {
             AnalyzedInput {
                 sql_params,
                 edges: edge_patches,
-                sub_values,
+                abstract_values,
                 query_select,
             },
             pg_table,

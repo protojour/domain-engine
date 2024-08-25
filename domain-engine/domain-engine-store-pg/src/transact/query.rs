@@ -9,7 +9,7 @@ use ontol_runtime::{
     sequence::SubSequence,
     tuple::{CardinalIdx, EndoTuple},
     value::Value,
-    DefId, PropId,
+    DefId, OntolDefTag, PropId,
 };
 use pin_utils::pin_mut;
 use serde::{Deserialize, Serialize};
@@ -19,7 +19,7 @@ use tracing::{debug, trace};
 use crate::{
     address::make_ontol_address,
     pg_error::{PgError, PgInputError, PgModelError},
-    pg_model::{PgDataKey, PgDomainTable, PgEdgeCardinalKind, PgTable, PgTableKey, PgType},
+    pg_model::{PgDataKey, PgDomainTable, PgEdgeCardinalKind, PgRepr, PgTable, PgTableKey, PgType},
     sql::{self, FromItem},
     sql_record::{SqlColumnStream, SqlRecord, SqlRecordIterator},
     sql_value::{Layout, SqlVal},
@@ -74,6 +74,15 @@ pub enum QuerySelect<'a> {
 pub enum IncludeJoinedAttrs {
     Yes,
     No,
+}
+
+enum AbstractKind<'a> {
+    VertexUnion(&'a [DefId]),
+    Scalar {
+        pg_type: PgType,
+        ontol_def_tag: OntolDefTag,
+        target_def_id: DefId,
+    },
 }
 
 pub struct Query {
@@ -301,21 +310,19 @@ impl<'a> TransactCtx<'a> {
         // TODO: The abstract props can be cached in PgTable
         for (prop_id, rel) in &def.data_relationships {
             match &rel.kind {
-                DataRelationshipKind::Id | DataRelationshipKind::Tree => {
-                    let Some(prop_key) = pg.table.find_abstract_property(prop_id) else {
-                        continue;
-                    };
+                DataRelationshipKind::Id | DataRelationshipKind::Tree => {}
+                DataRelationshipKind::Edge(_) => continue,
+            };
 
-                    let sub_def_ids = match &rel.target {
-                        DataRelationshipTarget::Unambiguous(def_id) => std::slice::from_ref(def_id),
-                        DataRelationshipTarget::Union(union_def_id) => {
-                            self.ontology.union_variants(*union_def_id)
-                        }
-                    };
+            let Some(prop_key) = pg.table.find_abstract_property(prop_id) else {
+                continue;
+            };
 
+            match self.abstract_kind(&rel.target) {
+                AbstractKind::VertexUnion(def_ids) => {
                     let mut union_operands: Vec<sql::Expr> = vec![];
 
-                    for sub_def_id in sub_def_ids.iter().copied() {
+                    for sub_def_id in def_ids.iter().copied() {
                         let sub_def = self.ontology.def(sub_def_id);
                         let sub_pg = self
                             .pg_model
@@ -391,11 +398,59 @@ impl<'a> TransactCtx<'a> {
                         });
                     }
                 }
-                DataRelationshipKind::Edge(_) => {}
+                AbstractKind::Scalar { ontol_def_tag, .. } => {
+                    let pkg_id = prop_id.0.package_id();
+                    let sub_def_id = ontol_def_tag.def_id();
+
+                    let sub_pg = self.pg_model.pg_domain_datatable(pkg_id, sub_def_id)?;
+
+                    // abstract scalar should always be an array
+                    output.push(sql::Expr::array(sql::Select {
+                        with: None,
+                        expressions: sql::Expressions {
+                            items: vec![sql::Expr::path1("value")],
+                            multiline: false,
+                        },
+                        from: vec![sub_pg.table_name().into()],
+                        where_: Some(sql::Expr::And(vec![
+                            sql::Expr::eq(
+                                sql::Expr::path1("_fprop"),
+                                sql::Expr::LiteralInt(prop_key),
+                            ),
+                            sql::Expr::eq(
+                                sql::Expr::path1("_fkey"),
+                                sql::Expr::path2(parent_alias, "_key"),
+                            ),
+                        ])),
+                        ..Default::default()
+                    }));
+                }
             }
         }
 
         Ok(())
+    }
+
+    fn abstract_kind(&self, target: &'a DataRelationshipTarget) -> AbstractKind<'a> {
+        match target {
+            DataRelationshipTarget::Unambiguous(target_def_id) => {
+                let target_def = self.ontology.def(*target_def_id);
+                if let Some(PgRepr::Scalar(pg_type, ontol_def_tag)) =
+                    PgRepr::classify_opt_def_repr(target_def.repr(), self.ontology)
+                {
+                    AbstractKind::Scalar {
+                        pg_type,
+                        ontol_def_tag,
+                        target_def_id: *target_def_id,
+                    }
+                } else {
+                    AbstractKind::VertexUnion(std::slice::from_ref(target_def_id))
+                }
+            }
+            DataRelationshipTarget::Union(union_def_id) => {
+                AbstractKind::VertexUnion(self.ontology.union_variants(*union_def_id))
+            }
+        }
     }
 
     pub fn sql_select_edge_properties(
@@ -559,63 +614,92 @@ impl<'a> TransactCtx<'a> {
 
                     for (prop_id, rel) in &def.data_relationships {
                         match &rel.kind {
-                            DataRelationshipKind::Id | DataRelationshipKind::Tree => {
-                                if pg.table.find_abstract_property(prop_id).is_none() {
-                                    continue;
-                                }
+                            DataRelationshipKind::Id | DataRelationshipKind::Tree => {}
+                            DataRelationshipKind::Edge(_) => continue,
+                        };
 
-                                // FIXME: the datastore clients should send the actual
-                                // inherent fields it's interested in
-                                let sub_query_select_properties = Default::default();
-                                let sub_query_select =
-                                    Some(QuerySelect::Struct(&sub_query_select_properties));
+                        if pg.table.find_abstract_property(prop_id).is_none() {
+                            continue;
+                        }
 
-                                match rel.cardinality.1 {
-                                    ValueCardinality::Unit => {
-                                        if let Some(sql_val) =
-                                            iterator.next_field(&Layout::Record)?.null_filter()
-                                        {
-                                            let sql_record = sql_val.into_record()?;
-                                            let row_value = self.read_row_value_as_vertex(
-                                                sql_record.fields(),
-                                                sub_query_select,
-                                                IncludeJoinedAttrs::Yes,
-                                                DataOperation::Queried,
-                                            )?;
+                        // FIXME: the datastore clients should send the actual
+                        // inherent fields it's interested in
+                        let sub_query_select_properties = Default::default();
+                        let sub_query_select =
+                            Some(QuerySelect::Struct(&sub_query_select_properties));
 
-                                            attrs.insert(*prop_id, Attr::Unit(row_value.value));
-                                        }
-                                    }
-                                    ValueCardinality::IndexSet | ValueCardinality::List => {
-                                        let sql_array =
-                                            iterator.next_field(&Layout::Array)?.into_array()?;
-                                        let mut matrix = AttrMatrix::default();
-                                        matrix.columns.push(Default::default());
+                        match (self.abstract_kind(&rel.target), &rel.cardinality.1) {
+                            (AbstractKind::VertexUnion(_), ValueCardinality::Unit) => {
+                                if let Some(sql_val) =
+                                    iterator.next_field(&Layout::Record)?.null_filter()
+                                {
+                                    let sql_record = sql_val.into_record()?;
+                                    let row_value = self.read_row_value_as_vertex(
+                                        sql_record.fields(),
+                                        sub_query_select,
+                                        IncludeJoinedAttrs::Yes,
+                                        DataOperation::Queried,
+                                    )?;
 
-                                        for result in sql_array.elements(&Layout::Record) {
-                                            let sql_record = result?.into_record()?;
-
-                                            let row_value = self.read_row_value_as_vertex(
-                                                sql_record.fields(),
-                                                sub_query_select,
-                                                IncludeJoinedAttrs::Yes,
-                                                op,
-                                            )?;
-
-                                            matrix.columns[0].push(row_value.value);
-                                        }
-
-                                        if matches!(
-                                            rel.cardinality.0,
-                                            PropertyCardinality::Mandatory
-                                        ) || !matrix.columns[0].elements().is_empty()
-                                        {
-                                            attrs.insert(*prop_id, Attr::Matrix(matrix));
-                                        }
-                                    }
+                                    attrs.insert(*prop_id, Attr::Unit(row_value.value));
                                 }
                             }
-                            DataRelationshipKind::Edge(_) => {}
+                            (
+                                AbstractKind::VertexUnion(_),
+                                ValueCardinality::IndexSet | ValueCardinality::List,
+                            ) => {
+                                let sql_array =
+                                    iterator.next_field(&Layout::Array)?.into_array()?;
+                                let mut matrix = AttrMatrix::default();
+                                matrix.columns.push(Default::default());
+
+                                for result in sql_array.elements(&Layout::Record) {
+                                    let sql_record = result?.into_record()?;
+
+                                    let row_value = self.read_row_value_as_vertex(
+                                        sql_record.fields(),
+                                        sub_query_select,
+                                        IncludeJoinedAttrs::Yes,
+                                        op,
+                                    )?;
+
+                                    matrix.columns[0].push(row_value.value);
+                                }
+
+                                if matches!(rel.cardinality.0, PropertyCardinality::Mandatory)
+                                    || !matrix.columns[0].elements().is_empty()
+                                {
+                                    attrs.insert(*prop_id, Attr::Matrix(matrix));
+                                }
+                            }
+                            (
+                                AbstractKind::Scalar {
+                                    pg_type,
+                                    target_def_id,
+                                    ..
+                                },
+                                _,
+                            ) => {
+                                let sql_array =
+                                    iterator.next_field(&Layout::Array)?.into_array()?;
+
+                                let mut matrix = AttrMatrix::default();
+                                matrix.columns.push(Default::default());
+
+                                for result in sql_array.elements(&Layout::Scalar(pg_type)) {
+                                    let sql_val = result?;
+
+                                    let value = self.deserialize_sql(target_def_id, sql_val)?;
+
+                                    matrix.columns[0].push(value);
+                                }
+
+                                if matches!(rel.cardinality.0, PropertyCardinality::Mandatory)
+                                    || !matrix.columns[0].elements().is_empty()
+                                {
+                                    attrs.insert(*prop_id, Attr::Matrix(matrix));
+                                }
+                            }
                         }
                     }
 
