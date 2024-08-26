@@ -128,42 +128,48 @@ impl<'c, 'm> ConditionBuilder<'c, 'm> {
                     .find(|variant| variant.def_id == narrowed_def_id)
                     .expect("union variant not found");
 
-                match &variant.discriminant {
-                    Discriminant::HasAttribute(relationship_id, _, leaf) => {
-                        let variant_var = self.output.mk_cond_var();
+                if true {
+                    // let it be up to each datastore how to discriminate a Def:
+                    self.output
+                        .add_clause(narrow_var, Clause::IsDef(variant.def_id));
+                } else {
+                    match &variant.discriminant {
+                        Discriminant::HasAttribute(relationship_id, _, leaf) => {
+                            let variant_var = self.output.mk_cond_var();
 
-                        self.output.add_clause(
-                            narrow_var,
-                            Clause::MatchProp(
-                                *relationship_id,
-                                SetOperator::ElementIn,
-                                variant_var,
-                            ),
-                        );
-
-                        if let LeafDiscriminant::IsTextLiteral(constant) = leaf {
                             self.output.add_clause(
-                                variant_var,
-                                Clause::Member(
-                                    CondTerm::Wildcard,
-                                    CondTerm::Value(Value::Text(
-                                        self.compiler.str_ctx[*constant].into(),
-                                        self.compiler.primitives.text.into(),
-                                    )),
+                                narrow_var,
+                                Clause::MatchProp(
+                                    *relationship_id,
+                                    SetOperator::ElementIn,
+                                    variant_var,
                                 ),
                             );
-                        } else {
-                            CompileError::BUG(
-                                "static condition: unhandled leaf discriminant for has-attribute",
-                            )
-                            .span(self.arena[node].span())
-                            .report(self)
+
+                            if let LeafDiscriminant::IsTextLiteral(constant) = leaf {
+                                self.output.add_clause(
+                                    variant_var,
+                                    Clause::Member(
+                                        CondTerm::Wildcard,
+                                        CondTerm::Value(Value::Text(
+                                            self.compiler.str_ctx[*constant].into(),
+                                            self.compiler.primitives.text.into(),
+                                        )),
+                                    ),
+                                );
+                            } else {
+                                CompileError::BUG(
+                                    "static condition: unhandled leaf discriminant for has-attribute",
+                                )
+                                .span(self.arena[node].span())
+                                .report(self)
+                            }
                         }
-                    }
-                    _ => {
-                        CompileError::BUG("static condition: unhandled discriminant")
-                            .span(self.arena[node].span())
-                            .report(self);
+                        _ => {
+                            CompileError::BUG("static condition: unhandled discriminant")
+                                .span(self.arena[node].span())
+                                .report(self);
+                        }
                     }
                 }
 

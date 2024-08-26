@@ -22,7 +22,7 @@ impl Condition {
     pub fn root_def_id(&self) -> Option<DefId> {
         let expansion = self.expansions.get(&Var(0))?;
         expansion.clauses.iter().find_map(|term| match term {
-            Clause::IsEntity(def_id) => Some(*def_id),
+            Clause::IsDef(def_id) => Some(*def_id),
             _ => None,
         })
     }
@@ -39,7 +39,7 @@ impl Condition {
 
     pub fn add_clause(&mut self, cond_var: Var, clause: Clause<Var, CondTerm>) {
         match &clause {
-            Clause::IsEntity(_) => {}
+            Clause::IsDef(_) => {}
             Clause::Member(rel, val) => {
                 self.register_term(rel);
                 self.register_term(val);
@@ -88,7 +88,7 @@ impl Condition {
 
         match clause {
             Clause::Root => {}
-            Clause::IsEntity(def_id) => self.add_clause(cond_var, Clause::IsEntity(def_id)),
+            Clause::IsDef(def_id) => self.add_clause(cond_var, Clause::IsDef(def_id)),
             Clause::MatchProp(property_id, set_op, var) => {
                 let var = self.merge_cond_var(var, rewrite_table);
                 self.add_clause(cond_var, Clause::MatchProp(property_id, set_op, var));
@@ -161,7 +161,7 @@ pub struct ClausePair<V, Term>(pub V, pub Clause<V, Term>);
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum Clause<V, Term> {
     Root,
-    IsEntity(DefId),
+    IsDef(DefId),
     /// The left variable is connected via a property to the right variable.
     /// The right variable represents a set of values for the property.
     MatchProp(PropId, SetOperator, V),
@@ -220,7 +220,7 @@ where
         let var = &self.0;
         match &self.1 {
             Clause::Root => write!(f, "(root {var})"),
-            Clause::IsEntity(def_id) => write!(f, "(is-entity {var} {def_id:?})"),
+            Clause::IsDef(def_id) => write!(f, "(is-def {var} {def_id:?})"),
             Clause::MatchProp(prop_id, operator, term) => {
                 write!(f, "(match-prop {var} {prop_id} ({operator} {term}))")
             }

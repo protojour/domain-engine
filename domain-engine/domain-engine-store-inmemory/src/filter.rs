@@ -144,7 +144,7 @@ impl InMemoryStore {
         for clause in walker.clauses(cond_var) {
             match (clause, val) {
                 (Clause::Root, _) => {}
-                (Clause::IsEntity(expected_def_id), FilterVal::Struct { type_def_id, .. }) => {
+                (Clause::IsDef(expected_def_id), FilterVal::Struct { type_def_id, .. }) => {
                     if type_def_id != *expected_def_id {
                         return Err(ProofError::Disproven);
                     }

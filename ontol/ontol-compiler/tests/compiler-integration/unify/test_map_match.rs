@@ -30,7 +30,7 @@ fn test_map_match_scalar_key() {
                         eq!(&ValueCardinality::Unit),
                         eq!(&Literal(indoc! { r#"
                             (root $a)
-                            (is-entity $a def@1:2)
+                            (is-def $a def@1:2)
                             (match-prop $a p@1:2:0 (element-in $b))
                             (member $b (_ 'input'))
                         "#
@@ -74,7 +74,7 @@ fn test_map_match_parameterless_query() {
                         eq!(&ValueCardinality::IndexSet),
                         eq!(&Literal(indoc! { "
                             (root $a)
-                            (is-entity $a def@1:2)
+                            (is-def $a def@1:2)
                         "
                         }))
                     ))
@@ -125,7 +125,7 @@ fn test_map_match_query_mandatory_properties() {
                         eq!(&ValueCardinality::IndexSet),
                         eq!(&Literal(indoc! { r#"
                             (root $a)
-                            (is-entity $a def@1:2)
+                            (is-def $a def@1:2)
                             (match-prop $a p@1:2:1 (element-in $b))
                             (match-prop $a p@1:2:2 (element-in $c))
                             (member $b (_ 'A'))
@@ -179,7 +179,7 @@ fn test_map_match_query_optional_property() {
                         eq!(&ValueCardinality::IndexSet),
                         eq!(&Literal(indoc! { r#"
                             (root $a)
-                            (is-entity $a def@1:2)
+                            (is-def $a def@1:2)
                             (match-prop $a p@1:2:1 (element-in $b))
                             (member $b (_ 'A'))
                         "#
@@ -200,7 +200,7 @@ fn test_map_match_query_optional_property() {
                         eq!(&ValueCardinality::IndexSet),
                         eq!(&Literal(indoc! { r#"
                             (root $a)
-                            (is-entity $a def@1:2)
+                            (is-def $a def@1:2)
                             (match-prop $a p@1:2:1 (element-in $b))
                             (match-prop $a p@1:2:2 (element-in $c))
                             (member $b (_ 'A'))
@@ -250,7 +250,7 @@ fn test_map_match_anonymous_with_translation() {
                         eq!(&ValueCardinality::IndexSet),
                         eq!(&Literal(indoc! { r#"
                             (root $a)
-                            (is-entity $a def@1:2)
+                            (is-def $a def@1:2)
                             (match-prop $a p@1:2:1 (element-in $b))
                             (member $b (_ 'X'))
                         "#
@@ -296,7 +296,7 @@ fn test_map_match_sequence_filter_in_set() {
                         eq!(&ValueCardinality::IndexSet),
                         eq!(&Literal(indoc! { r#"
                             (root $a)
-                            (is-entity $a def@1:2)
+                            (is-def $a def@1:2)
                             (match-prop $a p@1:2:1 (element-in $b))
                             (member $b (_ 'X'))
                             (member $b (_ 'Y'))
@@ -360,7 +360,7 @@ mod match_contains_all {
                         eq!(&ValueCardinality::IndexSet),
                         eq!(&Literal(indoc! { r#"
                                 (root $a)
-                                (is-entity $a def@1:1)
+                                (is-def $a def@1:1)
                                 (match-prop $a p@1:1:1 (superset-of $b))
                                 (member $b (_ 'x!'))
                                 (member $b (_ 'y!'))
@@ -387,7 +387,7 @@ mod match_contains_all {
                         eq!(&ValueCardinality::IndexSet),
                         eq!(&Literal(indoc! { r#"
                             (root $a)
-                            (is-entity $a def@1:1)
+                            (is-def $a def@1:1)
                             (match-prop $a p@1:1:2 (element-in $c))
                             (match-prop $b p@1:2:0 (superset-of $d))
                             (member $c (_ $b))
@@ -434,9 +434,9 @@ fn test_map_match_in_sub_multi_edge() {
                         eq!(&ValueCardinality::IndexSet),
                         eq!(&Literal(indoc! { r#"
                             (root $a)
-                            (is-entity $a def@1:1)
+                            (is-def $a def@1:1)
                             (match-prop $a p@1:1:1 (element-in $c))
-                            (is-entity $b def@1:2)
+                            (is-def $b def@1:2)
                             (match-prop $b p@1:2:1 (superset-of $d))
                             (member $c (_ $b))
                             (member $d (_ 'x'))
@@ -490,7 +490,7 @@ fn test_map_with_order_constant() {
                         eq!(&ValueCardinality::IndexSet),
                         eq!(&Literal(indoc! { r#"
                             (root $a)
-                            (is-entity $a def@1:1)
+                            (is-def $a def@1:1)
                             (order 'by_field')
                             (direction Descending)
                         "#
@@ -550,7 +550,7 @@ fn test_map_with_order_variable() {
                          eq!(&ValueCardinality::IndexSet),
                          eq!(&Literal(indoc! { r#"
                              (root $a)
-                             (is-entity $a def@1:1)
+                             (is-def $a def@1:1)
                              (order 'by_field')
                              (direction Ascending)
                          "#
@@ -620,7 +620,7 @@ fn test_map_with_order_indexset() {
                          eq!(&ValueCardinality::IndexSet),
                          eq!(&Literal(indoc! { r#"
                              (root $a)
-                             (is-entity $a def@1:1)
+                             (is-def $a def@1:1)
                              (order 'by_a' 'by_b')
                          "#
                          }))

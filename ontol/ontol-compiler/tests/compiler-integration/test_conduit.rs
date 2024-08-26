@@ -135,9 +135,9 @@ fn test_map_match_conduit_blog_post_cond_clauses() {
                     eq!(&ValueCardinality::IndexSet),
                     eq!(&Literal(indoc! { r#"
                         (root $a)
-                        (is-entity $a def@2:11)
+                        (is-def $a def@2:11)
                         (match-prop $a p@2:11:10 (element-in $c))
-                        (is-entity $b def@2:10)
+                        (is-def $b def@2:10)
                         (match-prop $b p@2:10:1 (element-in $d))
                         (member $c (_ $b))
                         (member $d (_ 'someone'))
@@ -181,9 +181,9 @@ fn test_conduit_feed_public() {
                     eq!(&ValueCardinality::IndexSet),
                     eq!(&Literal(indoc! { r#"
                         (root $a)
-                        (is-entity $a def@2:11)
+                        (is-def $a def@2:11)
                         (match-prop $a p@2:11:10 (element-in $c))
-                        (is-entity $b def@2:10)
+                        (is-def $b def@2:10)
                         (match-prop $b p@2:10:1 (element-in $d))
                         (member $c (_ $b))
                         (member $d (_ 'foobar'))

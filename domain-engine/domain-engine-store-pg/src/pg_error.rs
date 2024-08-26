@@ -88,6 +88,8 @@ pub enum PgError {
     EdgeParametersMissing,
     /// statement preparation
     PrepareStatement(Arc<String>, tokio_postgres::Error),
+    /// condition error: {0}
+    Condition(&'static str),
 }
 
 impl From<PgError> for DomainError {

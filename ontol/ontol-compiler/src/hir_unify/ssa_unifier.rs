@@ -886,7 +886,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         if let Some(type_def_id) = def_ty.get_single_def_id() {
             if let Some(properties) = self.prop_ctx.properties_by_def_id(type_def_id) {
                 if properties.identified_by.is_some() {
-                    base_clauses.push(ClausePair(binder.hir().var, Clause::IsEntity(type_def_id)));
+                    base_clauses.push(ClausePair(binder.hir().var, Clause::IsDef(type_def_id)));
                 }
             }
         }

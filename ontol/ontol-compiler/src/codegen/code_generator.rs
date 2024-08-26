@@ -1053,7 +1053,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 for ClausePair(var, clause_op) in clauses {
                     let vm_clause_op = match clause_op {
                         Clause::Root => Clause::Root,
-                        Clause::IsEntity(def_id) => Clause::IsEntity(*def_id),
+                        Clause::IsDef(def_id) => Clause::IsDef(*def_id),
                         Clause::MatchProp(prop_id, set_operator, set_var) => {
                             let Ok(set_local) = self.var_local(*set_var, &span) else {
                                 return;

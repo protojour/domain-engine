@@ -447,7 +447,7 @@ impl<'o> Processor for OntolProcessor<'o> {
         let var = self.var_local(input.0)?;
         let evaluated_clause: Clause<Var, CondTerm> = match &input.1 {
             Clause::Root => Clause::Root,
-            Clause::IsEntity(def_id) => Clause::IsEntity(*def_id),
+            Clause::IsDef(def_id) => Clause::IsDef(*def_id),
             Clause::MatchProp(prop_id, operator, set_local) => {
                 Clause::MatchProp(*prop_id, *operator, self.var_local(*set_local)?)
             }

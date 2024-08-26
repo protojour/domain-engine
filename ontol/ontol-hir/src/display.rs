@@ -395,8 +395,8 @@ impl<'h, 'a, L: Lang> Print<ClausePair<Var, EvalCondTerm>> for Printer<'h, 'a, L
                 write!(f, "(root '{var})")?;
                 Ok(Multiline(true))
             }
-            Clause::IsEntity(def_id) => {
-                write!(f, "(is-entity {var} {def_id:?})")?;
+            Clause::IsDef(def_id) => {
+                write!(f, "(is-def {var} {def_id:?})")?;
                 Ok(Multiline(true))
             }
             Clause::MatchProp(prop_id, operator, set_var) => {

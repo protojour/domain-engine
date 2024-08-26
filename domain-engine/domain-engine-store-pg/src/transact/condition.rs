@@ -6,9 +6,10 @@ use ontol_runtime::{
     var::Var,
     DefId, PropId,
 };
-use tracing::debug;
+use tracing::{debug, error};
 
 use crate::{
+    pg_error::PgError,
     pg_model::{PgColumn, PgProperty},
     sql::{self, WhereExt},
     sql_value::SqlVal,
@@ -95,24 +96,27 @@ impl<'a> TransactCtx<'a> {
         walker: ConditionWalker,
         path_builder: PathBuilder,
         ctx: &mut ConditionCtx<'a, '_>,
-    ) -> DomainResult<Option<sql::Expr>> {
+    ) -> DomainResult<()> {
         let def_id = if def_id_set.len() != 1 {
             let mut found_def_id: Option<DefId> = None;
 
             for clause in walker.clauses(cond_var) {
-                if let Clause::IsEntity(def_id) = clause {
+                if let Clause::IsDef(def_id) = clause {
                     match found_def_id {
                         None => {
                             found_def_id = Some(*def_id);
                         }
                         Some(_) => {
-                            panic!("no disambiguation");
+                            return Err(PgError::Condition(
+                                "condition ambiguous with regard to def",
+                            )
+                            .into());
                         }
                     }
                 }
             }
 
-            found_def_id.unwrap_or_else(|| panic!())
+            found_def_id.ok_or_else(|| PgError::Condition("ambiguous def"))?
         } else {
             def_id_set.iter().next().copied().unwrap()
         };
@@ -124,9 +128,10 @@ impl<'a> TransactCtx<'a> {
         for clause in walker.clauses(cond_var) {
             match clause {
                 Clause::Root => {}
-                Clause::IsEntity(pred_def_id) => {
+                Clause::IsDef(pred_def_id) => {
                     if def_id != *pred_def_id {
-                        todo!("def_id mismatch: {def_id:?} was not {pred_def_id:?}");
+                        error!("def_id mismatch: {def_id:?} was not {pred_def_id:?}");
+                        return Err(PgError::Condition("DefId mismatch").into());
                     }
                 }
                 Clause::MatchProp(prop_id, set_operator, prop_var) => {
@@ -139,13 +144,13 @@ impl<'a> TransactCtx<'a> {
                         ctx,
                     )?;
                 }
-                Clause::Member(rel, val) => {
-                    todo!()
+                Clause::Member(_rel, _val) => {
+                    return Err(PgError::Condition("weird member term").into())
                 }
             }
         }
 
-        Ok(None)
+        Ok(())
     }
 
     fn match_prop(
@@ -156,9 +161,9 @@ impl<'a> TransactCtx<'a> {
         walker: ConditionWalker,
         path_builder: PathBuilder,
         ctx: &mut ConditionCtx<'a, '_>,
-    ) -> DomainResult<Option<sql::Expr>> {
+    ) -> DomainResult<()> {
         let Some(rel_info) = def.data_relationships.get(&prop_id) else {
-            return Ok(None);
+            return Ok(());
         };
 
         let pg = self
@@ -255,7 +260,7 @@ impl<'a> TransactCtx<'a> {
             }
             (
                 DataRelationshipKind::Id | DataRelationshipKind::Tree,
-                Some(PgProperty::Abstract(reg_key)),
+                Some(PgProperty::Abstract(_reg_key)),
             ) => {
                 todo!("compare abstract property");
             }
@@ -287,10 +292,10 @@ impl<'a> TransactCtx<'a> {
                                         ctx,
                                     )?;
                                 }
-                                CondTerm::Value(val) => {
-                                    let target_cardinal = edge.cardinals.last().unwrap();
-                                    let builder = path_builder.add_cardinal_idx(params_cardinal);
-                                    panic!("REL TERM");
+                                CondTerm::Value(_val) => {
+                                    let _target_cardinal = edge.cardinals.last().unwrap();
+                                    let _builder = path_builder.add_cardinal_idx(params_cardinal);
+                                    return Err(PgError::Condition("rel value term").into());
                                 }
                             }
 
@@ -308,22 +313,24 @@ impl<'a> TransactCtx<'a> {
                                         ctx,
                                     )?;
                                 }
-                                CondTerm::Value(val) => {
-                                    let builder = path_builder.add_cardinal_idx(proj.object);
-                                    panic!("VAL TERM");
+                                CondTerm::Value(_val) => {
+                                    let _builder = path_builder.add_cardinal_idx(proj.object);
+                                    return Err(PgError::Condition("value term").into());
                                 }
                             }
                         }
                     }
-                    _ => todo!(),
+                    _ => {
+                        return Err(
+                            PgError::Condition("unhandled set operator in edge matcher").into()
+                        )
+                    }
                 }
             }
-            _ => {
-                panic!()
-            }
+            _ => {}
         }
 
-        Ok(None)
+        Ok(())
     }
 
     fn leaf_condition(
@@ -348,11 +355,16 @@ impl<'a> TransactCtx<'a> {
                                 sql::Expr::param(param_idx),
                             ));
                             let Data::Sql(sql_val) = self.data_from_value(value.clone())? else {
-                                panic!();
+                                return Err(PgError::Condition("compound condition value").into());
                             };
                             ctx.sql_params.push(sql_val);
                         }
-                        _ => todo!(),
+                        _ => {
+                            return Err(PgError::Condition(
+                                "leaf condition expected a member clause",
+                            )
+                            .into())
+                        }
                     }
                 }
 
@@ -362,7 +374,7 @@ impl<'a> TransactCtx<'a> {
                     Ok(None)
                 }
             }
-            _ => todo!(),
+            _ => Err(PgError::Condition("unhandled set operator").into()),
         }
     }
 }

@@ -99,7 +99,7 @@ impl<'a> MetaQuery<'a> {
     ) -> DomainResult<()> {
         for clause in walker.clauses(cond_var) {
             match clause {
-                Clause::IsEntity(var_def_id) => {
+                Clause::IsDef(var_def_id) => {
                     if *var_def_id == filter.def_id {
                         continue;
                     }
