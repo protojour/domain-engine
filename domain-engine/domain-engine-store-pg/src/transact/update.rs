@@ -75,6 +75,7 @@ impl<'a> TransactCtx<'a> {
                     after_cursor: None,
                     native_id_condition: Some(key),
                 },
+                None,
                 Some(query_select),
                 cache,
             )

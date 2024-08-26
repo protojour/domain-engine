@@ -1,11 +1,14 @@
-use domain_engine_core::{transact::DataOperation, DomainResult};
+use domain_engine_core::{filter::walker::ConditionWalker, transact::DataOperation, DomainResult};
 use fnv::FnvHashMap;
 use futures_util::Stream;
 use ontol_runtime::{
     attr::{Attr, AttrMatrix},
     ontology::domain::{DataRelationshipKind, DataRelationshipTarget, Def},
     property::{PropertyCardinality, ValueCardinality},
-    query::select::{EntitySelect, Select, StructOrUnionSelect},
+    query::{
+        filter::Filter,
+        select::{EntitySelect, Select, StructOrUnionSelect},
+    },
     sequence::SubSequence,
     tuple::{CardinalIdx, EndoTuple},
     value::Value,
@@ -20,7 +23,7 @@ use crate::{
     address::make_ontol_address,
     pg_error::{PgError, PgInputError, PgModelError},
     pg_model::{PgDataKey, PgDomainTable, PgEdgeCardinalKind, PgRepr, PgTable, PgTableKey, PgType},
-    sql::{self, FromItem},
+    sql::{self, FromItem, WhereExt},
     sql_record::{SqlColumnStream, SqlRecord, SqlRecordIterator},
     sql_value::{Layout, SqlVal},
 };
@@ -117,6 +120,7 @@ impl<'a> TransactCtx<'a> {
                 after_cursor,
                 native_id_condition: None,
             },
+            Some(&entity_select.filter),
             Some(QuerySelect::Struct(&struct_select.properties)),
             cache,
         )
@@ -127,10 +131,11 @@ impl<'a> TransactCtx<'a> {
         &'s self,
         def_id: DefId,
         q: Query,
+        filter: Option<&Filter>,
         query_select: Option<QuerySelect<'s>>,
         cache: &mut PgCache,
     ) -> DomainResult<impl Stream<Item = DomainResult<QueryFrame>> + 's> {
-        debug!("after cursor: {:?}", q.after_cursor);
+        debug!("query {def_id:?} after cursor: {:?}", q.after_cursor);
 
         let pg = self
             .pg_model
@@ -138,8 +143,9 @@ impl<'a> TransactCtx<'a> {
 
         let mut row_layout: Vec<Layout> = vec![];
         let mut query_ctx = QueryBuildCtx::default();
+        let mut sql_params: Vec<SqlVal> = vec![];
 
-        let mut sql_select = {
+        let sql_select = {
             let mut expressions = sql::Expressions {
                 items: vec![],
                 multiline: true,
@@ -150,32 +156,35 @@ impl<'a> TransactCtx<'a> {
                 row_layout.push(Layout::Scalar(PgType::BigInt));
             }
 
-            let (from, _alias, tail_expressions) = match query_select {
-                Some(QuerySelect::Struct(properties)) => self
-                    .sql_select_vertex_expressions_with_alias(
-                        def_id,
-                        properties,
-                        pg,
-                        &mut query_ctx,
-                        cache,
-                    )?,
-                Some(QuerySelect::Field(prop_id)) => {
-                    let mut fields: Vec<_> = self.initial_standard_data_fields(pg).into();
-                    fields.push(sql::Expr::path1(
-                        pg.table.column(&prop_id)?.col_name.as_ref(),
-                    ));
+            let (from, alias, tail_expressions) = {
+                match query_select {
+                    Some(QuerySelect::Struct(properties)) => self
+                        .sql_select_vertex_expressions_with_alias(
+                            def_id,
+                            properties,
+                            pg,
+                            &mut query_ctx,
+                            cache,
+                        )?,
+                    Some(QuerySelect::Field(prop_id)) => {
+                        let mut fields: Vec<_> = self.initial_standard_data_fields(pg).into();
+                        fields.push(sql::Expr::path1(
+                            pg.table.column(&prop_id)?.col_name.as_ref(),
+                        ));
 
-                    (pg.table_name().into(), sql::Alias(0), fields)
-                }
-                Some(QuerySelect::Unit) | None => {
-                    let fields: Vec<_> = self.initial_standard_data_fields(pg).into();
-                    (pg.table_name().into(), sql::Alias(0), fields)
+                        (pg.table_name().into(), sql::Alias(0), fields)
+                    }
+                    Some(QuerySelect::Unit) | None => {
+                        let fields: Vec<_> = self.initial_standard_data_fields(pg).into();
+                        (pg.table_name().into(), sql::Alias(0), fields)
+                    }
                 }
             };
+
             expressions.items.extend(tail_expressions);
 
-            sql::Select {
-                with: query_ctx.with(),
+            let mut sql_select = sql::Select {
+                with: None,
                 expressions,
                 from: vec![from],
                 where_: None,
@@ -186,23 +195,37 @@ impl<'a> TransactCtx<'a> {
                         _ => None,
                     },
                 },
+            };
+
+            if let Some(native_id_condition) = q.native_id_condition {
+                sql_select.where_and(sql::Expr::eq(sql::Expr::path1("_key"), sql::Expr::param(0)));
+                sql_params.push(SqlVal::I64(native_id_condition));
             }
+
+            if let Some(filter) = filter {
+                debug!("condition {}", filter.condition());
+                if let Some(condition) = self.sql_where_condition(
+                    def_id,
+                    alias,
+                    ConditionWalker::new(filter.condition()),
+                    &mut sql_params,
+                    &mut query_ctx,
+                )? {
+                    sql_select.where_and(condition);
+                }
+            }
+
+            sql_select.with = query_ctx.with();
+            sql_select
         };
-
-        let mut select_params: Vec<SqlVal> = vec![];
-
-        if let Some(native_id_condition) = q.native_id_condition {
-            sql_select.where_ = Some(sql::Expr::eq(sql::Expr::path1("_key"), sql::Expr::param(0)));
-            select_params.push(SqlVal::I64(native_id_condition));
-        }
 
         let sql = sql_select.to_string();
         debug!("{sql}");
-        trace!("{select_params:?}");
+        trace!("{sql_params:?}");
 
         let row_stream = self
             .client()
-            .query_raw(&sql, &select_params)
+            .query_raw(&sql, &sql_params)
             .await
             .map_err(PgError::SelectQuery)?;
 
@@ -356,7 +379,7 @@ impl<'a> TransactCtx<'a> {
                                 },
                                 from: vec![FromItem::TableNameAs(
                                     sub_pg.table_name(),
-                                    sql::Name::Alias(sub_alias),
+                                    sub_alias.into(),
                                 )],
                                 where_: Some(sql::Expr::And(vec![
                                     sql::Expr::eq(
@@ -550,7 +573,7 @@ impl<'a> TransactCtx<'a> {
             self.select_inherent_struct_fields(def, pg.table, &mut expressions.items, None)?;
 
             query_ctx.with_queries.push(sql::WithQuery {
-                name: sql::Name::Alias(with_alias),
+                name: with_alias.into(),
                 column_names: vec![],
                 stmt: sql::Stmt::Select(sql::Select {
                     expressions,

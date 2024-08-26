@@ -74,16 +74,22 @@ pub struct Update<'a> {
     pub returning: Vec<Expr<'a>>,
 }
 
-impl<'a> WhereExt<'a> for Update<'a> {
+pub struct Delete<'a> {
+    pub from: TableName<'a>,
+    pub where_: Option<Expr<'a>>,
+    pub returning: Vec<Expr<'a>>,
+}
+
+impl<'a> WhereExt<'a> for Select<'a> {
     fn where_mut(&mut self) -> &mut Option<Expr<'a>> {
         &mut self.where_
     }
 }
 
-pub struct Delete<'a> {
-    pub from: TableName<'a>,
-    pub where_: Option<Expr<'a>>,
-    pub returning: Vec<Expr<'a>>,
+impl<'a> WhereExt<'a> for Update<'a> {
+    fn where_mut(&mut self) -> &mut Option<Expr<'a>> {
+        &mut self.where_
+    }
 }
 
 impl<'a> WhereExt<'a> for Delete<'a> {
@@ -159,10 +165,12 @@ pub enum Expr<'a> {
     Union(Box<Union<'a>>),
     /// a AND b
     And(Vec<Expr<'a>>),
+    Or(Vec<Expr<'a>>),
     /// a = b
     Eq(Box<Expr<'a>>, Box<Expr<'a>>),
     /// a IN b
     In(Box<Expr<'a>>, Box<Expr<'a>>),
+    Exists(Box<Expr<'a>>),
     Row(Vec<Expr<'a>>),
     Any(Box<Expr<'a>>),
     Array(Box<Expr<'a>>),
@@ -242,6 +250,12 @@ pub enum Name {
     Alias(Alias),
 }
 
+impl From<Alias> for Name {
+    fn from(value: Alias) -> Self {
+        Self::Alias(value)
+    }
+}
+
 #[derive(Clone)]
 pub enum PathSegment<'a> {
     Ident(&'a str),
@@ -279,7 +293,7 @@ pub struct TableName<'a>(pub &'a str, pub &'a str);
 
 impl<'a> TableName<'a> {
     pub fn as_(self, alias: Alias) -> FromItem<'a> {
-        FromItem::TableNameAs(self, Name::Alias(alias))
+        FromItem::TableNameAs(self, alias.into())
     }
 }
 
@@ -297,12 +311,13 @@ impl<'a> Display for Select<'a> {
             writeln!(f, "{with}")?;
         }
 
-        write!(
-            f,
-            "SELECT {expressions} FROM {from}",
-            expressions = self.expressions,
-            from = self.from.iter().format(","),
-        )?;
+        write!(f, "SELECT")?;
+
+        if !self.expressions.items.is_empty() {
+            write!(f, " {e}", e = self.expressions)?;
+        }
+
+        write!(f, " FROM {}", self.from.iter().format(","))?;
 
         if let Some(condition) = &self.where_ {
             write!(f, " WHERE {condition}")?;
@@ -497,8 +512,10 @@ impl<'a> Display for Expr<'a> {
             Self::Select(select) => write!(f, "{select}"),
             Self::Union(union) => write!(f, "{union}"),
             Self::And(clauses) => write!(f, "{}", clauses.iter().format(" AND ")),
+            Self::Or(clauses) => write!(f, "{}", clauses.iter().format(" OR ")),
             Self::Eq(a, b) => write!(f, "{a} = {b}"),
             Self::In(a, b) => write!(f, "{a} IN {b}"),
+            Self::Exists(expr) => write!(f, "EXISTS({expr})"),
             Self::Row(fields) => write!(f, "ROW({})", fields.iter().format(",")),
             Self::Any(expr) => write!(f, "ANY({expr})"),
             Self::Array(expr) => write!(f, "ARRAY({expr})"),

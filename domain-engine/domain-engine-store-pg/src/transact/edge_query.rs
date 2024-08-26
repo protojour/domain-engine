@@ -10,7 +10,7 @@ use tracing::trace;
 use crate::{
     pg_error::{ds_err, PgInputError},
     pg_model::{PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgTable},
-    sql::{self, Path},
+    sql,
 };
 
 use super::{cache::PgCache, query::QueryBuildCtx, TransactCtx};
@@ -149,16 +149,15 @@ impl<'a> TransactCtx<'a> {
                                         sql::Expr::LiteralInt(pg_def.pg.table.key),
                                         sql::Expr::path2(leaf_alias, pg_id.col_name.as_ref()),
                                     ]),
-                                    // expr: sql::Expr::path2(leaf_alias, pg_id.col_name.as_ref()),
                                     from: pg_def.pg.table_name().as_(leaf_alias),
                                     join_condition: edge_join_condition(
-                                        Path::from_iter([pg_proj.edge_alias.into()]),
+                                        sql::Path::from_iter([pg_proj.edge_alias.into()]),
                                         pg_cardinal,
                                         pg_def.pg.table,
                                         sql::Expr::path2(leaf_alias, "_key"),
                                     ),
                                     where_condition: Some(sql::Expr::arc(edge_join_condition(
-                                        Path::from_iter([pg_proj.edge_alias.into()]),
+                                        sql::Path::from_iter([pg_proj.edge_alias.into()]),
                                         pg_proj.pg_subj_cardinal,
                                         pg_proj.pg_subj_data.table,
                                         sql::Expr::path2(pg_proj.subj_alias, "_key"),
@@ -192,13 +191,13 @@ impl<'a> TransactCtx<'a> {
                                     expr: sql::Expr::arc(sql::Expr::Row(expressions)),
                                     from,
                                     join_condition: edge_join_condition(
-                                        Path::from_iter([pg_proj.edge_alias.into()]),
+                                        sql::Path::from_iter([pg_proj.edge_alias.into()]),
                                         pg_cardinal,
                                         pg_def.pg.table,
                                         sql::Expr::path2(vertex_alias, "_key"),
                                     ),
                                     where_condition: Some(sql::Expr::arc(edge_join_condition(
-                                        Path::from_iter([pg_proj.edge_alias.into()]),
+                                        sql::Path::from_iter([pg_proj.edge_alias.into()]),
                                         pg_proj.pg_subj_cardinal,
                                         pg_proj.pg_subj_data.table,
                                         sql::Expr::path2(pg_proj.subj_alias, "_key"),
@@ -316,13 +315,16 @@ pub fn edge_join_condition<'a>(
         PgEdgeCardinalKind::Dynamic {
             def_col_name,
             key_col_name,
-        } => sql::Expr::And(vec![
-            sql::Expr::eq(
-                edge_path.join(def_col_name.as_ref()),
-                sql::Expr::LiteralInt(data.key),
-            ),
-            sql::Expr::eq(edge_path.join(key_col_name.as_ref()), data_key_expr),
-        ]),
+        } => {
+            // TODO: tuple comparison might be shorter/more readable: (a, b) = (c, d)
+            sql::Expr::And(vec![
+                sql::Expr::eq(
+                    edge_path.join(def_col_name.as_ref()),
+                    sql::Expr::LiteralInt(data.key),
+                ),
+                sql::Expr::eq(edge_path.join(key_col_name.as_ref()), data_key_expr),
+            ])
+        }
         PgEdgeCardinalKind::PinnedDef { key_col_name, .. } => {
             sql::Expr::eq(edge_path.join(key_col_name.as_ref()), data_key_expr)
         }

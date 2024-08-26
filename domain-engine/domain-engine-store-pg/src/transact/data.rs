@@ -100,7 +100,7 @@ impl<'a> TransactCtx<'a> {
         }
     }
 
-    pub fn data_from_value(&self, value: Value) -> DomainResult<Data> {
+    pub fn data_from_value(&self, value: Value) -> DomainResult<Data<'static>> {
         let def = self.ontology.def(value.type_def_id());
 
         match (value, &def.kind) {
