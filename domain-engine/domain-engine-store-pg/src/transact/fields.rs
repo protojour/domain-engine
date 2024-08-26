@@ -2,16 +2,16 @@ use domain_engine_core::DomainResult;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     attr::Attr,
-    ontology::domain::{DataRelationshipInfo, DataRelationshipKind, Def},
+    ontology::domain::{DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget, Def},
     property::ValueCardinality,
     value::Value,
-    PropId,
+    DefId, OntolDefTag, PropId,
 };
 use tracing::warn;
 
 use crate::{
     pg_error::PgModelError,
-    pg_model::{PgDomainTable, PgRepr, PgTable},
+    pg_model::{PgDomainTable, PgRepr, PgTable, PgType},
     sql,
     sql_record::SqlRecordIterator,
     sql_value::Layout,
@@ -22,6 +22,15 @@ use super::TransactCtx;
 #[derive(Default)]
 pub struct SelectStats {
     pub edge_count: usize,
+}
+
+pub enum AbstractKind<'a> {
+    VertexUnion(&'a [DefId]),
+    Scalar {
+        pg_type: PgType,
+        ontol_def_tag: OntolDefTag,
+        target_def_id: DefId,
+    },
 }
 
 impl<'a> TransactCtx<'a> {
@@ -117,6 +126,28 @@ impl<'a> TransactCtx<'a> {
             },
             PgRepr::Abstract => Ok(None),
             PgRepr::NotSupported(msg) => Err(PgModelError::DataTypeNotSupported(msg).into()),
+        }
+    }
+
+    pub fn abstract_kind(&self, target: &'a DataRelationshipTarget) -> AbstractKind<'a> {
+        match target {
+            DataRelationshipTarget::Unambiguous(target_def_id) => {
+                let target_def = self.ontology.def(*target_def_id);
+                if let Some(PgRepr::Scalar(pg_type, ontol_def_tag)) =
+                    PgRepr::classify_opt_def_repr(target_def.repr(), self.ontology)
+                {
+                    AbstractKind::Scalar {
+                        pg_type,
+                        ontol_def_tag,
+                        target_def_id: *target_def_id,
+                    }
+                } else {
+                    AbstractKind::VertexUnion(std::slice::from_ref(target_def_id))
+                }
+            }
+            DataRelationshipTarget::Union(union_def_id) => {
+                AbstractKind::VertexUnion(self.ontology.union_variants(*union_def_id))
+            }
         }
     }
 }

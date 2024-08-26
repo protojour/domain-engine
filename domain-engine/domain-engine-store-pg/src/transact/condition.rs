@@ -1,6 +1,6 @@
 use domain_engine_core::{filter::walker::ConditionWalker, DomainResult};
 use ontol_runtime::{
-    ontology::domain::{DataRelationshipKind, Def, EdgeCardinalProjection},
+    ontology::domain::{DataRelationshipInfo, DataRelationshipKind, Def, EdgeCardinalProjection},
     query::condition::{Clause, CondTerm, SetOperator},
     tuple::CardinalIdx,
     var::Var,
@@ -10,13 +10,13 @@ use tracing::{debug, error};
 
 use crate::{
     pg_error::PgError,
-    pg_model::{PgColumn, PgProperty},
+    pg_model::{PgColumn, PgProperty, PgRegKey},
     sql::{self, WhereExt},
     sql_value::SqlVal,
     transact::{data::Data, edge_query::edge_join_condition},
 };
 
-use super::{query::QueryBuildCtx, TransactCtx};
+use super::{fields::AbstractKind, query::QueryBuildCtx, TransactCtx};
 
 struct ConditionCtx<'a, 's> {
     root_def_id: DefId,
@@ -178,7 +178,7 @@ impl<'a> TransactCtx<'a> {
                 debug!("compare column: {:?} in {def_id:?}", path_builder.items);
 
                 if path_builder.items.is_empty() {
-                    if let Some(leaf_condition) = self.leaf_condition(
+                    if let Some(leaf_condition) = self.column_condition(
                         var,
                         ctx.root_alias,
                         pg_column,
@@ -192,8 +192,14 @@ impl<'a> TransactCtx<'a> {
                     let mut path_iter = path_builder.items.iter().rev();
 
                     let leaf_alias = ctx.query_ctx.alias.incr();
-                    let leaf_condition =
-                        self.leaf_condition(var, leaf_alias, pg_column, set_operator, walker, ctx)?;
+                    let leaf_condition = self.column_condition(
+                        var,
+                        leaf_alias,
+                        pg_column,
+                        set_operator,
+                        walker,
+                        ctx,
+                    )?;
 
                     let mut from_item =
                         sql::FromItem::TableNameAs(pg.table_name(), leaf_alias.into());
@@ -262,7 +268,43 @@ impl<'a> TransactCtx<'a> {
                 DataRelationshipKind::Id | DataRelationshipKind::Tree,
                 Some(PgProperty::Abstract(_reg_key)),
             ) => {
-                todo!("compare abstract property");
+                let prop_key = pg.table.abstract_property(&prop_id)?;
+
+                if path_builder.items.is_empty() {
+                    match set_operator {
+                        SetOperator::ElementIn => {
+                            let mut or_exprs: Vec<sql::Expr> = vec![];
+
+                            for clause in walker.clauses(var) {
+                                if let Clause::Member(_, CondTerm::Variable(mem_var)) = clause {
+                                    if let Some(leaf_condition) = self.abstract_leaf_condition(
+                                        *mem_var,
+                                        prop_key,
+                                        ctx.root_alias,
+                                        rel_info,
+                                        set_operator,
+                                        walker,
+                                        ctx,
+                                    )? {
+                                        or_exprs.push(leaf_condition);
+                                    }
+                                }
+                            }
+
+                            if !or_exprs.is_empty() {
+                                ctx.output_clauses.push(sql::Expr::Or(or_exprs));
+                            }
+                        }
+                        _ => {
+                            return Err(PgError::Condition(
+                                "unhandled operator for abstract property",
+                            )
+                            .into());
+                        }
+                    }
+                } else {
+                    return Err(PgError::Condition("abstract property under edge").into());
+                }
             }
             (DataRelationshipKind::Edge(proj), None) => {
                 let path_builder = path_builder.add(CondPathItem::EdgeJoin {
@@ -333,7 +375,7 @@ impl<'a> TransactCtx<'a> {
         Ok(())
     }
 
-    fn leaf_condition(
+    fn column_condition(
         &self,
         cond_var: Var,
         leaf_alias: sql::Alias,
@@ -375,6 +417,73 @@ impl<'a> TransactCtx<'a> {
                 }
             }
             _ => Err(PgError::Condition("unhandled set operator").into()),
+        }
+    }
+
+    fn abstract_leaf_condition(
+        &self,
+        cond_var: Var,
+        prop_key: PgRegKey,
+        leaf_alias: sql::Alias,
+        rel_info: &DataRelationshipInfo,
+        _set_operator: SetOperator,
+        walker: ConditionWalker,
+        ctx: &mut ConditionCtx<'a, '_>,
+    ) -> DomainResult<Option<sql::Expr<'a>>> {
+        match self.abstract_kind(&rel_info.target) {
+            AbstractKind::VertexUnion(_def_ids) => {
+                let mut exprs: Vec<sql::Expr> = vec![];
+
+                for clause in walker.clauses(cond_var) {
+                    match clause {
+                        Clause::Root => {}
+                        Clause::IsDef(def_id) => {
+                            let pg = self
+                                .pg_model
+                                .pg_domain_datatable(def_id.package_id(), *def_id)?;
+                            if !pg.table.has_fkey {
+                                return Err(PgError::Condition("abstract column not usable").into());
+                            }
+
+                            let alias = ctx.query_ctx.alias.incr();
+
+                            let sql_select = sql::Select {
+                                with: None,
+                                expressions: Default::default(),
+                                from: vec![pg.table_name().as_(alias)],
+                                where_: Some(sql::Expr::eq(
+                                    sql::Expr::Tuple(vec![
+                                        sql::Expr::path2(alias, "_fprop"),
+                                        sql::Expr::path2(alias, "_fkey"),
+                                    ]),
+                                    sql::Expr::Tuple(vec![
+                                        sql::Expr::LiteralInt(prop_key),
+                                        sql::Expr::path2(leaf_alias, "_key"),
+                                    ]),
+                                )),
+                                limit: Default::default(),
+                            };
+
+                            exprs.push(sql::Expr::Exists(Box::new(sql_select.into())));
+                        }
+                        Clause::MatchProp(_, _, _) => {
+                            todo!("match-prop!");
+                        }
+                        Clause::Member(_, _) => {
+                            todo!("member!");
+                        }
+                    }
+                }
+
+                Ok(if exprs.is_empty() {
+                    None
+                } else {
+                    Some(sql::Expr::And(exprs))
+                })
+            }
+            AbstractKind::Scalar { .. } => {
+                Err(PgError::Condition("compare scalar set-to-set").into())
+            }
         }
     }
 }

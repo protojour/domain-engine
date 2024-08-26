@@ -3,7 +3,7 @@ use fnv::FnvHashMap;
 use futures_util::Stream;
 use ontol_runtime::{
     attr::{Attr, AttrMatrix},
-    ontology::domain::{DataRelationshipKind, DataRelationshipTarget, Def},
+    ontology::domain::{DataRelationshipKind, Def},
     property::{PropertyCardinality, ValueCardinality},
     query::{
         filter::Filter,
@@ -12,7 +12,7 @@ use ontol_runtime::{
     sequence::SubSequence,
     tuple::{CardinalIdx, EndoTuple},
     value::Value,
-    DefId, OntolDefTag, PropId,
+    DefId, PropId,
 };
 use pin_utils::pin_mut;
 use serde::{Deserialize, Serialize};
@@ -22,7 +22,7 @@ use tracing::{debug, trace};
 use crate::{
     address::make_ontol_address,
     pg_error::{PgError, PgInputError, PgModelError},
-    pg_model::{PgDataKey, PgDomainTable, PgEdgeCardinalKind, PgRepr, PgTable, PgTableKey, PgType},
+    pg_model::{PgDataKey, PgDomainTable, PgEdgeCardinalKind, PgTable, PgTableKey, PgType},
     sql::{self, FromItem, WhereExt},
     sql_record::{SqlColumnStream, SqlRecord, SqlRecordIterator},
     sql_value::{Layout, SqlVal},
@@ -34,6 +34,7 @@ use super::{
     edge_query::{
         CardinalSelect, EdgeUnionSelectBuilder, EdgeUnionVariantSelectBuilder, PgEdgeProjection,
     },
+    fields::AbstractKind,
     TransactCtx,
 };
 
@@ -77,15 +78,6 @@ pub enum QuerySelect<'a> {
 pub enum IncludeJoinedAttrs {
     Yes,
     No,
-}
-
-enum AbstractKind<'a> {
-    VertexUnion(&'a [DefId]),
-    Scalar {
-        pg_type: PgType,
-        ontol_def_tag: OntolDefTag,
-        target_def_id: DefId,
-    },
 }
 
 pub struct Query {
@@ -452,28 +444,6 @@ impl<'a> TransactCtx<'a> {
         }
 
         Ok(())
-    }
-
-    fn abstract_kind(&self, target: &'a DataRelationshipTarget) -> AbstractKind<'a> {
-        match target {
-            DataRelationshipTarget::Unambiguous(target_def_id) => {
-                let target_def = self.ontology.def(*target_def_id);
-                if let Some(PgRepr::Scalar(pg_type, ontol_def_tag)) =
-                    PgRepr::classify_opt_def_repr(target_def.repr(), self.ontology)
-                {
-                    AbstractKind::Scalar {
-                        pg_type,
-                        ontol_def_tag,
-                        target_def_id: *target_def_id,
-                    }
-                } else {
-                    AbstractKind::VertexUnion(std::slice::from_ref(target_def_id))
-                }
-            }
-            DataRelationshipTarget::Union(union_def_id) => {
-                AbstractKind::VertexUnion(self.ontology.union_variants(*union_def_id))
-            }
-        }
     }
 
     pub fn sql_select_edge_properties(

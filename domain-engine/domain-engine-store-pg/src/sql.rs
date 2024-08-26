@@ -157,8 +157,11 @@ pub enum Expr<'a> {
     /// input parameter
     Param(Param),
     Default,
-    Paren(Box<Expr<'a>>),
     LiteralInt(i32),
+    /// (a, b, ..)
+    Tuple(Vec<Expr<'a>>),
+    /// (a)
+    Paren(Box<Expr<'a>>),
     Select(Box<Select<'a>>),
     /// a UNION b
     #[allow(unused)]
@@ -507,8 +510,9 @@ impl<'a> Display for Expr<'a> {
             Self::Path(path) => write!(f, "{path}"),
             Self::Param(param) => write!(f, "{param}"),
             Self::Default => write!(f, "DEFAULT"),
-            Self::Paren(expr) => write!(f, "({expr})"),
             Self::LiteralInt(i) => write!(f, "{i}"),
+            Self::Tuple(t) => write!(f, "({})", t.iter().format(",")),
+            Self::Paren(expr) => write!(f, "({expr})"),
             Self::Select(select) => write!(f, "{select}"),
             Self::Union(union) => write!(f, "{union}"),
             Self::And(clauses) => write!(f, "{}", clauses.iter().format(" AND ")),
