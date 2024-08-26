@@ -315,16 +315,13 @@ pub fn edge_join_condition<'a>(
         PgEdgeCardinalKind::Dynamic {
             def_col_name,
             key_col_name,
-        } => {
-            // TODO: tuple comparison might be shorter/more readable: (a, b) = (c, d)
-            sql::Expr::And(vec![
-                sql::Expr::eq(
-                    edge_path.join(def_col_name.as_ref()),
-                    sql::Expr::LiteralInt(data.key),
-                ),
-                sql::Expr::eq(edge_path.join(key_col_name.as_ref()), data_key_expr),
-            ])
-        }
+        } => sql::Expr::eq(
+            sql::Expr::Tuple(vec![
+                edge_path.join(def_col_name.as_ref()).into(),
+                edge_path.join(key_col_name.as_ref()).into(),
+            ]),
+            sql::Expr::Tuple(vec![sql::Expr::LiteralInt(data.key), data_key_expr]),
+        ),
         PgEdgeCardinalKind::PinnedDef { key_col_name, .. } => {
             sql::Expr::eq(edge_path.join(key_col_name.as_ref()), data_key_expr)
         }

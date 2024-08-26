@@ -373,16 +373,16 @@ impl<'a> TransactCtx<'a> {
                                     sub_pg.table_name(),
                                     sub_alias.into(),
                                 )],
-                                where_: Some(sql::Expr::And(vec![
-                                    sql::Expr::eq(
+                                where_: Some(sql::Expr::eq(
+                                    sql::Expr::Tuple(vec![
                                         sql::Expr::path2(sub_alias, "_fprop"),
-                                        sql::Expr::LiteralInt(prop_key),
-                                    ),
-                                    sql::Expr::eq(
                                         sql::Expr::path2(sub_alias, "_fkey"),
+                                    ]),
+                                    sql::Expr::Tuple(vec![
+                                        sql::Expr::LiteralInt(prop_key),
                                         sql::Expr::path2(parent_alias, "_key"),
-                                    ),
-                                ])),
+                                    ]),
+                                )),
                                 ..Default::default()
                             }
                             .into(),
@@ -427,16 +427,16 @@ impl<'a> TransactCtx<'a> {
                             multiline: false,
                         },
                         from: vec![sub_pg.table_name().into()],
-                        where_: Some(sql::Expr::And(vec![
-                            sql::Expr::eq(
+                        where_: Some(sql::Expr::eq(
+                            sql::Expr::Tuple(vec![
                                 sql::Expr::path1("_fprop"),
-                                sql::Expr::LiteralInt(prop_key),
-                            ),
-                            sql::Expr::eq(
                                 sql::Expr::path1("_fkey"),
+                            ]),
+                            sql::Expr::Tuple(vec![
+                                sql::Expr::LiteralInt(prop_key),
                                 sql::Expr::path2(parent_alias, "_key"),
-                            ),
-                        ])),
+                            ]),
+                        )),
                         ..Default::default()
                     }));
                 }
