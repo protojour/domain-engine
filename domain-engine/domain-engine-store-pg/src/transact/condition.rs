@@ -189,8 +189,6 @@ impl<'a> TransactCtx<'a> {
                         ctx.output_clauses.push(leaf_condition);
                     }
                 } else {
-                    let mut path_iter = path_builder.items.iter().rev();
-
                     let leaf_alias = ctx.query_ctx.alias.incr();
                     let leaf_condition = self.column_condition(
                         var,
@@ -207,7 +205,7 @@ impl<'a> TransactCtx<'a> {
 
                     let mut alias = leaf_alias;
 
-                    while let Some(path) = path_iter.next() {
+                    for path in path_builder.items.iter().rev() {
                         match path {
                             CondPathItem::EdgeJoin { proj, idx } => {
                                 let edge_alias = ctx.query_ctx.alias.incr();
@@ -282,7 +280,6 @@ impl<'a> TransactCtx<'a> {
                                         prop_key,
                                         ctx.root_alias,
                                         rel_info,
-                                        set_operator,
                                         walker,
                                         ctx,
                                     )? {
@@ -426,7 +423,6 @@ impl<'a> TransactCtx<'a> {
         prop_key: PgRegKey,
         leaf_alias: sql::Alias,
         rel_info: &DataRelationshipInfo,
-        _set_operator: SetOperator,
         walker: ConditionWalker,
         ctx: &mut ConditionCtx<'a, '_>,
     ) -> DomainResult<Option<sql::Expr<'a>>> {
