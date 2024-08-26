@@ -584,7 +584,6 @@ impl<'a> TransactCtx<'a> {
                     // nothing to update, but it should be proven that the edge exists.
                     debug!("nothing to update");
                     let sql_select = sql::Select {
-                        with: None,
                         expressions: vec![sql::Expr::LiteralInt(0)].into(),
                         from: vec![pg_edge.table_name().into()],
                         where_: sql_update.where_,
@@ -592,6 +591,7 @@ impl<'a> TransactCtx<'a> {
                             limit: Some(1),
                             offset: None,
                         },
+                        ..Default::default()
                     };
                     sql_select.to_string()
                 },

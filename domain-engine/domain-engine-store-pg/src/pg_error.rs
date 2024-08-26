@@ -90,6 +90,8 @@ pub enum PgError {
     PrepareStatement(Arc<String>, tokio_postgres::Error),
     /// condition error: {0}
     Condition(&'static str),
+    /// order error: {0}
+    Order(&'static str),
 }
 
 impl From<PgError> for DomainError {

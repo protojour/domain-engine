@@ -1,6 +1,7 @@
 use std::{fmt::Display, sync::Arc};
 
 use itertools::Itertools;
+use ontol_runtime::query::order::Direction;
 use smallvec::{smallvec, SmallVec};
 
 pub struct Ident<T>(pub T);
@@ -53,6 +54,7 @@ pub struct Select<'a> {
     pub expressions: Expressions<'a>,
     pub from: Vec<FromItem<'a>>,
     pub where_: Option<Expr<'a>>,
+    pub order_by: OrderBy<'a>,
     pub limit: Limit,
 }
 
@@ -143,6 +145,14 @@ pub enum ConflictAction<'a> {
 
 /// column = expr
 pub struct UpdateColumn<'a>(pub &'a str, pub Expr<'a>);
+
+#[derive(Clone, Default)]
+pub struct OrderBy<'a> {
+    pub expressions: Vec<OrderByExpr<'a>>,
+}
+
+#[derive(Clone)]
+pub struct OrderByExpr<'a>(pub Expr<'a>, pub Direction);
 
 #[derive(Clone, Default)]
 pub struct Limit {
@@ -326,6 +336,7 @@ impl<'a> Display for Select<'a> {
             write!(f, " WHERE {condition}")?;
         }
 
+        write!(f, "{}", self.order_by)?;
         write!(f, "{}", self.limit)
     }
 }
@@ -420,6 +431,28 @@ impl Display for Limit {
 
         if let Some(offset) = self.offset {
             write!(f, " OFFSET {offset}")?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<'a> Display for OrderBy<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.expressions.is_empty() {
+            return Ok(());
+        }
+
+        write!(f, " ORDER BY {}", self.expressions.iter().format(","))
+    }
+}
+
+impl<'a> Display for OrderByExpr<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)?;
+
+        if matches!(self.1, Direction::Descending) {
+            write!(f, " DESC")?;
         }
 
         Ok(())

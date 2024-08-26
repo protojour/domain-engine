@@ -232,11 +232,9 @@ impl<'a> TransactCtx<'a> {
                     }
 
                     let mut sql_select = sql::Select {
-                        with: None,
-                        expressions: Default::default(),
                         from: vec![from_item],
                         where_: None,
-                        limit: sql::Limit::default(),
+                        ..Default::default()
                     };
 
                     if let Some(outer_proj) = outer_proj {
@@ -444,8 +442,6 @@ impl<'a> TransactCtx<'a> {
                             let alias = ctx.query_ctx.alias.incr();
 
                             let sql_select = sql::Select {
-                                with: None,
-                                expressions: Default::default(),
                                 from: vec![pg.table_name().as_(alias)],
                                 where_: Some(sql::Expr::eq(
                                     sql::Expr::Tuple(vec![
@@ -457,7 +453,7 @@ impl<'a> TransactCtx<'a> {
                                         sql::Expr::path2(leaf_alias, "_key"),
                                     ]),
                                 )),
-                                limit: Default::default(),
+                                ..Default::default()
                             };
 
                             exprs.push(sql::Expr::Exists(Box::new(sql_select.into())));

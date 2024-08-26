@@ -176,10 +176,8 @@ impl<'a> TransactCtx<'a> {
             expressions.items.extend(tail_expressions);
 
             let mut sql_select = sql::Select {
-                with: None,
                 expressions,
                 from: vec![from],
-                where_: None,
                 limit: sql::Limit {
                     limit: Some(q.limit + 1),
                     offset: match &q.after_cursor {
@@ -187,6 +185,7 @@ impl<'a> TransactCtx<'a> {
                         _ => None,
                     },
                 },
+                ..Default::default()
             };
 
             if let Some(native_id_condition) = q.native_id_condition {
@@ -205,6 +204,8 @@ impl<'a> TransactCtx<'a> {
                 )? {
                     sql_select.where_and(condition);
                 }
+
+                sql_select.order_by = self.select_order(def_id, filter.order())?;
             }
 
             sql_select.with = query_ctx.with();

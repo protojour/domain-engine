@@ -30,6 +30,7 @@ mod edge_patch;
 mod edge_query;
 mod fields;
 mod insert;
+mod order;
 mod query;
 mod update;
 

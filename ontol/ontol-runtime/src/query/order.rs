@@ -8,6 +8,12 @@ pub enum Direction {
     Descending,
 }
 
+impl Default for Direction {
+    fn default() -> Self {
+        Self::Ascending
+    }
+}
+
 impl Direction {
     /// Re-order an [Ordering] by this direction
     pub fn reorder(self, ordering: Ordering) -> Ordering {

@@ -218,7 +218,6 @@ impl<'a> TransactCtx<'a> {
         } else {
             // nothing inherent to update. Just fetch key.
             let sql = sql::Select {
-                with: None,
                 expressions: sql::Expressions {
                     items: vec![sql::Expr::path1("_key")],
                     multiline: false,
@@ -229,6 +228,7 @@ impl<'a> TransactCtx<'a> {
                     limit: Some(1),
                     offset: None,
                 },
+                ..Default::default()
             }
             .to_string();
             debug!("{sql}");

@@ -378,6 +378,7 @@ impl<'a> TransactCtx<'a> {
                                     limit: Some(1),
                                     offset: None,
                                 },
+                                ..Default::default()
                             }
                             .to_string()
                             .prepare(self.client())
