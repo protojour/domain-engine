@@ -6,6 +6,7 @@ use domain_engine_core::{
     transact::DataOperation,
     DomainResult,
 };
+use fnv::FnvHashMap;
 use futures_util::{future::BoxFuture, TryStreamExt};
 use ontol_runtime::{
     attr::Attr,
@@ -15,14 +16,15 @@ use ontol_runtime::{
     DefId, PackageId, PropId,
 };
 use pin_utils::pin_mut;
+use tokio_postgres::{Row, ToStatement};
 use tracing::{debug, trace, warn};
 
 use crate::{
     pg_error::{map_row_error, PgError, PgInputError},
-    pg_model::{InDomain, PgDataKey, PgRepr, PgTable},
+    pg_model::{InDomain, PgDataKey, PgDomainTable, PgRepr},
     sql::{self},
     sql_record::SqlColumnStream,
-    sql_value::SqlVal,
+    sql_value::SqlScalar,
     statement::{Prepare, PreparedStatement},
     transact::query::IncludeJoinedAttrs,
 };
@@ -41,8 +43,9 @@ pub struct PreparedInsert {
     edge_select_stmt: Option<PreparedStatement>,
 }
 
-struct AnalyzedInput<'a, 'b> {
-    pub sql_params: Vec<SqlVal<'b>>,
+struct AnalyzedInput<'a> {
+    pub sql_params: Vec<SqlScalar>,
+    pub update_tentative: Option<PgDataKey>,
     pub edges: EdgePatches,
     pub abstract_values: Vec<(PropId, Value)>,
     pub query_select: QuerySelect<'a>,
@@ -91,17 +94,21 @@ impl<'a> TransactCtx<'a> {
         self.preprocess_insert_value(mode, &mut value.value)?;
 
         let def = self.ontology.def(value.value.type_def_id());
-        let (analyzed, pg_table) = self.analyze_input(None, def, value, select)?;
+        let (analyzed, pg) = self.analyze_input(None, def, value, select, cache)?;
 
-        let mut row_value = self
-            .insert_row(
+        let mut row_value = if let Some(data_key) = analyzed.update_tentative {
+            self.update_tentative_vertex(def, pg, &analyzed, data_key)
+                .await?
+        } else {
+            self.insert_row(
                 &prepared.inherent_stmt,
                 &analyzed.sql_params,
                 analyzed.query_select,
             )
-            .await?;
+            .await?
+        };
 
-        self.patch_edges(pg_table, row_value.data_key, analyzed.edges, cache)
+        self.patch_edges(pg.table, row_value.data_key, analyzed.edges, cache)
             .await?;
 
         for (prop_id, value) in analyzed.abstract_values {
@@ -125,7 +132,7 @@ impl<'a> TransactCtx<'a> {
                 .client()
                 .query_one(
                     edge_select_stmt.deref(),
-                    &[&SqlVal::I64(row_value.data_key)],
+                    &[&SqlScalar::I64(row_value.data_key)],
                 )
                 .await
                 .map_err(PgError::InsertEdgeFetch)?;
@@ -140,6 +147,68 @@ impl<'a> TransactCtx<'a> {
         }
 
         Ok(row_value)
+    }
+
+    /// Instead of doing an INSERT, do an UPDATE against a vertex with a "tentative key".
+    /// A tentative vertex has been inserted into the database upon seing a foreign key referencing that vertice.
+    /// It has to exist in the DB because its _data key_ need to exist.
+    /// At the end of the transaction, all the tentative keys will be checked to have been updated with proper vertex data.
+    async fn update_tentative_vertex(
+        &self,
+        def: &Def,
+        pg: PgDomainTable<'a>,
+        analyzed: &AnalyzedInput<'a>,
+        data_key: PgDataKey,
+    ) -> DomainResult<RowValue> {
+        let mut sql_update = sql::Update {
+            with: None,
+            table_name: pg.table_name(),
+            set: vec![],
+            where_: Some(sql::Expr::eq(
+                sql::Expr::path1("_key"),
+                sql::Expr::param(analyzed.sql_params.len()),
+            )),
+            returning: vec![sql::Expr::LiteralInt(0)],
+        };
+
+        let mut param_idx = 0;
+
+        let mut attrs: FnvHashMap<PropId, Attr> =
+            FnvHashMap::with_capacity_and_hasher(def.data_relationships.len(), Default::default());
+
+        for (prop_id, rel_info) in &def.data_relationships {
+            if let Some(pg_column) = pg.table.find_column(prop_id) {
+                let input_param = analyzed.sql_params.get(param_idx).unwrap();
+
+                let unit_val =
+                    self.deserialize_sql(rel_info.target.def_id(), input_param.clone().into())?;
+                attrs.insert(*prop_id, Attr::Unit(unit_val));
+
+                sql_update.set.push(sql::UpdateColumn(
+                    &pg_column.col_name,
+                    sql::Expr::param(param_idx),
+                ));
+                param_idx += 1;
+            }
+        }
+
+        assert_eq!(param_idx, analyzed.sql_params.len());
+
+        let mut update_params = analyzed.sql_params.clone();
+        update_params.push(SqlScalar::I64(data_key));
+
+        let sql = sql_update.to_string();
+
+        debug!("{sql}");
+
+        self.query_one_raw(&sql, &update_params).await?;
+
+        Ok(RowValue {
+            value: Value::Struct(Box::new(attrs), def.id.into()),
+            def_key: pg.table.key,
+            data_key,
+            op: DataOperation::Inserted,
+        })
     }
 
     fn insert_abstract_sub_value<'s>(
@@ -185,7 +254,11 @@ impl<'a> TransactCtx<'a> {
                 panic!("value must be a scalar here");
             };
 
-            let sql_params = vec![SqlVal::I32(parent_prop_key), SqlVal::I64(parent.key), value];
+            let sql_params = vec![
+                SqlScalar::I32(parent_prop_key),
+                SqlScalar::I64(parent.key),
+                value,
+            ];
 
             self.insert_row(&prepared.inherent_stmt, &sql_params, QuerySelect::Unit)
                 .await?;
@@ -206,8 +279,13 @@ impl<'a> TransactCtx<'a> {
             };
 
             let def = self.ontology.def(def_id);
-            let (analyzed, pg_table) =
-                self.analyze_input(Some(parent), def, InDomain { pkg_id, value }, &Select::Unit)?;
+            let (analyzed, pg) = self.analyze_input(
+                Some(parent),
+                def,
+                InDomain { pkg_id, value },
+                &Select::Unit,
+                cache,
+            )?;
 
             let row_value = self
                 .insert_row(
@@ -217,7 +295,7 @@ impl<'a> TransactCtx<'a> {
                 )
                 .await?;
 
-            self.patch_edges(pg_table, row_value.data_key, analyzed.edges, cache)
+            self.patch_edges(pg.table, row_value.data_key, analyzed.edges, cache)
                 .await?;
 
             for (prop_id, value) in analyzed.abstract_values {
@@ -417,14 +495,19 @@ impl<'a> TransactCtx<'a> {
         def: &Def,
         value: InDomain<Value>,
         select: &'a Select,
-    ) -> DomainResult<(AnalyzedInput<'a, '_>, &PgTable)> {
-        let pg_table = self.pg_model.datatable(value.pkg_id, value.type_def_id())?;
+        cache: &mut PgCache,
+    ) -> DomainResult<(AnalyzedInput<'a>, PgDomainTable<'_>)> {
+        let pg = self
+            .pg_model
+            .pg_domain_datatable(value.pkg_id, value.type_def_id())?;
+        let pg_table = pg.table;
 
         let Value::Struct(mut attrs, _struct_tag) = value.value else {
             return Err(DomainErrorKind::EntityMustBeStruct.into_error());
         };
 
-        let mut sql_params: Vec<SqlVal> = vec![];
+        let mut sql_params: Vec<SqlScalar> = vec![];
+        let mut update_tentative: Option<PgDataKey> = None;
         let mut edge_patches = EdgePatches::default();
         let mut abstract_values: Vec<(PropId, Value)> = vec![];
 
@@ -438,7 +521,7 @@ impl<'a> TransactCtx<'a> {
                 .datatable(parent.prop_id.0.package_id(), parent.prop_id.0)?
                 .abstract_property(&parent.prop_id)?;
 
-            sql_params.extend([SqlVal::I32(parent_prop_key), SqlVal::I64(parent.key)]);
+            sql_params.extend([SqlScalar::I32(parent_prop_key), SqlScalar::I64(parent.key)]);
         }
 
         for (prop_id, rel_info) in &def.data_relationships {
@@ -480,22 +563,41 @@ impl<'a> TransactCtx<'a> {
                         None => {}
                     }
                 }
-                (_, Some(pg_column)) => {
+                (kind, Some(pg_column)) => {
                     if pg_column.pg_type.insert_default() {
                         continue;
                     }
 
                     match attr {
-                        Some(Attr::Unit(value)) => match self.data_from_value(value)? {
-                            Data::Sql(scalar) => {
-                                sql_params.push(scalar);
+                        Some(Attr::Unit(value)) => {
+                            let type_def_id = value.type_def_id();
+
+                            match self.data_from_value(value)? {
+                                Data::Sql(scalar) => {
+                                    // register inserted/known ID
+                                    if matches!(kind, DataRelationshipKind::Id) {
+                                        if let Some(tentative_foreign_ids) = cache
+                                            .tentative_foreign_keys
+                                            .get_mut(&(*prop_id, type_def_id))
+                                        {
+                                            if let Some((_, data_key)) =
+                                                tentative_foreign_ids.remove(&scalar)
+                                            {
+                                                trace!("pop tentative foreign key: {scalar:?}");
+                                                update_tentative = Some(data_key);
+                                            }
+                                        }
+                                    }
+
+                                    sql_params.push(scalar);
+                                }
+                                Data::Compound(comp) => {
+                                    todo!("compound: {comp:?}");
+                                }
                             }
-                            Data::Compound(comp) => {
-                                todo!("compound: {comp:?}");
-                            }
-                        },
+                        }
                         None => {
-                            sql_params.push(SqlVal::Null);
+                            sql_params.push(SqlScalar::Null);
                         }
                         Some(_) => {
                             debug!("edge ignored");
@@ -552,60 +654,67 @@ impl<'a> TransactCtx<'a> {
         Ok((
             AnalyzedInput {
                 sql_params,
+                update_tentative,
                 edges: edge_patches,
                 abstract_values,
                 query_select,
             },
-            pg_table,
+            pg,
         ))
     }
 
     async fn insert_row(
         &self,
-        prepared_inherent_insert: &PreparedStatement,
-        sql_params: &[SqlVal<'a>],
+        stmt: &PreparedStatement,
+        sql_params: &[SqlScalar],
         query_select: QuerySelect<'a>,
     ) -> DomainResult<RowValue> {
-        let row = {
-            debug!("{}", prepared_inherent_insert);
-            trace!("{sql_params:?}");
-
-            let stream = self
-                .client()
-                .query_raw(prepared_inherent_insert.deref(), sql_params)
-                .await
-                .map_err(PgError::InsertQuery)?;
-            pin_mut!(stream);
-
-            let row = stream
-                .try_next()
-                .await
-                .map_err(map_row_error)?
-                .ok_or(PgError::NothingInserted)?;
-
-            stream
-                .try_next()
-                .await
-                .map_err(PgError::InsertRowStreamNotClosed)?;
-
-            match stream.rows_affected() {
-                Some(affected) => {
-                    if affected != 1 {
-                        return Err(PgError::InsertIncorrectAffectCount.into());
-                    }
-                }
-                None => {
-                    return Err(PgError::InsertNoRowsAffected.into());
-                }
-            }
-
-            row
-        };
+        debug!("{}", stmt);
+        let row = self.query_one_raw(stmt.deref(), sql_params).await?;
         self.read_row_value_as_vertex(
             SqlColumnStream::new(&row),
             Some(query_select),
             IncludeJoinedAttrs::No,
             DataOperation::Inserted,
         )
+    }
+
+    async fn query_one_raw<S: ToStatement>(
+        &self,
+        stmt: &S,
+        sql_params: &[SqlScalar],
+    ) -> DomainResult<Row> {
+        trace!("{sql_params:?}");
+
+        let stream = self
+            .client()
+            .query_raw(stmt, sql_params)
+            .await
+            .map_err(PgError::InsertQuery)?;
+        pin_mut!(stream);
+
+        let row = stream
+            .try_next()
+            .await
+            .map_err(map_row_error)?
+            .ok_or(PgError::NothingInserted)?;
+
+        stream
+            .try_next()
+            .await
+            .map_err(PgError::InsertRowStreamNotClosed)?;
+
+        match stream.rows_affected() {
+            Some(affected) => {
+                if affected != 1 {
+                    return Err(PgError::InsertIncorrectAffectCount.into());
+                }
+            }
+            None => {
+                return Err(PgError::InsertNoRowsAffected.into());
+            }
+        }
+
+        Ok(row)
     }
 }

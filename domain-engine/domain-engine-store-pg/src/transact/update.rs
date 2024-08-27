@@ -14,7 +14,7 @@ use crate::{
     pg_error::{PgError, PgInputError},
     pg_model::{InDomain, PgDataKey},
     sql::{self, UpdateColumn},
-    sql_value::SqlVal,
+    sql_value::SqlScalar,
     transact::query::{QueryFrame, QuerySelect},
 };
 
@@ -102,7 +102,7 @@ impl<'a> TransactCtx<'a> {
         let where_: Option<sql::Expr>;
         let mut set: Vec<UpdateColumn> = vec![];
 
-        let mut update_params: Vec<SqlVal> = vec![];
+        let mut update_params: Vec<SqlScalar> = vec![];
 
         match update_condition {
             UpdateCondition::FieldEq(prop_id, value) => {
@@ -118,7 +118,7 @@ impl<'a> TransactCtx<'a> {
             }
             UpdateCondition::PgKey(key) => {
                 where_ = Some(sql::Expr::eq(sql::Expr::path1("_key"), sql::Expr::param(0)));
-                update_params.push(SqlVal::I64(key));
+                update_params.push(SqlScalar::I64(key));
             }
         }
 

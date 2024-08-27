@@ -125,6 +125,8 @@ pub enum DomainErrorKind {
     BadInputData(String),
     /// unresolved foreign key: {0}
     UnresolvedForeignKey(String),
+    /// unresolved foreign keys, including: {0}
+    UnresolvedForeignKeys(String),
     /// not implemented
     NotImplemented,
     /// impure mapping where a pure mapping was expected

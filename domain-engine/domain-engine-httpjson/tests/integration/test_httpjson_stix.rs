@@ -24,7 +24,7 @@ async fn test_httpjson_stix(ds: &str) {
         .oneshot(
             Request::put("/stix-object")
                 .header(CONTENT_TYPE, "application/json")
-                .body(json_body(testdata::url()))
+                .body(json_body(testdata::url1()))
                 .unwrap(),
         )
         .await
@@ -43,7 +43,7 @@ async fn test_httpjson_stix(ds: &str) {
                     testdata::identity(),
                     testdata::marking_definition(),
                     testdata::course_of_action(),
-                    testdata::url(),
+                    testdata::url2(),
                 ]))
                 .unwrap(),
         )
@@ -142,11 +142,22 @@ mod testdata {
         })
     }
 
-    pub fn url() -> serde_json::Value {
+    pub fn url1() -> serde_json::Value {
         json!({
             "id": "url--13164076-ab7e-4cb1-8747-0624c5361edc",
             "type": "url",
             "value": "http://jøkkagnork",
+            "defanged": true,
+            "object_marking_refs": [],
+            "granular_markings": [],
+        })
+    }
+
+    pub fn url2() -> serde_json::Value {
+        json!({
+            "id": "url--43477621-084b-4151-8834-50986efbf51b",
+            "type": "url",
+            "value": "http://jøkkagnork2",
             "defanged": true,
             "object_marking_refs": [],
             "granular_markings": [],

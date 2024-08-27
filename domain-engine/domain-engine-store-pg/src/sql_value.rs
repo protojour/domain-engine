@@ -4,6 +4,7 @@ use bytes::BytesMut;
 use domain_engine_core::{DomainError, DomainResult};
 use fallible_iterator::FallibleIterator;
 use ontol_runtime::value::OctetSequence;
+use ordered_float::OrderedFloat;
 use postgres_types::{FromSql, ToSql, Type};
 use tracing::error;
 
@@ -32,21 +33,34 @@ mod wellknown_oid {
     pub const TIMESTAMPTZ: u32 = 1184;
 }
 
-#[derive(Debug)]
-pub enum SqlVal<'b> {
+/// Something put into PG
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SqlScalar {
     Null,
     Unit,
     Bool(bool),
     I32(i32),
     I64(i64),
-    F64(f64),
+    F64(OrderedFloat<f64>),
     Text(String),
     Octets(OctetSequence),
     DateTime(chrono::DateTime<chrono::Utc>),
     Date(chrono::NaiveDate),
     Time(chrono::NaiveTime),
+}
+
+/// Something read out of PG
+#[derive(Debug)]
+pub enum SqlOutput<'b> {
+    Scalar(SqlScalar),
     Array(SqlArray<'b>),
     Record(SqlRecord<'b>),
+}
+
+impl<'b> From<SqlScalar> for SqlOutput<'b> {
+    fn from(value: SqlScalar) -> Self {
+        Self::Scalar(value)
+    }
 }
 
 /// Layout of Sql data
@@ -57,10 +71,10 @@ pub enum Layout {
     Record,
 }
 
-impl<'b> SqlVal<'b> {
+impl<'b> SqlOutput<'b> {
     pub fn null_filter(self) -> Option<Self> {
         match self {
-            Self::Null => None,
+            Self::Scalar(SqlScalar::Null) => None,
             other => Some(other),
         }
     }
@@ -68,21 +82,21 @@ impl<'b> SqlVal<'b> {
     #[allow(unused)]
     pub fn non_null(self) -> DomainResult<Self> {
         match self {
-            Self::Null => Err(PgError::InvalidType("null").into()),
+            Self::Scalar(SqlScalar::Null) => Err(PgError::InvalidType("null").into()),
             other => Ok(other),
         }
     }
 
     pub fn into_i32(self) -> DomainResult<i32> {
         match self {
-            Self::I32(int) => Ok(int),
+            Self::Scalar(SqlScalar::I32(int)) => Ok(int),
             _ => Err(PgError::ExpectedType("i32").into()),
         }
     }
 
     pub fn into_i64(self) -> DomainResult<i64> {
         match self {
-            Self::I64(int) => Ok(int),
+            Self::Scalar(SqlScalar::I64(int)) => Ok(int),
             _ => Err(PgError::ExpectedType("i64").into()),
         }
     }
@@ -103,36 +117,40 @@ impl<'b> SqlVal<'b> {
 
     pub(crate) fn decode(buf: Option<&'b [u8]>, layout: &Layout) -> CodecResult<Self> {
         let Some(raw) = buf else {
-            return Ok(Self::Null);
+            return Ok(SqlScalar::Null.into());
         };
 
         match layout {
             Layout::Scalar(PgType::Integer) => {
-                Ok(SqlVal::I32(postgres_protocol::types::int4_from_sql(raw)?))
+                Ok(SqlScalar::I32(postgres_protocol::types::int4_from_sql(raw)?).into())
             }
             Layout::Scalar(PgType::BigInt | PgType::Bigserial) => {
-                Ok(SqlVal::I64(postgres_protocol::types::int8_from_sql(raw)?))
+                Ok(SqlScalar::I64(postgres_protocol::types::int8_from_sql(raw)?).into())
             }
             Layout::Scalar(PgType::DoublePrecision) => {
-                Ok(SqlVal::F64(postgres_protocol::types::float8_from_sql(raw)?))
+                Ok(SqlScalar::F64(postgres_protocol::types::float8_from_sql(raw)?.into()).into())
             }
-            Layout::Scalar(PgType::Boolean) => Ok(SqlVal::I64(
+            Layout::Scalar(PgType::Boolean) => Ok(SqlScalar::I64(
                 if postgres_protocol::types::bool_from_sql(raw)? {
                     1
                 } else {
                     0
                 },
-            )),
-            Layout::Scalar(PgType::Text) => Ok(SqlVal::Text(
+            )
+            .into()),
+            Layout::Scalar(PgType::Text) => Ok(SqlScalar::Text(
                 postgres_protocol::types::text_from_sql(raw)?.to_string(),
-            )),
-            Layout::Scalar(PgType::Bytea) => Ok(SqlVal::Octets(OctetSequence(
+            )
+            .into()),
+            Layout::Scalar(PgType::Bytea) => Ok(SqlScalar::Octets(OctetSequence(
                 postgres_protocol::types::bytea_from_sql(raw).into(),
-            ))),
-            Layout::Scalar(PgType::TimestampTz) => Ok(SqlVal::DateTime(FromSql::from_sql(
+            ))
+            .into()),
+            Layout::Scalar(PgType::TimestampTz) => Ok(SqlScalar::DateTime(FromSql::from_sql(
                 &Type::from_oid(wellknown_oid::TIMESTAMPTZ).unwrap(),
                 raw,
-            )?)),
+            )?)
+            .into()),
             Layout::Array => {
                 let array = postgres_protocol::types::array_from_sql(raw)?;
                 if array.dimensions().count()? > 1 {
@@ -146,7 +164,7 @@ impl<'b> SqlVal<'b> {
     }
 }
 
-impl<'b> ToSql for SqlVal<'b> {
+impl ToSql for SqlScalar {
     fn to_sql(
         &self,
         ty: &tokio_postgres::types::Type,
@@ -166,7 +184,6 @@ impl<'b> ToSql for SqlVal<'b> {
             Self::DateTime(dt) => dt.to_sql(ty, out),
             Self::Date(d) => d.to_sql(ty, out),
             Self::Time(t) => t.to_sql(ty, out),
-            Self::Array(_) | Self::Record(_) => Err("cannot convert output values to SQL".into()),
         }
     }
 
@@ -193,7 +210,6 @@ impl<'b> ToSql for SqlVal<'b> {
             Self::DateTime(dt) => dt.to_sql_checked(ty, out),
             Self::Date(d) => d.to_sql_checked(ty, out),
             Self::Time(t) => t.to_sql_checked(ty, out),
-            Self::Array(_) | Self::Record(_) => Err("cannot convert output values to SQL".into()),
         }
     }
 }
@@ -206,14 +222,14 @@ impl<'b> SqlArray<'b> {
     pub fn elements<'l>(
         &self,
         element_layout: &'l Layout,
-    ) -> impl Iterator<Item = CodecResult<SqlVal<'b>>> + 'l
+    ) -> impl Iterator<Item = CodecResult<SqlOutput<'b>>> + 'l
     where
         'b: 'l,
     {
         self.inner
             .values()
             .iterator()
-            .map(move |buf_result| SqlVal::decode(buf_result?, element_layout))
+            .map(move |buf_result| SqlOutput::decode(buf_result?, element_layout))
     }
 }
 

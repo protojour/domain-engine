@@ -31,6 +31,12 @@ pub enum TransactionMode {
     ReadWriteAtomic,
 }
 
+impl TransactionMode {
+    pub fn is_atomic(&self) -> bool {
+        matches!(self, Self::ReadOnlyAtomic | Self::ReadWriteAtomic)
+    }
+}
+
 /// Operation sequence number (within one transaction)
 pub type OpSequence = u32;
 

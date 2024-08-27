@@ -54,6 +54,7 @@ pub enum InsertMode {
 }
 
 struct TransactCtx<'a> {
+    txn_mode: TransactionMode,
     pg_model: &'a PgModel,
     ontology: &'a Ontology,
     system: &'a (dyn SystemAPI + Send + Sync),
@@ -154,6 +155,7 @@ pub async fn transact(
         };
 
         let ctx = TransactCtx {
+            txn_mode: mode,
             pg_model: &store.pg_model,
             ontology: &store.ontology,
             system: store.system.as_ref(),
@@ -241,6 +243,8 @@ pub async fn transact(
                 }
             }
         }
+
+        ctx.check_unresolved_foreign_keys(&cache)?;
 
         if let ConnectionState::Transaction(txn) = ctx.connection_state {
             txn.commit().await.map_err(PgError::CommitTransaction)?;

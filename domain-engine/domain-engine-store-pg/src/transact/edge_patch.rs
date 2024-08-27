@@ -19,11 +19,11 @@ use tracing::{debug, trace};
 use crate::{
     pg_error::{ds_bad_req, map_row_error, PgError, PgInputError, PgModelError},
     pg_model::{
-        InDomain, PgDataKey, PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexType,
-        PgRegKey, PgTable,
+        InDomain, PgColumn, PgDataKey, PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind,
+        PgIndexType, PgRegKey, PgTable,
     },
     sql::{self, WhereExt},
-    sql_value::SqlVal,
+    sql_value::SqlScalar,
     statement::{Prepare, PreparedStatement},
     transact::{data::Data, edge_query::edge_join_condition},
     CountRows, IgnoreRows,
@@ -273,7 +273,7 @@ impl<'a> TransactCtx<'a> {
 
         let mut insert_sql: Option<String> = None;
 
-        let mut param_buf: Vec<SqlVal> = vec![];
+        let mut param_buf: Vec<SqlScalar> = vec![];
 
         for tuple in patch.tuples {
             param_buf.clear();
@@ -325,7 +325,7 @@ impl<'a> TransactCtx<'a> {
             }
 
             for (vertex_def_id, foreign_ids) in foreigns_per_vertex {
-                let mut sql_ids_param: Vec<SqlVal> = Vec::with_capacity(foreign_ids.len());
+                let mut sql_ids_param: Vec<SqlScalar> = Vec::with_capacity(foreign_ids.len());
                 let pg_foreign = self
                     .pg_model
                     .pg_domain_datatable(vertex_def_id.package_id(), vertex_def_id)?;
@@ -400,7 +400,7 @@ impl<'a> TransactCtx<'a> {
         (subject_datatable, subject_data_key): (&PgTable, PgDataKey),
         analysis: &EdgeAnalysis<'s>,
         tuple: EdgeEndoTuplePatch,
-        param_buf: &mut Vec<SqlVal<'s>>,
+        param_buf: &mut Vec<SqlScalar>,
         insert_sql: &str,
         cache: &mut PgCache,
     ) -> DomainResult<()> {
@@ -410,12 +410,12 @@ impl<'a> TransactCtx<'a> {
             match projected_cardinal {
                 ProjectedEdgeCardinal::Subject(_, Dynamic::Yes { .. }) => {
                     param_buf.extend([
-                        SqlVal::I32(subject_datatable.key),
-                        SqlVal::I64(subject_data_key),
+                        SqlScalar::I32(subject_datatable.key),
+                        SqlScalar::I64(subject_data_key),
                     ]);
                 }
                 ProjectedEdgeCardinal::Subject(_, Dynamic::No) => {
-                    param_buf.push(SqlVal::I64(subject_data_key));
+                    param_buf.push(SqlScalar::I64(subject_data_key));
                 }
                 ProjectedEdgeCardinal::Object(.., dynamic) => {
                     let (value, mode) = element_iter.next().unwrap();
@@ -427,10 +427,10 @@ impl<'a> TransactCtx<'a> {
                         let datatable = self
                             .pg_model
                             .datatable(foreign_def_id.package_id(), foreign_def_id)?;
-                        param_buf.push(SqlVal::I32(datatable.key));
+                        param_buf.push(SqlScalar::I32(datatable.key));
                     }
 
-                    param_buf.push(SqlVal::I64(foreign_key));
+                    param_buf.push(SqlScalar::I64(foreign_key));
                 }
                 ProjectedEdgeCardinal::Parameters => {
                     let Some((Value::Struct(mut map, _), _op)) = element_iter.next() else {
@@ -443,7 +443,7 @@ impl<'a> TransactCtx<'a> {
                             Some(_) => {
                                 return Err(ds_bad_req("non-scalar attribute in edge parameter"))
                             }
-                            None => Data::Sql(SqlVal::Null),
+                            None => Data::Sql(SqlScalar::Null),
                         };
 
                         match data {
@@ -482,7 +482,7 @@ impl<'a> TransactCtx<'a> {
         (subject_datatable, subject_data_key): (&PgTable, PgDataKey),
         analysis: &EdgeAnalysis<'s>,
         tuple: EdgeEndoTuplePatch,
-        param_buf: &mut Vec<SqlVal<'s>>,
+        param_buf: &mut Vec<SqlScalar>,
         cache: &mut PgCache,
     ) -> DomainResult<()> {
         let mut element_iter = tuple.into_element_ops();
@@ -504,7 +504,7 @@ impl<'a> TransactCtx<'a> {
                         subject_datatable,
                         sql::Expr::param(param_buf.len()),
                     ));
-                    param_buf.push(SqlVal::I64(subject_data_key));
+                    param_buf.push(SqlScalar::I64(subject_data_key));
                 }
                 ProjectedEdgeCardinal::Object(pg_cardinal, dynamic) => {
                     // for objects, the edge itself is not updated
@@ -520,14 +520,14 @@ impl<'a> TransactCtx<'a> {
                                     def_col_name,
                                     sql::Expr::param(param_buf.len()),
                                 ));
-                                param_buf.push(SqlVal::I32(foreign_def_key));
+                                param_buf.push(SqlScalar::I32(foreign_def_key));
                             }
 
                             sql_update.set.push(sql::UpdateColumn(
                                 pg_cardinal.key_col_name().unwrap(),
                                 sql::Expr::param(param_buf.len()),
                             ));
-                            param_buf.push(SqlVal::I64(foreign_data_key));
+                            param_buf.push(SqlScalar::I64(foreign_data_key));
                         }
                         MutationMode::Create(_) | MutationMode::Update => {
                             let object_datatable = self
@@ -540,7 +540,7 @@ impl<'a> TransactCtx<'a> {
                                 object_datatable,
                                 sql::Expr::param(param_buf.len()),
                             ));
-                            param_buf.push(SqlVal::I64(foreign_data_key));
+                            param_buf.push(SqlScalar::I64(foreign_data_key));
                         }
                     }
                 }
@@ -555,7 +555,7 @@ impl<'a> TransactCtx<'a> {
                             Some(_) => {
                                 return Err(ds_bad_req("non-scalar attribute in edge parameter"))
                             }
-                            None => Data::Sql(SqlVal::Null),
+                            None => Data::Sql(SqlScalar::Null),
                         };
 
                         match data {
@@ -715,78 +715,131 @@ impl<'a> TransactCtx<'a> {
 
                 Ok((def_id, row_value.def_key, row_value.data_key))
             }
-            ResolveMode::Id(id_prop_id, id_resolve_mode) => {
-                let pg = self
-                    .pg_model
-                    .pg_domain_datatable(vertex_def_id.package_id(), vertex_def_id)?;
+            ResolveMode::Id(id_prop_id, IdResolveMode::Plain) => {
+                let (pg, pg_column, id_param) =
+                    self.prepare_id_check(vertex_def_id, id_prop_id, value)?;
 
-                let pg_id_field = pg.table.column(&id_prop_id)?;
+                let stmt_key = (vertex_def_id, id_prop_id);
+                let select_stmt = if let Some(stmt) = cache.key_by_id.get(&stmt_key).cloned() {
+                    stmt
+                } else {
+                    let stmt = sql::Select {
+                        expressions: sql::Expressions {
+                            items: vec![sql::Expr::path1("_key")],
+                            multiline: false,
+                        },
+                        from: vec![pg.table_name().into()],
+                        where_: Some(sql::Expr::eq(
+                            sql::Expr::path1(pg_column.col_name.as_ref()),
+                            sql::Expr::param(0),
+                        )),
+                        ..Default::default()
+                    }
+                    .to_string()
+                    .prepare(self.client())
+                    .await?;
 
-                let Data::Sql(id_param) = self.data_from_value(value)? else {
-                    return Err(ds_bad_req("compound foreign key"));
+                    cache.key_by_id.insert(stmt_key, stmt.clone());
+                    stmt
                 };
 
-                let stmt = match id_resolve_mode {
-                    IdResolveMode::Plain => {
-                        let stmt_key = (vertex_def_id, id_prop_id);
-                        if let Some(stmt) = cache.key_by_id.get(&stmt_key).cloned() {
-                            stmt
-                        } else {
-                            let stmt = sql::Select {
-                                expressions: sql::Expressions {
-                                    items: vec![sql::Expr::path1("_key")],
-                                    multiline: false,
-                                },
-                                from: vec![pg.table_name().into()],
-                                where_: Some(sql::Expr::eq(
-                                    sql::Expr::path1(pg_id_field.col_name.as_ref()),
-                                    sql::Expr::param(0),
-                                )),
-                                ..Default::default()
-                            }
-                            .to_string()
-                            .prepare(self.client())
-                            .await?;
+                debug!("{select_stmt}");
+                trace!("resolve linked vertex {:?}", [&id_param]);
 
-                            cache.key_by_id.insert(stmt_key, stmt.clone());
-                            stmt
-                        }
-                    }
-                    IdResolveMode::SelfIdentifying => {
-                        let stmt_key = vertex_def_id;
-                        if let Some(stmt) = cache.upsert_self_identifying.get(&stmt_key).cloned() {
-                            stmt
-                        } else {
-                            // upsert
-                            // TODO: It might actually be better to do SELECT + optional INSERT.
-                            // this approach (DO UPDATE SET) always re-appends the row.
-                            let stmt = sql::Insert {
-                                with: None,
-                                into: pg.table_name(),
-                                as_: None,
-                                column_names: vec![&pg_id_field.col_name],
-                                values: vec![sql::Expr::param(0)],
-                                on_conflict: Some(sql::OnConflict {
-                                    target: Some(sql::ConflictTarget::Columns(vec![
-                                        &pg_id_field.col_name,
-                                    ])),
-                                    action: sql::ConflictAction::DoUpdateSet(vec![
-                                        sql::UpdateColumn(
-                                            &pg_id_field.col_name,
-                                            sql::Expr::param(0),
-                                        ),
-                                    ]),
-                                }),
-                                returning: vec![sql::Expr::path1("_key")],
-                            }
-                            .to_string()
-                            .prepare(self.client())
-                            .await?;
+                let opt_row = self
+                    .client()
+                    .query_opt(select_stmt.deref(), &[&id_param])
+                    .await
+                    .map_err(PgError::ForeignKeyLookup)?;
 
-                            cache.upsert_self_identifying.insert(stmt_key, stmt.clone());
-                            stmt
-                        }
+                if let Some(row) = opt_row {
+                    return Ok((vertex_def_id, pg.table.key, row.get(0)));
+                } else if !self.txn_mode.is_atomic() {
+                    return Err(self.unresolved_foreign_error(def_id, id_param));
+                }
+
+                // Key does not exist based on the ID, and the transaction is atomic.
+                // Now, create a row that just maps a key to the ID,
+                // and then assert before the transaction is committed that it's actually written.
+                let insert_stmt = if let Some(stmt) = cache.insert_tmp_id.get(&stmt_key).cloned() {
+                    stmt
+                } else {
+                    let stmt = sql::Insert {
+                        with: None,
+                        into: pg.table_name(),
+                        as_: None,
+                        column_names: vec![&pg_column.col_name],
+                        values: vec![sql::Expr::param(0)],
+                        on_conflict: None,
+                        returning: vec![sql::Expr::path1("_key")],
                     }
+                    .to_string()
+                    .prepare(self.client())
+                    .await?;
+
+                    cache.insert_tmp_id.insert(stmt_key, stmt.clone());
+                    stmt
+                };
+
+                debug!("{insert_stmt}");
+
+                let row = self
+                    .client()
+                    .query_one(insert_stmt.deref(), &[&id_param])
+                    .await
+                    .map_err(PgError::TentativeForeignKey)?;
+
+                let data_key = row.get(0);
+
+                trace!(
+                    "register tentative foreign key: {id_param:?}: ({}, {})",
+                    pg.table.key,
+                    data_key
+                );
+
+                cache
+                    .tentative_foreign_keys
+                    .entry((id_prop_id, def_id))
+                    .or_default()
+                    .insert(id_param, (pg.table.key, data_key));
+
+                Ok((vertex_def_id, pg.table.key, data_key))
+            }
+            ResolveMode::Id(id_prop_id, IdResolveMode::SelfIdentifying) => {
+                let (pg, pg_column, id_param) =
+                    self.prepare_id_check(vertex_def_id, id_prop_id, value)?;
+
+                let stmt = if let Some(stmt) =
+                    cache.upsert_self_identifying.get(&vertex_def_id).cloned()
+                {
+                    stmt
+                } else {
+                    // upsert
+                    // TODO: It might actually be better to do SELECT + optional INSERT.
+                    // this approach (DO UPDATE SET) always re-appends the row.
+                    let stmt = sql::Insert {
+                        with: None,
+                        into: pg.table_name(),
+                        as_: None,
+                        column_names: vec![&pg_column.col_name],
+                        values: vec![sql::Expr::param(0)],
+                        on_conflict: Some(sql::OnConflict {
+                            target: Some(sql::ConflictTarget::Columns(vec![&pg_column.col_name])),
+                            action: sql::ConflictAction::DoUpdateSet(vec![sql::UpdateColumn(
+                                &pg_column.col_name,
+                                sql::Expr::param(0),
+                            )]),
+                        }),
+                        returning: vec![sql::Expr::path1("_key")],
+                    }
+                    .to_string()
+                    .prepare(self.client())
+                    .await?;
+
+                    cache
+                        .upsert_self_identifying
+                        .insert(vertex_def_id, stmt.clone());
+                    stmt
                 };
 
                 debug!("{stmt}");
@@ -797,17 +850,73 @@ impl<'a> TransactCtx<'a> {
                     .query_opt(stmt.deref(), &[&id_param])
                     .await
                     .map_err(PgError::ForeignKeyLookup)?
-                    .ok_or_else(|| {
-                        let value = match self.deserialize_sql(def_id, id_param) {
-                            Ok(value) => value,
-                            Err(error) => return error,
-                        };
-                        DomainErrorKind::UnresolvedForeignKey(self.ontology.format_value(&value))
-                            .into_error()
-                    })?;
+                    .ok_or_else(|| self.unresolved_foreign_error(def_id, id_param))?;
 
                 Ok((vertex_def_id, pg.table.key, row.get(0)))
             }
         }
+    }
+
+    pub fn check_unresolved_foreign_keys(&self, cache: &PgCache) -> DomainResult<()> {
+        if !self.txn_mode.is_atomic() {
+            return Ok(());
+        }
+
+        const MAX_REPORTED: usize = 2;
+        let mut values: Vec<Value> = vec![];
+
+        'outer: for ((_, def_id), scalars) in &cache.tentative_foreign_keys {
+            for scalar in scalars.keys() {
+                values.push(self.deserialize_sql(*def_id, scalar.clone().into())?);
+
+                if values.len() >= MAX_REPORTED {
+                    break 'outer;
+                }
+            }
+        }
+
+        match values.len() {
+            0 => Ok(()),
+            1 => {
+                let value = values.into_iter().next().unwrap();
+                Err(
+                    DomainErrorKind::UnresolvedForeignKey(self.ontology.format_value(&value))
+                        .into_error(),
+                )
+            }
+            _ => {
+                let value = values.into_iter().next().unwrap();
+                Err(
+                    DomainErrorKind::UnresolvedForeignKeys(self.ontology.format_value(&value))
+                        .into_error(),
+                )
+            }
+        }
+    }
+
+    pub fn unresolved_foreign_error(&self, def_id: DefId, id: SqlScalar) -> DomainError {
+        match self.deserialize_sql(def_id, id.into()) {
+            Ok(value) => DomainErrorKind::UnresolvedForeignKey(self.ontology.format_value(&value))
+                .into_error(),
+            Err(error) => error,
+        }
+    }
+
+    fn prepare_id_check(
+        &self,
+        vertex_def_id: DefId,
+        id_prop_id: PropId,
+        id: Value,
+    ) -> DomainResult<(PgDomainTable<'a>, &'a PgColumn, SqlScalar)> {
+        let pg = self
+            .pg_model
+            .pg_domain_datatable(vertex_def_id.package_id(), vertex_def_id)?;
+        let pg_column = pg.table.column(&id_prop_id)?;
+
+        let Data::Sql(id_param) = self.data_from_value(id)? else {
+            return Err(ds_bad_req("compound foreign key"));
+        };
+
+        Ok((pg, pg_column, id_param))
     }
 }

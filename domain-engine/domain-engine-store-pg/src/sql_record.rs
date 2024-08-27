@@ -6,11 +6,11 @@ use tokio_postgres::Row;
 
 use crate::{
     pg_model::{PgRegKey, PgType},
-    sql_value::{CodecError, CodecResult, Layout, SqlVal},
+    sql_value::{CodecError, CodecResult, Layout, SqlOutput, SqlScalar},
 };
 
 pub trait SqlRecordIterator<'b> {
-    fn next_field(&mut self, layout: &Layout) -> CodecResult<SqlVal<'b>>;
+    fn next_field(&mut self, layout: &Layout) -> CodecResult<SqlOutput<'b>>;
 }
 
 pub struct SqlRecord<'b> {
@@ -33,7 +33,8 @@ impl<'b> SqlRecord<'b> {
 
     pub fn def_key(&self) -> CodecResult<PgRegKey> {
         let mut buf = self.buf;
-        let SqlVal::I32(def_key) = decode_record_field(&mut buf, &Layout::Scalar(PgType::Integer))?
+        let SqlOutput::Scalar(SqlScalar::I32(def_key)) =
+            decode_record_field(&mut buf, &Layout::Scalar(PgType::Integer))?
         else {
             return Err(CodecError(
                 "sql dyn record must start with an integer".into(),
@@ -60,7 +61,7 @@ pub struct RecordFields<'b> {
 }
 
 impl<'b> SqlRecordIterator<'b> for RecordFields<'b> {
-    fn next_field(&mut self, layout: &Layout) -> CodecResult<SqlVal<'b>> {
+    fn next_field(&mut self, layout: &Layout) -> CodecResult<SqlOutput<'b>> {
         if self.buf.is_empty() {
             panic!("sql record exhausted");
         }
@@ -79,7 +80,7 @@ fn read_record_field_count(buf: &mut &[u8]) -> CodecResult<usize> {
     Ok(field_count as usize)
 }
 
-fn decode_record_field<'b>(buf: &mut &'b [u8], layout: &Layout) -> CodecResult<SqlVal<'b>> {
+fn decode_record_field<'b>(buf: &mut &'b [u8], layout: &Layout) -> CodecResult<SqlOutput<'b>> {
     let _oid = buf
         .read_u32::<BigEndian>()
         .map_err(|e| CodecError(e.into()))?;
@@ -93,9 +94,9 @@ fn decode_record_field<'b>(buf: &mut &'b [u8], layout: &Layout) -> CodecResult<S
 
         buf.advance(field_len);
 
-        SqlVal::decode(Some(field_buf), layout)
+        SqlOutput::decode(Some(field_buf), layout)
     } else {
-        Ok(SqlVal::Null)
+        Ok(SqlOutput::Scalar(SqlScalar::Null))
     }
 }
 
@@ -111,7 +112,7 @@ impl<'a> SqlColumnStream<'a> {
 }
 
 impl<'a> SqlRecordIterator<'a> for SqlColumnStream<'a> {
-    fn next_field(&mut self, layout: &Layout) -> CodecResult<SqlVal<'a>> {
+    fn next_field(&mut self, layout: &Layout) -> CodecResult<SqlOutput<'a>> {
         if self.index >= self.row.columns().len() {
             Err(CodecError(
                 format!("no column at index {}", self.index).into(),
@@ -121,7 +122,7 @@ impl<'a> SqlRecordIterator<'a> for SqlColumnStream<'a> {
             self.index += 1;
             let buf = self.row.col_buffer(index);
 
-            SqlVal::decode(buf, layout)
+            SqlOutput::decode(buf, layout)
         }
     }
 }

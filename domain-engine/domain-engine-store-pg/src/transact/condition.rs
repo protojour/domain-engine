@@ -12,7 +12,7 @@ use crate::{
     pg_error::PgError,
     pg_model::{PgColumn, PgProperty, PgRegKey},
     sql::{self, WhereExt},
-    sql_value::SqlVal,
+    sql_value::SqlScalar,
     transact::{data::Data, edge_query::edge_join_condition},
 };
 
@@ -21,7 +21,7 @@ use super::{fields::AbstractKind, query::QueryBuildCtx, TransactCtx};
 struct ConditionCtx<'a, 's> {
     root_def_id: DefId,
     root_alias: sql::Alias,
-    sql_params: &'s mut Vec<SqlVal<'a>>,
+    sql_params: &'s mut Vec<SqlScalar>,
     query_ctx: &'s mut QueryBuildCtx<'a>,
     output_clauses: Vec<sql::Expr<'a>>,
 }
@@ -60,7 +60,7 @@ impl<'a> TransactCtx<'a> {
         def_id: DefId,
         root_alias: sql::Alias,
         condition_walker: ConditionWalker,
-        sql_params: &mut Vec<SqlVal<'a>>,
+        sql_params: &mut Vec<SqlScalar>,
         query_ctx: &mut QueryBuildCtx<'a>,
     ) -> DomainResult<Option<sql::Expr>> {
         let mut ctx = ConditionCtx {

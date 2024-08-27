@@ -99,6 +99,13 @@ pub fn domain_error_to_response(error: DomainError) -> http::Response<Body> {
             json_error(format!("unresolved foreign key: {key}")),
         )
             .into_response(),
+        DomainErrorKind::UnresolvedForeignKeys(key) => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            json_error(format!(
+                "multiple unresolved foreign keys, including: {key}"
+            )),
+        )
+            .into_response(),
         DomainErrorKind::NotImplemented => (
             StatusCode::INTERNAL_SERVER_ERROR,
             json_error("not implemented"),

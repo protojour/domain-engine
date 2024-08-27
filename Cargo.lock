@@ -1047,6 +1047,7 @@ dependencies = [
  "ontol-macros",
  "ontol-runtime",
  "ontol-test-utils",
+ "ordered-float 4.2.1",
  "pin-utils",
  "postgres-protocol 0.6.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "postgres-types",

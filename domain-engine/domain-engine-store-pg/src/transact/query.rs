@@ -25,7 +25,7 @@ use crate::{
     pg_model::{PgDataKey, PgDomainTable, PgEdgeCardinalKind, PgTable, PgTableKey, PgType},
     sql::{self, FromItem, WhereExt},
     sql_record::{SqlColumnStream, SqlRecord, SqlRecordIterator},
-    sql_value::{Layout, SqlVal},
+    sql_value::{Layout, SqlOutput, SqlScalar},
 };
 
 use super::{
@@ -135,7 +135,7 @@ impl<'a> TransactCtx<'a> {
 
         let mut row_layout: Vec<Layout> = vec![];
         let mut query_ctx = QueryBuildCtx::default();
-        let mut sql_params: Vec<SqlVal> = vec![];
+        let mut sql_params: Vec<SqlScalar> = vec![];
 
         let sql_select = {
             let mut expressions = sql::Expressions {
@@ -190,7 +190,7 @@ impl<'a> TransactCtx<'a> {
 
             if let Some(native_id_condition) = q.native_id_condition {
                 sql_select.where_and(sql::Expr::eq(sql::Expr::path1("_key"), sql::Expr::param(0)));
-                sql_params.push(SqlVal::I64(native_id_condition));
+                sql_params.push(SqlScalar::I64(native_id_condition));
             }
 
             if let Some(filter) = filter {
@@ -845,7 +845,7 @@ impl<'a> TransactCtx<'a> {
         }
     }
 
-    fn read_record(&self, sql_val: SqlVal, select: &Select) -> DomainResult<Value> {
+    fn read_record(&self, sql_val: SqlOutput, select: &Select) -> DomainResult<Value> {
         let sql_record = sql_val.into_record()?;
         let def_key = sql_record.def_key()?;
         let (_pkg_id, def_id) = self.pg_model.datatable_key_by_def_key(def_key)?;

@@ -15,7 +15,7 @@ use tracing::trace;
 use crate::{
     pg_error::{ds_bad_req, ds_err},
     pg_model::{PgDataKey, PgRegKey},
-    sql_value::SqlVal,
+    sql_value::{SqlOutput, SqlScalar},
 };
 
 use super::TransactCtx;
@@ -27,19 +27,19 @@ pub struct RowValue {
     pub op: DataOperation,
 }
 
-pub enum Data<'a> {
-    Sql(SqlVal<'a>),
+pub enum Data {
+    Sql(SqlScalar),
     #[allow(unused)]
     Compound(Compound),
 }
 
-impl<'a> From<SqlVal<'a>> for Data<'a> {
-    fn from(value: SqlVal<'a>) -> Self {
+impl From<SqlScalar> for Data {
+    fn from(value: SqlScalar) -> Self {
         Self::Sql(value)
     }
 }
 
-impl<'a> From<Compound> for Data<'a> {
+impl From<Compound> for Data {
     fn from(value: Compound) -> Self {
         Self::Compound(value)
     }
@@ -56,7 +56,7 @@ pub enum Compound {
 }
 
 impl<'a> TransactCtx<'a> {
-    pub fn deserialize_sql(&self, def_id: DefId, sql_val: SqlVal) -> DomainResult<Value> {
+    pub fn deserialize_sql(&self, def_id: DefId, sql_val: SqlOutput) -> DomainResult<Value> {
         trace!("pg deserialize sql {def_id:?}");
         let tag = ValueTag::from(def_id);
 
@@ -78,21 +78,29 @@ impl<'a> TransactCtx<'a> {
                 (_sql_val, DefRepr::FmtStruct(None)) => {
                     unreachable!("tried to deserialize an empty FmtStruct (has no data)")
                 }
-                (SqlVal::Unit | SqlVal::Null, _) => Ok(Value::Unit(tag)),
-                (SqlVal::Bool(b), _) => Ok(Value::I64(if b { 1 } else { 0 }, tag)),
-                (SqlVal::I32(i), _) => Ok(Value::I64(i as i64, tag)),
-                (SqlVal::I64(i), DefRepr::Serial) => Ok(Value::Serial(
+                (SqlOutput::Scalar(SqlScalar::Unit | SqlScalar::Null), _) => Ok(Value::Unit(tag)),
+                (SqlOutput::Scalar(SqlScalar::Bool(b)), _) => {
+                    Ok(Value::I64(if b { 1 } else { 0 }, tag))
+                }
+                (SqlOutput::Scalar(SqlScalar::I32(i)), _) => Ok(Value::I64(i as i64, tag)),
+                (SqlOutput::Scalar(SqlScalar::I64(i)), DefRepr::Serial) => Ok(Value::Serial(
                     Serial(i.try_into().map_err(|_| ds_err("serial underflow"))?),
                     tag,
                 )),
-                (SqlVal::I64(i), _) => Ok(Value::I64(i, tag)),
-                (SqlVal::F64(f), _) => Ok(Value::F64(f, tag)),
-                (SqlVal::Text(string), _) => Ok(Value::Text(string.into(), tag)),
-                (SqlVal::Octets(seq), _) => Ok(Value::OctetSequence(seq, tag)),
-                (SqlVal::DateTime(dt), _) => Ok(Value::ChronoDateTime(dt, tag)),
-                (SqlVal::Date(d), _) => Ok(Value::ChronoDate(d, tag)),
-                (SqlVal::Time(t), _) => Ok(Value::ChronoTime(t, tag)),
-                (SqlVal::Array(_) | SqlVal::Record(_), _) => {
+                (SqlOutput::Scalar(SqlScalar::I64(i)), _) => Ok(Value::I64(i, tag)),
+                (SqlOutput::Scalar(SqlScalar::F64(f)), _) => Ok(Value::F64(f.into(), tag)),
+                (SqlOutput::Scalar(SqlScalar::Text(string)), _) => {
+                    Ok(Value::Text(string.into(), tag))
+                }
+                (SqlOutput::Scalar(SqlScalar::Octets(seq)), _) => {
+                    Ok(Value::OctetSequence(seq, tag))
+                }
+                (SqlOutput::Scalar(SqlScalar::DateTime(dt)), _) => {
+                    Ok(Value::ChronoDateTime(dt, tag))
+                }
+                (SqlOutput::Scalar(SqlScalar::Date(d)), _) => Ok(Value::ChronoDate(d, tag)),
+                (SqlOutput::Scalar(SqlScalar::Time(t)), _) => Ok(Value::ChronoTime(t, tag)),
+                (SqlOutput::Array(_) | SqlOutput::Record(_), _) => {
                     Err(ds_err("cannot turn a composite into a value"))
                 }
             },
@@ -100,30 +108,30 @@ impl<'a> TransactCtx<'a> {
         }
     }
 
-    pub fn data_from_value(&self, value: Value) -> DomainResult<Data<'static>> {
+    pub fn data_from_value(&self, value: Value) -> DomainResult<Data> {
         let def = self.ontology.def(value.type_def_id());
 
         match (value, &def.kind) {
-            (Value::Unit(_) | Value::Void(_), _) => Ok(SqlVal::Unit.into()),
+            (Value::Unit(_) | Value::Void(_), _) => Ok(SqlScalar::Unit.into()),
             (Value::I64(int, _), _) => match def.repr() {
-                Some(DefRepr::Boolean) => Ok(SqlVal::Bool(int > 0).into()),
-                _ => Ok(SqlVal::I64(int).into()),
+                Some(DefRepr::Boolean) => Ok(SqlScalar::Bool(int > 0).into()),
+                _ => Ok(SqlScalar::I64(int).into()),
             },
-            (Value::F64(float, _), _) => Ok(SqlVal::F64(float).into()),
+            (Value::F64(float, _), _) => Ok(SqlScalar::F64(float.into()).into()),
             (Value::Serial(serial, _), _) => {
                 let int: i64 = serial
                     .0
                     .try_into()
                     .map_err(|_| ds_bad_req("serial overflow"))?;
 
-                Ok(SqlVal::I64(int).into())
+                Ok(SqlScalar::I64(int).into())
             }
             (Value::Rational(_, _), _) => Err(ds_bad_req("rational not supported yet")),
-            (Value::Text(s, _), _) => Ok(SqlVal::Text(s.into()).into()),
-            (Value::OctetSequence(seq, _), _) => Ok(SqlVal::Octets(seq).into()),
-            (Value::ChronoDateTime(dt, _), _) => Ok(SqlVal::DateTime(dt).into()),
-            (Value::ChronoDate(d, _), _) => Ok(SqlVal::Date(d).into()),
-            (Value::ChronoTime(t, _), _) => Ok(SqlVal::Time(t).into()),
+            (Value::Text(s, _), _) => Ok(SqlScalar::Text(s.into()).into()),
+            (Value::OctetSequence(seq, _), _) => Ok(SqlScalar::Octets(seq).into()),
+            (Value::ChronoDateTime(dt, _), _) => Ok(SqlScalar::DateTime(dt).into()),
+            (Value::ChronoDate(d, _), _) => Ok(SqlScalar::Date(d).into()),
+            (Value::ChronoTime(t, _), _) => Ok(SqlScalar::Time(t).into()),
             (Value::Struct(map, tag), DefKind::Data(basic_def)) => match &basic_def.repr {
                 DefRepr::FmtStruct(Some(_)) => {
                     let inner_value = map
