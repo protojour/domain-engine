@@ -86,19 +86,9 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         if subject_ty.cardinality == ValueCardinality::Unit
             && object_ty.cardinality == ValueCardinality::Unit
         {
-            let edge_id = self
-                .ctx
-                .compiler
-                .edge_ctx
-                .alloc_edge_id(subject_ty.def_id.package_id());
             let identifies_relationship = Relationship {
                 relation_def_id: self.ctx.compiler.primitives.relations.identifies,
-                projection: EdgeCardinalProjection {
-                    id: edge_id,
-                    object: CardinalIdx(0),
-                    subject: CardinalIdx(1),
-                    one_to_one: false,
-                },
+                edge_projection: None,
                 relation_span: self.ctx.source_span(stmt.view().span()),
                 subject: (object_ty.def_id, self.ctx.source_span(object_ty.span)),
                 subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),
@@ -336,12 +326,12 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
             Relationship {
                 relation_def_id,
-                projection: EdgeCardinalProjection {
+                edge_projection: Some(EdgeCardinalProjection {
                     id: edge_id,
                     subject: CardinalIdx(0),
                     object: CardinalIdx(1),
                     one_to_one: false,
-                },
+                }),
                 relation_span: self.ctx.source_span(ident_span),
                 subject: (subject_ty.def_id, self.ctx.source_span(subject_ty.span)),
                 subject_cardinality,
@@ -357,12 +347,12 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             let relation1_def_id = self.unescaped_text_literal_def_id(prop);
             let relationship1 = Relationship {
                 relation_def_id: relation1_def_id,
-                projection: EdgeCardinalProjection {
+                edge_projection: Some(EdgeCardinalProjection {
                     id: edge_id,
                     subject: CardinalIdx(1),
                     object: CardinalIdx(0),
                     one_to_one: false,
-                },
+                }),
                 relation_span: self.ctx.source_span(name.view().span()),
                 subject: relationship0.object,
                 subject_cardinality: relationship0.object_cardinality,
@@ -386,12 +376,12 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         if relation_def_id == self.ctx.compiler.primitives.relations.id {
             relationship0 = Relationship {
                 relation_def_id: self.ctx.compiler.primitives.relations.identifies,
-                projection: EdgeCardinalProjection {
+                edge_projection: Some(EdgeCardinalProjection {
                     id: edge_id,
                     object: CardinalIdx(0),
                     subject: CardinalIdx(1),
                     one_to_one: false,
-                },
+                }),
                 relation_span: relationship0.relation_span,
                 subject: relationship0.object,
                 subject_cardinality: relationship0.object_cardinality,
@@ -466,7 +456,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     backward_relation
                         .and_then(|rel| property_cardinality(rel.prop_cardinality()))
                         .unwrap_or(default.0),
-                    subject_ty.cardinality, // value_cardinality(rel_subject.type_quant()).unwrap_or(default.1),
+                    subject_ty.cardinality,
                 )
             };
 
@@ -487,7 +477,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
             Relationship {
                 relation_def_id: sym_id,
-                projection,
+                edge_projection: Some(projection),
                 relation_span: self.ctx.source_span(ident_span),
                 subject: (subject_ty.def_id, self.ctx.source_span(subject_ty.span)),
                 subject_cardinality,

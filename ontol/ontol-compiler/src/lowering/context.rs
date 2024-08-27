@@ -13,9 +13,7 @@ use ontol_parser::{
     ParserError, U32Span,
 };
 use ontol_runtime::{
-    ontology::domain::EdgeCardinalProjection,
     property::{PropertyCardinality, ValueCardinality},
-    tuple::CardinalIdx,
     var::{Var, VarAllocator},
     DefId, PackageId,
 };
@@ -299,12 +297,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                 rel_id,
                 Relationship {
                     relation_def_id: self.compiler.primitives.relations.is,
-                    projection: EdgeCardinalProjection {
-                        id: self.compiler.primitives.edges.is,
-                        subject: CardinalIdx(0),
-                        object: CardinalIdx(1),
-                        one_to_one: false,
-                    },
+                    edge_projection: None,
                     relation_span: span,
                     subject: (def_id, span),
                     subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),

@@ -142,7 +142,7 @@ impl FromStr for RelId {
 #[derive(Clone, Debug)]
 pub struct Relationship {
     pub relation_def_id: DefId,
-    pub projection: EdgeCardinalProjection,
+    pub edge_projection: Option<EdgeCardinalProjection>,
     pub relation_span: SourceSpan,
 
     pub subject: (DefId, SourceSpan),

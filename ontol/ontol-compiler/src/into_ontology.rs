@@ -559,48 +559,50 @@ impl<'m> Compiler<'m> {
             RelParams::Unit | RelParams::IndexRange(_) => None,
         };
 
-        let edge_id = meta.relationship.projection.id;
-        let edge_projection = meta.relationship.projection;
+        // let edge_id = meta.relationship.projection.id;
+        // let edge_projection = meta.relationship.projection;
 
-        let (data_relationship_kind, target) = match target_repr_kind {
-            ReprKind::Union(members, _bound) => {
-                let kinds_and_targets = members
-                    .iter()
-                    .map(|(member_def_id, _)| {
-                        self.data_relationship_kind_and_target(
-                            rel_id,
-                            &meta.relationship,
-                            edge_projection,
-                            source_def_id,
-                            *member_def_id,
+        let (data_relationship_kind, target) =
+            match (meta.relationship.edge_projection, target_repr_kind) {
+                (Some(edge_projection), ReprKind::Union(members, _bound)) => {
+                    let kinds_and_targets = members
+                        .iter()
+                        .map(|(member_def_id, _)| {
+                            self.data_relationship_kind_and_target(
+                                rel_id,
+                                &meta.relationship,
+                                Some(edge_projection),
+                                source_def_id,
+                                *member_def_id,
+                            )
+                        })
+                        .collect_vec();
+
+                    let target = DataRelationshipTarget::Union(target_def_id);
+                    if kinds_and_targets
+                        .iter()
+                        .all(|(kind, _)| matches!(kind, DataRelationshipKind::Edge(_)))
+                    {
+                        (DataRelationshipKind::Edge(edge_projection), target)
+                    } else {
+                        (
+                            DataRelationshipKind::Tree,
+                            DataRelationshipTarget::Union(target_def_id),
                         )
-                    })
-                    .collect_vec();
-
-                let target = DataRelationshipTarget::Union(target_def_id);
-                if kinds_and_targets
-                    .iter()
-                    .all(|(kind, _)| matches!(kind, DataRelationshipKind::Edge(_)))
-                {
-                    (DataRelationshipKind::Edge(edge_projection), target)
-                } else {
-                    (
-                        DataRelationshipKind::Tree,
-                        DataRelationshipTarget::Union(target_def_id),
-                    )
+                    }
                 }
-            }
-            _ => self.data_relationship_kind_and_target(
-                rel_id,
-                &meta.relationship,
-                edge_projection,
-                source_def_id,
-                target_def_id,
-            ),
-        };
+                _ => self.data_relationship_kind_and_target(
+                    rel_id,
+                    &meta.relationship,
+                    meta.relationship.edge_projection,
+                    source_def_id,
+                    target_def_id,
+                ),
+            };
 
         // collect edge
-        if let DataRelationshipKind::Edge(_) = &data_relationship_kind {
+        if let DataRelationshipKind::Edge(proj) = &data_relationship_kind {
+            let edge_id = proj.id;
             if !self.edge_ctx.symbolic_edges.contains_key(&edge_id) {
                 // fallback/legacy mode:
                 let edge_info = edges
@@ -617,7 +619,7 @@ impl<'m> Compiler<'m> {
                     for i in 0_u8..2 {
                         let mut flags = EdgeCardinalFlags::ENTITY;
 
-                        if i == edge_projection.subject.0 {
+                        if i == proj.subject.0 {
                             if matches!(
                                 meta.relationship.subject_cardinality.1,
                                 ValueCardinality::Unit
@@ -658,8 +660,7 @@ impl<'m> Compiler<'m> {
 
                 // replace cardinal target with union members if union was found
                 if let DataRelationshipTarget::Union(union_def_id) = &target {
-                    let cardinal_target =
-                        &mut edge_info.cardinals[edge_projection.object.0 as usize].target;
+                    let cardinal_target = &mut edge_info.cardinals[proj.object.0 as usize].target;
 
                     cardinal_target.clear();
 
@@ -693,7 +694,7 @@ impl<'m> Compiler<'m> {
         &self,
         rel_id: RelId,
         relationship: &Relationship,
-        edge_projection: EdgeCardinalProjection,
+        edge_projection: Option<EdgeCardinalProjection>,
         source_def_id: DefId,
         target_def_id: DefId,
     ) -> (DataRelationshipKind, DataRelationshipTarget) {
@@ -715,7 +716,9 @@ impl<'m> Compiler<'m> {
                 .unwrap_or(false)
             {
                 (
-                    DataRelationshipKind::Edge(edge_projection),
+                    edge_projection
+                        .map(DataRelationshipKind::Edge)
+                        .unwrap_or(DataRelationshipKind::Tree),
                     DataRelationshipTarget::Unambiguous(target_def_id),
                 )
             } else {
@@ -726,7 +729,9 @@ impl<'m> Compiler<'m> {
             }
         } else if target_properties.and_then(|p| p.identified_by).is_some() {
             (
-                DataRelationshipKind::Edge(edge_projection),
+                edge_projection
+                    .map(DataRelationshipKind::Edge)
+                    .unwrap_or(DataRelationshipKind::Tree),
                 DataRelationshipTarget::Unambiguous(target_def_id),
             )
         } else {

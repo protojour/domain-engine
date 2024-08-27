@@ -709,18 +709,18 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 let property = self.prop_ctx.property_by_id(*prop_id).unwrap();
                 rel_def_meta(property.rel_id, self.rel_ctx, self.defs)
                     .relationship
-                    .projection
-                    .subject
-                    .0
+                    .edge_projection
+                    .map(|p| p.subject.0)
+                    .unwrap_or(0)
             }
             // Connections are placed after "plain" fields
             FieldKind::ConnectionProperty(field) => {
                 let property = self.prop_ctx.property_by_id(field.prop_id).unwrap();
                 100 + rel_def_meta(property.rel_id, self.rel_ctx, self.defs)
                     .relationship
-                    .projection
-                    .subject
-                    .0
+                    .edge_projection
+                    .map(|p| p.subject.0)
+                    .unwrap_or(0)
             }
             _ => 255,
         }

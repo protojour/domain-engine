@@ -1,9 +1,7 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    ontology::domain::EdgeCardinalProjection,
     property::{PropertyCardinality, ValueCardinality},
-    tuple::CardinalIdx,
     var::Var,
     DefId, PropId,
 };
@@ -11,7 +9,6 @@ use tracing::{debug, info};
 
 use crate::{
     def::{DefKind, Defs},
-    edge::EdgeCtx,
     entity::entity_ctx::EntityCtx,
     pattern::{CompoundPatternAttrKind, PatId, Pattern, PatternKind, Patterns, TypePath},
     primitive::Primitives,
@@ -47,13 +44,11 @@ pub struct Outcome {
 }
 
 pub struct MapArmDefInferencer<'c, 'm> {
-    map_def_id: DefId,
     outcome: Outcome,
     patterns: &'c Patterns,
     rel_ctx: &'c mut RelCtx,
     prop_ctx: &'c mut PropCtx,
     defs: &'c mut Defs<'m>,
-    edge_ctx: &'c mut EdgeCtx,
     entity_ctx: &'c EntityCtx,
     primitives: &'c Primitives,
     errors: &'c mut CompileErrors,
@@ -164,16 +159,9 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                         ValueCardinality::Unit
                     };
 
-                    let edge_id = self.edge_ctx.alloc_edge_id(self.map_def_id.package_id());
-
                     let relationship = Relationship {
                         relation_def_id,
-                        projection: EdgeCardinalProjection {
-                            id: edge_id,
-                            object: CardinalIdx(0),
-                            subject: CardinalIdx(0),
-                            one_to_one: false,
-                        },
+                        edge_projection: None,
                         relation_span: pattern.span,
                         subject: (parent_def_id, pattern.span),
                         subject_cardinality: if flags.is_option {
@@ -490,13 +478,11 @@ impl<'m> Compiler<'m> {
         }
     }
 
-    pub fn map_arm_def_inferencer(&mut self, map_def_id: DefId) -> MapArmDefInferencer<'_, 'm> {
+    pub fn map_arm_def_inferencer(&mut self, _map_def_id: DefId) -> MapArmDefInferencer<'_, 'm> {
         MapArmDefInferencer {
-            map_def_id,
             outcome: Outcome::default(),
             patterns: &self.patterns,
             defs: &mut self.defs,
-            edge_ctx: &mut self.edge_ctx,
             rel_ctx: &mut self.rel_ctx,
             prop_ctx: &mut self.prop_ctx,
             entity_ctx: &self.entity_ctx,

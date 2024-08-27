@@ -324,12 +324,14 @@ impl<'m> Compiler<'m> {
                 // Reset RelParams::Type back to RelParams::Unit if its representation is ReprKind::Unit.
                 // This simplifies later compiler stages, that can trust RelParams::Type is a type with real data in it.
                 if let RelParams::Type(rel_params_def_id) = &relationship.rel_params {
-                    copy_relationship_store_key(
-                        relationship.projection.id,
-                        *rel_params_def_id,
-                        &mut self.edge_ctx,
-                        &self.thesaurus,
-                    );
+                    if let Some(projection) = &relationship.edge_projection {
+                        copy_relationship_store_key(
+                            projection.id,
+                            *rel_params_def_id,
+                            &mut self.edge_ctx,
+                            &self.thesaurus,
+                        );
+                    }
 
                     if matches!(
                         self.repr_ctx.get_repr_kind(rel_params_def_id).unwrap(),
@@ -448,7 +450,7 @@ impl<'m> Compiler<'m> {
                             ctx.output.push((
                                 Relationship {
                                     relation_def_id: relationship.relation_def_id,
-                                    projection: relationship.projection,
+                                    edge_projection: relationship.edge_projection,
                                     relation_span: relationship.relation_span,
                                     subject: (source_rel_id.0, relationship.subject.1),
                                     subject_cardinality: relationship.subject_cardinality,
