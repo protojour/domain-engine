@@ -2,6 +2,7 @@
 
 use std::{collections::BTreeSet, sync::Arc};
 
+use anyhow::anyhow;
 use domain_engine_core::{
     data_store::DataStoreAPI,
     system::ArcSystemApi,
@@ -72,8 +73,10 @@ pub async fn connect_and_migrate(
     ontology: &Ontology,
     pg_config: &tokio_postgres::Config,
 ) -> anyhow::Result<PgModel> {
-    let db_name = pg_config.get_dbname().unwrap();
-    let (mut client, connection) = pg_config.connect(NoTls).await.unwrap();
+    let db_name = pg_config
+        .get_dbname()
+        .ok_or_else(|| anyhow!("missing db name"))?;
+    let (mut client, connection) = pg_config.connect(NoTls).await?;
 
     // The connection object performs the actual communication with the database,
     // so spawn it off to run on its own.
@@ -86,7 +89,7 @@ pub async fn connect_and_migrate(
     let pg_model = migrate::migrate(persistent_domains, ontology, db_name, &mut client).await?;
     drop(client);
 
-    join_handle.await.unwrap();
+    join_handle.await?;
 
     Ok(pg_model)
 }
@@ -111,7 +114,7 @@ pub async fn recreate_database(
         "recreate database `{db_name}` (will hang if there are open connections to this database)"
     );
 
-    let (client, connection) = master_config.connect(NoTls).await.unwrap();
+    let (client, connection) = master_config.connect(NoTls).await?;
 
     // The connection object performs the actual communication with the database,
     // so spawn it off to run on its own.
@@ -132,7 +135,7 @@ pub async fn recreate_database(
         .await?;
 
     drop(client);
-    join_handle.await.unwrap();
+    join_handle.await?;
 
     Ok(())
 }
