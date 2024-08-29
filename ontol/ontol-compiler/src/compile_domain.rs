@@ -15,7 +15,7 @@ use crate::{
     misc::{MacroExpand, MacroItem, MiscCtx},
     namespace::DocId,
     package::ParsedPackage,
-    relation::{RelId, RelParams, Relationship},
+    relation::{rel_def_meta, RelId, RelParams, Relationship},
     repr::repr_model::ReprKind,
     thesaurus::{Thesaurus, TypeRelation},
     type_check::MapArmsKind,
@@ -187,35 +187,6 @@ impl<'m> Compiler<'m> {
                 }
             }
         }
-
-        // expanded rels from macros
-        /*
-        while !expanded_rels.is_empty() {
-            let mut rel_ids = Vec::with_capacity(expanded_rels.len());
-
-            for (relationship, span) in std::mem::take(&mut expanded_rels) {
-                let macro_source = relationship
-                    .macro_source
-                    .expect("expanded relationship has no macro source");
-
-                if !self
-                    .rel_ctx
-                    .rel_with_macro_source_exists(relationship.subject.0, macro_source)
-                {
-                    debug!("expanded rel: {relationship:?}");
-                    let rel_id = self.rel_ctx.alloc_rel_id(relationship.subject.0);
-                    rel_ids.push(rel_id);
-                    self.rel_ctx.commit_rel(rel_id, relationship, span);
-                }
-            }
-
-            let mut type_check = self.type_check();
-
-            for rel_id in rel_ids {
-                type_check.check_rel(rel_id, Some(&mut expanded_rels));
-            }
-        }
-        */
     }
 
     /// Do all the (remaining) checks and generations for the package/domain and seal it
@@ -233,8 +204,9 @@ impl<'m> Compiler<'m> {
         }
 
         self.domain_no_entity_supertype_check(package_id);
-        self.domain_union_and_edge_check(package_id);
+        self.domain_union_and_extern_check(package_id);
         self.domain_rel_normalization(package_id);
+        self.domain_entity_rel_force_edge_check(package_id);
         self.domain_map_check(package_id);
 
         self.seal_ctx.mark_domain_sealed(package_id);
@@ -293,7 +265,7 @@ impl<'m> Compiler<'m> {
         }
     }
 
-    fn domain_union_and_edge_check(&mut self, package_id: PackageId) {
+    fn domain_union_and_extern_check(&mut self, package_id: PackageId) {
         let mut type_check = self.type_check();
 
         // union and extern checks
@@ -339,6 +311,26 @@ impl<'m> Compiler<'m> {
                     ) {
                         relationship.rel_params = RelParams::Unit;
                     }
+                }
+            }
+        }
+    }
+
+    fn domain_entity_rel_force_edge_check(&mut self, package_id: PackageId) {
+        for def_id in self.defs.iter_package_def_ids(package_id) {
+            for rel_id in self.rel_ctx.iter_rel_ids(def_id) {
+                let meta = rel_def_meta(rel_id, &self.rel_ctx, &self.defs);
+
+                let subject = meta.relationship.subject;
+                let object = meta.relationship.object;
+
+                if self.entity_ctx.entities.contains_key(&subject.0)
+                    && self.entity_ctx.entities.contains_key(&object.0)
+                    && meta.relationship.edge_projection.is_none()
+                {
+                    CompileError::TODO("must use an edge relationship")
+                        .span(meta.relationship.relation_span)
+                        .report(self);
                 }
             }
         }
