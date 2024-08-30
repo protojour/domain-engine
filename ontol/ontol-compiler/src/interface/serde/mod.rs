@@ -41,6 +41,7 @@ impl<'m> Compiler<'m> {
             def_ty_ctx: &self.def_ty_ctx,
             rel_ctx: &self.rel_ctx,
             prop_ctx: &self.prop_ctx,
+            edge_ctx: &self.edge_ctx,
             repr_ctx: &self.repr_ctx,
             misc_ctx: &self.misc_ctx,
             patterns: &self.text_patterns,

@@ -18,19 +18,17 @@ def instrument (
     rel* 'name': text
 )
 
-def play_params (
+def plays_params (
     rel* 'how_much': text
 )
 
 sym {
-    (a) plays: (i),
-    (i) played_by: (a)
+    (a) plays: (i) with: plays_params,
+    (i) played_by: (a) with: plays_params,
 }
 
 rel {artist} plays: {instrument}
 rel {instrument} played_by: {artist}
-
-// rel {artist} 'plays'[rel* is: plays]::'played_by' {instrument}
 
 map artists (
     (),

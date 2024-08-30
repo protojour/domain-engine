@@ -28,6 +28,7 @@ use std::{
 
 use crate::{
     def::{BuiltinRelationKind, DefKind, TypeDef, TypeDefFlags},
+    edge::CardinalKind,
     interface::{
         graphql::generate_schema::generate_graphql_schema,
         httpjson::generate_httpjson_interface,
@@ -268,33 +269,42 @@ impl<'m> Compiler<'m> {
                 }
 
                 let mut edge_info = EdgeInfo {
-                    cardinals: Vec::with_capacity(edge.variables.len()),
+                    cardinals: Vec::with_capacity(edge.cardinals.len()),
                     store_key: None,
                 };
 
-                for variable in edge.variables.values() {
-                    let entity_count = variable
-                        .members
-                        .keys()
-                        .filter(|def_id| self.entity_ctx.entities.contains_key(def_id))
-                        .count();
+                for cardinal in edge.cardinals.values() {
+                    let output_cardinal = match &cardinal.kind {
+                        CardinalKind::Vertex { members } => {
+                            let entity_count = members
+                                .keys()
+                                .filter(|def_id| self.entity_ctx.entities.contains_key(def_id))
+                                .count();
 
-                    let mut flags = EdgeCardinalFlags::empty();
+                            let mut flags = EdgeCardinalFlags::empty();
 
-                    if entity_count == variable.members.len() {
-                        flags.insert(EdgeCardinalFlags::ENTITY);
+                            if entity_count == members.len() {
+                                flags.insert(EdgeCardinalFlags::ENTITY);
 
-                        if variable.one_to_one_count > 0 {
-                            flags.insert(EdgeCardinalFlags::PINNED_DEF);
+                                if cardinal.one_to_one_count > 0 {
+                                    flags.insert(EdgeCardinalFlags::PINNED_DEF);
+                                }
+                            } else if entity_count > 0 {
+                                panic!("FIXME: mix of entity/non-entity");
+                            };
+
+                            EdgeCardinal {
+                                target: members.keys().copied().collect(),
+                                flags,
+                            }
                         }
-                    } else if entity_count > 0 {
-                        panic!("FIXME: mix of entity/non-entity");
+                        CardinalKind::Parameter { def_id } => EdgeCardinal {
+                            target: DefIdSet::from_iter([*def_id]),
+                            flags: EdgeCardinalFlags::empty(),
+                        },
                     };
 
-                    edge_info.cardinals.push(EdgeCardinal {
-                        target: variable.members.keys().copied().collect(),
-                        flags,
-                    });
+                    edge_info.cardinals.push(output_cardinal);
                 }
 
                 let old_edge = edges

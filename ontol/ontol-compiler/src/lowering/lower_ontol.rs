@@ -17,14 +17,18 @@ use tracing::debug_span;
 use ulid::Ulid;
 
 use crate::{
-    edge::{Slot, SymbolicEdge, SymbolicEdgeVariable},
+    edge::{CardinalKind, Slot, SymbolicEdge, SymbolicEdgeCardinal},
     namespace::{DocId, Space},
     package::PackageReference,
     CompileError, Compiler, Src,
 };
 
-use super::context::{
-    BlockContext, CstLowering, Extern, LoweringCtx, LoweringOutcome, Macro, Open, Private, RootDefs,
+use super::{
+    context::{
+        BlockContext, CstLowering, Extern, LoweringCtx, LoweringOutcome, Macro, Open, Private,
+        RootDefs,
+    },
+    lower_misc::ReportError,
 };
 
 enum PreDefinedStmt<V> {
@@ -337,8 +341,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                             opt_edge_builder = Some(Some(EdgeBuilder {
                                 edge_id,
                                 slots: Default::default(),
-                                variables: Default::default(),
-                                var_name_table: Default::default(),
+                                cardinals: Default::default(),
+                                cardinal_name_table: Default::default(),
                             }));
 
                             opt_edge_builder
@@ -354,13 +358,13 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                         }
                     };
 
-                    let Some(mut prev_cardinal) = self.add_sym_variable(sym_var, edge_builder)
+                    let Some(mut prev_cardinal) = self.add_edge_variable(sym_var, edge_builder)
                     else {
                         continue;
                     };
 
                     loop {
-                        if let Some((sym_id, next_cardinal)) = self.add_sym_decl_then_variable(
+                        if let Some((sym_id, next_cardinal)) = self.add_sym_decl_then_cardinal(
                             &mut item_iter,
                             prev_cardinal,
                             edge_builder,
@@ -383,6 +387,9 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                         }
                     }
                 }
+                Some(insp::SymItem::SymTypeParam(_)) => {
+                    unreachable!("statement cannot start with SymTypeParam")
+                }
                 None => {}
             }
         }
@@ -392,7 +399,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 edge_builder.edge_id,
                 SymbolicEdge {
                     symbols: edge_builder.slots,
-                    variables: edge_builder.variables,
+                    cardinals: edge_builder.cardinals,
                 },
             );
         }
@@ -414,7 +421,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         item
     }
 
-    fn add_sym_decl_then_variable(
+    fn add_sym_decl_then_cardinal(
         &mut self,
         item_iter: &mut impl Iterator<Item = insp::SymItem<V>>,
         prev_cardinal_idx: CardinalIdx,
@@ -429,18 +436,23 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         };
 
         let symbol = sym_decl.symbol()?;
-        let opt_def_id = self.catch(|zelf| zelf.ctx.coin_symbol(symbol.slice(), symbol.span()));
+        let opt_symbol_def_id =
+            self.catch(|zelf| zelf.ctx.coin_symbol(symbol.slice(), symbol.span()));
         let next_item = self.next_sym_item(item_iter, sym_relation_span)?;
 
-        let insp::SymItem::SymVar(sym_var) = next_item else {
-            CompileError::SymEdgeExpectedVariable
-                .span_report(next_item.view().span(), &mut self.ctx);
-            return None;
+        let cardinal_idx = match next_item {
+            insp::SymItem::SymVar(sym_var) => self.add_edge_variable(sym_var, edge_builder),
+            insp::SymItem::SymTypeParam(sym_type_param) => {
+                self.add_edge_type_param(sym_type_param, edge_builder)
+            }
+            insp::SymItem::SymDecl(_) => {
+                CompileError::SymEdgeExpectedVariable
+                    .span_report(next_item.view().span(), &mut self.ctx);
+                return None;
+            }
         };
 
-        let cardinal_idx = self.add_sym_variable(sym_var, edge_builder);
-
-        match (opt_def_id, cardinal_idx) {
+        match (opt_symbol_def_id, cardinal_idx) {
             (Some(def_id), Some(cardinal_idx)) => {
                 edge_builder.slots.insert(
                     def_id,
@@ -457,16 +469,16 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         }
     }
 
-    fn add_sym_variable(
+    fn add_edge_variable(
         &mut self,
         sym_var: insp::SymVar<V>,
         edge_builder: &mut EdgeBuilder,
     ) -> Option<CardinalIdx> {
         let var_symbol = sym_var.symbol()?;
-        let len = edge_builder.variables.len();
+        let len = edge_builder.cardinals.len();
 
         match edge_builder
-            .var_name_table
+            .cardinal_name_table
             .entry(var_symbol.slice().to_string())
         {
             Entry::Occupied(occupied) => Some(*occupied.get()),
@@ -479,11 +491,58 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 };
                 let cardinal_idx = CardinalIdx(cardinal_idx);
 
-                edge_builder.variables.insert(
+                edge_builder.cardinals.insert(
                     cardinal_idx,
-                    SymbolicEdgeVariable {
+                    SymbolicEdgeCardinal {
                         span: self.ctx.source_span(var_symbol.span()),
-                        members: Default::default(),
+                        kind: CardinalKind::Vertex {
+                            members: Default::default(),
+                        },
+                        one_to_one_count: 0,
+                    },
+                );
+
+                vacant.insert(cardinal_idx);
+                Some(cardinal_idx)
+            }
+        }
+    }
+
+    fn add_edge_type_param(
+        &mut self,
+        sym_type_param: insp::SymTypeParam<V>,
+        edge_builder: &mut EdgeBuilder,
+    ) -> Option<CardinalIdx> {
+        let ident_path = sym_type_param.ident_path()?;
+        let Some(def_id) = self.lookup_path(&ident_path, ReportError::Yes) else {
+            return None;
+        };
+        let Some(leaf_symbol) = ident_path.symbols().last() else {
+            return None;
+        };
+
+        // let var_symbol = sym_var.symbol()?;
+        let len = edge_builder.cardinals.len();
+
+        match edge_builder
+            .cardinal_name_table
+            .entry(leaf_symbol.slice().to_string())
+        {
+            Entry::Occupied(occupied) => Some(*occupied.get()),
+            Entry::Vacant(vacant) => {
+                let Ok(cardinal_idx): Result<u8, _> = len.try_into() else {
+                    CompileError::SymEdgeArityOverflow
+                        .span_report(sym_type_param.view().span(), &mut self.ctx);
+
+                    return None;
+                };
+                let cardinal_idx = CardinalIdx(cardinal_idx);
+
+                edge_builder.cardinals.insert(
+                    cardinal_idx,
+                    SymbolicEdgeCardinal {
+                        span: self.ctx.source_span(leaf_symbol.span()),
+                        kind: CardinalKind::Parameter { def_id },
                         one_to_one_count: 0,
                     },
                 );
@@ -529,7 +588,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
 struct EdgeBuilder {
     edge_id: EdgeId,
-    var_name_table: HashMap<String, CardinalIdx>,
+    cardinal_name_table: HashMap<String, CardinalIdx>,
     slots: FnvHashMap<DefId, Slot>,
-    variables: BTreeMap<CardinalIdx, SymbolicEdgeVariable>,
+    cardinals: BTreeMap<CardinalIdx, SymbolicEdgeCardinal>,
 }

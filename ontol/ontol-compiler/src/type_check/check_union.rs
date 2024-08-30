@@ -45,6 +45,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             _ => panic!("not a union"),
         };
 
+        // debug!("variants: {union_variants:?}");
+
         let mut inherent_builder = DiscriminatorBuilder::default();
         // Also verify that entity ids are disjoint:
         let mut entity_id_builder = DiscriminatorBuilder::default();
@@ -190,6 +192,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) where
         't: 'b,
     {
+        let _entered = debug_span!("variant", def = ?variant_def).entered();
+
         let variant_ty = self
             .def_ty_ctx
             .def_table
@@ -315,7 +319,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Err(UnionCheckError::UnitTypePartOfUnion(*scalar_def_id))
                 }
             },
-            _ => Err(UnionCheckError::UnitTypePartOfUnion(def_id)),
+            repr_kind => {
+                // FIXME: The error message here is not helpful.
+                // ONTOL needs to tell about the reasons why it can't make
+                // a meaningful union that's "sound" JSON-wise, with clear
+                // disambiguating properties.
+                debug!("THIS ERROR: {def_id:?} {repr_kind:?}");
+                Err(UnionCheckError::UnitTypePartOfUnion(def_id))
+            }
         }
     }
 

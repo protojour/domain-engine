@@ -310,6 +310,8 @@ pub enum Note {
     AbtractMapSuggestion,
     /// already defined here
     AlreadyDefinedHere,
+    /// this symbol
+    ThisSymbol,
 }
 
 impl Note {

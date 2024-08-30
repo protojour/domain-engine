@@ -94,6 +94,9 @@ pub enum Kind {
     #[token("def")]
     KwDef,
 
+    #[token("edge")]
+    KwEdge,
+
     #[token("sym")]
     KwSym,
 
@@ -145,7 +148,11 @@ pub enum Kind {
     /// sym statement
     SymStatement,
     SymRelation,
+    /// (SymVar) SymDecl: (SymVar)
     SymVar,
+    /// SymTypeParam SymDecl: SymTypeParam
+    SymTypeParam,
+    /// _ SymDecl: _
     SymDecl,
 
     /// rel statement
@@ -316,6 +323,7 @@ impl Display for Kind {
             K![use] => write!(f, "`use`"),
             K![def] => write!(f, "`def`"),
             K![rel] => write!(f, "`rel`"),
+            K![edge] => write!(f, "`edge`"),
             K![sym] => write!(f, "`sym`"),
             K![fmt] => write!(f, "`fmt`"),
             K![map] => write!(f, "`map`"),
@@ -334,7 +342,8 @@ impl Display for Kind {
             Kind::DefBody => write!(f, "def body"),
             Kind::SymStatement => write!(f, "sym statement"),
             Kind::SymRelation => write!(f, "sym relation"),
-            Kind::SymVar => write!(f, "sym relatoin variable"),
+            Kind::SymVar => write!(f, "sym relation variable"),
+            Kind::SymTypeParam => write!(f, "sym reference parameter"),
             Kind::SymDecl => write!(f, "sym declaration"),
             Kind::RelStatement => write!(f, "rel statement"),
             Kind::RelFwdSet => write!(f, "rel forward set"),
@@ -386,6 +395,9 @@ macro_rules! K {
     };
     [rel] => {
         Kind::KwRel
+    };
+    [edge] => {
+        Kind::KwEdge
     };
     [sym] => {
         Kind::KwSym

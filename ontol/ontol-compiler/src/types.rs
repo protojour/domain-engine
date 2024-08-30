@@ -360,7 +360,7 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
             Type::Option(ty) => {
                 write!(f, "{tick}{}?{tick}", self.child(ty))
             }
-            Type::Function(_) => write!(f, "function"),
+            Type::Function(_) => write!(f, "<function>"),
             Type::DomainDef(def_id) => {
                 let ident = self.defs.def_kind(*def_id).opt_identifier().unwrap();
                 write!(f, "{tick}{ident}{tick}")
@@ -370,17 +370,17 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
                 write!(f, "@macro{tick}{ident}{tick}")
             }
             Type::Anonymous(_) => {
-                write!(f, "anonymous type")
+                write!(f, "<anonymous type>")
             }
-            Type::ValueGenerator(_) => write!(f, "value generator"),
+            Type::ValueGenerator(_) => write!(f, "<value generator>"),
             Type::Package => write!(f, "package"),
-            Type::BuiltinRelation => write!(f, "relation"),
+            Type::BuiltinRelation => write!(f, "<relation>"),
             Type::Extern(def_id) => {
                 let ident = self.defs.def_kind(*def_id).opt_identifier().unwrap();
                 write!(f, "extern({ident})")
             }
-            Type::Infer(_) => write!(f, "?infer"),
-            Type::Error => write!(f, "error!"),
+            Type::Infer(_) => write!(f, "<?infer>"),
+            Type::Error => write!(f, "<error!>"),
         }
     }
 }

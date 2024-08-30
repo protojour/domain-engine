@@ -1,8 +1,9 @@
-use ontol_runtime::{property::PropertyCardinality, EdgeId};
+use ontol_runtime::{property::PropertyCardinality, tuple::CardinalIdx, DefId, EdgeId, PropId};
 use tracing::debug;
 
 use crate::{
     def::{BuiltinRelationKind, DefKind},
+    edge::{CardinalKind, SymbolicEdge},
     error::CompileError,
     mem::Intern,
     misc::{MacroExpand, TypeParam},
@@ -12,7 +13,7 @@ use crate::{
     sequence::Sequence,
     thesaurus::TypeRelation,
     types::{FormatType, Type, TypeRef, ERROR_TYPE},
-    SourceSpan,
+    Note, SourceSpan,
 };
 
 use super::TypeCheck;
@@ -115,20 +116,34 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             let edge = self.edge_ctx.symbolic_edges.get_mut(&edge_id).unwrap();
             let slot = edge.symbols.get(&relationship.relation_def_id).unwrap();
 
-            edge.variables
-                .get_mut(&slot.left)
-                .unwrap()
-                .members
-                .entry(subject.0)
-                .or_default()
-                .insert(prop_id);
-            edge.variables
-                .get_mut(&slot.right)
-                .unwrap()
-                .members
-                .entry(object.0)
-                .or_default()
-                .insert(prop_id);
+            let left = slot.left;
+            let right = slot.right;
+
+            fn update_edge_prop(
+                edge: &mut SymbolicEdge,
+                idx: CardinalIdx,
+                def_id: DefId,
+                prop_id: PropId,
+            ) -> bool {
+                let cardinal = edge.cardinals.get_mut(&idx).unwrap();
+                if let CardinalKind::Vertex { members } = &mut cardinal.kind {
+                    members.entry(def_id).or_default().insert(prop_id);
+                    true
+                } else {
+                    false
+                }
+            }
+
+            if !update_edge_prop(edge, left, subject.0, prop_id)
+                || !update_edge_prop(edge, right, object.0, prop_id)
+            {
+                CompileError::TODO("must use an edge symbol that has variables on both sides")
+                    .span(relationship.relation_span)
+                    .with_note(
+                        Note::ThisSymbol.span(self.defs.def_span(relationship.relation_def_id)),
+                    )
+                    .report(self);
+            }
         }
 
         object_ty

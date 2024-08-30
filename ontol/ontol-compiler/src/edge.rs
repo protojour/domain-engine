@@ -60,9 +60,38 @@ pub struct SymbolicEdge {
     /// There is one slot per edge symbol, one slot connects two vertices together using a symbol.
     pub symbols: FnvHashMap<DefId, Slot>,
 
-    /// The variables in this symbolic edge
-    /// The variable count is the edge's arity.
-    pub variables: BTreeMap<CardinalIdx, SymbolicEdgeVariable>,
+    /// The cardinals in this symbolic edge
+    /// The cardinal count is the edge's arity.
+    pub cardinals: BTreeMap<CardinalIdx, SymbolicEdgeCardinal>,
+}
+
+impl SymbolicEdge {
+    pub fn vertex_cardinals(
+        &self,
+    ) -> impl Iterator<
+        Item = (
+            CardinalIdx,
+            &SymbolicEdgeCardinal,
+            &FnvHashMap<DefId, BTreeSet<PropId>>,
+        ),
+    > {
+        self.cardinals
+            .iter()
+            .filter_map(|(idx, cardinal)| match &cardinal.kind {
+                CardinalKind::Vertex { members } => Some((*idx, cardinal, members)),
+                CardinalKind::Parameter { .. } => None,
+            })
+    }
+
+    pub fn find_parameter_cardinal(&self) -> Option<(CardinalIdx, DefId)> {
+        self.cardinals.iter().find_map(|(idx, cardinal)| {
+            if let CardinalKind::Parameter { def_id } = &cardinal.kind {
+                Some((*idx, *def_id))
+            } else {
+                None
+            }
+        })
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -74,11 +103,20 @@ pub struct Slot {
 }
 
 #[derive(Debug)]
-pub struct SymbolicEdgeVariable {
+pub struct SymbolicEdgeCardinal {
     pub span: SourceSpan,
-    /// Defs participating in this variable.
-    pub members: FnvHashMap<DefId, BTreeSet<PropId>>,
+    pub kind: CardinalKind,
     pub one_to_one_count: usize,
+}
+
+#[derive(Debug)]
+pub enum CardinalKind {
+    Vertex {
+        members: FnvHashMap<DefId, BTreeSet<PropId>>,
+    },
+    Parameter {
+        def_id: DefId,
+    },
 }
 
 impl<'m> Compiler<'m> {
@@ -93,14 +131,21 @@ impl<'m> Compiler<'m> {
     /// Resolve all variable participants to entities/vertices
     fn normalize_variable_participants(&mut self) {
         for edge in self.edge_ctx.symbolic_edges.values_mut() {
-            for var in edge.variables.values_mut() {
-                if var.members.is_empty() {
+            for cardinal in edge.cardinals.values_mut() {
+                let CardinalKind::Vertex {
+                    members: var_members,
+                } = &mut cardinal.kind
+                else {
+                    continue;
+                };
+
+                if var_members.is_empty() {
                     // FIXME: This is actually not an error.
                     // An edge does not need to have participants.
                     // The error case is instead that some variables are populated,
                     // while others aren't.
                     CompileError::SymEdgeNoDefinitionForExistentialVar
-                        .span(var.span)
+                        .span(cardinal.span)
                         .report(&mut self.errors);
                     continue;
                 }
@@ -108,37 +153,37 @@ impl<'m> Compiler<'m> {
                 // refine/normalize def set
                 // refinement means that it should consist only of entity defs.
 
-                debug!("raw participants: {:?}", var.members);
+                debug!("raw participants: {:?}", var_members);
 
                 // step 1: resolve unions
-                for (def_id, prop_set) in std::mem::take(&mut var.members) {
+                for (def_id, prop_set) in std::mem::take(var_members) {
                     match self.repr_ctx.get_repr_kind(&def_id) {
-                        Some(ReprKind::Union(members, _)) => {
-                            for (member, _span) in members {
-                                var.members.entry(*member).or_default().extend(&prop_set);
+                        Some(ReprKind::Union(union_members, _)) => {
+                            for (member, _span) in union_members {
+                                var_members.entry(*member).or_default().extend(&prop_set);
                             }
                         }
                         _ => {
-                            var.members.entry(def_id).or_default().extend(&prop_set);
+                            var_members.entry(def_id).or_default().extend(&prop_set);
                         }
                     }
                 }
 
                 // step 2: resolve identifier types
-                for (def_id, prop_set) in std::mem::take(&mut var.members) {
+                for (def_id, prop_set) in std::mem::take(var_members) {
                     if let Some(properties) = self.prop_ctx.properties_by_def_id(def_id) {
                         if let Some(identifies_rel_id) = properties.identifies {
                             let meta = rel_def_meta(identifies_rel_id, &self.rel_ctx, &self.defs);
 
-                            var.members.insert(meta.relationship.object.0, prop_set);
+                            var_members.insert(meta.relationship.object.0, prop_set);
                         } else {
-                            var.members.insert(def_id, prop_set);
+                            var_members.insert(def_id, prop_set);
                         }
                     }
                 }
 
                 // step 3: edge entity check
-                for (def_id, prop_set) in &var.members {
+                for (def_id, prop_set) in var_members {
                     if !self.entity_ctx.entities.contains_key(def_id) {
                         let prop_id = prop_set.first().unwrap();
                         let property = self.prop_ctx.property_by_id(*prop_id).unwrap();
@@ -157,17 +202,22 @@ impl<'m> Compiler<'m> {
     /// not information there to construct a new edge.
     fn mark_partial_participations(&mut self) {
         for edge in self.edge_ctx.symbolic_edges.values() {
-            let mut slot_set_per_member: BTreeMap<DefId, FnvHashSet<CardinalIdx>> =
+            let mut vertex_slot_set_per_member: BTreeMap<DefId, FnvHashSet<CardinalIdx>> =
                 Default::default();
 
-            for var in edge.variables.values() {
-                for (member_id, prop_ids) in &var.members {
+            for cardinal in edge.cardinals.values() {
+                let CardinalKind::Vertex { members } = &cardinal.kind else {
+                    continue;
+                };
+
+                for (member_id, prop_ids) in members {
                     for prop_id in prop_ids {
                         let property = self.prop_ctx.property_by_id(*prop_id).unwrap();
                         let meta = rel_def_meta(property.rel_id, &self.rel_ctx, &self.defs);
 
                         if &meta.relationship.subject.0 == member_id {
-                            let slot_set = slot_set_per_member.entry(*member_id).or_default();
+                            let slot_set =
+                                vertex_slot_set_per_member.entry(*member_id).or_default();
                             let symbol = edge
                                 .symbols
                                 .get(&meta.relationship.relation_def_id)
@@ -180,8 +230,8 @@ impl<'m> Compiler<'m> {
                 }
             }
 
-            for (member_id, slot_set) in slot_set_per_member {
-                if slot_set.len() >= edge.variables.len() {
+            for (member_id, slot_set) in vertex_slot_set_per_member {
+                if slot_set.len() >= edge.vertex_cardinals().count() {
                     continue;
                 }
 
@@ -196,8 +246,12 @@ impl<'m> Compiler<'m> {
                 }
 
                 // collect relationships again
-                for var in edge.variables.values() {
-                    for prop_ids in var.members.values() {
+                for cardinal in edge.cardinals.values() {
+                    let CardinalKind::Vertex { members } = &cardinal.kind else {
+                        continue;
+                    };
+
+                    for prop_ids in members.values() {
                         for prop_id in prop_ids {
                             let property = self.prop_ctx.property_by_id(*prop_id).unwrap();
                             let meta = rel_def_meta(property.rel_id, &self.rel_ctx, &self.defs);

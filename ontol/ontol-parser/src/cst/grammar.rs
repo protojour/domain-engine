@@ -401,18 +401,26 @@ mod sym {
                 sym_var(p);
                 sym_decl(p);
                 p.eat(K![:]);
-                sym_var(p);
+                sym_cardinal(p);
 
                 while p.not_peekforward(|kind| matches!(kind, K![,] | K!['}'])) {
                     sym_decl(p);
                     p.eat(K![:]);
-                    sym_var(p);
+                    sym_cardinal(p);
                 }
             }
             _ => {}
         }
 
         p.end(relation);
+    }
+
+    fn sym_cardinal(p: &mut CstParser) {
+        if p.not_peekforward(|kind| matches!(kind, K!['('])) {
+            sym_type_param(p)
+        } else {
+            sym_var(p)
+        }
     }
 
     fn sym_var(p: &mut CstParser) {
@@ -422,6 +430,12 @@ mod sym {
         p.eat(Kind::Symbol);
         p.eat(K![')']);
         p.end(var);
+    }
+
+    fn sym_type_param(p: &mut CstParser) {
+        let type_ref = p.start(Kind::SymTypeParam);
+        ident_path(p);
+        p.end(type_ref);
     }
 
     fn sym_decl(p: &mut CstParser) {
@@ -604,9 +618,9 @@ mod struct_pattern {
         let prop = p.start(Kind::StructParamAttrProp);
 
         {
-            let type_ref = p.start(Kind::TypeQuantUnit);
+            let type_quant = p.start(Kind::TypeQuantUnit);
             type_ref_inner(p, TypeAccept::empty(), "property type");
-            p.end(type_ref);
+            p.end(type_quant);
 
             if p.at() == K!['['] {
                 p.eat_space();

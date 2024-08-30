@@ -25,7 +25,7 @@ use crate::{
     misc::UnionDiscriminatorRole,
     phf_build::build_phf_index_map,
     properties::{identifies_any, Properties, Property},
-    relation::{rel_def_meta, rel_repr_meta, RelParams, RelReprMeta},
+    relation::{rel_def_meta, rel_repr_meta, RelReprMeta},
     repr::repr_model::{ReprKind, ReprScalarKind, UnionBound},
 };
 
@@ -153,13 +153,25 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             modifier.cross_def_flags(),
         );
 
-        let rel_params_addr = match &meta.relationship.rel_params {
-            RelParams::Type(def_id) => {
-                self.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(*def_id, modifier.reset())))
+        let rel_params_addr = if let Some(edge_projection) = &meta.relationship.edge_projection {
+            let edge_id = edge_projection.id;
+            let edge = self.edge_ctx.symbolic_edges.get(&edge_id).unwrap();
+            if let Some((_, param_def_id)) = edge.find_parameter_cardinal() {
+                self.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(param_def_id, modifier.reset())))
+            } else {
+                None
             }
-            RelParams::Unit => None,
-            _ => todo!(),
+        } else {
+            None
         };
+
+        // let rel_params_addr = match &meta.relationship.rel_params {
+        //     RelParams::Type(def_id) => {
+        //         self.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(*def_id, modifier.reset())))
+        //     }
+        //     RelParams::Unit => None,
+        //     _ => todo!(),
+        // };
 
         let prop_key: Cow<str> = match meta.relation_repr_kind.deref() {
             ReprKind::Scalar(_, ReprScalarKind::TextConstant(constant_def_id), _) => {

@@ -107,6 +107,7 @@ nodes!(Node {
     SymStatement,
     SymRelation,
     SymVar,
+    SymTypeParam,
     SymDecl,
     RelStatement,
     RelFwdSet,
@@ -169,7 +170,11 @@ node_union!(TypeRef {
     TypeUnion,
 });
 
-node_union!(SymItem { SymVar, SymDecl });
+node_union!(SymItem {
+    SymVar,
+    SymTypeParam,
+    SymDecl
+});
 
 node_union!(Pattern {
     PatStruct,
@@ -250,6 +255,12 @@ impl<V: NodeView> SymRelation<V> {
 impl<V: NodeView> SymVar<V> {
     pub fn symbol(&self) -> Option<V::Token> {
         self.view().local_tokens_filter(Kind::Symbol).next()
+    }
+}
+
+impl<V: NodeView> SymTypeParam<V> {
+    pub fn ident_path(&self) -> Option<IdentPath<V>> {
+        self.view().sub_nodes().find_map(IdentPath::from_view)
     }
 }
 

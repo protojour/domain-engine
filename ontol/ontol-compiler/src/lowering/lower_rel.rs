@@ -210,7 +210,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         // This syntax just defines the relation the first time it's used
         let relation_def_id = self.ctx.define_relation_if_undefined(key);
 
-        let (rel_id, edge_id) = if subject_ty.def_id == DefId::unit() {
+        let (rel_id, _edge_id) = if subject_ty.def_id == DefId::unit() {
             // a parent relation modifier
             (RelId(DefId::unit(), DefRelTag(0)), EdgeId(ONTOL_PKG, 0))
         } else {
@@ -479,7 +479,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             };
 
             if one_to_one {
-                let edge_variable = edge.variables.get_mut(&slot.left).unwrap();
+                let edge_variable = edge.cardinals.get_mut(&slot.left).unwrap();
                 edge_variable.one_to_one_count += 1;
             }
 
