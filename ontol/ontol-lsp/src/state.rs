@@ -173,6 +173,7 @@ impl State {
                             }
                         }
                         insp::Statement::SymStatement(_) => {}
+                        insp::Statement::EdgeStatement(_) => {}
                         insp::Statement::RelStatement(stmt) => {
                             if let Some(set) = stmt.fwd_set() {
                                 for relation in set.relations() {

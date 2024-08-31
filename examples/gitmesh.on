@@ -3,9 +3,14 @@ domain 01HH2687A8SPTZSX05YMBR43AH ()
 def Repository (
     rel. 'id'[rel* gen: auto]: (rel* is: uuid)
     rel* 'handle': text
+    // BUG: ontol should complain that this needs an edge relationship:
     rel* 'owner'::'repositories'? RepositoryOwner
-    rel* 'origin'?: .
+    rel* origin?: .
 )
+
+edge fork {
+    (fork) origin: (origin)
+}
 
 def RepositoryOwner (
     rel* is?: User
@@ -15,14 +20,20 @@ def RepositoryOwner (
 def User (
     rel. 'id': (fmt '' => 'user/' => text => .)
     rel* 'email': text
+    rel* member_of: {Organization}
 )
 
 def Organization (
     rel. 'id': (fmt '' => 'org/' => text => .)
-    rel* 'members'[rel. is: OrganizationMember]::'member_of' {User}
+    rel* members: {User}
 )
 
-def OrganizationMember (
+edge membership {
+    (org) members: (member) membership: Membership,
+    (member) member_of: (org) membership: Membership,
+}
+
+def Membership (
     rel* 'role': text
 )
 
@@ -34,7 +45,7 @@ map users(
     User {
         ..@match User(
             'id'?: @in { ..id },
-            'member_of'?: Organization (
+            member_of?: Organization (
                 'id': @in { ..member_of }
             ),
         ),

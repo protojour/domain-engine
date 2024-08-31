@@ -106,9 +106,12 @@ nodes!(Node {
     DefBody,
     SymStatement,
     SymRelation,
-    SymVar,
-    SymTypeParam,
     SymDecl,
+    EdgeStatement,
+    EdgeRelation,
+    EdgeSlot,
+    EdgeVar,
+    EdgeTypeParam,
     RelStatement,
     RelFwdSet,
     RelBackwdSet,
@@ -149,6 +152,7 @@ node_union!(Statement {
     UseStatement,
     DefStatement,
     SymStatement,
+    EdgeStatement,
     RelStatement,
     FmtStatement,
     MapStatement,
@@ -170,10 +174,10 @@ node_union!(TypeRef {
     TypeUnion,
 });
 
-node_union!(SymItem {
-    SymVar,
-    SymTypeParam,
-    SymDecl
+node_union!(EdgeItem {
+    EdgeSlot,
+    EdgeVar,
+    EdgeTypeParam,
 });
 
 node_union!(Pattern {
@@ -247,24 +251,46 @@ impl<V: NodeView> SymStatement<V> {
 }
 
 impl<V: NodeView> SymRelation<V> {
-    pub fn items(&self) -> impl Iterator<Item = SymItem<V>> {
-        self.view().sub_nodes().filter_map(SymItem::from_view)
+    pub fn decl(&self) -> Option<SymDecl<V>> {
+        self.view().sub_nodes().find_map(SymDecl::from_view)
     }
 }
 
-impl<V: NodeView> SymVar<V> {
+impl<V: NodeView> SymDecl<V> {
     pub fn symbol(&self) -> Option<V::Token> {
         self.view().local_tokens_filter(Kind::Symbol).next()
     }
 }
 
-impl<V: NodeView> SymTypeParam<V> {
+impl<V: NodeView> EdgeStatement<V> {
+    pub fn ident_path(&self) -> Option<IdentPath<V>> {
+        self.view().sub_nodes().find_map(IdentPath::from_view)
+    }
+
+    pub fn edge_relations(&self) -> impl Iterator<Item = EdgeRelation<V>> {
+        self.view().sub_nodes().filter_map(EdgeRelation::from_view)
+    }
+}
+
+impl<V: NodeView> EdgeRelation<V> {
+    pub fn items(&self) -> impl Iterator<Item = EdgeItem<V>> {
+        self.view().sub_nodes().filter_map(EdgeItem::from_view)
+    }
+}
+
+impl<V: NodeView> EdgeVar<V> {
+    pub fn symbol(&self) -> Option<V::Token> {
+        self.view().local_tokens_filter(Kind::Symbol).next()
+    }
+}
+
+impl<V: NodeView> EdgeTypeParam<V> {
     pub fn ident_path(&self) -> Option<IdentPath<V>> {
         self.view().sub_nodes().find_map(IdentPath::from_view)
     }
 }
 
-impl<V: NodeView> SymDecl<V> {
+impl<V: NodeView> EdgeSlot<V> {
     pub fn symbol(&self) -> Option<V::Token> {
         self.view().local_tokens_filter(Kind::Symbol).next()
     }

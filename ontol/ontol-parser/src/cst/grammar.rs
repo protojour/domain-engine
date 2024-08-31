@@ -88,6 +88,10 @@ fn statement(p: &mut CstParser) {
             rel::rel(p);
             Kind::RelStatement
         }
+        K![edge] => {
+            edge::statement(p);
+            Kind::EdgeStatement
+        }
         K![sym] => {
             sym::statement(p);
             Kind::SymStatement
@@ -392,50 +396,8 @@ mod sym {
 
     fn sym_relation(p: &mut CstParser) {
         let relation = p.start(Kind::SymRelation);
-
-        match lookahead_sym_variant(p) {
-            Some(Kind::SymDecl) => {
-                sym_decl(p);
-            }
-            Some(Kind::SymVar) => {
-                sym_var(p);
-                sym_decl(p);
-                p.eat(K![:]);
-                sym_cardinal(p);
-
-                while p.not_peekforward(|kind| matches!(kind, K![,] | K!['}'])) {
-                    sym_decl(p);
-                    p.eat(K![:]);
-                    sym_cardinal(p);
-                }
-            }
-            _ => {}
-        }
-
+        sym_decl(p);
         p.end(relation);
-    }
-
-    fn sym_cardinal(p: &mut CstParser) {
-        if p.not_peekforward(|kind| matches!(kind, K!['('])) {
-            sym_type_param(p)
-        } else {
-            sym_var(p)
-        }
-    }
-
-    fn sym_var(p: &mut CstParser) {
-        let var = p.start(Kind::SymVar);
-        p.eat_trivia();
-        p.eat(K!['(']);
-        p.eat(Kind::Symbol);
-        p.eat(K![')']);
-        p.end(var);
-    }
-
-    fn sym_type_param(p: &mut CstParser) {
-        let type_ref = p.start(Kind::SymTypeParam);
-        ident_path(p);
-        p.end(type_ref);
     }
 
     fn sym_decl(p: &mut CstParser) {
@@ -444,18 +406,63 @@ mod sym {
         p.eat(Kind::Symbol);
         p.end(decl);
     }
+}
 
-    fn lookahead_sym_variant(p: &CstParser) -> Option<Kind> {
-        for kind in p.peek_tokens() {
-            match kind {
-                K!['('] => return Some(Kind::SymVar),
-                Kind::Symbol => return Some(Kind::SymDecl),
-                Kind::Whitespace | Kind::Comment | Kind::DocComment => {}
-                _ => break,
-            }
+mod edge {
+    use super::*;
+
+    pub fn statement(p: &mut CstParser) {
+        p.eat(K![edge]);
+        p.eat_trivia();
+        ident_path(p);
+        delimited_comma_separated(p, K!['{'], &edge_relation, K!['}']);
+    }
+
+    fn edge_relation(p: &mut CstParser) {
+        let relation = p.start(Kind::EdgeRelation);
+
+        edge_var(p);
+        edge_slot(p);
+        p.eat(K![:]);
+        edge_cardinal(p);
+
+        while p.not_peekforward(|kind| matches!(kind, K![,] | K!['}'])) {
+            edge_slot(p);
+            p.eat(K![:]);
+            edge_cardinal(p);
         }
 
-        None
+        p.end(relation);
+    }
+
+    fn edge_cardinal(p: &mut CstParser) {
+        if p.not_peekforward(|kind| matches!(kind, K!['('])) {
+            edge_type_param(p)
+        } else {
+            edge_var(p)
+        }
+    }
+
+    fn edge_var(p: &mut CstParser) {
+        let var = p.start(Kind::EdgeVar);
+        p.eat_trivia();
+        p.eat(K!['(']);
+        p.eat(Kind::Symbol);
+        p.eat(K![')']);
+        p.end(var);
+    }
+
+    fn edge_type_param(p: &mut CstParser) {
+        let type_ref = p.start(Kind::EdgeTypeParam);
+        ident_path(p);
+        p.end(type_ref);
+    }
+
+    fn edge_slot(p: &mut CstParser) {
+        let decl = p.start(Kind::EdgeSlot);
+        p.eat_trivia();
+        p.eat(Kind::Symbol);
+        p.end(decl);
     }
 }
 

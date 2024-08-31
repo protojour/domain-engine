@@ -42,6 +42,10 @@ impl RelCtx {
         rel_id
     }
 
+    pub fn is_committed(&self, rel_id: RelId) -> bool {
+        self.table.contains_key(&rel_id)
+    }
+
     pub fn commit_rel(&mut self, rel_id: RelId, relationship: Relationship, span: SourceSpan) {
         self.table.insert(rel_id, (relationship, span));
     }
@@ -202,7 +206,10 @@ pub fn rel_def_meta<'c, 'm>(
     rel_ctx: &'c RelCtx,
     defs: &'c Defs<'m>,
 ) -> RelDefMeta<'c, 'm> {
-    let (relationship, span) = rel_ctx.table.get(&rel_id).unwrap();
+    let (relationship, span) = rel_ctx
+        .table
+        .get(&rel_id)
+        .unwrap_or_else(|| panic!("{rel_id:?} is an undefined relation"));
     let relationship = SpannedBorrow {
         value: relationship,
         span,

@@ -1,0 +1,15 @@
+domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
+
+def Foo (
+    rel. 'id': (fmt '' => '/foo/' => uuid => .)
+    rel* 'test'?: Union
+)
+
+def Bar (
+    rel. 'id': (fmt '' => '/bar/' => uuid => .)
+)
+
+def Union (
+    rel* is?: Foo
+    rel* is?: Bar
+)

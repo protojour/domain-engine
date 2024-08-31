@@ -319,6 +319,10 @@ impl<'m> Compiler<'m> {
     fn domain_entity_rel_force_edge_check(&mut self, package_id: PackageId) {
         for def_id in self.defs.iter_package_def_ids(package_id) {
             for rel_id in self.rel_ctx.iter_rel_ids(def_id) {
+                if !self.rel_ctx.is_committed(rel_id) {
+                    continue;
+                }
+
                 let meta = rel_def_meta(rel_id, &self.rel_ctx, &self.defs);
 
                 let subject = meta.relationship.subject;
@@ -328,7 +332,7 @@ impl<'m> Compiler<'m> {
                     && self.entity_ctx.entities.contains_key(&object.0)
                     && meta.relationship.edge_projection.is_none()
                 {
-                    CompileError::TODO("must use an edge relationship")
+                    CompileError::EntityToEntityRelationshipMustUseEdge
                         .span(meta.relationship.relation_span)
                         .report(self);
                 }

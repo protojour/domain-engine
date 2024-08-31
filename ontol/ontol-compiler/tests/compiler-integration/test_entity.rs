@@ -252,7 +252,7 @@ fn artist_and_instrument_id_as_relation_object_invalid_id_format() {
 fn test_entity_self_relationship_optional_object_sym() {
     "
     domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
-    sym {
+    edge ancestry {
         (p) children: (c),
         (c) parent: (p),
     }
@@ -301,7 +301,7 @@ fn test_entity_self_relationship_optional_object_sym() {
 fn test_entity_self_relationship_optional_object() {
     "
     domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
-    sym { (p) children: (c), (c) parent: (p) }
+    edge ancestry { (p) children: (c), (c) parent: (p) }
 
     def node_id (fmt '' => serial => .)
     def node (
@@ -339,7 +339,7 @@ fn test_entity_self_relationship_optional_object() {
 fn test_entity_self_relationship_mandatory_object() {
     "
     domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
-    sym { (p) children: (c), (c) parent: (p) }
+    edge ancestry { (p) children: (c), (c) parent: (p) }
 
     def node_id (fmt '' => serial => .)
     def node (

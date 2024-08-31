@@ -144,7 +144,7 @@ impl<'m> Compiler<'m> {
                     // An edge does not need to have participants.
                     // The error case is instead that some variables are populated,
                     // while others aren't.
-                    CompileError::SymEdgeNoDefinitionForExistentialVar
+                    CompileError::EdgeNoDefinitionForExistentialVar
                         .span(cardinal.span)
                         .report(&mut self.errors);
                     continue;

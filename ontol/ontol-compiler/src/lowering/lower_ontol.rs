@@ -7,12 +7,12 @@ use std::{
 use fnv::FnvHashMap;
 use ontol_parser::{
     cst::{
-        inspect as insp,
+        inspect::{self as insp, EdgeTypeParam},
         view::{NodeView, TokenView},
     },
     U32Span,
 };
-use ontol_runtime::{ontology::domain::DomainId, tuple::CardinalIdx, DefId, EdgeId};
+use ontol_runtime::{ontology::domain::DomainId, tuple::CardinalIdx, DefId, EdgeId, OntolDefTag};
 use tracing::debug_span;
 use ulid::Ulid;
 
@@ -36,6 +36,11 @@ enum PreDefinedStmt<V> {
     Def(DefId, insp::DefStatement<V>),
     Sym(Vec<DefId>),
     Rel(insp::RelStatement<V>),
+    Edge {
+        edge_id: EdgeId,
+        root_defs: RootDefs,
+        params: BTreeMap<CardinalIdx, insp::EdgeTypeParam<V>>,
+    },
     Fmt(insp::FmtStatement<V>),
     Map(insp::MapStatement<V>),
 }
@@ -156,6 +161,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 Some(root_defs)
             }
             insp::Statement::SymStatement(_) => None,
+            insp::Statement::EdgeStatement(_) => None,
             insp::Statement::RelStatement(rel_stmt) => {
                 self.lower_rel_statement(rel_stmt, block_context)
             }
@@ -277,6 +283,15 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 let root_defs = self.lower_sym_statement(sym_stmt);
                 Some(PreDefinedStmt::Sym(root_defs))
             }
+            insp::Statement::EdgeStatement(edge_stmt) => {
+                let (root_defs, edge_id, params) = self.lower_edge_statement(edge_stmt)?;
+
+                Some(PreDefinedStmt::Edge {
+                    root_defs,
+                    edge_id,
+                    params,
+                })
+            }
             insp::Statement::RelStatement(rel_stmt) => Some(PreDefinedStmt::Rel(rel_stmt)),
             insp::Statement::FmtStatement(fmt_stmt) => Some(PreDefinedStmt::Fmt(fmt_stmt)),
             insp::Statement::MapStatement(map_stmt) => Some(PreDefinedStmt::Map(map_stmt)),
@@ -293,6 +308,38 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             PreDefinedStmt::Def(def_id, def_stmt) => self.lower_def_body(def_id, def_stmt),
             PreDefinedStmt::Sym(root_defs) => Some(root_defs),
             PreDefinedStmt::Rel(rel_stmt) => self.lower_statement(rel_stmt.into(), block_context),
+            PreDefinedStmt::Edge {
+                edge_id,
+                mut root_defs,
+                params,
+            } => {
+                for (cardinal_idx, edge_type_param) in params {
+                    let Some(ident_path) = edge_type_param.ident_path() else {
+                        continue;
+                    };
+                    let Some(param_def_id) = self.lookup_path(&ident_path, ReportError::Yes) else {
+                        continue;
+                    };
+
+                    let edge = self
+                        .ctx
+                        .compiler
+                        .edge_ctx
+                        .symbolic_edges
+                        .get_mut(&edge_id)
+                        .unwrap();
+
+                    let cardinal = edge.cardinals.get_mut(&cardinal_idx).unwrap();
+                    let CardinalKind::Parameter { def_id } = &mut cardinal.kind else {
+                        panic!("not a parameter cardinal");
+                    };
+
+                    *def_id = param_def_id;
+                    root_defs.push(param_def_id);
+                }
+
+                Some(root_defs)
+            }
             PreDefinedStmt::Fmt(fmt_stmt) => self.lower_statement(fmt_stmt.into(), block_context),
             PreDefinedStmt::Map(map_stmt) => self.lower_statement(map_stmt.into(), block_context),
         }
@@ -301,82 +348,77 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     fn lower_sym_statement(&mut self, sym_stmt: insp::SymStatement<V>) -> RootDefs {
         let mut root_defs = vec![];
 
-        let mut opt_edge_builder: Option<Option<EdgeBuilder>> = None;
-
         for sym_relation in sym_stmt.sym_relations() {
-            let mut item_iter = sym_relation.items().peekable();
+            let Some(sym_decl) = sym_relation.decl() else {
+                continue;
+            };
 
-            match self.next_sym_item(&mut item_iter, sym_relation.view().span()) {
-                Some(insp::SymItem::SymDecl(sym_decl)) => {
-                    if matches!(opt_edge_builder, Some(Some(_))) {
-                        CompileError::SymCannotMixStandaloneSymbolsAndSymbolicEdge
-                            .span_report(sym_decl.view().span(), &mut self.ctx);
-                    }
+            let Some(symbol) = sym_decl.symbol() else {
+                continue;
+            };
 
-                    // not in "edge mode"
-                    opt_edge_builder = Some(None);
+            let opt_def_id = self.catch(|zelf| zelf.ctx.coin_symbol(symbol.slice(), symbol.span()));
+            root_defs.extend(opt_def_id);
+        }
 
-                    let Some(symbol) = sym_decl.symbol() else {
-                        continue;
-                    };
+        root_defs
+    }
 
-                    let opt_def_id =
-                        self.catch(|zelf| zelf.ctx.coin_symbol(symbol.slice(), symbol.span()));
-                    root_defs.extend(opt_def_id);
+    fn lower_edge_statement(
+        &mut self,
+        edge_stmt: insp::EdgeStatement<V>,
+    ) -> Option<(
+        RootDefs,
+        EdgeId,
+        BTreeMap<CardinalIdx, insp::EdgeTypeParam<V>>,
+    )> {
+        let mut root_defs = vec![];
 
-                    if let Some(next) = item_iter.next() {
-                        CompileError::SymStandaloneTrailingItems
-                            .span_report(next.view().span(), &mut self.ctx);
-                    }
-                }
-                Some(insp::SymItem::SymVar(sym_var)) => {
-                    let edge_builder = match &mut opt_edge_builder {
-                        None => {
-                            let edge_id = self
-                                .ctx
-                                .compiler
-                                .edge_ctx
-                                .alloc_edge_id(self.ctx.package_id);
+        let Some(_ident_path) = edge_stmt.ident_path() else {
+            return None;
+        };
 
-                            opt_edge_builder = Some(Some(EdgeBuilder {
-                                edge_id,
-                                slots: Default::default(),
-                                cardinals: Default::default(),
-                                cardinal_name_table: Default::default(),
-                            }));
+        let edge_id = self
+            .ctx
+            .compiler
+            .edge_ctx
+            .alloc_edge_id(self.ctx.package_id);
 
-                            opt_edge_builder
-                                .as_mut()
-                                .and_then(|builder| builder.as_mut())
-                                .unwrap()
-                        }
-                        Some(Some(builder)) => builder,
-                        Some(None) => {
-                            CompileError::SymCannotMixStandaloneSymbolsAndSymbolicEdge
-                                .span_report(sym_var.view().span(), &mut self.ctx);
-                            continue;
-                        }
-                    };
+        let mut edge_builder = EdgeBuilder {
+            edge_id,
+            slots: Default::default(),
+            cardinals: Default::default(),
+            cardinal_name_table: Default::default(),
+            params: Default::default(),
+        };
 
-                    let Some(mut prev_cardinal) = self.add_edge_variable(sym_var, edge_builder)
+        for edge_relation in edge_stmt.edge_relations() {
+            let mut item_iter = edge_relation.items().peekable();
+
+            match self.next_edge_item(&mut item_iter, edge_relation.view().span()) {
+                Some(insp::EdgeItem::EdgeVar(edge_var)) => {
+                    let Some(mut prev_cardinal) =
+                        self.add_edge_variable(edge_var, &mut edge_builder)
                     else {
                         continue;
                     };
 
                     loop {
-                        if let Some((sym_id, next_cardinal)) = self.add_sym_decl_then_cardinal(
-                            &mut item_iter,
-                            prev_cardinal,
-                            edge_builder,
-                            sym_stmt.view().span(),
-                        ) {
+                        if let Some((slot_def_id, next_cardinal)) = self
+                            .add_edge_slot_symbol_then_cardinal(
+                                &mut item_iter,
+                                prev_cardinal,
+                                &mut edge_builder,
+                                edge_stmt.view().span(),
+                            )
+                        {
                             self.ctx
                                 .compiler
                                 .edge_ctx
                                 .symbols
-                                .insert(sym_id, edge_builder.edge_id);
+                                .insert(slot_def_id, edge_builder.edge_id);
 
-                            root_defs.push(sym_id);
+                            root_defs.push(slot_def_id);
                             prev_cardinal = next_cardinal;
                         } else {
                             break;
@@ -387,72 +429,74 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                         }
                     }
                 }
-                Some(insp::SymItem::SymTypeParam(_)) => {
-                    unreachable!("statement cannot start with SymTypeParam")
+                Some(insp::EdgeItem::EdgeSlot(edge_slot)) => {
+                    CompileError::EdgeCannotMixStandaloneSymbolsAndSymbolicEdge
+                        .span_report(edge_slot.view().span(), &mut self.ctx);
+                }
+                Some(insp::EdgeItem::EdgeTypeParam(_)) => {
+                    unreachable!("statement cannot start with EdgeTypeParam")
                 }
                 None => {}
             }
         }
 
-        if let Some(Some(edge_builder)) = opt_edge_builder {
-            self.ctx.compiler.edge_ctx.symbolic_edges.insert(
-                edge_builder.edge_id,
-                SymbolicEdge {
-                    symbols: edge_builder.slots,
-                    cardinals: edge_builder.cardinals,
-                },
-            );
-        }
+        self.ctx.compiler.edge_ctx.symbolic_edges.insert(
+            edge_builder.edge_id,
+            SymbolicEdge {
+                symbols: edge_builder.slots,
+                cardinals: edge_builder.cardinals,
+            },
+        );
 
-        root_defs
+        Some((root_defs, edge_id, edge_builder.params))
     }
 
-    fn next_sym_item(
+    fn next_edge_item(
         &mut self,
-        item_iter: &mut impl Iterator<Item = insp::SymItem<V>>,
-        sym_relation_span: U32Span,
-    ) -> Option<insp::SymItem<V>> {
+        item_iter: &mut impl Iterator<Item = insp::EdgeItem<V>>,
+        edge_relation_span: U32Span,
+    ) -> Option<insp::EdgeItem<V>> {
         let item = item_iter.next();
 
         if item.is_none() {
-            CompileError::SymEdgeExpectedTrailingItem.span_report(sym_relation_span, &mut self.ctx);
+            CompileError::EdgeExpectedTrailingItem.span_report(edge_relation_span, &mut self.ctx);
         }
 
         item
     }
 
-    fn add_sym_decl_then_cardinal(
+    fn add_edge_slot_symbol_then_cardinal(
         &mut self,
-        item_iter: &mut impl Iterator<Item = insp::SymItem<V>>,
+        item_iter: &mut impl Iterator<Item = insp::EdgeItem<V>>,
         prev_cardinal_idx: CardinalIdx,
-        edge_builder: &mut EdgeBuilder,
-        sym_relation_span: U32Span,
+        edge_builder: &mut EdgeBuilder<V>,
+        edge_relation_span: U32Span,
     ) -> Option<(DefId, CardinalIdx)> {
-        let next_item = self.next_sym_item(item_iter, sym_relation_span)?;
+        let next_item = self.next_edge_item(item_iter, edge_relation_span)?;
 
-        let insp::SymItem::SymDecl(sym_decl) = next_item else {
-            CompileError::SymEdgeExpectedSymbol.span_report(next_item.view().span(), &mut self.ctx);
+        let insp::EdgeItem::EdgeSlot(edge_slot) = next_item else {
+            CompileError::EdgeExpectedSymbol.span_report(next_item.view().span(), &mut self.ctx);
             return None;
         };
 
-        let symbol = sym_decl.symbol()?;
-        let opt_symbol_def_id =
+        let symbol = edge_slot.symbol()?;
+        let slot_symbol_def_id =
             self.catch(|zelf| zelf.ctx.coin_symbol(symbol.slice(), symbol.span()));
-        let next_item = self.next_sym_item(item_iter, sym_relation_span)?;
+        let next_item = self.next_edge_item(item_iter, edge_relation_span)?;
 
         let cardinal_idx = match next_item {
-            insp::SymItem::SymVar(sym_var) => self.add_edge_variable(sym_var, edge_builder),
-            insp::SymItem::SymTypeParam(sym_type_param) => {
-                self.add_edge_type_param(sym_type_param, edge_builder)
+            insp::EdgeItem::EdgeVar(edge_var) => self.add_edge_variable(edge_var, edge_builder),
+            insp::EdgeItem::EdgeTypeParam(edge_type_param) => {
+                self.add_edge_type_param(edge_type_param, edge_builder)
             }
-            insp::SymItem::SymDecl(_) => {
-                CompileError::SymEdgeExpectedVariable
+            insp::EdgeItem::EdgeSlot(_) => {
+                CompileError::EdgeExpectedVariable
                     .span_report(next_item.view().span(), &mut self.ctx);
                 return None;
             }
         };
 
-        match (opt_symbol_def_id, cardinal_idx) {
+        match (slot_symbol_def_id, cardinal_idx) {
             (Some(def_id), Some(cardinal_idx)) => {
                 edge_builder.slots.insert(
                     def_id,
@@ -471,8 +515,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
     fn add_edge_variable(
         &mut self,
-        sym_var: insp::SymVar<V>,
-        edge_builder: &mut EdgeBuilder,
+        sym_var: insp::EdgeVar<V>,
+        edge_builder: &mut EdgeBuilder<V>,
     ) -> Option<CardinalIdx> {
         let var_symbol = sym_var.symbol()?;
         let len = edge_builder.cardinals.len();
@@ -484,7 +528,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             Entry::Occupied(occupied) => Some(*occupied.get()),
             Entry::Vacant(vacant) => {
                 let Ok(cardinal_idx): Result<u8, _> = len.try_into() else {
-                    CompileError::SymEdgeArityOverflow
+                    CompileError::EdgeArityOverflow
                         .span_report(sym_var.view().span(), &mut self.ctx);
 
                     return None;
@@ -508,20 +552,18 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         }
     }
 
+    /// note: the path of the type param is not looked up in the pre-define stage,
+    /// that's instead isdone in the post-processing stage, to be able to resolve later definitions.
     fn add_edge_type_param(
         &mut self,
-        sym_type_param: insp::SymTypeParam<V>,
-        edge_builder: &mut EdgeBuilder,
+        edge_type_param: insp::EdgeTypeParam<V>,
+        edge_builder: &mut EdgeBuilder<V>,
     ) -> Option<CardinalIdx> {
-        let ident_path = sym_type_param.ident_path()?;
-        let Some(def_id) = self.lookup_path(&ident_path, ReportError::Yes) else {
-            return None;
-        };
+        let ident_path = edge_type_param.ident_path()?;
         let Some(leaf_symbol) = ident_path.symbols().last() else {
             return None;
         };
 
-        // let var_symbol = sym_var.symbol()?;
         let len = edge_builder.cardinals.len();
 
         match edge_builder
@@ -531,8 +573,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             Entry::Occupied(occupied) => Some(*occupied.get()),
             Entry::Vacant(vacant) => {
                 let Ok(cardinal_idx): Result<u8, _> = len.try_into() else {
-                    CompileError::SymEdgeArityOverflow
-                        .span_report(sym_type_param.view().span(), &mut self.ctx);
+                    CompileError::EdgeArityOverflow
+                        .span_report(edge_type_param.view().span(), &mut self.ctx);
 
                     return None;
                 };
@@ -542,10 +584,15 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     cardinal_idx,
                     SymbolicEdgeCardinal {
                         span: self.ctx.source_span(leaf_symbol.span()),
-                        kind: CardinalKind::Parameter { def_id },
+                        kind: CardinalKind::Parameter {
+                            // will be resolved later..
+                            def_id: OntolDefTag::Unit.def_id(),
+                        },
                         one_to_one_count: 0,
                     },
                 );
+                // .. by this "params" thing which stores the source position:
+                edge_builder.params.insert(cardinal_idx, edge_type_param);
 
                 vacant.insert(cardinal_idx);
                 Some(cardinal_idx)
@@ -586,9 +633,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     }
 }
 
-struct EdgeBuilder {
+struct EdgeBuilder<V> {
     edge_id: EdgeId,
     cardinal_name_table: HashMap<String, CardinalIdx>,
     slots: FnvHashMap<DefId, Slot>,
     cardinals: BTreeMap<CardinalIdx, SymbolicEdgeCardinal>,
+    params: BTreeMap<CardinalIdx, EdgeTypeParam<V>>,
 }

@@ -176,8 +176,8 @@ fn deserialize_recursive() {
     domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo ()
     def bar ()
-    rel foo 'b': bar
-    rel bar 'f': foo
+    rel {foo} 'b': bar
+    rel {bar} 'f': foo
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);

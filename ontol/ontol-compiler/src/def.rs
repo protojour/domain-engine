@@ -255,6 +255,10 @@ impl<'m> Defs<'m> {
             .unwrap_or_else(|| panic!("no DefKind for {def_id:?}"))
     }
 
+    pub fn is_macro(&self, def_id: DefId) -> bool {
+        matches!(self.def_kind(def_id), DefKind::Macro(_))
+    }
+
     pub fn def_kind_option(&self, def_id: DefId) -> Option<&DefKind<'m>> {
         self.table.get(&def_id).map(|def| &def.kind)
     }

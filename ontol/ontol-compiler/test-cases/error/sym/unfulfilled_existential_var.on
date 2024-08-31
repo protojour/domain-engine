@@ -1,4 +1,4 @@
-sym {
+edge test {
     // a and b are existential type variables,
     // the property must be used at least once.
     (a) // ERROR existential variable is not associated with a definition

@@ -219,20 +219,22 @@ pub enum CompileError {
     SpreadLabelMustBeLastArgument,
     /// modifier not recognized in this context
     InvalidModifier,
+    /// entity-to-entity relationship must use an edge
+    EntityToEntityRelationshipMustUseEdge,
     /// cannot mix standalone symbol and symbolic edge in the same `sym` statement
-    SymCannotMixStandaloneSymbolsAndSymbolicEdge,
+    EdgeCannotMixStandaloneSymbolsAndSymbolicEdge,
     /// no trailing item expected
     SymStandaloneTrailingItems,
     /// expected another item
-    SymEdgeExpectedTrailingItem,
+    EdgeExpectedTrailingItem,
     /// expected sym variable (`(var)`)
-    SymEdgeExpectedVariable,
+    EdgeExpectedVariable,
     /// expected symbol
-    SymEdgeExpectedSymbol,
+    EdgeExpectedSymbol,
     /// edge arity overflow
-    SymEdgeArityOverflow,
+    EdgeArityOverflow,
     /// existential variable is not associated with a definition
-    SymEdgeNoDefinitionForExistentialVar,
+    EdgeNoDefinitionForExistentialVar,
     /// BUG: {0}
     ///
     /// A message regarded as a bug in the compiler
@@ -328,6 +330,10 @@ pub struct CompileErrors {
 impl CompileErrors {
     pub fn extend(&mut self, errors: CompileErrors) {
         self.errors.extend(errors.errors);
+    }
+
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
     }
 }
 

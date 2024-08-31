@@ -147,13 +147,19 @@ pub enum Kind {
 
     /// sym statement
     SymStatement,
+    /// sym, ..
     SymRelation,
-    /// (SymVar) SymDecl: (SymVar)
-    SymVar,
-    /// SymTypeParam SymDecl: SymTypeParam
-    SymTypeParam,
-    /// _ SymDecl: _
+    /// sym, ..
     SymDecl,
+
+    EdgeStatement,
+    EdgeRelation,
+    /// _ EdgeSlot: _
+    EdgeSlot,
+    /// (EdgeVar) EdgeSlot: (EdgeVar)
+    EdgeVar,
+    /// EdgeTypeParam EdgeSlot: EdgeTypeParam
+    EdgeTypeParam,
 
     /// rel statement
     RelStatement,
@@ -342,9 +348,12 @@ impl Display for Kind {
             Kind::DefBody => write!(f, "def body"),
             Kind::SymStatement => write!(f, "sym statement"),
             Kind::SymRelation => write!(f, "sym relation"),
-            Kind::SymVar => write!(f, "sym relation variable"),
-            Kind::SymTypeParam => write!(f, "sym reference parameter"),
             Kind::SymDecl => write!(f, "sym declaration"),
+            Kind::EdgeStatement => write!(f, "edge statement"),
+            Kind::EdgeRelation => write!(f, "edge relation"),
+            Kind::EdgeSlot => write!(f, "edge slot"),
+            Kind::EdgeVar => write!(f, "edge variable"),
+            Kind::EdgeTypeParam => write!(f, "edge type parameter"),
             Kind::RelStatement => write!(f, "rel statement"),
             Kind::RelFwdSet => write!(f, "rel forward set"),
             Kind::RelBackwdSet => write!(f, "rel backward set"),
