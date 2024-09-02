@@ -167,7 +167,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     attributes,
                     spread_label: _,
                 },
-                Some((expected_struct_ty @ Type::Anonymous(def_id), _)),
+                Some((expected_struct_ty @ (Type::DomainDef(def_id) | Type::Anonymous(def_id)), _)),
             ) => {
                 let actual_ty = self.check_def(*def_id);
                 if actual_ty != expected_struct_ty {
@@ -236,7 +236,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         modifier = Some(CompoundPatternModifier::Match);
                         (struct_ty, *def_id)
                     }
-                    _ => unreachable!(),
+                    TypePath::RelContextual => unreachable!("rel contextual"),
                 };
 
                 let node = self.build_unpacker(

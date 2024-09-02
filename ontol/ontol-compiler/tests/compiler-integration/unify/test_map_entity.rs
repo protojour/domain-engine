@@ -48,27 +48,36 @@ fn test_extract_rel_params() {
         rel* 'bar': text
     )
 
-    def a_edge (
+    edge edge_a {
+        (s) foreign: (f) with: a_params
+    }
+
+    def a_params (
         rel* 'bar': text
     )
 
     def a1(
         rel. id: a1_id
-        rel* 'foreign'[rel* is: a_edge]: a2
+        rel* edge_a.foreign: a2
     )
+
+    edge edge_b {
+        (s) foreign: (f)
+    }
+
     def b1(
         rel. id: b1_id
-        rel* 'foreign': b2
+        rel* edge_b.foreign: b2
     )
 
     map(
         a1(
             id: root_id,
-            'foreign'['bar': b]: a2(id: foreign_id, 'foo': f)
+            edge_a.foreign['bar': b]: a2(id: foreign_id, 'foo': f)
         ),
         b1(
             id: root_id,
-            'foreign': b2(
+            edge_b.foreign: b2(
                 id: foreign_id,
                 'foo': f,
                 'bar': b,
@@ -141,16 +150,23 @@ fn test_rel_params_implicit_map() {
         rel* 'b_prop': text
     )
 
-    def a_edge (rel* 'aa': text)
-    def b_edge (rel* 'bb': text)
+    edge edge_a {
+        (s) foreign: (o) with: a_params
+    }
+    edge edge_b {
+        (s) foreign: (o) with: b_params
+    }
+
+    def a_params (rel* 'aa': text)
+    def b_params (rel* 'bb': text)
 
     def a (
         rel. 'id': a_id
-        rel* 'foreign'[rel* is: a_edge]: a_inner
+        rel* edge_a.foreign: a_inner
     )
     def b (
         rel. 'id': b_id
-        rel* 'foreign'[rel* is: b_edge]: b_inner
+        rel* edge_b.foreign: b_inner
     )
 
     map(
@@ -158,12 +174,12 @@ fn test_rel_params_implicit_map() {
         b_inner('id': id, 'b_prop': x),
     )
     map(
-        a_edge('aa': x),
-        b_edge('bb': x),
+        a_params('aa': x),
+        b_params('bb': x),
     )
     map(
-        a('id': id, 'foreign': x),
-        b('id': id, 'foreign': x),
+        a('id': id, edge_a.foreign: x),
+        b('id': id, edge_b.foreign: x),
     )
     "
     .compile_then(|test| {
@@ -250,24 +266,32 @@ fn test_map_generate_edge() {
         (
             src_name("outer"),
             "
+            domain ZZZZZZZZZZZTEST1ZZZZZZZZZZ ()
             use 'inner' as inner
+
+            edge arc {
+                (a) bars: (b) with: params
+            }
+            def params (
+                rel* 'field': text
+            )
 
             def foo (
                 rel. 'id': (rel* is: text)
-                rel* 'bars'[rel* 'field': text]: {bar}
+                rel* arc.bars: {bar}
             )
-            def bar (rel* 'id': (rel* is: text))
+            def bar (rel. 'id': (rel* is: text))
 
             map(
                 foo(
                     'id': foo_id,
-                    'bars': {
+                    arc.bars: {
                         ..['field': field] bar('id': bar_id)
                     }
                 ),
                 inner.foo(
                     'id': foo_id,
-                    'bars': {
+                    inner.arc.bars: {
                         ..inner.bar(
                             'id': bar_id,
                             'field': field
@@ -280,10 +304,14 @@ fn test_map_generate_edge() {
         (
             src_name("inner"),
             "
-            domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
+            domain ZZZZZZZZZZZTEST2ZZZZZZZZZZ ()
+            edge arc {
+                (a) bars: (b)
+            }
+
             def foo (
                 rel. 'id': (rel* is: text)
-                rel* 'bars': {bar}
+                rel* arc.bars: {bar}
             )
 
             def bar (
