@@ -38,23 +38,16 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         EdgeId,
         BTreeMap<CardinalIdx, insp::EdgeTypeParam<V>>,
     )> {
-        let Some(ident_path) = edge_stmt.ident_path() else {
-            return None;
-        };
-        let Some(ident_symbol) = ident_path.symbols().next() else {
-            return None;
-        };
-
-        let Some((edge_def_id, coinage, ident)) = self.catch(|zelf| {
+        let ident_path = edge_stmt.ident_path()?;
+        let ident_symbol = ident_path.symbols().next()?;
+        let (edge_def_id, coinage, ident) = self.catch(|zelf| {
             zelf.ctx.named_def_id(
                 zelf.ctx.pkg_def_id,
                 Space::Def,
                 ident_symbol.slice(),
                 ident_symbol.span(),
             )
-        }) else {
-            return None;
-        };
+        })?;
 
         if matches!(coinage, Coinage::Used) {
             CompileError::EdgeMustHaveUniqueIdentifier
@@ -266,9 +259,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         edge_builder: &mut EdgeBuilder<V>,
     ) -> Option<CardinalIdx> {
         let ident_path = edge_type_param.ident_path()?;
-        let Some(leaf_symbol) = ident_path.symbols().last() else {
-            return None;
-        };
+        let leaf_symbol = ident_path.symbols().last()?;
 
         let len = edge_builder.cardinals.len();
 

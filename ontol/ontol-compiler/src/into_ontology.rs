@@ -103,7 +103,7 @@ impl<'m> Compiler<'m> {
             let mut cache: FnvHashMap<DefId, BTreeSet<DefId>> = Default::default();
 
             for package_id in package_ids.iter() {
-                let domain_def_id = self.package_def_ids.get(&package_id).cloned().unwrap();
+                let domain_def_id = self.package_def_ids.get(package_id).cloned().unwrap();
                 let namespace = namespaces.get(&domain_def_id).unwrap();
 
                 for (_, union_def_id) in &namespace.types {

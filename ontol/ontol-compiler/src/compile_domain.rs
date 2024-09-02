@@ -344,25 +344,23 @@ impl<'m> Compiler<'m> {
 
                         relationship.rel_params = RelParams::Def(param_def_id);
                     }
-                } else {
-                    if !matches!(
-                        meta.relationship.object_cardinality.1,
-                        ValueCardinality::Unit
-                    ) && def_implies_entity(
-                        subject.0,
-                        &self.repr_ctx,
-                        &self.prop_ctx,
-                        &self.entity_ctx,
-                    ) && def_implies_entity(
-                        object.0,
-                        &self.repr_ctx,
-                        &self.prop_ctx,
-                        &self.entity_ctx,
-                    ) {
-                        CompileError::EntityToEntityRelationshipMustUseEdge
-                            .span(meta.relationship.relation_span)
-                            .report(&mut self.errors);
-                    }
+                } else if !matches!(
+                    meta.relationship.object_cardinality.1,
+                    ValueCardinality::Unit
+                ) && def_implies_entity(
+                    subject.0,
+                    &self.repr_ctx,
+                    &self.prop_ctx,
+                    &self.entity_ctx,
+                ) && def_implies_entity(
+                    object.0,
+                    &self.repr_ctx,
+                    &self.prop_ctx,
+                    &self.entity_ctx,
+                ) {
+                    CompileError::EntityToEntityRelationshipMustUseEdge
+                        .span(meta.relationship.relation_span)
+                        .report(&mut self.errors);
                 }
             }
         }
