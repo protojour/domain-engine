@@ -18,7 +18,7 @@ sym {
     type
 }
 
-sym {
+edge relationship-edge {
     (src) related_to: (target) with_rel: (relationship),
     (target) related_from: (src) with_rel: (relationship),
     (relationship) source_ref: (src),

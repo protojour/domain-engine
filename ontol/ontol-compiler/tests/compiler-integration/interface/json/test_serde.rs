@@ -964,8 +964,12 @@ fn test_serialize_raw_tree_only() {
     def foo (
         rel. 'key': ( rel* is: text )
         rel* 'foo_field': text
-        rel* 'bar'?: bar
+        rel* bar_?: bar
     )
+    edge foobar {
+        // TODO: namespacing
+        (f) bar_: (b)
+    }
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -973,7 +977,7 @@ fn test_serialize_raw_tree_only() {
             .to_attr_nocheck(json!({
                 "key": "a",
                 "foo_field": "1",
-                "bar": {
+                "bar_": {
                     "key": "b",
                     "bar_field": "2"
                 }
@@ -1102,13 +1106,18 @@ fn test_union_with_extra_ambiguating_text_pattern() {
 
     def foo (
         rel. 'id': foo-id
-        rel* 'bar': bar-id
+        rel* bar_: bar-id
     )
     def bar (
         rel. 'id': bar-id
         // also a normal, non-identifying field that has `bar-id` type:
-        rel* 'bar': bar-id
+        rel* bar_: bar-id
     )
+
+    edge bar_ref {
+        // FIXME: namespacing:
+        (source) bar_: (bar)
+    }
 
     def foobar (
         rel* is?: foo
@@ -1123,11 +1132,11 @@ fn test_union_with_extra_ambiguating_text_pattern() {
         );
         assert_json_io_matches!(serde_create(&foobar), {
             "id": "foo/1",
-            "bar": "bar/666",
+            "bar_": "bar/666",
         });
         assert_json_io_matches!(serde_create(&foobar), {
             "id": "bar/1",
-            "bar": "bar/666",
+            "bar_": "bar/666",
         });
     });
 }

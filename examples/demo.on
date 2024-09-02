@@ -21,6 +21,7 @@ def @private archive_item (
     rel* 'description': text
     rel* 'asset_score': i64
     rel* 'type': ItemType
+    rel* archive_groups: {archive_group}
 )
 def @private archive_group (
     rel. 'id': (fmt '' => 'archive_group/' => uuid => .)
@@ -31,8 +32,12 @@ def @private archive_group (
     rel* 'description': text
     rel* 'start_date': datetime
     rel* 'end_date': datetime
+    rel* archive_items: {archive_item}
 )
-rel {archive_group} 'archive_items'::'archive_groups' {archive_item}
+edge db_linkage {
+    (g) archive_items: (i),
+    (i) archive_groups: (g),
+}
 
 // -----------------------------------
 // public API
@@ -61,6 +66,8 @@ def ArchiveObject (
     rel* 'assetScoreTimesTen': i64
     /// Classification of the object
     rel* 'kind': ItemType
+    /// Relation between ArchiveObject and ArchiveCollection
+    rel* archiveCollections: {ArchiveCollection}
 )
 /// ## An Archived Object Collection
 /// A collection of archived objects
@@ -79,25 +86,23 @@ def ArchiveCollection (
     /// Start date; latest (estimated)
     /// creation date of object in collection
     rel* 'endDate': datetime
+    /// Relation between ArchiveCollections and ArchiveObjects
+    rel* archiveObjects: {ArchiveObject}
 )
-/// Relation between ArchiveCollections and ArchiveObjects
-rel {ArchiveCollection} 'archiveObjects'::'archiveCollections' {ArchiveObject}
+
+/// a virtual (non-persisted) edge
+edge archive_linkage {
+    (c) archiveObjects: (o),
+    (o) archiveCollections: (c),
+}
+
+// TODO: should lower the "virtual edge" archive_linkage
+// to a persisted edge
+// map(archive_linkage, db_linkage)
 
 map(
     // variables for mapping values between
     // map arms are created as needed
-    archive_item(
-        'id': id,
-        'created': cr,
-        'updated':  up,
-        'archived': ar,
-        'name': n,
-        'description': d,
-        'asset_score': s,
-        'type': t,
-    ),
-    // variables must all be used
-    // and correspond between map arms
     ArchiveObject(
         // values can be remapped structurally
         'id': id,
@@ -113,21 +118,21 @@ map(
         'assetScoreTimesTen': s * 10,
         'kind': t,
     ),
-)
-
-map(
-    archive_group(
+    // variables must all be used
+    // and correspond between map arms
+    archive_item(
         'id': id,
         'created': cr,
-        'updated': up,
+        'updated':  up,
         'archived': ar,
         'name': n,
         'description': d,
-        'start_date': sd,
-        'end_date': ed,
-        // the previous map is reused here
-        'archive_items': {..ai},
+        'asset_score': s,
+        'type': t,
     ),
+)
+
+map(
     ArchiveCollection(
         'id': id,
         'dates': ArchiveDates(
@@ -139,6 +144,18 @@ map(
         'description': d,
         'startDate': sd,
         'endDate': ed,
-        'archiveObjects': {..ai}
-    )
+        archiveObjects: {..ai}
+    ),
+    archive_group(
+        'id': id,
+        'created': cr,
+        'updated': up,
+        'archived': ar,
+        'name': n,
+        'description': d,
+        'start_date': sd,
+        'end_date': ed,
+        // the previous map is reused here
+        archive_items: {..ai},
+    ),
 )

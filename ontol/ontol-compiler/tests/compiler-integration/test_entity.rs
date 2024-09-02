@@ -33,8 +33,11 @@ fn inherent_id_no_autogen() {
     def foo_id (rel* is: text)
     def foo (
         rel. 'key': foo_id
-        rel* 'children': {foo}
+        rel* children: {foo}
     )
+    edge ancestry {
+        (p) children: (c)
+    }
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -55,8 +58,11 @@ fn inherent_id_autogen() {
     def foo_id (rel* is: text)
     def foo (
         rel. 'key'[rel* gen: auto]: foo_id
-        rel* 'children': {foo}
+        rel* children: {foo}
     )
+    edge ancestry {
+        (p) children: (c)
+    }
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -76,8 +82,11 @@ fn id_and_inherent_property_inline_type() {
     domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'key': (rel* is: text)
-        rel* 'children': {foo}
+        rel* children: {foo}
     )
+    edge ancestry {
+        (p) children: (c)
+    }
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -384,13 +393,19 @@ fn entity_union_with_union_def_id_larger_than_id() {
     domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def Repository (
         rel. 'id'[rel* gen: auto]: (rel* is: uuid)
-        rel* 'owner'::'repositories' RepositoryOwner
+        rel* owner: RepositoryOwner
     )
+
+    edge repo_ownerhship {
+        (repo) owner: (owner),
+        (owner) repositories: (repo),
+    }
 
     def org_id (fmt '' => 'org/' => text => .)
 
     def Organization (
         rel. 'id': org_id
+        rel* repositories: {Repository}
     )
 
     def RepositoryOwner (
@@ -474,8 +489,11 @@ fn entity_relationship_without_reverse() {
     def programmer (
         rel. 'id': prog_id
         rel* 'name': text
-        rel* 'favorite-language': language
+        rel* favorite-language: language
     )
+    edge fav {
+        (p) favorite-language: (l)
+    }
     "
     .compile_then(|test| {
         let [programmer] = test.bind(["programmer"]);
@@ -496,10 +514,13 @@ fn recursive_entity_union() {
     def owner_id (fmt '' => text => .)
 
     def lifeform ()
+    edge diet {
+        (organism) eats: (nutrition)
+    }
     def animal (
         rel. 'id'[rel* gen: auto]: animal_id
         rel* 'class': 'animal'
-        rel* 'eats': {lifeform}
+        rel* eats: {lifeform}
     )
     def plant (
         rel. 'id'[rel* gen: auto]: plant_id
@@ -508,10 +529,14 @@ fn recursive_entity_union() {
     rel {lifeform} is?: animal
     rel {lifeform} is?: plant
 
+    edge ownership {
+        (owner) owns: (organism)
+    }
+
     def owner (
         rel. 'id': owner_id
         rel* 'name': text
-        rel* 'owns': {lifeform}
+        rel* owns: {lifeform}
     )
     "
     .compile_then(|test| {
@@ -565,13 +590,19 @@ fn store_key_in_def_info() {
     def foo (
         rel. 'id': (rel* is: text)
         rel* store_key: 'fu'
-        rel* 'bar'[rel* is: foobar_edge]: bar
+        rel* bar_: bar
     )
 
     def bar (
         rel. 'id': (rel* is: text)
-        rel* 'foo'[rel* store_key: 'baaah']: bar
+        rel* foo_: bar
     )
+
+    edge linkage {
+        // FIXME: introduce namespacing:
+        (f) bar_: (b) with: foobar_edge,
+        (b) foo_: (f) with: foobar_edge,
+    }
     "
     .compile_then(|test| {
         let ontology = test.ontology();
@@ -588,19 +619,21 @@ fn store_key_in_def_info() {
                 if name == "foo" {
                     assert_eq!(&ontology[def.store_key.unwrap()], "fu");
 
-                    let (_prop_id, _rel_info, projection) =
+                    let (_prop_id, _rel_info, _projection) =
                         def.edge_relationships().next().unwrap();
-                    let edge_info = ontology.find_edge(projection.id).unwrap();
-                    assert_eq!(&ontology[edge_info.store_key.unwrap()], "fubar");
+                    // TODO: "store_key" for eges has been deprecated
+                    // let edge_info = ontology.find_edge(projection.id).unwrap();
+                    // assert_eq!(&ontology[edge_info.store_key.unwrap()], "fubar");
                 }
 
                 if name == "bar" {
                     assert_eq!(&ontology[def.store_key.unwrap()], "bar");
 
-                    let (_prop_id, _rel_info, projection) =
+                    let (_prop_id, _rel_info, _projection) =
                         def.edge_relationships().next().unwrap();
-                    let edge_info = ontology.find_edge(projection.id).unwrap();
-                    assert_eq!(&ontology[edge_info.store_key.unwrap()], "baaah");
+                    // TODO: "store_key" for eges has been deprecated
+                    // let edge_info = ontology.find_edge(projection.id).unwrap();
+                    // assert_eq!(&ontology[edge_info.store_key.unwrap()], "baaah");
                 }
             }
         }

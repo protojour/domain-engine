@@ -1,0 +1,25 @@
+domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
+
+def foo-id (fmt '' => '/foo/' => uuid => .)
+def bar-id (fmt '' => '/bar/' => uuid => .)
+
+def Foo (
+    rel. 'id': foo-id
+    rel* 'test1'?: bar-id // ERROR entity-to-entity relationship must use an edge
+    rel* 'test2'?: foo-bar-id // ERROR entity-to-entity relationship must use an edge
+)
+
+def Bar (
+    rel. 'id': bar-id
+    rel* 'field': text
+)
+
+def FooBar (
+    rel* is?: Foo
+    rel* is?: Bar
+)
+
+def foo-bar-id (
+    rel* is?: foo-id
+    rel* is?: bar-id
+)

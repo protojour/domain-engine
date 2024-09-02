@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use arcstr::ArcStr;
 use fnv::FnvHashSet;
 use ontol_runtime::{
@@ -11,6 +13,7 @@ use ulid::Ulid;
 use crate::{
     def::{BuiltinRelationKind, DefKind},
     edge::EdgeCtx,
+    entity::entity_ctx::def_implies_entity,
     lowering::context::LoweringOutcome,
     misc::{MacroExpand, MacroItem, MiscCtx},
     namespace::DocId,
@@ -328,9 +331,27 @@ impl<'m> Compiler<'m> {
                 let subject = meta.relationship.subject;
                 let object = meta.relationship.object;
 
-                if self.entity_ctx.entities.contains_key(&subject.0)
-                    && self.entity_ctx.entities.contains_key(&object.0)
-                    && meta.relationship.edge_projection.is_none()
+                if matches!(meta.relation_def_kind.deref(), DefKind::BuiltinRelType(..)) {
+                    continue;
+                }
+
+                if meta.relationship.edge_projection.is_none()
+                    && !matches!(
+                        meta.relationship.object_cardinality.1,
+                        ValueCardinality::Unit
+                    )
+                    && def_implies_entity(
+                        subject.0,
+                        &self.repr_ctx,
+                        &self.prop_ctx,
+                        &self.entity_ctx,
+                    )
+                    && def_implies_entity(
+                        object.0,
+                        &self.repr_ctx,
+                        &self.prop_ctx,
+                        &self.entity_ctx,
+                    )
                 {
                     CompileError::EntityToEntityRelationshipMustUseEdge
                         .span(meta.relationship.relation_span)

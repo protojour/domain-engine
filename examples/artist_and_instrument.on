@@ -18,14 +18,14 @@ def instrument (
     rel* 'name': text
 )
 
-def play_params (
-    rel* 'how_much': text
-)
-
-edge play {
+edge playing {
     (a) plays: (i) with: play_params,
     (i) played_by: (a) with: play_params,
 }
+
+def play_params (
+    rel* 'how_much': text
+)
 
 rel {artist} plays: {instrument}
 rel {instrument} played_by: {artist}

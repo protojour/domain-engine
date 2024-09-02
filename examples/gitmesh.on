@@ -3,10 +3,14 @@ domain 01HH2687A8SPTZSX05YMBR43AH ()
 def Repository (
     rel. 'id'[rel* gen: auto]: (rel* is: uuid)
     rel* 'handle': text
-    // BUG: ontol should complain that this needs an edge relationship:
-    rel* 'owner'::'repositories'? RepositoryOwner
+    rel* owner: RepositoryOwner
     rel* origin?: .
 )
+
+edge ownership {
+    (repo) owner: (owner),
+    (owner) repositories: (repo),
+}
 
 edge fork {
     (fork) origin: (origin)
@@ -21,11 +25,13 @@ def User (
     rel. 'id': (fmt '' => 'user/' => text => .)
     rel* 'email': text
     rel* member_of: {Organization}
+    rel* repositories: {Repository}
 )
 
 def Organization (
     rel. 'id': (fmt '' => 'org/' => text => .)
     rel* members: {User}
+    rel* repositories: {Repository}
 )
 
 edge membership {
