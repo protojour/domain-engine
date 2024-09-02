@@ -574,9 +574,6 @@ impl<'m> Compiler<'m> {
             RelParams::Unit | RelParams::IndexRange(_) => None,
         };
 
-        // let edge_id = meta.relationship.projection.id;
-        // let edge_projection = meta.relationship.projection;
-
         let (data_relationship_kind, target) =
             match (meta.relationship.edge_projection, target_repr_kind) {
                 (Some(edge_projection), ReprKind::Union(members, _bound)) => {
@@ -605,6 +602,17 @@ impl<'m> Compiler<'m> {
                             DataRelationshipTarget::Union(target_def_id),
                         )
                     }
+                }
+                (None, ReprKind::Union(..)) => {
+                    let (kind, _) = self.data_relationship_kind_and_target(
+                        rel_id,
+                        &meta.relationship,
+                        meta.relationship.edge_projection,
+                        source_def_id,
+                        target_def_id,
+                    );
+
+                    (kind, DataRelationshipTarget::Union(target_def_id))
                 }
                 _ => self.data_relationship_kind_and_target(
                     rel_id,

@@ -765,3 +765,19 @@ fn edge_entity_union() {
         assert!(to_proj.pinned);
     }
 }
+
+#[test]
+fn edge_entity_subtype_db() {
+    let test = examples::entity_subtype::DB.1.compile();
+    let [foo] = test.bind(["foo"]);
+
+    let data_rels = &foo.def.data_relationships;
+
+    assert_eq!(data_rels.len(), 2);
+
+    let (_prop_id, anonymous) = data_rels.iter().nth(1).unwrap();
+
+    let DataRelationshipTarget::Union(_) = &anonymous.target else {
+        panic!("not a union: {:?}", anonymous.target);
+    };
+}
