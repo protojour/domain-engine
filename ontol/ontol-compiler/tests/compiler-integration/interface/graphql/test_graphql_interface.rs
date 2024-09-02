@@ -361,8 +361,7 @@ fn incompatible_edge_types_are_distinct() {
             let targets_connection = schema.type_data(targets_field.field_type.unit.addr());
             assert_eq!(
                 &ontology[targets_connection.typename],
-                // FIXME: something funky going on if not disambiguating this type:
-                "_anon1_5targetConnection"
+                "edge_typetargetConnection"
             );
 
             let targets_edge = schema.type_data(
@@ -376,7 +375,7 @@ fn incompatible_edge_types_are_distinct() {
                     .addr(),
             );
 
-            assert_eq!(&ontology[targets_edge.typename], "_anon1_5targetEdge");
+            assert_eq!(&ontology[targets_edge.typename], "edge_typetargetEdge");
             assert!(targets_edge.fields().unwrap().contains_key("edge_field"));
         }
     });
