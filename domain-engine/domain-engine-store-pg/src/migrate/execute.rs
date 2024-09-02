@@ -18,10 +18,14 @@ pub async fn execute_domain_migration<'t>(
     txn: &Transaction<'t>,
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
-    for (ids, step) in std::mem::take(&mut ctx.steps) {
-        execute_migration_step(ids, step, txn, ctx)
-            .instrument(info_span!("migrate", uid = %ids.uid))
-            .await?;
+    let staged_steps = std::mem::take(&mut ctx.steps).into_inner();
+
+    for (_stage, steps) in staged_steps {
+        for (ids, step) in steps {
+            execute_migration_step(ids, step, txn, ctx)
+                .instrument(info_span!("migrate", uid = %ids.uid))
+                .await?;
+        }
     }
 
     Ok(())
@@ -405,7 +409,7 @@ async fn execute_migration_step<'t>(
                     }
                 }
                 PgEdgeCardinalKind::PinnedDef {
-                    def_id,
+                    pinned_def_id: def_id,
                     key_col_name,
                 } => {
                     let pg_target_domain = ctx.domains.get(&def_id.package_id()).unwrap();
@@ -447,11 +451,13 @@ async fn execute_migration_step<'t>(
                     key_column_name = Some(key_col_name.as_ref());
                 }
                 PgEdgeCardinalKind::PinnedDef {
-                    def_id,
+                    pinned_def_id,
                     key_col_name,
                 } => {
-                    pinned_domaintable_key =
-                        Some(pg_edge_domain.datatables.get(def_id).unwrap().key);
+                    let pinned_domain = ctx.domains.get(&pinned_def_id.package_id()).unwrap();
+                    let pinned_table = pinned_domain.datatables.get(pinned_def_id).unwrap();
+
+                    pinned_domaintable_key = Some(pinned_table.key);
                     key_column_name = Some(key_col_name.as_ref());
                 }
                 PgEdgeCardinalKind::Parameters(_) => {}

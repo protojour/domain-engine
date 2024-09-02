@@ -36,12 +36,42 @@ struct PgDomainIds {
     uid: DomainUid,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
+enum Stage {
+    Domain,
+    Vertex,
+    Edge,
+}
+
 struct MigrationCtx {
     current_version: RegVersion,
     deployed_version: RegVersion,
     domains: FnvHashMap<PackageId, PgDomain>,
-    steps: Vec<(PgDomainIds, MigrationStep)>,
+    steps: Steps,
     abstract_scalars: FnvHashMap<PackageId, BTreeMap<OntolDefTag, PgType>>,
+}
+
+#[derive(Default)]
+struct Steps {
+    steps: BTreeMap<Stage, Vec<(PgDomainIds, MigrationStep)>>,
+}
+
+impl Steps {
+    pub fn extend(
+        &mut self,
+        stage: Stage,
+        domain_ids: PgDomainIds,
+        steps: impl IntoIterator<Item = MigrationStep>,
+    ) {
+        self.steps
+            .entry(stage)
+            .or_default()
+            .extend(steps.into_iter().map(|step| (domain_ids, step)));
+    }
+
+    pub fn into_inner(self) -> BTreeMap<Stage, Vec<(PgDomainIds, MigrationStep)>> {
+        self.steps
+    }
 }
 
 /// The descructive steps that may be performed by the domain migration

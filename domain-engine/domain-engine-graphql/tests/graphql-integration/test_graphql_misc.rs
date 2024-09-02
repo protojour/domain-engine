@@ -186,18 +186,18 @@ async fn sym_edge_simple(ds: &str) {
         SrcName::default(),
         "
         domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
-        sym {
+        edge just_testing {
             (a) prop: (b),
             (b) reverse_prop: (a),
         }
 
         def foo (
             rel. 'id': (rel* is: text)
-            rel* prop: {bar}
+            rel* just_testing.prop: {bar}
         )
         def bar (
             rel. 'id': (rel* is: text)
-            rel* reverse_prop: {foo}
+            rel* just_testing.reverse_prop: {foo}
         )
 
         map bars (

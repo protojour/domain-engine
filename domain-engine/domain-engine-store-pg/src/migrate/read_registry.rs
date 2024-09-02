@@ -240,7 +240,7 @@ pub async fn read_registry<'t>(
                 kind: match (key_col_name, pinned_domaintable_def_id, def_col_name) {
                     (Some(key_col_name), Some(pinned_domaintable_def_id), None) => {
                         PgEdgeCardinalKind::PinnedDef {
-                            def_id: pinned_domaintable_def_id,
+                            pinned_def_id: pinned_domaintable_def_id,
                             key_col_name,
                         }
                     }

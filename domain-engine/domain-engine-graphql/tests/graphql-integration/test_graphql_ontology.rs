@@ -93,6 +93,10 @@ async fn test_stix_ontology(ds: &str) {
                     "name": "stix_common",
                 },
                 {
+                    "id": "01J6SACJ2A3P8FNEQ2S20M3DV7",
+                    "name": "stix_edges",
+                },
+                {
                     "id": "01H7ZN6PJ0NHEFMHW2PBN4FEPZ",
                     "name": "stix_interface",
                 },
@@ -131,28 +135,28 @@ async fn test_stix_ontology(ds: &str) {
         .await,
         expected = Ok(graphql_value!({
             "def": {
-                "id": "def@1:59",
+                "id": "def@1:54",
                 "kind": "ENTITY",
                 "dataRelationships": [
-                    { "propId": "p@1:59:0", "name": "type" },
-                    { "propId": "p@1:59:1", "name": "id" },
-                    { "propId": "p@1:59:2", "name": "spec_version" },
-                    { "propId": "p@1:59:3", "name": "created" },
-                    { "propId": "p@1:59:4", "name": "modified" },
-                    { "propId": "p@1:59:5", "name": "confidence" },
-                    { "propId": "p@1:59:6", "name": "revoked" },
-                    { "propId": "p@1:59:7", "name": "labels" },
-                    { "propId": "p@1:59:8", "name": "lang" },
-                    { "propId": "p@1:59:9", "name": "external_references" },
-                    { "propId": "p@1:59:10", "name": "created_by_ref" },
-                    { "propId": "p@1:59:11", "name": "object_marking_refs" },
-                    { "propId": "p@1:59:12", "name": "granular_markings" },
-                    { "propId": "p@1:59:13", "name": "name" },
-                    { "propId": "p@1:59:14", "name": "description" },
-                    { "propId": "p@1:59:15", "name": "roles" },
-                    { "propId": "p@1:59:16", "name": "identity_class" },
-                    { "propId": "p@1:59:17", "name": "sectors" },
-                    { "propId": "p@1:59:18", "name": "contact_information" },
+                    { "propId": "p@1:54:0", "name": "type" },
+                    { "propId": "p@1:54:1", "name": "id" },
+                    { "propId": "p@1:54:2", "name": "spec_version" },
+                    { "propId": "p@1:54:3", "name": "created" },
+                    { "propId": "p@1:54:4", "name": "modified" },
+                    { "propId": "p@1:54:5", "name": "confidence" },
+                    { "propId": "p@1:54:6", "name": "revoked" },
+                    { "propId": "p@1:54:7", "name": "labels" },
+                    { "propId": "p@1:54:8", "name": "lang" },
+                    { "propId": "p@1:54:9", "name": "external_references" },
+                    { "propId": "p@1:54:10", "name": "created_by_ref" },
+                    { "propId": "p@1:54:11", "name": "object_marking_refs" },
+                    { "propId": "p@1:54:12", "name": "granular_markings" },
+                    { "propId": "p@1:54:13", "name": "name" },
+                    { "propId": "p@1:54:14", "name": "description" },
+                    { "propId": "p@1:54:15", "name": "roles" },
+                    { "propId": "p@1:54:16", "name": "identity_class" },
+                    { "propId": "p@1:54:17", "name": "sectors" },
+                    { "propId": "p@1:54:18", "name": "contact_information" },
                 ]
             }
         }))
@@ -181,37 +185,37 @@ async fn test_stix_ontology(ds: &str) {
                         "type": "struct",
                         "attrs": [
                             {
-                                "propId": "p@1:59:0",
+                                "propId": "p@1:54:0",
                                 "attr": "unit",
                                 "type": "text",
                                 "value": "identity",
                             },
                             {
-                                "propId": "p@1:59:1",
+                                "propId": "p@1:54:1",
                                 "attr": "unit",
                                 "type": "text",
                                 "value": "identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5",
                             },
                             {
-                                "propId": "p@1:59:2",
+                                "propId": "p@1:54:2",
                                 "attr": "unit",
                                 "type": "text",
                                 "value": "2.1",
                             },
                             {
-                                "propId": "p@1:59:3",
+                                "propId": "p@1:54:3",
                                 "attr": "unit",
                                 "type": "datetime",
                                 "value": "2017-06-01T00:00:00Z",
                             },
                             {
-                                "propId": "p@1:59:4",
+                                "propId": "p@1:54:4",
                                 "attr": "unit",
                                 "type": "datetime",
                                 "value": "2017-06-01T00:00:00Z",
                             },
                             {
-                                "propId": "p@1:59:9",
+                                "propId": "p@1:54:9",
                                 "attr": "matrix",
                                 "columns": [
                                     [
@@ -242,13 +246,13 @@ async fn test_stix_ontology(ds: &str) {
                                 ]
                             },
                             {
-                                "propId": "p@1:59:13",
+                                "propId": "p@1:54:13",
                                 "attr": "unit",
                                 "type": "text",
                                 "value": "The MITRE Corporation"
                             },
                             {
-                                "propId": "p@1:59:15",
+                                "propId": "p@1:54:15",
                                 "attr": "matrix",
                                 "columns": [
                                     [
@@ -258,7 +262,7 @@ async fn test_stix_ontology(ds: &str) {
                                 ]
                             },
                             {
-                                "propId": "p@1:59:16",
+                                "propId": "p@1:54:16",
                                 "attr": "unit",
                                 "type": "text",
                                 "value": "organization"

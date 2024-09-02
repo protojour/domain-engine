@@ -343,7 +343,7 @@ pub enum PgEdgeCardinalKind {
     /// is an "extension" of that vertex.
     /// Unique edge cardinals have ON DELETE CASCADE set up.
     PinnedDef {
-        def_id: DefId,
+        pinned_def_id: DefId,
         key_col_name: Box<str>,
     },
     Parameters(DefId),

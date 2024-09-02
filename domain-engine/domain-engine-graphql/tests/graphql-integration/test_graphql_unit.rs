@@ -68,22 +68,36 @@ async fn version() {
 fn field_order() {
     let (_test, schema) = "
     domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
+    edge edge1 {
+        (a) subjects: (b),
+        (b) obj_1: (a)
+    }
+    edge edge2 {
+        (a) subjects: (b),
+        (b) obj_2: (a)
+    }
+    edge conn {
+        (a) connection: (b)
+    }
+
     def ent1 (
         rel. 'id': (rel* is: text)
-        rel* 'subjects'::'obj_1' {subject}
+        rel* edge1.subjects: {subject}
     )
     def subject (
         rel* is: a
         rel* is: b
         rel. 'id': (rel* is: text)
-        rel* 'connection': {ent1}
+        rel* conn.connection: {ent1}
         rel* 'field': text
         rel* is: c
         rel* is: d
+        rel* edge1.obj_1: {ent1}
+        rel* edge2.obj_2: {ent2}
     )
     def ent2 (
         rel. 'id': (rel* is: text)
-        rel* 'subjects'::'obj_2' {subject}
+        rel* edge2.subjects: {subject}
     )
 
     def @macro a(rel* 'a': text)
@@ -691,7 +705,7 @@ async fn docs_introspection() {
 #[test(tokio::test)]
 async fn artist_and_instrument_connections() {
     let (test, schema) = ARTIST_AND_INSTRUMENT.1.compile_single_schema();
-    let [artist, instrument, plays] = test.bind(["artist", "instrument", "plays"]);
+    let [artist, instrument, play_params] = test.bind(["artist", "instrument", "play_params"]);
     let ziggy: Value = artist
         .entity_builder(
             json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
@@ -710,7 +724,7 @@ async fn artist_and_instrument_connections() {
                         }),
                     )
                     .to_value()]),
-                Sequence::from_iter([plays
+                Sequence::from_iter([play_params
                     .value_builder(json!({ "how_much": "A lot" }))
                     .to_value()]),
             ])
@@ -1581,9 +1595,14 @@ async fn test_extension_and_member_from_foreign_domain() {
 async fn test_const_in_union_bug() {
     "
     domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
+    edge e {
+        (t) unions: (u),
+        (u) targets: (t),
+    }
+
     def union (
         rel* is?: member
-        rel* 'targets'::'unions' {target}
+        rel* e.targets: {target}
     )
 
     def member (
@@ -1593,6 +1612,7 @@ async fn test_const_in_union_bug() {
 
     def target (
         rel. 'id'[rel* gen: auto]: (fmt '' => 'target/' => text => .)
+        rel* e.unions: {union}
     )
     "
     .compile_single_schema();
@@ -1775,8 +1795,16 @@ async fn schema_bug1() {
         domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
         def foo (rel. 'id': (rel* is: text))
         def bar (rel. 'id': (rel* is: text))
-        rel {bar} 'foo': foo
-        rel {foo} 'bar2'::'foo2'? {bar}
+        edge e1 {
+            (a) foo: (b)
+        }
+        edge e2 {
+            (a) foo2: (b),
+            (b) bar2: (a),
+        }
+        rel {bar} e1.foo: foo
+        rel {foo} e2.bar2?: {bar}
+        rel {bar} e2.foo2?: {bar}
         ",
     )])
     .compile_schemas([SrcName::default()]);

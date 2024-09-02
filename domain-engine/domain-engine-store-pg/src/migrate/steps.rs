@@ -22,7 +22,7 @@ use crate::{
     },
 };
 
-use super::{MigrationCtx, PgDomainIds};
+use super::{MigrationCtx, PgDomainIds, Stage};
 
 pub async fn migrate_domain_steps<'t>(
     pkg_id: PackageId,
@@ -42,13 +42,14 @@ pub async fn migrate_domain_steps<'t>(
         info!("domain already deployed");
 
         if pg_domain.schema_name != schema {
-            ctx.steps.push((
+            ctx.steps.extend(
+                Stage::Domain,
                 domain_ids,
-                MigrationStep::RenameDomainSchema {
+                [MigrationStep::RenameDomainSchema {
                     old: pg_domain.schema_name.clone(),
                     new: schema,
-                },
-            ));
+                }],
+            );
         }
     } else {
         ctx.domains.insert(
@@ -61,13 +62,14 @@ pub async fn migrate_domain_steps<'t>(
             },
         );
 
-        ctx.steps.push((
+        ctx.steps.extend(
+            Stage::Domain,
             domain_ids,
-            MigrationStep::DeployDomain {
+            [MigrationStep::DeployDomain {
                 name: ontology[domain.unique_name()].into(),
                 schema_name: schema,
-            },
-        ));
+            }],
+        );
     };
 
     for def in domain.defs() {
@@ -96,22 +98,17 @@ pub async fn migrate_domain_steps<'t>(
                 continue;
             }
 
-            ctx.steps.extend([
-                (
-                    domain_ids,
+            ctx.steps.extend(
+                Stage::Vertex,
+                domain_ids,
+                [
                     MigrationStep::DeployVertex {
                         vertex_def_id: tag.def_id(),
                         table_name: format!("s_{:?}", tag.debug(ontology)).into_boxed_str(),
                     },
-                ),
-                (
-                    domain_ids,
                     MigrationStep::DeployVertexFKey {
                         vertex_def_id: tag.def_id(),
                     },
-                ),
-                (
-                    domain_ids,
                     MigrationStep::DeployProperty {
                         table_id: PgTableIdUnion::Def(tag.def_id()),
                         prop_tag: DefPropTag(0),
@@ -120,8 +117,8 @@ pub async fn migrate_domain_steps<'t>(
                             pg_type,
                         },
                     },
-                ),
-            ]);
+                ],
+            );
         }
     }
 
@@ -141,25 +138,27 @@ async fn migrate_vertex_steps<'t>(
 
     let exists = if let Some(datatable) = pg_domain.datatables.get_mut(&vertex_def_id) {
         if datatable.table_name != table_name {
-            ctx.steps.push((
+            ctx.steps.extend(
+                Stage::Vertex,
                 domain_ids,
-                MigrationStep::RenameDataTable {
+                [MigrationStep::RenameDataTable {
                     def_id: vertex_def_id,
                     old: datatable.table_name.clone(),
                     new: table_name.clone(),
-                },
-            ));
+                }],
+            );
         }
 
         true
     } else {
-        ctx.steps.push((
+        ctx.steps.extend(
+            Stage::Vertex,
             domain_ids,
-            MigrationStep::DeployVertex {
+            [MigrationStep::DeployVertex {
                 vertex_def_id,
                 table_name: table_name.clone(),
-            },
-        ));
+            }],
+        );
         false
     };
 
@@ -170,13 +169,15 @@ async fn migrate_vertex_steps<'t>(
         .count();
     let needs_fkey = id_count == 0;
     if !exists && needs_fkey {
-        ctx.steps.push((
+        ctx.steps.extend(
+            Stage::Vertex,
             domain_ids,
-            MigrationStep::DeployVertexFKey { vertex_def_id },
-        ));
+            [MigrationStep::DeployVertexFKey { vertex_def_id }],
+        );
     }
 
     migrate_datafields_steps(
+        Stage::Vertex,
         domain_ids,
         PgTableIdUnion::Def(vertex_def_id),
         def,
@@ -212,13 +213,14 @@ async fn migrate_domain_edges_steps<'t>(
                 todo!("adjust edge arity");
             }
         } else {
-            ctx.steps.push((
+            ctx.steps.extend(
+                Stage::Edge,
                 domain_ids,
-                MigrationStep::DeployEdge {
+                [MigrationStep::DeployEdge {
                     edge_tag,
                     table_name,
-                },
-            ));
+                }],
+            );
         }
 
         for (index, cardinal) in edge_info.cardinals.iter().enumerate() {
@@ -233,7 +235,7 @@ async fn migrate_domain_edges_steps<'t>(
                 if cardinal.flags.contains(EdgeCardinalFlags::PINNED_DEF) {
                     PgEdgeCardinalKind::PinnedDef {
                         key_col_name,
-                        def_id: *cardinal.target.iter().next().unwrap(),
+                        pinned_def_id: *cardinal.target.iter().next().unwrap(),
                     }
                 } else {
                     index_type = Some(if cardinal.flags.contains(EdgeCardinalFlags::UNIQUE) {
@@ -292,22 +294,24 @@ async fn migrate_domain_edges_steps<'t>(
                     Err(PgMigrationError::ChangeIndexTypeNotImplemented)?;
                 }
             } else {
-                ctx.steps.push((
+                ctx.steps.extend(
+                    Stage::Edge,
                     domain_ids,
-                    MigrationStep::DeployEdgeCardinal {
+                    [MigrationStep::DeployEdgeCardinal {
                         edge_tag,
                         index,
                         ident,
                         kind: edge_cardinal_kind,
                         index_type,
-                    },
-                ));
+                    }],
+                );
             }
         }
     }
 
     for (edge_id, data_def_id) in data_def_ids {
         migrate_datafields_steps(
+            Stage::Edge,
             domain_ids,
             PgTableIdUnion::Edge(edge_id),
             ontology.def(data_def_id),
@@ -320,6 +324,7 @@ async fn migrate_domain_edges_steps<'t>(
 }
 
 fn migrate_datafields_steps(
+    stage: Stage,
     domain_ids: PgDomainIds,
     table_id: PgTableIdUnion,
     def: &Def,
@@ -393,41 +398,44 @@ fn migrate_datafields_steps(
                 PgRepr::Scalar(pg_type, scalar_tag),
                 ValueCardinality::IndexSet | ValueCardinality::List,
             ) => {
-                ctx.steps.push((
+                ctx.steps.extend(
+                    stage,
                     domain_ids,
-                    MigrationStep::DeployProperty {
+                    [MigrationStep::DeployProperty {
                         table_id,
                         prop_tag: *prop_tag,
                         data: PgPropertyData::Abstract,
-                    },
-                ));
+                    }],
+                );
                 ctx.abstract_scalars
                     .entry(domain_ids.pkg_id)
                     .or_default()
                     .insert(scalar_tag, pg_type);
             }
             (None, PgRepr::Scalar(pg_type, _), _) => {
-                ctx.steps.push((
+                ctx.steps.extend(
+                    stage,
                     domain_ids,
-                    MigrationStep::DeployProperty {
+                    [MigrationStep::DeployProperty {
                         table_id,
                         prop_tag: *prop_tag,
                         data: PgPropertyData::Scalar {
                             col_name: column_name.to_string().into_boxed_str(),
                             pg_type,
                         },
-                    },
-                ));
+                    }],
+                );
             }
             (None, PgRepr::Abstract, _) => {
-                ctx.steps.push((
+                ctx.steps.extend(
+                    stage,
                     domain_ids,
-                    MigrationStep::DeployProperty {
+                    [MigrationStep::DeployProperty {
                         table_id,
                         prop_tag: *prop_tag,
                         data: PgPropertyData::Abstract,
-                    },
-                ));
+                    }],
+                );
             }
             (_, PgRepr::NotSupported(msg), _) => {
                 error!("pg repr error for {table_id:?}:`{column_name}`: `{msg:?}`");
@@ -462,15 +470,16 @@ fn migrate_datafields_steps(
                     }
                 }
                 None => {
-                    ctx.steps.push((
+                    ctx.steps.extend(
+                        stage,
                         domain_ids,
-                        MigrationStep::DeployPropertyIndex {
+                        [MigrationStep::DeployPropertyIndex {
                             table_id,
                             index_def_id: def_id,
                             index_type,
                             field_tuple: vec![*prop_tag],
-                        },
-                    ));
+                        }],
+                    );
                 }
             }
         }
