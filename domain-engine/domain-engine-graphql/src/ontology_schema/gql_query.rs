@@ -83,7 +83,7 @@ impl Query {
 
         for (_, domain) in ctx.domains() {
             for def in domain.defs() {
-                if let Some(name) = def.name() {
+                if let Some(name) = def.ident() {
                     dict.entry(ctx[name].to_string())
                         .or_default()
                         .push(gql_def::Def { id: def.id });

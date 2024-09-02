@@ -28,7 +28,7 @@ use crate::{serde_helper::serde_create, OntolTest};
 pub(crate) const TEST_JSON_SCHEMA_VALIDATION: bool = true;
 
 pub struct DefBinding<'on> {
-    pub def: Def,
+    pub def: &'on Def,
     json_schema: Option<JSONSchema>,
     ontology: &'on Ontology,
 }
@@ -48,15 +48,14 @@ impl<'on> DefBinding<'on> {
         let domain = ontology.find_domain(package_id).unwrap();
         let def = domain
             .defs()
-            .find(|def| match def.name().map(|name| &ontology[name]) {
+            .find(|def| match def.ident().map(|name| &ontology[name]) {
                 Some(name) => name == type_name,
                 None => false,
             })
-            .cloned()
             .unwrap_or_else(|| panic!("type not found: `{type_name}`"));
 
         if !def.public {
-            warn!("`{:?}` is not public!", def.name().debug(ontology));
+            warn!("`{:?}` is not public!", def.ident().debug(ontology));
         }
 
         trace!(
@@ -82,7 +81,7 @@ impl<'on> DefBinding<'on> {
 
     pub fn from_def_id(def_id: DefId, ontology: &'on Ontology) -> Self {
         Self {
-            def: ontology.def(def_id).clone(),
+            def: ontology.def(def_id),
             json_schema: None,
             ontology,
         }

@@ -21,7 +21,7 @@ impl AqlQuery {
         database: &ArangoDatabase,
     ) -> DomainResult<AqlQuery> {
         let def = ontology.def(entity.type_def_id());
-        let def_name = def.name().expect("entity should have a name");
+        let def_name = def.ident().expect("entity should have an identifier");
 
         debug!("AqlQuery::prequery_from_entity {}", &ontology[def_name]);
 

@@ -517,12 +517,12 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 output.push_str(name);
             }
 
-            if let Some(relation_name) = relation_def.name() {
-                typename_append(&mut typename, &self.serde_gen.str_ctx[relation_name]);
+            if let Some(relation_ident) = relation_def.ident() {
+                typename_append(&mut typename, &self.serde_gen.str_ctx[relation_ident]);
             }
 
-            if let Some(variant_name) = variant_def.name() {
-                typename_append(&mut typename, &self.serde_gen.str_ctx[variant_name]);
+            if let Some(variant_ident) = variant_def.ident() {
+                typename_append(&mut typename, &self.serde_gen.str_ctx[variant_ident]);
             }
         }
 

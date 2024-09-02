@@ -20,6 +20,7 @@ pub struct Entity {
 pub enum DefKind {
     Entity,
     Data,
+    Edge,
     Relation,
     Function,
     Domain,
@@ -53,8 +54,8 @@ impl Def {
     fn id(&self) -> String {
         format!("{:?}", self.id)
     }
-    fn name(&self, ctx: &OntologyCtx) -> Option<String> {
-        ctx.def(self.id).name().map(|name| ctx[name].into())
+    fn ident(&self, ctx: &OntologyCtx) -> Option<String> {
+        ctx.def(self.id).ident().map(|name| ctx[name].into())
     }
     fn doc(&self, ctx: &OntologyCtx) -> Option<String> {
         ctx.get_def_docs(self.id)
@@ -74,6 +75,7 @@ impl Def {
         match ctx.def(self.id).kind {
             domain::DefKind::Entity(_) => DefKind::Entity,
             domain::DefKind::Data(_) => DefKind::Data,
+            domain::DefKind::Edge(_) => DefKind::Edge,
             domain::DefKind::Relation(_) => DefKind::Relation,
             domain::DefKind::Function(_) => DefKind::Function,
             domain::DefKind::Domain(_) => DefKind::Domain,

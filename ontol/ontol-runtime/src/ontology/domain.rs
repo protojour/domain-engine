@@ -32,7 +32,7 @@ pub struct Domain {
 
     unique_name: TextConstant,
 
-    /// Types by DefId.1 (the type's index within the domain)
+    /// Types by def tag (the type's index within the domain)
     defs: Vec<Def>,
 
     edges: BTreeMap<EdgeId, EdgeInfo>,
@@ -86,7 +86,7 @@ impl Domain {
     }
 
     pub fn find_def_by_name(&self, name: TextConstant) -> Option<&Def> {
-        self.defs.iter().find(|info| info.name() == Some(name))
+        self.defs.iter().find(|info| info.ident() == Some(name))
     }
 
     pub fn add_def(&mut self, info: Def) {
@@ -102,7 +102,7 @@ impl Domain {
             id: DefId(info.id.0, 0),
             public: false,
             kind: DefKind::Data(BasicDef {
-                name: None,
+                ident: None,
                 repr: DefRepr::Unit,
             }),
             store_key: None,
@@ -138,14 +138,15 @@ pub struct Def {
 }
 
 impl Def {
-    pub fn name(&self) -> Option<TextConstant> {
+    pub fn ident(&self) -> Option<TextConstant> {
         match &self.kind {
-            DefKind::Entity(info) => Some(info.name),
+            DefKind::Entity(info) => Some(info.ident),
+            DefKind::Edge(edge_info) => Some(edge_info.ident),
             DefKind::Data(info)
             | DefKind::Relation(info)
             | DefKind::Function(info)
             | DefKind::Domain(info)
-            | DefKind::Generator(info) => info.name,
+            | DefKind::Generator(info) => info.ident,
         }
     }
 
@@ -192,6 +193,7 @@ impl Def {
 pub enum DefKind {
     Entity(Entity),
     Data(BasicDef),
+    Edge(EdgeInfo),
     Relation(BasicDef),
     Function(BasicDef),
     Domain(BasicDef),
@@ -200,7 +202,7 @@ pub enum DefKind {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BasicDef {
-    pub name: Option<TextConstant>,
+    pub ident: Option<TextConstant>,
     pub repr: DefRepr,
 }
 
@@ -236,7 +238,7 @@ pub enum DefReprUnionBound {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Entity {
-    pub name: TextConstant,
+    pub ident: TextConstant,
     pub id_prop: PropId,
     pub id_value_def_id: DefId,
     pub id_operator_addr: SerdeOperatorAddr,
@@ -318,8 +320,10 @@ pub struct EntityOrder {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FieldPath(pub Box<[PropId]>);
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct EdgeInfo {
+    pub ident: TextConstant,
+
     /// The cardinals represents a template for how to represent the edge.
     /// The length of the cardinals is the edge's cardinality.
     pub cardinals: Vec<EdgeCardinal>,

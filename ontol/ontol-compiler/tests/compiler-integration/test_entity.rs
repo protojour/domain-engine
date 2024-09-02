@@ -608,7 +608,7 @@ fn store_key_in_def_info() {
         let domain = ontology.find_domain(PackageId::second()).unwrap();
 
         for def in domain.defs() {
-            if let Some(text_constant) = def.name() {
+            if let Some(text_constant) = def.ident() {
                 let name = &ontology[text_constant];
 
                 if name == "foobar_edge" {

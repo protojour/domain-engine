@@ -36,13 +36,13 @@ pub fn generate_httpjson_interface(
                 };
 
                 http_json.resources.push(HttpResource {
-                    name: entity.name,
+                    name: entity.ident,
                     operator_addr: addr,
                     put: Some(Endpoint {}),
                 });
             }
             DefKind::Data(_) => {
-                let Some(name) = def.name() else {
+                let Some(ident) = def.ident() else {
                     continue;
                 };
                 if is_entity_union(def.id, serde_gen) {
@@ -54,7 +54,7 @@ pub fn generate_httpjson_interface(
                     };
 
                     http_json.resources.push(HttpResource {
-                        name,
+                        name: ident,
                         operator_addr: addr,
                         put: Some(Endpoint {}),
                     });

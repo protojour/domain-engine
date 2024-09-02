@@ -224,7 +224,7 @@ impl<'e> SchemaCtx<'e> {
         let def_id = serde_def.def_id;
         self.ontology
             .find_domain(def_id.0)
-            .and_then(|domain| domain.def(def_id).name())
+            .and_then(|domain| domain.def(def_id).ident())
             .map(|constant| &self.ontology[constant])
             .map(|type_name| format!("{type_name}{modifier}"))
     }

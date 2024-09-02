@@ -44,7 +44,7 @@ impl AqlQuery {
         database: &ArangoDatabase,
     ) -> DomainResult<Vec<AqlQuery>> {
         let def = ontology.def(entity.type_def_id());
-        let def_name = def.name().expect("entity should have a name");
+        let def_name = def.ident().expect("entity should have an identifier");
         debug!("AqlQuery::build_write {:?} {}", mode, &ontology[def_name]);
 
         if def.entity().is_some()
@@ -509,7 +509,7 @@ impl<'a> MetaQuery<'a> {
             match rel_info.target {
                 DataRelationshipTarget::Unambiguous(def_id) => {
                     let def = self.ontology.def(def_id);
-                    let def_name = def.name().expect("type should have a name");
+                    let def_name = def.ident().expect("type should have an identifier");
                     format!("_{}", &self.ontology[def_name])
                 }
                 DataRelationshipTarget::Union { .. } => "".to_string(), // TODO: validate
@@ -964,7 +964,8 @@ impl<'a> MetaQuery<'a> {
                             match rel_info.target {
                                 DataRelationshipTarget::Unambiguous(def_id) => {
                                     let def = self.ontology.def(def_id);
-                                    let def_name = def.name().expect("type should have a name");
+                                    let def_name =
+                                        def.ident().expect("type should have an identifier");
                                     format!("_{}", &self.ontology[def_name])
                                 }
                                 DataRelationshipTarget::Union { .. } => "".to_string(),

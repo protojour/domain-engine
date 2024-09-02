@@ -16,7 +16,6 @@ use ontol_runtime::{
         ontol::{OntolDomainMeta, TextConstant, TextLikeType, ValueGenerator},
         Ontology,
     },
-    property::ValueCardinality,
     rustdoc::RustDoc,
     DefId, DefIdSet, EdgeId, FnvIndexMap, PackageId, PropId,
 };
@@ -38,9 +37,7 @@ use crate::{
     package::ONTOL_PKG,
     primitive::PrimitiveKind,
     properties::Properties,
-    relation::{
-        rel_def_meta, rel_repr_meta, RelDefMeta, RelId, RelParams, Relationship, UnionMemberCache,
-    },
+    relation::{rel_def_meta, rel_repr_meta, RelDefMeta, RelId, Relationship, UnionMemberCache},
     repr::repr_model::{ReprKind, ReprScalarKind, UnionBound},
     strings::StringCtx,
     Compiler,
@@ -167,12 +164,11 @@ impl<'m> Compiler<'m> {
                 }
             }
 
-            for (type_name, type_def_id) in type_namespace {
-                let type_name_constant = serde_gen.str_ctx.intern_constant(type_name);
+            for (def_ident, type_def_id) in type_namespace {
+                let def_ident_constant = serde_gen.str_ctx.intern_constant(def_ident);
                 let data_relationships = self.collect_relationships_and_edges(
                     type_def_id,
                     &union_member_cache,
-                    &mut edges,
                     serde_gen.str_ctx,
                 );
                 let def_kind = self.defs.def_kind(type_def_id);
@@ -187,13 +183,13 @@ impl<'m> Compiler<'m> {
                     },
                     kind: match self.domain_entity(
                         type_def_id,
-                        type_name_constant,
+                        def_ident_constant,
                         &mut serde_gen,
                         &data_relationships,
                     ) {
                         Some(entity) => domain::DefKind::Entity(entity),
                         None => def_kind.as_ontology_type_kind(BasicDef {
-                            name: Some(type_name_constant),
+                            ident: Some(def_ident_constant),
                             repr: self
                                 .repr_ctx
                                 .get_repr_kind(&type_def_id)
@@ -210,7 +206,7 @@ impl<'m> Compiler<'m> {
                             .store_keys
                             .get(&type_def_id)
                             .copied()
-                            .unwrap_or(type_name_constant),
+                            .unwrap_or(def_ident_constant),
                     ),
                     data_relationships,
                 });
@@ -224,7 +220,7 @@ impl<'m> Compiler<'m> {
                         .defs
                         .def_kind(type_def_id)
                         .as_ontology_type_kind(BasicDef {
-                            name: None,
+                            ident: None,
                             repr: self
                                 .repr_ctx
                                 .get_repr_kind(&type_def_id)
@@ -239,7 +235,6 @@ impl<'m> Compiler<'m> {
                     data_relationships: self.collect_relationships_and_edges(
                         type_def_id,
                         &union_member_cache,
-                        &mut edges,
                         serde_gen.str_ctx,
                     ),
                 });
@@ -254,7 +249,7 @@ impl<'m> Compiler<'m> {
                         id: def_id,
                         public: false,
                         kind: domain::DefKind::Data(BasicDef {
-                            name: None,
+                            ident: None,
                             repr: DefRepr::TextConstant(constant),
                         }),
                         operator_addr: None,
@@ -270,6 +265,7 @@ impl<'m> Compiler<'m> {
                 }
 
                 let mut edge_info = EdgeInfo {
+                    ident: TextConstant(0),
                     cardinals: Vec::with_capacity(edge.cardinals.len()),
                     store_key: None,
                 };
@@ -467,16 +463,10 @@ impl<'m> Compiler<'m> {
         &self,
         type_def_id: DefId,
         union_member_cache: &UnionMemberCache,
-        edges: &mut FnvHashMap<PackageId, FnvHashMap<EdgeId, EdgeInfo>>,
         str_ctx: &mut StringCtx<'m>,
     ) -> FnvIndexMap<PropId, DataRelationshipInfo> {
         let mut relationships = FnvIndexMap::default();
-        self.collect_inherent_relationships_and_edges(
-            type_def_id,
-            &mut relationships,
-            edges,
-            str_ctx,
-        );
+        self.collect_inherent_relationships_and_edges(type_def_id, &mut relationships, str_ctx);
 
         if let Some(ReprKind::StructIntersection(members)) =
             self.repr_ctx.get_repr_kind(&type_def_id)
@@ -485,7 +475,6 @@ impl<'m> Compiler<'m> {
                 self.collect_inherent_relationships_and_edges(
                     *member_def_id,
                     &mut relationships,
-                    edges,
                     str_ctx,
                 );
             }
@@ -506,7 +495,6 @@ impl<'m> Compiler<'m> {
                         property.rel_id,
                         DataRelationshipSource::ByUnionProxy,
                         &mut relationships,
-                        edges,
                         str_ctx,
                     );
                 }
@@ -520,7 +508,6 @@ impl<'m> Compiler<'m> {
         &self,
         type_def_id: DefId,
         relationships: &mut FnvIndexMap<PropId, DataRelationshipInfo>,
-        edges: &mut FnvHashMap<PackageId, FnvHashMap<EdgeId, EdgeInfo>>,
         str_ctx: &mut StringCtx<'m>,
     ) {
         let Some(properties) = self.prop_ctx.properties_by_def_id(type_def_id) else {
@@ -533,7 +520,6 @@ impl<'m> Compiler<'m> {
                     property.rel_id,
                     DataRelationshipSource::Inherent,
                     relationships,
-                    edges,
                     str_ctx,
                 );
             }
@@ -546,7 +532,6 @@ impl<'m> Compiler<'m> {
         rel_id: RelId,
         source: DataRelationshipSource,
         relationships: &mut FnvIndexMap<PropId, DataRelationshipInfo>,
-        edges: &mut FnvHashMap<PackageId, FnvHashMap<EdgeId, EdgeInfo>>,
         str_ctx: &mut StringCtx<'m>,
     ) {
         let meta = rel_repr_meta(rel_id, &self.rel_ctx, &self.defs, &self.repr_ctx);
@@ -567,11 +552,6 @@ impl<'m> Compiler<'m> {
                 str_ctx.intern_constant("")
             }
             _ => return,
-        };
-
-        let edge_params = match meta.relationship.rel_params {
-            RelParams::Def(def_id) => Some(def_id),
-            RelParams::Unit | RelParams::IndexRange(_) => None,
         };
 
         let (data_relationship_kind, target) =
@@ -622,83 +602,6 @@ impl<'m> Compiler<'m> {
                     target_def_id,
                 ),
             };
-
-        // collect edge
-        if let DataRelationshipKind::Edge(proj) = &data_relationship_kind {
-            let edge_id = proj.id;
-            if !self.edge_ctx.symbolic_edges.contains_key(&edge_id) {
-                // fallback/legacy mode:
-                let edge_info = edges
-                    .entry(edge_id.0)
-                    .or_default()
-                    .entry(edge_id)
-                    .or_insert_with(|| EdgeInfo {
-                        cardinals: vec![],
-                        store_key: self.edge_ctx.edge_store_keys.get(&edge_id).copied(),
-                    });
-
-                if edge_info.cardinals.is_empty() {
-                    // initialize edge cardinals first
-                    for i in 0_u8..2 {
-                        let mut flags = EdgeCardinalFlags::ENTITY;
-
-                        if i == proj.subject.0 {
-                            if matches!(
-                                meta.relationship.subject_cardinality.1,
-                                ValueCardinality::Unit
-                            ) {
-                                flags.insert(EdgeCardinalFlags::UNIQUE);
-                            }
-
-                            edge_info.cardinals.push(EdgeCardinal {
-                                target: DefIdSet::from_iter([
-                                    self.identifier_to_vertex_def_id(source_def_id)
-                                ]),
-                                flags,
-                            });
-                        } else {
-                            if matches!(
-                                meta.relationship.object_cardinality.1,
-                                ValueCardinality::Unit
-                            ) {
-                                flags.insert(EdgeCardinalFlags::UNIQUE);
-                            }
-
-                            edge_info.cardinals.push(EdgeCardinal {
-                                target: DefIdSet::from_iter([
-                                    self.identifier_to_vertex_def_id(target_def_id)
-                                ]),
-                                flags,
-                            });
-                        }
-                    }
-
-                    if let Some(edge_params) = edge_params {
-                        edge_info.cardinals.resize_with(3, || EdgeCardinal {
-                            target: DefIdSet::from_iter([edge_params]),
-                            flags: EdgeCardinalFlags::empty(),
-                        });
-                    }
-                }
-
-                // replace cardinal target with union members if union was found
-                if let DataRelationshipTarget::Union(union_def_id) = &target {
-                    let cardinal_target = &mut edge_info.cardinals[proj.object.0 as usize].target;
-
-                    cardinal_target.clear();
-
-                    let Some(ReprKind::Union(members, _)) =
-                        self.repr_ctx.get_repr_kind(union_def_id)
-                    else {
-                        panic!("not a union");
-                    };
-
-                    for (member, _span) in members {
-                        cardinal_target.insert(*member);
-                    }
-                }
-            }
-        }
 
         // collect relationship
         relationships.insert(
@@ -777,7 +680,7 @@ impl<'m> Compiler<'m> {
     fn domain_entity(
         &self,
         type_def_id: DefId,
-        name: TextConstant,
+        ident: TextConstant,
         serde_generator: &mut SerdeGenerator,
         data_relationships: &FnvIndexMap<PropId, DataRelationshipInfo>,
     ) -> Option<Entity> {
@@ -811,7 +714,7 @@ impl<'m> Compiler<'m> {
             };
 
         Some(Entity {
-            name,
+            ident,
             // The entity is self-identifying if it has an inherent primary_id and that is its only inherent property.
             // TODO: Is the entity still self-identifying if it has only an external primary id (i.e. it is a unit type)?
             is_self_identifying: inherent_primary_id_meta.is_some() && inherent_property_count <= 1,
@@ -828,17 +731,6 @@ impl<'m> Compiler<'m> {
                 )))
                 .unwrap(),
         })
-    }
-
-    fn identifier_to_vertex_def_id(&self, def_id: DefId) -> DefId {
-        if let Some(properties) = self.prop_ctx.properties_by_def_id(def_id) {
-            if let Some(identifies_rel) = properties.identifies {
-                let meta = rel_def_meta(identifies_rel, &self.rel_ctx, &self.defs);
-                return meta.relationship.object.0;
-            }
-        }
-
-        def_id
     }
 
     fn find_inherent_primary_id(

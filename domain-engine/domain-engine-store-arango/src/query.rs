@@ -36,7 +36,7 @@ impl AqlQuery {
             Select::Struct(struct_select) => ontology.def(struct_select.def_id),
             _ => return Err(DomainErrorKind::EntityMustBeStruct.into_error()),
         };
-        let def_name = def.name().expect("entity should have a name");
+        let def_name = def.ident().expect("entity should have a name");
         debug!("AqlQuery::build_query for {}", &ontology[def_name]);
 
         let mut meta = MetaQuery::from("obj".into(), ontology, database);

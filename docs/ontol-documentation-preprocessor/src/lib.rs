@@ -49,10 +49,10 @@ fn get_ontol_docs_md(ontology: &Ontology, predicate: &dyn Fn(&Def) -> bool) -> S
             continue;
         }
         let doc = ontology.get_def_docs(t.id);
-        if let Some(name) = t.name() {
-            let name = &ontology[name];
+        if let Some(ident) = t.ident() {
+            let ident = &ontology[ident];
             docs.push((
-                name.into(),
+                ident.into(),
                 doc.map(|docs_constant| ontology[docs_constant].to_string())
                     .unwrap_or_default(),
             ));

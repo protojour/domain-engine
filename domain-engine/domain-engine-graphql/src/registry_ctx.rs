@@ -539,7 +539,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         let def = self.schema_ctx.ontology.def(def_id);
                         panic!(
                             "struct not found for {def_id:?} {name:?}",
-                            name = def.name().debug(self.schema_ctx.ontology())
+                            name = def.ident().debug(self.schema_ctx.ontology())
                         );
                     });
 

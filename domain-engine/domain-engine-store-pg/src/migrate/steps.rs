@@ -78,13 +78,13 @@ pub async fn migrate_domain_steps<'t>(
             Some(DefRepr::Struct) => {}
             _ => continue,
         }
-        let Some(name) = def.name() else {
+        let Some(ident) = def.ident() else {
             continue;
         };
-        let name = &ontology[name];
+        let ident = &ontology[ident];
 
-        migrate_vertex_steps(domain_ids, def.id, def, name, ontology, ctx)
-            .instrument(trace_span!("vtx", name))
+        migrate_vertex_steps(domain_ids, def.id, def, ident, ontology, ctx)
+            .instrument(trace_span!("vtx", ident))
             .await?;
     }
 
@@ -129,11 +129,11 @@ async fn migrate_vertex_steps<'t>(
     domain_ids: PgDomainIds,
     vertex_def_id: DefId,
     def: &Def,
-    name: &str,
+    ident: &str,
     ontology: &Ontology,
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
-    let table_name = format!("v_{}", name).into_boxed_str();
+    let table_name = format!("v_{}", ident).into_boxed_str();
     let pg_domain = ctx.domains.get_mut(&domain_ids.pkg_id).unwrap();
 
     let exists = if let Some(datatable) = pg_domain.datatables.get_mut(&vertex_def_id) {

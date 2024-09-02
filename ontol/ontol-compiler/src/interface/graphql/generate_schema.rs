@@ -108,7 +108,7 @@ pub fn generate_graphql_schema<'c>(
         }
 
         if def.operator_addr.is_some() {
-            trace!("adapt def `{name:?}`", name = def.name());
+            trace!("adapt def `{ident:?}`", ident = def.ident());
 
             let type_ref = builder.gen_def_type_ref(def.id, QLevel::Node);
 

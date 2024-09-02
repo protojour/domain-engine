@@ -114,7 +114,7 @@ impl State {
         let mut ontol_def = HashMap::new();
 
         for def in ontol_domain.defs() {
-            if let Some(name) = def.name() {
+            if let Some(name) = def.ident() {
                 let name = &ontology[name];
                 ontol_def.insert(name.to_string(), def.clone());
             }

@@ -303,7 +303,7 @@ impl ArangoClient {
 fn get_collection_name(def: &Def, ontology: &Ontology) -> Ident {
     let text_constant = match def.store_key {
         Some(store_key) => store_key,
-        None => def.name().expect("type should have a name"),
+        None => def.ident().expect("type should have an identifier"),
     };
     let mut name = ontology[text_constant].to_ascii_lossy().replace("[?]", "_");
     name.truncate(256);
@@ -431,30 +431,30 @@ impl ArangoDatabase {
             return Ok(Ident::new(self.ontology[store_key].to_string()));
         }
 
-        if let Some(name) = subject_names_by_edge_id.get(&edge_id).copied() {
-            let mut name = self.ontology[name]
+        if let Some(ident) = subject_names_by_edge_id.get(&edge_id).copied() {
+            let mut ident = self.ontology[ident]
                 .to_ascii_lossy()
                 .replace("[?]", "_")
                 .to_string();
 
             for other_edge_collection in self.edge_collections.values() {
-                if name == other_edge_collection.name.raw_str() {
+                if ident == other_edge_collection.name.raw_str() {
                     // return Err(anyhow!("duplicate edge name: {name}"));
 
                     if let Some(type_disambiguation) = edge_info.cardinals[0].target.iter().next() {
                         let collection =
                             self.collections.get(type_disambiguation).ok_or_else(|| {
                                 anyhow!(
-                                    "cannot disambiguate for `{name}` {edge_id:?}: {type_disambiguation:?}"
+                                    "cannot disambiguate for `{ident}` {edge_id:?}: {type_disambiguation:?}"
                                 )
                             })?;
 
-                        name = format!("{prefix}_{name}", prefix = collection.raw_str());
+                        ident = format!("{prefix}_{ident}", prefix = collection.raw_str());
                     }
                 }
             }
 
-            return Ok(Ident::new(name));
+            return Ok(Ident::new(ident));
         }
 
         // find non-union type in the cardinals
@@ -462,8 +462,8 @@ impl ArangoDatabase {
             if cardinal.target.len() == 1 {
                 let def = self.ontology.def(*cardinal.target.iter().next().unwrap());
 
-                if let Some(name) = def.name() {
-                    let mut concat = self.ontology[name].to_string();
+                if let Some(ident) = def.ident() {
+                    let mut concat = self.ontology[ident].to_string();
 
                     for (_, rel_info, projection) in def.edge_relationships() {
                         if projection.id == edge_id {

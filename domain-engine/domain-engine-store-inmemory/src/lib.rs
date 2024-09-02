@@ -68,7 +68,10 @@ impl InMemoryDb {
 
             for def in domain.defs() {
                 if let Some(entity) = def.entity() {
-                    debug!("new collection {:?} (`{}`)", def.id, &ontology[entity.name]);
+                    debug!(
+                        "new collection {:?} (`{}`)",
+                        def.id, &ontology[entity.ident]
+                    );
 
                     collections.insert(def.id, Default::default());
                 }
