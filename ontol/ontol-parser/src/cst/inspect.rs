@@ -108,7 +108,7 @@ nodes!(Node {
     SymRelation,
     SymDecl,
     EdgeStatement,
-    EdgeRelation,
+    EdgeClause,
     EdgeSlot,
     EdgeVar,
     EdgeTypeParam,
@@ -267,12 +267,12 @@ impl<V: NodeView> EdgeStatement<V> {
         self.view().sub_nodes().find_map(IdentPath::from_view)
     }
 
-    pub fn edge_relations(&self) -> impl Iterator<Item = EdgeRelation<V>> {
-        self.view().sub_nodes().filter_map(EdgeRelation::from_view)
+    pub fn edge_clauses(&self) -> impl Iterator<Item = EdgeClause<V>> {
+        self.view().sub_nodes().filter_map(EdgeClause::from_view)
     }
 }
 
-impl<V: NodeView> EdgeRelation<V> {
+impl<V: NodeView> EdgeClause<V> {
     pub fn items(&self) -> impl Iterator<Item = EdgeItem<V>> {
         self.view().sub_nodes().filter_map(EdgeItem::from_view)
     }

@@ -153,7 +153,7 @@ pub enum Kind {
     SymDecl,
 
     EdgeStatement,
-    EdgeRelation,
+    EdgeClause,
     /// _ EdgeSlot: _
     EdgeSlot,
     /// (EdgeVar) EdgeSlot: (EdgeVar)
@@ -350,7 +350,7 @@ impl Display for Kind {
             Kind::SymRelation => write!(f, "sym relation"),
             Kind::SymDecl => write!(f, "sym declaration"),
             Kind::EdgeStatement => write!(f, "edge statement"),
-            Kind::EdgeRelation => write!(f, "edge relation"),
+            Kind::EdgeClause => write!(f, "edge relation"),
             Kind::EdgeSlot => write!(f, "edge slot"),
             Kind::EdgeVar => write!(f, "edge variable"),
             Kind::EdgeTypeParam => write!(f, "edge type parameter"),

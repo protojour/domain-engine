@@ -287,7 +287,10 @@ impl<'m> Compiler<'m> {
                             if entity_count == members.len() {
                                 flags.insert(EdgeCardinalFlags::ENTITY);
 
-                                if cardinal.one_to_one_count > 0 {
+                                if cardinal.unique_count > 0 {
+                                    flags.insert(EdgeCardinalFlags::UNIQUE);
+                                }
+                                if cardinal.pinned_count > 0 {
                                     flags.insert(EdgeCardinalFlags::PINNED_DEF);
                                 }
                             } else if entity_count > 0 {

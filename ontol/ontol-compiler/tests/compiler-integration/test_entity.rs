@@ -666,7 +666,7 @@ fn edge_entity_simple() {
 
         assert_eq!(related_to.subject, CardinalIdx(0));
         assert_eq!(related_to.object, CardinalIdx(1));
-        assert!(!related_to.one_to_one);
+        assert!(!related_to.pinned);
     }
 
     {
@@ -681,7 +681,7 @@ fn edge_entity_simple() {
         assert_eq!(foo_id.def_id(), from_target);
         assert_eq!(CardinalIdx(2), from_proj.subject);
         assert_eq!(CardinalIdx(0), from_proj.object);
-        assert!(from_proj.one_to_one);
+        assert!(from_proj.pinned);
 
         let DataRelationshipTarget::Unambiguous(to_target) = to.target else {
             panic!()
@@ -689,7 +689,7 @@ fn edge_entity_simple() {
         assert_eq!(bar_id.def_id(), to_target);
         assert_eq!(CardinalIdx(2), to_proj.subject);
         assert_eq!(CardinalIdx(1), to_proj.object);
-        assert!(to_proj.one_to_one);
+        assert!(to_proj.pinned);
     }
 }
 
@@ -734,7 +734,7 @@ fn edge_entity_union() {
 
         assert_eq!(related_to.subject, CardinalIdx(0));
         assert_eq!(related_to.object, CardinalIdx(1));
-        assert!(!related_to.one_to_one);
+        assert!(!related_to.pinned);
     }
 
     {
@@ -756,12 +756,12 @@ fn edge_entity_union() {
         assert_eq!(&[foo_id.def_id(), bar_id.def_id()], from_target_variants);
         assert_eq!(CardinalIdx(2), from_proj.subject);
         assert_eq!(CardinalIdx(0), from_proj.object);
-        assert!(from_proj.one_to_one);
+        assert!(from_proj.pinned);
 
         let to_target_variants = ontology.union_variants(to.target.def_id());
         assert_eq!(&[baz_id.def_id(), qux_id.def_id()], to_target_variants);
         assert_eq!(CardinalIdx(2), to_proj.subject);
         assert_eq!(CardinalIdx(1), to_proj.object);
-        assert!(to_proj.one_to_one);
+        assert!(to_proj.pinned);
     }
 }

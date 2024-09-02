@@ -415,11 +415,11 @@ mod edge {
         p.eat(K![edge]);
         p.eat_trivia();
         ident_path(p);
-        delimited_comma_separated(p, K!['{'], &edge_relation, K!['}']);
+        delimited_comma_separated(p, K!['{'], &edge_clause, K!['}']);
     }
 
-    fn edge_relation(p: &mut CstParser) {
-        let relation = p.start(Kind::EdgeRelation);
+    fn edge_clause(p: &mut CstParser) {
+        let relation = p.start(Kind::EdgeClause);
 
         edge_var(p);
         edge_slot(p);

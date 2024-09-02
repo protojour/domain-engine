@@ -468,19 +468,28 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 )
             };
 
-            let one_to_one = matches!(subject_cardinality.1, ValueCardinality::Unit);
+            let unique = matches!(subject_cardinality.1, ValueCardinality::Unit);
             let slot = *edge.symbols.get(&sym_id).unwrap();
+            let cardinality = edge.cardinals.len();
 
             let projection = EdgeCardinalProjection {
                 id: edge_id,
                 subject: slot.left,
                 object: slot.right,
-                one_to_one,
+                pinned: unique,
             };
 
-            if one_to_one {
+            if unique {
                 let edge_variable = edge.cardinals.get_mut(&slot.left).unwrap();
-                edge_variable.one_to_one_count += 1;
+                edge_variable.unique_count += 1;
+
+                // The current heuristic for "edge cardinal def pinning":
+                // Using a clause that is less wide than the overall cardinality.
+                let clause_width = edge.clause_widths.get(&slot.clause_idx).unwrap();
+
+                if *clause_width < cardinality {
+                    edge_variable.pinned_count += 1;
+                }
             }
 
             Relationship {

@@ -378,7 +378,7 @@ pub struct EdgeCardinalProjection {
 
     /// Indicates that the subject has a one-to-one relationship with the hyperedge itself,
     /// i.e. they are necessarily coexistent
-    pub one_to_one: bool,
+    pub pinned: bool,
 }
 
 impl EdgeCardinalProjection {

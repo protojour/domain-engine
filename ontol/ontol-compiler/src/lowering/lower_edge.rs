@@ -25,6 +25,7 @@ struct EdgeBuilder<V> {
     cardinal_name_table: HashMap<String, CardinalIdx>,
     slots: FnvHashMap<DefId, Slot>,
     cardinals: BTreeMap<CardinalIdx, SymbolicEdgeCardinal>,
+    clause_widths: BTreeMap<usize, usize>,
     params: BTreeMap<CardinalIdx, EdgeTypeParam<V>>,
 }
 
@@ -79,14 +80,15 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             edge_id,
             slots: Default::default(),
             cardinals: Default::default(),
+            clause_widths: Default::default(),
             cardinal_name_table: Default::default(),
             params: Default::default(),
         };
 
-        for edge_relation in edge_stmt.edge_relations() {
-            let mut item_iter = edge_relation.items().peekable();
+        for (clause_idx, edge_clause) in edge_stmt.edge_clauses().enumerate() {
+            let mut item_iter = edge_clause.items().peekable();
 
-            match self.next_edge_item(&mut item_iter, edge_relation.view().span()) {
+            match self.next_edge_item(&mut item_iter, edge_clause.view().span()) {
                 Some(insp::EdgeItem::EdgeVar(edge_var)) => {
                     let Some(mut prev_cardinal) =
                         self.add_edge_variable(edge_var, &mut edge_builder)
@@ -97,6 +99,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     loop {
                         if let Some((slot_def_id, next_cardinal)) = self
                             .add_edge_slot_symbol_then_cardinal(
+                                clause_idx,
                                 &mut item_iter,
                                 prev_cardinal,
                                 &mut edge_builder,
@@ -136,6 +139,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             SymbolicEdge {
                 symbols: edge_builder.slots,
                 cardinals: edge_builder.cardinals,
+                clause_widths: edge_builder.clause_widths,
             },
         );
 
@@ -158,6 +162,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
     fn add_edge_slot_symbol_then_cardinal(
         &mut self,
+        clause_idx: usize,
         item_iter: &mut impl Iterator<Item = insp::EdgeItem<V>>,
         prev_cardinal_idx: CardinalIdx,
         edge_builder: &mut EdgeBuilder<V>,
@@ -190,17 +195,24 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         };
 
         match (slot_symbol_def_id, cardinal_idx) {
-            (Some(def_id), Some(cardinal_idx)) => {
+            (Some(slot_symbol_def_id), Some(cardinal_idx)) => {
+                let clause_width = edge_builder
+                    .clause_widths
+                    .entry(clause_idx)
+                    .or_insert_with(|| 1);
+                *clause_width += 1;
+
                 edge_builder.slots.insert(
-                    def_id,
+                    slot_symbol_def_id,
                     Slot {
+                        clause_idx,
                         left: prev_cardinal_idx,
                         depth: 0,
                         right: cardinal_idx,
                     },
                 );
 
-                Some((def_id, cardinal_idx))
+                Some((slot_symbol_def_id, cardinal_idx))
             }
             _ => None,
         }
@@ -235,7 +247,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                         kind: CardinalKind::Vertex {
                             members: Default::default(),
                         },
-                        one_to_one_count: 0,
+                        unique_count: 0,
+                        pinned_count: 0,
                     },
                 );
 
@@ -281,7 +294,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                             // will be resolved later..
                             def_id: OntolDefTag::Unit.def_id(),
                         },
-                        one_to_one_count: 0,
+                        unique_count: 0,
+                        pinned_count: 0,
                     },
                 );
                 // .. by this "params" thing which stores the source position:

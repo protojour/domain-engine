@@ -63,6 +63,8 @@ pub struct SymbolicEdge {
     /// The cardinals in this symbolic edge
     /// The cardinal count is the edge's arity.
     pub cardinals: BTreeMap<CardinalIdx, SymbolicEdgeCardinal>,
+
+    pub clause_widths: BTreeMap<usize, usize>,
 }
 
 impl SymbolicEdge {
@@ -97,6 +99,7 @@ impl SymbolicEdge {
 #[derive(Clone, Copy, Debug)]
 #[allow(unused)]
 pub struct Slot {
+    pub clause_idx: usize,
     pub left: CardinalIdx,
     pub depth: u8,
     pub right: CardinalIdx,
@@ -106,7 +109,8 @@ pub struct Slot {
 pub struct SymbolicEdgeCardinal {
     pub span: SourceSpan,
     pub kind: CardinalKind,
-    pub one_to_one_count: usize,
+    pub unique_count: usize,
+    pub pinned_count: usize,
 }
 
 #[derive(Debug)]
