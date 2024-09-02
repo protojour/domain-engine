@@ -179,7 +179,7 @@ impl Relationship {
 #[derive(Clone, Debug)]
 pub enum RelParams {
     Unit,
-    Type(DefId),
+    Def(DefId),
     IndexRange(Range<Option<u16>>),
 }
 

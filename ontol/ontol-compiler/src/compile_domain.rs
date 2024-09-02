@@ -298,7 +298,7 @@ impl<'m> Compiler<'m> {
 
                 // Reset RelParams::Type back to RelParams::Unit if its representation is ReprKind::Unit.
                 // This simplifies later compiler stages, that can trust RelParams::Type is a type with real data in it.
-                if let RelParams::Type(rel_params_def_id) = &relationship.rel_params {
+                if let RelParams::Def(rel_params_def_id) = &relationship.rel_params {
                     if let Some(projection) = &relationship.edge_projection {
                         copy_relationship_store_key(
                             projection.id,
@@ -335,27 +335,34 @@ impl<'m> Compiler<'m> {
                     continue;
                 }
 
-                if meta.relationship.edge_projection.is_none()
-                    && !matches!(
+                if let Some(projection) = meta.relationship.edge_projection {
+                    let edge_id = projection.id;
+                    let edge = self.edge_ctx.symbolic_edges.get(&edge_id).unwrap();
+
+                    if let Some((_, param_def_id)) = edge.find_parameter_cardinal() {
+                        let relationship = self.rel_ctx.relationship_by_id_mut(rel_id).unwrap();
+
+                        relationship.rel_params = RelParams::Def(param_def_id);
+                    }
+                } else {
+                    if !matches!(
                         meta.relationship.object_cardinality.1,
                         ValueCardinality::Unit
-                    )
-                    && def_implies_entity(
+                    ) && def_implies_entity(
                         subject.0,
                         &self.repr_ctx,
                         &self.prop_ctx,
                         &self.entity_ctx,
-                    )
-                    && def_implies_entity(
+                    ) && def_implies_entity(
                         object.0,
                         &self.repr_ctx,
                         &self.prop_ctx,
                         &self.entity_ctx,
-                    )
-                {
-                    CompileError::EntityToEntityRelationshipMustUseEdge
-                        .span(meta.relationship.relation_span)
-                        .report(self);
+                    ) {
+                        CompileError::EntityToEntityRelationshipMustUseEdge
+                            .span(meta.relationship.relation_span)
+                            .report(&mut self.errors);
+                    }
                 }
             }
         }

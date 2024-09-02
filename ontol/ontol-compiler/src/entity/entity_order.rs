@@ -48,7 +48,7 @@ impl<'m> Compiler<'m> {
         }
 
         let entity_order = match meta.relationship.rel_params {
-            RelParams::Type(params_def_id) => {
+            RelParams::Def(params_def_id) => {
                 self.check_order_params(entity_def_id, params_def_id, *meta.relationship.span)?
             }
             _ => {

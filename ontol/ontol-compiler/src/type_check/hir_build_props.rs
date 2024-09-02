@@ -300,7 +300,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     rel_id: property.rel_id,
                     cardinality: owner_cardinality,
                     rel_params_def: match &meta.relationship.rel_params {
-                        RelParams::Type(def_id) => Some(*def_id),
+                        RelParams::Def(def_id) => Some(*def_id),
                         _ => None,
                     },
                     value_def: value_def_id,
@@ -699,7 +699,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 },
                 ctx,
             )),
-            (ty @ Type::Anonymous(def_id), None) => {
+            (ty @ (Type::DomainDef(def_id) | Type::Anonymous(def_id)), None) => {
                 match self.prop_ctx.properties_by_def_id(*def_id) {
                     Some(_) => {
                         if actual_struct_flags.contains(StructFlags::MATCH) {

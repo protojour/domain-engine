@@ -567,7 +567,7 @@ impl<'m> Compiler<'m> {
         };
 
         let edge_params = match meta.relationship.rel_params {
-            RelParams::Type(def_id) => Some(def_id),
+            RelParams::Def(def_id) => Some(def_id),
             RelParams::Unit | RelParams::IndexRange(_) => None,
         };
 

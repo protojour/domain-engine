@@ -241,7 +241,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         );
         self.state.span_stack.pop();
 
-        if let RelParams::Type(def_id) = &meta.relationship.rel_params {
+        if let RelParams::Def(def_id) = &meta.relationship.rel_params {
             let rel_def = self.defs.table.get(def_id).unwrap();
 
             self.state.span_stack.push(SpanNode {

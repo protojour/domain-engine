@@ -887,7 +887,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             } else {
                 let qlevel = match meta.relationship.rel_params {
                     RelParams::Unit => QLevel::Node,
-                    RelParams::Type(rel_def_id) => {
+                    RelParams::Def(rel_def_id) => {
                         let operator_addr = self
                             .serde_gen
                             .gen_addr_lazy(gql_serde_key(rel_def_id))
@@ -929,7 +929,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             let connection_ref = {
                 let rel_params = match meta.relationship.rel_params {
                     RelParams::Unit => None,
-                    RelParams::Type(rel_def_id) => Some((
+                    RelParams::Def(rel_def_id) => Some((
                         rel_def_id,
                         self.serde_gen
                             .gen_addr_lazy(gql_serde_key(rel_def_id))
@@ -950,7 +950,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 connection_ref,
             )
         } else {
-            let mut unit = if let RelParams::Type(rel_def_id) = meta.relationship.rel_params {
+            let mut unit = if let RelParams::Def(rel_def_id) = meta.relationship.rel_params {
                 let rel_operator_addr = self
                     .serde_gen
                     .gen_addr_lazy(gql_serde_key(rel_def_id))

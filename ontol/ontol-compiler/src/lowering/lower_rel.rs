@@ -271,7 +271,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     }
                 }
 
-                RelParams::Type(rel_def_id)
+                RelParams::Def(rel_def_id)
             } else {
                 for statement in rp.statements() {
                     if let Some(mut defs) = self.lower_statement(
