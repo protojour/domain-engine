@@ -405,9 +405,12 @@ mod match_contains_all {
 fn test_map_match_in_sub_multi_edge() {
     r#"
     domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
+    edge foobar {
+        (foo) bars: (bar),
+    }
     def foo (
         rel. 'key': (rel* is: text)
-        rel* 'bars': {bar}
+        rel* foobar.bars: {bar}
     )
     def bar (
         rel. 'key': (rel* is: text)
@@ -417,7 +420,7 @@ fn test_map_match_in_sub_multi_edge() {
         ('bar_tags'?: { ..tags }),
         foo {
             ..@match foo(
-                'bars'?: @match bar(
+                foobar.bars?: @match bar(
                     'tags': @contains_all { ..tags }
                 )
             )
@@ -434,10 +437,10 @@ fn test_map_match_in_sub_multi_edge() {
                         eq!(&ValueCardinality::IndexSet),
                         eq!(&Literal(indoc! { r#"
                             (root $a)
-                            (is-def $a def@1:1)
-                            (match-prop $a p@1:1:1 (element-in $c))
-                            (is-def $b def@1:2)
-                            (match-prop $b p@1:2:1 (superset-of $d))
+                            (is-def $a def@1:3)
+                            (match-prop $a p@1:3:1 (element-in $c))
+                            (is-def $b def@1:4)
+                            (match-prop $b p@1:4:1 (superset-of $d))
                             (member $c (_ $b))
                             (member $d (_ 'x'))
                             (member $d (_ 'y'))
