@@ -8,6 +8,7 @@
 domain 01GZ13EAM0RY693MSJ75XZARHY ()
 
 use 'stix_common' as common
+use 'stix_edges' as edges
 use 'stix_interface' as interface
 use 'stix_open_vocab' as ov
 
@@ -16,13 +17,6 @@ use 'SI' as SI
 sym {
     id,
     type
-}
-
-edge relationship_edge {
-    (src) related_to: (target) with_rel: (relationship),
-    (target) related_from: (src) with_rel: (relationship),
-    (relationship) source_ref: (src),
-    (relationship) target_ref: (target),
 }
 
 /// `STIX object` is a union of all the `STIX core objects` and `STIX meta objects`.
@@ -261,7 +255,7 @@ def @macro created_by_interface (
     /// The **created_by_ref** property specifies the **id** property of the `identity` object that describes the entity that created this object.
     ///
     /// If this attribute is omitted, the source of this information is undefined. This may be used by object creators who wish to remain anonymous.
-    rel* 'created_by_ref'?: identity-id
+    rel* edges.created.created_by_ref?: identity-id
 )
 
 // FIXME: This type has union-like properties:
@@ -294,7 +288,7 @@ def @macro markings_interface (
     /// In this case, this property **MUST NOT** contain any references to the same Marking Definition object (i.e., it cannot contain any circular references).
     ///
     /// See section [7.2](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_95gfoglikdzh) for further definition of data markings.
-    rel* 'object_marking_refs'?: {marking-definition-id}
+    rel* edges.object_marking.object_marking_refs?: {marking-definition-id}
 
     /// The **granular_markings** property specifies a list of granular markings applied to this object.
     ///
@@ -491,7 +485,7 @@ def grouping (
     /// This is an open vocabulary and values SHOULD come from the `grouping-context-ov` vocabulary.
     rel* 'context': ov.grouping-context-ov
 
-    rel* 'object_refs': {SDO_intentifier}
+    rel* edges.object.object_refs: {SDO_intentifier}
 )
 
 /// Identities can represent actual individuals, organizations, or groups (e.g., ACME, Inc.) as well as classes of individuals, organizations, systems or groups (e.g., the finance sector).
@@ -826,7 +820,7 @@ def malware (
     /// The sample_refs property specifies a list of identifiers of the SCO file or artifact objects associated with this malware instance(s) or family.
     ///
     /// If is_family is false, then all samples listed in sample_refs MUST refer to the same binary data.
-    rel* 'sample_refs'?: {SDO_intentifier}
+    rel* edges.sample.sample_refs?: {SDO_intentifier}
 )
 
 /// Malware Analysis captures the metadata and results of a particular static or dynamic analysis performed on a malware instance or family.
@@ -846,7 +840,7 @@ def malware-analysis (
     /// The version of the analysis product that was used to perform the analysis. 
     rel* 'version'?: common.string
 
-    rel* 'host_vm_ref'?: software-id
+    rel* edges.host_vm.host_vm_ref?: software-id
 )
 
 /// A Note is intended to convey informative text to provide further context and/or to provide additional analysis not contained in the STIX Objects, Marking Definition objects, or Language Content objects which the Note relates to.
@@ -872,7 +866,7 @@ def note (
     rel* 'authors'?: {common.string}
 
     /// The STIX Objects that the note is being applied to.
-    rel* 'object_refs': {SDO_intentifier}
+    rel* edges.object.object_refs: {SDO_intentifier}
 )
 
 /// Observed Data conveys information about cyber security related entities such as files, systems, and networks using the STIX Cyber-observable Objects (SCOs).
@@ -924,7 +918,7 @@ def observed-data (
     /// For example, a Network Traffic object and two IPv4 Address objects related via the src_ref and dst_ref properties can be contained in the same Observed Data because they are all related and used to characterize that single entity.
     ///
     /// This property MUST NOT be present if objects is provided.
-    rel* 'object_refs'?: {SDO_intentifier}
+    rel* edges.object.object_refs?: {SDO_intentifier}
 )
 
 /// An Opinion is an assessment of the correctness of the information in a STIX Object produced by a different entity.
@@ -956,7 +950,7 @@ def opinion (
     rel* 'opinion': ov.opinion-enum
 
     /// The STIX Objects that the Opinion is being applied to.
-    rel* 'object_refs': {SDO_intentifier}
+    rel* edges.object.object_refs: {SDO_intentifier}
 )
 
 /// Reports are collections of threat intelligence focused on one or more topics, such as a description of a threat actor, malware, or attack technique, including context and related details.
@@ -989,7 +983,7 @@ def report (
     rel* 'published': common.timestamp
 
     /// Specifies the STIX Objects that are referred to by this Report.
-    rel* 'object_refs': {SDO_intentifier}
+    rel* edges.object.object_refs: {SDO_intentifier}
 )
 
 /// Threat Actors are actual individuals, groups, or organizations believed to be operating with malicious intent.
@@ -1228,7 +1222,7 @@ def directory (
     /// Specifies a list of references to other File and/or Directory objects contained within the directory.
     ///
     /// The objects referenced in this list MUST be of type `file` or `directory`.
-    rel* 'contains_refs'?: {(
+    rel* edges.dir_tree.contains_refs?: {(
         rel* is?: file-id
         rel* is?: directory-id
     )}
@@ -1269,7 +1263,7 @@ def email-addr (
     /// Specifies the user account that the email address belongs to, as a reference to a User Account object.
     ///
     /// The object referenced in this property MUST be of type user-account.
-    rel* 'belongs_to_ref'?: user-account-id
+    rel* edges.possession.belongs_to_ref?: user-account-id
 )
 
 
@@ -1335,30 +1329,30 @@ def email-message (
     /// The "From:" field specifies the author of the message, that is, the mailbox(es) of the person or system responsible for the writing of the message.
     ///
     /// The object referenced in this property MUST be of type email-address.
-    rel* 'from_ref'?: email-addr-id
+    rel* edges.email_from.from_ref?: email-addr-id
 
     /// Specifies the value of the “Sender” field of the email message.
     /// The "Sender:" field specifies the mailbox of the agent responsible for the actual transmission of the message.
     ///
     /// The object referenced in this property MUST be of type email-address.
-    rel* 'sender_ref'?: email-addr-id
+    rel* edges.email_sender.sender_ref?: email-addr-id
 
     /// Specifies the mailboxes that are “To:” recipients of the email message.
     ///
     /// The objects referenced in this list MUST be of type email-address.
-    rel* 'to_refs'?: {email-addr-id}
+    rel* edges.email_to.to_refs?: {email-addr-id}
 
     /// Specifies the mailboxes that are “CC:” recipients of the email message.
     ///
     /// The objects referenced in this list MUST be of type email-address.
-    rel* 'cc_refs'?: {email-addr-id}
+    rel* edges.email_cc.cc_refs?: {email-addr-id}
 
     /// Specifies the mailboxes that are “BCC:” recipients of the email message.
     ///
     /// As per [RFC5322], the absence of this property should not be interpreted as semantically equivalent to an absent BCC header on the message being characterized.
     ///
     /// The objects referenced in this list MUST be of type email-address.
-    rel* 'bcc_refs'?: {email-addr-id}
+    rel* edges.email_bcc.bcc_refs?: {email-addr-id}
 
     /// Specifies the Message-ID field of the email message.
     rel* 'message_id'?: common.string
@@ -1387,7 +1381,7 @@ def email-message (
     /// Specifies the raw binary contents of the email message, including both the headers and body, as a reference to an Artifact object.
     ///
     /// The object referenced in this property MUST be of type `artifact`.
-    rel* 'raw_email_ref'?: artifact-id
+    rel* edges.email_raw.raw_email_ref?: artifact-id
 )
 
 /// The File object represents the properties of a file.
@@ -1450,17 +1444,17 @@ def file (
 
     /// Specifies the parent directory of the file, as a reference to a Directory object.
     /// The object referenced in this property MUST be of type directory.
-    rel* 'parent_directory_ref'?: directory-id
+    rel* edges.dir_tree.parent_directory_ref?: directory-id
 
     /// Specifies a list of references to other Cyber-observable Objects contained within the file, such as another file that is appended to the end of the file, or an IP address that is contained somewhere in the file.
     ///
     /// This is intended for use cases other than those targeted by the Archive extension.
-    rel* 'contains_refs'?: {SDO_intentifier}
+    rel* edges.dir_tree.contains_refs?: {SDO_intentifier}
 
     /// Specifies the content of the file, represented as an Artifact object.
     ///
     /// The object referenced in this property MUST be of type artifact.
-    rel* 'content_ref'?: {artifact-id}
+    rel* edges.dir_content.content_ref?: {artifact-id}
 )
 
 /// The IPv4 Address object represents one or more IPv4 addresses expressed using CIDR notation.
@@ -1565,7 +1559,7 @@ def network-traffic (
     /// Specifies the source of the network traffic, as a reference to a Cyber-observable Object.
     ///
     /// The object referenced MUST be of type `ipv4-addr`, `ipv6-addr`, `mac-addr`, or `domain-name` (for cases where the IP address for a domain name is unknown).
-    rel* 'src_ref'?: (
+    rel* edges.traffic_src.src_ref?: (
         rel* is?: ipv4-addr-id
         rel* is?: ipv6-addr-id
         rel* is?: mac-addr-id
@@ -1575,7 +1569,7 @@ def network-traffic (
     /// Specifies the destination of the network traffic, as a reference to a Cyber-observable Object.
     ///
     /// The object referenced MUST be of type `ipv4-addr`, `ipv6-addr`, `mac-addr`, or `domain-name` (for cases where the IP address for a domain name is unknown).
-    rel* 'dst_ref'?: (
+    rel* edges.traffic_dst.dst_ref?: (
         rel* is?: ipv4-addr-id
         rel* is?: ipv6-addr-id
         rel* is?: mac-addr-id
@@ -1645,19 +1639,19 @@ def network-traffic (
 
     /// Specifies the bytes sent from the source to the destination.
     /// The object referenced in this property MUST be of type `artifact`.
-    rel* 'src_payload_ref'?: artifact-id
+    rel* edges.traffic_src_payload.src_payload_ref?: artifact-id
 
     /// Specifies the bytes sent from the destination to the source.
     /// The object referenced in this property MUST be of type `artifact`.
-    rel* 'dst_payload_ref'?: artifact-id
+    rel* edges.traffic_dst_payload.dst_payload_ref?: artifact-id
 
     /// Links to other network-traffic objects encapsulated by this network-traffic object.
     /// The objects referenced in this property MUST be of type `network-traffic`.
-    rel* 'encapsulates_refs'?: {network-traffic-id}
+    rel* edges.traffic_encapsulation.encapsulates_refs?: {network-traffic-id}
 
     /// Links to another network-traffic object which encapsulates this object.
     /// The object referenced in this property MUST be of type `network-traffic`.
-    rel* 'encapsulated_by_ref'?: {network-traffic-id}
+    rel* edges.traffic_encapsulation.encapsulated_by_ref?: {network-traffic-id}
 )
 
 /// The Process object represents common properties of an instance of a computer program as executed on an operating system.
@@ -1700,28 +1694,28 @@ def process (
     /// Specifies the list of network connections opened by the process, as a reference to one or more Network Traffic objects.
     ///
     /// The objects referenced in this list MUST be of type `network-traffic`.
-    rel* 'opened_connection_refs'?: {network-traffic-id}
+    rel* edges.process_opened_connections.opened_connection_refs?: {network-traffic-id}
 
     /// Specifies the user that created the process, as a reference to a User Account object.
     ///
     /// The object referenced in this property MUST be of type user-account.
-    rel* 'creator_user_ref'?: user-account-id
+    rel* edges.account-origin.creator_user_ref?: user-account-id
 
     /// Specifies the executable binary that was executed as the process image, as a reference to a File object.
     ///
     /// The object referenced in this property MUST be of type file.
-    rel* 'image_ref'?: file-id
+    rel* edges.process_image.image_ref?: file-id
 
     /// Specifies the other process that spawned (i.e. is the parent of) this one, as a reference to a Process object.
     ///
     /// The object referenced in this property MUST be of type `process`.
     // FIXME: Mirror with child_refs?
-    rel* 'parent_ref'?: process-id
+    rel* edges.process_tree.parent_ref?: process-id
 
     /// Specifies the other processes that were spawned by (i.e. children of) this process, as a reference to one or more other Process objects.
     ///
     /// The objects referenced in this list MUST be of type process.
-    rel* 'child_refs'?: {process-id}
+    rel* edges.process_tree.child_refs?: {process-id}
 )
 
 /// The Software object represents high-level properties associated with software, including software products.
@@ -1863,10 +1857,10 @@ def windows-registry-key (
 
     /// Specifies the last date/time that the registry key was modified.
     rel* 'modified_time'?: common.timestamp
-    
+
     /// Specifies a reference to the user account that created the registry key.
     /// The object referenced in this property MUST be of type user-account.
-    rel* 'creator_user_ref'?: user-account-id
+    rel* edges.account-origin.creator_user_ref?: user-account-id
 
     /// Specifies the number of subkeys contained under the registry key.
     rel* 'number_of_subkeys'?: common.integer
@@ -1991,10 +1985,10 @@ def relationship (
     rel* 'description'?: common.string
 
     /// The id of the source (from) object. The value MUST be an ID reference to an SDO or SCO (i.e., it cannot point to an SRO, Bundle, Language Content, or Marking Definition).
-    rel* relationship_edge.source_ref: sdo_sco_identifier
+    rel* edges.relationship.source_ref: sdo_sco_identifier
 
     /// The id of the target (to) object. The value MUST be an ID reference to an SDO or SCO (i.e., it cannot point to an SRO, Bundle, Language Content, or Marking Definition).
-    rel* relationship_edge.target_ref: sdo_sco_identifier
+    rel* edges.relationship.target_ref: sdo_sco_identifier
 
     /// This optional timestamp represents the earliest time at which the Relationship between the objects exists.
     /// If this property is a future timestamp, at the time the start_time property is defined, then this represents an estimate by the producer of the intelligence of the earliest time at which relationship will be asserted to be true.

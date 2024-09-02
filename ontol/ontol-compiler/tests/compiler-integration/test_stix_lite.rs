@@ -105,8 +105,12 @@ fn test_stix_object_course_of_action() {
 }
 
 fn stix_ontology_smoke(test: &OntolTest) {
-    let [windows_registry_key, user_account, attack_pattern] =
-        test.bind(["windows-registry-key", "user-account", "attack-pattern"]);
+    let [user_account, attack_pattern, process, windows_registry_key] = test.bind([
+        "user-account",
+        "attack-pattern",
+        "process",
+        "windows-registry-key",
+    ]);
     let [string] = test.bind(["stix_common.string"]);
 
     let (_, creator_user_ref) = windows_registry_key
@@ -115,8 +119,8 @@ fn stix_ontology_smoke(test: &OntolTest) {
         .unwrap();
     let creator_edge_projection = creator_user_ref.edge_kind().unwrap();
 
-    assert_eq!(creator_edge_projection.subject, CardinalIdx(0));
-    assert_eq!(creator_edge_projection.object, CardinalIdx(1));
+    assert_eq!(creator_edge_projection.subject, CardinalIdx(1));
+    assert_eq!(creator_edge_projection.object, CardinalIdx(0));
 
     let reg_key_user_account_edge_info = test
         .ontology()
@@ -124,11 +128,11 @@ fn stix_ontology_smoke(test: &OntolTest) {
         .unwrap();
 
     assert_eq!(
-        &reg_key_user_account_edge_info.cardinals[0].target,
-        &DefIdSet::from_iter([windows_registry_key.def_id()])
+        &reg_key_user_account_edge_info.cardinals[1].target,
+        &DefIdSet::from_iter([windows_registry_key.def_id(), process.def_id()])
     );
     assert_eq!(
-        &reg_key_user_account_edge_info.cardinals[1].target,
+        &reg_key_user_account_edge_info.cardinals[0].target,
         &DefIdSet::from_iter([user_account.def_id()])
     );
 

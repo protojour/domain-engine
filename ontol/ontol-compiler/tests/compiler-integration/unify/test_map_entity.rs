@@ -197,19 +197,29 @@ fn test_rel_params_implicit_map() {
 fn test_map_relation_sequence_default_fallback() {
     "
     domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
-    def foo_inner (rel. 'foo_id': (rel* is: text))
-    def bar_inner (rel. 'bar_id': (rel* is: text))
-    rel {foo_inner} 'bars'::'foos'? {bar_inner}
+    def foo_inner (
+        rel. 'foo_id': (rel* is: text)
+        rel* link.bars: {bar_inner}
+    )
+    def bar_inner (
+        rel. 'bar_id': (rel* is: text)
+        rel* link.foos?: {foo_inner}
+    )
 
     def bar (
         rel. 'id': (rel* is: text)
         rel* 'foos': {text}
     )
 
+    edge link {
+        (b) foos: (f),
+        (f) bars: (b),
+    }
+
     map(
         @match bar_inner(
             'bar_id': id,
-            'foos': { ..foo_inner('foo_id': foo) },
+            link.foos: { ..foo_inner('foo_id': foo) },
         ),
         bar(
             'id': id,
@@ -302,6 +312,7 @@ fn test_map_generate_edge() {
 }
 
 const WORK: &str = "
+use 'link' as link
 def worker_id (fmt '' => 'worker/' => uuid => .)
 def tech_id (fmt '' => 'tech/' => uuid => .)
 
@@ -312,7 +323,7 @@ def worker (
     rel. 'ID': worker_id
     rel* 'name': text
 
-    rel* 'technologies': {technology}
+    rel* link.link.technologies: {technology}
 )
 
 def technology (
@@ -322,6 +333,7 @@ def technology (
 ";
 
 const DEV: &str = "
+use 'link' as link
 def lang_id (fmt '' => uuid => .)
 def dev_id (fmt '' => uuid => .)
 
@@ -332,13 +344,19 @@ def language (
     rel. 'id': lang_id
 
     rel* 'name': text
-    rel* 'developers': {developer}
+    rel* link.link.developers: {developer}
 )
 
 def developer (
     rel. 'id': dev_id
     rel* 'name': text
 )
+";
+const LINK: &str = "
+edge link {
+    (a) technologies: (b),
+    (b) developers: (a),
+}
 ";
 
 #[test]
@@ -347,6 +365,7 @@ fn test_map_invert() {
         (
             src_name("entry"),
             "
+            use 'link' as link
             use 'work' as work
             use 'dev' as dev
 
@@ -354,7 +373,7 @@ fn test_map_invert() {
                 work.worker(
                     'ID': p_id,
                     'name': p_name,
-                    'technologies': {..work.technology(
+                    link.link.technologies: {..work.technology(
                         'ID': tech_id,
                         'name': tech_name,
                     )}
@@ -362,7 +381,7 @@ fn test_map_invert() {
                 dev.language(
                     'id': tech_id,
                     'name': tech_name,
-                    'developers': {..dev.developer( // ERROR TODO: Incompatible aggregation group// ERROR TODO: unable to loop
+                    link.link.developers: {..dev.developer( // ERROR TODO: Incompatible aggregation group// ERROR TODO: unable to loop
                         'id': p_id,
                         'name': p_name,
                     )}
@@ -372,6 +391,7 @@ fn test_map_invert() {
         ),
         (src_name("work"), WORK),
         (src_name("dev"), DEV),
+        (src_name("link"), LINK),
     ])
     .compile_fail();
 }
