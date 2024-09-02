@@ -33,7 +33,7 @@ fn inherent_id_no_autogen() {
     def foo_id (rel* is: text)
     def foo (
         rel. 'key': foo_id
-        rel* children: {foo}
+        rel* ancestry.children: {foo}
     )
     edge ancestry {
         (p) children: (c)
@@ -58,7 +58,7 @@ fn inherent_id_autogen() {
     def foo_id (rel* is: text)
     def foo (
         rel. 'key'[rel* gen: auto]: foo_id
-        rel* children: {foo}
+        rel* ancestry.children: {foo}
     )
     edge ancestry {
         (p) children: (c)
@@ -82,7 +82,7 @@ fn id_and_inherent_property_inline_type() {
     domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def foo (
         rel. 'key': (rel* is: text)
-        rel* children: {foo}
+        rel* ancestry.children: {foo}
     )
     edge ancestry {
         (p) children: (c)
@@ -270,8 +270,8 @@ fn test_entity_self_relationship_optional_object_sym() {
     def node (
         rel. 'id': node_id
         rel* 'name': text
-        rel* children: {node}
-        rel* parent?: node
+        rel* ancestry.children: {node}
+        rel* ancestry.parent?: node
     )
     "
     .compile_then(|test| {
@@ -316,8 +316,8 @@ fn test_entity_self_relationship_optional_object() {
     def node (
         rel. 'id': node_id
         rel* 'name': text
-        rel* children: {node}
-        rel* parent?: node
+        rel* ancestry.children: {node}
+        rel* ancestry.parent?: node
     )
     "
     .compile_then(|test| {
@@ -353,8 +353,8 @@ fn test_entity_self_relationship_mandatory_object() {
     def node_id (fmt '' => serial => .)
     def node (
         rel. 'id': node_id
-        rel* children: {node}
-        rel* parent: node
+        rel* ancestry.children: {node}
+        rel* ancestry.parent: node
     )
     "
     .compile_then(|test| {
@@ -393,10 +393,10 @@ fn entity_union_with_union_def_id_larger_than_id() {
     domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
     def Repository (
         rel. 'id'[rel* gen: auto]: (rel* is: uuid)
-        rel* owner: RepositoryOwner
+        rel* repo_ownership.owner: RepositoryOwner
     )
 
-    edge repo_ownerhship {
+    edge repo_ownership {
         (repo) owner: (owner),
         (owner) repositories: (repo),
     }
@@ -405,7 +405,7 @@ fn entity_union_with_union_def_id_larger_than_id() {
 
     def Organization (
         rel. 'id': org_id
-        rel* repositories: {Repository}
+        rel* repo_ownership.repositories: {Repository}
     )
 
     def RepositoryOwner (
@@ -489,7 +489,7 @@ fn entity_relationship_without_reverse() {
     def programmer (
         rel. 'id': prog_id
         rel* 'name': text
-        rel* favorite-language: language
+        rel* fav.favorite-language: language
     )
     edge fav {
         (p) favorite-language: (l)
@@ -520,7 +520,7 @@ fn recursive_entity_union() {
     def animal (
         rel. 'id'[rel* gen: auto]: animal_id
         rel* 'class': 'animal'
-        rel* eats: {lifeform}
+        rel* diet.eats: {lifeform}
     )
     def plant (
         rel. 'id'[rel* gen: auto]: plant_id
@@ -536,7 +536,7 @@ fn recursive_entity_union() {
     def owner (
         rel. 'id': owner_id
         rel* 'name': text
-        rel* owns: {lifeform}
+        rel* ownership.owns: {lifeform}
     )
     "
     .compile_then(|test| {
@@ -590,18 +590,17 @@ fn store_key_in_def_info() {
     def foo (
         rel. 'id': (rel* is: text)
         rel* store_key: 'fu'
-        rel* bar_: bar
+        rel* linkage.bar: bar
     )
 
     def bar (
         rel. 'id': (rel* is: text)
-        rel* foo_: bar
+        rel* linkage.foo: bar
     )
 
     edge linkage {
-        // FIXME: introduce namespacing:
-        (f) bar_: (b) with: foobar_edge,
-        (b) foo_: (f) with: foobar_edge,
+        (f) bar: (b) with: foobar_edge,
+        (b) foo: (f) with: foobar_edge,
     }
     "
     .compile_then(|test| {

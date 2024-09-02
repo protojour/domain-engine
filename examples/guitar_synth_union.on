@@ -11,13 +11,13 @@ def guitar (
     rel. 'instrument-id'[rel* gen: auto]: guitar_id
     rel* 'type': 'guitar'
     rel* 'string_count': i64
-    rel* played-by: {artist}
+    rel* playing.played-by: {artist}
 )
 def synth (
     rel. 'instrument-id'[rel* gen: auto]: synth_id
     rel* 'type': 'synth'
     rel* 'polyphony': i64
-    rel* played-by: {artist}
+    rel* playing.played-by: {artist}
 )
 def instrument (
     rel* is?: guitar
@@ -26,7 +26,7 @@ def instrument (
 def artist (
     rel. 'artist-id'[rel* gen: auto]: ( fmt '' => text => . )
     rel* 'name': text
-    rel* plays: {instrument}
+    rel* playing.plays: {instrument}
 )
 
 edge playing {

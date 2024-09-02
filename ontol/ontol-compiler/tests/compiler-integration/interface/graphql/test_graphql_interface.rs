@@ -303,9 +303,13 @@ fn incompatible_edge_types_are_distinct() {
         rel* 'edge_field': text
     )
 
+    edge link {
+        (s) targets: (t) type: edge_type
+    }
+
     def source (
         rel. 'id': (rel* is: text)
-        rel* 'targets'[rel* is: edge_type]: {target}
+        rel* link.targets: {target}
     )
     def target (
         rel. 'id': (rel* is: text)
@@ -357,6 +361,7 @@ fn incompatible_edge_types_are_distinct() {
             let targets_connection = schema.type_data(targets_field.field_type.unit.addr());
             assert_eq!(
                 &ontology[targets_connection.typename],
+                // FIXME: something funky going on if not disambiguating this type:
                 "_anon1_5targetConnection"
             );
 

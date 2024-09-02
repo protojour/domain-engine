@@ -17,27 +17,27 @@ def qux_id (fmt '' => 'qux/' => serial => .)
 
 def foo (
     rel. id: foo_id
-    rel* related_to: {baz|qux}
+    rel* linkage.related_to: {baz|qux}
 )
 def bar (
     rel. id: bar_id
-    rel* related_to: {baz|qux}
+    rel* linkage.related_to: {baz|qux}
 )
 def baz (
     rel. id: baz_id
-    rel* related_from: {foo|bar}
+    rel* linkage.related_from: {foo|bar}
 )
 def qux (
     rel. id: qux_id
     rel* 'qux_field': text
-    rel* related_from: {foo|bar}
+    rel* linkage.related_from: {foo|bar}
 )
 
 /// This definition is both an entity in its own right and an edge
 def link (
     rel. id: (fmt '' => 'link/' => serial => .)
-    rel* from: foo_id|bar_id
-    rel* to: baz_id|qux_id
+    rel* linkage.from: foo_id|bar_id
+    rel* linkage.to: baz_id|qux_id
 )
 
 map foos(

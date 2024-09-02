@@ -200,6 +200,10 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                                     .get(package_def_id)
                                     .unwrap();
                             }
+                            DefKind::Edge(..) => {
+                                namespace =
+                                    self.compiler.namespaces.namespaces.get(def_id).unwrap();
+                            }
                             other => {
                                 debug!("namespace not found. def kind was {other:?}");
                                 return Err((CompileError::NamespaceNotFound, current.span()));
@@ -240,9 +244,9 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
         extern_: Extern,
         macro_: Macro,
     ) -> Result<DefId, LoweringError> {
-        let (def_id, coinage) = self.named_def_id(Space::Def, ident, ident_span)?;
+        let (def_id, coinage, ident) =
+            self.named_def_id(self.pkg_def_id, Space::Def, ident, ident_span)?;
         if matches!(coinage, Coinage::New) {
-            let ident = self.compiler.str_ctx.intern(ident);
             debug!("{def_id:?}: `{}`", ident);
 
             let kind = if macro_.0.is_some() {
@@ -275,10 +279,11 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
 
     pub fn coin_symbol(
         &mut self,
+        namespace: DefId,
         ident: &str,
         ident_span: U32Span,
     ) -> Result<DefId, LoweringError> {
-        let (def_id, coinage) = self.named_def_id(Space::Def, ident, ident_span)?;
+        let (def_id, coinage, _) = self.named_def_id(namespace, Space::Def, ident, ident_span)?;
         if matches!(coinage, Coinage::New) {
             let ident = self.compiler.str_ctx.intern(ident);
             debug!("{def_id:?}: `{}`", ident);
@@ -330,20 +335,21 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
 
     pub fn named_def_id(
         &mut self,
+        namespace: DefId,
         space: Space,
         ident: &str,
         span: U32Span,
-    ) -> Result<(DefId, Coinage), LoweringError> {
+    ) -> Result<(DefId, Coinage, &'m str), LoweringError> {
         let ident = self.compiler.str_ctx.intern(ident);
         match self
             .compiler
             .namespaces
-            .get_namespace_mut(self.pkg_def_id, space)
+            .get_namespace_mut(namespace, space)
             .entry(ident)
         {
             Entry::Occupied(occupied) => {
                 if occupied.get().package_id() == self.package_id {
-                    Ok((*occupied.get(), Coinage::Used))
+                    Ok((*occupied.get(), Coinage::Used, ident))
                 } else {
                     Err((
                         CompileError::TODO("definition of external identifier"),
@@ -354,7 +360,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
             Entry::Vacant(vacant) => {
                 let def_id = self.compiler.defs.alloc_def_id(self.package_id);
                 vacant.insert(def_id);
-                Ok((def_id, Coinage::New))
+                Ok((def_id, Coinage::New, ident))
             }
         }
     }

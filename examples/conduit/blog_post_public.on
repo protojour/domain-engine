@@ -20,10 +20,10 @@ map(
         'article_id': id,
         'body': body,
         'title': title,
-        'author': db.User(
+        db.article_authorship.author: db.User(
             'username': author
         ),
-        db.tags: {
+        db.tagging.tags: {
             ..db.TagEntity('tag': tag)
         },
     ),
@@ -35,7 +35,7 @@ map posts(
     ),
     BlogPost {
         ..@match db.Article(
-            'author': @match db.User(
+            db.article_authorship.author: @match db.User(
                 'username'?: by
             ),
             order: { db.by_date() }

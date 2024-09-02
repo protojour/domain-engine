@@ -38,9 +38,13 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         let (def_id, ident) = match stmt.ident_path() {
             Some(ident_path) => {
                 let symbol = ident_path.symbols().next()?;
-                let (def_id, coinage) = self.catch(|zelf| {
-                    zelf.ctx
-                        .named_def_id(Space::Map, symbol.slice(), symbol.span())
+                let (def_id, coinage, _) = self.catch(|zelf| {
+                    zelf.ctx.named_def_id(
+                        zelf.ctx.pkg_def_id,
+                        Space::Map,
+                        symbol.slice(),
+                        symbol.span(),
+                    )
                 })?;
                 if matches!(coinage, Coinage::Used) {
                     CompileError::DuplicateMapIdentifier.span_report(symbol.span(), &mut self.ctx);

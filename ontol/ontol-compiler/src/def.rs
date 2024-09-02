@@ -11,7 +11,7 @@ use ontol_runtime::{
         ontol::TextLikeType,
     },
     var::VarAllocator,
-    DefId, OntolDefTag, PackageId,
+    DefId, EdgeId, OntolDefTag, PackageId,
 };
 
 use crate::{
@@ -44,7 +44,7 @@ pub enum DefKind<'m> {
     Macro(&'m str),
     InlineUnion(BTreeSet<DefId>),
     BuiltinRelType(BuiltinRelationKind, Option<&'static str>),
-    Edge,
+    Edge(&'m str, EdgeId),
     // FIXME: This should not be builtin proc directly.
     // we may find the _actual_ builtin proc to call during type check,
     // if there are different variants per type.
@@ -75,7 +75,7 @@ impl<'m> DefKind<'m> {
             Self::Macro(ident) => Some((*ident).into()),
             Self::InlineUnion(_) => None,
             Self::BuiltinRelType(_, ident) => ident.map(|ident| ident.into()),
-            Self::Edge => None,
+            Self::Edge(ident, _) => Some(Cow::Borrowed(ident)),
             Self::Constant(_) => None,
             Self::Mapping { ident, .. } => ident.map(|ident| ident.into()),
             Self::AutoMapping => None,

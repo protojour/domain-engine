@@ -52,7 +52,7 @@ map feed(
             'link': /http:\/\/blogs\.com\/(?<username>\w+)\/feed/,
             'items': {
                 ..@match db.Article(
-                    'author': db.User (
+                    db.article_authorship.author: db.User (
                         'username': username,
                     ),
                     order: db.by_date()

@@ -11,13 +11,16 @@ use ontol_parser::{
 use ontol_runtime::{tuple::CardinalIdx, DefId, EdgeId, OntolDefTag};
 
 use crate::{
+    def::DefKind,
     edge::{CardinalKind, Slot, SymbolicEdge, SymbolicEdgeCardinal},
+    namespace::Space,
     CompileError,
 };
 
-use super::context::{CstLowering, RootDefs};
+use super::context::{Coinage, CstLowering, RootDefs};
 
 struct EdgeBuilder<V> {
+    edge_def_id: DefId,
     edge_id: EdgeId,
     cardinal_name_table: HashMap<String, CardinalIdx>,
     slots: FnvHashMap<DefId, Slot>,
@@ -34,11 +37,30 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         EdgeId,
         BTreeMap<CardinalIdx, insp::EdgeTypeParam<V>>,
     )> {
-        let mut root_defs = vec![];
-
-        let Some(_ident_path) = edge_stmt.ident_path() else {
+        let Some(ident_path) = edge_stmt.ident_path() else {
             return None;
         };
+        let Some(ident_symbol) = ident_path.symbols().next() else {
+            return None;
+        };
+
+        let Some((edge_def_id, coinage, ident)) = self.catch(|zelf| {
+            zelf.ctx.named_def_id(
+                zelf.ctx.pkg_def_id,
+                Space::Def,
+                ident_symbol.slice(),
+                ident_symbol.span(),
+            )
+        }) else {
+            return None;
+        };
+
+        if matches!(coinage, Coinage::Used) {
+            CompileError::EdgeMustHaveUniqueIdentifier
+                .span_report(ident_symbol.span(), &mut self.ctx);
+        }
+
+        let mut root_defs = vec![edge_def_id];
 
         let edge_id = self
             .ctx
@@ -46,7 +68,14 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             .edge_ctx
             .alloc_edge_id(self.ctx.package_id);
 
+        self.ctx.set_def_kind(
+            edge_def_id,
+            DefKind::Edge(ident, edge_id),
+            ident_symbol.span(),
+        );
+
         let mut edge_builder = EdgeBuilder {
+            edge_def_id,
             edge_id,
             slots: Default::default(),
             cardinals: Default::default(),
@@ -142,8 +171,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         };
 
         let symbol = edge_slot.symbol()?;
-        let slot_symbol_def_id =
-            self.catch(|zelf| zelf.ctx.coin_symbol(symbol.slice(), symbol.span()));
+        let slot_symbol_def_id = self.catch(|zelf| {
+            zelf.ctx
+                .coin_symbol(edge_builder.edge_def_id, symbol.slice(), symbol.span())
+        });
         let next_item = self.next_edge_item(item_iter, edge_relation_span)?;
 
         let cardinal_idx = match next_item {

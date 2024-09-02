@@ -18,7 +18,7 @@ sym {
     type
 }
 
-edge relationship-edge {
+edge relationship_edge {
     (src) related_to: (target) with_rel: (relationship),
     (target) related_from: (src) with_rel: (relationship),
     (relationship) source_ref: (src),
@@ -1991,10 +1991,10 @@ def relationship (
     rel* 'description'?: common.string
 
     /// The id of the source (from) object. The value MUST be an ID reference to an SDO or SCO (i.e., it cannot point to an SRO, Bundle, Language Content, or Marking Definition).
-    rel* source_ref: sdo_sco_identifier
+    rel* relationship_edge.source_ref: sdo_sco_identifier
 
     /// The id of the target (to) object. The value MUST be an ID reference to an SDO or SCO (i.e., it cannot point to an SRO, Bundle, Language Content, or Marking Definition).
-    rel* target_ref: sdo_sco_identifier
+    rel* relationship_edge.target_ref: sdo_sco_identifier
 
     /// This optional timestamp represents the earliest time at which the Relationship between the objects exists.
     /// If this property is a future timestamp, at the time the start_time property is defined, then this represents an estimate by the producer of the intelligence of the earliest time at which relationship will be asserted to be true.

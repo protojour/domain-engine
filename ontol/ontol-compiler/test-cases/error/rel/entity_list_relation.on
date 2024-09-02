@@ -1,6 +1,6 @@
 def foo(
     rel. 'id': (rel* is: text)
-    rel* bars: [bar] // ERROR entity relationships must be sets instead of lists. Use `{}` syntax.
+    rel* e.bars: [bar] // ERROR entity relationships must be sets instead of lists. Use `{}` syntax.
 )
 def bar(
     rel. 'id': (rel* is: text)

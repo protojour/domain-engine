@@ -27,8 +27,8 @@ def play_params (
     rel* 'how_much': text
 )
 
-rel {artist} plays: {instrument}
-rel {instrument} played_by: {artist}
+rel {artist} playing.plays: {instrument}
+rel {instrument} playing.played_by: {artist}
 
 map artists (
     (),

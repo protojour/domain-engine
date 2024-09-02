@@ -48,6 +48,7 @@ pub enum Type<'m> {
     // A builtin function for generating values
     ValueGenerator(DefId),
     Package,
+    Edge,
     BuiltinRelation,
     Extern(DefId),
     Infer(TypeVar<'m>),
@@ -77,6 +78,7 @@ impl<'m> Type<'m> {
             Self::Anonymous(def_id) => Some(*def_id),
             Self::ValueGenerator(def_id) => Some(*def_id),
             Self::Package => None,
+            Self::Edge => None,
             Self::BuiltinRelation => None,
             Self::Extern(def_id) => Some(*def_id),
             Self::Infer(_) => None,
@@ -373,7 +375,8 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
                 write!(f, "<anonymous type>")
             }
             Type::ValueGenerator(_) => write!(f, "<value generator>"),
-            Type::Package => write!(f, "package"),
+            Type::Package => write!(f, "<package>"),
+            Type::Edge => write!(f, "<edge>"),
             Type::BuiltinRelation => write!(f, "<relation>"),
             Type::Extern(def_id) => {
                 let ident = self.defs.def_kind(*def_id).opt_identifier().unwrap();

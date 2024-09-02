@@ -21,7 +21,7 @@ def @private archive_item (
     rel* 'description': text
     rel* 'asset_score': i64
     rel* 'type': ItemType
-    rel* archive_groups: {archive_group}
+    rel* db_linkage.archive_groups: {archive_group}
 )
 def @private archive_group (
     rel. 'id': (fmt '' => 'archive_group/' => uuid => .)
@@ -32,7 +32,7 @@ def @private archive_group (
     rel* 'description': text
     rel* 'start_date': datetime
     rel* 'end_date': datetime
-    rel* archive_items: {archive_item}
+    rel* db_linkage.archive_items: {archive_item}
 )
 edge db_linkage {
     (g) archive_items: (i),
@@ -67,7 +67,7 @@ def ArchiveObject (
     /// Classification of the object
     rel* 'kind': ItemType
     /// Relation between ArchiveObject and ArchiveCollection
-    rel* archiveCollections: {ArchiveCollection}
+    rel* archive_linkage.archiveCollections: {ArchiveCollection}
 )
 /// ## An Archived Object Collection
 /// A collection of archived objects
@@ -87,7 +87,7 @@ def ArchiveCollection (
     /// creation date of object in collection
     rel* 'endDate': datetime
     /// Relation between ArchiveCollections and ArchiveObjects
-    rel* archiveObjects: {ArchiveObject}
+    rel* archive_linkage.archiveObjects: {ArchiveObject}
 )
 
 /// a virtual (non-persisted) edge
@@ -144,7 +144,7 @@ map(
         'description': d,
         'startDate': sd,
         'endDate': ed,
-        archiveObjects: {..ai}
+        archive_linkage.archiveObjects: {..ai}
     ),
     archive_group(
         'id': id,
@@ -156,6 +156,6 @@ map(
         'start_date': sd,
         'end_date': ed,
         // the previous map is reused here
-        archive_items: {..ai},
+        db_linkage.archive_items: {..ai},
     ),
 )

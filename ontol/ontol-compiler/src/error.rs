@@ -221,6 +221,8 @@ pub enum CompileError {
     InvalidModifier,
     /// entity-to-entity relationship must use an edge
     EntityToEntityRelationshipMustUseEdge,
+    /// Edge must have a unique identifier
+    EdgeMustHaveUniqueIdentifier,
     /// cannot mix standalone symbol and symbolic edge in the same `sym` statement
     EdgeCannotMixStandaloneSymbolsAndSymbolicEdge,
     /// no trailing item expected

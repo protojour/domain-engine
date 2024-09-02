@@ -349,7 +349,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 continue;
             };
 
-            let opt_def_id = self.catch(|zelf| zelf.ctx.coin_symbol(symbol.slice(), symbol.span()));
+            let opt_def_id = self.catch(|zelf| {
+                zelf.ctx
+                    .coin_symbol(zelf.ctx.pkg_def_id, symbol.slice(), symbol.span())
+            });
             root_defs.extend(opt_def_id);
         }
 

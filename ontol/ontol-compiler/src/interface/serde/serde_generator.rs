@@ -498,6 +498,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 panic!("MacroDef not handled here")
             }
             Type::Function(_)
+            | Type::Edge
             | Type::Anonymous(..)
             | Type::Package
             | Type::BuiltinRelation

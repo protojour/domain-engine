@@ -5,21 +5,6 @@ def user_id (rel* is: uuid)
 def slug (rel* is: text)
 def tag (rel* is: text)
 
-sym {
-    (art) tags: (tag),
-    (tag) tagged: (art),
-}
-
-sym {
-    (user) favorited: (art),
-    (art) favorited_by: (user),
-}
-
-sym {
-    (art) comments: (c),
-    (c) comment_on: (art),
-}
-
 def User (
     // TODO: This must be an Authly user id
     rel. 'user_id'[rel* gen: auto]: user_id
@@ -35,9 +20,13 @@ def User (
     rel* 'image'?: text
 
     // TODO(constraint): User cannot follow itself
-    rel* 'following'::'followed_by'? {User}
+    rel* follow.following?: {User}
+    rel* follow.followed_by?: {User}
 
-    rel* favorited?: {Article}
+    rel* fav.favorited?: {Article}
+
+    rel* article_authorship.authored_articles?: {Article}
+    rel* comment_authorship.authored_comments?: {Comment}
 )
 
 def Article (
@@ -50,9 +39,10 @@ def Article (
     rel* 'created_at'[rel* gen: create_time]: datetime
     rel* 'updated_at'[rel* gen: update_time]: datetime
 
-    rel* tags?: {TagEntity}
-    rel* favorited_by: {User}
-    rel* comments?: {Comment}
+    rel* tagging.tags?: {TagEntity}
+    rel* fav.favorited_by: {User}
+    rel* commentary.comments?: {Comment}
+    rel* article_authorship.author: User
 
     rel* order[rel* 0: 'title']: alphabetical
     rel* order[
@@ -67,16 +57,44 @@ def Comment (
     rel* 'created_at'[rel* gen: create_time]: datetime
     rel* 'updated_at'[rel* gen: update_time]: datetime
 
-    rel* comment_on?: Article
+    rel* commentary.comment_on?: Article
+    rel* comment_authorship.author: User
 )
 
 def TagEntity (
     rel. 'tag': tag
-    rel* tagged: {Article}
+    rel* tagging.tagged: {Article}
 )
 
-rel {Article} 'author'::'authored_articles'? User
-rel {Comment} 'author'::'authored_comments'? User
+edge fav {
+    (user) favorited: (art),
+    (art) favorited_by: (user),
+}
+
+edge follow {
+    (follower) following: (followee),
+    (followee) followed_by: (follower),
+}
+
+edge article_authorship {
+    (article) author: (author),
+    (author) authored_articles: (article),
+}
+
+edge commentary {
+    (art) comments: (c),
+    (c) comment_on: (art),
+}
+
+edge comment_authorship {
+    (comment) author: (author),
+    (author) authored_comments: (comment),
+}
+
+edge tagging {
+    (article) tags: (tag),
+    (tag) tagged: (article),
+}
 
 sym {
     /// An ordering by date

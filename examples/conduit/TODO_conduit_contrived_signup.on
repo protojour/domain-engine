@@ -18,7 +18,7 @@ map(
         'username': username,
         'email': email,
         'password_hash': password,
-        'following': {
+        db.follow.following: {
             ..@match db.User(
                 'username': follow_username
             )

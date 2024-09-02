@@ -15,19 +15,19 @@ def bar_id (rel* is: text)
 
 def foo (
     rel. id: foo_id
-    rel* related_to: {bar}
+    rel* linkage.related_to: {bar}
 )
 def bar (
     rel. id: bar_id
     rel* 'bar_field': text
-    rel* related_from: {foo}
+    rel* linkage.related_from: {foo}
 )
 
 /// This definition is both an entity in its own right and an edge
 def link (
     rel. id: (rel* is: text)
-    rel* from: foo_id
-    rel* to: bar_id
+    rel* linkage.from: foo_id
+    rel* linkage.to: bar_id
 )
 
 map foos(
