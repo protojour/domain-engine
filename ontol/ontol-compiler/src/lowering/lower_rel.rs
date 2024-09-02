@@ -326,14 +326,6 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             Relationship {
                 relation_def_id,
                 edge_projection: None,
-                /*
-                edge_projection: Some(EdgeCardinalProjection {
-                    id: edge_id,
-                    subject: CardinalIdx(0),
-                    object: CardinalIdx(1),
-                    one_to_one: false,
-                }),
-                */
                 relation_span: self.ctx.source_span(ident_span),
                 subject: (subject_ty.def_id, self.ctx.source_span(subject_ty.span)),
                 subject_cardinality,
@@ -350,14 +342,6 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             let relationship1 = Relationship {
                 relation_def_id: relation1_def_id,
                 edge_projection: None,
-                /*
-                edge_projection: Some(EdgeCardinalProjection {
-                    id: edge_id,
-                    subject: CardinalIdx(1),
-                    object: CardinalIdx(0),
-                    one_to_one: false,
-                }),
-                */
                 relation_span: self.ctx.source_span(name.view().span()),
                 subject: relationship0.object,
                 subject_cardinality: relationship0.object_cardinality,
@@ -382,14 +366,6 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             relationship0 = Relationship {
                 relation_def_id: self.ctx.compiler.primitives.relations.identifies,
                 edge_projection: None,
-                /*
-                edge_projection: Some(EdgeCardinalProjection {
-                    id: edge_id,
-                    object: CardinalIdx(0),
-                    subject: CardinalIdx(1),
-                    one_to_one: false,
-                }),
-                */
                 relation_span: relationship0.relation_span,
                 subject: relationship0.object,
                 subject_cardinality: relationship0.object_cardinality,
