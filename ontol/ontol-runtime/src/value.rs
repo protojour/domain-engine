@@ -289,7 +289,7 @@ impl ValueTag {
     pub const fn unit() -> Self {
         Self {
             first: 0,
-            second: 0,
+            second: OntolDefTag::Unit as u16,
         }
     }
 

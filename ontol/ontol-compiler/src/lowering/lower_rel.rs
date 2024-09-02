@@ -257,7 +257,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 self.ctx
                     .compiler
                     .namespaces
-                    .add_anonymous(self.ctx.package_id, rel_def_id);
+                    .add_anonymous(self.ctx.pkg_def_id, rel_def_id);
 
                 for statement in rp.statements() {
                     if let Some(mut defs) = self.lower_statement(

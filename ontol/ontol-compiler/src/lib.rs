@@ -8,7 +8,7 @@ use lowering::context::LoweringOutcome;
 use misc::MiscCtx;
 use properties::PropCtx;
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     ops::{Deref, Index},
 };
 
@@ -171,7 +171,7 @@ struct Compiler<'m> {
     namespaces: Namespaces<'m>,
     defs: Defs<'m>,
     package_def_ids: FnvHashMap<PackageId, DefId>,
-    domain_ids: FnvHashMap<PackageId, DomainId>,
+    domain_ids: BTreeMap<PackageId, DomainId>,
     package_config_table: FnvHashMap<PackageId, PackageConfig>,
     primitives: Primitives,
     patterns: Patterns,
@@ -234,10 +234,6 @@ impl<'m> Compiler<'m> {
             persistent_domains: Default::default(),
             errors: Default::default(),
         }
-    }
-
-    fn package_ids(&self) -> Vec<PackageId> {
-        self.namespaces.namespaces.keys().copied().collect()
     }
 
     /// Check for errors and bail out of the compilation process now, if in error state.

@@ -48,7 +48,7 @@ use crate::{
 
 impl<'m> Compiler<'m> {
     pub(crate) fn into_ontology_inner(mut self) -> Ontology {
-        let package_ids = self.package_ids();
+        let package_ids: Vec<PackageId> = self.domain_ids.keys().copied().collect();
         let unique_domain_names = self.unique_domain_names();
 
         let mut namespaces = std::mem::take(&mut self.namespaces.namespaces);
@@ -103,7 +103,8 @@ impl<'m> Compiler<'m> {
             let mut cache: FnvHashMap<DefId, BTreeSet<DefId>> = Default::default();
 
             for package_id in package_ids.iter() {
-                let namespace = namespaces.get(package_id).unwrap();
+                let domain_def_id = self.package_def_ids.get(&package_id).cloned().unwrap();
+                let namespace = namespaces.get(&domain_def_id).unwrap();
 
                 for (_, union_def_id) in &namespace.types {
                     let Some(ReprKind::Union(variants, UnionBound::Struct)) =
@@ -148,7 +149,7 @@ impl<'m> Compiler<'m> {
                 domain_name,
             );
 
-            let namespace = namespaces.remove(&package_id).unwrap();
+            let namespace = namespaces.remove(&domain_def_id).unwrap();
             let type_namespace = namespace.types;
 
             if let Some(package_config) = package_config_table.remove(&package_id) {
@@ -326,6 +327,7 @@ impl<'m> Compiler<'m> {
         let domain_interfaces = {
             let mut interfaces: FnvHashMap<PackageId, Vec<DomainInterface>> = Default::default();
             for package_id in package_ids.iter().cloned() {
+                let domain_def_id = self.package_def_ids.get(&package_id).cloned().unwrap();
                 if package_id == ONTOL_PKG {
                     continue;
                 }
@@ -345,7 +347,7 @@ impl<'m> Compiler<'m> {
                     package_id,
                     builder.partial_ontology(),
                     &self.primitives,
-                    map_namespaces.get(&package_id),
+                    map_namespaces.get(&domain_def_id),
                     &self.code_ctx,
                     &self.resolver_graph,
                     &union_member_cache,

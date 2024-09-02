@@ -3,12 +3,12 @@ use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::DefId;
 
-use crate::{relation::RelId, PackageId};
+use crate::relation::RelId;
 
 /// Namespace disambiguator
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Space {
-    Type,
+    Def,
     Map,
 }
 
@@ -25,14 +25,14 @@ pub struct Namespace<'m> {
 impl<'m> Namespace<'m> {
     pub fn space(&self, space: Space) -> &IndexMap<&'m str, DefId> {
         match space {
-            Space::Type => &self.types,
+            Space::Def => &self.types,
             Space::Map => &self.maps,
         }
     }
 
     pub fn space_mut(&mut self, space: Space) -> &mut IndexMap<&'m str, DefId> {
         match space {
-            Space::Type => &mut self.types,
+            Space::Def => &mut self.types,
             Space::Map => &mut self.maps,
         }
     }
@@ -46,14 +46,14 @@ pub enum DocId {
 
 #[derive(Default)]
 pub struct Namespaces<'m> {
-    pub(crate) namespaces: FnvHashMap<PackageId, Namespace<'m>>,
+    pub(crate) namespaces: FnvHashMap<DefId, Namespace<'m>>,
     pub(crate) docs: FnvHashMap<DocId, ArcStr>,
 }
 
 impl<'m> Namespaces<'m> {
-    pub fn lookup(&self, search_path: &[PackageId], space: Space, ident: &str) -> Option<DefId> {
-        for package in search_path {
-            let Some(namespace) = self.namespaces.get(package) else {
+    pub fn lookup(&self, search_path: &[DefId], space: Space, ident: &str) -> Option<DefId> {
+        for def_id in search_path {
+            let Some(namespace) = self.namespaces.get(def_id) else {
                 continue;
             };
             if let Some(def_id) = namespace.space(space).get(ident) {
@@ -66,15 +66,15 @@ impl<'m> Namespaces<'m> {
 
     pub fn get_namespace_mut(
         &mut self,
-        package: PackageId,
+        parent: DefId,
         space: Space,
     ) -> &mut IndexMap<&'m str, DefId> {
-        self.namespaces.entry(package).or_default().space_mut(space)
+        self.namespaces.entry(parent).or_default().space_mut(space)
     }
 
-    pub fn add_anonymous(&mut self, package: PackageId, def_id: DefId) {
+    pub fn add_anonymous(&mut self, parent: DefId, def_id: DefId) {
         self.namespaces
-            .entry(package)
+            .entry(parent)
             .or_default()
             .anonymous
             .push(def_id);

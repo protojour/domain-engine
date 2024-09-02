@@ -180,7 +180,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 self.ctx
                     .compiler
                     .namespaces
-                    .add_anonymous(self.ctx.package_id, def_id);
+                    .add_anonymous(self.ctx.pkg_def_id, def_id);
                 root_defs.push(def_id);
 
                 let context_fn = || def_id;
@@ -237,7 +237,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     self.ctx
                         .compiler
                         .namespaces
-                        .add_anonymous(self.ctx.package_id, union_def_id);
+                        .add_anonymous(self.ctx.pkg_def_id, union_def_id);
 
                     Some(union_def_id)
                 }

@@ -417,18 +417,18 @@ impl<'m> Compiler<'m> {
         name: &'m str,
         space: Space,
         kind: DefKind<'m>,
-        package: PackageId,
+        parent: DefId,
         span: SourceSpan,
     ) -> DefId {
-        let def_id = self.defs.alloc_def_id(package);
+        let def_id = self.defs.alloc_def_id(parent.package_id());
         self.namespaces
-            .get_namespace_mut(package, space)
+            .get_namespace_mut(parent, space)
             .insert(name, def_id);
         self.defs.table.insert(
             def_id,
             Def {
                 id: def_id,
-                package,
+                package: parent.package_id(),
                 span,
                 kind,
             },
@@ -453,10 +453,12 @@ impl<'m> Compiler<'m> {
         self.def_ty_ctx.def_table.insert(package_def_id, ty);
 
         // make sure the namespace exists
-        let namespace = self.namespaces.get_namespace_mut(package_id, Space::Type);
+        let namespace = self
+            .namespaces
+            .get_namespace_mut(package_def_id, Space::Def);
 
         // The name `ontol` is always defined, and refers to the ontol domain
-        namespace.insert("ontol", self.primitives.ontol_domain);
+        namespace.insert("ontol", OntolDefTag::Ontol.def_id());
 
         package_def_id
     }

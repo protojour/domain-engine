@@ -31,7 +31,7 @@ const ONTOL_DOMAIN_ID: &str = "01GNYFZP30ED0EZ1579TH0D55P";
 impl<'m> Compiler<'m> {
     pub fn register_ontol_domain(&mut self) {
         self.str_ctx.intern_constant("ontol");
-        let def_id = self.define_package(self.primitives.ontol_domain);
+        let def_id = self.define_package(OntolDefTag::Ontol.def_id());
 
         assert_eq!(def_id.package_id(), PackageId::first());
         self.domain_ids.insert(
@@ -57,7 +57,7 @@ impl<'m> Compiler<'m> {
                     let ty = self.ty_ctx.intern(Type::Primitive(*kind, def_id));
                     if let Some(ident) = *ident {
                         self.namespaces
-                            .get_namespace_mut(ONTOL_PKG, Space::Type)
+                            .get_namespace_mut(OntolDefTag::Ontol.def_id(), Space::Def)
                             .insert(ident, def_id);
                     }
                     self.def_ty_ctx.def_table.insert(def_id, ty);
@@ -95,7 +95,7 @@ impl<'m> Compiler<'m> {
                         );
 
                         self.namespaces
-                            .get_namespace_mut(ONTOL_PKG, Space::Type)
+                            .get_namespace_mut(OntolDefTag::Ontol.def_id(), Space::Def)
                             .insert(ident, def_id);
                     }
                 }
@@ -331,14 +331,20 @@ impl<'m> Compiler<'m> {
     ) -> TypeRef<'m> {
         let ty = self.ty_ctx.intern(ty_fn(def_id));
         self.namespaces
-            .get_namespace_mut(ONTOL_PKG, Space::Type)
+            .get_namespace_mut(OntolDefTag::Ontol.def_id(), Space::Def)
             .insert(ident, def_id);
         self.def_ty_ctx.def_table.insert(def_id, ty);
         ty
     }
 
     fn def_proc(&mut self, ident: &'static str, def_kind: DefKind<'m>, ty: TypeRef<'m>) -> DefId {
-        let def_id = self.add_named_def(ident, Space::Type, def_kind, ONTOL_PKG, NO_SPAN);
+        let def_id = self.add_named_def(
+            ident,
+            Space::Def,
+            def_kind,
+            OntolDefTag::Ontol.def_id(),
+            NO_SPAN,
+        );
         self.def_ty_ctx.def_table.insert(def_id, ty);
 
         def_id

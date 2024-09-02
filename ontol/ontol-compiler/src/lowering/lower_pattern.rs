@@ -76,7 +76,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 self.ctx
                     .compiler
                     .namespaces
-                    .add_anonymous(self.ctx.package_id, def_id);
+                    .add_anonymous(self.ctx.pkg_def_id, def_id);
 
                 TypePath::Inferred { def_id }
             }

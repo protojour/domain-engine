@@ -52,8 +52,8 @@ impl<'m> Compiler<'m> {
                 // But before the union check!
                 self.type_check().repr_check(order_union).check_repr_root();
 
-                self.namespaces
-                    .add_anonymous(def_id.package_id(), order_union);
+                let domain_def_id = self.package_def_ids.get(&def_id.package_id()).unwrap();
+                self.namespaces.add_anonymous(*domain_def_id, order_union);
 
                 self.type_check().check_def(order_union);
 

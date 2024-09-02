@@ -244,7 +244,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     .ctx
                     .compiler
                     .namespaces
-                    .get_namespace_mut(self.ctx.package_id, Space::Type);
+                    .get_namespace_mut(self.ctx.pkg_def_id, Space::Def);
 
                 let symbol = use_stmt.ident_path()?.symbols().next()?;
 

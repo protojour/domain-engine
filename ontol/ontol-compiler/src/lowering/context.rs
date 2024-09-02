@@ -15,7 +15,7 @@ use ontol_parser::{
 use ontol_runtime::{
     property::{PropertyCardinality, ValueCardinality},
     var::{Var, VarAllocator},
-    DefId, PackageId,
+    DefId, OntolDefTag, PackageId,
 };
 use tracing::debug;
 
@@ -23,7 +23,6 @@ use crate::{
     def::{Def, DefKind, TypeDef, TypeDefFlags},
     fmt::FmtChain,
     namespace::Space,
-    package::ONTOL_PKG,
     pattern::{Pattern, PatternKind},
     relation::{DefRelTag, RelId, RelParams, Relationship},
     CompileError, Compiler, SourceId, SourceSpan,
@@ -151,11 +150,11 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
 
     pub fn lookup_ident(&mut self, ident: &str, span: U32Span) -> Result<DefId, LoweringError> {
         // A single ident looks in both ONTOL_PKG and the current package
-        match self
-            .compiler
-            .namespaces
-            .lookup(&[self.package_id, ONTOL_PKG], Space::Type, ident)
-        {
+        match self.compiler.namespaces.lookup(
+            &[self.pkg_def_id, OntolDefTag::Ontol.def_id()],
+            Space::Def,
+            ident,
+        ) {
             Some(def_id) => Ok(def_id),
             None => Err((CompileError::DefinitionNotFound, span)),
         }
@@ -180,20 +179,26 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                 .compiler
                 .namespaces
                 .namespaces
-                .get(&self.package_id)
+                .get(&self.pkg_def_id)
                 .unwrap();
 
             let mut def_id;
 
             loop {
                 let segment = self.compiler.str_ctx.intern(current.slice());
-                def_id = namespace.space(Space::Type).get(segment);
+                def_id = namespace.space(Space::Def).get(segment);
                 if segment_iter.peek().is_some() {
                     match def_id {
                         Some(def_id) => match self.compiler.defs.def_kind(*def_id) {
                             DefKind::Package(package_id) => {
-                                namespace =
-                                    self.compiler.namespaces.namespaces.get(package_id).unwrap();
+                                let package_def_id =
+                                    self.compiler.package_def_ids.get(package_id).unwrap();
+                                namespace = self
+                                    .compiler
+                                    .namespaces
+                                    .namespaces
+                                    .get(package_def_id)
+                                    .unwrap();
                             }
                             other => {
                                 debug!("namespace not found. def kind was {other:?}");
@@ -235,7 +240,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
         extern_: Extern,
         macro_: Macro,
     ) -> Result<DefId, LoweringError> {
-        let (def_id, coinage) = self.named_def_id(Space::Type, ident, ident_span)?;
+        let (def_id, coinage) = self.named_def_id(Space::Def, ident, ident_span)?;
         if matches!(coinage, Coinage::New) {
             let ident = self.compiler.str_ctx.intern(ident);
             debug!("{def_id:?}: `{}`", ident);
@@ -273,7 +278,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
         ident: &str,
         ident_span: U32Span,
     ) -> Result<DefId, LoweringError> {
-        let (def_id, coinage) = self.named_def_id(Space::Type, ident, ident_span)?;
+        let (def_id, coinage) = self.named_def_id(Space::Def, ident, ident_span)?;
         if matches!(coinage, Coinage::New) {
             let ident = self.compiler.str_ctx.intern(ident);
             debug!("{def_id:?}: `{}`", ident);
@@ -333,7 +338,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
         match self
             .compiler
             .namespaces
-            .get_namespace_mut(self.package_id, space)
+            .get_namespace_mut(self.pkg_def_id, space)
             .entry(ident)
         {
             Entry::Occupied(occupied) => {

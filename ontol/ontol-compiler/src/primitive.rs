@@ -106,9 +106,6 @@ pub struct Primitives {
     pub serial: DefId,
     pub direction_union: DefId,
 
-    /// The definition of the ontol domain
-    pub ontol_domain: DefId,
-
     /// The address of something in a data store
     pub data_store_address: DefId,
 
@@ -212,7 +209,6 @@ impl Primitives {
                     flags: TypeDefFlags::CONCRETE | TypeDefFlags::PUBLIC,
                 }),
             ),
-            ontol_domain: DefId(ONTOL_PKG, OntolDefTag::OntolDomain as u16),
             data_store_address: defs.add_primitive(
                 OntolDefTag::DataStoreAddress,
                 PrimitiveKind::DataStoreAddress,
