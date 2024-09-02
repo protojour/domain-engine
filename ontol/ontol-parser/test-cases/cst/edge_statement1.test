@@ -1,62 +1,64 @@
-sym {
+edge ident {
     /// the variable `x`
     (x)
         /// the symbol `a`
         a:
         (y),
-    (y) b: (x) c: (y)
+    (y) b: (x) c: y
 }
 
 //@ grammar=ontol
 Ontol
-    SymStatement
-        KwSym `sym`
+    EdgeStatement
+        KwEdge `edge`
+        Whitespace
+        IdentPath
+            Symbol `ident`
         Whitespace
         CurlyOpen `{`
         Whitespace
-        SymRelation
-            SymVar
+        EdgeClause
+            EdgeVar
                 DocComment `/// the variable `x``
                 Whitespace
                 ParenOpen `(`
                 Symbol `x`
                 ParenClose `)`
             Whitespace
-            SymDecl
+            EdgeSlot
                 DocComment `/// the symbol `a``
                 Whitespace
                 Symbol `a`
             Colon `:`
             Whitespace
-            SymVar
+            EdgeVar
                 ParenOpen `(`
                 Symbol `y`
                 ParenClose `)`
         Comma `,`
         Whitespace
-        SymRelation
-            SymVar
+        EdgeClause
+            EdgeVar
                 ParenOpen `(`
                 Symbol `y`
                 ParenClose `)`
             Whitespace
-            SymDecl
+            EdgeSlot
                 Symbol `b`
             Colon `:`
             Whitespace
-            SymVar
+            EdgeVar
                 ParenOpen `(`
                 Symbol `x`
                 ParenClose `)`
             Whitespace
-            SymDecl
+            EdgeSlot
                 Symbol `c`
             Colon `:`
             Whitespace
-            SymVar
-                ParenOpen `(`
-                Symbol `y`
-                ParenClose `)`
+            EdgeTypeParam
+                IdentPath
+                    Symbol `y`
         Whitespace
         CurlyClose `}`
     Whitespace
