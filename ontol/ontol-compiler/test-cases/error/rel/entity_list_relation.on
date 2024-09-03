@@ -6,6 +6,6 @@ def bar(
     rel. 'id': (rel* is: text)
     rel* 'field': text
 )
-edge e {
+arc e {
     (a) bars: (b)
 }

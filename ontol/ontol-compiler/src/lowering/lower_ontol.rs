@@ -28,10 +28,10 @@ enum PreDefinedStmt<V> {
     Def(DefId, insp::DefStatement<V>),
     Sym(Vec<DefId>),
     Rel(insp::RelStatement<V>),
-    Edge {
+    Arc {
         edge_id: EdgeId,
         root_defs: RootDefs,
-        params: BTreeMap<CardinalIdx, insp::EdgeTypeParam<V>>,
+        params: BTreeMap<CardinalIdx, insp::ArcTypeParam<V>>,
     },
     Fmt(insp::FmtStatement<V>),
     Map(insp::MapStatement<V>),
@@ -153,7 +153,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 Some(root_defs)
             }
             insp::Statement::SymStatement(_) => None,
-            insp::Statement::EdgeStatement(_) => None,
+            insp::Statement::ArcStatement(_) => None,
             insp::Statement::RelStatement(rel_stmt) => {
                 self.lower_rel_statement(rel_stmt, block_context)
             }
@@ -275,10 +275,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 let root_defs = self.lower_sym_statement(sym_stmt);
                 Some(PreDefinedStmt::Sym(root_defs))
             }
-            insp::Statement::EdgeStatement(edge_stmt) => {
-                let (root_defs, edge_id, params) = self.lower_edge_statement(edge_stmt)?;
+            insp::Statement::ArcStatement(edge_stmt) => {
+                let (root_defs, edge_id, params) = self.lower_arc_statement(edge_stmt)?;
 
-                Some(PreDefinedStmt::Edge {
+                Some(PreDefinedStmt::Arc {
                     root_defs,
                     edge_id,
                     params,
@@ -300,7 +300,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             PreDefinedStmt::Def(def_id, def_stmt) => self.lower_def_body(def_id, def_stmt),
             PreDefinedStmt::Sym(root_defs) => Some(root_defs),
             PreDefinedStmt::Rel(rel_stmt) => self.lower_statement(rel_stmt.into(), block_context),
-            PreDefinedStmt::Edge {
+            PreDefinedStmt::Arc {
                 edge_id,
                 mut root_defs,
                 params,

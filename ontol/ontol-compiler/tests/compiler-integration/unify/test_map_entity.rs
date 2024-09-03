@@ -48,7 +48,7 @@ fn test_extract_rel_params() {
         rel* 'bar': text
     )
 
-    edge edge_a {
+    arc edge_a {
         (s) foreign: (f) with: a_params
     }
 
@@ -61,7 +61,7 @@ fn test_extract_rel_params() {
         rel* edge_a.foreign: a2
     )
 
-    edge edge_b {
+    arc edge_b {
         (s) foreign: (f)
     }
 
@@ -150,10 +150,10 @@ fn test_rel_params_implicit_map() {
         rel* 'b_prop': text
     )
 
-    edge edge_a {
+    arc edge_a {
         (s) foreign: (o) with: a_params
     }
-    edge edge_b {
+    arc edge_b {
         (s) foreign: (o) with: b_params
     }
 
@@ -227,7 +227,7 @@ fn test_map_relation_sequence_default_fallback() {
         rel* 'foos': {text}
     )
 
-    edge link {
+    arc link {
         (b) foos: (f),
         (f) bars: (b),
     }
@@ -269,7 +269,7 @@ fn test_map_generate_edge() {
             domain ZZZZZZZZZZZTEST1ZZZZZZZZZZ ()
             use 'inner' as inner
 
-            edge arc {
+            arc edge {
                 (a) bars: (b) with: params
             }
             def params (
@@ -278,20 +278,20 @@ fn test_map_generate_edge() {
 
             def foo (
                 rel. 'id': (rel* is: text)
-                rel* arc.bars: {bar}
+                rel* edge.bars: {bar}
             )
             def bar (rel. 'id': (rel* is: text))
 
             map(
                 foo(
                     'id': foo_id,
-                    arc.bars: {
+                    edge.bars: {
                         ..['field': field] bar('id': bar_id)
                     }
                 ),
                 inner.foo(
                     'id': foo_id,
-                    inner.arc.bars: {
+                    inner.edge.bars: {
                         ..inner.bar(
                             'id': bar_id,
                             'field': field
@@ -305,13 +305,13 @@ fn test_map_generate_edge() {
             src_name("inner"),
             "
             domain ZZZZZZZZZZZTEST2ZZZZZZZZZZ ()
-            edge arc {
+            arc edge {
                 (a) bars: (b)
             }
 
             def foo (
                 rel. 'id': (rel* is: text)
-                rel* arc.bars: {bar}
+                rel* edge.bars: {bar}
             )
 
             def bar (
@@ -381,7 +381,7 @@ def developer (
 )
 ";
 const LINK: &str = "
-edge link {
+arc link {
     (a) technologies: (b),
     (b) developers: (a),
 }

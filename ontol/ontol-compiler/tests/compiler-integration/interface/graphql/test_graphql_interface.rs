@@ -303,7 +303,7 @@ fn incompatible_edge_types_are_distinct() {
         rel* 'edge_field': text
     )
 
-    edge link {
+    arc link {
         (s) targets: (t) type: edge_type
     }
 

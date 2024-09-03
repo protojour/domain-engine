@@ -3,7 +3,7 @@ domain 01J2QAP8H1WWPA8A3QB8NKEGZE ()
 
 sym { id }
 
-edge linkage {
+arc linkage {
     (src) related_to: (target) with_link: (ln),
     (target) related_from: (src) with_link: (ln),
     (ln) from: (src),

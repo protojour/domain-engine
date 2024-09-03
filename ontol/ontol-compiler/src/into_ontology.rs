@@ -615,7 +615,7 @@ impl<'m> Compiler<'m> {
         data_relationships: &FnvIndexMap<PropId, DataRelationshipInfo>,
     ) -> domain::DefKind {
         match def_kind {
-            DefKind::Edge(_) => {
+            DefKind::Arc(_) => {
                 let edge = self.edge_ctx.symbolic_edges.get(&EdgeId(def_id)).unwrap();
 
                 let mut edge_info = EdgeInfo {

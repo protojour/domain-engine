@@ -405,7 +405,7 @@ mod match_contains_all {
 fn test_map_match_in_sub_multi_edge() {
     r#"
     domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
-    edge foobar {
+    arc foobar {
         (foo) bars: (bar),
     }
     def foo (

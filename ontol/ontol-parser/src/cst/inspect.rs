@@ -107,11 +107,11 @@ nodes!(Node {
     SymStatement,
     SymRelation,
     SymDecl,
-    EdgeStatement,
-    EdgeClause,
-    EdgeSlot,
-    EdgeVar,
-    EdgeTypeParam,
+    ArcStatement,
+    ArcClause,
+    ArcSlot,
+    ArcVar,
+    ArcTypeParam,
     RelStatement,
     RelFwdSet,
     RelBackwdSet,
@@ -152,7 +152,7 @@ node_union!(Statement {
     UseStatement,
     DefStatement,
     SymStatement,
-    EdgeStatement,
+    ArcStatement,
     RelStatement,
     FmtStatement,
     MapStatement,
@@ -174,10 +174,10 @@ node_union!(TypeRef {
     TypeUnion,
 });
 
-node_union!(EdgeItem {
-    EdgeSlot,
-    EdgeVar,
-    EdgeTypeParam,
+node_union!(ArcItem {
+    ArcSlot,
+    ArcVar,
+    ArcTypeParam,
 });
 
 node_union!(Pattern {
@@ -262,35 +262,35 @@ impl<V: NodeView> SymDecl<V> {
     }
 }
 
-impl<V: NodeView> EdgeStatement<V> {
+impl<V: NodeView> ArcStatement<V> {
     pub fn ident_path(&self) -> Option<IdentPath<V>> {
         self.view().sub_nodes().find_map(IdentPath::from_view)
     }
 
-    pub fn edge_clauses(&self) -> impl Iterator<Item = EdgeClause<V>> {
-        self.view().sub_nodes().filter_map(EdgeClause::from_view)
+    pub fn arc_clauses(&self) -> impl Iterator<Item = ArcClause<V>> {
+        self.view().sub_nodes().filter_map(ArcClause::from_view)
     }
 }
 
-impl<V: NodeView> EdgeClause<V> {
-    pub fn items(&self) -> impl Iterator<Item = EdgeItem<V>> {
-        self.view().sub_nodes().filter_map(EdgeItem::from_view)
+impl<V: NodeView> ArcClause<V> {
+    pub fn items(&self) -> impl Iterator<Item = ArcItem<V>> {
+        self.view().sub_nodes().filter_map(ArcItem::from_view)
     }
 }
 
-impl<V: NodeView> EdgeVar<V> {
+impl<V: NodeView> ArcVar<V> {
     pub fn symbol(&self) -> Option<V::Token> {
         self.view().local_tokens_filter(Kind::Symbol).next()
     }
 }
 
-impl<V: NodeView> EdgeTypeParam<V> {
+impl<V: NodeView> ArcTypeParam<V> {
     pub fn ident_path(&self) -> Option<IdentPath<V>> {
         self.view().sub_nodes().find_map(IdentPath::from_view)
     }
 }
 
-impl<V: NodeView> EdgeSlot<V> {
+impl<V: NodeView> ArcSlot<V> {
     pub fn symbol(&self) -> Option<V::Token> {
         self.view().local_tokens_filter(Kind::Symbol).next()
     }

@@ -7,12 +7,12 @@ def Repository (
     rel* fork.origin?: .
 )
 
-edge ownership {
+arc ownership {
     (repo) owner: (owner),
     (owner) repositories: (repo),
 }
 
-edge fork {
+arc fork {
     (fork) origin: (origin)
 }
 
@@ -34,7 +34,7 @@ def Organization (
     rel* ownership.repositories: {Repository}
 )
 
-edge membership {
+arc membership {
     (org) members: (member) membership: Membership,
     (member) member_of: (org) membership: Membership,
 }

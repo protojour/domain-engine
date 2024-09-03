@@ -35,7 +35,7 @@ fn inherent_id_no_autogen() {
         rel. 'key': foo_id
         rel* ancestry.children: {foo}
     )
-    edge ancestry {
+    arc ancestry {
         (p) children: (c)
     }
     "
@@ -60,7 +60,7 @@ fn inherent_id_autogen() {
         rel. 'key'[rel* gen: auto]: foo_id
         rel* ancestry.children: {foo}
     )
-    edge ancestry {
+    arc ancestry {
         (p) children: (c)
     }
     "
@@ -84,7 +84,7 @@ fn id_and_inherent_property_inline_type() {
         rel. 'key': (rel* is: text)
         rel* ancestry.children: {foo}
     )
-    edge ancestry {
+    arc ancestry {
         (p) children: (c)
     }
     "
@@ -261,7 +261,7 @@ fn artist_and_instrument_id_as_relation_object_invalid_id_format() {
 fn test_entity_self_relationship_optional_object_sym() {
     "
     domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
-    edge ancestry {
+    arc ancestry {
         (p) children: (c),
         (c) parent: (p),
     }
@@ -310,7 +310,7 @@ fn test_entity_self_relationship_optional_object_sym() {
 fn test_entity_self_relationship_optional_object() {
     "
     domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
-    edge ancestry { (p) children: (c), (c) parent: (p) }
+    arc ancestry { (p) children: (c), (c) parent: (p) }
 
     def node_id (fmt '' => serial => .)
     def node (
@@ -348,7 +348,7 @@ fn test_entity_self_relationship_optional_object() {
 fn test_entity_self_relationship_mandatory_object() {
     "
     domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
-    edge ancestry { (p) children: (c), (c) parent: (p) }
+    arc ancestry { (p) children: (c), (c) parent: (p) }
 
     def node_id (fmt '' => serial => .)
     def node (
@@ -396,7 +396,7 @@ fn entity_union_with_union_def_id_larger_than_id() {
         rel* repo_ownership.owner: RepositoryOwner
     )
 
-    edge repo_ownership {
+    arc repo_ownership {
         (repo) owner: (owner),
         (owner) repositories: (repo),
     }
@@ -491,7 +491,7 @@ fn entity_relationship_without_reverse() {
         rel* 'name': text
         rel* fav.favorite-language: language
     )
-    edge fav {
+    arc fav {
         (p) favorite-language: (l)
     }
     "
@@ -514,7 +514,7 @@ fn recursive_entity_union() {
     def owner_id (fmt '' => text => .)
 
     def lifeform ()
-    edge diet {
+    arc diet {
         (organism) eats: (nutrition)
     }
     def animal (
@@ -529,7 +529,7 @@ fn recursive_entity_union() {
     rel {lifeform} is?: animal
     rel {lifeform} is?: plant
 
-    edge ownership {
+    arc ownership {
         (owner) owns: (organism)
     }
 
@@ -598,7 +598,7 @@ fn store_key_in_def_info() {
         rel* linkage.foo: bar
     )
 
-    edge linkage {
+    arc linkage {
         (f) bar: (b) with: foobar_edge,
         (b) foo: (f) with: foobar_edge,
     }

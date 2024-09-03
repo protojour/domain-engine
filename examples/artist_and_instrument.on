@@ -18,7 +18,7 @@ def instrument (
     rel* 'name': text
 )
 
-edge playing {
+arc playing {
     (a) plays: (i) with: play_params,
     (i) played_by: (a) with: play_params,
 }

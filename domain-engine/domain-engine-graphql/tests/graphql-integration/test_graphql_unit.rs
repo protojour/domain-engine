@@ -68,15 +68,15 @@ async fn version() {
 fn field_order() {
     let (_test, schema) = "
     domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
-    edge edge1 {
+    arc edge1 {
         (a) subjects: (b),
         (b) obj_1: (a)
     }
-    edge edge2 {
+    arc edge2 {
         (a) subjects: (b),
         (b) obj_2: (a)
     }
-    edge conn {
+    arc conn {
         (a) connection: (b)
     }
 
@@ -1595,7 +1595,7 @@ async fn test_extension_and_member_from_foreign_domain() {
 async fn test_const_in_union_bug() {
     "
     domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
-    edge e {
+    arc e {
         (t) unions: (u),
         (u) targets: (t),
     }
@@ -1795,10 +1795,10 @@ async fn schema_bug1() {
         domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
         def foo (rel. 'id': (rel* is: text))
         def bar (rel. 'id': (rel* is: text))
-        edge e1 {
+        arc e1 {
             (a) foo: (b)
         }
-        edge e2 {
+        arc e2 {
             (a) foo2: (b),
             (b) bar2: (a),
         }

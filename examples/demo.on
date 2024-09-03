@@ -34,7 +34,7 @@ def @private archive_group (
     rel* 'end_date': datetime
     rel* db_linkage.archive_items: {archive_item}
 )
-edge db_linkage {
+arc db_linkage {
     (g) archive_items: (i),
     (i) archive_groups: (g),
 }
@@ -91,7 +91,7 @@ def ArchiveCollection (
 )
 
 /// a virtual (non-persisted) edge
-edge archive_linkage {
+arc archive_linkage {
     (c) archiveObjects: (o),
     (o) archiveCollections: (c),
 }

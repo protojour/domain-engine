@@ -966,7 +966,7 @@ fn test_serialize_raw_tree_only() {
         rel* 'foo_field': text
         rel* foobar.bar?: bar
     )
-    edge foobar {
+    arc foobar {
         (f) bar: (b)
     }
     "
@@ -1113,7 +1113,7 @@ fn test_union_with_extra_ambiguating_text_pattern() {
         rel* bar_ref.bar: bar-id
     )
 
-    edge bar_ref {
+    arc bar_ref {
         (source) bar: (bar)
     }
 

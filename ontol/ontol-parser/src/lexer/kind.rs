@@ -94,8 +94,8 @@ pub enum Kind {
     #[token("def")]
     KwDef,
 
-    #[token("edge")]
-    KwEdge,
+    #[token("arc")]
+    KwArc,
 
     #[token("sym")]
     KwSym,
@@ -152,14 +152,14 @@ pub enum Kind {
     /// sym, ..
     SymDecl,
 
-    EdgeStatement,
-    EdgeClause,
+    ArcStatement,
+    ArcClause,
     /// _ EdgeSlot: _
-    EdgeSlot,
-    /// (EdgeVar) EdgeSlot: (EdgeVar)
-    EdgeVar,
-    /// EdgeTypeParam EdgeSlot: EdgeTypeParam
-    EdgeTypeParam,
+    ArcSlot,
+    /// (ArcVar) ArcSlot: (ArcVar)
+    ArcVar,
+    /// ArcTypeParam ArcSlot: ArcTypeParam
+    ArcTypeParam,
 
     /// rel statement
     RelStatement,
@@ -329,7 +329,7 @@ impl Display for Kind {
             K![use] => write!(f, "`use`"),
             K![def] => write!(f, "`def`"),
             K![rel] => write!(f, "`rel`"),
-            K![edge] => write!(f, "`edge`"),
+            K![arc] => write!(f, "`arc`"),
             K![sym] => write!(f, "`sym`"),
             K![fmt] => write!(f, "`fmt`"),
             K![map] => write!(f, "`map`"),
@@ -349,11 +349,11 @@ impl Display for Kind {
             Kind::SymStatement => write!(f, "sym statement"),
             Kind::SymRelation => write!(f, "sym relation"),
             Kind::SymDecl => write!(f, "sym declaration"),
-            Kind::EdgeStatement => write!(f, "edge statement"),
-            Kind::EdgeClause => write!(f, "edge relation"),
-            Kind::EdgeSlot => write!(f, "edge slot"),
-            Kind::EdgeVar => write!(f, "edge variable"),
-            Kind::EdgeTypeParam => write!(f, "edge type parameter"),
+            Kind::ArcStatement => write!(f, "arc statement"),
+            Kind::ArcClause => write!(f, "arc clause"),
+            Kind::ArcSlot => write!(f, "arc slot"),
+            Kind::ArcVar => write!(f, "arc variable"),
+            Kind::ArcTypeParam => write!(f, "edge type parameter"),
             Kind::RelStatement => write!(f, "rel statement"),
             Kind::RelFwdSet => write!(f, "rel forward set"),
             Kind::RelBackwdSet => write!(f, "rel backward set"),
@@ -405,8 +405,8 @@ macro_rules! K {
     [rel] => {
         Kind::KwRel
     };
-    [edge] => {
-        Kind::KwEdge
+    [arc] => {
+        Kind::KwArc
     };
     [sym] => {
         Kind::KwSym

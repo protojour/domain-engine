@@ -3,7 +3,7 @@ use std::collections::{hash_map::Entry, BTreeMap, HashMap};
 use fnv::FnvHashMap;
 use ontol_parser::{
     cst::{
-        inspect::{self as insp, EdgeTypeParam},
+        inspect as insp,
         view::{NodeView, TokenView},
     },
     U32Span,
@@ -25,19 +25,19 @@ struct EdgeBuilder<V> {
     slots: FnvHashMap<DefId, Slot>,
     cardinals: BTreeMap<CardinalIdx, SymbolicEdgeCardinal>,
     clause_widths: BTreeMap<usize, usize>,
-    params: BTreeMap<CardinalIdx, EdgeTypeParam<V>>,
+    params: BTreeMap<CardinalIdx, insp::ArcTypeParam<V>>,
 }
 
 impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
-    pub fn lower_edge_statement(
+    pub fn lower_arc_statement(
         &mut self,
-        edge_stmt: insp::EdgeStatement<V>,
+        arc_stmt: insp::ArcStatement<V>,
     ) -> Option<(
         RootDefs,
         EdgeId,
-        BTreeMap<CardinalIdx, insp::EdgeTypeParam<V>>,
+        BTreeMap<CardinalIdx, insp::ArcTypeParam<V>>,
     )> {
-        let ident_path = edge_stmt.ident_path()?;
+        let ident_path = arc_stmt.ident_path()?;
         let ident_symbol = ident_path.symbols().next()?;
         let (edge_def_id, coinage, ident) = self.catch(|zelf| {
             zelf.ctx.named_def_id(
@@ -49,14 +49,14 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         })?;
 
         if matches!(coinage, Coinage::Used) {
-            CompileError::EdgeMustHaveUniqueIdentifier
+            CompileError::ArcMustHaveUniqueIdentifier
                 .span_report(ident_symbol.span(), &mut self.ctx);
         }
 
         let mut root_defs = vec![edge_def_id];
 
         self.ctx
-            .set_def_kind(edge_def_id, DefKind::Edge(ident), ident_symbol.span());
+            .set_def_kind(edge_def_id, DefKind::Arc(ident), ident_symbol.span());
 
         let mut edge_builder = EdgeBuilder {
             edge_def_id,
@@ -67,13 +67,13 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             params: Default::default(),
         };
 
-        for (clause_idx, edge_clause) in edge_stmt.edge_clauses().enumerate() {
-            let mut item_iter = edge_clause.items().peekable();
+        for (clause_idx, arc_clause) in arc_stmt.arc_clauses().enumerate() {
+            let mut item_iter = arc_clause.items().peekable();
 
-            match self.next_edge_item(&mut item_iter, edge_clause.view().span()) {
-                Some(insp::EdgeItem::EdgeVar(edge_var)) => {
+            match self.next_arc_item(&mut item_iter, arc_clause.view().span()) {
+                Some(insp::ArcItem::ArcVar(edge_var)) => {
                     let Some(mut prev_cardinal) =
-                        self.add_edge_variable(edge_var, &mut edge_builder)
+                        self.add_arc_variable(edge_var, &mut edge_builder)
                     else {
                         continue;
                     };
@@ -85,7 +85,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                                 &mut item_iter,
                                 prev_cardinal,
                                 &mut edge_builder,
-                                edge_stmt.view().span(),
+                                arc_stmt.view().span(),
                             )
                         {
                             self.ctx
@@ -105,12 +105,11 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                         }
                     }
                 }
-                Some(insp::EdgeItem::EdgeSlot(edge_slot)) => {
-                    CompileError::EdgeCannotMixStandaloneSymbolsAndSymbolicEdge
-                        .span_report(edge_slot.view().span(), &mut self.ctx);
+                Some(insp::ArcItem::ArcSlot(_slot)) => {
+                    unreachable!("arc cannot start with a slot");
                 }
-                Some(insp::EdgeItem::EdgeTypeParam(_)) => {
-                    unreachable!("statement cannot start with EdgeTypeParam")
+                Some(insp::ArcItem::ArcTypeParam(_)) => {
+                    unreachable!("statement cannot start with ArcTypeParam")
                 }
                 None => {}
             }
@@ -128,15 +127,16 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         Some((root_defs, EdgeId(edge_def_id), edge_builder.params))
     }
 
-    fn next_edge_item(
+    fn next_arc_item(
         &mut self,
-        item_iter: &mut impl Iterator<Item = insp::EdgeItem<V>>,
+        item_iter: &mut impl Iterator<Item = insp::ArcItem<V>>,
         edge_relation_span: U32Span,
-    ) -> Option<insp::EdgeItem<V>> {
+    ) -> Option<insp::ArcItem<V>> {
         let item = item_iter.next();
 
         if item.is_none() {
-            CompileError::EdgeExpectedTrailingItem.span_report(edge_relation_span, &mut self.ctx);
+            CompileError::ArcClauseExpectedTrailingItem
+                .span_report(edge_relation_span, &mut self.ctx);
         }
 
         item
@@ -145,32 +145,33 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     fn add_edge_slot_symbol_then_cardinal(
         &mut self,
         clause_idx: usize,
-        item_iter: &mut impl Iterator<Item = insp::EdgeItem<V>>,
+        item_iter: &mut impl Iterator<Item = insp::ArcItem<V>>,
         prev_cardinal_idx: CardinalIdx,
         edge_builder: &mut EdgeBuilder<V>,
         edge_relation_span: U32Span,
     ) -> Option<(DefId, CardinalIdx)> {
-        let next_item = self.next_edge_item(item_iter, edge_relation_span)?;
+        let next_item = self.next_arc_item(item_iter, edge_relation_span)?;
 
-        let insp::EdgeItem::EdgeSlot(edge_slot) = next_item else {
-            CompileError::EdgeExpectedSymbol.span_report(next_item.view().span(), &mut self.ctx);
+        let insp::ArcItem::ArcSlot(arc_slot) = next_item else {
+            CompileError::ArcClauseExpectedSymbol
+                .span_report(next_item.view().span(), &mut self.ctx);
             return None;
         };
 
-        let symbol = edge_slot.symbol()?;
+        let symbol = arc_slot.symbol()?;
         let slot_symbol_def_id = self.catch(|zelf| {
             zelf.ctx
                 .coin_symbol(edge_builder.edge_def_id, symbol.slice(), symbol.span())
         });
-        let next_item = self.next_edge_item(item_iter, edge_relation_span)?;
+        let next_item = self.next_arc_item(item_iter, edge_relation_span)?;
 
         let cardinal_idx = match next_item {
-            insp::EdgeItem::EdgeVar(edge_var) => self.add_edge_variable(edge_var, edge_builder),
-            insp::EdgeItem::EdgeTypeParam(edge_type_param) => {
-                self.add_edge_type_param(edge_type_param, edge_builder)
+            insp::ArcItem::ArcVar(arc_var) => self.add_arc_variable(arc_var, edge_builder),
+            insp::ArcItem::ArcTypeParam(arc_type_param) => {
+                self.add_edge_type_param(arc_type_param, edge_builder)
             }
-            insp::EdgeItem::EdgeSlot(_) => {
-                CompileError::EdgeExpectedVariable
+            insp::ArcItem::ArcSlot(_) => {
+                CompileError::ArcClauseExpectedVariable
                     .span_report(next_item.view().span(), &mut self.ctx);
                 return None;
             }
@@ -200,12 +201,12 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         }
     }
 
-    fn add_edge_variable(
+    fn add_arc_variable(
         &mut self,
-        sym_var: insp::EdgeVar<V>,
+        arc_var: insp::ArcVar<V>,
         edge_builder: &mut EdgeBuilder<V>,
     ) -> Option<CardinalIdx> {
-        let var_symbol = sym_var.symbol()?;
+        let var_symbol = arc_var.symbol()?;
         let len = edge_builder.cardinals.len();
 
         match edge_builder
@@ -216,7 +217,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             Entry::Vacant(vacant) => {
                 let Ok(cardinal_idx): Result<u8, _> = len.try_into() else {
                     CompileError::EdgeArityOverflow
-                        .span_report(sym_var.view().span(), &mut self.ctx);
+                        .span_report(arc_var.view().span(), &mut self.ctx);
 
                     return None;
                 };
@@ -244,7 +245,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     /// that's instead isdone in the post-processing stage, to be able to resolve later definitions.
     fn add_edge_type_param(
         &mut self,
-        edge_type_param: insp::EdgeTypeParam<V>,
+        edge_type_param: insp::ArcTypeParam<V>,
         edge_builder: &mut EdgeBuilder<V>,
     ) -> Option<CardinalIdx> {
         let ident_path = edge_type_param.ident_path()?;

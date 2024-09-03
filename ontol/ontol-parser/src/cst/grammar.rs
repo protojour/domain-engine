@@ -88,9 +88,9 @@ fn statement(p: &mut CstParser) {
             rel::rel(p);
             Kind::RelStatement
         }
-        K![edge] => {
-            edge::statement(p);
-            Kind::EdgeStatement
+        K![arc] => {
+            arc::statement(p);
+            Kind::ArcStatement
         }
         K![sym] => {
             sym::statement(p);
@@ -408,43 +408,43 @@ mod sym {
     }
 }
 
-mod edge {
+mod arc {
     use super::*;
 
     pub fn statement(p: &mut CstParser) {
-        p.eat(K![edge]);
+        p.eat(K![arc]);
         p.eat_trivia();
         ident_path(p);
-        delimited_comma_separated(p, K!['{'], &edge_clause, K!['}']);
+        delimited_comma_separated(p, K!['{'], &arc_clause, K!['}']);
     }
 
-    fn edge_clause(p: &mut CstParser) {
-        let relation = p.start(Kind::EdgeClause);
+    fn arc_clause(p: &mut CstParser) {
+        let clause = p.start(Kind::ArcClause);
 
-        edge_var(p);
-        edge_slot(p);
+        arc_var(p);
+        arc_slot(p);
         p.eat(K![:]);
         edge_cardinal(p);
 
         while p.not_peekforward(|kind| matches!(kind, K![,] | K!['}'])) {
-            edge_slot(p);
+            arc_slot(p);
             p.eat(K![:]);
             edge_cardinal(p);
         }
 
-        p.end(relation);
+        p.end(clause);
     }
 
     fn edge_cardinal(p: &mut CstParser) {
         if p.not_peekforward(|kind| matches!(kind, K!['('])) {
-            edge_type_param(p)
+            arc_type_param(p)
         } else {
-            edge_var(p)
+            arc_var(p)
         }
     }
 
-    fn edge_var(p: &mut CstParser) {
-        let var = p.start(Kind::EdgeVar);
+    fn arc_var(p: &mut CstParser) {
+        let var = p.start(Kind::ArcVar);
         p.eat_trivia();
         p.eat(K!['(']);
         p.eat(Kind::Symbol);
@@ -452,14 +452,14 @@ mod edge {
         p.end(var);
     }
 
-    fn edge_type_param(p: &mut CstParser) {
-        let type_ref = p.start(Kind::EdgeTypeParam);
+    fn arc_type_param(p: &mut CstParser) {
+        let type_ref = p.start(Kind::ArcTypeParam);
         ident_path(p);
         p.end(type_ref);
     }
 
-    fn edge_slot(p: &mut CstParser) {
-        let decl = p.start(Kind::EdgeSlot);
+    fn arc_slot(p: &mut CstParser) {
+        let decl = p.start(Kind::ArcSlot);
         p.eat_trivia();
         p.eat(Kind::Symbol);
         p.end(decl);

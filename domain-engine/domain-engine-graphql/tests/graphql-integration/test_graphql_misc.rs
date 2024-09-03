@@ -181,12 +181,12 @@ async fn test_entity_subtype(ds: &str) {
 }
 
 #[datastore_test(tokio::test)]
-async fn sym_edge_simple(ds: &str) {
+async fn arc_simple(ds: &str) {
     let (test, [schema]) = TestPackages::with_static_sources([(
         SrcName::default(),
         "
         domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
-        edge just_testing {
+        arc just_testing {
             (a) prop: (b),
             (b) reverse_prop: (a),
         }

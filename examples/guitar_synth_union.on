@@ -29,7 +29,7 @@ def artist (
     rel* playing.plays: {instrument}
 )
 
-edge playing {
+arc playing {
     (a) plays: (i),
     (i) played-by: (a),
 }

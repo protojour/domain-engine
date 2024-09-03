@@ -221,22 +221,18 @@ pub enum CompileError {
     InvalidModifier,
     /// entity-to-entity relationship must use an edge
     EntityToEntityRelationshipMustUseEdge,
-    /// Edge must have a unique identifier
-    EdgeMustHaveUniqueIdentifier,
-    /// cannot mix standalone symbol and symbolic edge in the same `sym` statement
-    EdgeCannotMixStandaloneSymbolsAndSymbolicEdge,
-    /// no trailing item expected
-    SymStandaloneTrailingItems,
+    /// Arc must have a unique identifier
+    ArcMustHaveUniqueIdentifier,
     /// expected another item
-    EdgeExpectedTrailingItem,
+    ArcClauseExpectedTrailingItem,
     /// expected sym variable (`(var)`)
-    EdgeExpectedVariable,
+    ArcClauseExpectedVariable,
     /// expected symbol
-    EdgeExpectedSymbol,
+    ArcClauseExpectedSymbol,
     /// edge arity overflow
     EdgeArityOverflow,
     /// existential variable is not associated with a definition
-    EdgeNoDefinitionForExistentialVar,
+    ArcNoDefinitionForExistentialVar,
     /// BUG: {0}
     ///
     /// A message regarded as a bug in the compiler

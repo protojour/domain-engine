@@ -66,32 +66,32 @@ def TagEntity (
     rel* tagging.tagged: {Article}
 )
 
-edge fav {
+arc fav {
     (user) favorited: (art),
     (art) favorited_by: (user),
 }
 
-edge follow {
+arc follow {
     (follower) following: (followee),
     (followee) followed_by: (follower),
 }
 
-edge article_authorship {
+arc article_authorship {
     (article) author: (author),
     (author) authored_articles: (article),
 }
 
-edge commentary {
+arc commentary {
     (art) comments: (c),
     (c) comment_on: (art),
 }
 
-edge comment_authorship {
+arc comment_authorship {
     (comment) author: (author),
     (author) authored_comments: (comment),
 }
 
-edge tagging {
+arc tagging {
     (article) tags: (tag),
     (tag) tagged: (article),
 }

@@ -1,7 +1,7 @@
 /// This domain defines edges for stix
 domain 01J6SACJ2A3P8FNEQ2S20M3DV7 ()
 
-edge relationship {
+arc relationship {
     (src) related_to: (target) with_rel: (relationship),
     (target) related_from: (src) with_rel: (relationship),
     (relationship) source_ref: (src),
@@ -9,99 +9,99 @@ edge relationship {
 }
 
 /// The entity which created a stix object
-edge created {
+arc created {
     (artifact) created_by_ref: (identity),
 }
 
 /// An account which is an origin of something
-edge account-origin {
+arc account-origin {
     (account) created: (artifact),
     (artifact) creator_user_ref: (account),
 }
 
-edge possession {
+arc possession {
     (artifact) belongs_to_ref: (owner),
 }
 
-edge object_marking {
+arc object_marking {
     (subject) object_marking_refs: (ref),
 }
 
-edge object {
+arc object {
     (subject) object_refs: (ref),
 }
 
-edge sample {
+arc sample {
     (subject) sample_refs: (ref),
 }
 
-edge host_vm {
+arc host_vm {
     (subject) host_vm_ref: (ref),
 }
 
-edge dir_tree {
+arc dir_tree {
     (dir) contains_refs: (obj),
     (obj) parent_directory_ref: (dir),
 }
 
-edge dir_content {
+arc dir_content {
     (dir) content_ref: (artifact),
 }
 
-edge traffic_src {
+arc traffic_src {
     (traffic) src_ref: (src),
 }
 
-edge traffic_dst {
+arc traffic_dst {
     (traffic) dst_ref: (dst),
 }
 
-edge traffic_src_payload {
+arc traffic_src_payload {
     (traffic) src_payload_ref: (artifact),
 }
 
-edge traffic_dst_payload {
+arc traffic_dst_payload {
     (traffic) dst_payload_ref: (artifact),
 }
 
-edge traffic_encapsulation {
+arc traffic_encapsulation {
     (outer) encapsulates_refs: (inner),
     (inner) encapsulated_by_ref: (outer),
 }
 
-edge process_opened_connections {
+arc process_opened_connections {
     (process) opened_connection_refs: (traffic),
 }
 
-edge process_image {
+arc process_image {
     (process) image_ref: (image),
 }
 
-edge process_tree {
+arc process_tree {
     (parent) child_refs: (child),
     (child) parent_ref: (parent),
 }
 
-edge email_from {
+arc email_from {
     (email) from_ref: (addr),
 }
 
-edge email_sender {
+arc email_sender {
     (email) sender_ref: (addr),
 }
 
-edge email_to {
+arc email_to {
     (email) to_refs: (addr),
 }
 
-edge email_cc {
+arc email_cc {
     (email) cc_refs: (addr),
 }
 
-edge email_bcc {
+arc email_bcc {
     (email) bcc_refs: (addr),
 }
 
-edge email_raw {
+arc email_raw {
     (email) raw_email_ref: (artifact),
 }

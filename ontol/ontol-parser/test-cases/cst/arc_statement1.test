@@ -1,4 +1,4 @@
-edge ident {
+arc ident {
     /// the variable `x`
     (x)
         /// the symbol `a`
@@ -9,54 +9,54 @@ edge ident {
 
 //@ grammar=ontol
 Ontol
-    EdgeStatement
-        KwEdge `edge`
+    ArcStatement
+        KwArc `arc`
         Whitespace
         IdentPath
             Symbol `ident`
         Whitespace
         CurlyOpen `{`
         Whitespace
-        EdgeClause
-            EdgeVar
+        ArcClause
+            ArcVar
                 DocComment `/// the variable `x``
                 Whitespace
                 ParenOpen `(`
                 Symbol `x`
                 ParenClose `)`
             Whitespace
-            EdgeSlot
+            ArcSlot
                 DocComment `/// the symbol `a``
                 Whitespace
                 Symbol `a`
             Colon `:`
             Whitespace
-            EdgeVar
+            ArcVar
                 ParenOpen `(`
                 Symbol `y`
                 ParenClose `)`
         Comma `,`
         Whitespace
-        EdgeClause
-            EdgeVar
+        ArcClause
+            ArcVar
                 ParenOpen `(`
                 Symbol `y`
                 ParenClose `)`
             Whitespace
-            EdgeSlot
+            ArcSlot
                 Symbol `b`
             Colon `:`
             Whitespace
-            EdgeVar
+            ArcVar
                 ParenOpen `(`
                 Symbol `x`
                 ParenClose `)`
             Whitespace
-            EdgeSlot
+            ArcSlot
                 Symbol `c`
             Colon `:`
             Whitespace
-            EdgeTypeParam
+            ArcTypeParam
                 IdentPath
                     Symbol `y`
         Whitespace

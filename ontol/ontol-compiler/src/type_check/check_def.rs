@@ -55,7 +55,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             DefKind::Macro(_ident) => self.type_ctx.intern(Type::MacroDef(def_id)),
             DefKind::TextLiteral(_) => self.type_ctx.intern(Type::TextConstant(def_id)),
             DefKind::Regex(_) => self.type_ctx.intern(Type::Regex(def_id)),
-            DefKind::Edge(..) => self.type_ctx.intern(Type::Edge),
+            DefKind::Arc(..) => self.type_ctx.intern(Type::Edge),
             DefKind::Primitive(kind, _ident) => {
                 self.type_ctx.intern(Type::Primitive(*kind, def_id))
             }

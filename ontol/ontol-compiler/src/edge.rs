@@ -140,7 +140,7 @@ impl<'m> Compiler<'m> {
                     // An edge does not need to have participants.
                     // The error case is instead that some variables are populated,
                     // while others aren't.
-                    CompileError::EdgeNoDefinitionForExistentialVar
+                    CompileError::ArcNoDefinitionForExistentialVar
                         .span(cardinal.span)
                         .report(&mut self.errors);
                     continue;

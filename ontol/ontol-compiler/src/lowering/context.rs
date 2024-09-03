@@ -200,7 +200,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                                     .get(package_def_id)
                                     .unwrap();
                             }
-                            DefKind::Edge(..) => {
+                            DefKind::Arc(..) => {
                                 namespace =
                                     self.compiler.namespaces.namespaces.get(def_id).unwrap();
                             }
