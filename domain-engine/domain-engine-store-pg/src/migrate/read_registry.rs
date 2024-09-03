@@ -6,8 +6,8 @@ use tokio_postgres::Transaction;
 use ulid::Ulid;
 
 use crate::pg_model::{
-    EdgeId, PgColumn, PgDomain, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexData, PgIndexType,
-    PgProperty, PgRegKey, PgTable, PgTableIdUnion, PgType,
+    EdgeId, PgColumn, PgDomain, PgDomainTableType, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexData,
+    PgIndexType, PgProperty, PgRegKey, PgTable, PgTableIdUnion, PgType,
 };
 
 use super::MigrationCtx;
@@ -54,9 +54,9 @@ pub async fn read_registry<'t>(
                 SELECT
                     key,
                     domain_key,
+                    table_type,
                     def_domain_key,
                     def_tag,
-                    edge_tag,
                     table_name,
                     fprop_column,
                     fkey_column
@@ -69,18 +69,12 @@ pub async fn read_registry<'t>(
     {
         let key: PgRegKey = row.get(0);
         let domain_key: PgRegKey = row.get(1);
+        let table_type: PgDomainTableType = row.get(2);
 
         let owner_pkg_id = domain_pkg_by_key.get(&domain_key).copied().unwrap();
 
-        let def_domain_key: Option<PgRegKey> = row.get(2);
-        let def_tag: Option<u16> = row
-            .get::<_, Option<i32>>(3)
-            .map(|tag: i32| tag.try_into())
-            .transpose()?;
-        let edge_tag: Option<u16> = row
-            .get::<_, Option<i32>>(4)
-            .map(|tag: i32| tag.try_into())
-            .transpose()?;
+        let def_domain_key: PgRegKey = row.get(3);
+        let def_tag: u16 = row.get::<_, i32>(4).try_into()?;
         let table_name: Box<str> = row.get(5);
         let fprop_column: Option<Box<str>> = row.get(6);
         let fkey_column: Option<Box<str>> = row.get(7);
@@ -98,21 +92,20 @@ pub async fn read_registry<'t>(
             continue;
         };
 
-        match (def_domain_key, def_tag, edge_tag) {
-            (Some(def_domain_key), Some(def_tag), None) => {
+        match table_type {
+            PgDomainTableType::Vertex => {
                 let def_pkg_id = domain_pkg_by_key.get(&def_domain_key).unwrap();
                 let def_id = DefId(*def_pkg_id, def_tag);
                 owner_pg_domain.datatables.insert(def_id, pg_table);
                 table_by_key.insert(key, PgTableIdUnion::Def(def_id));
             }
-            (None, None, Some(edge_tag)) => {
-                owner_pg_domain.edgetables.insert(edge_tag, pg_table);
+            PgDomainTableType::Edge => {
+                owner_pg_domain.edgetables.insert(def_tag, pg_table);
                 table_by_key.insert(
                     key,
-                    PgTableIdUnion::Edge(EdgeId(DefId(owner_pkg_id, edge_tag))),
+                    PgTableIdUnion::Edge(EdgeId(DefId(owner_pkg_id, def_tag))),
                 );
             }
-            _ => unreachable!(),
         }
     }
 

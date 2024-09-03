@@ -17,6 +17,11 @@ CREATE TYPE m6m_pg_type AS ENUM (
     'bigserial'
 );
 
+CREATE TYPE m6m_pg_domaintable_type AS ENUM (
+    'vertex',
+    'edge'
+);
+
 CREATE SCHEMA m6mreg;
 
 -- The state of the migrated domain schemas outside m6mreg.
@@ -43,11 +48,12 @@ CREATE TABLE m6mreg.domaintable
     key serial PRIMARY KEY,
     -- the domain which owns this data
     domain_key integer NOT NULL REFERENCES m6mreg.domain(key),
+    -- the fundamental type of the table
+    table_type m6m_pg_domaintable_type NOT NULL,
     -- the def domain (can be different than the owning domain)
-    def_domain_key integer REFERENCES m6mreg.domain(key),
+    def_domain_key integer NOT NULL REFERENCES m6mreg.domain(key),
     -- the def tag within the def domain
-    def_tag integer,
-    edge_tag integer,
+    def_tag integer NOT NULL,
     -- a path of properties in the case of child tables.
     -- the root is always 'root'
     proppath ltree NOT NULL DEFAULT 'root',
@@ -60,12 +66,8 @@ CREATE TABLE m6mreg.domaintable
     -- the name of the foreign key column, if specified
     fkey_column text,
 
-    -- the domaintable is either for an edge or a def
-    CHECK ((edge_tag IS NULL) != (def_tag IS NULL)),
-    -- def_domain_key and def_tag must be set at the same time
-    CHECK ((def_domain_key IS NULL) = (def_tag IS NULL)),
     -- def tables are keyed, edges are not
-    CHECK ((def_domain_key IS NULL) = (key_column IS NULL)),
+    CHECK ((table_type = 'edge') = (key_column IS NULL)),
     -- foreign key consists of fprop AND fkey
     CHECK ((fprop_column IS NULL) = (fkey_column IS NULL))
 );

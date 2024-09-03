@@ -6,8 +6,8 @@ use tracing::{info, info_span, Instrument};
 
 use crate::{
     pg_model::{
-        PgColumn, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexType, PgProperty, PgPropertyData,
-        PgRegKey, PgTable, PgTableIdUnion, PgType,
+        PgColumn, PgDomainTableType, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexType, PgProperty,
+        PgPropertyData, PgRegKey, PgTable, PgTableIdUnion, PgType,
     },
     sql::{self},
 };
@@ -90,15 +90,17 @@ async fn execute_migration_step<'t>(
                     indoc! { "
                         INSERT INTO m6mreg.domaintable (
                             domain_key,
+                            table_type,
                             def_domain_key,
                             def_tag,
                             table_name,
                             key_column
-                        ) VALUES($1, $2, $3, $4, $5)
+                        ) VALUES($1, $2, $3, $4, $5, $6)
                         RETURNING key
                     "},
                     &[
                         &pg_domain.key,
+                        &PgDomainTableType::Vertex,
                         &pg_domain.key,
                         &vertex_def_tag,
                         &table_name,
@@ -106,7 +108,7 @@ async fn execute_migration_step<'t>(
                     ],
                 )
                 .await
-                .context("insert datatable")?;
+                .context("insert vertex table")?;
 
             let domaintable_key: PgRegKey = row.get(0);
             pg_domain.datatables.insert(
@@ -324,15 +326,23 @@ async fn execute_migration_step<'t>(
                     indoc! { "
                         INSERT INTO m6mreg.domaintable (
                             domain_key,
-                            edge_tag,
+                            table_type,
+                            def_domain_key,
+                            def_tag,
                             table_name
-                        ) VALUES($1, $2, $3)
+                        ) VALUES($1, $2, $3, $4, $5)
                         RETURNING key
                     "},
-                    &[&pg_domain.key, &(edge_tag as i32), &table_name],
+                    &[
+                        &pg_domain.key,
+                        &PgDomainTableType::Edge,
+                        &pg_domain.key,
+                        &(edge_tag as i32),
+                        &table_name,
+                    ],
                 )
                 .await
-                .context("insert edgetable")?;
+                .context("insert edge table")?;
 
             let key: PgRegKey = row.get(0);
 

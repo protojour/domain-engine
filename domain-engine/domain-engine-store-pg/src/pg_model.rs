@@ -420,6 +420,15 @@ impl PgRepr {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, ToSql, FromSql, Debug)]
+#[postgres(name = "m6m_pg_domaintable_type")]
+pub enum PgDomainTableType {
+    #[postgres(name = "vertex")]
+    Vertex,
+    #[postgres(name = "edge")]
+    Edge,
+}
+
 /// NB: Do not change the names of these enum variants.
 /// They are serialized to and deserialized from DB.
 #[derive(Clone, Copy, PartialEq, ToSql, FromSql, Debug)]
