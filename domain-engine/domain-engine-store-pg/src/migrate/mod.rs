@@ -164,9 +164,9 @@ pub async fn migrate(
 
     read_registry(ontology, &mut ctx, &txn).await?;
 
-    // collect migration steps
+    // collect migration steps for persistent domains
     // this improves separation of concerns while also enabling dry run simulations
-    for package_id in persistent_domains {
+    for package_id in [PackageId::ontol()].iter().chain(persistent_domains) {
         let domain = ontology
             .find_domain(*package_id)
             .ok_or_else(|| anyhow!("domain does not exist"))?;

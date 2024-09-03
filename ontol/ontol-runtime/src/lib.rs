@@ -40,7 +40,8 @@ extern crate self as ontol_runtime;
 pub struct PackageId(u16);
 
 impl PackageId {
-    pub const fn first() -> Self {
+    /// The ontol domain is always the first package
+    pub const fn ontol() -> Self {
         Self(0)
     }
 
@@ -372,7 +373,7 @@ mod tests {
     use super::DefIdSet;
 
     fn def(i: u16) -> DefId {
-        DefId(PackageId::first(), i)
+        DefId(PackageId::ontol(), i)
     }
 
     #[test]

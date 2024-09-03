@@ -70,6 +70,13 @@ async fn execute_migration_step<'t>(
             table_name,
         } => {
             let vertex_def_tag = vertex_def_id.1 as i32;
+            let def_domain_key = ctx
+                .domains
+                .get(&vertex_def_id.package_id())
+                .ok_or_else(|| anyhow!("could not find deployed domain for {vertex_def_id:?}"))?
+                .key
+                .ok_or_else(|| anyhow!("deployed domain for {vertex_def_id:?} has no key"))?;
+
             let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
 
             let key_column = "_key";
@@ -101,7 +108,7 @@ async fn execute_migration_step<'t>(
                     &[
                         &pg_domain.key,
                         &PgDomainTableType::Vertex,
-                        &pg_domain.key,
+                        &def_domain_key,
                         &vertex_def_tag,
                         &table_name,
                         &key_column,

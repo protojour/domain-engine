@@ -19,7 +19,7 @@ use crate::Sources;
 use crate::Src;
 use crate::NO_SPAN;
 
-pub const ONTOL_PKG: PackageId = PackageId::first();
+pub const ONTOL_PKG: PackageId = PackageId::ontol();
 const ROOT_PKG: PackageId = PackageId::second();
 
 /// The compiler's loaded packages

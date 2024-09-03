@@ -7,10 +7,15 @@ use ulid::Ulid;
 
 use crate::pg_model::{
     EdgeId, PgColumn, PgDomain, PgDomainTableType, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexData,
-    PgIndexType, PgProperty, PgRegKey, PgTable, PgTableIdUnion, PgType,
+    PgIndexType, PgProperty, PgRegKey, PgTable, PgType,
 };
 
 use super::MigrationCtx;
+
+enum TableRef {
+    Vertex(PackageId, DefId),
+    Edge(EdgeId),
+}
 
 /// Read the entire database registry into PgModel
 pub async fn read_registry<'t>(
@@ -23,7 +28,7 @@ pub async fn read_registry<'t>(
         .map(|(pkg_id, domain)| (domain.domain_id().ulid, pkg_id))
         .collect();
     let mut domain_pkg_by_key: FnvHashMap<PgRegKey, PackageId> = Default::default();
-    let mut table_by_key: FnvHashMap<PgRegKey, PgTableIdUnion> = Default::default();
+    let mut table_by_key: FnvHashMap<PgRegKey, TableRef> = Default::default();
 
     // domains
     for row in txn
@@ -97,14 +102,11 @@ pub async fn read_registry<'t>(
                 let def_pkg_id = domain_pkg_by_key.get(&def_domain_key).unwrap();
                 let def_id = DefId(*def_pkg_id, def_tag);
                 owner_pg_domain.datatables.insert(def_id, pg_table);
-                table_by_key.insert(key, PgTableIdUnion::Def(def_id));
+                table_by_key.insert(key, TableRef::Vertex(owner_pkg_id, def_id));
             }
             PgDomainTableType::Edge => {
                 owner_pg_domain.edgetables.insert(def_tag, pg_table);
-                table_by_key.insert(
-                    key,
-                    PgTableIdUnion::Edge(EdgeId(DefId(owner_pkg_id, def_tag))),
-                );
+                table_by_key.insert(key, TableRef::Edge(EdgeId(DefId(owner_pkg_id, def_tag))));
             }
         }
     }
@@ -135,13 +137,17 @@ pub async fn read_registry<'t>(
         };
 
         match table_by_key.get(&domaintable_key) {
-            Some(PgTableIdUnion::Def(def_id)) => {
-                let pg_domain = ctx.domains.get_mut(&def_id.0).unwrap();
-                let pg_table = pg_domain.datatables.get_mut(def_id).unwrap();
+            Some(TableRef::Vertex(owner_pkg_id, def_id)) => {
+                let pg_domain = ctx.domains.get_mut(owner_pkg_id).unwrap();
+
+                let pg_table = pg_domain
+                    .datatables
+                    .get_mut(def_id)
+                    .unwrap_or_else(|| panic!("no datatable for {def_id:?}"));
 
                 pg_table.properties.insert(prop_tag, pg_property);
             }
-            Some(PgTableIdUnion::Edge(edge_id)) => {
+            Some(TableRef::Edge(edge_id)) => {
                 let pg_domain = ctx.domains.get_mut(&edge_id.pkg_id()).unwrap();
                 let pg_table = pg_domain.edgetables.get_mut(&edge_id.def_id().1).unwrap();
 
@@ -169,15 +175,15 @@ pub async fn read_registry<'t>(
         let index_def_id = DefId(*domain_pkg_by_key.get(&def_domain_key).unwrap(), def_tag);
 
         match table_by_key.get(&domaintable_key) {
-            Some(PgTableIdUnion::Def(def_id)) => {
-                let pg_domain = ctx.domains.get_mut(&def_id.0).unwrap();
+            Some(TableRef::Vertex(owner_pkg_id, def_id)) => {
+                let pg_domain = ctx.domains.get_mut(owner_pkg_id).unwrap();
                 let pg_table = pg_domain.datatables.get_mut(def_id).unwrap();
 
                 pg_table.property_indexes.insert((index_def_id, index_type), PgIndexData {
                     property_keys
                 });
             }
-            Some(PgTableIdUnion::Edge(_edge_id)) => {
+            Some(TableRef::Edge(_edge_id)) => {
                 todo!("edge custom index");
             }
             None => unreachable!(),
@@ -215,13 +221,13 @@ pub async fn read_registry<'t>(
         let index_type: Option<PgIndexType> = row.get(7);
 
         let pinned_domaintable_def_id = pinned_domaintable_key.map(|key| {
-            let Some(PgTableIdUnion::Def(def_id)) = table_by_key.get(&key) else {
+            let Some(TableRef::Vertex(_, def_id)) = table_by_key.get(&key) else {
                 panic!()
             };
             *def_id
         });
 
-        let Some(PgTableIdUnion::Edge(edge_id)) = table_by_key.get(&domaintable_key) else {
+        let Some(TableRef::Edge(edge_id)) = table_by_key.get(&domaintable_key) else {
             panic!()
         };
 

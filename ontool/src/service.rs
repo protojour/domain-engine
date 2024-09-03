@@ -28,7 +28,7 @@ pub async fn domains_router(domain_engine: Arc<DomainEngine>, base_url: &str) ->
 
     for (package_id, domain) in ontology
         .domains()
-        .filter(|(package_id, _)| *package_id != PackageId::first())
+        .filter(|(package_id, _)| *package_id != PackageId::ontol())
     {
         let domain_path = format!(
             "/{unique_name}",

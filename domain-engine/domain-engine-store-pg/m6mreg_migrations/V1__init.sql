@@ -66,6 +66,8 @@ CREATE TABLE m6mreg.domaintable
     -- the name of the foreign key column, if specified
     fkey_column text,
 
+    UNIQUE(def_domain_key, def_tag),
+
     -- def tables are keyed, edges are not
     CHECK ((table_type = 'edge') = (key_column IS NULL)),
     -- foreign key consists of fprop AND fkey

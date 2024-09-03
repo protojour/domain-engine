@@ -33,7 +33,7 @@ impl<'m> Compiler<'m> {
         self.str_ctx.intern_constant("ontol");
         let def_id = self.define_package(OntolDefTag::Ontol.def_id());
 
-        assert_eq!(def_id.package_id(), PackageId::first());
+        assert_eq!(def_id.package_id(), PackageId::ontol());
         self.domain_ids.insert(
             def_id.package_id(),
             DomainId {
