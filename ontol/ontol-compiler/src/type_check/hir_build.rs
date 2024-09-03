@@ -115,7 +115,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         let sig = func_type.signature(
                             &infer_args,
                             Some(expected_ty.0),
-                            self.primitives,
                             self.def_ty_ctx,
                             self.repr_ctx,
                             self.type_ctx,

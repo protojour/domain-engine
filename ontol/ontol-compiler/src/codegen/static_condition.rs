@@ -4,6 +4,7 @@ use ontol_runtime::{
     query::condition::{Clause, CondTerm, Condition, SetOperator},
     value::Value,
     var::Var,
+    OntolDefTag,
 };
 use tracing::debug;
 
@@ -153,7 +154,7 @@ impl<'c, 'm> ConditionBuilder<'c, 'm> {
                                         CondTerm::Wildcard,
                                         CondTerm::Value(Value::Text(
                                             self.compiler.str_ctx[*constant].into(),
-                                            self.compiler.primitives.text.into(),
+                                            OntolDefTag::Text.def_id().into(),
                                         )),
                                     ),
                                 );

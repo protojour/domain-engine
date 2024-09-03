@@ -19,7 +19,6 @@ use crate::{
     codegen::task::CodeCtx,
     interface::{graphql::schema_builder::QLevel, serde::serde_generator::SerdeGenerator},
     phf_build::build_phf_map,
-    primitive::Primitives,
     relation::UnionMemberCache,
 };
 
@@ -32,7 +31,6 @@ use super::{
 pub fn generate_graphql_schema<'c>(
     package_id: PackageId,
     partial_ontology: &'c Ontology,
-    primitives: &'c Primitives,
     map_namespace: Option<&'c IndexMap<&str, DefId>>,
     code_ctx: &'c CodeCtx,
     resolver_graph: &'c ResolverGraph,
@@ -87,7 +85,6 @@ pub fn generate_graphql_schema<'c>(
             rel_ctx,
             misc_ctx,
             defs,
-            primitives,
             repr_ctx,
             prop_ctx,
             resolver_graph,

@@ -4,7 +4,7 @@ use ontol_runtime::{
     property::{Cardinality, PropertyCardinality, ValueCardinality},
     query::condition::SetOperator,
     var::Var,
-    DefId, DefPropTag, PropId,
+    DefId, DefPropTag, OntolDefTag, PropId,
 };
 use smallvec::smallvec;
 use tracing::{debug, info};
@@ -327,9 +327,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         if self.prop_ctx.identified_by(type_def_id).is_some() {
             if let Some(order_union_def_id) = self.entity_ctx.order_union(&type_def_id) {
                 match_attributes.insert(
-                    MatchAttributeKey::Def(self.primitives.relations.order),
+                    MatchAttributeKey::Def(OntolDefTag::RelationOrder.def_id()),
                     MatchAttribute {
-                        prop_id: PropId(self.primitives.relations.order, DefPropTag(0)),
+                        prop_id: OntolDefTag::RelationOrder.prop_id(DefPropTag(0)),
                         rel_id: RelId(DefId::unit(), DefRelTag(0)),
                         cardinality: (PropertyCardinality::Optional, ValueCardinality::IndexSet),
                         rel_params_def: None,
@@ -340,13 +340,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
 
             match_attributes.insert(
-                MatchAttributeKey::Def(self.primitives.relations.direction),
+                MatchAttributeKey::Def(OntolDefTag::RelationDirection.def_id()),
                 MatchAttribute {
-                    prop_id: PropId(self.primitives.relations.direction, DefPropTag(0)),
+                    prop_id: OntolDefTag::RelationDirection.prop_id(DefPropTag(0)),
                     rel_id: RelId(DefId::unit(), DefRelTag(0)),
                     cardinality: (PropertyCardinality::Optional, ValueCardinality::Unit),
                     rel_params_def: None,
-                    value_def: self.primitives.direction_union,
+                    value_def: OntolDefTag::UnionDirection.def_id(),
                     mentioned: false,
                 },
             );

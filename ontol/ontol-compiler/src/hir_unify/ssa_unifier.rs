@@ -7,7 +7,7 @@ use ontol_hir::{
 use ontol_runtime::{
     query::condition::{Clause, ClausePair, SetOperator},
     var::{Var, VarAllocator, VarSet},
-    MapDirection, MapFlags, PropId,
+    MapDirection, MapFlags, OntolDefTag, PropId,
 };
 use smallvec::{smallvec, SmallVec};
 use thin_vec::thin_vec;
@@ -17,7 +17,6 @@ use crate::{
     def::{DefKind, Defs},
     hir_unify::{regex_interpolation::RegexStringInterpolator, ssa_util::NodesExt},
     mem::Intern,
-    primitive::Primitives,
     properties::PropCtx,
     relation::RelCtx,
     repr::{
@@ -47,7 +46,6 @@ pub struct SsaUnifier<'c, 'm> {
     pub(super) repr_ctx: &'c ReprCtx,
     pub(super) defs: &'c Defs<'m>,
     pub(super) errors: &'c mut CompileErrors,
-    pub(super) primitives: &'c Primitives,
     pub(super) var_allocator: VarAllocator,
     pub(super) scope_arena: &'c ontol_hir::arena::Arena<'m, TypedHir>,
     pub(super) expr_arena: &'c ontol_hir::arena::Arena<'m, TypedHir>,
@@ -77,7 +75,6 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             prop_ctx: &compiler.prop_ctx,
             repr_ctx: &compiler.repr_ctx,
             defs: &compiler.defs,
-            primitives: &compiler.primitives,
             errors: &mut compiler.errors,
             var_allocator,
             scope_arena,
@@ -417,15 +414,15 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         meta: &Meta<'m>,
         mode: ExprMode,
     ) -> UnifierResult<ontol_hir::Nodes> {
-        let builtin_rels = &self.primitives.relations;
-
         let (applied_mode, struct_var) = match mode {
             ExprMode::MatchStruct {
                 match_var,
                 match_level,
                 ..
             } => {
-                if prop_id.0 == builtin_rels.order || prop_id.0 == builtin_rels.direction {
+                if prop_id.0 == OntolDefTag::RelationOrder.def_id()
+                    || prop_id.0 == OntolDefTag::RelationDirection.def_id()
+                {
                     if match_level != 0 {
                         CompileError::TODO("order/direction at incorrect location")
                             .span(meta.span)

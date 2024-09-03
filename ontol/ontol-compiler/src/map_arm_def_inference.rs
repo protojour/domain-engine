@@ -3,7 +3,7 @@ use indexmap::IndexMap;
 use ontol_runtime::{
     property::{PropertyCardinality, ValueCardinality},
     var::Var,
-    DefId, PropId,
+    DefId, OntolDefTag, PropId,
 };
 use tracing::{debug, info};
 
@@ -11,7 +11,6 @@ use crate::{
     def::{DefKind, Defs},
     entity::entity_ctx::EntityCtx,
     pattern::{CompoundPatternAttrKind, PatId, Pattern, PatternKind, Patterns, TypePath},
-    primitive::Primitives,
     properties::{PropCtx, Property},
     relation::{rel_def_meta, RelCtx, RelId, RelParams, Relationship},
     CompileError, CompileErrors, Compiler, SourceSpan,
@@ -50,7 +49,6 @@ pub struct MapArmDefInferencer<'c, 'm> {
     prop_ctx: &'c mut PropCtx,
     defs: &'c mut Defs<'m>,
     entity_ctx: &'c EntityCtx,
-    primitives: &'c Primitives,
     errors: &'c mut CompileErrors,
 }
 
@@ -345,7 +343,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
         (parent_def_id, parent_table): (DefId, &IndexMap<PropId, Property>),
         output: &mut FnvHashMap<Var, Vec<VarRelationship>>,
     ) {
-        if attr_relation_id == self.primitives.relations.order {
+        if attr_relation_id == OntolDefTag::RelationOrder.def_id() {
             let Some(info) = self.entity_ctx.entities.get(&parent_def_id) else {
                 return;
             };
@@ -379,10 +377,10 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                 }
                 _ => {}
             }
-        } else if attr_relation_id == self.primitives.relations.direction {
+        } else if attr_relation_id == OntolDefTag::RelationDirection.def_id() {
             if let PatternKind::Variable(pat_var) = &pattern.kind {
                 output.entry(*pat_var).or_default().push(VarRelationship {
-                    val_def_id: self.primitives.direction_union,
+                    val_def_id: OntolDefTag::UnionDirection.def_id(),
                     flags,
                 });
             }
@@ -486,7 +484,6 @@ impl<'m> Compiler<'m> {
             rel_ctx: &mut self.rel_ctx,
             prop_ctx: &mut self.prop_ctx,
             entity_ctx: &self.entity_ctx,
-            primitives: &self.primitives,
             errors: &mut self.errors,
         }
     }

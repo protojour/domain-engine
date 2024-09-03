@@ -654,10 +654,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match union_error {
             UnionCheckError::UnitTypePartOfUnion(def_id) => {
                 let ty = self.def_ty_ctx.def_table.get(&def_id).unwrap();
-                CompileError::UnitTypePartOfUnion(format!(
-                    "{}",
-                    FormatType::new(ty, self.defs, self.primitives)
-                ))
+                CompileError::UnitTypePartOfUnion(format!("{}", FormatType::new(ty, self.defs)))
             }
             UnionCheckError::CannotDiscriminateType
             | UnionCheckError::CannotDiscriminateTypeByProperty => {

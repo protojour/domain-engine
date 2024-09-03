@@ -306,7 +306,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
             self.outcome.predefine_rel(
                 rel_id,
                 Relationship {
-                    relation_def_id: self.compiler.primitives.relations.is,
+                    relation_def_id: OntolDefTag::RelationIs.def_id(),
                     edge_projection: None,
                     relation_span: span,
                     subject: (def_id, span),
@@ -329,7 +329,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
         match key {
             RelationKey::Named(def_id) => def_id,
             RelationKey::Builtin(def_id) => def_id,
-            RelationKey::Indexed => self.compiler.primitives.relations.indexed,
+            RelationKey::Indexed => OntolDefTag::RelationIndexed.def_id(),
         }
     }
 

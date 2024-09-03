@@ -33,7 +33,7 @@ use crate::{
     edge::EdgeCtx,
     interface::graphql::graphql_namespace::{adapt_graphql_identifier, GqlAdaptedIdent},
     misc::MiscCtx,
-    primitive::{PrimitiveKind, Primitives},
+    primitive::PrimitiveKind,
     properties::{Constructor, PropCtx, Properties},
     relation::{rel_def_meta, RelCtx, UnionMemberCache},
     repr::{
@@ -57,7 +57,6 @@ pub struct SerdeGenerator<'c, 'm> {
     pub repr_ctx: &'c ReprCtx,
     pub patterns: &'c TextPatterns,
     pub code_ctx: &'c CodeCtx<'m>,
-    pub primitives: &'c Primitives,
     pub union_member_cache: &'c UnionMemberCache,
 
     pub(super) lazy_struct_op_tasks: VecDeque<(SerdeOperatorAddr, SerdeDef, &'c Properties)>,

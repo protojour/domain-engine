@@ -12,7 +12,7 @@ use ontol_parser::{
     lexer::{kind::Kind, unescape::unescape_regex},
     U32Span,
 };
-use ontol_runtime::{property::ValueCardinality, DefId};
+use ontol_runtime::{property::ValueCardinality, DefId, OntolDefTag};
 use tracing::debug;
 
 use crate::{
@@ -155,7 +155,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             (insp::TypeRef::DefBody(body), _) => {
                 if body.statements().next().is_none() {
                     return Some(ResolvedType {
-                        def_id: self.ctx.compiler.primitives.unit,
+                        def_id: OntolDefTag::Unit.def_id(),
                         cardinality: syntax_cardinality,
                         span: body.view().span(),
                     });
@@ -253,7 +253,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
     pub(super) fn unescaped_text_literal_def_id(&mut self, unescaped: &str) -> DefId {
         match unescaped {
-            "" => self.ctx.compiler.primitives.empty_text,
+            "" => OntolDefTag::EmptyText.def_id(),
             other => self
                 .ctx
                 .compiler

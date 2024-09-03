@@ -18,7 +18,7 @@ use crate::{
     error::CompileError,
     misc::MiscCtx,
     package::ONTOL_PKG,
-    primitive::{PrimitiveKind, Primitives},
+    primitive::PrimitiveKind,
     properties::{Constructor, PropCtx, Properties},
     relation::{rel_def_meta, RelCtx, RelId, RelParams},
     repr::repr_model::UnionBound,
@@ -45,7 +45,6 @@ pub struct ReprCheck<'c, 'm> {
     pub misc_ctx: &'c MiscCtx,
     pub thesaurus: &'c Thesaurus,
     pub repr_ctx: &'c mut ReprCtx,
-    pub primitives: &'c Primitives,
 
     #[allow(unused)]
     pub errors: &'c mut CompileErrors,
@@ -453,7 +452,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                 Constructor::TextFmt(segment) => {
                                     assert!(!has_table);
                                     let mut attributes = Default::default();
-                                    segment.collect_attributes(&mut attributes, self.primitives);
+                                    segment.collect_attributes(&mut attributes);
                                     let kind = if attributes.len() == 1 {
                                         ReprKind::FmtStruct(Some(
                                             attributes.into_iter().next().unwrap(),

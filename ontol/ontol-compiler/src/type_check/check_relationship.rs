@@ -257,10 +257,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 let Type::TextConstant(def_id) = object_ty else {
                     return CompileError::TypeMismatch {
-                        actual: format!(
-                            "{}",
-                            FormatType::new(object_ty, self.defs, self.primitives)
-                        ),
+                        actual: format!("{}", FormatType::new(object_ty, self.defs)),
                         expected: "text constant".to_string(),
                     }
                     .span(*span)

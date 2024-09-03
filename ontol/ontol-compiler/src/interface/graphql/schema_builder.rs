@@ -24,7 +24,7 @@ use ontol_runtime::{
     },
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolverGraph},
     var::Var,
-    DefId, MapDefFlags, MapKey, PackageId, PropId,
+    DefId, MapDefFlags, MapKey, OntolDefTag, PackageId, PropId,
 };
 use thin_vec::thin_vec;
 
@@ -33,7 +33,6 @@ use crate::{
     interface::serde::{serde_generator::SerdeGenerator, SerdeKey},
     misc::MiscCtx,
     phf_build::build_phf_index_map,
-    primitive::Primitives,
     properties::PropCtx,
     relation::{RelCtx, UnionMemberCache},
     repr::{repr_ctx::ReprCtx, repr_model::ReprKind},
@@ -60,8 +59,6 @@ pub(super) struct SchemaBuilder<'a, 's, 'c, 'm> {
     pub misc_ctx: &'c MiscCtx,
     /// The compiler's defs
     pub defs: &'c Defs<'m>,
-    /// The compiler's primitives
-    pub primitives: &'c Primitives,
     /// representation of concrete types
     pub repr_ctx: &'c ReprCtx,
     /// A resolver graph
@@ -212,7 +209,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                 operator_addr: self
                                     .serde_gen
                                     .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
-                                        self.primitives.text,
+                                        OntolDefTag::Text.def_id(),
                                         SerdeModifier::NONE,
                                     )))
                                     .unwrap(),
@@ -231,7 +228,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                 operator_addr: self
                                     .serde_gen
                                     .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
-                                        self.primitives.boolean,
+                                        OntolDefTag::Boolean.def_id(),
                                         SerdeModifier::NONE,
                                     )))
                                     .unwrap(),
@@ -270,7 +267,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         operator_addr: self
                             .serde_gen
                             .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
-                                self.primitives.text,
+                                OntolDefTag::Text.def_id(),
                                 SerdeModifier::NONE,
                             )))
                             .unwrap(),

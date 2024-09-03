@@ -4,12 +4,11 @@ use std::collections::HashSet;
 
 use fnv::FnvHashMap;
 use indexmap::{map::Entry, IndexMap};
-use ontol_runtime::DefId;
+use ontol_runtime::{DefId, OntolDefTag};
 use thin_vec::{thin_vec, ThinVec};
 
 use crate::{
     def::{DefKind, Defs},
-    primitive::Primitives,
     SourceSpan, NO_SPAN,
 };
 
@@ -101,22 +100,24 @@ pub struct Thesaurus {
     text_literal_entries: ThinVec<(Is, SourceSpan)>,
 }
 
-impl Thesaurus {
-    pub fn new(primitives: &Primitives) -> Self {
+impl Default for Thesaurus {
+    fn default() -> Self {
         Self {
             table: Default::default(),
             reverse_table: Default::default(),
             no_entries: Default::default(),
             text_literal_entries: thin_vec![(
                 Is {
-                    def_id: primitives.text,
+                    def_id: OntolDefTag::Text.def_id(),
                     rel: TypeRelation::ImplicitSuper
                 },
                 NO_SPAN
             )],
         }
     }
+}
 
+impl Thesaurus {
     pub fn iter(&self) -> impl Iterator<Item = (DefId, &IndexMap<Is, SourceSpan>)> {
         self.table.iter().map(|(def_id, map)| (*def_id, map))
     }

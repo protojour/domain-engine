@@ -5,6 +5,7 @@ use std::{collections::BTreeSet, fmt::Debug, str::FromStr};
 use ::serde::{Deserialize, Serialize};
 use fnv::FnvBuildHasher;
 use indexmap::IndexMap;
+use num_enum::TryFromPrimitive;
 use ontol_macros::OntolDebug;
 use smallvec::SmallVec;
 use value::{TagFlags, ValueTagError};
@@ -134,8 +135,10 @@ impl DefId {
     }
 }
 
+/// NB: The numbers here get serialized and persisted.
+/// Think twice before changing number values.
 #[repr(u16)]
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, TryFromPrimitive)]
 pub enum OntolDefTag {
     /// The ONTOL domain itself
     Ontol = 0,
@@ -157,28 +160,30 @@ pub enum OntolDefTag {
     Uuid = 16,
     Ulid = 17,
     DateTime = 18,
-    DirectionUnion = 19,
-    DataStoreAddress = 20,
-    OpenDataRelationship = 21,
-    EdgeRelationship = 22,
-    FlatUnionRelationship = 23,
-    Is = 24,
-    Identifies = 25,
-    Id = 26,
-    Indexed = 27,
-    StoreKey = 28,
-    Min = 29,
-    Max = 30,
-    Default = 31,
-    Gen = 32,
-    Order = 33,
-    Direction = 34,
-    Example = 35,
-    Ascending = 36,
-    Descending = 37,
-    Auto = 38,
-    CreateTime = 39,
-    UpdateTime = 40,
+    /// An open, domainless relationship between some value and arbitrary, quasi-structured data
+    RelationOpenData = 19,
+    RelationEdge = 20,
+    RelationFlatUnion = 21,
+    RelationIs = 22,
+    RelationIdentifies = 23,
+    RelationId = 24,
+    RelationIndexed = 25,
+    RelationStoreKey = 26,
+    RelationMin = 27,
+    RelationMax = 28,
+    RelationDefault = 29,
+    RelationGen = 30,
+    RelationOrder = 31,
+    RelationDirection = 32,
+    RelationExample = 33,
+    RelationDataStoreAddress = 34,
+    /// Union of `ascending` and `descending`
+    UnionDirection = 35,
+    SymAscending = 36,
+    SymDescending = 37,
+    GeneratorAuto = 38,
+    GeneratorCreateTime = 39,
+    GeneratorUpdateTime = 40,
     /// This must be the last entry. Update the value accordingly.
     _LastEntry = 41,
 }
@@ -188,6 +193,10 @@ impl_ontol_debug!(OntolDefTag);
 impl OntolDefTag {
     pub const fn def_id(self) -> DefId {
         DefId(PackageId(0), self as u16)
+    }
+
+    pub const fn prop_id(self, prop_tag: DefPropTag) -> PropId {
+        PropId(self.def_id(), prop_tag)
     }
 }
 
@@ -266,11 +275,14 @@ pub struct PropId(pub DefId, pub DefPropTag);
 
 impl PropId {
     pub const fn open_data() -> Self {
-        Self(OntolDefTag::OpenDataRelationship.def_id(), DefPropTag(0))
+        Self(OntolDefTag::RelationOpenData.def_id(), DefPropTag(0))
     }
 
     pub const fn data_store_address() -> Self {
-        Self(OntolDefTag::DataStoreAddress.def_id(), DefPropTag(0))
+        Self(
+            OntolDefTag::RelationDataStoreAddress.def_id(),
+            DefPropTag(0),
+        )
     }
 
     pub fn tag(&self) -> DefPropTag {

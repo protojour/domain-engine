@@ -20,6 +20,6 @@ pub fn make_ontol_address(def_key: PgRegKey, data_key: PgDataKey) -> Value {
 
     Value::OctetSequence(
         octet_sequence,
-        OntolDefTag::DataStoreAddress.def_id().into(),
+        OntolDefTag::RelationDataStoreAddress.def_id().into(),
     )
 }

@@ -2,11 +2,11 @@ use std::ops::RangeInclusive;
 
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
-use ontol_runtime::{DefId, PropId};
+use ontol_runtime::{DefId, OntolDefTag, PropId};
 use ordered_float::NotNan;
 use smallvec::SmallVec;
 
-use crate::{misc::TypeParam, primitive::Primitives, SourceSpan};
+use crate::{misc::TypeParam, SourceSpan};
 
 #[derive(Debug)]
 pub struct Repr {
@@ -105,12 +105,12 @@ pub enum NumberResolution {
 }
 
 impl NumberResolution {
-    pub fn def_id(&self, primitives: &Primitives) -> DefId {
+    pub fn def_id(&self) -> DefId {
         match self {
-            Self::Integer => primitives.integer,
-            Self::Float => primitives.float,
-            Self::F32 => todo!(),
-            Self::F64 => primitives.f64,
+            Self::Integer => OntolDefTag::Integer.def_id(),
+            Self::Float => OntolDefTag::Float.def_id(),
+            Self::F32 => OntolDefTag::F32.def_id(),
+            Self::F64 => OntolDefTag::F64.def_id(),
         }
     }
 

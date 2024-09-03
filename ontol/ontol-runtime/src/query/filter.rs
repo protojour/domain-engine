@@ -47,9 +47,9 @@ impl Filter {
     pub fn set_direction(&mut self, direction: Value) -> Result<(), InvalidDirection> {
         let def_id = direction.type_def_id();
 
-        if def_id == OntolDefTag::Ascending.def_id() {
+        if def_id == OntolDefTag::SymAscending.def_id() {
             self.direction = Some(Direction::Ascending);
-        } else if def_id == OntolDefTag::Descending.def_id() {
+        } else if def_id == OntolDefTag::SymDescending.def_id() {
             self.direction = Some(Direction::Descending);
         } else {
             return Err(InvalidDirection);

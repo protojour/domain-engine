@@ -6,6 +6,7 @@ pub use error::*;
 use fnv::{FnvHashMap, FnvHashSet};
 use lowering::context::LoweringOutcome;
 use misc::MiscCtx;
+use primitive::init_ontol_primitives;
 use properties::PropCtx;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -28,7 +29,6 @@ use ontol_runtime::{
 };
 use package::{PackageTopology, Packages};
 use pattern::Patterns;
-use primitive::Primitives;
 use relation::RelCtx;
 use repr::repr_ctx::ReprCtx;
 pub use source::*;
@@ -173,7 +173,6 @@ struct Compiler<'m> {
     package_def_ids: FnvHashMap<PackageId, DefId>,
     domain_ids: BTreeMap<PackageId, DomainId>,
     package_config_table: FnvHashMap<PackageId, PackageConfig>,
-    primitives: Primitives,
     patterns: Patterns,
 
     str_ctx: StringCtx<'m>,
@@ -200,9 +199,7 @@ struct Compiler<'m> {
 impl<'m> Compiler<'m> {
     fn new(mem: &'m Mem, sources: Sources) -> Self {
         let mut defs = Defs::default();
-        let primitives = Primitives::new(&mut defs);
-
-        let thesaurus = Thesaurus::new(&primitives);
+        init_ontol_primitives(&mut defs);
 
         Self {
             sources,
@@ -214,7 +211,6 @@ impl<'m> Compiler<'m> {
             package_def_ids: Default::default(),
             domain_ids: Default::default(),
             package_config_table: Default::default(),
-            primitives,
             patterns: Default::default(),
             str_ctx: StringCtx::new(mem),
             ty_ctx: TypeCtx::new(mem),
@@ -223,7 +219,7 @@ impl<'m> Compiler<'m> {
             prop_ctx: PropCtx::default(),
             misc_ctx: MiscCtx::default(),
             edge_ctx: EdgeCtx::default(),
-            thesaurus,
+            thesaurus: Thesaurus::default(),
             repr_ctx: ReprCtx::default(),
             seal_ctx: Default::default(),
             entity_ctx: Default::default(),

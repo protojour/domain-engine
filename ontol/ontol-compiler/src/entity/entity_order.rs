@@ -1,7 +1,7 @@
 use ontol_runtime::{
     ontology::domain::{EntityOrder, FieldPath},
     query::order::Direction,
-    DefId, PropId,
+    DefId, OntolDefTag, PropId,
 };
 use tracing::{debug, info};
 
@@ -128,9 +128,9 @@ impl<'m> Compiler<'m> {
 
         let direction = match self.misc_ctx.direction_relationships.get(&params_def_id) {
             Some((rel_id, dir_def_id)) => {
-                if dir_def_id == &self.primitives.symbols.ascending {
+                if dir_def_id == &OntolDefTag::SymAscending.def_id() {
                     Direction::Ascending
-                } else if dir_def_id == &self.primitives.symbols.descending {
+                } else if dir_def_id == &OntolDefTag::SymDescending.def_id() {
                     Direction::Descending
                 } else {
                     CompileError::TODO("invalid direction")

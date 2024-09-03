@@ -209,9 +209,9 @@ impl<'o> Processor for OntolProcessor<'o> {
                 Value::Filter(filter, _) => {
                     let relationship = key.0;
 
-                    if relationship == OntolDefTag::Order.def_id() {
+                    if relationship == OntolDefTag::RelationOrder.def_id() {
                         filter.set_order(value);
-                    } else if relationship == OntolDefTag::Direction.def_id() {
+                    } else if relationship == OntolDefTag::RelationDirection.def_id() {
                         filter
                             .set_direction(value)
                             .map_err(|_| VmError::InvalidDirection)?;
@@ -260,7 +260,7 @@ impl<'o> Processor for OntolProcessor<'o> {
             Value::Filter(filter, _) => {
                 let relationship = key.0;
 
-                if relationship == OntolDefTag::Order.def_id() && arity == 1 {
+                if relationship == OntolDefTag::RelationOrder.def_id() && arity == 1 {
                     filter.set_order(Value::Sequence(
                         columns.into_iter().next().unwrap(),
                         ValueTag::unit(),

@@ -24,7 +24,6 @@ use crate::{
     },
     def::Defs,
     error::CompileError,
-    primitive::Primitives,
     properties::PropCtx,
     relation::{rel_def_meta, RelCtx},
     repr::{
@@ -63,7 +62,6 @@ pub(super) fn const_codegen<'m>(
         builder: &mut builder,
         errors: &mut compiler.errors,
         strings: &mut compiler.str_ctx,
-        primitives: &compiler.primitives,
         repr_ctx: &compiler.repr_ctx,
         type_mapper,
         scope: Default::default(),
@@ -137,7 +135,6 @@ pub(super) fn map_codegen<'m>(
         builder: &mut builder,
         errors: &mut compiler.errors,
         strings: &mut compiler.str_ctx,
-        primitives: &compiler.primitives,
         repr_ctx: &compiler.repr_ctx,
         type_mapper,
         scope: Default::default(),
@@ -188,8 +185,6 @@ pub(super) struct CodeGenerator<'a, 'm> {
     pub builder: &'a mut ProcBuilder,
     pub errors: &'a mut CompileErrors,
     pub strings: &'a mut StringCtx<'m>,
-    #[allow(unused)]
-    pub primitives: &'a Primitives,
     pub repr_ctx: &'a ReprCtx,
     pub type_mapper: TypeMapper<'a, 'm>,
 

@@ -3,14 +3,13 @@ use ontol_runtime::{
     ontology::ontol::text_pattern::{
         Regex, TextPattern, TextPatternConstantPart, TextPatternProperty,
     },
-    DefId, DefPropTag, PropId,
+    DefId, DefPropTag, OntolDefTag, PropId,
 };
 use regex_syntax::hir::{Capture, Hir, Look};
 use std::fmt::Write;
 use tracing::debug;
 
 use crate::{
-    primitive::Primitives,
     properties::Constructor,
     regex_util::{self, unsigned_integer_with_radix},
     strings::StringCtx,
@@ -152,11 +151,7 @@ impl TextPatternSegment {
         }
     }
 
-    pub fn collect_attributes(
-        &self,
-        output: &mut FnvHashSet<(PropId, DefId)>,
-        primitives: &Primitives,
-    ) {
+    pub fn collect_attributes(&self, output: &mut FnvHashSet<(PropId, DefId)>) {
         match self {
             Self::Attribute {
                 prop_id,
@@ -164,16 +159,16 @@ impl TextPatternSegment {
                 segment,
             } => {
                 output.insert((*prop_id, *type_def_id));
-                segment.collect_attributes(output, primitives);
+                segment.collect_attributes(output);
             }
             Self::AnyString => {
                 // note: should match what ontol-runtime/../text_matcher.rs does
-                let prop_id = PropId(primitives.text, DefPropTag(0));
-                output.insert((prop_id, primitives.text));
+                let prop_id = PropId(OntolDefTag::Text.def_id(), DefPropTag(0));
+                output.insert((prop_id, OntolDefTag::Text.def_id()));
             }
             Self::Concat(segments) | Self::Alternation(segments) => {
                 for segment in segments {
-                    segment.collect_attributes(output, primitives);
+                    segment.collect_attributes(output);
                 }
             }
             _ => {}

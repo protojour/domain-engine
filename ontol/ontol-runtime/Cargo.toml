@@ -35,6 +35,7 @@ bincode = "1"
 thiserror = "1"
 ahash = "0.8"
 phf_shared = "0.11"
+num_enum = { version = "0.7", default-features = false }
 
 [dev-dependencies]
 tracing-subscriber.workspace = true

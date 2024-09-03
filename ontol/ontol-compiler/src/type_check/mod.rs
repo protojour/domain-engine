@@ -9,7 +9,6 @@ use crate::{
     error::CompileError,
     misc::MiscCtx,
     pattern::Patterns,
-    primitive::Primitives,
     properties::PropCtx,
     relation::RelCtx,
     repr::{repr_check::ReprCheck, repr_ctx::ReprCtx},
@@ -75,7 +74,6 @@ pub struct TypeCheck<'c, 'm> {
     pub defs: &'c Defs<'m>,
     pub rel_ctx: &'c RelCtx,
     pub entity_ctx: &'c EntityCtx,
-    pub primitives: &'c Primitives,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -98,23 +96,17 @@ impl<'m> TypeError<'m> {
         let error = match self {
             TypeError::Propagated => return &ERROR_TYPE,
             TypeError::Mismatch(equation) => CompileError::TypeMismatch {
-                actual: format!(
-                    "{}",
-                    FormatType::new(equation.actual.0, tc.defs, tc.primitives)
-                ),
-                expected: format!(
-                    "{}",
-                    FormatType::new(equation.expected.0, tc.defs, tc.primitives)
-                ),
+                actual: format!("{}", FormatType::new(equation.actual.0, tc.defs)),
+                expected: format!("{}", FormatType::new(equation.expected.0, tc.defs)),
             },
             TypeError::MustBeSequence(ty) => CompileError::TypeMismatch {
-                actual: format!("{}", FormatType::new(ty, tc.defs, tc.primitives)),
-                expected: format!("{{{}}}", FormatType::new(ty, tc.defs, tc.primitives)),
+                actual: format!("{}", FormatType::new(ty, tc.defs)),
+                expected: format!("{{{}}}", FormatType::new(ty, tc.defs)),
             },
             TypeError::VariableMustBeSequenceEnclosed(ty) => {
                 CompileError::VariableMustBeSequenceEnclosed(format!(
                     "{}",
-                    FormatType::new(ty, tc.defs, tc.primitives)
+                    FormatType::new(ty, tc.defs)
                 ))
             }
             TypeError::NotEnoughInformation => {
@@ -122,7 +114,7 @@ impl<'m> TypeError<'m> {
             }
             TypeError::NotConvertibleFromNumber(ty) => CompileError::TODO(format!(
                 "Type {} cannot be represented as a number",
-                FormatType::new(ty, tc.defs, tc.primitives)
+                FormatType::new(ty, tc.defs)
             )),
             TypeError::NoRelationParametersExpected => CompileError::NoRelationParametersExpected,
             TypeError::StructTypeNotInferrable => CompileError::ExpectedExplicitStructPath,
@@ -143,7 +135,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             rel_ctx: self.rel_ctx,
             misc_ctx: self.misc_ctx,
             thesaurus: self.thesaurus,
-            primitives: self.primitives,
             repr_ctx: self.repr_ctx,
             prop_ctx: self.prop_ctx,
             errors: self.errors,
@@ -188,7 +179,6 @@ impl<'m> Compiler<'m> {
             seal_ctx: &mut self.seal_ctx,
             str_ctx: &mut self.str_ctx,
             defs: &self.defs,
-            primitives: &self.primitives,
             entity_ctx: &self.entity_ctx,
         }
     }

@@ -4,14 +4,14 @@ use fnv::{FnvHashMap, FnvHashSet};
 use itertools::{Itertools, Position};
 use ontol_runtime::{
     ontology::{map::Extern, ontol::TextLikeType},
-    DefId,
+    DefId, OntolDefTag,
 };
 use ordered_float::NotNan;
 
 use crate::{
     def::{DefKind, Defs},
     mem::{Intern, Mem},
-    primitive::{PrimitiveKind, Primitives},
+    primitive::PrimitiveKind,
     repr::{
         repr_ctx::ReprCtx,
         repr_model::{ReprKind, ReprScalarKind},
@@ -122,7 +122,6 @@ impl FunctionType {
         &self,
         param_types: &[Option<TypeRef<'m>>],
         out_type: Option<TypeRef<'m>>,
-        primitives: &Primitives,
         def_types: &DefTypeCtx<'m>,
         repr_ctx: &ReprCtx,
         type_ctx: &mut TypeCtx<'m>,
@@ -136,7 +135,6 @@ impl FunctionType {
                             .filter_map(|ty| ty.as_ref())
                             .next()
                             .unwrap(),
-                        primitives,
                         repr_ctx,
                         type_ctx,
                     );
@@ -146,12 +144,7 @@ impl FunctionType {
                         output: known_arg,
                     }
                 } else if out_type.is_some() {
-                    let output = Self::concrete_numeric_ty(
-                        out_type.unwrap(),
-                        primitives,
-                        repr_ctx,
-                        type_ctx,
-                    );
+                    let output = Self::concrete_numeric_ty(out_type.unwrap(), repr_ctx, type_ctx);
 
                     FunctionSig {
                         args: type_ctx.intern([output, output]),
@@ -165,7 +158,10 @@ impl FunctionType {
                 }
             }
             Self::BinaryText => {
-                let text = *def_types.def_table.get(&primitives.text).unwrap();
+                let text = *def_types
+                    .def_table
+                    .get(&OntolDefTag::Text.def_id())
+                    .unwrap();
                 let text_text = type_ctx.intern([text, text]);
 
                 FunctionSig {
@@ -178,7 +174,6 @@ impl FunctionType {
 
     fn concrete_numeric_ty<'m>(
         ty: TypeRef<'m>,
-        primitives: &Primitives,
         repr_ctx: &ReprCtx,
         types: &mut TypeCtx<'m>,
     ) -> TypeRef<'m> {
@@ -186,12 +181,14 @@ impl FunctionType {
             return &ERROR_TYPE;
         };
         match repr_ctx.get_repr_kind(&def_id) {
-            Some(ReprKind::Scalar(_, ReprScalarKind::I64(_), _)) => {
-                types.intern(Type::Primitive(PrimitiveKind::I64, primitives.i64))
-            }
-            Some(ReprKind::Scalar(_, ReprScalarKind::F64(_), _)) => {
-                types.intern(Type::Primitive(PrimitiveKind::F64, primitives.f64))
-            }
+            Some(ReprKind::Scalar(_, ReprScalarKind::I64(_), _)) => types.intern(Type::Primitive(
+                PrimitiveKind::I64,
+                OntolDefTag::I64.def_id(),
+            )),
+            Some(ReprKind::Scalar(_, ReprScalarKind::F64(_), _)) => types.intern(Type::Primitive(
+                PrimitiveKind::F64,
+                OntolDefTag::F64.def_id(),
+            )),
             _ => &ERROR_TYPE,
         }
     }
@@ -278,16 +275,14 @@ pub struct DefTypeCtx<'m> {
 pub struct FormatType<'m, 'c> {
     ty: TypeRef<'m>,
     defs: &'c Defs<'m>,
-    primitives: &'c Primitives,
     root: bool,
 }
 
 impl<'m, 'c> FormatType<'m, 'c> {
-    pub fn new(ty: TypeRef<'m>, defs: &'c Defs<'m>, primitives: &'c Primitives) -> Self {
+    pub fn new(ty: TypeRef<'m>, defs: &'c Defs<'m>) -> Self {
         Self {
             ty,
             defs,
-            primitives,
             root: true,
         }
     }
@@ -296,7 +291,6 @@ impl<'m, 'c> FormatType<'m, 'c> {
         Self {
             ty,
             defs: self.defs,
-            primitives: self.primitives,
             root: false,
         }
     }

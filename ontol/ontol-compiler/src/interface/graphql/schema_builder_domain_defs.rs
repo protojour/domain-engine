@@ -27,7 +27,7 @@ use ontol_runtime::{
     ontology::ontol::TextConstant,
     phf::PhfIndexMap,
     property::{PropertyCardinality, ValueCardinality},
-    DefId, PropId,
+    DefId, OntolDefTag, PropId,
 };
 use thin_vec::thin_vec;
 use tracing::{trace, trace_span, warn};
@@ -173,11 +173,13 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                                 operator_addr: self
                                                     .serde_gen
                                                     .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
-                                                        self.primitives.i64,
+                                                        OntolDefTag::I64.def_id(),
                                                         SerdeModifier::NONE,
                                                     )))
                                                     .unwrap(),
-                                                kind: NativeScalarKind::Int(self.primitives.i64),
+                                                kind: NativeScalarKind::Int(
+                                                    OntolDefTag::I64.def_id(),
+                                                ),
                                             }),
                                         },
                                     },
@@ -217,7 +219,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                                 operator_addr: self
                                                     .serde_gen
                                                     .gen_addr_lazy(gql_serde_key(
-                                                        self.primitives.boolean,
+                                                        OntolDefTag::Boolean.def_id(),
                                                     ))
                                                     .unwrap(),
                                                 kind: NativeScalarKind::Boolean,
@@ -766,12 +768,12 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         UnitTypeRef::NativeScalar(NativeScalarRef {
                             operator_addr: self
                                 .serde_gen
-                                .gen_addr_lazy(gql_serde_key(self.primitives.text))
+                                .gen_addr_lazy(gql_serde_key(OntolDefTag::Text.def_id()))
                                 .unwrap(),
                             kind: NativeScalarKind::String,
                         })
                     } else if scalar_union == LeafDiscriminantScalarUnion::INT {
-                        self.gen_def_type_ref(self.primitives.i64, QLevel::Node)
+                        self.gen_def_type_ref(OntolDefTag::I64.def_id(), QLevel::Node)
                     } else {
                         UnitTypeRef::Addr(self.schema.json_scalar)
                     };

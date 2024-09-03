@@ -17,7 +17,7 @@ use ontol_runtime::{
     },
     ontology::ontol::{TextConstant, ValueGenerator},
     phf::PhfKey,
-    DefId, DefPropTag, PropId,
+    DefId, DefPropTag, OntolDefTag, PropId,
 };
 use tracing::{debug, debug_span, warn};
 
@@ -97,7 +97,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             (
                 self.str_ctx.make_phf_key(EDGE_PROPERTY),
                 SerdeProperty {
-                    id: PropId(self.primitives.edge_relationship, DefPropTag(0)),
+                    id: PropId(OntolDefTag::RelationEdge.def_id(), DefPropTag(0)),
                     flags: SerdePropertyFlags::REL_PARAMS | SerdePropertyFlags::OPTIONAL,
                     value_addr: SerdeOperatorAddr(0),
                     value_generator: None,
@@ -363,7 +363,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     (
                         self.str_ctx.make_phf_key(&key),
                         SerdeProperty {
-                            id: PropId(self.primitives.flat_union_relationship, DefPropTag(0)),
+                            id: PropId(OntolDefTag::RelationFlatUnion.def_id(), DefPropTag(0)),
                             value_addr,
                             flags: SerdePropertyFlags::OPTIONAL,
                             value_generator: None,

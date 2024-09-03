@@ -2,7 +2,7 @@ use fnv::FnvHashSet;
 use ontol_runtime::{
     ontology::ontol::{TextLikeType, ValueGenerator},
     property::{PropertyCardinality, ValueCardinality},
-    DefId, PropId,
+    DefId, OntolDefTag, PropId,
 };
 use tracing::{debug, instrument, trace};
 
@@ -220,7 +220,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         let object_ty = self.def_ty_ctx.def_table.get(&object_def_id).unwrap();
                         CompileError::CannotGenerateValue(format!(
                             "{}",
-                            FormatType::new(object_ty, self.defs, self.primitives)
+                            FormatType::new(object_ty, self.defs)
                         ))
                         .span(span)
                         .report(self);
@@ -254,10 +254,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             _ => return Err(()),
         };
 
-        let generators = &self.primitives.generators;
-
         match generator_def_id {
-            _ if generator_def_id == generators.auto => {
+            _ if generator_def_id == OntolDefTag::GeneratorAuto.def_id() => {
                 match self.def_ty_ctx.def_table.get(&scalar_def_id) {
                     Some(Type::Primitive(PrimitiveKind::Serial, _)) => {
                         Ok(ValueGenerator::Autoincrement)
@@ -272,7 +270,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     },
                 }
             }
-            _ if generator_def_id == generators.create_time => {
+            _ if generator_def_id == OntolDefTag::GeneratorCreateTime.def_id() => {
                 match self.def_ty_ctx.def_table.get(&scalar_def_id) {
                     Some(Type::TextLike(_, TextLikeType::DateTime)) => {
                         Ok(ValueGenerator::CreatedAtTime)
@@ -280,7 +278,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     _ => Err(()),
                 }
             }
-            _ if generator_def_id == generators.update_time => {
+            _ if generator_def_id == OntolDefTag::GeneratorUpdateTime.def_id() => {
                 match self.def_ty_ctx.def_table.get(&scalar_def_id) {
                     Some(Type::TextLike(_, TextLikeType::DateTime)) => {
                         Ok(ValueGenerator::UpdatedAtTime)
@@ -314,7 +312,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 output_generator.ok_or(())
             }
             TextPatternSegment::Attribute { type_def_id, .. } => {
-                self.determine_value_generator(self.primitives.generators.auto, *type_def_id)
+                self.determine_value_generator(OntolDefTag::GeneratorAuto.def_id(), *type_def_id)
             }
             _ => Err(()),
         }

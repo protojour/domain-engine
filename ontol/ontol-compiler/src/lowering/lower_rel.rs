@@ -7,7 +7,7 @@ use ontol_parser::{
 use ontol_runtime::{
     ontology::domain::EdgeCardinalProjection,
     property::{PropertyCardinality, ValueCardinality},
-    DefId,
+    DefId, OntolDefTag,
 };
 use tracing::debug_span;
 
@@ -86,7 +86,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             && object_ty.cardinality == ValueCardinality::Unit
         {
             let identifies_relationship = Relationship {
-                relation_def_id: self.ctx.compiler.primitives.relations.identifies,
+                relation_def_id: OntolDefTag::RelationIdentifies.def_id(),
                 edge_projection: None,
                 relation_span: self.ctx.source_span(stmt.view().span()),
                 subject: (object_ty.def_id, self.ctx.source_span(object_ty.span)),
@@ -355,9 +355,9 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         }
 
         // HACK(for now): invert id relationship
-        if relation_def_id == self.ctx.compiler.primitives.relations.id {
+        if relation_def_id == OntolDefTag::RelationId.def_id() {
             relationship0 = Relationship {
-                relation_def_id: self.ctx.compiler.primitives.relations.identifies,
+                relation_def_id: OntolDefTag::RelationIdentifies.def_id(),
                 edge_projection: None,
                 relation_span: relationship0.relation_span,
                 subject: relationship0.object,

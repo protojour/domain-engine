@@ -274,7 +274,6 @@ impl<'m> Compiler<'m> {
                 if let Some(schema) = generate_graphql_schema(
                     package_id,
                     builder.partial_ontology(),
-                    &self.primitives,
                     map_namespaces.get(&domain_def_id),
                     &self.code_ctx,
                     &self.resolver_graph,

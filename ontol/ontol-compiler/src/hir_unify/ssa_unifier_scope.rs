@@ -5,7 +5,7 @@ use ontol_hir::{
 };
 use ontol_runtime::{
     var::{Var, VarSet},
-    MapDirection, PropId,
+    MapDirection, OntolDefTag, PropId,
 };
 use smallvec::smallvec;
 use thin_vec::{thin_vec, ThinVec};
@@ -381,7 +381,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                     Meta::new(
                                         self.types.intern(Type::Primitive(
                                             PrimitiveKind::Text,
-                                            self.primitives.text,
+                                            OntolDefTag::Text.def_id(),
                                         )),
                                         node_ref.meta().span,
                                     ),

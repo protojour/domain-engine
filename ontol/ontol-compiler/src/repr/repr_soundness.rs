@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
-use ontol_runtime::DefId;
+use ontol_runtime::{DefId, OntolDefTag};
 use ordered_float::NotNan;
 
 use crate::{
@@ -68,7 +68,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                             self.check_valid_intersection(&base_defs, thesaurus_mesh)?;
                         self.check_type_params(base_def_id, &mut repr, &mut checked_type_params)?;
 
-                        if base_def_id == self.primitives.number {
+                        if base_def_id == OntolDefTag::Number.def_id() {
                             match (
                                 number_resolution,
                                 checked_type_params.min,
@@ -81,7 +81,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                     match (min, max) {
                                         (Ok(min), Ok(max)) => Some(Repr {
                                             kind: ReprKind::Scalar(
-                                                self.primitives.i64,
+                                                OntolDefTag::I64.def_id(),
                                                 ReprScalarKind::I64(min..=max),
                                                 span,
                                             ),
@@ -97,7 +97,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                     match (min, max) {
                                         (Ok(min), Ok(max)) => Some(Repr {
                                             kind: ReprKind::Scalar(
-                                                self.primitives.i64,
+                                                OntolDefTag::I64.def_id(),
                                                 ReprScalarKind::F64(min..=max),
                                                 span,
                                             ),
@@ -116,7 +116,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                     None
                                 }
                             }
-                        } else if base_def_id == self.primitives.text {
+                        } else if base_def_id == OntolDefTag::Text.def_id() {
                             let mut repr_scalar_kind = ReprScalarKind::Text;
 
                             if matches!(self.defs.def_kind(def_id), DefKind::TextLiteral(_)) {
@@ -245,11 +245,8 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 let base_ty = self.def_types.def_table.get(base_def).unwrap();
 
                 notes.push(
-                    Note::BaseTypeIs(format!(
-                        "{}",
-                        FormatType::new(base_ty, self.defs, self.primitives)
-                    ))
-                    .span(level1_path.rel_span),
+                    Note::BaseTypeIs(format!("{}", FormatType::new(base_ty, self.defs)))
+                        .span(level1_path.rel_span),
                 );
             }
         }
@@ -328,7 +325,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     .number_resolutions
                     .iter()
                     .flat_map(|(resolution, span)| {
-                        let type_def_id = resolution.def_id(self.primitives);
+                        let type_def_id = resolution.def_id();
                         self.defs
                             .def_kind(type_def_id)
                             .opt_identifier()

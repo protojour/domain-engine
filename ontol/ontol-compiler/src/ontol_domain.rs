@@ -43,7 +43,7 @@ impl<'m> Compiler<'m> {
         );
 
         // fundamental types
-        self.register_type(self.primitives.empty_sequence, Type::EmptySequence);
+        self.register_type(OntolDefTag::EmptySequence.def_id(), Type::EmptySequence);
 
         // pre-process primitive definitions
         let mut named_builtin_relations: Vec<(DefId, &'static str)> = vec![];
@@ -69,7 +69,7 @@ impl<'m> Compiler<'m> {
 
                     let constraints = match kind {
                         BuiltinRelationKind::Min | BuiltinRelationKind::Max => RelTypeConstraints {
-                            subject_set: [self.primitives.number].into(),
+                            subject_set: [OntolDefTag::Number.def_id()].into(),
                             object: vec![RelObjectConstraint::ConstantOfSubjectType],
                         },
                         _ => RelTypeConstraints::default(),
@@ -109,14 +109,14 @@ impl<'m> Compiler<'m> {
 
         // bools
         self.is(
-            self.primitives.true_value,
+            OntolDefTag::True.def_id(),
             (TypeRelation::Subset, TypeRelation::ImplicitSuper),
-            self.primitives.boolean,
+            OntolDefTag::Boolean.def_id(),
         );
         self.is(
-            self.primitives.false_value,
+            OntolDefTag::False.def_id(),
             (TypeRelation::Subset, TypeRelation::ImplicitSuper),
-            self.primitives.boolean,
+            OntolDefTag::Boolean.def_id(),
         );
 
         self.setup_number_system();
@@ -141,30 +141,28 @@ impl<'m> Compiler<'m> {
         self.def_datetime();
 
         self.register_named_type(
-            self.primitives.generators.auto,
+            OntolDefTag::GeneratorAuto.def_id(),
             "auto",
             Type::ValueGenerator,
         );
         self.register_named_type(
-            self.primitives.generators.create_time,
+            OntolDefTag::GeneratorCreateTime.def_id(),
             "create_time",
             Type::ValueGenerator,
         );
         self.register_named_type(
-            self.primitives.generators.update_time,
+            OntolDefTag::GeneratorUpdateTime.def_id(),
             "update_time",
             Type::ValueGenerator,
         );
 
         // union setup
         {
-            let symbols = &self.primitives.symbols;
-
-            for direction in [symbols.ascending, symbols.descending] {
+            for sym_tag in [OntolDefTag::SymAscending, OntolDefTag::SymDescending] {
                 self.thesaurus.insert_domain_is(
-                    self.primitives.direction_union,
+                    OntolDefTag::UnionDirection.def_id(),
                     TypeRelation::SubVariant,
-                    direction,
+                    sym_tag.def_id(),
                     NO_SPAN,
                 );
             }
@@ -181,41 +179,45 @@ impl<'m> Compiler<'m> {
     fn setup_number_system(&mut self) {
         // integers
         self.is(
-            self.primitives.integer,
+            OntolDefTag::Integer.def_id(),
             (TypeRelation::Subset, TypeRelation::Super),
-            self.primitives.number,
+            OntolDefTag::Number.def_id(),
         );
         self.is(
-            self.primitives.i64,
+            OntolDefTag::I64.def_id(),
             (TypeRelation::Subset, TypeRelation::Super),
-            self.primitives.integer,
+            OntolDefTag::Integer.def_id(),
         );
         self.define_number_range(
-            self.primitives.i64,
+            OntolDefTag::I64.def_id(),
             "-9223372036854775808".."9223372036854775807",
         );
 
         // floats
         self.is(
-            self.primitives.float,
+            OntolDefTag::Float.def_id(),
             (TypeRelation::Subset, TypeRelation::Super),
-            self.primitives.number,
+            OntolDefTag::Number.def_id(),
         );
         self.is(
-            self.primitives.f64,
+            OntolDefTag::F64.def_id(),
             (TypeRelation::Subset, TypeRelation::Super),
-            self.primitives.float,
+            OntolDefTag::Float.def_id(),
         );
 
         self.define_number_range(
-            self.primitives.f64,
+            OntolDefTag::F64.def_id(),
             "-1.7976931348623157E+308".."1.7976931348623157E+308",
         );
     }
 
     fn define_number_range(&mut self, def_id: DefId, range: Range<&'static str>) {
-        self.define_number_literal_type_param(def_id, self.primitives.relations.min, range.start);
-        self.define_number_literal_type_param(def_id, self.primitives.relations.max, range.end);
+        self.define_number_literal_type_param(
+            def_id,
+            OntolDefTag::RelationMin.def_id(),
+            range.start,
+        );
+        self.define_number_literal_type_param(def_id, OntolDefTag::RelationMax.def_id(), range.end);
     }
 
     fn define_number_literal_type_param(
@@ -344,10 +346,10 @@ impl<'m> Compiler<'m> {
 
     fn repr_smoke_test(&self) {
         let repr_table = &self.repr_ctx.repr_table;
-        assert!(!repr_table.contains_key(&self.primitives.number));
-        assert!(!repr_table.contains_key(&self.primitives.integer));
-        assert!(!repr_table.contains_key(&self.primitives.float));
-        assert!(repr_table.contains_key(&self.primitives.i64));
-        assert!(repr_table.contains_key(&self.primitives.f64));
+        assert!(!repr_table.contains_key(&OntolDefTag::Number.def_id()));
+        assert!(!repr_table.contains_key(&OntolDefTag::Integer.def_id()));
+        assert!(!repr_table.contains_key(&OntolDefTag::Float.def_id()));
+        assert!(repr_table.contains_key(&OntolDefTag::I64.def_id()));
+        assert!(repr_table.contains_key(&OntolDefTag::F64.def_id()));
     }
 }
