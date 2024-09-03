@@ -358,7 +358,7 @@ impl<'m> Compiler<'m> {
                     &self.prop_ctx,
                     &self.entity_ctx,
                 ) {
-                    CompileError::EntityToEntityRelationshipMustUseEdge
+                    CompileError::EntityToEntityRelationshipMustUseArc
                         .span(meta.relationship.relation_span)
                         .report(&mut self.errors);
                 }

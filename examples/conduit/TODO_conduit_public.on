@@ -25,7 +25,7 @@ def Article (
     rel* 'updatedAt': datetime
     rel* 'favorited': boolean
     rel* 'favoritesCount': i64
-    rel* 'author': Profile // ERROR entity-to-entity relationship must use an edge
+    rel* 'author': Profile // ERROR entity-to-entity relationship must use an arc
 )
 
 def Comment (
@@ -33,7 +33,7 @@ def Comment (
     rel* 'createdAt': datetime
     rel* 'updatedAt': datetime
     rel* 'body': text
-    rel* 'author': Profile // ERROR entity-to-entity relationship must use an edge
+    rel* 'author': Profile // ERROR entity-to-entity relationship must use an arc
 )
 
 def SingleArticle (

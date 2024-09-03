@@ -5,8 +5,8 @@ def bar-id (fmt '' => '/bar/' => uuid => .)
 
 def Foo (
     rel. 'id': foo-id
-    rel* 'test1'?: bar-id // ERROR entity-to-entity relationship must use an edge
-    rel* 'test2'?: foo-bar-id // ERROR entity-to-entity relationship must use an edge
+    rel* 'test1'?: bar-id // ERROR entity-to-entity relationship must use an arc
+    rel* 'test2'?: foo-bar-id // ERROR entity-to-entity relationship must use an arc
 )
 
 def Bar (

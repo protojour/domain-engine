@@ -1,4 +1,0 @@
-def Foo (
-    rel. 'id': (rel* is: uuid)
-    rel* 'self'?: . // ERROR entity-to-entity relationship must use an edge
-)

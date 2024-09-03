@@ -2,7 +2,7 @@ domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
 
 def Foo (
     rel. 'id': (fmt '' => '/foo/' => uuid => .)
-    rel* 'test'?: Union // ERROR entity-to-entity relationship must use an edge
+    rel* 'test'?: Union // ERROR entity-to-entity relationship must use an arc
 )
 
 def Bar (

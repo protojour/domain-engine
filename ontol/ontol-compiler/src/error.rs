@@ -219,8 +219,8 @@ pub enum CompileError {
     SpreadLabelMustBeLastArgument,
     /// modifier not recognized in this context
     InvalidModifier,
-    /// entity-to-entity relationship must use an edge
-    EntityToEntityRelationshipMustUseEdge,
+    /// entity-to-entity relationship must use an arc
+    EntityToEntityRelationshipMustUseArc,
     /// Arc must have a unique identifier
     ArcMustHaveUniqueIdentifier,
     /// expected another item
