@@ -206,7 +206,8 @@ async fn migrate_domain_edges_steps<'t>(
     let mut param_def_ids: Vec<(EdgeId, DefId)> = vec![];
     for (edge_id, edge_info) in domain.edges() {
         let edge_tag = edge_id.1;
-        let table_name = format!("e_{edge_tag}").into_boxed_str();
+        let ident = &ontology[edge_info.ident];
+        let table_name = format!("e_{ident}").into_boxed_str();
 
         if let Some(pg_table) = pg_domain.edgetables.get_mut(&edge_tag) {
             if edge_info.cardinals.len() != pg_table.edge_cardinals.len() {

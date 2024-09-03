@@ -619,7 +619,7 @@ impl<'m> Compiler<'m> {
                 let edge = self.edge_ctx.symbolic_edges.get(&EdgeId(def_id)).unwrap();
 
                 let mut edge_info = EdgeInfo {
-                    ident: TextConstant(0),
+                    ident,
                     cardinals: Vec::with_capacity(edge.cardinals.len()),
                     store_key: None,
                 };
