@@ -1,13 +1,13 @@
 use anyhow::Context;
 use fnv::FnvHashMap;
 use indoc::indoc;
-use ontol_runtime::{ontology::Ontology, tuple::CardinalIdx, DefId, DefPropTag, EdgeId, PackageId};
+use ontol_runtime::{ontology::Ontology, tuple::CardinalIdx, DefId, DefPropTag, PackageId};
 use tokio_postgres::Transaction;
 use ulid::Ulid;
 
 use crate::pg_model::{
-    PgColumn, PgDomain, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexData, PgIndexType, PgProperty,
-    PgRegKey, PgTable, PgTableIdUnion, PgType,
+    EdgeId, PgColumn, PgDomain, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexData, PgIndexType,
+    PgProperty, PgRegKey, PgTable, PgTableIdUnion, PgType,
 };
 
 use super::MigrationCtx;
@@ -107,7 +107,10 @@ pub async fn read_registry<'t>(
             }
             (None, None, Some(edge_tag)) => {
                 owner_pg_domain.edgetables.insert(edge_tag, pg_table);
-                table_by_key.insert(key, PgTableIdUnion::Edge(EdgeId(owner_pkg_id, edge_tag)));
+                table_by_key.insert(
+                    key,
+                    PgTableIdUnion::Edge(EdgeId(DefId(owner_pkg_id, edge_tag))),
+                );
             }
             _ => unreachable!(),
         }
@@ -146,8 +149,8 @@ pub async fn read_registry<'t>(
                 pg_table.properties.insert(prop_tag, pg_property);
             }
             Some(PgTableIdUnion::Edge(edge_id)) => {
-                let pg_domain = ctx.domains.get_mut(&edge_id.0).unwrap();
-                let pg_table = pg_domain.edgetables.get_mut(&edge_id.1).unwrap();
+                let pg_domain = ctx.domains.get_mut(&edge_id.pkg_id()).unwrap();
+                let pg_table = pg_domain.edgetables.get_mut(&edge_id.def_id().1).unwrap();
 
                 pg_table.properties.insert(prop_tag, pg_property);
             }
@@ -229,8 +232,8 @@ pub async fn read_registry<'t>(
             panic!()
         };
 
-        let pg_domain = ctx.domains.get_mut(&edge_id.0).unwrap();
-        let pg_table = pg_domain.edgetables.get_mut(&edge_id.1).unwrap();
+        let pg_domain = ctx.domains.get_mut(&edge_id.pkg_id()).unwrap();
+        let pg_table = pg_domain.edgetables.get_mut(&edge_id.def_id().1).unwrap();
 
         pg_table.edge_cardinals.insert(
             CardinalIdx(ordinal.try_into()?),

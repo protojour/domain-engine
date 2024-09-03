@@ -124,7 +124,7 @@ fn stix_ontology_smoke(test: &OntolTest) {
 
     let reg_key_user_account_edge_info = test
         .ontology()
-        .find_edge(creator_edge_projection.id)
+        .find_edge(creator_edge_projection.edge_id)
         .unwrap();
 
     assert_eq!(

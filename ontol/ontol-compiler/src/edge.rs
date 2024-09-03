@@ -5,19 +5,18 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use fnv::{FnvHashMap, FnvHashSet};
-use ontol_runtime::{
-    ontology::ontol::TextConstant, tuple::CardinalIdx, DefId, EdgeId, PackageId, PropId,
-};
+use ontol_runtime::{ontology::ontol::TextConstant, tuple::CardinalIdx, DefId, PropId};
 use tracing::{debug, error};
 
 use crate::{
     relation::rel_def_meta, repr::repr_model::ReprKind, CompileError, Compiler, SourceSpan,
 };
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct EdgeId(pub DefId);
+
 #[derive(Default)]
 pub struct EdgeCtx {
-    pub ids: FnvHashMap<PackageId, u16>,
-
     /// Entrypoints into the edges are the relation symbols defined by the edge.
     ///
     /// This table maps from a symbol definition to an edge definition.
@@ -31,13 +30,6 @@ pub struct EdgeCtx {
 }
 
 impl EdgeCtx {
-    pub fn alloc_edge_id(&mut self, package_id: PackageId) -> EdgeId {
-        let next = self.ids.entry(package_id).or_default();
-        let tag = *next;
-        *next += 1;
-        EdgeId(package_id, tag)
-    }
-
     #[allow(unused)]
     pub fn edge_id_by_symbol(&self, symbol: DefId) -> Option<EdgeId> {
         self.symbols.get(&symbol).copied()

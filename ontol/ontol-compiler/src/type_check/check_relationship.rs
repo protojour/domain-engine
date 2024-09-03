@@ -1,9 +1,9 @@
-use ontol_runtime::{property::PropertyCardinality, tuple::CardinalIdx, DefId, EdgeId, PropId};
+use ontol_runtime::{property::PropertyCardinality, tuple::CardinalIdx, DefId, PropId};
 use tracing::debug;
 
 use crate::{
     def::{BuiltinRelationKind, DefKind},
-    edge::{CardinalKind, SymbolicEdge},
+    edge::{CardinalKind, EdgeId, SymbolicEdge},
     error::CompileError,
     mem::Intern,
     misc::{MacroExpand, TypeParam},

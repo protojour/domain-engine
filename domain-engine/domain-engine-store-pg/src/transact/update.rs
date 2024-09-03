@@ -12,7 +12,7 @@ use tracing::{debug, trace, warn};
 
 use crate::{
     pg_error::{PgError, PgInputError},
-    pg_model::{InDomain, PgDataKey},
+    pg_model::{EdgeId, InDomain, PgDataKey},
     sql::{self, UpdateColumn},
     sql_value::SqlScalar,
     transact::query::{QueryFrame, QuerySelect},
@@ -157,7 +157,7 @@ impl<'a> TransactCtx<'a> {
                     }
                 }
                 DataRelationshipKind::Edge(proj) => {
-                    let edge_patch = edge_patches.patch(proj.id, proj.subject);
+                    let edge_patch = edge_patches.patch(EdgeId(proj.edge_id), proj.subject);
 
                     match attr {
                         Attr::Unit(value) => {

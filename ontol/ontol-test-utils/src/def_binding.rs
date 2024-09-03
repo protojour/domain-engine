@@ -67,7 +67,7 @@ impl<'on> DefBinding<'on> {
         );
 
         let json_schema = if ontol_test.compile_json_schema {
-            Some(compile_json_schema(ontology, &def))
+            Some(compile_json_schema(ontology, def))
         } else {
             None
         };
@@ -155,7 +155,7 @@ impl<'on> DefBinding<'on> {
     }
 
     pub fn new_json_schema(&self, processor_mode: ProcessorMode) -> serde_json::Value {
-        let schema = build_standalone_schema(self.ontology, &self.def, processor_mode).unwrap();
+        let schema = build_standalone_schema(self.ontology, self.def, processor_mode).unwrap();
         serde_json::to_value(schema).unwrap()
     }
 }

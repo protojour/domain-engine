@@ -16,7 +16,7 @@ use ontol_runtime::{
     query::{filter::Filter, select::Select},
     tuple::{CardinalIdx, EndoTuple},
     value::{Serial, Value, ValueDebug},
-    DefId, EdgeId, PropId,
+    DefId, PropId,
 };
 use tracing::{debug, debug_span};
 
@@ -119,7 +119,7 @@ impl InMemoryStore {
         };
 
         let mut edge_builders: FnvHashMap<
-            EdgeId,
+            DefId,
             BTreeMap<CardinalIdx, (EdgeWriteMode, EdgeData<VertexKey>)>,
         > = Default::default();
 
@@ -143,7 +143,7 @@ impl InMemoryStore {
                     ValueCardinality::Unit,
                 ) => {
                     edge_builders
-                        .entry(projection.id)
+                        .entry(projection.edge_id)
                         .or_insert_with(|| {
                             BTreeMap::from_iter([(
                                 projection.subject,
@@ -174,7 +174,7 @@ impl InMemoryStore {
                             )?;
                         } else {
                             self.write_edge(
-                                projection.id,
+                                projection.edge_id,
                                 endo_tuple_to_edge_input(
                                     projection,
                                     &vertex_key,
@@ -303,7 +303,7 @@ impl InMemoryStore {
         debug!("write vertex_key={vertex_key:?}");
 
         let mut edge_builders: FnvHashMap<
-            EdgeId,
+            DefId,
             BTreeMap<CardinalIdx, (EdgeWriteMode, EdgeData<VertexKey>)>,
         > = Default::default();
 
@@ -324,7 +324,7 @@ impl InMemoryStore {
                     ValueCardinality::Unit,
                 ) => {
                     edge_builders
-                        .entry(projection.id)
+                        .entry(projection.edge_id)
                         .or_insert_with(|| {
                             BTreeMap::from_iter([(
                                 projection.subject,
@@ -342,7 +342,7 @@ impl InMemoryStore {
                     ValueCardinality::Unit,
                 ) => {
                     self.write_edge(
-                        projection.id,
+                        projection.edge_id,
                         endo_tuple_to_edge_input(
                             projection,
                             &vertex_key,
@@ -359,7 +359,7 @@ impl InMemoryStore {
                 ) => {
                     for tuple in matrix.into_rows() {
                         self.write_edge(
-                            projection.id,
+                            projection.edge_id,
                             endo_tuple_to_edge_input(
                                 projection,
                                 &vertex_key,
@@ -397,7 +397,7 @@ impl InMemoryStore {
 
     fn write_edge(
         &mut self,
-        edge_id: EdgeId,
+        edge_id: DefId,
         input: BTreeMap<CardinalIdx, (EdgeWriteMode, EdgeData<VertexKey>)>,
         ctx: &mut DbContext,
     ) -> DomainResult<()> {
@@ -592,7 +592,7 @@ impl InMemoryStore {
 
         let edge_store = self
             .edges
-            .get_mut(&projection.id)
+            .get_mut(&projection.edge_id)
             .expect("No edge collection");
 
         let (subject_data, object_data) = match projection.proj() {

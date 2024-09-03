@@ -4,12 +4,12 @@ use ontol_parser::cst::{
     inspect::{self as insp},
     view::{NodeView, TokenView},
 };
-use ontol_runtime::{ontology::domain::DomainId, tuple::CardinalIdx, DefId, EdgeId};
+use ontol_runtime::{ontology::domain::DomainId, tuple::CardinalIdx, DefId};
 use tracing::debug_span;
 use ulid::Ulid;
 
 use crate::{
-    edge::CardinalKind,
+    edge::{CardinalKind, EdgeId},
     namespace::{DocId, Space},
     package::PackageReference,
     CompileError, Compiler, Src,

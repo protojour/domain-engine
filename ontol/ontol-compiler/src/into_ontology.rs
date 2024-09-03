@@ -17,7 +17,7 @@ use ontol_runtime::{
         Ontology,
     },
     rustdoc::RustDoc,
-    DefId, DefIdSet, EdgeId, FnvIndexMap, PackageId, PropId,
+    DefId, DefIdSet, FnvIndexMap, PackageId, PropId,
 };
 use std::{
     collections::{BTreeSet, HashMap},
@@ -27,7 +27,7 @@ use std::{
 
 use crate::{
     def::{BuiltinRelationKind, DefKind, TypeDef, TypeDefFlags},
-    edge::CardinalKind,
+    edge::{CardinalKind, EdgeId},
     interface::{
         graphql::generate_schema::generate_graphql_schema,
         httpjson::generate_httpjson_interface,
@@ -132,8 +132,6 @@ impl<'m> Compiler<'m> {
             })
             .collect();
 
-        let mut edges: FnvHashMap<PackageId, FnvHashMap<EdgeId, EdgeInfo>> = Default::default();
-
         // For now, create serde operators for every domain
         for package_id in package_ids.iter().cloned() {
             let domain_def_id = self.package_def_ids.get(&package_id).cloned().unwrap();
@@ -181,22 +179,13 @@ impl<'m> Compiler<'m> {
                         }
                         _ => true,
                     },
-                    kind: match self.domain_entity(
+                    kind: self.namespaced_to_ontology_def_kind(
                         type_def_id,
+                        def_kind,
                         def_ident_constant,
                         &mut serde_gen,
                         &data_relationships,
-                    ) {
-                        Some(entity) => domain::DefKind::Entity(entity),
-                        None => def_kind.as_ontology_type_kind(BasicDef {
-                            ident: Some(def_ident_constant),
-                            repr: self
-                                .repr_ctx
-                                .get_repr_kind(&type_def_id)
-                                .map(|repr_kind| make_def_repr(repr_kind, &mut serde_gen))
-                                .unwrap_or(DefRepr::Unknown),
-                        }),
-                    },
+                    ),
                     operator_addr: serde_gen.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
                         type_def_id,
                         SerdeModifier::json_default(),
@@ -259,67 +248,7 @@ impl<'m> Compiler<'m> {
                 }
             }
 
-            for (edge_id, edge) in &self.edge_ctx.symbolic_edges {
-                if edge_id.0 != package_id {
-                    continue;
-                }
-
-                let mut edge_info = EdgeInfo {
-                    ident: TextConstant(0),
-                    cardinals: Vec::with_capacity(edge.cardinals.len()),
-                    store_key: None,
-                };
-
-                for cardinal in edge.cardinals.values() {
-                    let output_cardinal = match &cardinal.kind {
-                        CardinalKind::Vertex { members } => {
-                            let entity_count = members
-                                .keys()
-                                .filter(|def_id| self.entity_ctx.entities.contains_key(def_id))
-                                .count();
-
-                            let mut flags = EdgeCardinalFlags::empty();
-
-                            if entity_count == members.len() {
-                                flags.insert(EdgeCardinalFlags::ENTITY);
-
-                                if cardinal.unique_count > 0 {
-                                    flags.insert(EdgeCardinalFlags::UNIQUE);
-                                }
-                                if cardinal.pinned_count > 0 {
-                                    flags.insert(EdgeCardinalFlags::PINNED_DEF);
-                                }
-                            } else if entity_count > 0 {
-                                panic!("FIXME: mix of entity/non-entity");
-                            };
-
-                            EdgeCardinal {
-                                target: members.keys().copied().collect(),
-                                flags,
-                            }
-                        }
-                        CardinalKind::Parameter { def_id } => EdgeCardinal {
-                            target: DefIdSet::from_iter([*def_id]),
-                            flags: EdgeCardinalFlags::empty(),
-                        },
-                    };
-
-                    edge_info.cardinals.push(output_cardinal);
-                }
-
-                let old_edge = edges
-                    .entry(edge_id.0)
-                    .or_default()
-                    .insert(*edge_id, edge_info);
-                assert!(old_edge.is_none());
-            }
-
-            // domain.set_edges(edges.into_iter());
             builder.add_domain(package_id, domain);
-        }
-
-        for (package_id, edges) in edges {
-            builder.domain_mut(package_id).set_edges(edges);
         }
 
         // interface handling
@@ -677,59 +606,136 @@ impl<'m> Compiler<'m> {
         }
     }
 
-    fn domain_entity(
+    fn namespaced_to_ontology_def_kind(
         &self,
-        type_def_id: DefId,
+        def_id: DefId,
+        def_kind: &DefKind,
         ident: TextConstant,
-        serde_generator: &mut SerdeGenerator,
+        serde_gen: &mut SerdeGenerator,
         data_relationships: &FnvIndexMap<PropId, DataRelationshipInfo>,
-    ) -> Option<Entity> {
-        let properties = self.prop_ctx.properties_by_def_id(type_def_id)?;
-        let id_relationship_id = properties.identified_by?;
+    ) -> domain::DefKind {
+        match def_kind {
+            DefKind::Edge(_) => {
+                let edge = self.edge_ctx.symbolic_edges.get(&EdgeId(def_id)).unwrap();
 
-        let identifies_meta = rel_def_meta(id_relationship_id, &self.rel_ctx, &self.defs);
+                let mut edge_info = EdgeInfo {
+                    ident: TextConstant(0),
+                    cardinals: Vec::with_capacity(edge.cardinals.len()),
+                    store_key: None,
+                };
 
-        // inherent properties are the properties that are _not_ entity relationships:
-        let mut inherent_property_count = 0;
+                for cardinal in edge.cardinals.values() {
+                    let output_cardinal = match &cardinal.kind {
+                        CardinalKind::Vertex { members } => {
+                            let entity_count = members
+                                .keys()
+                                .filter(|def_id| self.entity_ctx.entities.contains_key(def_id))
+                                .count();
 
-        for data_relationship in data_relationships.values() {
-            if matches!(
-                data_relationship.kind,
-                DataRelationshipKind::Tree | DataRelationshipKind::Id
-            ) {
-                inherent_property_count += 1;
+                            let mut flags = EdgeCardinalFlags::empty();
+
+                            if entity_count == members.len() {
+                                flags.insert(EdgeCardinalFlags::ENTITY);
+
+                                if cardinal.unique_count > 0 {
+                                    flags.insert(EdgeCardinalFlags::UNIQUE);
+                                }
+                                if cardinal.pinned_count > 0 {
+                                    flags.insert(EdgeCardinalFlags::PINNED_DEF);
+                                }
+                            } else if entity_count > 0 {
+                                panic!("FIXME: mix of entity/non-entity");
+                            };
+
+                            EdgeCardinal {
+                                target: members.keys().copied().collect(),
+                                flags,
+                            }
+                        }
+                        CardinalKind::Parameter { def_id } => EdgeCardinal {
+                            target: DefIdSet::from_iter([*def_id]),
+                            flags: EdgeCardinalFlags::empty(),
+                        },
+                    };
+
+                    edge_info.cardinals.push(output_cardinal);
+                }
+
+                domain::DefKind::Edge(edge_info)
+            }
+            _ => {
+                let Some(properties) = self.prop_ctx.properties_by_def_id(def_id) else {
+                    return self
+                        .fallback_namespaced_ontology_def_kind(def_id, def_kind, ident, serde_gen);
+                };
+                let Some(id_relationship_id) = properties.identified_by else {
+                    return self
+                        .fallback_namespaced_ontology_def_kind(def_id, def_kind, ident, serde_gen);
+                };
+
+                let identifies_meta = rel_def_meta(id_relationship_id, &self.rel_ctx, &self.defs);
+
+                // inherent properties are the properties that are _not_ entity relationships:
+                let mut inherent_property_count = 0;
+
+                for data_relationship in data_relationships.values() {
+                    if matches!(
+                        data_relationship.kind,
+                        DataRelationshipKind::Tree | DataRelationshipKind::Id
+                    ) {
+                        inherent_property_count += 1;
+                    }
+                }
+
+                let inherent_primary_id_meta = self.find_inherent_primary_id(def_id, properties);
+
+                let id_value_generator =
+                    if let Some((_, inherent_primary_id_meta)) = &inherent_primary_id_meta {
+                        self.misc_ctx
+                            .value_generators
+                            .get(&inherent_primary_id_meta.rel_id)
+                            .cloned()
+                    } else {
+                        None
+                    };
+
+                domain::DefKind::Entity(Entity {
+                    ident,
+                    // The entity is self-identifying if it has an inherent primary_id and that is its only inherent property.
+                    // TODO: Is the entity still self-identifying if it has only an external primary id (i.e. it is a unit type)?
+                    is_self_identifying: inherent_primary_id_meta.is_some()
+                        && inherent_property_count <= 1,
+                    id_prop: match inherent_primary_id_meta {
+                        Some((prop_id, _)) => prop_id,
+                        None => todo!(),
+                    },
+                    id_value_def_id: identifies_meta.relationship.subject.0,
+                    id_value_generator,
+                    id_operator_addr: serde_gen
+                        .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
+                            identifies_meta.relationship.subject.0,
+                            SerdeModifier::NONE,
+                        )))
+                        .unwrap(),
+                })
             }
         }
+    }
 
-        let inherent_primary_id_meta = self.find_inherent_primary_id(type_def_id, properties);
-
-        let id_value_generator =
-            if let Some((_, inherent_primary_id_meta)) = &inherent_primary_id_meta {
-                self.misc_ctx
-                    .value_generators
-                    .get(&inherent_primary_id_meta.rel_id)
-                    .cloned()
-            } else {
-                None
-            };
-
-        Some(Entity {
-            ident,
-            // The entity is self-identifying if it has an inherent primary_id and that is its only inherent property.
-            // TODO: Is the entity still self-identifying if it has only an external primary id (i.e. it is a unit type)?
-            is_self_identifying: inherent_primary_id_meta.is_some() && inherent_property_count <= 1,
-            id_prop: match inherent_primary_id_meta {
-                Some((prop_id, _)) => prop_id,
-                None => todo!(),
-            },
-            id_value_def_id: identifies_meta.relationship.subject.0,
-            id_value_generator,
-            id_operator_addr: serde_generator
-                .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
-                    identifies_meta.relationship.subject.0,
-                    SerdeModifier::NONE,
-                )))
-                .unwrap(),
+    fn fallback_namespaced_ontology_def_kind(
+        &self,
+        def_id: DefId,
+        def_kind: &DefKind,
+        ident: TextConstant,
+        serde_gen: &mut SerdeGenerator,
+    ) -> domain::DefKind {
+        def_kind.as_ontology_type_kind(BasicDef {
+            ident: Some(ident),
+            repr: self
+                .repr_ctx
+                .get_repr_kind(&def_id)
+                .map(|repr_kind| make_def_repr(repr_kind, serde_gen))
+                .unwrap_or(DefRepr::Unknown),
         })
     }
 

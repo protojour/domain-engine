@@ -200,8 +200,7 @@ struct Compiler<'m> {
 impl<'m> Compiler<'m> {
     fn new(mem: &'m Mem, sources: Sources) -> Self {
         let mut defs = Defs::default();
-        let mut edge_ctx = EdgeCtx::default();
-        let primitives = Primitives::new(&mut defs, &mut edge_ctx);
+        let primitives = Primitives::new(&mut defs);
 
         let thesaurus = Thesaurus::new(&primitives);
 
@@ -223,7 +222,7 @@ impl<'m> Compiler<'m> {
             rel_ctx: RelCtx::default(),
             prop_ctx: PropCtx::default(),
             misc_ctx: MiscCtx::default(),
-            edge_ctx,
+            edge_ctx: EdgeCtx::default(),
             thesaurus,
             repr_ctx: ReprCtx::default(),
             seal_ctx: Default::default(),

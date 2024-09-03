@@ -4,7 +4,7 @@ use crate::juniper;
 
 use ontol_runtime::{
     ontology::domain::{self, EdgeCardinalProjection},
-    property, DefId, EdgeId, PropId,
+    property, DefId, PropId,
 };
 
 use super::{gql_def, OntologyCtx};
@@ -21,7 +21,7 @@ struct DataRelationshipEdgeProjection {
 }
 
 struct Edge {
-    id: EdgeId,
+    id: DefId,
 }
 
 struct EdgeCardinal {
@@ -125,7 +125,7 @@ impl DataRelationshipEdgeProjection {
 
     fn edge(&self) -> Edge {
         Edge {
-            id: self.projection.id,
+            id: self.projection.edge_id,
         }
     }
 }

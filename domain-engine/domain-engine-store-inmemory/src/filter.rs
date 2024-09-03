@@ -221,7 +221,7 @@ impl InMemoryStore {
 
                             let (target_key, rel_params) = edge_lookup(
                                 self.edges
-                                    .get(&projection.id)
+                                    .get(&projection.edge_id)
                                     .ok_or(ProofError::Disproven)?,
                                 projection,
                                 key,

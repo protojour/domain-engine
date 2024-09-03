@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use domain_engine_core::{domain_error::DomainErrorKind, DomainError};
-use ontol_runtime::{tuple::CardinalIdx, DefId, EdgeId, PackageId, PropId};
+use ontol_runtime::{tuple::CardinalIdx, DefId, PackageId, PropId};
 use tracing::{error, info, warn};
 
-use crate::pg_model::PgRegKey;
+use crate::pg_model::{EdgeId, PgRegKey};
 
 pub fn ds_err(s: impl Into<String>) -> DomainError {
     DomainError::data_store(s)

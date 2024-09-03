@@ -22,7 +22,7 @@ use tracing::{debug, trace};
 use crate::{
     address::make_ontol_address,
     pg_error::{PgError, PgInputError, PgModelError},
-    pg_model::{PgDataKey, PgDomainTable, PgEdgeCardinalKind, PgTable, PgTableKey, PgType},
+    pg_model::{EdgeId, PgDataKey, PgDomainTable, PgEdgeCardinalKind, PgTable, PgTableKey, PgType},
     sql::{self, FromItem, WhereExt},
     sql_record::{SqlColumnStream, SqlRecord, SqlRecordIterator},
     sql_value::{Layout, SqlOutput, SqlScalar},
@@ -465,12 +465,12 @@ impl<'a> TransactCtx<'a> {
             };
 
             let edge_alias = query_ctx.alias.incr();
-            let edge_info = self.ontology.find_edge(proj.id).unwrap();
-            let pg_edge = self.pg_model.pg_domain_edgetable(&proj.id)?;
+            let edge_info = self.ontology.find_edge(proj.edge_id).unwrap();
+            let pg_edge = self.pg_model.pg_domain_edgetable(&EdgeId(proj.edge_id))?;
             let pg_subj_cardinal = pg_edge.table.edge_cardinal(proj.subject)?;
 
             let pg_proj = PgEdgeProjection {
-                id: proj.id,
+                id: EdgeId(proj.edge_id),
                 subject_index: proj.subject,
                 object_index: proj.object,
                 pg_subj_data: pg,
@@ -750,7 +750,7 @@ impl<'a> TransactCtx<'a> {
                 continue;
             };
 
-            let pg_edge = self.pg_model.edgetable(&proj.id)?;
+            let pg_edge = self.pg_model.edgetable(&EdgeId(proj.edge_id))?;
 
             match rel_info.cardinality.1 {
                 ValueCardinality::Unit => {

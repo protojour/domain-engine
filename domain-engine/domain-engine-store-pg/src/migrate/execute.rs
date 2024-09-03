@@ -170,7 +170,7 @@ async fn execute_migration_step<'t>(
             let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
             let pg_table = match table_id {
                 PgTableIdUnion::Def(def_id) => pg_domain.datatables.get_mut(&def_id),
-                PgTableIdUnion::Edge(edge_id) => pg_domain.edgetables.get_mut(&edge_id.1),
+                PgTableIdUnion::Edge(edge_id) => pg_domain.edgetables.get_mut(&edge_id.def_id().1),
             }
             .unwrap();
 

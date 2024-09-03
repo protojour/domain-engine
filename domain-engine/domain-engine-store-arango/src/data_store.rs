@@ -487,10 +487,10 @@ mod tests {
 
         expect_eq!(
             expected = indoc! {r#"
-            WITH `artist`, `plays`, `instrument`
+            WITH `artist`, `artist_plays`, `instrument`
             FOR obj IN `artist`
                 LET `obj_plays` = (
-                    FOR `sub_obj`, `sub_obj_edge` IN OUTBOUND obj `plays`
+                    FOR `sub_obj`, `sub_obj_edge` IN OUTBOUND obj `artist_plays`
                         RETURN MERGE({ _key: `sub_obj`._key }, { _edge: { how_much: `sub_obj_edge`.how_much } })
                 )
                 RETURN MERGE(obj, { plays: `obj_plays` })

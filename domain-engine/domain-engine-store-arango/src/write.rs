@@ -812,7 +812,7 @@ impl<'a> MetaQuery<'a> {
         let edge_collection = self
             .database
             .edge_collections
-            .get(&edge_projection.id)
+            .get(&edge_projection.edge_id)
             .expect("edge collection should exist");
 
         let entry = self.rels.entry(edge_collection.name.clone()).or_default();

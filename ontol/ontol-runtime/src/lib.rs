@@ -311,19 +311,6 @@ impl FromStr for PropId {
     }
 }
 
-/// The ID of some relationship between ONTOL types.
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub struct EdgeId(pub PackageId, pub u16);
-
-/// This forces single-line output even when pretty-printed
-impl ::std::fmt::Debug for EdgeId {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "edge@{}:{}", self.0 .0, self.1)
-    }
-}
-
-impl_ontol_debug!(EdgeId);
-
 /// Sorted set of DefIds
 #[derive(Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub struct DefIdSet(SmallVec<DefId, 1>);

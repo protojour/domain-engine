@@ -7,11 +7,11 @@ use ontol_runtime::{
         processor::{ProcessorProfile, ProcessorProfileFlags, ScalarFormat},
     },
     ontology::{
-        domain::{DataRelationshipKind, Def, EdgeInfo},
+        domain::{DataRelationshipKind, Def, DefKind, EdgeInfo},
         ontol::TextConstant,
         Ontology,
     },
-    DefId, EdgeId, PackageId,
+    DefId, PackageId,
 };
 use reqwest::Url;
 use reqwest_middleware::ClientWithMiddleware;
@@ -52,7 +52,7 @@ pub struct ArangoDatabase {
     /// Collections by DefId
     pub collections: HashMap<DefId, Ident>,
     /// Edge collections by Edge id
-    pub edge_collections: HashMap<EdgeId, EdgeCollection>,
+    pub edge_collections: HashMap<DefId, EdgeCollection>,
     /// Reverse lookup DefId for ProcessorProfileApi
     pub collection_lookup: HashMap<String, DefId>,
     pub ontology: Arc<Ontology>,
@@ -371,27 +371,51 @@ impl ArangoDatabase {
             .find_domain(package_id)
             .expect("package id should match a domain");
 
-        let mut subject_names_by_edge_id: HashMap<EdgeId, TextConstant> = Default::default();
+        let mut subject_names_by_edge_id: HashMap<DefId, TextConstant> = Default::default();
         let mut collection_name_collisions: BTreeSet<String> = Default::default();
 
         // collections
         // TODO: handle rare collisions after ASCII/length coercion
         for def in domain.defs() {
-            if def.entity().is_none() {
-                continue;
-            }
+            let def_id = def.id;
 
-            let collection = get_collection_name(def, &self.ontology);
-            if let Some(prev_collection) = self.collections.insert(def.id, collection.clone()) {
-                collection_name_collisions.insert(prev_collection.raw_str().to_string());
-            }
+            match &def.kind {
+                DefKind::Entity(_entity) => {
+                    let collection = get_collection_name(def, &self.ontology);
+                    if let Some(prev_collection) =
+                        self.collections.insert(def.id, collection.clone())
+                    {
+                        collection_name_collisions.insert(prev_collection.raw_str().to_string());
+                    }
 
-            for data_relationship in def.data_relationships.values() {
-                if let DataRelationshipKind::Edge(projection) = data_relationship.kind {
-                    if projection.subject.0 == 0 {
-                        subject_names_by_edge_id.insert(projection.id, data_relationship.name);
+                    for data_relationship in def.data_relationships.values() {
+                        if let DataRelationshipKind::Edge(projection) = data_relationship.kind {
+                            if projection.subject.0 == 0 {
+                                subject_names_by_edge_id
+                                    .insert(projection.edge_id, data_relationship.name);
+                            }
+                        }
                     }
                 }
+                DefKind::Edge(edge_info) => {
+                    let name = self.find_edge_collection_name(
+                        def.id,
+                        edge_info,
+                        &subject_names_by_edge_id,
+                    )?;
+                    debug!("register edge collection {name}: edge_id={def_id:?}");
+
+                    let rel_params = if edge_info.cardinals.len() > 2 {
+                        // FIXME: This could be a union
+                        edge_info.cardinals[2].target.iter().copied().next()
+                    } else {
+                        None
+                    };
+
+                    self.edge_collections
+                        .insert(def_id, EdgeCollection { name, rel_params });
+                }
+                _ => {}
             }
         }
 
@@ -423,9 +447,9 @@ impl ArangoDatabase {
 
     fn find_edge_collection_name(
         &self,
-        edge_id: EdgeId,
+        edge_id: DefId,
         edge_info: &EdgeInfo,
-        subject_names_by_edge_id: &HashMap<EdgeId, TextConstant>,
+        subject_names_by_edge_id: &HashMap<DefId, TextConstant>,
     ) -> anyhow::Result<Ident> {
         if let Some(store_key) = edge_info.store_key {
             return Ok(Ident::new(self.ontology[store_key].to_string()));
@@ -466,7 +490,7 @@ impl ArangoDatabase {
                     let mut concat = self.ontology[ident].to_string();
 
                     for (_, rel_info, projection) in def.edge_relationships() {
-                        if projection.id == edge_id {
+                        if projection.edge_id == edge_id {
                             concat.push('_');
                             concat.push_str(&self.ontology[rel_info.name]);
                         }

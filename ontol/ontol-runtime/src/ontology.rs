@@ -5,7 +5,7 @@ use std::ops::Index;
 use ::serde::{Deserialize, Serialize};
 use arcstr::ArcStr;
 use bincode::Options;
-use domain::DefRepr;
+use domain::{DefRepr, EdgeInfo};
 use fnv::FnvHashMap;
 use tracing::debug;
 
@@ -26,13 +26,13 @@ use crate::{
         ontol_vm::OntolVm,
         proc::{Lib, Procedure},
     },
-    DefId, DefIdSet, EdgeId, MapKey, PackageId, PropId,
+    DefId, DefIdSet, MapKey, PackageId, PropId,
 };
 
 use self::{
     builder::OntologyBuilder,
     config::PackageConfig,
-    domain::{Def, Domain, EdgeInfo, ExtendedEntityInfo},
+    domain::{Def, Domain, ExtendedEntityInfo},
     map::{Extern, MapMeta, PropertyFlow},
     ontol::{
         text_pattern::TextPattern, OntolDomainMeta, TextConstant, TextLikeType, ValueGenerator,
@@ -174,7 +174,7 @@ impl Ontology {
             .unwrap_or(&[])
     }
 
-    pub fn find_edge(&self, id: EdgeId) -> Option<&EdgeInfo> {
+    pub fn find_edge(&self, id: DefId) -> Option<&EdgeInfo> {
         let domain = self.find_domain(id.0)?;
         domain.find_edge(id)
     }

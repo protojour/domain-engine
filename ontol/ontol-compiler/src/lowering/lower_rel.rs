@@ -7,13 +7,13 @@ use ontol_parser::{
 use ontol_runtime::{
     ontology::domain::EdgeCardinalProjection,
     property::{PropertyCardinality, ValueCardinality},
-    DefId, EdgeId,
+    DefId,
 };
 use tracing::debug_span;
 
 use crate::{
     def::{DefKind, RelationContext, TypeDef, TypeDefFlags},
-    package::ONTOL_PKG,
+    edge::EdgeId,
     relation::{DefRelTag, RelId, RelParams, Relationship},
     CompileError, SourceSpan,
 };
@@ -210,18 +210,11 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         // This syntax just defines the relation the first time it's used
         let relation_def_id = self.ctx.define_relation_if_undefined(key);
 
-        let (rel_id, _edge_id) = if subject_ty.def_id == DefId::unit() {
+        let rel_id = if subject_ty.def_id == DefId::unit() {
             // a parent relation modifier
-            (RelId(DefId::unit(), DefRelTag(0)), EdgeId(ONTOL_PKG, 0))
+            RelId(DefId::unit(), DefRelTag(0))
         } else {
-            let rel_id = self.ctx.compiler.rel_ctx.alloc_rel_id(subject_ty.def_id);
-            // Fake edge id
-            let edge_id = self
-                .ctx
-                .compiler
-                .edge_ctx
-                .alloc_edge_id(self.ctx.package_id);
-            (rel_id, edge_id)
+            self.ctx.compiler.rel_ctx.alloc_rel_id(subject_ty.def_id)
         };
 
         let docs = Self::extract_documentation(rel_stmt.0.clone());
@@ -449,7 +442,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             let cardinality = edge.cardinals.len();
 
             let projection = EdgeCardinalProjection {
-                id: edge_id,
+                edge_id: edge_id.0,
                 subject: slot.left,
                 object: slot.right,
                 pinned: unique,

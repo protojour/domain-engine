@@ -1,10 +1,9 @@
 use ontol_macros::RustDoc;
-use ontol_runtime::{DefId, EdgeId, OntolDefTag};
+use ontol_runtime::{DefId, OntolDefTag};
 
 use crate::{
     def::{BuiltinRelationKind, DefKind, Defs, TypeDef, TypeDefFlags},
-    edge::EdgeCtx,
-    package::ONTOL_PKG,
+    edge::EdgeId,
 };
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug, RustDoc)]
@@ -117,8 +116,6 @@ pub struct Primitives {
     /// Builtin relations
     pub relations: OntolRelations,
 
-    pub edges: OntolEdges,
-
     pub generators: Generators,
 
     pub symbols: OntolSymbols,
@@ -171,7 +168,7 @@ pub struct Generators {
 }
 
 impl Primitives {
-    pub fn new(defs: &mut Defs, edge_ctx: &mut EdgeCtx) -> Self {
+    pub fn new(defs: &mut Defs) -> Self {
         let primitives = Self {
             unit: defs.add_primitive(OntolDefTag::Unit, PrimitiveKind::Unit, None),
 
@@ -278,10 +275,6 @@ impl Primitives {
                     BuiltinRelationKind::Direction,
                     Some("direction"),
                 ),
-            },
-            edges: OntolEdges {
-                is: edge_ctx.alloc_edge_id(ONTOL_PKG),
-                identifies: edge_ctx.alloc_edge_id(ONTOL_PKG),
             },
 
             generators: Generators {

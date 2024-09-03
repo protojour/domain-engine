@@ -11,7 +11,7 @@ use ontol_runtime::{
     },
     tuple::CardinalIdx,
     value::{Serial, Value},
-    DefId, EdgeId, PropId,
+    DefId, PropId,
 };
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
@@ -25,7 +25,7 @@ use crate::constraint::ConstraintCheck;
 
 pub(super) struct InMemoryStore {
     pub vertices: FnvHashMap<DefId, VertexTable<DynamicKey>>,
-    pub edges: FnvHashMap<EdgeId, HyperEdgeTable>,
+    pub edges: FnvHashMap<DefId, HyperEdgeTable>,
     pub serial_counter: u64,
 }
 
@@ -95,7 +95,7 @@ pub enum EdgeColumnMatch {
 impl InMemoryStore {
     pub fn match_edge_column(
         &self,
-        edge_id: EdgeId,
+        edge_id: DefId,
         cardinal_idx: CardinalIdx,
         value_def_id: DefId,
         ctx: &DbContext,

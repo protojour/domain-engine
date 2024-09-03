@@ -39,7 +39,7 @@ fn test_conduit_db_ontology_smoke() {
 
     let author_edge_info = test
         .ontology()
-        .find_edge(author_edge_projection.id)
+        .find_edge(author_edge_projection.edge_id)
         .unwrap();
 
     assert_eq!(

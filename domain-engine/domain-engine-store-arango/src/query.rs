@@ -200,7 +200,11 @@ impl<'a> MetaQuery<'a> {
         let mut rel_props = vec![];
         for rel_info in target_def.data_relationships.values() {
             if let DataRelationshipKind::Edge(projection) = rel_info.kind {
-                let edge = self.database.edge_collections.get(&projection.id).unwrap();
+                let edge = self
+                    .database
+                    .edge_collections
+                    .get(&projection.edge_id)
+                    .unwrap();
 
                 if let Some(def_id) = edge.rel_params {
                     let rel_def = self.ontology.def(def_id);
@@ -234,7 +238,7 @@ impl<'a> MetaQuery<'a> {
         let edge_collection = self
             .database
             .edge_collections
-            .get(&edge_projection.id)
+            .get(&edge_projection.edge_id)
             .expect("collection should exist");
 
         self.with.extend(sub_meta.with);

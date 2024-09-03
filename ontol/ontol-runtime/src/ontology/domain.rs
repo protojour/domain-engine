@@ -1,6 +1,6 @@
 //! Domain description model, part of the Ontology
 
-use std::{collections::BTreeMap, fmt::Debug};
+use std::fmt::Debug;
 
 use fnv::FnvHashMap;
 use ontol_macros::OntolDebug;
@@ -10,7 +10,7 @@ use ulid::Ulid;
 
 use crate::{
     impl_ontol_debug, interface::serde::operator::SerdeOperatorAddr, property::Cardinality,
-    query::order::Direction, tuple::CardinalIdx, DefId, DefIdSet, EdgeId, FnvIndexMap, PropId,
+    query::order::Direction, tuple::CardinalIdx, DefId, DefIdSet, FnvIndexMap, PropId,
 };
 
 use super::{
@@ -34,8 +34,6 @@ pub struct Domain {
 
     /// Types by def tag (the type's index within the domain)
     defs: Vec<Def>,
-
-    edges: BTreeMap<EdgeId, EdgeInfo>,
 }
 
 impl Domain {
@@ -45,7 +43,6 @@ impl Domain {
             def_id,
             unique_name,
             defs: Default::default(),
-            edges: Default::default(),
         }
     }
 
@@ -77,12 +74,23 @@ impl Domain {
         self.defs.iter()
     }
 
-    pub fn edges(&self) -> impl Iterator<Item = (&EdgeId, &EdgeInfo)> {
-        self.edges.iter()
+    pub fn edges(&self) -> impl Iterator<Item = (&DefId, &EdgeInfo)> {
+        self.defs.iter().filter_map(|def| {
+            if let DefKind::Edge(edge_info) = &def.kind {
+                Some((&def.id, edge_info))
+            } else {
+                None
+            }
+        })
     }
 
-    pub fn find_edge(&self, id: EdgeId) -> Option<&EdgeInfo> {
-        self.edges.get(&id)
+    pub fn find_edge(&self, id: DefId) -> Option<&EdgeInfo> {
+        let def = self.def(id);
+        if let DefKind::Edge(edge_info) = &def.kind {
+            Some(edge_info)
+        } else {
+            None
+        }
     }
 
     pub fn find_def_by_name(&self, name: TextConstant) -> Option<&Def> {
@@ -111,10 +119,6 @@ impl Domain {
         });
 
         self.defs[index] = info;
-    }
-
-    pub fn set_edges(&mut self, edges: impl IntoIterator<Item = (EdgeId, EdgeInfo)>) {
-        self.edges = edges.into_iter().collect();
     }
 }
 
@@ -371,7 +375,7 @@ bitflags::bitflags! {
 #[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct EdgeCardinalProjection {
     /// The edge id that is the source of this data point
-    pub id: EdgeId,
+    pub edge_id: DefId,
 
     /// The object cardinal of the projection, the attribute value.
     pub object: CardinalIdx,
@@ -396,7 +400,7 @@ impl Debug for EdgeCardinalProjection {
         write!(
             f,
             "{}:{}:{}<-{}",
-            self.id.0 .0, self.id.1, self.object, self.subject,
+            self.edge_id.0 .0, self.edge_id.1, self.object, self.subject,
         )
     }
 }

@@ -5,7 +5,7 @@ use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::{domain::DefKind, Ontology},
     tuple::CardinalIdx,
-    DefId, DefPropTag, EdgeId, OntolDefTag, PackageId,
+    DefId, DefPropTag, OntolDefTag, PackageId,
 };
 use read_registry::read_registry;
 use tokio_postgres::{Client, Transaction};
@@ -205,7 +205,7 @@ pub async fn migrate(
                     .count();
 
                 if unique_count > 1 {
-                    let edge_id = EdgeId(*pkg_id, *edge_tag);
+                    let edge_id = DefId(*pkg_id, *edge_tag);
                     return Err(anyhow!(
                         "edge {edge_id:?} has more than one unique cardinal, which doesn't work yet"
                     ));

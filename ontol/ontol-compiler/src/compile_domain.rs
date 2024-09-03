@@ -5,14 +5,14 @@ use fnv::FnvHashSet;
 use ontol_runtime::{
     ontology::{domain::DomainId, ontol::TextConstant},
     property::{PropertyCardinality, ValueCardinality},
-    DefId, EdgeId, PackageId,
+    DefId, PackageId,
 };
 use tracing::{debug, debug_span, info};
 use ulid::Ulid;
 
 use crate::{
     def::{BuiltinRelationKind, DefKind},
-    edge::EdgeCtx,
+    edge::{EdgeCtx, EdgeId},
     entity::entity_ctx::def_implies_entity,
     lowering::context::LoweringOutcome,
     misc::{MacroExpand, MacroItem, MiscCtx},
@@ -301,7 +301,7 @@ impl<'m> Compiler<'m> {
                 if let RelParams::Def(rel_params_def_id) = &relationship.rel_params {
                     if let Some(projection) = &relationship.edge_projection {
                         copy_relationship_store_key(
-                            projection.id,
+                            EdgeId(projection.edge_id),
                             *rel_params_def_id,
                             &mut self.edge_ctx,
                             &self.thesaurus,
@@ -336,7 +336,7 @@ impl<'m> Compiler<'m> {
                 }
 
                 if let Some(projection) = meta.relationship.edge_projection {
-                    let edge_id = projection.id;
+                    let edge_id = EdgeId(projection.edge_id);
                     let edge = self.edge_ctx.symbolic_edges.get(&edge_id).unwrap();
 
                     if let Some((_, param_def_id)) = edge.find_parameter_cardinal() {

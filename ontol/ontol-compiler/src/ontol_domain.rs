@@ -174,24 +174,6 @@ impl<'m> Compiler<'m> {
             self.type_check().check_def(def_id);
         }
 
-        // "is" edge
-        {
-            self.edge_ctx
-                .symbols
-                .insert(self.primitives.relations.is, self.primitives.edges.is);
-        }
-
-        // "identifies" edge
-        {
-            let edge_id = self.primitives.edges.identifies;
-            self.edge_ctx
-                .symbols
-                .insert(self.primitives.relations.id, edge_id);
-            self.edge_ctx
-                .symbols
-                .insert(self.primitives.relations.identifies, edge_id);
-        }
-
         self.seal_domain(ONTOL_PKG);
         self.repr_smoke_test();
     }

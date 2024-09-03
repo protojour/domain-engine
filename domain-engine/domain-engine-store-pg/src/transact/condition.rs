@@ -10,7 +10,7 @@ use tracing::{debug, error};
 
 use crate::{
     pg_error::PgError,
-    pg_model::{PgColumn, PgProperty, PgRegKey},
+    pg_model::{EdgeId, PgColumn, PgProperty, PgRegKey},
     sql::{self, WhereExt},
     sql_value::SqlScalar,
     transact::{data::Data, edge_query::edge_join_condition},
@@ -209,7 +209,8 @@ impl<'a> TransactCtx<'a> {
                         match path {
                             CondPathItem::EdgeJoin { proj, idx } => {
                                 let edge_alias = ctx.query_ctx.alias.incr();
-                                let pg_edge = self.pg_model.pg_domain_edgetable(&proj.id)?;
+                                let pg_edge =
+                                    self.pg_model.pg_domain_edgetable(&EdgeId(proj.edge_id))?;
                                 let pg_cardinal = pg_edge.table.edge_cardinal(*idx)?;
                                 from_item = sql::Join {
                                     first: from_item,
@@ -238,7 +239,9 @@ impl<'a> TransactCtx<'a> {
                     };
 
                     if let Some(outer_proj) = outer_proj {
-                        let pg_edge = self.pg_model.pg_domain_edgetable(&outer_proj.id)?;
+                        let pg_edge = self
+                            .pg_model
+                            .pg_domain_edgetable(&EdgeId(outer_proj.edge_id))?;
                         let pg_cardinal = pg_edge.table.edge_cardinal(outer_proj.subject)?;
                         let pg_outer = self
                             .pg_model
@@ -306,7 +309,7 @@ impl<'a> TransactCtx<'a> {
                     proj,
                     idx: CardinalIdx(0),
                 });
-                let edge = self.ontology.find_edge(proj.id).unwrap();
+                let edge = self.ontology.find_edge(proj.edge_id).unwrap();
 
                 match set_operator {
                     SetOperator::ElementIn => {

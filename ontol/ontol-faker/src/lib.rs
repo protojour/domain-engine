@@ -21,7 +21,7 @@ use ontol_runtime::{
     sequence::Sequence,
     tuple::EndoTuple,
     value::{OctetSequence, Serial, Value, ValueTag},
-    DefId, EdgeId,
+    DefId,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use regex_generate::Generator;
@@ -71,7 +71,7 @@ struct FakeGenerator<'a, R: Rng> {
     processor_mode: ProcessorMode,
 
     // A guard that prevents the generator from generating data for the same edge recursively
-    edge_saturation: HashSet<EdgeId>,
+    edge_saturation: HashSet<DefId>,
 }
 
 impl<'a, R: Rng> FakeGenerator<'a, R> {
@@ -254,11 +254,11 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     if let Some(data_relationship) = def.data_relationships.get(&property.id) {
                         if let DataRelationshipKind::Edge(projection) = data_relationship.kind {
                             // FIXME: Probably can't skip when the relationship is required
-                            if self.edge_saturation.contains(&projection.id) {
+                            if self.edge_saturation.contains(&projection.edge_id) {
                                 continue;
                             }
 
-                            self.edge_saturation.insert(projection.id);
+                            self.edge_saturation.insert(projection.edge_id);
                         }
                     }
 

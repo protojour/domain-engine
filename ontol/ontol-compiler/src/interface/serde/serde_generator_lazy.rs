@@ -22,6 +22,7 @@ use ontol_runtime::{
 use tracing::{debug, debug_span, warn};
 
 use crate::{
+    edge::EdgeId,
     misc::UnionDiscriminatorRole,
     phf_build::build_phf_index_map,
     properties::{identifies_any, Properties, Property},
@@ -154,7 +155,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         );
 
         let rel_params_addr = if let Some(edge_projection) = &meta.relationship.edge_projection {
-            let edge_id = edge_projection.id;
+            let edge_id = EdgeId(edge_projection.edge_id);
             let edge = self.edge_ctx.symbolic_edges.get(&edge_id).unwrap();
             if let Some((_, param_def_id)) = edge.find_parameter_cardinal() {
                 self.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(param_def_id, modifier.reset())))

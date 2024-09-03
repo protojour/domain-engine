@@ -10,7 +10,7 @@ use ontol_runtime::{
     },
     property::ValueCardinality,
     tuple::CardinalIdx,
-    DefId, DefPropTag, EdgeId, PackageId,
+    DefId, DefPropTag, PackageId,
 };
 use tracing::{error, info, trace_span, Instrument};
 
@@ -18,7 +18,7 @@ use crate::{
     migrate::{MigrationStep, PgDomain},
     pg_error::PgMigrationError,
     pg_model::{
-        PgEdgeCardinalKind, PgIndexType, PgProperty, PgPropertyData, PgRepr, PgTableIdUnion,
+        EdgeId, PgEdgeCardinalKind, PgIndexType, PgProperty, PgPropertyData, PgRepr, PgTableIdUnion,
     },
 };
 
@@ -203,7 +203,7 @@ async fn migrate_domain_edges_steps<'t>(
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
     let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
-    let mut data_def_ids: Vec<(EdgeId, DefId)> = vec![];
+    let mut param_def_ids: Vec<(EdgeId, DefId)> = vec![];
     for (edge_id, edge_info) in domain.edges() {
         let edge_tag = edge_id.1;
         let table_name = format!("e_{edge_tag}").into_boxed_str();
@@ -256,7 +256,7 @@ async fn migrate_domain_edges_steps<'t>(
                 }
                 let param_def_id = *cardinal.target.iter().next().unwrap();
 
-                data_def_ids.push((*edge_id, param_def_id));
+                param_def_ids.push((EdgeId(*edge_id), param_def_id));
 
                 PgEdgeCardinalKind::Parameters(param_def_id)
             };
@@ -309,7 +309,7 @@ async fn migrate_domain_edges_steps<'t>(
         }
     }
 
-    for (edge_id, data_def_id) in data_def_ids {
+    for (edge_id, data_def_id) in param_def_ids {
         migrate_datafields_steps(
             Stage::Edge,
             domain_ids,

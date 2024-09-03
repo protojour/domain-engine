@@ -3,13 +3,12 @@ use ontol_runtime::{
     ontology::domain::EdgeInfo,
     query::select::{Select, StructOrUnionSelect, StructSelect},
     tuple::CardinalIdx,
-    EdgeId,
 };
 use tracing::trace;
 
 use crate::{
     pg_error::{ds_err, PgInputError},
-    pg_model::{PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgTable},
+    pg_model::{EdgeId, PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgTable},
     sql,
 };
 

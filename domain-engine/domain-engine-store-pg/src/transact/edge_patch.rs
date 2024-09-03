@@ -11,7 +11,7 @@ use ontol_runtime::{
     query::select::Select,
     tuple::CardinalIdx,
     value::Value,
-    DefId, EdgeId, PropId,
+    DefId, PropId,
 };
 use postgres_types::ToSql;
 use tracing::{debug, trace};
@@ -19,7 +19,7 @@ use tracing::{debug, trace};
 use crate::{
     pg_error::{ds_bad_req, map_row_error, PgError, PgInputError, PgModelError},
     pg_model::{
-        InDomain, PgColumn, PgDataKey, PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind,
+        EdgeId, InDomain, PgColumn, PgDataKey, PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind,
         PgIndexType, PgRegKey, PgTable,
     },
     sql::{self, WhereExt},

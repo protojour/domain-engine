@@ -216,7 +216,7 @@ impl InMemoryStore {
         include_null: bool,
         ctx: &DbContext,
     ) -> DomainResult<AttrMatrix> {
-        let edge_store = self.edges.get(&projection.id).expect("No edge store");
+        let edge_store = self.edges.get(&projection.edge_id).expect("No edge store");
 
         let mut out = AttrMatrix::default();
 

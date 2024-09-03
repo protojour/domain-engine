@@ -9,7 +9,7 @@ use ontol_runtime::{
     },
     tuple::CardinalIdx,
     value::Value,
-    DefId, DefPropTag, EdgeId, OntolDefTag, PackageId, PropId,
+    DefId, DefPropTag, OntolDefTag, PackageId, PropId,
 };
 use postgres_types::ToSql;
 use tokio_postgres::types::FromSql;
@@ -24,6 +24,21 @@ pub type PgRegKey = i32;
 pub type PgDataKey = i64;
 
 pub type DomainUid = ulid::Ulid;
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub struct EdgeId(pub DefId);
+
+impl EdgeId {
+    #[inline]
+    pub fn pkg_id(&self) -> PackageId {
+        self.0 .0
+    }
+
+    #[inline]
+    pub fn def_id(&self) -> DefId {
+        self.0
+    }
+}
 
 pub enum PgTableKey {
     Data { pkg_id: PackageId, def_id: DefId },
@@ -85,7 +100,7 @@ impl PgModel {
     }
 
     pub(crate) fn pg_domain_edgetable(&self, edge_id: &EdgeId) -> DomainResult<PgDomainTable> {
-        let domain = self.pg_domain(edge_id.0)?;
+        let domain = self.pg_domain(edge_id.pkg_id())?;
         let datatable = self.edgetable(edge_id)?;
         Ok(PgDomainTable {
             domain,
@@ -107,8 +122,8 @@ impl PgModel {
 
     pub(crate) fn find_edgetable(&self, edge_id: &EdgeId) -> Option<&PgTable> {
         self.domains
-            .get(&edge_id.0)
-            .and_then(|pg_domain| pg_domain.edgetables.get(&edge_id.1))
+            .get(&edge_id.pkg_id())
+            .and_then(|pg_domain| pg_domain.edgetables.get(&edge_id.def_id().1))
     }
 
     pub(crate) fn edgetable(&self, edge_id: &EdgeId) -> DomainResult<&PgTable> {
@@ -204,7 +219,7 @@ impl PgDomain {
     pub fn get_table(&self, id: &PgTableIdUnion) -> Option<&PgTable> {
         match id {
             PgTableIdUnion::Def(def_id) => self.datatables.get(def_id),
-            PgTableIdUnion::Edge(edge_id) => self.edgetables.get(&edge_id.1),
+            PgTableIdUnion::Edge(edge_id) => self.edgetables.get(&edge_id.def_id().1),
         }
     }
 }

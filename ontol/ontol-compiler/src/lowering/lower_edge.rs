@@ -8,11 +8,11 @@ use ontol_parser::{
     },
     U32Span,
 };
-use ontol_runtime::{tuple::CardinalIdx, DefId, EdgeId, OntolDefTag};
+use ontol_runtime::{tuple::CardinalIdx, DefId, OntolDefTag};
 
 use crate::{
     def::DefKind,
-    edge::{CardinalKind, Slot, SymbolicEdge, SymbolicEdgeCardinal},
+    edge::{CardinalKind, EdgeId, Slot, SymbolicEdge, SymbolicEdgeCardinal},
     namespace::Space,
     CompileError,
 };
@@ -21,7 +21,6 @@ use super::context::{Coinage, CstLowering, RootDefs};
 
 struct EdgeBuilder<V> {
     edge_def_id: DefId,
-    edge_id: EdgeId,
     cardinal_name_table: HashMap<String, CardinalIdx>,
     slots: FnvHashMap<DefId, Slot>,
     cardinals: BTreeMap<CardinalIdx, SymbolicEdgeCardinal>,
@@ -56,21 +55,11 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
         let mut root_defs = vec![edge_def_id];
 
-        let edge_id = self
-            .ctx
-            .compiler
-            .edge_ctx
-            .alloc_edge_id(self.ctx.package_id);
-
-        self.ctx.set_def_kind(
-            edge_def_id,
-            DefKind::Edge(ident, edge_id),
-            ident_symbol.span(),
-        );
+        self.ctx
+            .set_def_kind(edge_def_id, DefKind::Edge(ident), ident_symbol.span());
 
         let mut edge_builder = EdgeBuilder {
             edge_def_id,
-            edge_id,
             slots: Default::default(),
             cardinals: Default::default(),
             clause_widths: Default::default(),
@@ -103,7 +92,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                                 .compiler
                                 .edge_ctx
                                 .symbols
-                                .insert(slot_def_id, edge_builder.edge_id);
+                                .insert(slot_def_id, EdgeId(edge_builder.edge_def_id));
 
                             root_defs.push(slot_def_id);
                             prev_cardinal = next_cardinal;
@@ -128,7 +117,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         }
 
         self.ctx.compiler.edge_ctx.symbolic_edges.insert(
-            edge_builder.edge_id,
+            EdgeId(edge_builder.edge_def_id),
             SymbolicEdge {
                 symbols: edge_builder.slots,
                 cardinals: edge_builder.cardinals,
@@ -136,7 +125,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             },
         );
 
-        Some((root_defs, edge_id, edge_builder.params))
+        Some((root_defs, EdgeId(edge_def_id), edge_builder.params))
     }
 
     fn next_edge_item(

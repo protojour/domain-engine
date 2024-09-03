@@ -19,7 +19,7 @@ use ontol_runtime::ontology::domain::EdgeCardinalFlags;
 use ontol_runtime::ontology::{config::DataStoreConfig, Ontology};
 use ontol_runtime::query::select::Select;
 use ontol_runtime::value::Value;
-use ontol_runtime::{DefId, EdgeId, PackageId};
+use ontol_runtime::{DefId, PackageId};
 use tokio::sync::RwLock;
 
 use constraint::ConstraintCheck;
@@ -61,7 +61,7 @@ impl InMemoryDb {
         system: ArcSystemApi,
     ) -> Self {
         let mut collections: FnvHashMap<DefId, VertexTable<DynamicKey>> = Default::default();
-        let mut hyper_edges: FnvHashMap<EdgeId, HyperEdgeTable> = Default::default();
+        let mut hyper_edges: FnvHashMap<DefId, HyperEdgeTable> = Default::default();
 
         for package_id in package_ids {
             let domain = ontology.find_domain(*package_id).unwrap();

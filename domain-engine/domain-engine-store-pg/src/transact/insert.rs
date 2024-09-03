@@ -21,7 +21,7 @@ use tracing::{debug, trace, warn};
 
 use crate::{
     pg_error::{map_row_error, PgError, PgInputError},
-    pg_model::{InDomain, PgDataKey, PgDomainTable, PgRepr},
+    pg_model::{EdgeId, InDomain, PgDataKey, PgDomainTable, PgRepr},
     sql::{self},
     sql_record::SqlColumnStream,
     sql_value::SqlScalar,
@@ -529,7 +529,7 @@ impl<'a> TransactCtx<'a> {
 
             match (rel_info.kind, pg_table.find_column(prop_id)) {
                 (DataRelationshipKind::Edge(proj), _) => {
-                    let patch = edge_patches.patch(proj.id, proj.subject);
+                    let patch = edge_patches.patch(EdgeId(proj.edge_id), proj.subject);
 
                     match attr {
                         Some(Attr::Unit(value)) => {
