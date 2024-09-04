@@ -60,7 +60,7 @@ pub enum ReprScalarKind {
     Boolean,
     Text,
     TextConstant(DefId),
-    Octets,
+    Octets(Option<ReprFormat>),
     DateTime,
     Other,
 }
@@ -80,7 +80,7 @@ impl ReprScalarKind {
             (Self::Text, Self::TextConstant(_)) => Self::Text,
             (Self::TextConstant(_), Self::Text) => Self::Text,
             (Self::TextConstant(_), Self::TextConstant(_)) => Self::Text,
-            (Self::Octets, Self::Octets) => Self::Octets,
+            (Self::Octets(format_a), Self::Octets(_format_b)) => Self::Octets(*format_a),
             (Self::DateTime, Self::DateTime) => Self::DateTime,
             _ => Self::Other,
         }
@@ -102,6 +102,13 @@ pub enum NumberResolution {
     Float,
     F32,
     F64,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
+pub enum ReprFormat {
+    Custom,
+    Hex,
+    Base64,
 }
 
 impl NumberResolution {
@@ -126,4 +133,5 @@ pub(super) struct ReprBuilder {
     pub type_params: FnvHashMap<DefId, TypeParam>,
 
     pub number_resolutions: IndexMap<NumberResolution, SourceSpan>,
+    pub formats: IndexMap<ReprFormat, SourceSpan>,
 }

@@ -819,7 +819,7 @@ fn make_scalar_def_repr(kind: &ReprScalarKind, serde_gen: &mut SerdeGenerator) -
             let constant = serde_gen.str_ctx.intern_constant(literal);
             DefRepr::TextConstant(constant)
         }
-        ReprScalarKind::Octets => DefRepr::Octets,
+        ReprScalarKind::Octets(_) => DefRepr::Octets,
         ReprScalarKind::DateTime => DefRepr::DateTime,
         ReprScalarKind::Other => DefRepr::Unknown,
     }

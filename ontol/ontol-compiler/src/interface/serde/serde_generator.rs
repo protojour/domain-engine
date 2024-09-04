@@ -445,8 +445,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 | PrimitiveKind::OpenDataRelationship
                 | PrimitiveKind::EdgeRelationship
                 | PrimitiveKind::FlatUnionRelationship
-                | PrimitiveKind::FormatHex
-                | PrimitiveKind::FormatBase64 => None,
+                | PrimitiveKind::Format => None,
             },
             Type::IntConstant(int) => Some(OperatorAllocation::Allocated(
                 self.alloc_addr(&def),

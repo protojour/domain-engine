@@ -9,6 +9,7 @@ use crate::{
     def::{BuiltinRelationKind, DefKind},
     error::CompileError,
     misc::RelObjectConstraint,
+    primitive::PrimitiveKind,
     thesaurus::TypeRelation,
     types::FormatType,
     Note,
@@ -53,7 +54,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         self.check_type_params(base_def_id, &mut repr, &mut checked_type_params)?;
                         Some(repr)
                     }
-                    ReprKind::Scalar(def_id, _, span) => {
+                    ReprKind::Scalar(def_id, _scalar_kind, span) => {
                         let def_id = *def_id;
                         let span = *span;
                         let mut base_defs: BTreeSet<DefId> = Default::default();
@@ -137,6 +138,28 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                 kind: ReprKind::Scalar(def_id, repr_scalar_kind, span),
                                 type_params: Default::default(),
                             })
+                        } else if base_def_id == OntolDefTag::Octets.def_id() {
+                            match &repr.kind {
+                                ReprKind::Scalar(_, ReprScalarKind::Octets(None), _) => {
+                                    if builder.formats.len() == 1 {
+                                        let (repr_format, _) =
+                                            builder.formats.iter().next().unwrap();
+                                        Some(Repr {
+                                            kind: ReprKind::Scalar(
+                                                def_id,
+                                                ReprScalarKind::Octets(Some(*repr_format)),
+                                                span,
+                                            ),
+                                            type_params: Default::default(),
+                                        })
+                                    } else {
+                                        // still abstract
+                                        None
+                                    }
+                                }
+                                // any other repr of octets (also with known format) is concrete
+                                _ => Some(repr),
+                            }
                         } else {
                             Some(repr)
                         }
@@ -222,7 +245,14 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         }
 
         if !has_supertypes {
-            output.insert(def_id);
+            match self.defs.def_kind(def_id) {
+                DefKind::Primitive(PrimitiveKind::Format, _) => {
+                    // format is not a base def, can be used "anywhere"
+                }
+                _ => {
+                    output.insert(def_id);
+                }
+            }
         }
     }
 

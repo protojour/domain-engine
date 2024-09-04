@@ -76,8 +76,7 @@ pub enum PrimitiveKind {
     OpenDataRelationship,
     EdgeRelationship,
     FlatUnionRelationship,
-    FormatHex,
-    FormatBase64,
+    Format,
 }
 
 impl PrimitiveKind {
@@ -263,10 +262,10 @@ fn register_ontol_def_tag(tag: OntolDefTag, defs: &mut Defs) {
             defs.add_ontol(tag, DefKind::BuiltinModule(&["format"]));
         }
         OntolDefTag::FormatHex => {
-            defs.add_primitive(tag, PrimitiveKind::FormatHex, &["format", "hex"]);
+            defs.add_primitive(tag, PrimitiveKind::Format, &["format", "hex"]);
         }
         OntolDefTag::FormatBase64 => {
-            defs.add_primitive(tag, PrimitiveKind::FormatBase64, &["format", "base64"]);
+            defs.add_primitive(tag, PrimitiveKind::Format, &["format", "base64"]);
         }
         OntolDefTag::_LastEntry => {}
     }

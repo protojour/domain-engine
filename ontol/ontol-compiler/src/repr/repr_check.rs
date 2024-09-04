@@ -9,9 +9,9 @@ use std::collections::{hash_map::Entry, HashMap};
 
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
-use ontol_runtime::{ontology::ontol::TextLikeType, DefId};
+use ontol_runtime::{ontology::ontol::TextLikeType, DefId, OntolDefTag};
 use ordered_float::NotNan;
-use tracing::{debug_span, trace};
+use tracing::{debug, debug_span, trace};
 
 use crate::{
     def::{Def, DefKind, Defs, TypeDefFlags},
@@ -29,7 +29,7 @@ use crate::{
 
 use super::{
     repr_ctx::ReprCtx,
-    repr_model::{NumberResolution, Repr, ReprBuilder, ReprKind, ReprScalarKind},
+    repr_model::{NumberResolution, Repr, ReprBuilder, ReprFormat, ReprKind, ReprScalarKind},
 };
 
 /// If there are repr problems in the ONTOL domain, turn this on.
@@ -267,6 +267,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             kind: None,
             number_resolutions: Default::default(),
             type_params: Default::default(),
+            formats: Default::default(),
         };
 
         for (def_id, data) in &mesh {
@@ -335,33 +336,56 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                     data,
                                 );
                             }
-                            PrimitiveKind::Integer => {
-                                self.merge_number_resolution(
+                            PrimitiveKind::Octets => {
+                                self.merge_repr(
                                     &mut builder,
-                                    NumberResolution::Integer,
-                                    data.rel_span,
+                                    leaf_def_id,
+                                    ReprKind::Scalar(
+                                        def_id,
+                                        ReprScalarKind::Octets(None),
+                                        data.rel_span,
+                                    ),
+                                    def_id,
+                                    data,
                                 );
+                            }
+                            PrimitiveKind::Integer => {
+                                builder
+                                    .number_resolutions
+                                    .entry(NumberResolution::Integer)
+                                    .or_insert(data.rel_span);
                             }
                             PrimitiveKind::Float => {
-                                self.merge_number_resolution(
-                                    &mut builder,
-                                    NumberResolution::Float,
-                                    data.rel_span,
-                                );
+                                builder
+                                    .number_resolutions
+                                    .entry(NumberResolution::Float)
+                                    .or_insert(data.rel_span);
                             }
                             PrimitiveKind::F32 => {
-                                self.merge_number_resolution(
-                                    &mut builder,
-                                    NumberResolution::F32,
-                                    data.rel_span,
-                                );
+                                builder
+                                    .number_resolutions
+                                    .entry(NumberResolution::F32)
+                                    .or_insert(data.rel_span);
                             }
                             PrimitiveKind::F64 => {
-                                self.merge_number_resolution(
-                                    &mut builder,
-                                    NumberResolution::F64,
-                                    data.rel_span,
-                                );
+                                builder
+                                    .number_resolutions
+                                    .entry(NumberResolution::F64)
+                                    .or_insert(data.rel_span);
+                            }
+                            PrimitiveKind::Format => {
+                                let repr_format = if def_id == OntolDefTag::FormatHex.def_id() {
+                                    Some(ReprFormat::Hex)
+                                } else if def_id == OntolDefTag::FormatBase64.def_id() {
+                                    Some(ReprFormat::Base64)
+                                } else {
+                                    debug!("unrecognized repr format");
+                                    None
+                                };
+
+                                if let Some(repr_format) = repr_format {
+                                    builder.formats.entry(repr_format).or_insert(data.rel_span);
+                                }
                             }
                             _ => {}
                         }
@@ -403,7 +427,9 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     // Some `ontol` types are "domain types" but still scalars
                     if let Some(text_like) = self.defs.text_like_types.get(&def_id) {
                         let scalar_kind = match text_like {
-                            TextLikeType::Ulid | TextLikeType::Uuid => ReprScalarKind::Octets,
+                            TextLikeType::Ulid | TextLikeType::Uuid => {
+                                ReprScalarKind::Octets(Some(ReprFormat::Custom))
+                            }
                             TextLikeType::DateTime => ReprScalarKind::DateTime,
                         };
 
@@ -724,15 +750,6 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         if self.state.do_trace {
             trace!("    tmp repr: {:?}", builder.kind);
         }
-    }
-
-    fn merge_number_resolution(
-        &mut self,
-        builder: &mut ReprBuilder,
-        resolution: NumberResolution,
-        span: SourceSpan,
-    ) {
-        builder.number_resolutions.entry(resolution).or_insert(span);
     }
 
     fn collect_thesaurus(&mut self, def_id: DefId) -> IndexMap<DefId, IsData> {
