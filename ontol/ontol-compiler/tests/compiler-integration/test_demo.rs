@@ -4,7 +4,7 @@ use ontol_runtime::interface::serde::{
     processor::ProcessorMode,
 };
 use ontol_test_utils::{
-    examples::{DEMO, GITMESH},
+    examples::{DEMO, FINDINGS, GITMESH},
     TestCompile,
 };
 use serde_json::json;
@@ -108,4 +108,9 @@ fn test_gitmesh() {
         panic!();
     };
     assert!(!org_op.flags.contains(SerdeStructFlags::PROPER_ENTITY));
+}
+
+#[test]
+fn test_findings() {
+    let _test = FINDINGS.1.compile();
 }

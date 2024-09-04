@@ -62,6 +62,7 @@ pub enum ReprScalarKind {
     TextConstant(DefId),
     Octets(ReprFormat),
     DateTime,
+    Vertex,
     Other,
 }
 

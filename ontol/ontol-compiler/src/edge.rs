@@ -5,7 +5,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use fnv::{FnvHashMap, FnvHashSet};
-use ontol_runtime::{ontology::ontol::TextConstant, tuple::CardinalIdx, DefId, PropId};
+use ontol_runtime::{
+    ontology::ontol::TextConstant, tuple::CardinalIdx, DefId, OntolDefTag, PropId,
+};
 use tracing::{debug, error};
 
 use crate::{
@@ -180,10 +182,12 @@ impl<'m> Compiler<'m> {
 
                 // step 3: edge entity check
                 for (def_id, prop_set) in var_members {
-                    if !self.entity_ctx.entities.contains_key(def_id) {
+                    if !self.entity_ctx.entities.contains_key(def_id)
+                        && *def_id != OntolDefTag::Vertex.def_id()
+                    {
                         let prop_id = prop_set.first().unwrap();
                         let property = self.prop_ctx.property_by_id(*prop_id).unwrap();
-                        CompileError::TODO("must be entity to participate in edge")
+                        CompileError::MustBeEntityToParticipateInEdge
                             .span(self.rel_ctx.span(property.rel_id))
                             .report(&mut self.errors);
                     }

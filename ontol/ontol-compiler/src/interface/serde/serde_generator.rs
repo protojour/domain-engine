@@ -440,6 +440,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     self.alloc_addr(&def),
                     SerdeOperator::String(def.def_id),
                 )),
+                PrimitiveKind::Vertex => Some(OperatorAllocation::Allocated(
+                    self.alloc_addr(&def),
+                    SerdeOperator::Octets(OctetsOperator {
+                        target_def_id: OntolDefTag::Vertex.def_id(),
+                        format: OntolDefTag::FormatBase64.def_id(),
+                    }),
+                )),
                 PrimitiveKind::Octets
                 | PrimitiveKind::DataStoreAddress
                 | PrimitiveKind::OpenDataRelationship

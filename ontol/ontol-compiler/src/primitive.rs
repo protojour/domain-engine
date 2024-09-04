@@ -69,7 +69,11 @@ pub enum PrimitiveKind {
     /// rel* is: text
     /// ```
     Text,
+    /// A sequence of octets.
     Octets,
+    /// Reference to some vertex.
+    /// The vertex can come from any domain.
+    Vertex,
     /// Address of something in a data store
     DataStoreAddress,
     /// Open relationship to domainless data
@@ -181,6 +185,9 @@ fn register_ontol_def_tag(tag: OntolDefTag, defs: &mut Defs) {
         }
         OntolDefTag::Octets => {
             defs.add_primitive(tag, PrimitiveKind::Octets, &["octets"]);
+        }
+        OntolDefTag::Vertex => {
+            defs.add_primitive(tag, PrimitiveKind::Vertex, &["vertex"]);
         }
         OntolDefTag::Uuid => {}
         OntolDefTag::Ulid => {}

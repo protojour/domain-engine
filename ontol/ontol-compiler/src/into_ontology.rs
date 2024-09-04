@@ -821,6 +821,7 @@ fn make_scalar_def_repr(kind: &ReprScalarKind, serde_gen: &mut SerdeGenerator) -
         }
         ReprScalarKind::Octets(_) => DefRepr::Octets,
         ReprScalarKind::DateTime => DefRepr::DateTime,
+        ReprScalarKind::Vertex => DefRepr::Vertex,
         ReprScalarKind::Other => DefRepr::Unknown,
     }
 }

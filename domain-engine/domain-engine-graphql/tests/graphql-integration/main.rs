@@ -7,6 +7,7 @@ use domain_engine_test_utils::{
 use ontol_runtime::ontology::Ontology;
 
 mod test_graphql_conduit;
+mod test_graphql_findings;
 mod test_graphql_gitmesh;
 mod test_graphql_input;
 mod test_graphql_misc;

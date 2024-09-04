@@ -229,6 +229,7 @@ pub enum DefRepr {
     /// It exists as a simplification for now:
     FmtStruct(Option<(PropId, DefId)>),
     Macro,
+    Vertex,
     Unknown,
 }
 

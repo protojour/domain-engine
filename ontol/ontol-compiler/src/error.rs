@@ -231,6 +231,8 @@ pub enum CompileError {
     ArcClauseExpectedSymbol,
     /// edge arity overflow
     EdgeArityOverflow,
+    /// must be entity to participate in edge
+    MustBeEntityToParticipateInEdge,
     /// existential variable is not associated with a definition
     ArcNoDefinitionForExistentialVar,
     /// BUG: {0}

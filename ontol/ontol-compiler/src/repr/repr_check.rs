@@ -349,6 +349,15 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                     data,
                                 );
                             }
+                            PrimitiveKind::Vertex => {
+                                self.merge_repr(
+                                    &mut builder,
+                                    leaf_def_id,
+                                    ReprKind::Scalar(def_id, ReprScalarKind::Vertex, data.rel_span),
+                                    def_id,
+                                    data,
+                                );
+                            }
                             PrimitiveKind::Integer => {
                                 builder
                                     .number_resolutions
