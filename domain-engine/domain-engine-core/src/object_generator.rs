@@ -2,7 +2,9 @@ use fnv::FnvHashMap;
 use ontol_runtime::{
     attr::Attr,
     interface::serde::{
-        operator::{AppliedVariants, SerdeOperator, SerdeOperatorAddr, SerdeProperty},
+        operator::{
+            AppliedVariants, OctetsOperator, SerdeOperator, SerdeOperatorAddr, SerdeProperty,
+        },
         processor::{ProcessorLevel, ProcessorMode},
     },
     ontology::{domain::Def, ontol::ValueGenerator, Ontology},
@@ -176,7 +178,11 @@ impl<'e> ObjectGenerator<'e> {
             | SerdeOperator::String(def_id)
             | SerdeOperator::StringConstant(_, def_id)
             | SerdeOperator::TextPattern(def_id)
-            | SerdeOperator::CapturingTextPattern(def_id) => *def_id,
+            | SerdeOperator::CapturingTextPattern(def_id)
+            | SerdeOperator::Octets(OctetsOperator {
+                target_def_id: def_id,
+                ..
+            }) => *def_id,
             SerdeOperator::DynamicSequence => panic!("DynamicSequence"),
             SerdeOperator::RelationList(_) | SerdeOperator::RelationIndexSet(_) => panic!(),
             SerdeOperator::ConstructorSequence(seq_op) => seq_op.def.def_id,

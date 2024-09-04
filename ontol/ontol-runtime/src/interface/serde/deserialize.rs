@@ -22,6 +22,7 @@ use crate::{
 use super::{
     deserialize_patch::GraphqlPatchVisitor,
     matcher::{
+        octets_matcher::OctetsMatcher,
         primitive_matchers::{BooleanMatcher, NumberMatcher, UnitMatcher},
         sequence_matcher::{SequenceKind, SequenceRangesMatcher},
         text_matchers::{
@@ -158,6 +159,11 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                     def_id: *def_id,
                 }
                 .into_visitor_no_params(self),
+            ),
+            // TODO: octets matcher could use deserialize_any, so it can also accept bytes proper?
+            (SerdeOperator::Octets(octets_op), _) => deserializer.deserialize_str(
+                OctetsMatcher::new(octets_op.target_def_id, octets_op.format)
+                    .into_visitor_no_params(self),
             ),
             (SerdeOperator::TextPattern(def_id), _) => deserializer.deserialize_str(
                 TextPatternMatcher {

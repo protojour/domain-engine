@@ -1000,7 +1000,8 @@ pub(super) fn get_native_scalar_kind(
         SerdeOperator::I64(..) => panic!("Must be a custom scalar"),
         SerdeOperator::I32(def_id, _) => NativeScalarKind::Int(*def_id),
         SerdeOperator::F64(def_id, _) => NativeScalarKind::Number(*def_id),
-        SerdeOperator::String(_)
+        SerdeOperator::Octets(_)
+        | SerdeOperator::String(_)
         | SerdeOperator::StringConstant(..)
         | SerdeOperator::TextPattern(_)
         | SerdeOperator::CapturingTextPattern(_)

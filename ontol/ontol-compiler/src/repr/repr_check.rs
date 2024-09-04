@@ -342,7 +342,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                     leaf_def_id,
                                     ReprKind::Scalar(
                                         def_id,
-                                        ReprScalarKind::Octets(None),
+                                        ReprScalarKind::Octets(ReprFormat::Unspecified),
                                         data.rel_span,
                                     ),
                                     def_id,
@@ -428,7 +428,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     if let Some(text_like) = self.defs.text_like_types.get(&def_id) {
                         let scalar_kind = match text_like {
                             TextLikeType::Ulid | TextLikeType::Uuid => {
-                                ReprScalarKind::Octets(Some(ReprFormat::Custom))
+                                ReprScalarKind::Octets(ReprFormat::TextLike)
                             }
                             TextLikeType::DateTime => ReprScalarKind::DateTime,
                         };

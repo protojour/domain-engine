@@ -7,6 +7,7 @@ use crate::value::Value;
 use self::sequence_matcher::SequenceRangesMatcher;
 
 pub mod map_matcher;
+pub mod octets_matcher;
 pub mod primitive_matchers;
 pub mod sequence_matcher;
 pub mod text_matchers;

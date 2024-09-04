@@ -6,7 +6,7 @@ use ontol_runtime::{
         ProcessorLevel, ProcessorMode, ProcessorProfile, ProcessorProfileFlags, ScalarFormat,
         SpecialProperty,
     },
-    value::Value,
+    value::{OctetSequence, Value},
 };
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches,
@@ -321,6 +321,45 @@ fn test_serde_uuid() {
         assert_error_msg!(
             serde_create(&my_id).to_value(json!("foobar")),
             r#"invalid type: string "foobar", expected `uuid` at line 1 column 8"#
+        );
+    });
+}
+
+#[test]
+fn test_serde_octets() {
+    "
+    def hex (
+        rel* is: octets
+        rel* is: ontol.format.hex
+    )
+    def base64 (
+        rel* is: octets
+        rel* is: ontol.format.base64
+    )
+    "
+    .compile_then(|test| {
+        let [hex, base64] = test.bind(["hex", "base64"]);
+
+        // hex
+        assert_matches!(
+            serde_create(&hex).to_value(json!("2a")),
+            Ok(Value::OctetSequence(OctetSequence(_), _))
+        );
+        assert_json_io_matches!(serde_create(&hex), "2a");
+        assert_error_msg!(
+            serde_create(&hex).to_value(json!("bGlnaHQgd29yay4=")),
+            r#"invalid type: string "bGlnaHQgd29yay4=", expected hex at line 1 column 18"#
+        );
+
+        // base64
+        assert_matches!(
+            serde_create(&base64).to_value(json!("bGlnaHQgd29yay4=")),
+            Ok(Value::OctetSequence(OctetSequence(_), _))
+        );
+        assert_json_io_matches!(serde_create(&base64), "bGlnaHQgd29yay4=");
+        assert_error_msg!(
+            serde_create(&base64).to_value(json!("2a")),
+            r#"invalid type: string "2a", expected base64 at line 1 column 4"#
         );
     });
 }

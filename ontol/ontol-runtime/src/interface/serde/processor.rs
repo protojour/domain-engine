@@ -411,6 +411,7 @@ impl<'on, 'p> Display for SerdeProcessor<'on, 'p> {
                 None => write!(f, "`float`"),
             },
             SerdeOperator::Serial(_) => write!(f, "`serial`"),
+            SerdeOperator::Octets(_) => write!(f, "`octets`"),
             SerdeOperator::String(_) => write!(f, "`string`"),
             SerdeOperator::StringConstant(constant, _) => {
                 DoubleQuote(&self.ontology[*constant]).fmt(f)

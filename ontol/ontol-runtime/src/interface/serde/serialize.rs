@@ -1,3 +1,4 @@
+use base64::Engine;
 use fnv::FnvHashMap;
 use serde::{
     ser::{Error, SerializeMap, SerializeSeq},
@@ -20,6 +21,7 @@ use crate::{
 };
 
 use super::{
+    matcher::octets_matcher::OctetsFormat,
     operator::{SequenceRange, SerdeOperator, SerdePropertyKind, SerdeStructFlags},
     processor::{ProcessorProfileFlags, SerdeProcessor, SpecialProperty, SubProcessorContext},
     serialize_raw::RawProxy,
@@ -81,6 +83,9 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             }
             (SerdeOperator::Serial(def_id), ScalarFormat::DomainTransparent, AttrRef::Unit(v)) => {
                 self.serialize_as_text_formatted(v, *def_id, serializer)
+            }
+            (SerdeOperator::Octets(octets_op), _, AttrRef::Unit(Value::OctetSequence(seq, _))) => {
+                self.serialize_octets(&seq.0, octets_op.format, serializer)
             }
             (
                 SerdeOperator::I32(def_id, ..)
@@ -193,6 +198,25 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 self.serialize_struct(struct_op, attr, serializer)
             }
             (_, _, attr) => panic!("unknown serializer combination: {self:?} attr: {attr:?}"),
+        }
+    }
+
+    fn serialize_octets<S: Serializer>(
+        &self,
+        bytes: &[u8],
+        format: DefId,
+        serializer: S,
+    ) -> Res<S> {
+        match OctetsFormat::from_format_def(format) {
+            OctetsFormat::Unknown => serializer.serialize_str(""),
+            OctetsFormat::Hex => {
+                let hex = hex::encode(bytes);
+                serializer.serialize_str(&hex)
+            }
+            OctetsFormat::Base64 => {
+                let base64 = base64::engine::general_purpose::STANDARD.encode(bytes);
+                serializer.serialize_str(&base64)
+            }
         }
     }
 

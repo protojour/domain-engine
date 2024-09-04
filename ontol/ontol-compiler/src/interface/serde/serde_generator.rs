@@ -10,9 +10,9 @@ use ontol_runtime::{
         discriminator::LeafDiscriminant,
         serde::{
             operator::{
-                AliasOperator, ConstructorSequenceOperator, RelationSequenceOperator,
-                SequenceRange, SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdeStructFlags,
-                StructOperator,
+                AliasOperator, ConstructorSequenceOperator, OctetsOperator,
+                RelationSequenceOperator, SequenceRange, SerdeOperator, SerdeOperatorAddr,
+                SerdeProperty, SerdeStructFlags, StructOperator,
             },
             SerdeDef, SerdeModifier,
         },
@@ -20,7 +20,7 @@ use ontol_runtime::{
     ontology::ontol::TextConstant,
     phf::PhfKey,
     property::{Cardinality, PropertyCardinality, ValueCardinality},
-    DefId,
+    DefId, OntolDefTag,
 };
 use tracing::{debug, debug_span, error, trace, warn};
 
@@ -38,7 +38,7 @@ use crate::{
     relation::{rel_def_meta, RelCtx, UnionMemberCache},
     repr::{
         repr_ctx::ReprCtx,
-        repr_model::{ReprKind, ReprScalarKind},
+        repr_model::{ReprFormat, ReprKind, ReprScalarKind},
     },
     strings::StringCtx,
     text_patterns::{TextPatternSegment, TextPatterns},
@@ -580,6 +580,24 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             Some(f64_range)
                         },
                     ),
+                ))
+            }
+            ReprKind::Scalar(_def_id, ReprScalarKind::Octets(ReprFormat::Hex), _span) => {
+                Some(OperatorAllocation::Allocated(
+                    self.alloc_addr(&def),
+                    SerdeOperator::Octets(OctetsOperator {
+                        target_def_id: def.def_id,
+                        format: OntolDefTag::FormatHex.def_id(),
+                    }),
+                ))
+            }
+            ReprKind::Scalar(_def_id, ReprScalarKind::Octets(ReprFormat::Base64), _span) => {
+                Some(OperatorAllocation::Allocated(
+                    self.alloc_addr(&def),
+                    SerdeOperator::Octets(OctetsOperator {
+                        target_def_id: def.def_id,
+                        format: OntolDefTag::FormatBase64.def_id(),
+                    }),
                 ))
             }
             ReprKind::FmtStruct(..) => {

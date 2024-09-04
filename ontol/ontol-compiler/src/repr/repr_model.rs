@@ -60,7 +60,7 @@ pub enum ReprScalarKind {
     Boolean,
     Text,
     TextConstant(DefId),
-    Octets(Option<ReprFormat>),
+    Octets(ReprFormat),
     DateTime,
     Other,
 }
@@ -106,7 +106,8 @@ pub enum NumberResolution {
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
 pub enum ReprFormat {
-    Custom,
+    Unspecified,
+    TextLike,
     Hex,
     Base64,
 }

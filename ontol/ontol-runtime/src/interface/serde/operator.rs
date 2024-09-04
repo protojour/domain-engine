@@ -50,6 +50,8 @@ pub enum SerdeOperator {
     String(DefId),
     StringConstant(TextConstant, DefId),
 
+    Octets(OctetsOperator),
+
     /// Always deserializes into text, ignores capture groups:
     TextPattern(DefId),
 
@@ -92,6 +94,12 @@ impl OntologyInit for SerdeOperator {
             struct_op.properties.ontology_init(ontology);
         }
     }
+}
+
+#[derive(Serialize, Deserialize, OntolDebug)]
+pub struct OctetsOperator {
+    pub target_def_id: DefId,
+    pub format: DefId,
 }
 
 #[derive(Serialize, Deserialize, OntolDebug)]

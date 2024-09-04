@@ -351,7 +351,8 @@ fn serialize_schema_inline<S: Serializer>(
                 map.serialize_entry("description", docs)?;
             }
         }
-        SerdeOperator::String(_) | SerdeOperator::Serial(_) => {
+        SerdeOperator::String(_) | SerdeOperator::Serial(_) | SerdeOperator::Octets(_) => {
+            // note: octets is always encoded as a string in JSON, but we could expose the formatting
             map.serialize_entry("type", "string")?;
             if let Some(docs) = ctx.docs {
                 map.serialize_entry("description", docs)?;
@@ -491,6 +492,7 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
             | SerdeOperator::I32(..)
             | SerdeOperator::F64(..)
             | SerdeOperator::Serial(..)
+            | SerdeOperator::Octets(_)
             | SerdeOperator::String(_)
             | SerdeOperator::StringConstant(..)
             | SerdeOperator::TextPattern(_)
@@ -790,6 +792,7 @@ impl SchemaGraphBuilder {
             | SerdeOperator::I32(..)
             | SerdeOperator::F64(..)
             | SerdeOperator::Serial(_)
+            | SerdeOperator::Octets(_)
             | SerdeOperator::String(_)
             | SerdeOperator::StringConstant(..)
             | SerdeOperator::TextPattern(_)

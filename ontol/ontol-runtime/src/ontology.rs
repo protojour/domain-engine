@@ -340,6 +340,7 @@ impl Ontology {
             | SerdeOperator::I64(..)
             | SerdeOperator::F64(..)
             | SerdeOperator::Serial(_)
+            | SerdeOperator::Octets(_)
             | SerdeOperator::String(_) => None,
             SerdeOperator::StringConstant(text_constant, def_id) => {
                 Some(Value::Text(self[*text_constant].into(), (*def_id).into()))

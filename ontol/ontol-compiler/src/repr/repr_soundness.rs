@@ -17,7 +17,7 @@ use crate::{
 
 use super::{
     repr_check::{IsData, ReprCheck},
-    repr_model::{NumberResolution, Repr, ReprBuilder, ReprKind, ReprScalarKind},
+    repr_model::{NumberResolution, Repr, ReprBuilder, ReprFormat, ReprKind, ReprScalarKind},
 };
 
 impl<'c, 'm> ReprCheck<'c, 'm> {
@@ -140,14 +140,18 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                             })
                         } else if base_def_id == OntolDefTag::Octets.def_id() {
                             match &repr.kind {
-                                ReprKind::Scalar(_, ReprScalarKind::Octets(None), _) => {
+                                ReprKind::Scalar(
+                                    _,
+                                    ReprScalarKind::Octets(ReprFormat::Unspecified),
+                                    _,
+                                ) => {
                                     if builder.formats.len() == 1 {
                                         let (repr_format, _) =
                                             builder.formats.iter().next().unwrap();
                                         Some(Repr {
                                             kind: ReprKind::Scalar(
                                                 def_id,
-                                                ReprScalarKind::Octets(Some(*repr_format)),
+                                                ReprScalarKind::Octets(*repr_format),
                                                 span,
                                             ),
                                             type_params: Default::default(),

@@ -132,6 +132,17 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     (*def_id).into(),
                 )
             }
+            SerdeOperator::Octets(octets_op) => {
+                let len = self.rng.gen_range(0usize..1000);
+                let mut bytes: Vec<u8> = Vec::with_capacity(len);
+
+                for _ in 0..len {
+                    bytes.push(self.rng.r#gen());
+                }
+
+                let seq = OctetSequence(bytes.into());
+                Value::OctetSequence(seq, octets_op.target_def_id.into())
+            }
             SerdeOperator::Serial(def_id) => {
                 Value::Serial(Serial(self.rng.gen()), (*def_id).into())
             }

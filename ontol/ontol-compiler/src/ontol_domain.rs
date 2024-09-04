@@ -336,7 +336,7 @@ impl<'m> Compiler<'m> {
         let def_id = self.defs.add_ontol(
             tag,
             DefKind::Type(TypeDef {
-                ident: path.last().map(|ident| *ident),
+                ident: path.last().copied(),
                 rel_type_for: None,
                 flags: TypeDefFlags::PUBLIC | TypeDefFlags::CONCRETE,
             }),
