@@ -1,0 +1,16 @@
+domain 01J6YRT0EB97ZY7NCDDBX00YXK ()
+
+def FindingSession (
+    rel. 'id'[rel* gen: auto]: (rel* is: uuid)
+    rel* 'name': text
+    rel* Finding.findings?: {vertex}
+)
+
+arc Finding {
+    (session) findings: (v)
+}
+
+map findings(
+    (),
+    FindingSession { ..@match FindingSession() }
+)
