@@ -355,11 +355,15 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         ))?;
 
         // FIXME: What about unions?
-        let to_entity = self
+        let mut to_entity = self
             .prop_ctx
             .properties_by_def_id(def.def_id)
             .map(|properties| properties.identified_by.is_some())
             .unwrap_or(false);
+
+        if def.def_id == OntolDefTag::Vertex.def_id() {
+            to_entity = true;
+        }
 
         Some((
             self.alloc_addr_for_key(&key),

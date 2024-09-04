@@ -683,6 +683,49 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
     }
 
     #[inline]
+    pub fn get_arg<T>(
+        &mut self,
+        name: &str,
+        type_ref: TypeRef,
+        typing_purpose: TypingPurpose,
+    ) -> juniper::meta::Argument<'r, GqlScalar>
+    where
+        T: juniper::GraphQLType<GqlScalar>
+            + juniper::FromInputValue<GqlScalar>
+            + juniper::GraphQLValue<GqlScalar, TypeInfo = SchemaType>,
+    {
+        match type_ref.unit {
+            UnitTypeRef::Addr(type_addr) => self.modified_arg::<T>(
+                name,
+                type_ref.modifier,
+                &SchemaType {
+                    schema_ctx: self.schema_ctx.clone(),
+                    type_addr,
+                    typing_purpose,
+                },
+            ),
+            UnitTypeRef::NativeScalar(scalar_ref) => match &scalar_ref.kind {
+                NativeScalarKind::Unit => {
+                    todo!("Unit type")
+                }
+                NativeScalarKind::Boolean => {
+                    self.modified_arg::<bool>(name, type_ref.modifier, &())
+                }
+                NativeScalarKind::Int(_) => self.modified_arg::<i32>(name, type_ref.modifier, &()),
+                NativeScalarKind::Number(_) => {
+                    self.modified_arg::<f64>(name, type_ref.modifier, &())
+                }
+                NativeScalarKind::String => {
+                    self.modified_arg::<std::string::String>(name, type_ref.modifier, &())
+                }
+                NativeScalarKind::ID => {
+                    self.modified_arg::<juniper::ID>(name, type_ref.modifier, &())
+                }
+            },
+        }
+    }
+
+    #[inline]
     fn modified_type<T>(
         &mut self,
         def: &<T as GraphQLValue<GqlScalar>>::TypeInfo,

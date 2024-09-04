@@ -51,79 +51,85 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             QLevel::Edge { rel_params } => {
                 let def = self.partial_ontology.def(def_id);
                 let node_ref = self.gen_def_type_ref(def_id, QLevel::Node);
-                let node_type_addr = node_ref.unwrap_addr();
+                match node_ref {
+                    UnitTypeRef::Addr(node_type_addr) => {
+                        let mut field_namespace = GraphqlNamespace::default();
 
-                let mut field_namespace = GraphqlNamespace::default();
+                        // FIXME: what if some of the relation data's fields are called "node"
+                        let fields: PhfIndexMap<FieldData> = build_phf_index_map([(
+                            self.serde_gen
+                                .str_ctx
+                                .make_phf_key(&field_namespace.unique_literal("node")),
+                            FieldData {
+                                kind: FieldKind::Node,
+                                field_type: TypeRef::mandatory(node_ref),
+                            },
+                        )]);
 
-                // FIXME: what if some of the relation data's fields are called "node"
-                let fields: PhfIndexMap<FieldData> = build_phf_index_map([(
-                    self.serde_gen
-                        .str_ctx
-                        .make_phf_key(&field_namespace.unique_literal("node")),
-                    FieldData {
-                        kind: FieldKind::Node,
-                        field_type: TypeRef::mandatory(node_ref),
-                    },
-                )]);
+                        let node_operator_addr =
+                            self.serde_gen.gen_addr_lazy(gql_serde_key(def.id)).unwrap();
 
-                let node_operator_addr =
-                    self.serde_gen.gen_addr_lazy(gql_serde_key(def.id)).unwrap();
+                        if let Some((rel_def_id, _operator_addr)) = rel_params {
+                            let rel_edge_ref = self.gen_def_type_ref(rel_def_id, QLevel::Node);
 
-                if let Some((rel_def_id, _operator_addr)) = rel_params {
-                    let rel_edge_ref = self.gen_def_type_ref(rel_def_id, QLevel::Node);
+                            let typename = self.mk_typename(|namespace, ctx| {
+                                namespace.edge(Some(rel_def_id), def_id, ctx)
+                            });
 
-                    let typename = self.mk_typename(|namespace, ctx| {
-                        namespace.edge(Some(rel_def_id), def_id, ctx)
-                    });
-
-                    NewType::TypeData(
-                        TypeData {
-                            typename,
-                            input_typename: Some(self.mk_typename(|namespace, ctx| {
-                                namespace.edge_input(Some(rel_def_id), def_id, ctx)
-                            })),
-                            partial_input_typename: None,
-                            kind: TypeKind::Object(ObjectData {
-                                fields,
-                                kind: ObjectKind::Edge(EdgeData {
-                                    node_type_addr,
-                                    node_operator_addr,
-                                    rel_edge_ref: Some(rel_edge_ref),
-                                }),
-                                interface: ObjectInterface::Implements(thin_vec![]),
-                            }),
-                        },
-                        NewTypeActions {
-                            harvest_fields: Some((rel_def_id, PropertyFieldProducer::EdgeProperty)),
-                        },
-                    )
-                } else {
-                    NewType::TypeData(
-                        TypeData {
-                            typename: self
-                                .mk_typename(|namespace, ctx| namespace.edge(None, def_id, ctx)),
-                            input_typename: Some(self.mk_typename(|namespace, ctx| {
-                                namespace.edge_input(None, def_id, ctx)
-                            })),
-                            partial_input_typename: None,
-                            kind: TypeKind::Object(ObjectData {
-                                fields,
-                                kind: ObjectKind::Edge(EdgeData {
-                                    node_type_addr,
-                                    node_operator_addr,
-                                    rel_edge_ref: None,
-                                }),
-                                interface: ObjectInterface::Implements(thin_vec![]),
-                            }),
-                        },
-                        NewTypeActions::default(),
-                    )
+                            NewType::TypeData(
+                                TypeData {
+                                    typename,
+                                    input_typename: Some(self.mk_typename(|namespace, ctx| {
+                                        namespace.edge_input(Some(rel_def_id), def_id, ctx)
+                                    })),
+                                    partial_input_typename: None,
+                                    kind: TypeKind::Object(ObjectData {
+                                        fields,
+                                        kind: ObjectKind::Edge(EdgeData {
+                                            node_type_addr,
+                                            node_operator_addr,
+                                            rel_edge_ref: Some(rel_edge_ref),
+                                        }),
+                                        interface: ObjectInterface::Implements(thin_vec![]),
+                                    }),
+                                },
+                                NewTypeActions {
+                                    harvest_fields: Some((
+                                        rel_def_id,
+                                        PropertyFieldProducer::EdgeProperty,
+                                    )),
+                                },
+                            )
+                        } else {
+                            NewType::TypeData(
+                                TypeData {
+                                    typename: self.mk_typename(|namespace, ctx| {
+                                        namespace.edge(None, def_id, ctx)
+                                    }),
+                                    input_typename: Some(self.mk_typename(|namespace, ctx| {
+                                        namespace.edge_input(None, def_id, ctx)
+                                    })),
+                                    partial_input_typename: None,
+                                    kind: TypeKind::Object(ObjectData {
+                                        fields,
+                                        kind: ObjectKind::Edge(EdgeData {
+                                            node_type_addr,
+                                            node_operator_addr,
+                                            rel_edge_ref: None,
+                                        }),
+                                        interface: ObjectInterface::Implements(thin_vec![]),
+                                    }),
+                                },
+                                NewTypeActions::default(),
+                            )
+                        }
+                    }
+                    UnitTypeRef::NativeScalar(scalar_ref) => NewType::NativeScalar(scalar_ref),
                 }
             }
             QLevel::Connection { rel_params } => {
                 let edge_ref = self.gen_def_type_ref(def_id, QLevel::Edge { rel_params });
                 let node_ref = self.gen_def_type_ref(def_id, QLevel::Node);
-                let node_type_addr = node_ref.unwrap_addr();
 
                 let rel_params_def_id = rel_params.map(|(def_id, _)| def_id);
 
@@ -185,7 +191,9 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                     },
                                 ),
                             ]),
-                            kind: ObjectKind::Connection(ConnectionData { node_type_addr }),
+                            kind: ObjectKind::Connection(ConnectionData {
+                                node_type_ref: node_ref,
+                            }),
                             interface: ObjectInterface::Implements(thin_vec![]),
                         }),
                     },
@@ -861,6 +869,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                             .unwrap_or(false)
                     })
                 }
+                Some(ReprKind::Scalar(_, ReprScalarKind::Vertex, _)) => true,
                 _ => value_properties
                     .map(|properties| properties.identified_by.is_some())
                     .unwrap_or(false),

@@ -87,7 +87,7 @@ async fn findings(ds: &str) {
         FindingSession(
             update: [{
                 id: $sessionId
-                findings: [$found]
+                findings: { add: [$found] }
             }]
         ) {
             node {

@@ -64,7 +64,9 @@ impl UnitTypeRef {
     pub fn unwrap_addr(&self) -> TypeAddr {
         match self {
             Self::Addr(addr) => *addr,
-            Self::NativeScalar(_) => panic!("Cannot get addr from native scalar"),
+            Self::NativeScalar(scalar_ref) => {
+                panic!("Cannot get addr from native scalar: {scalar_ref:?}")
+            }
         }
     }
 }
@@ -237,7 +239,7 @@ pub struct EdgeData {
 
 #[derive(Serialize, Deserialize)]
 pub struct ConnectionData {
-    pub node_type_addr: TypeAddr,
+    pub node_type_ref: UnitTypeRef,
 }
 
 #[derive(Serialize, Deserialize)]

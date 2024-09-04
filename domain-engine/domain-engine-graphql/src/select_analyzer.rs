@@ -7,7 +7,7 @@ use ontol_runtime::{
         argument::{AfterArg, FieldArg, FirstArg, MapInputArg},
         data::{
             ConnectionData, EdgeData, FieldData, FieldKind, NodeData, ObjectData, ObjectKind,
-            TypeData, TypeKind, TypeModifier,
+            TypeData, TypeKind, TypeModifier, UnitTypeRef,
         },
     },
     query::{
@@ -616,7 +616,9 @@ impl<'a> SelectAnalyzer<'a> {
     ) -> Result<Select, FieldError<GqlScalar>> {
         match &object_data.kind {
             ObjectKind::Edge(EdgeData { node_type_addr, .. })
-            | ObjectKind::Connection(ConnectionData { node_type_addr }) => {
+            | ObjectKind::Connection(ConnectionData {
+                node_type_ref: UnitTypeRef::Addr(node_type_addr),
+            }) => {
                 let type_data = self.schema_ctx.type_data(*node_type_addr);
 
                 self.analyze_data(LookAheadChildren::default(), &type_data.kind)

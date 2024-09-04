@@ -88,36 +88,42 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
                 reg.build_input_object_meta_type(info, &arguments)
             }
             TypeKind::Object(ObjectData {
-                kind: ObjectKind::Connection(ConnectionData { node_type_addr }),
+                kind: ObjectKind::Connection(ConnectionData { node_type_ref }),
                 ..
             }) => {
                 let arguments = vec![
-                    reg.modified_arg::<InputType>(
+                    reg.get_arg::<InputType>(
                         "add",
-                        TypeModifier::Array {
-                            array: Optionality::Optional,
-                            element: Optionality::Mandatory,
+                        TypeRef {
+                            modifier: TypeModifier::Array {
+                                array: Optionality::Optional,
+                                element: Optionality::Mandatory,
+                            },
+                            unit: *node_type_ref,
                         },
-                        &reg.schema_ctx
-                            .get_schema_type(*node_type_addr, TypingPurpose::InputOrReference),
+                        TypingPurpose::InputOrReference,
                     ),
-                    reg.modified_arg::<InputType>(
+                    reg.get_arg::<InputType>(
                         "update",
-                        TypeModifier::Array {
-                            array: Optionality::Optional,
-                            element: Optionality::Mandatory,
+                        TypeRef {
+                            modifier: TypeModifier::Array {
+                                array: Optionality::Optional,
+                                element: Optionality::Mandatory,
+                            },
+                            unit: *node_type_ref,
                         },
-                        &reg.schema_ctx
-                            .get_schema_type(*node_type_addr, TypingPurpose::PartialInput),
+                        TypingPurpose::PartialInput,
                     ),
-                    reg.modified_arg::<InputType>(
+                    reg.get_arg::<InputType>(
                         "remove",
-                        TypeModifier::Array {
-                            array: Optionality::Optional,
-                            element: Optionality::Mandatory,
+                        TypeRef {
+                            modifier: TypeModifier::Array {
+                                array: Optionality::Optional,
+                                element: Optionality::Mandatory,
+                            },
+                            unit: *node_type_ref,
                         },
-                        &reg.schema_ctx
-                            .get_schema_type(*node_type_addr, TypingPurpose::PartialInput),
+                        TypingPurpose::PartialInput,
                     ),
                 ];
 
