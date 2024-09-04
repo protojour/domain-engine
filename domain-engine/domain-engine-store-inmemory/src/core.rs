@@ -11,7 +11,7 @@ use ontol_runtime::{
     },
     tuple::CardinalIdx,
     value::{Serial, Value},
-    DefId, PropId,
+    DefId, OntolDefTag, PropId,
 };
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
@@ -89,6 +89,7 @@ impl<K: AsRef<DynamicKey>> AsRef<DynamicKey> for VertexKey<K> {
 pub enum EdgeColumnMatch {
     VertexIdOf(DefId),
     VertexValue(DefId),
+    VertexRef(VertexKey<DynamicKey>),
     EdgeValue,
 }
 
@@ -97,15 +98,25 @@ impl InMemoryStore {
         &self,
         edge_id: DefId,
         cardinal_idx: CardinalIdx,
-        value_def_id: DefId,
+        value: &Value,
         ctx: &DbContext,
-    ) -> EdgeColumnMatch {
+    ) -> DomainResult<EdgeColumnMatch> {
         let edge_store = self.edges.get(&edge_id).expect("no edge store");
         let column = &edge_store.columns[cardinal_idx.0 as usize];
+        let value_def_id = value.type_def_id();
         match &column.data {
             EdgeVectorData::Keys(_) => {
-                if column.vertex_union.contains(&value_def_id) {
-                    EdgeColumnMatch::VertexValue(value_def_id)
+                if value_def_id == OntolDefTag::Vertex.def_id() {
+                    let Value::OctetSequence(seq, _) = value else {
+                        return Err(DomainError::data_store_bad_request("bad vertex type"));
+                    };
+
+                    let vertex_key = bincode::deserialize::<VertexKey<DynamicKey>>(&seq.0)
+                        .map_err(|_| DomainError::data_store_bad_request("bad vertex encoding"))?;
+
+                    Ok(EdgeColumnMatch::VertexRef(vertex_key))
+                } else if column.vertex_union.contains(&value_def_id) {
+                    Ok(EdgeColumnMatch::VertexValue(value_def_id))
                 } else {
                     let vertex_def_id = column
                         .vertex_union
@@ -118,10 +129,10 @@ impl InMemoryStore {
                             panic!("cardinal {cardinal_idx}: Corresponding entity def id not found for the given ID {value_def_id:?}. vertex_union = {:?}", column.vertex_union)
                         });
 
-                    EdgeColumnMatch::VertexIdOf(*vertex_def_id)
+                    Ok(EdgeColumnMatch::VertexIdOf(*vertex_def_id))
                 }
             }
-            EdgeVectorData::Values(_) => EdgeColumnMatch::EdgeValue,
+            EdgeVectorData::Values(_) => Ok(EdgeColumnMatch::EdgeValue),
         }
     }
 

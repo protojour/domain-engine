@@ -312,6 +312,12 @@ impl<'a> SelectAnalyzer<'a> {
                     select: self.analyze_data(look_ahead.children(), &type_data.kind)?,
                 }))
             }
+            (FieldKind::Node | FieldKind::Nodes, Err(_scalar_ref)) => {
+                Ok(Some(KeyedPropertySelection {
+                    key: unit_property(),
+                    select: Select::Leaf,
+                }))
+            }
             (
                 FieldKind::Property {
                     id: property_id, ..
@@ -623,6 +629,9 @@ impl<'a> SelectAnalyzer<'a> {
 
                 self.analyze_data(LookAheadChildren::default(), &type_data.kind)
             }
+            ObjectKind::Connection(ConnectionData {
+                node_type_ref: UnitTypeRef::NativeScalar(_),
+            }) => Ok(Select::Leaf),
             _ => self.analyze_object_data(LookAheadChildren::default(), object_data),
         }
     }

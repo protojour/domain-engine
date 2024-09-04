@@ -7,8 +7,8 @@ use ontol_runtime::{
     interface::{
         graphql::{
             data::{
-                FieldKind, ObjectData, ObjectInterface, ObjectKind, TypeAddr, TypeData, TypeKind,
-                TypeModifier, TypeRef, UnitTypeRef,
+                FieldKind, NativeScalarRef, ObjectData, ObjectInterface, ObjectKind, Optionality,
+                TypeAddr, TypeData, TypeKind, TypeModifier, TypeRef, UnitTypeRef,
             },
             schema::TypingPurpose,
         },
@@ -429,13 +429,22 @@ impl<'v> AttributeType<'v> {
             (
                 AttrRef::Matrix(matrix),
                 FieldKind::Nodes | FieldKind::Edges | FieldKind::EntityMutation { .. },
-            ) => resolve_schema_type_field(
-                MatrixType { matrix },
-                schema_ctx
-                    .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
-                    .unwrap(),
-                executor,
-            ),
+            ) => match schema_ctx
+                .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
+            {
+                Ok(schema_type) => {
+                    resolve_schema_type_field(MatrixType { matrix }, schema_type, executor)
+                }
+                Err(scalar_ref) => serialize_scalar_attr(
+                    AttrRef::Matrix(matrix),
+                    TypeModifier::Array {
+                        array: Optionality::Mandatory,
+                        element: Optionality::Optional,
+                    },
+                    &scalar_ref,
+                    schema_ctx,
+                ),
+            },
             (AttrRef::Matrix(matrix), FieldKind::PageInfo) => resolve_schema_type_field(
                 PageInfoType { matrix },
                 schema_ctx
@@ -530,52 +539,71 @@ fn resolve_property(
                 },
             }
         }
-        Err(scalar_ref) => match (
-            type_ref.modifier,
-            &schema_ctx.ontology[scalar_ref.operator_addr],
-        ) {
-            (TypeModifier::Array { .. }, SerdeOperator::RelationList(operator)) => {
-                let processor = schema_ctx
-                    .ontology
-                    .new_serde_processor(operator.range.addr, ProcessorMode::Read);
+        Err(scalar_ref) => {
+            serialize_scalar_attr(attr.as_ref(), type_ref.modifier, &scalar_ref, schema_ctx)
+        }
+    }
+}
 
-                let graphql_value = match attr {
-                    Attr::Unit(Value::Sequence(sequence, _)) => {
-                        let graphql_values: Vec<juniper::Value<GqlScalar>> = sequence
-                            .elements()
-                            .iter()
-                            .map(|value| -> juniper::ExecutionResult<GqlScalar> {
-                                Ok(processor
-                                    .serialize_attr(AttrRef::Unit(value), JuniperValueSerializer)?)
-                            })
-                            .collect::<Result<_, _>>()?;
-
-                        juniper::Value::List(graphql_values)
-                    }
-                    Attr::Matrix(matrix) if matrix.columns.len() == 1 => {
-                        let graphql_values: Vec<juniper::Value<GqlScalar>> = matrix.columns[0]
-                            .elements()
-                            .iter()
-                            .map(|value| -> juniper::ExecutionResult<GqlScalar> {
-                                Ok(processor
-                                    .serialize_attr(AttrRef::Unit(value), JuniperValueSerializer)?)
-                            })
-                            .collect::<Result<_, _>>()?;
-
-                        juniper::Value::List(graphql_values)
-                    }
-                    attr => {
-                        warn!("scalar array not a unit sequence or attr matrix: {attr:?}");
-                        juniper::Value::null()
-                    }
-                };
-
-                Ok(graphql_value)
-            }
-            _ => Ok(schema_ctx
+fn serialize_scalar_attr(
+    attr_ref: AttrRef,
+    modifier: TypeModifier,
+    scalar_ref: &NativeScalarRef,
+    schema_ctx: &SchemaCtx,
+) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
+    match (modifier, &schema_ctx.ontology[scalar_ref.operator_addr]) {
+        (TypeModifier::Array { .. }, SerdeOperator::RelationList(operator)) => {
+            serialize_scalar_attr(
+                attr_ref,
+                modifier,
+                &NativeScalarRef {
+                    operator_addr: operator.range.addr,
+                    kind: scalar_ref.kind,
+                },
+                schema_ctx,
+            )
+        }
+        (TypeModifier::Array { .. }, _operator) => {
+            let processor = schema_ctx
                 .ontology
-                .new_serde_processor(scalar_ref.operator_addr, ProcessorMode::Read)
-                .serialize_attr(attr.as_ref(), JuniperValueSerializer)?),
-        },
+                .new_serde_processor(scalar_ref.operator_addr, ProcessorMode::Read);
+
+            let graphql_value = match attr_ref {
+                AttrRef::Unit(Value::Sequence(sequence, _)) => {
+                    let graphql_values: Vec<juniper::Value<GqlScalar>> = sequence
+                        .elements()
+                        .iter()
+                        .map(|value| -> juniper::ExecutionResult<GqlScalar> {
+                            Ok(processor
+                                .serialize_attr(AttrRef::Unit(value), JuniperValueSerializer)?)
+                        })
+                        .collect::<Result<_, _>>()?;
+
+                    juniper::Value::List(graphql_values)
+                }
+                AttrRef::Matrix(matrix) if matrix.columns.len() == 1 => {
+                    let graphql_values: Vec<juniper::Value<GqlScalar>> = matrix.columns[0]
+                        .elements()
+                        .iter()
+                        .map(|value| -> juniper::ExecutionResult<GqlScalar> {
+                            Ok(processor
+                                .serialize_attr(AttrRef::Unit(value), JuniperValueSerializer)?)
+                        })
+                        .collect::<Result<_, _>>()?;
+
+                    juniper::Value::List(graphql_values)
+                }
+                attr => {
+                    warn!("scalar array not a unit sequence or attr matrix: {attr:?}");
+                    juniper::Value::null()
+                }
+            };
+
+            Ok(graphql_value)
+        }
+        _ => Ok(schema_ctx
+            .ontology
+            .new_serde_processor(scalar_ref.operator_addr, ProcessorMode::Read)
+            .serialize_attr(attr_ref, JuniperValueSerializer)?),
     }
 }

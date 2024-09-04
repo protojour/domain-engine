@@ -5,12 +5,12 @@ use domain_engine_graphql::{
     ontology_schema::{OntologyCtx, OntologySchema},
 };
 use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema, ValueExt};
-use juniper::InputValue;
+use juniper::{graphql_value, InputValue};
 use ontol_macros::datastore_test;
 use ontol_runtime::DefId;
 use ontol_test_utils::{
     examples::{FINDINGS, GUITAR_SYNTH_UNION},
-    TestPackages,
+    expect_eq, TestPackages,
 };
 use tracing::info;
 
@@ -55,7 +55,7 @@ async fn findings(ds: &str) {
     let session_value = r#"mutation {
         FindingSession(
             create: [{
-                name: "favorite instruments",
+                name: "favorite instruments"
             }]
         ) {
             node {
@@ -76,13 +76,11 @@ async fn findings(ds: &str) {
 
     let guitar_address =
         ontology_find_single_address(guitar.def_id(), &ontology_schema, &ontology_ctx).await;
-    let finding_session_address =
+    let _finding_session_address =
         ontology_find_single_address(finding_session.def_id(), &ontology_schema, &ontology_ctx)
             .await;
 
-    println!("{guitar_address}");
-    println!("{finding_session_address}");
-
+    info!("register finding (of a guitar)");
     r#"mutation addFinding($sessionId: ID!, $found: String!) {
         FindingSession(
             update: [{
@@ -111,6 +109,31 @@ async fn findings(ds: &str) {
     )
     .await
     .unwrap();
+
+    info!("list findings");
+    expect_eq!(
+        actual = r#"{
+            findings {
+                nodes {
+                    name
+                    findings {
+                        nodes
+                    }
+                }
+            }
+        }"#
+        .exec([], &findings_schema, &domain_ctx)
+        .await,
+        expected = Ok(graphql_value!({
+            "findings": {
+                "nodes": [
+                    {
+                        "name": "favorite instruments",
+                    }
+                ]
+            }
+        }))
+    );
 }
 
 async fn ontology_find_single_address(

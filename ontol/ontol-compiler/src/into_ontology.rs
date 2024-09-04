@@ -17,7 +17,7 @@ use ontol_runtime::{
         Ontology,
     },
     rustdoc::RustDoc,
-    DefId, DefIdSet, FnvIndexMap, PackageId, PropId,
+    DefId, DefIdSet, FnvIndexMap, OntolDefTag, PackageId, PropId,
 };
 use std::{
     collections::{BTreeSet, HashMap},
@@ -565,7 +565,7 @@ impl<'m> Compiler<'m> {
                 .prop_ctx
                 .properties_by_def_id(source_def_id)
                 // It can be an edge (for now) only the the source (subject) is an entity.
-                // i.e. there is no support for "indirect" edge properties
+                // i.e. there is no support (yet) for "indirect" edge properties
                 .map(|props| props.identified_by.is_some())
                 .unwrap_or(false)
             {
@@ -595,10 +595,15 @@ impl<'m> Compiler<'m> {
                     .map(|properties| properties.identified_by == Some(rel_id))
                     .unwrap_or(false);
 
-            let kind = if is_entity_id {
-                DataRelationshipKind::Id
-            } else {
-                DataRelationshipKind::Tree
+            let kind = match edge_projection {
+                Some(edge_projection) => DataRelationshipKind::Edge(edge_projection),
+                None => {
+                    if is_entity_id {
+                        DataRelationshipKind::Id
+                    } else {
+                        DataRelationshipKind::Tree
+                    }
+                }
             };
 
             (kind, DataRelationshipTarget::Unambiguous(target_def_id))
@@ -628,7 +633,10 @@ impl<'m> Compiler<'m> {
                         CardinalKind::Vertex { members } => {
                             let entity_count = members
                                 .keys()
-                                .filter(|def_id| self.entity_ctx.entities.contains_key(def_id))
+                                .filter(|def_id| {
+                                    self.entity_ctx.entities.contains_key(def_id)
+                                        || **def_id == OntolDefTag::Vertex.def_id()
+                                })
                                 .count();
 
                             let mut flags = EdgeCardinalFlags::empty();

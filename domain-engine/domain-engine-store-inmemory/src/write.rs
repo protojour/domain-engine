@@ -443,7 +443,7 @@ impl InMemoryStore {
             let edge_data = match input_data {
                 EdgeData::Key(key) => EdgeData::Key(key),
                 EdgeData::Value(value) => {
-                    match self.match_edge_column(edge_id, cardinal_idx, value.type_def_id(), ctx) {
+                    match self.match_edge_column(edge_id, cardinal_idx, &value, ctx)? {
                         EdgeColumnMatch::VertexIdOf(vertex_def_id) => {
                             let vertex_key = self.resolve_foreign_key_for_edge(
                                 vertex_def_id,
@@ -460,6 +460,16 @@ impl InMemoryStore {
                                 type_def_id: vertex_def_id,
                                 dynamic_key: Self::extract_dynamic_key(&vertex_id)?,
                             })
+                        }
+                        EdgeColumnMatch::VertexRef(vertex_key) => {
+                            if self
+                                .look_up_vertex(vertex_key.type_def_id, &vertex_key.dynamic_key)
+                                .is_none()
+                            {
+                                return Err(DomainErrorKind::EntityNotFound.into_error());
+                            }
+
+                            EdgeData::Key(vertex_key)
                         }
                         EdgeColumnMatch::EdgeValue => {
                             mapped_write_mode = write_mode_from_value(&value);
