@@ -397,7 +397,7 @@ impl PgRepr {
             DefRepr::Boolean => Self::Scalar(PgType::Boolean, OntolDefTag::Boolean),
             DefRepr::Text => Self::Scalar(PgType::Text, OntolDefTag::Text),
             DefRepr::TextConstant(_) => Self::Unit,
-            DefRepr::Octets => Self::Scalar(PgType::Bytea, OntolDefTag::OctetStream),
+            DefRepr::Octets => Self::Scalar(PgType::Bytea, OntolDefTag::Octets),
             DefRepr::DateTime => Self::Scalar(PgType::TimestampTz, OntolDefTag::DateTime),
             DefRepr::FmtStruct(Some((_prop_id, def_id))) => Self::classify(*def_id, ontology),
             DefRepr::FmtStruct(None) => Self::Unit,

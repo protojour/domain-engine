@@ -2,6 +2,7 @@
 
 use std::{ops::Range, str::FromStr};
 
+use indexmap::IndexMap;
 use ontol_hir::OverloadFunc;
 use ontol_runtime::{
     ontology::{domain::DomainId, ontol::TextLikeType},
@@ -28,6 +29,30 @@ use crate::{
 /// No other domain should have a timestamp earlier than what's encoded inside this ULID (2023-01-04)
 const ONTOL_DOMAIN_ID: &str = "01GNYFZP30ED0EZ1579TH0D55P";
 
+struct DefPath<'a, 'm>(&'a [&'m str], DefId);
+
+#[derive(Default)]
+struct PathNode<'m> {
+    def_id: Option<DefId>,
+    children: IndexMap<&'m str, PathNode<'m>>,
+}
+
+impl<'m> PathNode<'m> {
+    fn insert<'a>(&mut self, def_path: DefPath<'a, 'm>) {
+        if def_path.0.is_empty() {
+            self.def_id = Some(def_path.1);
+        } else {
+            let route = def_path.0[0];
+            let rest = &def_path.0[1..];
+
+            self.children
+                .entry(route)
+                .or_default()
+                .insert(DefPath(rest, def_path.1));
+        }
+    }
+}
+
 impl<'m> Compiler<'m> {
     pub fn register_ontol_domain(&mut self) {
         self.str_ctx.intern_constant("ontol");
@@ -45,26 +70,27 @@ impl<'m> Compiler<'m> {
         // fundamental types
         self.register_type(OntolDefTag::EmptySequence.def_id(), Type::EmptySequence);
 
+        let mut root_path_node = PathNode::default();
+
         // pre-process primitive definitions
-        let mut named_builtin_relations: Vec<(DefId, &'static str)> = vec![];
+        let mut named_builtin_relations: Vec<DefPath> = vec![];
         for def_id in self.defs.iter_package_def_ids(ONTOL_PKG) {
             let Some(def_kind) = self.defs.def_kind_option(def_id) else {
                 continue;
             };
 
             match def_kind {
-                DefKind::Primitive(kind, ident) => {
+                DefKind::BuiltinModule(path) => {
+                    root_path_node.insert(DefPath(path, def_id));
+                }
+                DefKind::Primitive(kind, path) => {
                     let ty = self.ty_ctx.intern(Type::Primitive(*kind, def_id));
-                    if let Some(ident) = *ident {
-                        self.namespaces
-                            .get_namespace_mut(OntolDefTag::Ontol.def_id(), Space::Def)
-                            .insert(ident, def_id);
-                    }
+                    root_path_node.insert(DefPath(path, def_id));
                     self.def_ty_ctx.def_table.insert(def_id, ty);
                 }
-                DefKind::BuiltinRelType(kind, ident) => {
-                    if let Some(ident) = ident {
-                        named_builtin_relations.push((def_id, ident));
+                DefKind::BuiltinRelType(kind, path) => {
+                    if !path.is_empty() {
+                        named_builtin_relations.push(DefPath(path, def_id));
                     }
 
                     let constraints = match kind {
@@ -94,17 +120,20 @@ impl<'m> Compiler<'m> {
                             symbol_literal_def_id,
                         );
 
-                        self.namespaces
-                            .get_namespace_mut(OntolDefTag::Ontol.def_id(), Space::Def)
-                            .insert(ident, def_id);
+                        root_path_node.insert(DefPath(&[ident], def_id));
+
+                        // self.namespaces
+                        //     .get_namespace_mut(OntolDefTag::Ontol.def_id(), Space::Def)
+                        //     .insert(ident, def_id);
                     }
                 }
                 _ => {}
             }
         }
 
-        for (def_id, ident) in named_builtin_relations {
-            self.register_named_type(def_id, ident, |_| Type::BuiltinRelation);
+        for DefPath(path, def_id) in named_builtin_relations {
+            self.register_def_type(def_id, |_| Type::BuiltinRelation);
+            root_path_node.insert(DefPath(path, def_id));
         }
 
         // bools
@@ -136,25 +165,32 @@ impl<'m> Compiler<'m> {
         // string manipulation
         self.def_proc("append", DefKind::Fn(OverloadFunc::Append), binary_text);
 
-        self.def_uuid();
-        self.def_ulid();
-        self.def_datetime();
+        root_path_node.insert(self.def_uuid());
+        root_path_node.insert(self.def_ulid());
+        root_path_node.insert(self.def_datetime());
 
-        self.register_named_type(
-            OntolDefTag::GeneratorAuto.def_id(),
-            "auto",
-            Type::ValueGenerator,
-        );
-        self.register_named_type(
-            OntolDefTag::GeneratorCreateTime.def_id(),
-            "create_time",
-            Type::ValueGenerator,
-        );
-        self.register_named_type(
-            OntolDefTag::GeneratorUpdateTime.def_id(),
-            "update_time",
-            Type::ValueGenerator,
-        );
+        root_path_node.insert(DefPath(
+            &["auto"],
+            self.register_def_type(OntolDefTag::GeneratorAuto.def_id(), Type::ValueGenerator)
+                .0,
+        ));
+        root_path_node.insert(DefPath(
+            &["create_time"],
+            self.register_def_type(
+                OntolDefTag::GeneratorCreateTime.def_id(),
+                Type::ValueGenerator,
+            )
+            .0,
+        ));
+
+        root_path_node.insert(DefPath(
+            &["update_time"],
+            self.register_def_type(
+                OntolDefTag::GeneratorUpdateTime.def_id(),
+                Type::ValueGenerator,
+            )
+            .0,
+        ));
 
         // union setup
         {
@@ -171,6 +207,8 @@ impl<'m> Compiler<'m> {
         for def_id in self.defs.iter_package_def_ids(ONTOL_PKG) {
             self.type_check().check_def(def_id);
         }
+
+        self.write_namespace(OntolDefTag::Ontol.def_id(), root_path_node);
 
         self.seal_domain(ONTOL_PKG);
         self.repr_smoke_test();
@@ -243,29 +281,34 @@ impl<'m> Compiler<'m> {
             );
     }
 
-    fn def_uuid(&mut self) {
-        let (uuid, _) = self.define_concrete_ontol_type(OntolDefTag::Uuid, "uuid", |def_id| {
+    fn def_uuid(&mut self) -> DefPath<'static, 'static> {
+        let path = &["uuid"];
+        let (uuid, _) = self.define_concrete_ontol_type(OntolDefTag::Uuid, path, |def_id| {
             Type::TextLike(def_id, TextLikeType::Uuid)
         });
         let segment = TextPatternSegment::Regex(regex_util::well_known::uuid());
         store_text_pattern_segment(uuid, &segment, &mut self.text_patterns, &mut self.str_ctx);
         self.prop_ctx.properties_by_def_id_mut(uuid).constructor = Constructor::TextFmt(segment);
         self.defs.text_like_types.insert(uuid, TextLikeType::Uuid);
+        DefPath(path, uuid)
     }
 
-    fn def_ulid(&mut self) {
-        let (ulid, _) = self.define_concrete_ontol_type(OntolDefTag::Ulid, "ulid", |def_id| {
+    fn def_ulid(&mut self) -> DefPath<'static, 'static> {
+        let path = &["ulid"];
+        let (ulid, _) = self.define_concrete_ontol_type(OntolDefTag::Ulid, path, |def_id| {
             Type::TextLike(def_id, TextLikeType::Ulid)
         });
         let segment = TextPatternSegment::Regex(regex_util::well_known::ulid());
         store_text_pattern_segment(ulid, &segment, &mut self.text_patterns, &mut self.str_ctx);
         self.prop_ctx.properties_by_def_id_mut(ulid).constructor = Constructor::TextFmt(segment);
         self.defs.text_like_types.insert(ulid, TextLikeType::Ulid);
+        DefPath(path, ulid)
     }
 
-    fn def_datetime(&mut self) {
+    fn def_datetime(&mut self) -> DefPath<'static, 'static> {
+        let path = &["datetime"];
         let (datetime, _) =
-            self.define_concrete_ontol_type(OntolDefTag::DateTime, "datetime", |def_id| {
+            self.define_concrete_ontol_type(OntolDefTag::DateTime, path, |def_id| {
                 Type::TextLike(def_id, TextLikeType::DateTime)
             });
         let segment = TextPatternSegment::Regex(regex_util::well_known::datetime_rfc3339());
@@ -280,25 +323,25 @@ impl<'m> Compiler<'m> {
         self.defs
             .text_like_types
             .insert(datetime, TextLikeType::DateTime);
+        DefPath(path, datetime)
     }
 
     /// Define an ontol _domain_ type, i.e. not a primitive
     fn define_concrete_ontol_type(
         &mut self,
         tag: OntolDefTag,
-        ident: &'static str,
+        path: &[&'static str],
         ty_fn: impl Fn(DefId) -> Type<'m>,
     ) -> (DefId, TypeRef<'m>) {
         let def_id = self.defs.add_ontol(
             tag,
             DefKind::Type(TypeDef {
-                ident: Some(ident),
+                ident: path.last().map(|ident| *ident),
                 rel_type_for: None,
                 flags: TypeDefFlags::PUBLIC | TypeDefFlags::CONCRETE,
             }),
         );
-        let type_ref = self.register_named_type(def_id, ident, ty_fn);
-        (def_id, type_ref)
+        self.register_def_type(def_id, ty_fn)
     }
 
     fn register_type(&mut self, def_id: DefId, ty_fn: impl Fn(DefId) -> Type<'m>) -> TypeRef<'m> {
@@ -307,18 +350,14 @@ impl<'m> Compiler<'m> {
         ty
     }
 
-    fn register_named_type(
+    fn register_def_type(
         &mut self,
         def_id: DefId,
-        ident: &'m str,
         ty_fn: impl Fn(DefId) -> Type<'m>,
-    ) -> TypeRef<'m> {
+    ) -> (DefId, TypeRef<'m>) {
         let ty = self.ty_ctx.intern(ty_fn(def_id));
-        self.namespaces
-            .get_namespace_mut(OntolDefTag::Ontol.def_id(), Space::Def)
-            .insert(ident, def_id);
         self.def_ty_ctx.def_table.insert(def_id, ty);
-        ty
+        (def_id, ty)
     }
 
     fn def_proc(&mut self, ident: &'static str, def_kind: DefKind<'m>, ty: TypeRef<'m>) -> DefId {
@@ -342,6 +381,19 @@ impl<'m> Compiler<'m> {
     ) {
         self.thesaurus
             .insert_builtin_is(sub_def_id, (super_rel, sub_rel), super_def_id);
+    }
+
+    fn write_namespace(&mut self, parent_def_id: DefId, path_node: PathNode<'m>) {
+        for (ident, node) in path_node.children {
+            if let Some(def_id) = node.def_id {
+                self.namespaces
+                    .get_namespace_mut(parent_def_id, Space::Def)
+                    .insert(ident, def_id);
+
+                // recurse into children
+                self.write_namespace(def_id, node);
+            }
+        }
     }
 
     fn repr_smoke_test(&self) {

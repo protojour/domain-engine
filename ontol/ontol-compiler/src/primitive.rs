@@ -69,13 +69,15 @@ pub enum PrimitiveKind {
     /// rel* is: text
     /// ```
     Text,
-    OctetStream,
+    Octets,
     /// Address of something in a data store
     DataStoreAddress,
     /// Open relationship to domainless data
     OpenDataRelationship,
     EdgeRelationship,
     FlatUnionRelationship,
+    FormatHex,
+    FormatBase64,
 }
 
 impl PrimitiveKind {
@@ -137,16 +139,16 @@ fn register_ontol_def_tag(tag: OntolDefTag, defs: &mut Defs) {
     match tag {
         OntolDefTag::Ontol => {}
         OntolDefTag::Unit => {
-            defs.add_primitive(tag, PrimitiveKind::Unit, None);
+            defs.add_primitive(tag, PrimitiveKind::Unit, &[]);
         }
         OntolDefTag::False => {
-            defs.add_primitive(tag, PrimitiveKind::False, Some("false"));
+            defs.add_primitive(tag, PrimitiveKind::False, &["false"]);
         }
         OntolDefTag::True => {
-            defs.add_primitive(tag, PrimitiveKind::True, Some("true"));
+            defs.add_primitive(tag, PrimitiveKind::True, &["true"]);
         }
         OntolDefTag::Boolean => {
-            defs.add_primitive(tag, PrimitiveKind::Boolean, Some("boolean"));
+            defs.add_primitive(tag, PrimitiveKind::Boolean, &["boolean"]);
         }
         OntolDefTag::EmptySequence => {
             defs.add_ontol(tag, DefKind::EmptySequence);
@@ -155,82 +157,82 @@ fn register_ontol_def_tag(tag: OntolDefTag, defs: &mut Defs) {
             defs.add_ontol(tag, DefKind::TextLiteral(""));
         }
         OntolDefTag::Number => {
-            defs.add_primitive(tag, PrimitiveKind::Number, Some("number"));
+            defs.add_primitive(tag, PrimitiveKind::Number, &["number"]);
         }
         OntolDefTag::Integer => {
-            defs.add_primitive(tag, PrimitiveKind::Integer, Some("integer"));
+            defs.add_primitive(tag, PrimitiveKind::Integer, &["integer"]);
         }
         OntolDefTag::I64 => {
-            defs.add_primitive(tag, PrimitiveKind::I64, Some("i64"));
+            defs.add_primitive(tag, PrimitiveKind::I64, &["i64"]);
         }
         OntolDefTag::Float => {
-            defs.add_primitive(tag, PrimitiveKind::Float, Some("float"));
+            defs.add_primitive(tag, PrimitiveKind::Float, &["float"]);
         }
         OntolDefTag::F32 => {
-            defs.add_primitive(tag, PrimitiveKind::F32, Some("f32"));
+            defs.add_primitive(tag, PrimitiveKind::F32, &["f32"]);
         }
         OntolDefTag::F64 => {
-            defs.add_primitive(tag, PrimitiveKind::F64, Some("f64"));
+            defs.add_primitive(tag, PrimitiveKind::F64, &["f64"]);
         }
         OntolDefTag::Serial => {
-            defs.add_primitive(tag, PrimitiveKind::Serial, Some("serial"));
+            defs.add_primitive(tag, PrimitiveKind::Serial, &["serial"]);
         }
         OntolDefTag::Text => {
-            defs.add_primitive(tag, PrimitiveKind::Text, Some("text"));
+            defs.add_primitive(tag, PrimitiveKind::Text, &["text"]);
         }
-        OntolDefTag::OctetStream => {
-            defs.add_primitive(tag, PrimitiveKind::OctetStream, None);
+        OntolDefTag::Octets => {
+            defs.add_primitive(tag, PrimitiveKind::Octets, &["octets"]);
         }
         OntolDefTag::Uuid => {}
         OntolDefTag::Ulid => {}
         OntolDefTag::DateTime => {}
         OntolDefTag::RelationOpenData => {
-            defs.add_primitive(tag, PrimitiveKind::OpenDataRelationship, None);
+            defs.add_primitive(tag, PrimitiveKind::OpenDataRelationship, &[]);
         }
         OntolDefTag::RelationEdge => {
-            defs.add_primitive(tag, PrimitiveKind::EdgeRelationship, None);
+            defs.add_primitive(tag, PrimitiveKind::EdgeRelationship, &[]);
         }
         OntolDefTag::RelationFlatUnion => {
-            defs.add_primitive(tag, PrimitiveKind::FlatUnionRelationship, None);
+            defs.add_primitive(tag, PrimitiveKind::FlatUnionRelationship, &[]);
         }
         OntolDefTag::RelationIs => {
-            defs.add_builtin_relation(tag, BuiltinRelationKind::Is, Some("is"));
+            defs.add_builtin_relation(tag, BuiltinRelationKind::Is, &["is"]);
         }
         OntolDefTag::RelationIdentifies => {
-            defs.add_builtin_relation(tag, BuiltinRelationKind::Identifies, None);
+            defs.add_builtin_relation(tag, BuiltinRelationKind::Identifies, &[]);
         }
         OntolDefTag::RelationId => {
-            defs.add_builtin_relation(tag, BuiltinRelationKind::Id, None);
+            defs.add_builtin_relation(tag, BuiltinRelationKind::Id, &[]);
         }
         OntolDefTag::RelationIndexed => {
-            defs.add_builtin_relation(tag, BuiltinRelationKind::Indexed, None);
+            defs.add_builtin_relation(tag, BuiltinRelationKind::Indexed, &[]);
         }
         OntolDefTag::RelationStoreKey => {
-            defs.add_builtin_relation(tag, BuiltinRelationKind::StoreKey, Some("store_key"));
+            defs.add_builtin_relation(tag, BuiltinRelationKind::StoreKey, &["store_key"]);
         }
         OntolDefTag::RelationMin => {
-            defs.add_builtin_relation(tag, BuiltinRelationKind::Min, Some("min"));
+            defs.add_builtin_relation(tag, BuiltinRelationKind::Min, &["min"]);
         }
         OntolDefTag::RelationMax => {
-            defs.add_builtin_relation(tag, BuiltinRelationKind::Max, Some("max"));
+            defs.add_builtin_relation(tag, BuiltinRelationKind::Max, &["max"]);
         }
         OntolDefTag::RelationDefault => {
-            defs.add_builtin_relation(tag, BuiltinRelationKind::Default, Some("default"));
+            defs.add_builtin_relation(tag, BuiltinRelationKind::Default, &["default"]);
         }
         OntolDefTag::RelationGen => {
-            defs.add_builtin_relation(tag, BuiltinRelationKind::Gen, Some("gen"));
+            defs.add_builtin_relation(tag, BuiltinRelationKind::Gen, &["gen"]);
         }
         OntolDefTag::RelationOrder => {
-            defs.add_builtin_relation(tag, BuiltinRelationKind::Order, Some("order"));
+            defs.add_builtin_relation(tag, BuiltinRelationKind::Order, &["order"]);
         }
         OntolDefTag::RelationDirection => {
-            defs.add_builtin_relation(tag, BuiltinRelationKind::Direction, Some("direction"));
+            defs.add_builtin_relation(tag, BuiltinRelationKind::Direction, &["direction"]);
         }
         OntolDefTag::RelationExample => {
-            defs.add_builtin_relation(tag, BuiltinRelationKind::Example, Some("example"));
+            defs.add_builtin_relation(tag, BuiltinRelationKind::Example, &["example"]);
         }
         OntolDefTag::RelationDataStoreAddress => {
-            defs.add_primitive(tag, PrimitiveKind::DataStoreAddress, None);
+            defs.add_primitive(tag, PrimitiveKind::DataStoreAddress, &[]);
         }
         OntolDefTag::UnionDirection => {
             defs.add_ontol(
@@ -256,6 +258,15 @@ fn register_ontol_def_tag(tag: OntolDefTag, defs: &mut Defs) {
         }
         OntolDefTag::GeneratorUpdateTime => {
             defs.add_ontol(OntolDefTag::GeneratorUpdateTime, DefKind::EmptySequence);
+        }
+        OntolDefTag::Format => {
+            defs.add_ontol(tag, DefKind::BuiltinModule(&["format"]));
+        }
+        OntolDefTag::FormatHex => {
+            defs.add_primitive(tag, PrimitiveKind::FormatHex, &["format", "hex"]);
+        }
+        OntolDefTag::FormatBase64 => {
+            defs.add_primitive(tag, PrimitiveKind::FormatBase64, &["format", "base64"]);
         }
         OntolDefTag::_LastEntry => {}
     }

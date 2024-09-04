@@ -1,0 +1,8 @@
+def bytes (
+    rel* is: octets
+    rel* is: ontol.format.hex
+)
+
+def foo (
+    rel* 'has': bytes
+)

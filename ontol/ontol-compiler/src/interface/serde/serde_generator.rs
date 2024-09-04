@@ -440,11 +440,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     self.alloc_addr(&def),
                     SerdeOperator::String(def.def_id),
                 )),
-                PrimitiveKind::OctetStream
+                PrimitiveKind::Octets
                 | PrimitiveKind::DataStoreAddress
                 | PrimitiveKind::OpenDataRelationship
                 | PrimitiveKind::EdgeRelationship
-                | PrimitiveKind::FlatUnionRelationship => None,
+                | PrimitiveKind::FlatUnionRelationship
+                | PrimitiveKind::FormatHex
+                | PrimitiveKind::FormatBase64 => None,
             },
             Type::IntConstant(int) => Some(OperatorAllocation::Allocated(
                 self.alloc_addr(&def),
@@ -502,8 +504,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             | Type::Package
             | Type::BuiltinRelation
             | Type::ValueGenerator(_)
-            | Type::Extern(_) => None,
-            Type::Tautology | Type::Infer(_) | Type::Error => {
+            | Type::Extern(_)
+            | Type::Tautology => None,
+            Type::Infer(_) | Type::Error => {
                 panic!("crap: {:?}", self.get_def_type(def.def_id));
             }
         }

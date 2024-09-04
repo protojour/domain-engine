@@ -418,6 +418,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 object_ty
             }
+            BuiltinRelationKind::Format => &Type::Tautology,
             BuiltinRelationKind::FmtTransition => &Type::Tautology,
         }
     }

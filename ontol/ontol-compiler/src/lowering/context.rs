@@ -200,14 +200,15 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                                     .get(package_def_id)
                                     .unwrap();
                             }
-                            DefKind::Arc(..) => {
-                                namespace =
-                                    self.compiler.namespaces.namespaces.get(def_id).unwrap();
-                            }
-                            other => {
-                                debug!("namespace not found. def kind was {other:?}");
-                                return Err((CompileError::NamespaceNotFound, current.span()));
-                            }
+                            other => match self.compiler.namespaces.namespaces.get(def_id) {
+                                Some(next_namespace) => {
+                                    namespace = next_namespace;
+                                }
+                                None => {
+                                    debug!("namespace not found. def kind was {other:?}");
+                                    return Err((CompileError::NamespaceNotFound, current.span()));
+                                }
+                            },
                         },
                         None => return Err((CompileError::NamespaceNotFound, current.span())),
                     }

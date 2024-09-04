@@ -34,7 +34,10 @@ pub struct Def<'m> {
 #[derive(Debug)]
 pub enum DefKind<'m> {
     Package(PackageId),
-    Primitive(PrimitiveKind, Option<&'static str>),
+    /// A namespace in the ONTOL domain
+    /// TODO: make it possible also for user domains to have modules?
+    BuiltinModule(&'static [&'static str]),
+    Primitive(PrimitiveKind, &'static [&'static str]),
     TextLiteral(&'m str),
     NumberLiteral(&'m str),
     EmptySequence,
@@ -43,7 +46,7 @@ pub enum DefKind<'m> {
     Type(TypeDef<'m>),
     Macro(&'m str),
     InlineUnion(BTreeSet<DefId>),
-    BuiltinRelType(BuiltinRelationKind, Option<&'static str>),
+    BuiltinRelType(BuiltinRelationKind, &'static [&'static str]),
     Arc(&'m str),
     // FIXME: This should not be builtin proc directly.
     // we may find the _actual_ builtin proc to call during type check,
@@ -65,7 +68,8 @@ impl<'m> DefKind<'m> {
     pub fn opt_identifier(&self) -> Option<Cow<str>> {
         match self {
             Self::Package(_) => None,
-            Self::Primitive(_, ident) => ident.map(|ident| ident.into()),
+            Self::BuiltinModule(_path) => None,
+            Self::Primitive(_, path) => path.last().map(|ident| (*ident).into()),
             Self::TextLiteral(lit) => Some(format!("\"{lit}\"").into()),
             Self::NumberLiteral(lit) => Some(format!("\"{lit}\"").into()),
             Self::Regex(_) => None,
@@ -74,7 +78,7 @@ impl<'m> DefKind<'m> {
             Self::Type(domain_type) => domain_type.ident.map(|ident| ident.into()),
             Self::Macro(ident) => Some((*ident).into()),
             Self::InlineUnion(_) => None,
-            Self::BuiltinRelType(_, ident) => ident.map(|ident| ident.into()),
+            Self::BuiltinRelType(_, path) => path.last().map(|ident| (*ident).into()),
             Self::Arc(ident) => Some(Cow::Borrowed(ident)),
             Self::Constant(_) => None,
             Self::Mapping { ident, .. } => ident.map(|ident| ident.into()),
@@ -183,25 +187,27 @@ pub enum BuiltinRelationKind {
     /// rel* example: 'Carlos'
     /// ```
     Example,
+    Format,
     FmtTransition,
 }
 
 impl BuiltinRelationKind {
     pub fn context(&self) -> RelationContext {
         match self {
-            BuiltinRelationKind::Is => RelationContext::Def,
-            BuiltinRelationKind::Identifies => RelationContext::Def,
-            BuiltinRelationKind::Id => RelationContext::Def,
-            BuiltinRelationKind::Indexed => RelationContext::Def,
-            BuiltinRelationKind::StoreKey => RelationContext::Def,
-            BuiltinRelationKind::Min => RelationContext::Def,
-            BuiltinRelationKind::Max => RelationContext::Def,
-            BuiltinRelationKind::Default => RelationContext::Rel,
-            BuiltinRelationKind::Gen => RelationContext::Rel,
-            BuiltinRelationKind::Order => RelationContext::Def,
-            BuiltinRelationKind::Direction => RelationContext::Def,
-            BuiltinRelationKind::Example => RelationContext::Def,
-            BuiltinRelationKind::FmtTransition => RelationContext::Def,
+            Self::Is => RelationContext::Def,
+            Self::Identifies => RelationContext::Def,
+            Self::Id => RelationContext::Def,
+            Self::Indexed => RelationContext::Def,
+            Self::StoreKey => RelationContext::Def,
+            Self::Min => RelationContext::Def,
+            Self::Max => RelationContext::Def,
+            Self::Default => RelationContext::Rel,
+            Self::Gen => RelationContext::Rel,
+            Self::Order => RelationContext::Def,
+            Self::Direction => RelationContext::Def,
+            Self::Example => RelationContext::Def,
+            Self::Format => RelationContext::Def,
+            Self::FmtTransition => RelationContext::Def,
         }
     }
 }
@@ -385,18 +391,18 @@ impl<'m> Defs<'m> {
         &mut self,
         tag: OntolDefTag,
         kind: PrimitiveKind,
-        ident: Option<&'static str>,
+        path: &'static [&'static str],
     ) -> DefId {
-        self.add_ontol(tag, DefKind::Primitive(kind, ident))
+        self.add_ontol(tag, DefKind::Primitive(kind, path))
     }
 
     pub fn add_builtin_relation(
         &mut self,
         tag: OntolDefTag,
         kind: BuiltinRelationKind,
-        ident: Option<&'static str>,
+        path: &'static [&'static str],
     ) -> DefId {
-        self.add_ontol(tag, DefKind::BuiltinRelType(kind, ident))
+        self.add_ontol(tag, DefKind::BuiltinRelType(kind, path))
     }
 
     pub fn add_builtin_symbol(&mut self, tag: OntolDefTag, ident: &'static str) -> DefId {

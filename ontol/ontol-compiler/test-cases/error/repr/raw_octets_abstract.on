@@ -1,0 +1,3 @@
+def foo ( // ERROR type not representable
+    rel* 'bytes': octets // NOTE type of field is abstract
+)

@@ -305,10 +305,14 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
             Type::Primitive(kind, def_id) => {
                 // write!(f, "{}", kind.ident())
                 match (kind, self.defs.def_kind(*def_id)) {
-                    (_, DefKind::Primitive(_, Some(ident))) => {
-                        write!(f, "{tick}ontol.{ident}{tick}")
+                    (_, DefKind::Primitive(_, path)) if !path.is_empty() => {
+                        write!(
+                            f,
+                            "{tick}ontol.{path}{tick}",
+                            path = path.iter().format(".")
+                        )
                     }
-                    (_, DefKind::Primitive(primitive_kind, None)) => {
+                    (_, DefKind::Primitive(primitive_kind, _)) => {
                         write!(f, "{primitive_kind:?}")
                     }
                     _ => unreachable!(),

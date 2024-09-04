@@ -156,7 +156,7 @@ pub enum OntolDefTag {
     F64 = 12,
     Serial = 13,
     Text = 14,
-    OctetStream = 15,
+    Octets = 15,
     Uuid = 16,
     Ulid = 17,
     DateTime = 18,
@@ -178,14 +178,18 @@ pub enum OntolDefTag {
     RelationExample = 33,
     RelationDataStoreAddress = 34,
     /// Union of `ascending` and `descending`
+    /// TODO: RelationDirection and this union can be the same def, which would be cleaner:
     UnionDirection = 35,
     SymAscending = 36,
     SymDescending = 37,
     GeneratorAuto = 38,
     GeneratorCreateTime = 39,
     GeneratorUpdateTime = 40,
+    Format = 41,
+    FormatHex = 42,
+    FormatBase64 = 43,
     /// This must be the last entry. Update the value accordingly.
-    _LastEntry = 41,
+    _LastEntry = 44,
 }
 
 impl_ontol_debug!(OntolDefTag);
