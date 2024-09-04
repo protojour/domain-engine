@@ -3,12 +3,15 @@ use std::collections::hash_map::Entry;
 use fnv::{FnvHashMap, FnvHashSet};
 use juniper::{FieldError, LookAheadChildren};
 use ontol_runtime::{
-    interface::graphql::{
-        argument::{AfterArg, FieldArg, FirstArg, MapInputArg},
-        data::{
-            ConnectionData, EdgeData, FieldData, FieldKind, NodeData, ObjectData, ObjectKind,
-            TypeData, TypeKind, TypeModifier, UnitTypeRef,
+    interface::{
+        graphql::{
+            argument::{AfterArg, FieldArg, FirstArg, MapInputArg},
+            data::{
+                ConnectionData, EdgeData, FieldData, FieldKind, NodeData, ObjectData, ObjectKind,
+                TypeData, TypeKind, TypeModifier, UnitTypeRef,
+            },
         },
+        serde::operator::SerdeOperator,
     },
     query::{
         filter::Filter,
@@ -16,7 +19,7 @@ use ontol_runtime::{
     },
     value::Value,
     var::Var,
-    DefId, DefPropTag, MapKey, PropId,
+    DefId, DefPropTag, MapKey, OntolDefTag, PropId,
 };
 use tracing::{debug, error, trace};
 
@@ -588,6 +591,7 @@ impl<'a> SelectAnalyzer<'a> {
         loop {
             match inner_select {
                 Select::Unit => return Ok(Select::Unit),
+                Select::VertexAddress => return Ok(Select::VertexAddress),
                 Select::Struct(object) => {
                     return Ok(Select::Entity(EntitySelect {
                         source: StructOrUnionSelect::Struct(object),
@@ -630,8 +634,15 @@ impl<'a> SelectAnalyzer<'a> {
                 self.analyze_data(LookAheadChildren::default(), &type_data.kind)
             }
             ObjectKind::Connection(ConnectionData {
-                node_type_ref: UnitTypeRef::NativeScalar(_),
-            }) => Ok(Select::Leaf),
+                node_type_ref: UnitTypeRef::NativeScalar(native_scalar_ref),
+            }) => match &self.schema_ctx.ontology[native_scalar_ref.operator_addr] {
+                SerdeOperator::Octets(octets_operator)
+                    if octets_operator.target_def_id == OntolDefTag::Vertex.def_id() =>
+                {
+                    Ok(Select::VertexAddress)
+                }
+                _ => Ok(Select::Leaf),
+            },
             _ => self.analyze_object_data(LookAheadChildren::default(), object_data),
         }
     }

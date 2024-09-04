@@ -11,7 +11,7 @@ use ontol_runtime::{
     },
     sequence::{Sequence, SubSequence},
     value::{OctetSequence, Value},
-    DefId, PropId,
+    DefId, OntolDefTag, PropId,
 };
 use tracing::{debug, debug_span, error};
 
@@ -300,6 +300,13 @@ impl InMemoryStore {
 
         match select {
             Select::Unit => Ok(Some(Value::unit())),
+            Select::VertexAddress => {
+                let bytes = bincode::serialize(&vertex_key).unwrap();
+                Ok(Some(Value::OctetSequence(
+                    OctetSequence(bytes.into()),
+                    OntolDefTag::Vertex.def_id().into(),
+                )))
+            }
             Select::Leaf => {
                 if let Some(properties) =
                     self.look_up_vertex(vertex_key.type_def_id, vertex_key.dynamic_key)

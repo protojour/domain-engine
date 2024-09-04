@@ -101,7 +101,7 @@ async fn findings(ds: &str) {
             ),
             (
                 "found".to_owned(),
-                InputValue::Scalar(guitar_address.into()),
+                InputValue::Scalar(guitar_address.clone().into()),
             ),
         ],
         &findings_schema,
@@ -129,6 +129,9 @@ async fn findings(ds: &str) {
                 "nodes": [
                     {
                         "name": "favorite instruments",
+                        "findings": {
+                            "nodes": [guitar_address]
+                        }
                     }
                 ]
             }

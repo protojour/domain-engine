@@ -165,7 +165,9 @@ impl ResolverGraph {
             ) => {
                 todo!()
             }
-            Select::Leaf | Select::EntityId => Some(ResolvePath { path: vec![] }),
+            Select::Leaf | Select::EntityId | Select::VertexAddress => {
+                Some(ResolvePath { path: vec![] })
+            }
         }
     }
 

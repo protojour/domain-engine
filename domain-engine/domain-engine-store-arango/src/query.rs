@@ -67,7 +67,7 @@ impl<'a> MetaQuery<'a> {
     pub fn query_select(&mut self, select: &Select) -> DomainResult<()> {
         match select {
             Select::Unit => {}
-            Select::EntityId => {
+            Select::EntityId | Select::VertexAddress => {
                 self.return_var = Expr::complex(format!("{}[0]", self.var));
             }
             Select::Leaf => {
@@ -343,6 +343,15 @@ pub fn apply_select(attr: AttrMut, select: &Select, db: &ArangoDatabase) -> Doma
                     .clone()
                     .into_unit()
                     .unwrap();
+            }
+        }
+        (AttrMut::Unit(val), Select::VertexAddress) => {
+            if let Value::Struct(ref mut attr_map, _) = val {
+                if let Some(Attr::Unit(address)) = attr_map.remove(&PropId::data_store_address()) {
+                    *val = address;
+                } else {
+                    *val = Value::unit();
+                }
             }
         }
         (AttrMut::Unit(Value::Struct(attr_map, _)), Select::Struct(struct_select)) => {

@@ -33,6 +33,7 @@ pub fn translate_select(select: &mut Select, key: &MapKey, ontology: &Ontology) 
         }
         Select::EntityId => {}
         Select::Leaf => {}
+        Select::VertexAddress => {}
     }
 }
 

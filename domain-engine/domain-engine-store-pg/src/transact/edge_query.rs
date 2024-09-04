@@ -25,6 +25,7 @@ impl<'a> CardinalSelect<'a> {
         match select {
             Select::Unit => Self::Leaf,
             Select::EntityId => Self::Leaf,
+            Select::VertexAddress => Self::Leaf,
             Select::Leaf => Self::Leaf,
             Select::Struct(s) => Self::StructUnion(std::slice::from_ref(s)),
             Select::StructUnion(_, u) => Self::StructUnion(u),

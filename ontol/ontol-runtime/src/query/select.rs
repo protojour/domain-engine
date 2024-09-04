@@ -8,6 +8,7 @@ use crate::{DefId, PropId};
 pub enum Select {
     Unit,
     EntityId,
+    VertexAddress,
     Leaf,
     Struct(StructSelect),
     StructUnion(DefId, Vec<StructSelect>),
