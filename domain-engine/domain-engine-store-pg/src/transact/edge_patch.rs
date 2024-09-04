@@ -11,12 +11,13 @@ use ontol_runtime::{
     query::select::Select,
     tuple::CardinalIdx,
     value::Value,
-    DefId, PropId,
+    DefId, OntolDefTag, PropId,
 };
 use postgres_types::ToSql;
 use tracing::{debug, trace};
 
 use crate::{
+    address::deserialize_ontol_vertex_address,
     pg_error::{ds_bad_req, map_row_error, PgError, PgInputError, PgModelError},
     pg_model::{
         EdgeId, InDomain, PgColumn, PgDataKey, PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind,
@@ -691,6 +692,11 @@ impl<'a> TransactCtx<'a> {
                 *vertex_def_id,
                 value,
             )
+        } else if def_id == OntolDefTag::Vertex.def_id() {
+            let (def_key, data_key) = deserialize_ontol_vertex_address(value)?;
+            let (_pkg_id, def_id) = self.pg_model.datatable_key_by_def_key(def_key)?;
+
+            return Ok((def_id, def_key, data_key));
         } else {
             return Err(ds_bad_req("bad foreign key"));
         };

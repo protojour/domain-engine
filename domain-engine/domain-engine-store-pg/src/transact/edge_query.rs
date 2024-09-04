@@ -7,7 +7,7 @@ use ontol_runtime::{
 use tracing::trace;
 
 use crate::{
-    pg_error::{ds_err, PgInputError},
+    pg_error::{ds_err, PgInputError, PgModelError},
     pg_model::{EdgeId, PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgTable},
     sql,
 };
@@ -17,6 +17,7 @@ use super::{cache::PgCache, query::QueryBuildCtx, TransactCtx};
 #[derive(Clone, Copy, Debug)]
 pub enum CardinalSelect<'a> {
     Leaf,
+    VertexAddress,
     StructUnion(&'a [StructSelect]),
 }
 
@@ -25,7 +26,7 @@ impl<'a> CardinalSelect<'a> {
         match select {
             Select::Unit => Self::Leaf,
             Select::EntityId => Self::Leaf,
-            Select::VertexAddress => Self::Leaf,
+            Select::VertexAddress => Self::VertexAddress,
             Select::Leaf => Self::Leaf,
             Select::Struct(s) => Self::StructUnion(std::slice::from_ref(s)),
             Select::StructUnion(_, u) => Self::StructUnion(u),
@@ -77,8 +78,13 @@ pub enum EdgeUnionCardinalVariantSelect<'a> {
         join_condition: sql::Expr<'a>,
         where_condition: Option<sql::Expr<'a>>,
     },
+    VertexAddress {
+        expr: sql::Expr<'a>,
+    },
     #[allow(unused)]
-    Parameters { expr: sql::Expr<'a> },
+    Parameters {
+        expr: sql::Expr<'a>,
+    },
 }
 
 impl<'a> TransactCtx<'a> {
@@ -124,6 +130,45 @@ impl<'a> TransactCtx<'a> {
                 }
 
                 match select {
+                    CardinalSelect::VertexAddress => {
+                        let edge_path = sql::Path::from_iter([pg_proj.edge_alias.into()]);
+
+                        let expr = match &pg_cardinal.kind {
+                            PgEdgeCardinalKind::Dynamic {
+                                def_col_name,
+                                key_col_name,
+                            } => sql::Expr::Row(vec![
+                                edge_path.join(def_col_name.as_ref()).into(),
+                                edge_path.join(key_col_name.as_ref()).into(),
+                            ]),
+                            PgEdgeCardinalKind::PinnedDef {
+                                pinned_def_id,
+                                key_col_name,
+                            } => {
+                                let pinned_table = self
+                                    .pg_model
+                                    .datatable(pinned_def_id.package_id(), *pinned_def_id)?;
+
+                                sql::Expr::Row(vec![
+                                    sql::Expr::LiteralInt(pinned_table.key),
+                                    edge_path.join(key_col_name.as_ref()).into(),
+                                ])
+                            }
+                            PgEdgeCardinalKind::Parameters(_) => {
+                                return Err(PgModelError::NoAddressInCardinal.into());
+                            }
+                        };
+
+                        self.sql_select_edge_cardinals(
+                            (next_cardinal_idx(cardinal_idx), pg_proj),
+                            select,
+                            variant_builder
+                                .append(EdgeUnionCardinalVariantSelect::VertexAddress { expr }),
+                            union_builder,
+                            query_ctx,
+                            cache,
+                        )?;
+                    }
                     CardinalSelect::Leaf => {
                         let edge_cardinal = pg_proj
                             .edge_info
@@ -278,6 +323,9 @@ impl<'a> TransactCtx<'a> {
                         on: join_condition,
                     }));
                     where_conjunctions.extend(where_condition);
+                }
+                EdgeUnionCardinalVariantSelect::VertexAddress { expr } => {
+                    row_tuple.push(expr);
                 }
                 EdgeUnionCardinalVariantSelect::Parameters { expr } => {
                     row_tuple.push(expr);

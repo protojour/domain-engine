@@ -164,6 +164,8 @@ pub enum PgModelError {
     InvalidUniqueCardinal,
     /// data type not supported
     DataTypeNotSupported(&'static str),
+    /// no address in cardinal
+    NoAddressInCardinal,
 }
 
 impl From<PgModelError> for DomainError {

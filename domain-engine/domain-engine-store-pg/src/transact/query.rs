@@ -20,7 +20,7 @@ use smallvec::smallvec;
 use tracing::{debug, trace};
 
 use crate::{
-    address::make_ontol_address,
+    address::make_ontol_vertex_address,
     pg_error::{PgError, PgInputError, PgModelError},
     pg_model::{EdgeId, PgDataKey, PgDomainTable, PgEdgeCardinalKind, PgTable, PgTableKey, PgType},
     sql::{self, FromItem, WhereExt},
@@ -596,7 +596,7 @@ impl<'a> TransactCtx<'a> {
 
                 attrs.insert(
                     PropId::data_store_address(),
-                    Attr::Unit(make_ontol_address(def_key, data_key)),
+                    Attr::Unit(make_ontol_vertex_address(def_key, data_key)),
                 );
 
                 // retrieve data properties
@@ -864,6 +864,16 @@ impl<'a> TransactCtx<'a> {
 
                 self.deserialize_sql(entity.id_value_def_id, sql_field)
             }
+            Select::VertexAddress => {
+                let mut fields = sql_record.fields();
+
+                let _ = fields.next_field(&Layout::Scalar(PgType::Integer))?;
+                let data_key = fields
+                    .next_field(&Layout::Scalar(PgType::BigInt))?
+                    .into_i64()?;
+
+                Ok(make_ontol_vertex_address(def_key, data_key))
+            }
             Select::Struct(struct_select) => {
                 self.read_record_as_struct(sql_record, &struct_select.properties)
             }
@@ -888,7 +898,7 @@ impl<'a> TransactCtx<'a> {
 
                 self.read_record_as_struct(sql_record, &actual_select.properties)
             }
-            _ => todo!("unhandled select"),
+            sel => todo!("unhandled select: {sel:?}"),
         }
     }
 

@@ -411,7 +411,7 @@ impl PgRepr {
                 _ => Self::Abstract,
             },
             DefRepr::Macro => Self::Unit,
-            DefRepr::Vertex => todo!("vertex"),
+            DefRepr::Vertex => Self::NotSupported("vertex"),
             DefRepr::Unknown => Self::NotSupported("unknown"),
         }
     }

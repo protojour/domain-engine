@@ -69,13 +69,6 @@ impl<'a> TransactCtx<'a> {
         }
     }
 
-    /*
-    pub fn stmt_cache_locked<T>(&self, func: impl FnOnce(&mut PgCache) -> T) -> T {
-        let mut lock = self.stmt_cache.lock().unwrap();
-        func(&mut lock)
-    }
-    */
-
     /// Look up ontology def and PG data for the given def_id
     pub fn lookup_def(&self, def_id: DefId) -> DomainResult<PgDef<'a>> {
         let def = self.ontology.def(def_id);

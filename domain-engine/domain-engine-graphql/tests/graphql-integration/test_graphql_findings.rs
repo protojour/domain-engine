@@ -80,6 +80,8 @@ async fn findings(ds: &str) {
         ontology_find_single_address(finding_session.def_id(), &ontology_schema, &ontology_ctx)
             .await;
 
+    info!("found guitar address {guitar_address}");
+
     info!("register finding (of a guitar)");
     r#"mutation addFinding($sessionId: ID!, $found: String!) {
         FindingSession(
@@ -101,7 +103,7 @@ async fn findings(ds: &str) {
             ),
             (
                 "found".to_owned(),
-                InputValue::Scalar(guitar_address.clone().into()),
+                InputValue::Scalar(guitar_address.clone()),
             ),
         ],
         &findings_schema,
@@ -155,8 +157,8 @@ async fn ontology_find_single_address(
         OntologyParams {
             def_id: Some(def_id),
         },
-        &ontology_schema,
-        &ontology_ctx,
+        ontology_schema,
+        ontology_ctx,
     )
     .await
     .unwrap();
