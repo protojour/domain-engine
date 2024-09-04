@@ -82,6 +82,7 @@ pub enum TypingPurpose {
     Input,
     PartialInput,
     InputOrReference,
+    EntityId,
 }
 
 impl TypingPurpose {
@@ -91,6 +92,7 @@ impl TypingPurpose {
             Self::Input => Self::Input,
             Self::PartialInput => Self::Input,
             Self::InputOrReference => Self::Input,
+            Self::EntityId => Self::EntityId,
         }
     }
 
@@ -102,6 +104,7 @@ impl TypingPurpose {
                 (ProcessorMode::GraphqlUpdate, ProcessorLevel::new_root())
             }
             TypingPurpose::InputOrReference => (ProcessorMode::Create, ProcessorLevel::new_child()),
+            TypingPurpose::EntityId => (ProcessorMode::Raw, ProcessorLevel::new_root()),
         }
     }
 }

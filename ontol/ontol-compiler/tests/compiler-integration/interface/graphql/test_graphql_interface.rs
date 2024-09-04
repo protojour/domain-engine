@@ -11,7 +11,7 @@ use ontol_runtime::{
     },
 };
 use ontol_test_utils::{
-    examples::{ARTIST_AND_INSTRUMENT, EDGE_ENTITY_UNION},
+    examples::{ARTIST_AND_INSTRUMENT, EDGE_ENTITY_UNION, FINDINGS},
     expect_eq, src_name,
     test_extensions::{
         graphql::{ObjectDataExt, TypeDataExt, UnitTypeRefExt},
@@ -501,4 +501,24 @@ fn test_edge_entity_union() {
             expected = "baz_or_quxConnection"
         );
     }
+}
+
+#[test]
+fn test_vertex() {
+    let test = FINDINGS.1.compile();
+    let (schema, test) = schema_test(&test, SrcName::default());
+
+    let finding_session = test
+        .type_data("FindingSession", QueryLevel::Node)
+        .object_data();
+    let findings_field = finding_session.fields.get("findings").unwrap();
+    let findings_connection = schema
+        .type_data(findings_field.field_type.unit.addr())
+        .object_data();
+    let findings_nodes = findings_connection.fields.get("nodes").unwrap();
+
+    expect_eq!(
+        actual = findings_nodes.field_type.unit.native_scalar().kind,
+        expected = NativeScalarKind::ID
+    );
 }

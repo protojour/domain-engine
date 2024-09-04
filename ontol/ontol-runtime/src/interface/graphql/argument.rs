@@ -200,7 +200,7 @@ impl FieldArg for EntityDeleteInputsArg {
 
 impl DomainFieldArg for EntityDeleteInputsArg {
     fn typing_purpose(&self) -> TypingPurpose {
-        TypingPurpose::Input
+        TypingPurpose::EntityId
     }
 
     fn operator_addr(&self) -> SerdeOperatorAddr {

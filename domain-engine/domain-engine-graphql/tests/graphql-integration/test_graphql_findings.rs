@@ -83,7 +83,7 @@ async fn findings(ds: &str) {
     info!("found guitar address {guitar_address}");
 
     info!("register finding (of a guitar)");
-    r#"mutation addFinding($sessionId: ID!, $found: String!) {
+    r#"mutation addFinding($sessionId: ID!, $found: ID!) {
         FindingSession(
             update: [{
                 id: $sessionId

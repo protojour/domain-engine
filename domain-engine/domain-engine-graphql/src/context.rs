@@ -191,7 +191,9 @@ impl SchemaType {
         let type_data = &self.type_data();
         match (&type_data.kind, self.typing_purpose) {
             (TypeKind::CustomScalar(_), _) => &ontology[type_data.typename],
-            (_, TypingPurpose::Selection) => &ontology[type_data.typename],
+            (_, TypingPurpose::Selection | TypingPurpose::EntityId) => {
+                &ontology[type_data.typename]
+            }
             (_, TypingPurpose::Input | TypingPurpose::InputOrReference) => type_data
                 .input_typename
                 .map(|constant| &ontology[constant])

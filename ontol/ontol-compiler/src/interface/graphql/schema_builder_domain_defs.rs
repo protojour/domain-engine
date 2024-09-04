@@ -1009,12 +1009,18 @@ pub(super) fn get_native_scalar_kind(
         SerdeOperator::I64(..) => panic!("Must be a custom scalar"),
         SerdeOperator::I32(def_id, _) => NativeScalarKind::Int(*def_id),
         SerdeOperator::F64(def_id, _) => NativeScalarKind::Number(*def_id),
-        SerdeOperator::Octets(_)
-        | SerdeOperator::String(_)
+        SerdeOperator::String(_)
         | SerdeOperator::StringConstant(..)
         | SerdeOperator::TextPattern(_)
         | SerdeOperator::CapturingTextPattern(_)
         | SerdeOperator::Serial(_) => NativeScalarKind::String,
+        SerdeOperator::Octets(octets_op) => {
+            if octets_op.target_def_id == OntolDefTag::Vertex.def_id() {
+                NativeScalarKind::ID
+            } else {
+                NativeScalarKind::String
+            }
+        }
         SerdeOperator::IdSingletonStruct(..) => panic!("Id should not appear in GraphQL"),
         SerdeOperator::Alias(alias_op) => get_native_scalar_kind(
             serde_generator,

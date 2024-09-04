@@ -90,12 +90,12 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
     }
 
     pub fn get_fields(&mut self, type_addr: TypeAddr) -> Vec<juniper::meta::Field<'r, GqlScalar>> {
-        // This is part of a big recursive algorithm, so iterator mapping is avoided
-        let mut fields = vec![];
-
         let type_data = self.schema_ctx.schema.type_data(type_addr);
 
         if let TypeKind::Object(object) = &type_data.kind {
+            // This is part of a big recursive algorithm, so iterator mapping is avoided
+            let mut fields = Vec::with_capacity(object.fields.len());
+
             for (name, field_data) in object.fields.iter() {
                 let field = juniper::meta::Field {
                     name: name.string.as_str().into(),
@@ -115,9 +115,11 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
                 fields.push(field);
             }
-        }
 
-        fields
+            fields
+        } else {
+            vec![]
+        }
     }
 
     pub fn collect_operator_arguments(
@@ -400,15 +402,16 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
                 self.modified_arg::<InputType>(name, modifier, &i64_schema_type)
             }
-            SerdeOperator::F64(_, _) => return self.modified_arg::<f64>(name, modifier, &()),
-            SerdeOperator::String(_) | SerdeOperator::Serial(_) | SerdeOperator::Octets(_) => {
-                return self.modified_arg::<String>(name, modifier, &())
-            }
-            SerdeOperator::StringConstant(_, _) => self.modified_arg::<String>(name, modifier, &()),
-            SerdeOperator::TextPattern(_) => self.modified_arg::<String>(name, modifier, &()),
-            SerdeOperator::CapturingTextPattern(_) => {
-                self.modified_arg::<String>(name, modifier, &())
-            }
+            SerdeOperator::F64(_, _) => self.modified_arg::<f64>(name, modifier, &()),
+            SerdeOperator::String(_)
+            | SerdeOperator::Serial(_)
+            | SerdeOperator::Octets(_)
+            | SerdeOperator::StringConstant(..)
+            | SerdeOperator::TextPattern(_)
+            | SerdeOperator::CapturingTextPattern(_) => match typing_purpose {
+                TypingPurpose::EntityId => self.modified_arg::<juniper::ID>(name, modifier, &()),
+                _ => self.modified_arg::<String>(name, modifier, &()),
+            },
             SerdeOperator::DynamicSequence => panic!("No dynamic sequence expected here"),
             SerdeOperator::RelationList(seq_op) | SerdeOperator::RelationIndexSet(seq_op) => {
                 if seq_op.to_entity && matches!(typing_purpose, TypingPurpose::PartialInput) {
@@ -635,7 +638,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 None,
                 SerdePropertyFlags::default(),
                 TypeModifier::Unit(Optionality::Mandatory),
-                TypingPurpose::Selection,
+                field_arg.typing_purpose(),
             ),
             ArgKind::Hidden => return None,
         };
