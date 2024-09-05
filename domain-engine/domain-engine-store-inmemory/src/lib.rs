@@ -64,7 +64,7 @@ impl InMemoryDb {
         let mut hyper_edges: FnvHashMap<DefId, HyperEdgeTable> = Default::default();
 
         for package_id in package_ids {
-            let domain = ontology.find_domain(*package_id).unwrap();
+            let domain = ontology.domain_by_pkg(*package_id).unwrap();
 
             for def in domain.defs() {
                 if let Some(entity) = def.entity() {

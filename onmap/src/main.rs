@@ -65,7 +65,7 @@ fn main() -> anyhow::Result<()> {
     let Ok(pkg_id) = PackageId::from_u16(1) else {
         return Err(anyhow!("invalid package"));
     };
-    let domain = ontology.find_domain(pkg_id).unwrap();
+    let domain = ontology.domain_by_pkg(pkg_id).unwrap();
     let from_name = ontology.find_text_constant(args.from.as_str()).unwrap();
     let to_name = ontology.find_text_constant(args.to.as_str()).unwrap();
     let input = MapDef {

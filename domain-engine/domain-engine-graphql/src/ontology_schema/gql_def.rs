@@ -5,7 +5,9 @@ use ontol_runtime::{
     DefId, MapKey, PropId,
 };
 
-use super::{gql_rel, OntologyCtx};
+use crate::gql_scalar::GqlScalar;
+
+use super::{gql_domain, gql_id, gql_rel, OntologyCtx};
 
 #[derive(Clone)]
 pub struct Def {
@@ -49,21 +51,39 @@ enum PropertyFlowKind {
 }
 
 #[juniper::graphql_object]
-#[graphql(context = OntologyCtx)]
+#[graphql(context = OntologyCtx, scalar = GqlScalar)]
 impl Def {
-    fn id(&self) -> String {
-        format!("{:?}", self.id)
+    /// The identifier of this def.
+    /// The ID is unique only within this particular ontology.
+    fn id(&self, ctx: &OntologyCtx) -> gql_id::DefId {
+        let domain = ctx.domain_by_pkg(self.id.package_id()).unwrap();
+        gql_id::DefId {
+            domain_id: domain.domain_id().ulid,
+            def_tag: self.id.1,
+        }
     }
+
+    /// The tag of this def, unique within its domain.
+    fn tag(&self) -> i32 {
+        self.id.1.into()
+    }
+
+    /// The ONTOL identifier of this def
     fn ident(&self, ctx: &OntologyCtx) -> Option<String> {
         ctx.def(self.id).ident().map(|name| ctx[name].into())
     }
+
+    /// The documentation of this def
     fn doc(&self, ctx: &OntologyCtx) -> Option<String> {
         ctx.get_def_docs(self.id)
             .map(|docs_constant| ctx[docs_constant].into())
     }
+
+    /// The optional entity represented by this def
     fn entity(&self, ctx: &OntologyCtx) -> Option<Entity> {
         ctx.def(self.id).entity().map(|_| Entity { id: self.id })
     }
+
     fn union_variants(&self, ctx: &OntologyCtx) -> Vec<Def> {
         ctx.union_variants(self.id)
             .iter()
@@ -126,6 +146,12 @@ impl Def {
             })
             .collect()
     }
+
+    fn domain(&self) -> gql_domain::Domain {
+        gql_domain::Domain {
+            pkg_id: self.id.package_id(),
+        }
+    }
 }
 
 #[juniper::graphql_object]
@@ -137,7 +163,7 @@ impl Entity {
 }
 
 #[juniper::graphql_object]
-#[graphql(context = OntologyCtx)]
+#[graphql(context = OntologyCtx, scalar = GqlScalar)]
 impl MapEdge {
     fn output(&self) -> Def {
         Def {

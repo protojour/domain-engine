@@ -16,7 +16,7 @@ pub fn generate_httpjson_interface(
     partial_ontology: &Ontology,
     serde_gen: &mut SerdeGenerator,
 ) -> Option<HttpJson> {
-    let domain = partial_ontology.find_domain(package_id).unwrap();
+    let domain = partial_ontology.domain_by_pkg(package_id).unwrap();
 
     let contains_entities = domain.defs().any(|def| def.entity().is_some());
     if !contains_entities {

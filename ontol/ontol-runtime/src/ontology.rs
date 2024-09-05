@@ -8,6 +8,7 @@ use bincode::Options;
 use domain::{DefRepr, EdgeInfo};
 use fnv::FnvHashMap;
 use tracing::debug;
+use ulid::Ulid;
 
 use crate::{
     attr::AttrRef,
@@ -118,7 +119,7 @@ impl Ontology {
     }
 
     pub fn def(&self, def_id: DefId) -> &Def {
-        match self.find_domain(def_id.0) {
+        match self.domain_by_pkg(def_id.0) {
             Some(domain) => domain.def(def_id),
             None => {
                 panic!("No domain for {:?}", def_id.0)
@@ -127,7 +128,7 @@ impl Ontology {
     }
 
     pub fn get_def(&self, def_id: DefId) -> Option<&Def> {
-        match self.find_domain(def_id.0) {
+        match self.domain_by_pkg(def_id.0) {
             Some(domain) => domain.def_option(def_id),
             None => None,
         }
@@ -160,8 +161,16 @@ impl Ontology {
         &self.data.ontol_domain_meta
     }
 
-    pub fn find_domain(&self, package_id: PackageId) -> Option<&Domain> {
+    pub fn domain_by_pkg(&self, package_id: PackageId) -> Option<&Domain> {
         self.data.domains.get(&package_id)
+    }
+
+    pub fn domain_by_id(&self, domain_id: Ulid) -> Option<&Domain> {
+        self.data
+            .domains
+            .iter()
+            .find(|(_, domain)| domain.domain_id().ulid == domain_id)
+            .map(|(_, domain)| domain)
     }
 
     /// Get the members of a given union.
@@ -175,7 +184,7 @@ impl Ontology {
     }
 
     pub fn find_edge(&self, id: DefId) -> Option<&EdgeInfo> {
-        let domain = self.find_domain(id.0)?;
+        let domain = self.domain_by_pkg(id.0)?;
         domain.find_edge(id)
     }
 

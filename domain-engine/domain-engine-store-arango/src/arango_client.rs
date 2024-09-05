@@ -368,7 +368,7 @@ impl ArangoDatabase {
     pub fn populate_collections(&mut self, package_id: PackageId) -> anyhow::Result<()> {
         let domain = self
             .ontology
-            .find_domain(package_id)
+            .domain_by_pkg(package_id)
             .expect("package id should match a domain");
 
         let mut subject_names_by_edge_id: HashMap<DefId, TextConstant> = Default::default();

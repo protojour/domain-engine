@@ -42,7 +42,7 @@ fn compile() -> Ontology {
 }
 
 fn get_ontol_docs_md(ontology: &Ontology, predicate: &dyn Fn(&Def) -> bool) -> String {
-    let ontol_domain = ontology.find_domain(ONTOL_PKG).unwrap();
+    let ontol_domain = ontology.domain_by_pkg(ONTOL_PKG).unwrap();
     let mut docs: Vec<(String, String)> = vec![];
     for t in ontol_domain.defs() {
         if !predicate(t) {

@@ -22,13 +22,13 @@ pub struct ValueScalarCfg {
 #[derive(juniper::GraphQLScalar)]
 #[graphql(
     scalar = GqlScalar,
-    to_output_with = OntolValue2::to_output,
-    from_input_with = OntolValue2::from_input,
-    parse_token_with = OntolValue2::parse_token,
+    to_output_with = OntolValue::to_output,
+    from_input_with = OntolValue::from_input,
+    parse_token_with = OntolValue::parse_token,
 )]
-pub struct OntolValue2(pub juniper::Value<GqlScalar>);
+pub struct OntolValue(pub juniper::Value<GqlScalar>);
 
-impl OntolValue2 {
+impl OntolValue {
     fn to_output(v: &Self) -> juniper::Value<GqlScalar> {
         v.0.clone()
     }

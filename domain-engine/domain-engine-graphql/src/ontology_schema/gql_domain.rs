@@ -3,7 +3,7 @@ use ontol_runtime::{
     PackageId,
 };
 
-use crate::juniper;
+use crate::{gql_scalar::GqlScalar, juniper};
 
 use super::{gql_def, OntologyCtx};
 
@@ -12,7 +12,7 @@ pub struct Domain {
 }
 
 #[juniper::graphql_object]
-#[graphql(context = OntologyCtx)]
+#[graphql(context = OntologyCtx, scalar = GqlScalar)]
 impl Domain {
     fn id(&self, ctx: &OntologyCtx) -> juniper::ID {
         self.data(ctx).domain_id().ulid.to_string().into()
@@ -64,6 +64,6 @@ impl Domain {
 
 impl Domain {
     fn data<'c>(&self, ctx: &'c OntologyCtx) -> &'c domain::Domain {
-        ctx.find_domain(self.pkg_id).unwrap()
+        ctx.domain_by_pkg(self.pkg_id).unwrap()
     }
 }

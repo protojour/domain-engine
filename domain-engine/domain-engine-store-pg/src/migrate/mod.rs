@@ -168,7 +168,7 @@ pub async fn migrate(
     // this improves separation of concerns while also enabling dry run simulations
     for package_id in [PackageId::ontol()].iter().chain(persistent_domains) {
         let domain = ontology
-            .find_domain(*package_id)
+            .domain_by_pkg(*package_id)
             .ok_or_else(|| anyhow!("domain does not exist"))?;
 
         steps::migrate_domain_steps(*package_id, domain, ontology, &mut ctx)

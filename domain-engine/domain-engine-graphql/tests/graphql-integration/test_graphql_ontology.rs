@@ -7,7 +7,6 @@ use domain_engine_graphql::{
 use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema};
 use juniper::graphql_value;
 use ontol_macros::datastore_test;
-use ontol_runtime::DefId;
 use ontol_test_utils::{
     examples::stix::{stix_bundle, STIX},
     expect_eq,
@@ -18,14 +17,14 @@ use crate::mk_engine_default;
 
 #[derive(Default)]
 pub struct OntologyParams {
-    pub def_id: Option<DefId>,
+    pub def_id: Option<String>,
 }
 
 impl From<OntologyParams> for juniper::Variables<GqlScalar> {
     fn from(value: OntologyParams) -> Self {
         let mut variables = juniper::Variables::default();
         if let Some(def_id) = value.def_id {
-            variables.insert("defId".to_string(), format!("{:?}", def_id).into());
+            variables.insert("defId".to_string(), format!("{}", def_id).into());
         }
         variables
     }
@@ -114,7 +113,7 @@ async fn test_stix_ontology(ds: &str) {
 
     expect_eq!(
         actual = r"
-            query def($defId: String!) {
+            query def($defId: DefId!) {
                 def(defId: $defId) {
                     id
                     kind
@@ -127,7 +126,7 @@ async fn test_stix_ontology(ds: &str) {
         "
         .exec(
             OntologyParams {
-                def_id: Some(identity.def_id())
+                def_id: Some(identity.graphql_def_id())
             },
             &ontology_schema,
             &ontology_ctx
@@ -135,7 +134,7 @@ async fn test_stix_ontology(ds: &str) {
         .await,
         expected = Ok(graphql_value!({
             "def": {
-                "id": "def@1:54",
+                "id": "01GZ13EAM0RY693MSJ75XZARHY:54",
                 "kind": "ENTITY",
                 "dataRelationships": [
                     { "propId": "p@1:54:0", "name": "type" },
@@ -164,7 +163,7 @@ async fn test_stix_ontology(ds: &str) {
 
     expect_eq!(
         actual = r#"
-            query vertices($defId: String!) {
+            query vertices($defId: DefId!) {
                 vertices(defId: $defId, first: 100, withAddress: false, withDefId: false) {
                     elements
                 }
@@ -172,7 +171,7 @@ async fn test_stix_ontology(ds: &str) {
             "#
         .exec(
             OntologyParams {
-                def_id: Some(identity.def_id()),
+                def_id: Some(identity.graphql_def_id()),
             },
             &ontology_schema,
             &ontology_ctx,
@@ -276,7 +275,7 @@ async fn test_stix_ontology(ds: &str) {
 
     {
         let vertices_with_address = r#"
-            query vertices($defId: String!) {
+            query vertices($defId: DefId!) {
                 vertices(defId: $defId, first: 100) {
                     elements
                     pageInfo {
@@ -288,7 +287,7 @@ async fn test_stix_ontology(ds: &str) {
             "#
         .exec(
             OntologyParams {
-                def_id: Some(identity.def_id()),
+                def_id: Some(identity.graphql_def_id()),
             },
             &ontology_schema,
             &ontology_ctx,

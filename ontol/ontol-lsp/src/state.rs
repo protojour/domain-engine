@@ -110,7 +110,7 @@ impl State {
             .unwrap()
             .into_ontology();
 
-        let ontol_domain = ontology.find_domain(ONTOL_PKG).unwrap();
+        let ontol_domain = ontology.domain_by_pkg(ONTOL_PKG).unwrap();
         let mut ontol_def = HashMap::new();
 
         for def in ontol_domain.defs() {

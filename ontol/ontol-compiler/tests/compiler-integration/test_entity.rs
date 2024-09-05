@@ -605,7 +605,7 @@ fn store_key_in_def_info() {
     "
     .compile_then(|test| {
         let ontology = test.ontology();
-        let domain = ontology.find_domain(PackageId::second()).unwrap();
+        let domain = ontology.domain_by_pkg(PackageId::second()).unwrap();
 
         for def in domain.defs() {
             if let Some(text_constant) = def.ident() {
@@ -643,7 +643,7 @@ fn store_key_in_def_info() {
 fn edge_entity_simple() {
     let test = examples::EDGE_ENTITY_SIMPLE.1.compile();
     let ontology = test.ontology();
-    let domain = ontology.find_domain(PackageId::second()).unwrap();
+    let domain = ontology.domain_by_pkg(PackageId::second()).unwrap();
     let [foo_id, foo, bar_id, link] = test.bind(["foo_id", "foo", "bar_id", "link"]);
 
     {
@@ -697,7 +697,7 @@ fn edge_entity_simple() {
 fn edge_entity_union() {
     let test = examples::EDGE_ENTITY_UNION.1.compile();
     let ontology = test.ontology();
-    let domain = ontology.find_domain(PackageId::second()).unwrap();
+    let domain = ontology.domain_by_pkg(PackageId::second()).unwrap();
 
     let [foo_id, bar_id, baz_id, qux_id] = test.bind(["foo_id", "bar_id", "baz_id", "qux_id"]);
     let [foo, bar, baz, qux, link] = test.bind(["foo", "bar", "baz", "qux", "link"]);

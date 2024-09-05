@@ -45,7 +45,7 @@ impl<'on> DefBinding<'on> {
         type_name: &str,
     ) -> Self {
         let ontology = ontol_test.ontology.as_ref();
-        let domain = ontology.find_domain(package_id).unwrap();
+        let domain = ontology.domain_by_pkg(package_id).unwrap();
         let def = domain
             .defs()
             .find(|def| match def.ident().map(|name| &ontology[name]) {
@@ -119,6 +119,15 @@ impl<'on> DefBinding<'on> {
 
     pub fn def_id(&self) -> DefId {
         self.def.id
+    }
+
+    pub fn graphql_def_id(&self) -> String {
+        let domain = self
+            .ontology
+            .domain_by_pkg(self.def.id.package_id())
+            .unwrap();
+
+        format!("{}:{}", domain.domain_id().ulid, self.def.id.1)
     }
 
     #[track_caller]

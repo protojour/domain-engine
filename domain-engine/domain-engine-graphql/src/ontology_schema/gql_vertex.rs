@@ -4,14 +4,14 @@ use ontol_runtime::{sequence::Sequence, value::Value};
 use crate::{cursor_util::serialize_cursor, gql_scalar::GqlScalar, juniper};
 
 use super::{
-    gql_value::{self, write_ontol_scalar, OntolValue2, ValueScalarCfg},
+    gql_value::{self, write_ontol_scalar, OntolValue, ValueScalarCfg},
     OntologyCtx,
 };
 
 #[derive(GraphQLObject)]
 #[graphql(context = OntologyCtx, scalar = GqlScalar)]
 pub struct VertexConnection {
-    pub elements: Vec<gql_value::OntolValue2>,
+    pub elements: Vec<gql_value::OntolValue>,
     pub page_info: Option<PageInfo>,
 }
 
@@ -35,7 +35,7 @@ impl VertexConnection {
             .map(|value| {
                 let mut gobj = juniper::Object::with_capacity(3);
                 write_ontol_scalar(&mut gobj, value, cfg, ctx)
-                    .map(|()| OntolValue2(juniper::Value::Object(gobj)))
+                    .map(|()| OntolValue(juniper::Value::Object(gobj)))
             })
             .collect::<Result<_, _>>()?;
 

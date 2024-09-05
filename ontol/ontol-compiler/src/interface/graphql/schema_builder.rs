@@ -169,7 +169,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             kind: TypeKind::Object(ObjectData {
                 fields: Default::default(),
                 kind: ObjectKind::Query {
-                    domain_def_id: partial_ontology.find_domain(package_id).unwrap().def_id(),
+                    domain_def_id: partial_ontology.domain_by_pkg(package_id).unwrap().def_id(),
                 },
                 interface: ObjectInterface::Implements(thin_vec![]),
             }),

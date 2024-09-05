@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::str::FromStr;
 
 use crate::cursor_util::GraphQLCursor;
 use crate::field_error;
@@ -15,18 +14,17 @@ use ontol_runtime::query::filter::Filter;
 use ontol_runtime::query::select::EntitySelect;
 use ontol_runtime::query::select::StructOrUnionSelect;
 use ontol_runtime::query::select::StructSelect;
-use ontol_runtime::DefId;
 use serde::de::value::StringDeserializer;
 use serde::Deserialize;
 use ulid::Ulid;
 
-use super::gql_def;
 use super::gql_dictionary;
 use super::gql_dictionary::DefDictionaryEntry;
 use super::gql_domain;
 use super::gql_value::ValueScalarCfg;
 use super::gql_vertex;
 use super::OntologyCtx;
+use super::{gql_def, gql_id};
 
 #[derive(Default)]
 pub struct Query;
@@ -69,11 +67,10 @@ impl Query {
         Ok(domains)
     }
 
-    fn def(def_id: String, ctx: &OntologyCtx) -> FieldResult<gql_def::Def> {
-        if let Ok(def_id) = DefId::from_str(&def_id) {
-            if let Some(def) = ctx.get_def(def_id) {
-                return Ok(gql_def::Def { id: def.id });
-            }
+    fn def(def_id: gql_id::DefId, ctx: &OntologyCtx) -> FieldResult<gql_def::Def> {
+        let def_id = def_id.as_runtime_def_id(ctx)?;
+        if let Some(def) = ctx.get_def(def_id) {
+            return Ok(gql_def::Def { id: def.id });
         }
         Err(field_error("Def not found"))
     }
@@ -100,7 +97,7 @@ impl Query {
     }
 
     async fn vertices(
-        def_id: String,
+        def_id: gql_id::DefId,
         first: i32,
         after: Option<String>,
         with_address: Option<bool>,
@@ -108,7 +105,8 @@ impl Query {
         ctx: &OntologyCtx,
     ) -> FieldResult<gql_vertex::VertexConnection> {
         let data_store = ctx.data_store().map_err(field_error)?;
-        let def_id = DefId::from_str(&def_id).map_err(|_| field_error("invalid def id format"))?;
+        let def_id = def_id.as_runtime_def_id(ctx)?;
+
         let _def = ctx
             .get_def(def_id)
             .ok_or_else(|| field_error("invalid def id"))?;

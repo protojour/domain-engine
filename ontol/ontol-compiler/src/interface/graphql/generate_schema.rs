@@ -37,7 +37,7 @@ pub fn generate_graphql_schema<'c>(
     union_member_cache: &'c UnionMemberCache,
     serde_gen: &mut SerdeGenerator<'c, '_>,
 ) -> Option<GraphqlSchema> {
-    let domain = partial_ontology.find_domain(package_id).unwrap();
+    let domain = partial_ontology.domain_by_pkg(package_id).unwrap();
 
     let contains_entities = domain.defs().any(|def| def.entity().is_some());
 

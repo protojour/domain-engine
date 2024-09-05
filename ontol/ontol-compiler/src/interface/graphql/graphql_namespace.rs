@@ -121,7 +121,7 @@ impl<'o> GraphqlNamespace<'o> {
                 let package_id = def_id.0;
                 if package_id != domain_disambiguation.root_domain {
                     output.push('_');
-                    if let Some(domain) = domain_disambiguation.ontology.find_domain(package_id) {
+                    if let Some(domain) = domain_disambiguation.ontology.domain_by_pkg(package_id) {
                         let domain_name =
                             adapt_graphql_identifier(&ctx.str_ctx[domain.unique_name()])
                                 .into_adapted();

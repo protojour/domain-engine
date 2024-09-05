@@ -1,6 +1,6 @@
 //! GraphQL types related to ONTOL relations
 
-use crate::juniper;
+use crate::{gql_scalar::GqlScalar, juniper};
 
 use ontol_runtime::{
     ontology::domain::{self, EdgeCardinalProjection},
@@ -67,7 +67,7 @@ enum ValueCardinality {
 }
 
 #[juniper::graphql_object]
-#[graphql(context = OntologyCtx)]
+#[graphql(context = OntologyCtx, scalar = GqlScalar)]
 impl DataRelationshipInfo {
     fn prop_id(&self) -> String {
         self.prop_id.to_string()
@@ -113,7 +113,7 @@ impl DataRelationshipInfo {
 }
 
 #[juniper::graphql_object]
-#[graphql(context = OntologyCtx)]
+#[graphql(context = OntologyCtx, scalar = GqlScalar)]
 impl DataRelationshipEdgeProjection {
     fn subject(&self) -> i32 {
         self.projection.subject.0.into()
@@ -131,7 +131,7 @@ impl DataRelationshipEdgeProjection {
 }
 
 #[juniper::graphql_object]
-#[graphql(context = OntologyCtx)]
+#[graphql(context = OntologyCtx, scalar = GqlScalar)]
 impl Edge {
     // fn def(&self) -> gql_def::Def {
     //     gql_def::Def { id: self.id.0 }
@@ -151,7 +151,7 @@ impl Edge {
 }
 
 #[juniper::graphql_object]
-#[graphql(context = OntologyCtx)]
+#[graphql(context = OntologyCtx, scalar = GqlScalar)]
 impl EdgeCardinal {
     fn index(&self) -> i32 {
         self.idx.try_into().unwrap()

@@ -8,7 +8,6 @@ use domain_engine_graphql::{
 use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema, ValueExt};
 use juniper::{graphql_value, InputValue};
 use ontol_macros::datastore_test;
-use ontol_runtime::DefId;
 use ontol_test_utils::{
     examples::{FINDINGS, GUITAR_SYNTH_UNION},
     expect_eq, TestPackages,
@@ -103,12 +102,16 @@ async fn findings(ds: &str) {
         .scalar();
 
     let guitar_address =
-        ontology_find_single_address(guitar.def_id(), &ontology_schema, &ontology_ctx).await;
-    let synth_address =
-        ontology_find_single_address(synth.def_id(), &ontology_schema, &ontology_ctx).await;
-    let _finding_session_address =
-        ontology_find_single_address(finding_session.def_id(), &ontology_schema, &ontology_ctx)
+        ontology_find_single_address(guitar.graphql_def_id(), &ontology_schema, &ontology_ctx)
             .await;
+    let synth_address =
+        ontology_find_single_address(synth.graphql_def_id(), &ontology_schema, &ontology_ctx).await;
+    let _finding_session_address = ontology_find_single_address(
+        finding_session.graphql_def_id(),
+        &ontology_schema,
+        &ontology_ctx,
+    )
+    .await;
 
     info!("register finding (of a guitar)");
     add_finding(
@@ -197,12 +200,12 @@ async fn add_finding(
 }
 
 async fn ontology_find_single_address(
-    def_id: DefId,
+    graphql_def_id: String,
     ontology_schema: &OntologySchema,
     ontology_ctx: &OntologyCtx,
 ) -> GqlScalar {
     let vertices = r"
-        query vertices($defId: String!) {
+        query vertices($defId: DefId!) {
             vertices(defId: $defId, first: 1, withAddress: true) {
                 elements
             }
@@ -210,7 +213,7 @@ async fn ontology_find_single_address(
     "
     .exec(
         OntologyParams {
-            def_id: Some(def_id),
+            def_id: Some(graphql_def_id),
         },
         ontology_schema,
         ontology_ctx,
