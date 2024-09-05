@@ -8,12 +8,14 @@ use domain_engine_test_utils::{
     dummy_session::DummySession, dynamic_data_store::DynamicDataStoreFactory,
     system::mock_current_time_monotonic, unimock,
 };
-use futures_util::StreamExt;
+use futures_util::{Stream, StreamExt};
 use http::StatusCode;
 use http_body_util::StreamBody;
 use ontol_runtime::ontology::Ontology;
 use ontol_test_utils::{OntolTest, SrcName};
+use tracing::debug;
 
+mod test_httpjson_error;
 mod test_httpjson_stix;
 
 trait MakeTestRouter {
@@ -43,18 +45,29 @@ fn json_body(json: serde_json::Value) -> axum::body::Body {
     axum::body::Body::from(serde_json::to_vec(&json).unwrap())
 }
 
-fn jsonlines_body(documents: Vec<serde_json::Value>) -> axum::body::Body {
-    axum::body::Body::new(StreamBody::new(futures_util::stream::iter(documents).then(
-        |json| async move {
+fn jsonlines_stream(
+    documents: Vec<serde_json::Value>,
+) -> impl Stream<Item = Result<Bytes, Infallible>> {
+    futures_util::stream::iter(documents)
+        .enumerate()
+        .then(|(idx, json)| async move {
             // simulate transmission
             tokio::time::sleep(Duration::from_millis(1)).await;
+            debug!("next jsonlines document (#{idx})");
 
             let mut buffer = serde_json::to_vec(&json).unwrap();
             buffer.extend(b"\n");
 
-            Ok::<_, Infallible>(http_body::Frame::data(Bytes::from(buffer)))
-        },
-    )))
+            Ok::<_, Infallible>(Bytes::from(buffer))
+        })
+}
+
+fn streaming_axum_body(
+    stream: impl Stream<Item = Result<Bytes, Infallible>> + Send + 'static,
+) -> axum::body::Body {
+    axum::body::Body::new(StreamBody::new(
+        stream.map(|result| result.map(http_body::Frame::data)),
+    ))
 }
 
 async fn fetch_body_assert_status(

@@ -9,7 +9,8 @@ use tower::ServiceExt;
 use tracing::info;
 
 use crate::{
-    fetch_body_assert_status, json_body, jsonlines_body, make_domain_engine, MakeTestRouter,
+    fetch_body_assert_status, json_body, jsonlines_stream, make_domain_engine, streaming_axum_body,
+    MakeTestRouter,
 };
 
 #[datastore_test(tokio::test)]
@@ -39,12 +40,12 @@ async fn test_httpjson_stix(ds: &str) {
         .oneshot(
             Request::put("/stix-object")
                 .header(CONTENT_TYPE, "application/json-lines")
-                .body(jsonlines_body(vec![
+                .body(streaming_axum_body(jsonlines_stream(vec![
                     testdata::identity(),
                     testdata::marking_definition(),
                     testdata::course_of_action(),
                     testdata::url2(),
-                ]))
+                ])))
                 .unwrap(),
         )
         .await
@@ -64,10 +65,10 @@ async fn test_httpjson_stix_jsonlines_unresolved_foreign_key(ds: &str) {
         .oneshot(
             Request::put("/stix-object")
                 .header(CONTENT_TYPE, "application/json-lines")
-                .body(jsonlines_body(vec![
+                .body(streaming_axum_body(jsonlines_stream(vec![
                     testdata::identity(),
                     testdata::course_of_action(),
-                ]))
+                ])))
                 .unwrap(),
         )
         .await
