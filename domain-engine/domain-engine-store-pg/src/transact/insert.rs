@@ -97,7 +97,7 @@ impl<'a> TransactCtx<'a> {
         let (analyzed, pg) = self.analyze_input(None, def, value, select, cache)?;
 
         let mut row_value = if let Some(data_key) = analyzed.update_tentative {
-            self.update_tentative_vertex(def, pg, &analyzed, data_key)
+            self.update_tentative_vertex(def, pg, &analyzed, data_key, cache)
                 .await?
         } else {
             self.insert_row(
@@ -153,22 +153,44 @@ impl<'a> TransactCtx<'a> {
     /// A tentative vertex has been inserted into the database upon seing a foreign key referencing that vertice.
     /// It has to exist in the DB because its _data key_ need to exist.
     /// At the end of the transaction, all the tentative keys will be checked to have been updated with proper vertex data.
-    async fn update_tentative_vertex(
-        &self,
+    async fn update_tentative_vertex<'s>(
+        &'s self,
         def: &Def,
         pg: PgDomainTable<'a>,
         analyzed: &AnalyzedInput<'a>,
         data_key: PgDataKey,
+        cache: &'s mut PgCache,
     ) -> DomainResult<RowValue> {
-        let mut sql_update = sql::Update {
-            with: None,
-            table_name: pg.table_name(),
-            set: vec![],
-            where_: Some(sql::Expr::eq(
-                sql::Expr::path1("_key"),
-                sql::Expr::param(analyzed.sql_params.len()),
-            )),
-            returning: vec![sql::Expr::LiteralInt(0)],
+        let cache_key = (def.id.package_id(), def.id);
+
+        let prepared = if let Some(prepared) = cache.update_tentative.get(&cache_key).cloned() {
+            prepared
+        } else {
+            let mut sql_update = sql::Update {
+                with: None,
+                table_name: pg.table_name(),
+                set: vec![],
+                where_: Some(sql::Expr::eq(
+                    sql::Expr::path1("_key"),
+                    sql::Expr::param(analyzed.sql_params.len()),
+                )),
+                returning: vec![sql::Expr::LiteralInt(0)],
+            };
+            let mut param_idx = 0;
+
+            for prop_id in def.data_relationships.keys() {
+                if let Some(pg_column) = pg.table.find_column(prop_id) {
+                    sql_update.set.push(sql::UpdateColumn(
+                        &pg_column.col_name,
+                        sql::Expr::param(param_idx),
+                    ));
+                    param_idx += 1;
+                }
+            }
+
+            let prepared = sql_update.to_string().prepare(self.client()).await?;
+            cache.update_tentative.insert(cache_key, prepared.clone());
+            prepared
         };
 
         let mut param_idx = 0;
@@ -177,17 +199,12 @@ impl<'a> TransactCtx<'a> {
             FnvHashMap::with_capacity_and_hasher(def.data_relationships.len(), Default::default());
 
         for (prop_id, rel_info) in &def.data_relationships {
-            if let Some(pg_column) = pg.table.find_column(prop_id) {
+            if pg.table.find_column(prop_id).is_some() {
                 let input_param = analyzed.sql_params.get(param_idx).unwrap();
 
                 let unit_val =
                     self.deserialize_sql(rel_info.target.def_id(), input_param.clone().into())?;
                 attrs.insert(*prop_id, Attr::Unit(unit_val));
-
-                sql_update.set.push(sql::UpdateColumn(
-                    &pg_column.col_name,
-                    sql::Expr::param(param_idx),
-                ));
                 param_idx += 1;
             }
         }
@@ -197,11 +214,9 @@ impl<'a> TransactCtx<'a> {
         let mut update_params = analyzed.sql_params.clone();
         update_params.push(SqlScalar::I64(data_key));
 
-        let sql = sql_update.to_string();
+        debug!("{prepared}");
 
-        debug!("{sql}");
-
-        self.query_one_raw(&sql, &update_params).await?;
+        self.query_one_raw(prepared.deref(), &update_params).await?;
 
         Ok(RowValue {
             value: Value::Struct(Box::new(attrs), def.id.into()),
