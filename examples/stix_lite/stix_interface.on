@@ -96,7 +96,7 @@ def @macro external_references (
     ///
     /// The **external_references** property specifies a list of external references which refers to non-STIX information.
     /// This property is used to provide one or more URLs, descriptions, or IDs to records in other systems.
-    rel* 'external_references'?: {common.external-reference}
+    rel* 'external_references'?: [common.external-reference]
 )
 
 /// Type providing the `defanged` property
