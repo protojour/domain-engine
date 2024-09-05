@@ -24,7 +24,7 @@ impl From<OntologyParams> for juniper::Variables<GqlScalar> {
     fn from(value: OntologyParams) -> Self {
         let mut variables = juniper::Variables::default();
         if let Some(def_id) = value.def_id {
-            variables.insert("defId".to_string(), format!("{}", def_id).into());
+            variables.insert("defId".to_string(), def_id.to_string().into());
         }
         variables
     }
