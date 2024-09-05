@@ -409,7 +409,7 @@ async fn basic_pagination() {
                         };
                         assert!(!entity_select.include_total_len);
                         assert_eq!(entity_select.limit, 42);
-                        assert_eq!(entity_select.after_cursor.as_deref().unwrap(), &[b'1']);
+                        assert_eq!(entity_select.after_cursor.as_deref().unwrap(), b"1");
 
                         Ok(vec![
                             Ok(RespMessage::SequenceStart(0)),

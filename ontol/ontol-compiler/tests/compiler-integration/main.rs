@@ -1,3 +1,5 @@
+#![allow(clippy::disallowed_names)]
+
 use ontol_test_utils::{SrcName, TestCompile, TestPackages};
 use std::{borrow::Cow, fs, path::PathBuf};
 

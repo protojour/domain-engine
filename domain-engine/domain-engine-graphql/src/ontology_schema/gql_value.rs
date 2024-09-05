@@ -89,7 +89,7 @@ pub fn write_ontol_scalar(
 ) -> juniper::FieldResult<()> {
     let def_id = value.type_def_id();
     if cfg.with_def_id {
-        put_string(gobj, DEF_ID, &format!("{:?}", def_id));
+        put_string(gobj, DEF_ID, format!("{:?}", def_id));
     }
 
     match value {
