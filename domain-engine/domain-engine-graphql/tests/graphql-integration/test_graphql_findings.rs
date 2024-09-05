@@ -3,6 +3,7 @@ use domain_engine_graphql::{
     context::ServiceCtx,
     gql_scalar::GqlScalar,
     ontology_schema::{OntologyCtx, OntologySchema},
+    Schema,
 };
 use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema, ValueExt};
 use juniper::{graphql_value, InputValue};
@@ -31,8 +32,11 @@ async fn findings(ds: &str) {
         Default::default(),
     );
 
-    let [guitar, finding_session] =
-        test.bind(["guitar_synth_union.guitar", "findings.FindingSession"]);
+    let [guitar, synth, finding_session] = test.bind([
+        "guitar_synth_union.guitar",
+        "guitar_synth_union.synth",
+        "findings.FindingSession",
+    ]);
 
     info!("create a guitar to be found");
     r#"mutation {
@@ -51,12 +55,30 @@ async fn findings(ds: &str) {
     .await
     .unwrap();
 
+    info!("create a synth to be found");
+    r#"mutation {
+        synth(
+            create: [{
+                type: "synth",
+                polyphony: 1,
+            }]
+        ) {
+            node {
+                instrument_id
+            }
+        }
+    }"#
+    .exec([], &guitar_schema, &domain_ctx)
+    .await
+    .unwrap();
+
     info!("create a finding session");
     let session_value = r#"mutation {
         FindingSession(
-            create: [{
-                name: "favorite instruments"
-            }]
+            create: [
+                { name: "favorite guitars" },
+                { name: "favorite synths" },
+            ]
         ) {
             node {
                 id
@@ -67,50 +89,44 @@ async fn findings(ds: &str) {
     .await
     .unwrap();
 
-    let finding_session_id = session_value
+    let favorite_guitars = session_value
         .field("FindingSession")
         .element(0)
+        .field("node")
+        .field("id")
+        .scalar();
+    let favorite_synths = session_value
+        .field("FindingSession")
+        .element(1)
         .field("node")
         .field("id")
         .scalar();
 
     let guitar_address =
         ontology_find_single_address(guitar.def_id(), &ontology_schema, &ontology_ctx).await;
+    let synth_address =
+        ontology_find_single_address(synth.def_id(), &ontology_schema, &ontology_ctx).await;
     let _finding_session_address =
         ontology_find_single_address(finding_session.def_id(), &ontology_schema, &ontology_ctx)
             .await;
 
-    info!("found guitar address {guitar_address}");
-
     info!("register finding (of a guitar)");
-    r#"mutation addFinding($sessionId: ID!, $found: ID!) {
-        FindingSession(
-            update: [{
-                id: $sessionId
-                findings: { add: [$found] }
-            }]
-        ) {
-            node {
-                id
-            }
-        }
-    }"#
-    .exec(
-        [
-            (
-                "sessionId".to_owned(),
-                InputValue::Scalar(finding_session_id.clone()),
-            ),
-            (
-                "found".to_owned(),
-                InputValue::Scalar(guitar_address.clone()),
-            ),
-        ],
+    add_finding(
+        favorite_guitars,
+        &guitar_address,
         &findings_schema,
         &domain_ctx,
     )
-    .await
-    .unwrap();
+    .await;
+
+    info!("register finding (of a synth)");
+    add_finding(
+        favorite_synths,
+        &synth_address,
+        &findings_schema,
+        &domain_ctx,
+    )
+    .await;
 
     info!("list findings");
     expect_eq!(
@@ -130,15 +146,54 @@ async fn findings(ds: &str) {
             "findings": {
                 "nodes": [
                     {
-                        "name": "favorite instruments",
+                        "name": "favorite guitars",
                         "findings": {
                             "nodes": [guitar_address]
+                        }
+                    },
+                    {
+                        "name": "favorite synths",
+                        "findings": {
+                            "nodes": [synth_address]
                         }
                     }
                 ]
             }
         }))
     );
+}
+
+async fn add_finding(
+    finding_session_id: &GqlScalar,
+    found_id: &GqlScalar,
+    findings_schema: &Schema,
+    domain_ctx: &ServiceCtx,
+) {
+    r#"mutation addFinding($sessionId: ID!, $found: ID!) {
+        FindingSession(
+            update: [{
+                id: $sessionId
+                findings: { add: [$found] }
+            }]
+        ) {
+            node {
+                id
+            }
+        }
+    }"#
+    .exec(
+        [
+            (
+                "sessionId".to_owned(),
+                InputValue::Scalar(finding_session_id.clone()),
+            ),
+            ("found".to_owned(), InputValue::Scalar(found_id.clone())),
+        ],
+        findings_schema,
+        domain_ctx,
+    )
+    .await
+    .unwrap();
 }
 
 async fn ontology_find_single_address(

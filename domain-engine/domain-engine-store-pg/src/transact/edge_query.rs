@@ -80,8 +80,8 @@ pub enum EdgeUnionCardinalVariantSelect<'a> {
     },
     VertexAddress {
         expr: sql::Expr<'a>,
+        where_condition: Option<sql::Expr<'a>>,
     },
-    #[allow(unused)]
     Parameters {
         expr: sql::Expr<'a>,
     },
@@ -162,8 +162,15 @@ impl<'a> TransactCtx<'a> {
                         self.sql_select_edge_cardinals(
                             (next_cardinal_idx(cardinal_idx), pg_proj),
                             select,
-                            variant_builder
-                                .append(EdgeUnionCardinalVariantSelect::VertexAddress { expr }),
+                            variant_builder.append(EdgeUnionCardinalVariantSelect::VertexAddress {
+                                expr,
+                                where_condition: Some(sql::Expr::arc(edge_join_condition(
+                                    sql::Path::from_iter([pg_proj.edge_alias.into()]),
+                                    pg_proj.pg_subj_cardinal,
+                                    pg_proj.pg_subj_data.table,
+                                    sql::Expr::path2(pg_proj.subj_alias, "_key"),
+                                ))),
+                            }),
                             union_builder,
                             query_ctx,
                             cache,
@@ -324,8 +331,12 @@ impl<'a> TransactCtx<'a> {
                     }));
                     where_conjunctions.extend(where_condition);
                 }
-                EdgeUnionCardinalVariantSelect::VertexAddress { expr } => {
+                EdgeUnionCardinalVariantSelect::VertexAddress {
+                    expr,
+                    where_condition,
+                } => {
                     row_tuple.push(expr);
+                    where_conjunctions.extend(where_condition);
                 }
                 EdgeUnionCardinalVariantSelect::Parameters { expr } => {
                     row_tuple.push(expr);
