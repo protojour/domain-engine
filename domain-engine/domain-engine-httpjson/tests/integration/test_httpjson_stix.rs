@@ -19,41 +19,56 @@ async fn test_httpjson_stix(ds: &str) {
     let engine = make_domain_engine(test.ontology_owned(), ds).await;
     let router = test.make_test_router(engine, STIX.0);
 
-    info!("test json");
-    let put_json_response = router
-        .clone()
-        .oneshot(
-            Request::put("/stix-object")
-                .header(CONTENT_TYPE, "application/json")
-                .body(json_body(testdata::url1()))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
+    async fn put_one_url(router: &axum::Router) {
+        let put_json_response = router
+            .clone()
+            .oneshot(
+                Request::put("/stix-object")
+                    .header(CONTENT_TYPE, "application/json")
+                    .body(json_body(testdata::url1()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
 
-    fetch_body_assert_status(put_json_response, StatusCode::OK)
-        .await
-        .unwrap();
+        fetch_body_assert_status(put_json_response, StatusCode::OK)
+            .await
+            .unwrap();
+    }
+
+    async fn put_jsonlines_bundle(router: &axum::Router) {
+        let put_jsonlines_response = router
+            .clone()
+            .oneshot(
+                Request::put("/stix-object")
+                    .header(CONTENT_TYPE, "application/json-lines")
+                    .body(streaming_axum_body(jsonlines_stream(vec![
+                        testdata::identity(),
+                        testdata::marking_definition(),
+                        testdata::course_of_action(),
+                        testdata::url2(),
+                    ])))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        fetch_body_assert_status(put_jsonlines_response, StatusCode::OK)
+            .await
+            .unwrap();
+    }
+
+    info!("test json");
+    put_one_url(&router).await;
+
+    info!("test json UPDATE (UPSERT) over last PUT");
+    put_one_url(&router).await;
 
     info!("test jsonlines");
-    let put_jsonlines_response = router
-        .oneshot(
-            Request::put("/stix-object")
-                .header(CONTENT_TYPE, "application/json-lines")
-                .body(streaming_axum_body(jsonlines_stream(vec![
-                    testdata::identity(),
-                    testdata::marking_definition(),
-                    testdata::course_of_action(),
-                    testdata::url2(),
-                ])))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
+    put_jsonlines_bundle(&router).await;
 
-    fetch_body_assert_status(put_jsonlines_response, StatusCode::OK)
-        .await
-        .unwrap();
+    info!("test jsonlines UPDATE UPSERT) over last PUT");
+    put_jsonlines_bundle(&router).await;
 }
 
 #[datastore_test(tokio::test)]

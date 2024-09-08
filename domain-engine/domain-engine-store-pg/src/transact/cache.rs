@@ -9,11 +9,11 @@ use crate::{
     statement::PreparedStatement,
 };
 
-use super::insert::PreparedInsert;
+use super::{insert::PreparedInsert, InsertMode};
 
 #[derive(Default)]
 pub struct PgCache {
-    pub insert: FnvHashMap<(PackageId, DefId), PreparedInsert>,
+    pub insert: FnvHashMap<(InsertMode, PackageId, DefId), PreparedInsert>,
     pub update_tentative: FnvHashMap<(PackageId, DefId), PreparedStatement>,
     pub key_by_id: FnvHashMap<(DefId, PropId), PreparedStatement>,
     pub insert_tmp_id: FnvHashMap<(DefId, PropId), PreparedStatement>,

@@ -21,7 +21,7 @@ use tracing::{debug, trace, warn};
 
 use crate::{
     pg_error::{map_row_error, PgError, PgInputError},
-    pg_model::{EdgeId, InDomain, PgDataKey, PgDomainTable, PgRepr},
+    pg_model::{EdgeId, InDomain, PgColumn, PgDataKey, PgDomainTable, PgRepr},
     sql::{self},
     sql_record::SqlColumnStream,
     sql_value::SqlScalar,
@@ -89,18 +89,22 @@ impl<'a> TransactCtx<'a> {
         let pkg_id = value.pkg_id;
         let def_id = value.value.type_def_id();
 
-        let prepared = if let Some(prepared) = cache.insert.get(&(pkg_id, def_id)).cloned() {
+        let cache_key = (insert_mode, pkg_id, def_id);
+
+        let prepared = if let Some(prepared) = cache.insert.get(&cache_key).cloned() {
             prepared
         } else {
-            let prepared = self.prepare_insert(pkg_id, def_id, select, cache).await?;
-            cache.insert.insert((pkg_id, def_id), prepared.clone());
+            let prepared = self
+                .prepare_insert(pkg_id, def_id, insert_mode, select, cache)
+                .await?;
+            cache.insert.insert(cache_key, prepared.clone());
             prepared
         };
 
         self.preprocess_insert_value(insert_mode, &mut value.value)?;
 
         let def = self.ontology.def(value.value.type_def_id());
-        let (analyzed, pg) = self.analyze_input(None, def, value, insert_mode, select, cache)?;
+        let (analyzed, pg) = self.analyze_input(None, def, value, select, cache)?;
         let sql_params = analyzed.sql_params;
 
         let mut row_value = match analyzed.query_kind {
@@ -255,13 +259,19 @@ impl<'a> TransactCtx<'a> {
             let pkg_id = parent.prop_id.0.package_id();
             let def_id = ontol_def_tag.def_id();
 
-            let prepared = if let Some(prepared) = cache.insert.get(&(pkg_id, def_id)).cloned() {
+            let prepared = if let Some(prepared) = cache
+                .insert
+                .get(&(InsertMode::Insert, pkg_id, def_id))
+                .cloned()
+            {
                 prepared
             } else {
                 let prepared = self
-                    .prepare_insert(pkg_id, def_id, &Select::Unit, cache)
+                    .prepare_insert(pkg_id, def_id, InsertMode::Insert, &Select::Unit, cache)
                     .await?;
-                cache.insert.insert((pkg_id, def_id), prepared.clone());
+                cache
+                    .insert
+                    .insert((InsertMode::Insert, pkg_id, def_id), prepared.clone());
                 prepared
             };
 
@@ -288,13 +298,15 @@ impl<'a> TransactCtx<'a> {
             let pkg_id = value_def_id.0;
             let def_id = value_def_id;
 
-            let prepared = if let Some(prepared) = cache.insert.get(&(pkg_id, def_id)).cloned() {
+            let cache_key = (InsertMode::Insert, pkg_id, def_id);
+
+            let prepared = if let Some(prepared) = cache.insert.get(&cache_key).cloned() {
                 prepared
             } else {
                 let prepared = self
-                    .prepare_insert(pkg_id, def_id, &Select::Unit, cache)
+                    .prepare_insert(pkg_id, def_id, InsertMode::Insert, &Select::Unit, cache)
                     .await?;
-                cache.insert.insert((pkg_id, def_id), prepared.clone());
+                cache.insert.insert(cache_key, prepared.clone());
                 prepared
             };
 
@@ -303,7 +315,6 @@ impl<'a> TransactCtx<'a> {
                 Some(parent),
                 def,
                 InDomain { pkg_id, value },
-                InsertMode::Insert,
                 &Select::Unit,
                 cache,
             )?;
@@ -375,6 +386,7 @@ impl<'a> TransactCtx<'a> {
         &self,
         pkg_id: PackageId,
         def_id: DefId,
+        insert_mode: InsertMode,
         select: &'a Select,
         cache: &mut PgCache,
     ) -> DomainResult<PreparedInsert> {
@@ -390,6 +402,8 @@ impl<'a> TransactCtx<'a> {
         let mut column_names = vec!["_key"];
         let mut values = vec![sql::Expr::Default];
         let mut insert_returning = vec![];
+        let mut primary_id_column: Option<&PgColumn> = None;
+        let mut on_conflict: Option<sql::OnConflict> = None;
 
         let mut param_idx = 0;
 
@@ -407,22 +421,61 @@ impl<'a> TransactCtx<'a> {
             _ => {
                 // insert columns in the order of data relationships
                 for (prop_id, rel_info) in &def.data_relationships {
-                    if matches!(
-                        &rel_info.kind,
-                        DataRelationshipKind::Id | DataRelationshipKind::Tree
-                    ) {
-                        if let Some(pg_column) = pg.table.find_column(prop_id) {
-                            column_names.push(pg_column.col_name.as_ref());
-                            if pg_column.pg_type.insert_default() {
-                                values.push(sql::Expr::Default);
-                            } else {
-                                values.push(sql::Expr::param(param_idx));
-                                param_idx += 1;
-                            }
+                    let pg_column = pg.table.find_column(prop_id);
+
+                    match &rel_info.kind {
+                        DataRelationshipKind::Id => {
+                            primary_id_column = pg_column;
+                        }
+                        DataRelationshipKind::Tree => {}
+                        DataRelationshipKind::Edge(_) => continue,
+                    }
+
+                    if let Some(pg_column) = pg_column {
+                        column_names.push(pg_column.col_name.as_ref());
+                        if pg_column.pg_type.insert_default() {
+                            values.push(sql::Expr::Default);
+                        } else {
+                            values.push(sql::Expr::param(param_idx));
+                            param_idx += 1;
                         }
                     }
                 }
             }
+        }
+
+        // UPSERT / ON CONFLICT clause handling
+        if let (InsertMode::Upsert, Some(primary_id_column)) = (insert_mode, primary_id_column) {
+            let mut update_columns: Vec<sql::UpdateColumn> = vec![];
+            let mut param_idx = 0;
+
+            for (prop_id, rel_info) in &def.data_relationships {
+                match rel_info.kind {
+                    DataRelationshipKind::Id => {
+                        if pg.table.find_column(prop_id).is_some() {
+                            param_idx += 1;
+                        }
+                    }
+                    DataRelationshipKind::Tree => {
+                        // TODO: Make sure not to write "write-once" columns like Created time
+                        if let Some(pg_column) = pg.table.find_column(prop_id) {
+                            update_columns.push(sql::UpdateColumn(
+                                &pg_column.col_name,
+                                sql::Expr::param(param_idx),
+                            ));
+                            param_idx += 1;
+                        }
+                    }
+                    DataRelationshipKind::Edge(_) => {}
+                }
+            }
+
+            on_conflict = Some(sql::OnConflict {
+                target: Some(sql::ConflictTarget::Columns(vec![
+                    &primary_id_column.col_name,
+                ])),
+                action: sql::ConflictAction::DoUpdateSet(update_columns),
+            });
         }
 
         // RETURNING is based on select, etc
@@ -500,7 +553,7 @@ impl<'a> TransactCtx<'a> {
             as_: None,
             column_names,
             values,
-            on_conflict: None,
+            on_conflict,
             returning: insert_returning,
         };
 
@@ -515,7 +568,6 @@ impl<'a> TransactCtx<'a> {
         parent: Option<ParentProp>,
         def: &Def,
         value: InDomain<Value>,
-        insert_mode: InsertMode,
         select: &'a Select,
         cache: &mut PgCache,
     ) -> DomainResult<(AnalyzedInput<'a>, PgDomainTable<'_>)> {

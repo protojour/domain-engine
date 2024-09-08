@@ -47,9 +47,11 @@ impl MutationMode {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum InsertMode {
+    /// Insert - no conflict tolerated
     Insert,
+    /// Upsert - update on matching primary key
     Upsert,
 }
 
