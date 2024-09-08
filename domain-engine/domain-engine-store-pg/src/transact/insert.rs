@@ -44,11 +44,17 @@ pub struct PreparedInsert {
 }
 
 struct AnalyzedInput<'a> {
-    pub sql_params: Vec<SqlScalar>,
-    pub update_tentative: Option<PgDataKey>,
-    pub edges: EdgePatches,
-    pub abstract_values: Vec<(PropId, Value)>,
-    pub query_select: QuerySelect<'a>,
+    sql_params: Vec<SqlScalar>,
+    query_kind: InsertQueryKind,
+    edges: EdgePatches,
+    abstract_values: Vec<(PropId, Value)>,
+    query_select: QuerySelect<'a>,
+}
+
+enum InsertQueryKind {
+    Insert,
+    // Upsert,
+    UpdateTentative(PgDataKey),
 }
 
 struct ParentProp {
@@ -61,13 +67,13 @@ impl<'a> TransactCtx<'a> {
     pub fn insert_vertex<'s>(
         &'s self,
         value: InDomain<Value>,
-        mode: InsertMode,
+        insert_mode: InsertMode,
         select: &'a Select,
         cache: &'s mut PgCache,
     ) -> BoxFuture<'_, DomainResult<RowValue>> {
         Box::pin(async move {
             let _def_id = value.value.type_def_id();
-            self.insert_vertex_impl(value, mode, select, cache)
+            self.insert_vertex_impl(value, insert_mode, select, cache)
                 // .instrument(debug_span!("ins", id = ?def_id))
                 .await
         })
@@ -76,7 +82,7 @@ impl<'a> TransactCtx<'a> {
     async fn insert_vertex_impl<'s>(
         &'s self,
         mut value: InDomain<Value>,
-        mode: InsertMode,
+        insert_mode: InsertMode,
         select: &'a Select,
         cache: &'s mut PgCache,
     ) -> DomainResult<RowValue> {
@@ -91,21 +97,21 @@ impl<'a> TransactCtx<'a> {
             prepared
         };
 
-        self.preprocess_insert_value(mode, &mut value.value)?;
+        self.preprocess_insert_value(insert_mode, &mut value.value)?;
 
         let def = self.ontology.def(value.value.type_def_id());
-        let (analyzed, pg) = self.analyze_input(None, def, value, select, cache)?;
+        let (analyzed, pg) = self.analyze_input(None, def, value, insert_mode, select, cache)?;
+        let sql_params = analyzed.sql_params;
 
-        let mut row_value = if let Some(data_key) = analyzed.update_tentative {
-            self.update_tentative_vertex(def, pg, &analyzed, data_key, cache)
-                .await?
-        } else {
-            self.insert_row(
-                &prepared.inherent_stmt,
-                &analyzed.sql_params,
-                analyzed.query_select,
-            )
-            .await?
+        let mut row_value = match analyzed.query_kind {
+            InsertQueryKind::Insert => {
+                self.insert_row(&prepared.inherent_stmt, &sql_params, analyzed.query_select)
+                    .await?
+            }
+            InsertQueryKind::UpdateTentative(data_key) => {
+                self.update_tentative_vertex(def, pg, sql_params, data_key, cache)
+                    .await?
+            }
         };
 
         self.patch_edges(pg.table, row_value.data_key, analyzed.edges, cache)
@@ -157,7 +163,7 @@ impl<'a> TransactCtx<'a> {
         &'s self,
         def: &Def,
         pg: PgDomainTable<'a>,
-        analyzed: &AnalyzedInput<'a>,
+        mut sql_params: Vec<SqlScalar>,
         data_key: PgDataKey,
         cache: &'s mut PgCache,
     ) -> DomainResult<RowValue> {
@@ -172,7 +178,7 @@ impl<'a> TransactCtx<'a> {
                 set: vec![],
                 where_: Some(sql::Expr::eq(
                     sql::Expr::path1("_key"),
-                    sql::Expr::param(analyzed.sql_params.len()),
+                    sql::Expr::param(sql_params.len()),
                 )),
                 returning: vec![sql::Expr::LiteralInt(0)],
             };
@@ -200,7 +206,7 @@ impl<'a> TransactCtx<'a> {
 
         for (prop_id, rel_info) in &def.data_relationships {
             if pg.table.find_column(prop_id).is_some() {
-                let input_param = analyzed.sql_params.get(param_idx).unwrap();
+                let input_param = sql_params.get(param_idx).unwrap();
 
                 let unit_val =
                     self.deserialize_sql(rel_info.target.def_id(), input_param.clone().into())?;
@@ -209,14 +215,13 @@ impl<'a> TransactCtx<'a> {
             }
         }
 
-        assert_eq!(param_idx, analyzed.sql_params.len());
+        assert_eq!(param_idx, sql_params.len());
 
-        let mut update_params = analyzed.sql_params.clone();
-        update_params.push(SqlScalar::I64(data_key));
+        sql_params.push(SqlScalar::I64(data_key));
 
         debug!("{prepared}");
 
-        self.query_one_raw(prepared.deref(), &update_params).await?;
+        self.query_one_raw(prepared.deref(), &sql_params).await?;
 
         Ok(RowValue {
             value: Value::Struct(Box::new(attrs), def.id.into()),
@@ -298,6 +303,7 @@ impl<'a> TransactCtx<'a> {
                 Some(parent),
                 def,
                 InDomain { pkg_id, value },
+                InsertMode::Insert,
                 &Select::Unit,
                 cache,
             )?;
@@ -509,6 +515,7 @@ impl<'a> TransactCtx<'a> {
         parent: Option<ParentProp>,
         def: &Def,
         value: InDomain<Value>,
+        insert_mode: InsertMode,
         select: &'a Select,
         cache: &mut PgCache,
     ) -> DomainResult<(AnalyzedInput<'a>, PgDomainTable<'_>)> {
@@ -669,7 +676,11 @@ impl<'a> TransactCtx<'a> {
         Ok((
             AnalyzedInput {
                 sql_params,
-                update_tentative,
+                query_kind: if let Some(data_key) = update_tentative {
+                    InsertQueryKind::UpdateTentative(data_key)
+                } else {
+                    InsertQueryKind::Insert
+                },
                 edges: edge_patches,
                 abstract_values,
                 query_select,

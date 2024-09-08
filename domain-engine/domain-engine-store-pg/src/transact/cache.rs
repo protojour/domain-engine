@@ -14,8 +14,8 @@ use super::insert::PreparedInsert;
 #[derive(Default)]
 pub struct PgCache {
     pub insert: FnvHashMap<(PackageId, DefId), PreparedInsert>,
-    pub key_by_id: FnvHashMap<(DefId, PropId), PreparedStatement>,
     pub update_tentative: FnvHashMap<(PackageId, DefId), PreparedStatement>,
+    pub key_by_id: FnvHashMap<(DefId, PropId), PreparedStatement>,
     pub insert_tmp_id: FnvHashMap<(DefId, PropId), PreparedStatement>,
     pub upsert_self_identifying: FnvHashMap<DefId, PreparedStatement>,
     pub edge_update: FnvHashMap<Arc<String>, PreparedStatement>,
