@@ -21,8 +21,8 @@ test:
     - name: postgres:16
       alias: postgres
       variables:
-        POSTGRES_DB: postgres
-        POSTGRES_USER: postgres
+        POSTGRES_DB: domainengine
+        POSTGRES_USER: domainengine
         POSTGRES_PASSWORD: postgres
   script:
     - cargo test --tests --benches --no-fail-fast

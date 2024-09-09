@@ -231,7 +231,7 @@ mod pg {
         let test_name = format!("testdb_{}", super::detect_test_name("::ds_pg"));
 
         if recreate_db {
-            let master_config = test_pg_config("postgres");
+            let master_config = test_pg_config("domainengine");
             recreate_database(&test_name, &master_config)
                 .await
                 .map_err(|err| DomainError::data_store(format!("{err}")))
@@ -279,7 +279,7 @@ mod pg {
             .host(host)
             .port(5432)
             .dbname(dbname)
-            .user("postgres")
+            .user("domainengine")
             .password("postgres");
         config
     }
