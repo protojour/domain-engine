@@ -177,6 +177,12 @@ pub enum OntoolError {
 pub async fn run() -> Result<(), OntoolError> {
     let cli = Cli::parse();
 
+    if let Some(Command::Lsp) = &cli.command {
+        init_tracing_stderr();
+    } else {
+        init_tracing();
+    }
+
     if let Some(command) = cli.command {
         run_command(command).await
     } else {
@@ -187,16 +193,12 @@ pub async fn run() -> Result<(), OntoolError> {
 pub async fn run_command(command: Command) -> Result<(), OntoolError> {
     match command {
         Command::Check(args) => {
-            init_tracing();
-
             compile(args.dir, args.files, None)?;
             println!("No errors found.");
 
             Ok(())
         }
         Command::Compile(args) => {
-            init_tracing();
-
             let output_file = File::create(args.output)?;
 
             let ontology = compile(args.dir, args.files, args.backend)?;
@@ -205,8 +207,6 @@ pub async fn run_command(command: Command) -> Result<(), OntoolError> {
             Ok(())
         }
         Command::Generate(args) => {
-            init_tracing();
-
             let first_domain =
                 get_source_name(args.files.as_slice().iter().next().expect("no input files"));
 
@@ -232,8 +232,6 @@ pub async fn run_command(command: Command) -> Result<(), OntoolError> {
             Ok(())
         }
         Command::Serve(args) => {
-            init_tracing();
-
             serve(args.dir, args.files, args.port).await?;
 
             Ok(())
@@ -244,11 +242,7 @@ pub async fn run_command(command: Command) -> Result<(), OntoolError> {
 
             Ok(())
         }
-        Command::Lsp => {
-            init_tracing_stderr();
-
-            lsp().await
-        }
+        Command::Lsp => lsp().await,
     }
 }
 
