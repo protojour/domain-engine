@@ -16,7 +16,7 @@ use ontol_runtime::{
     query::select::{Select, StructSelect},
     tuple::EndoTuple,
     value::Value,
-    DefId, PackageId, PropId,
+    DefId, DomainIndex, PropId,
 };
 use serde::de::DeserializeSeed;
 use tracing::{debug, trace, warn};
@@ -35,17 +35,17 @@ pub struct DefBinding<'on> {
 
 impl<'on> DefBinding<'on> {
     pub(crate) fn new(ontol_test: &'on OntolTest, type_name: &str) -> Self {
-        let (package_id, type_name) = ontol_test.parse_test_ident(type_name);
-        Self::new_with_package(ontol_test, package_id, type_name)
+        let (domain_index, type_name) = ontol_test.parse_test_ident(type_name);
+        Self::new_with_domain(ontol_test, domain_index, type_name)
     }
 
-    fn new_with_package(
+    fn new_with_domain(
         ontol_test: &'on OntolTest,
-        package_id: PackageId,
+        domain_index: DomainIndex,
         type_name: &str,
     ) -> Self {
         let ontology = ontol_test.ontology.as_ref();
-        let domain = ontology.domain_by_pkg(package_id).unwrap();
+        let domain = ontology.domain_by_index(domain_index).unwrap();
         let def = domain
             .defs()
             .find(|def| match def.ident().map(|name| &ontology[name]) {
@@ -124,7 +124,7 @@ impl<'on> DefBinding<'on> {
     pub fn graphql_def_id(&self) -> String {
         let domain = self
             .ontology
-            .domain_by_pkg(self.def.id.package_id())
+            .domain_by_index(self.def.id.domain_index())
             .unwrap();
 
         format!("{}:{}", domain.domain_id().ulid, self.def.id.1)

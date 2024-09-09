@@ -23,14 +23,14 @@ impl<'m> Compiler<'m> {
         order_relationship: RelId,
         order_union: DefId,
     ) -> Option<(DefId, EntityOrder)> {
-        let package_id = entity_def_id.package_id();
+        let domain_index = entity_def_id.domain_index();
         let meta = rel_def_meta(order_relationship, &self.rel_ctx, &self.defs);
         let object = meta.relationship.object;
         let rel_span = *meta.relationship.span;
 
         match self.repr_ctx.get_repr_kind(&object.0) {
             Some(ReprKind::Scalar(scalar_def_id, ReprScalarKind::TextConstant(_), _)) => {
-                if object.0.package_id() != package_id
+                if object.0.domain_index() != domain_index
                     || !matches!(self.defs.def_kind(*scalar_def_id), DefKind::TextLiteral(_))
                 {
                     CompileError::EntityOrderMustBeSymbolInThisDomain

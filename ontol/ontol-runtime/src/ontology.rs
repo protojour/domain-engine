@@ -27,12 +27,12 @@ use crate::{
         ontol_vm::OntolVm,
         proc::{Lib, Procedure},
     },
-    DefId, DefIdSet, MapKey, PackageId, PropId,
+    DefId, DefIdSet, DomainIndex, MapKey, PropId,
 };
 
 use self::{
     builder::OntologyBuilder,
-    config::PackageConfig,
+    config::DomainConfig,
     domain::{Def, Domain, ExtendedEntityInfo},
     map::{Extern, MapMeta, PropertyFlow},
     ontol::{
@@ -57,7 +57,7 @@ pub struct Data {
     pub(crate) const_proc_table: FnvHashMap<DefId, Procedure>,
     pub(crate) map_meta_table: FnvHashMap<MapKey, MapMeta>,
     pub(crate) static_conditions: FnvHashMap<MapKey, Condition>,
-    pub(crate) named_downmaps: FnvHashMap<(PackageId, TextConstant), MapKey>,
+    pub(crate) named_downmaps: FnvHashMap<(DomainIndex, TextConstant), MapKey>,
     pub(crate) text_like_types: FnvHashMap<DefId, TextLikeType>,
     pub(crate) text_patterns: FnvHashMap<DefId, TextPattern>,
     pub(crate) extern_table: FnvHashMap<DefId, Extern>,
@@ -67,12 +67,12 @@ pub struct Data {
     /// (length is stored on the heap) and which makes the vector as dense as possible:
     text_constants: Vec<ArcStr>,
 
-    domains: VecMap<PackageId, Domain>,
+    domains: VecMap<DomainIndex, Domain>,
     extended_entity_table: FnvHashMap<DefId, ExtendedEntityInfo>,
     ontol_domain_meta: OntolDomainMeta,
     union_variants: FnvHashMap<DefId, DefIdSet>,
-    domain_interfaces: FnvHashMap<PackageId, Vec<DomainInterface>>,
-    package_config_table: FnvHashMap<PackageId, PackageConfig>,
+    domain_interfaces: FnvHashMap<DomainIndex, Vec<DomainInterface>>,
+    domain_config_table: FnvHashMap<DomainIndex, DomainConfig>,
     def_docs: FnvHashMap<DefId, TextConstant>,
     prop_docs: FnvHashMap<PropId, TextConstant>,
     serde_operators: Vec<SerdeOperator>,
@@ -119,7 +119,7 @@ impl Ontology {
     }
 
     pub fn def(&self, def_id: DefId) -> &Def {
-        match self.domain_by_pkg(def_id.0) {
+        match self.domain_by_index(def_id.0) {
             Some(domain) => domain.def(def_id),
             None => {
                 panic!("No domain for {:?}", def_id.0)
@@ -128,7 +128,7 @@ impl Ontology {
     }
 
     pub fn get_def(&self, def_id: DefId) -> Option<&Def> {
-        match self.domain_by_pkg(def_id.0) {
+        match self.domain_by_index(def_id.0) {
             Some(domain) => domain.def_option(def_id),
             None => None,
         }
@@ -150,19 +150,19 @@ impl Ontology {
         self.data.text_like_types.get(&def_id).cloned()
     }
 
-    pub fn domains(&self) -> impl Iterator<Item = (PackageId, &Domain)> {
+    pub fn domains(&self) -> impl Iterator<Item = (DomainIndex, &Domain)> {
         self.data
             .domains
             .iter()
-            .map(|(idx, domain)| (PackageId(idx as u16), domain))
+            .map(|(idx, domain)| (DomainIndex(idx as u16), domain))
     }
 
     pub fn ontol_domain_meta(&self) -> &OntolDomainMeta {
         &self.data.ontol_domain_meta
     }
 
-    pub fn domain_by_pkg(&self, package_id: PackageId) -> Option<&Domain> {
-        self.data.domains.get(&package_id)
+    pub fn domain_by_index(&self, index: DomainIndex) -> Option<&Domain> {
+        self.data.domains.get(&index)
     }
 
     pub fn domain_by_id(&self, domain_id: Ulid) -> Option<&Domain> {
@@ -184,7 +184,7 @@ impl Ontology {
     }
 
     pub fn find_edge(&self, id: DefId) -> Option<&EdgeInfo> {
-        let domain = self.domain_by_pkg(id.0)?;
+        let domain = self.domain_by_index(id.0)?;
         domain.find_edge(id)
     }
 
@@ -192,14 +192,14 @@ impl Ontology {
         self.data.extended_entity_table.get(&def_id)
     }
 
-    pub fn get_package_config(&self, package_id: PackageId) -> Option<&PackageConfig> {
-        self.data.package_config_table.get(&package_id)
+    pub fn get_domain_config(&self, index: DomainIndex) -> Option<&DomainConfig> {
+        self.data.domain_config_table.get(&index)
     }
 
-    pub fn domain_interfaces(&self, package_id: PackageId) -> &[DomainInterface] {
+    pub fn domain_interfaces(&self, index: DomainIndex) -> &[DomainInterface] {
         self.data
             .domain_interfaces
-            .get(&package_id)
+            .get(&index)
             .map(|interfaces| interfaces.as_slice())
             .unwrap_or(&[])
     }
@@ -217,11 +217,11 @@ impl Ontology {
 
     pub fn iter_named_downmaps(
         &self,
-    ) -> impl Iterator<Item = (PackageId, TextConstant, MapKey)> + '_ {
+    ) -> impl Iterator<Item = (DomainIndex, TextConstant, MapKey)> + '_ {
         self.data
             .named_downmaps
             .iter()
-            .map(|((package_id, text_constant), value)| (*package_id, *text_constant, *value))
+            .map(|((index, text_constant), value)| (*index, *text_constant, *value))
     }
 
     pub fn get_map_meta(&self, key: &MapKey) -> Option<&MapMeta> {
@@ -292,11 +292,11 @@ impl Ontology {
     }
 
     /// This primarily exists for testing only.
-    pub fn find_named_downmap_meta(&self, package_id: PackageId, name: &str) -> Option<MapKey> {
+    pub fn find_named_downmap_meta(&self, index: DomainIndex, name: &str) -> Option<MapKey> {
         let text_constant = self.find_text_constant(name)?;
         self.data
             .named_downmaps
-            .get(&(package_id, text_constant))
+            .get(&(index, text_constant))
             .cloned()
     }
 

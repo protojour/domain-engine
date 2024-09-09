@@ -511,7 +511,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             Type::Function(_)
             | Type::Edge
             | Type::Anonymous(..)
-            | Type::Package
+            | Type::Domain
             | Type::BuiltinRelation
             | Type::ValueGenerator(_)
             | Type::Extern(_)

@@ -25,7 +25,7 @@ impl<'a> TransactCtx<'a> {
 
         let pg = self
             .pg_model
-            .pg_domain_datatable(def_id.package_id(), def_id)?;
+            .pg_domain_datatable(def_id.domain_index(), def_id)?;
 
         let Some(info) = self.ontology.extended_entity_info(def_id) else {
             warn!("no extended entity info; cannot order");

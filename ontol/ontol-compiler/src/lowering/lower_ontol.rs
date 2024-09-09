@@ -49,8 +49,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         Self {
             ctx: LoweringCtx {
                 compiler,
-                pkg_def_id,
-                package_id: src.package_id,
+                domain_def_id: pkg_def_id,
+                domain_index: src.domain_index,
                 source_id: src.id,
                 anonymous_unions: Default::default(),
                 outcome: Default::default(),
@@ -97,7 +97,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     ) -> Option<RootDefs> {
         match statement {
             insp::Statement::DomainStatement(stmt) => {
-                self.append_documentation(DocId::Def(self.ctx.pkg_def_id), stmt.0.clone());
+                self.append_documentation(DocId::Def(self.ctx.domain_def_id), stmt.0.clone());
 
                 let domain_id = stmt.domain_id()?;
 
@@ -123,7 +123,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 }
 
                 self.ctx.compiler.domain_ids.insert(
-                    self.ctx.package_id,
+                    self.ctx.domain_index,
                     DomainId {
                         ulid: domain_ulid,
                         stable: true,
@@ -236,15 +236,15 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 self.ctx
                     .compiler
                     .domain_dep_graph
-                    .entry(self.ctx.package_id)
+                    .entry(self.ctx.domain_index)
                     .or_default()
-                    .insert(used_package_def_id.package_id());
+                    .insert(used_package_def_id.domain_index());
 
                 let type_namespace = self
                     .ctx
                     .compiler
                     .namespaces
-                    .get_namespace_mut(self.ctx.pkg_def_id, Space::Def);
+                    .get_namespace_mut(self.ctx.domain_def_id, Space::Def);
 
                 let symbol = use_stmt.ident_path()?.symbols().next()?;
 
@@ -351,7 +351,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
             let opt_def_id = self.catch(|zelf| {
                 zelf.ctx
-                    .coin_symbol(zelf.ctx.pkg_def_id, symbol.slice(), symbol.span())
+                    .coin_symbol(zelf.ctx.domain_def_id, symbol.slice(), symbol.span())
             });
             root_defs.extend(opt_def_id);
         }

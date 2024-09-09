@@ -40,7 +40,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 let symbol = ident_path.symbols().next()?;
                 let (def_id, coinage, _) = self.catch(|zelf| {
                     zelf.ctx.named_def_id(
-                        zelf.ctx.pkg_def_id,
+                        zelf.ctx.domain_def_id,
                         Space::Map,
                         symbol.slice(),
                         symbol.span(),
@@ -54,7 +54,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 (def_id, Some(ident))
             }
             None => (
-                self.ctx.compiler.defs.alloc_def_id(self.ctx.package_id),
+                self.ctx.compiler.defs.alloc_def_id(self.ctx.domain_index),
                 None,
             ),
         };

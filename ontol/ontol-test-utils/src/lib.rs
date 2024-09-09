@@ -13,17 +13,17 @@ use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
     ontol_syntax::OntolTreeSyntax,
-    package::{GraphState, PackageGraphBuilder, PackageReference, PackageTopology, ParsedPackage},
+    package::{GraphState, PackageGraphBuilder, PackageReference, PackageTopology, ParsedDomain},
     SourceCodeRegistry, Sources,
 };
 use ontol_parser::cst_parse;
 use ontol_runtime::{
     interface::{graphql::schema::GraphqlSchema, DomainInterface},
     ontology::{
-        config::{DataStoreConfig, PackageConfig},
+        config::{DataStoreConfig, DomainConfig},
         Ontology,
     },
-    PackageId, PropId,
+    DomainIndex, PropId,
 };
 use tracing::info;
 
@@ -93,9 +93,9 @@ macro_rules! assert_json_io_matches {
 #[derive(Clone)]
 pub struct OntolTest {
     ontology: Arc<Ontology>,
-    root_package: PackageId,
+    root_package: DomainIndex,
     compile_json_schema: bool,
-    packages_by_source_name: HashMap<String, PackageId>,
+    packages_by_source_name: HashMap<String, DomainIndex>,
 }
 
 impl OntolTest {
@@ -107,7 +107,7 @@ impl OntolTest {
         self.ontology.clone()
     }
 
-    pub fn root_package(&self) -> PackageId {
+    pub fn root_package(&self) -> DomainIndex {
         self.root_package
     }
 
@@ -115,19 +115,19 @@ impl OntolTest {
         self.compile_json_schema = enabled;
     }
 
-    pub fn parse_test_ident<'s>(&self, ident: &'s str) -> (PackageId, &'s str) {
+    pub fn parse_test_ident<'s>(&self, ident: &'s str) -> (DomainIndex, &'s str) {
         if ident.contains('.') {
             let vector: Vec<&str> = ident.split('.').collect();
             let source_name = vector.first().unwrap();
             let local_ident = vector.get(1).unwrap();
 
-            (self.get_package_id(source_name), local_ident)
+            (self.get_domain_index(source_name), local_ident)
         } else {
             (self.root_package, ident)
         }
     }
 
-    pub fn get_package_id(&self, source_name: &str) -> PackageId {
+    pub fn get_domain_index(&self, source_name: &str) -> DomainIndex {
         self.packages_by_source_name
             .get(source_name)
             .cloned()
@@ -161,7 +161,7 @@ impl OntolTest {
     /// Get the ontol_runtime GraphQL schema
     pub fn graphql_schema(&self, source_name: impl Into<SrcName>) -> &GraphqlSchema {
         self.ontology
-            .domain_interfaces(self.get_package_id(&source_name.into().0))
+            .domain_interfaces(self.get_domain_index(&source_name.into().0))
             .iter()
             .filter_map(|interface| match interface {
                 DomainInterface::GraphQL(schema) => Some(schema),
@@ -226,7 +226,7 @@ pub struct TestPackages {
     sources: Sources,
     source_code_registry: SourceCodeRegistry,
     data_store: Option<(SrcName, DataStoreConfig)>,
-    packages_by_source_name: HashMap<String, PackageId>,
+    packages_by_source_name: HashMap<String, DomainIndex>,
     disable_ontology_serde: bool,
 }
 
@@ -319,7 +319,7 @@ impl TestPackages {
         self
     }
 
-    fn load_topology(&mut self) -> Result<(PackageTopology, PackageId), UnifiedCompileError> {
+    fn load_topology(&mut self) -> Result<(PackageTopology, DomainIndex), UnifiedCompileError> {
         let mut package_graph_builder = PackageGraphBuilder::with_roots(
             self.root_package_names
                 .iter()
@@ -338,15 +338,15 @@ impl TestPackages {
                         };
 
                         self.packages_by_source_name
-                            .insert(source_name.to_string(), request.package_id);
+                            .insert(source_name.to_string(), request.domain_index);
 
                         if let Some(first_root) = self.root_package_names.first() {
                             if source_name == first_root.0 {
-                                root_package = Some(request.package_id);
+                                root_package = Some(request.domain_index);
                             }
                         }
 
-                        let mut package_config = PackageConfig::default();
+                        let mut package_config = DomainConfig::default();
 
                         if let Some((db_source_name, data_store_config)) = &self.data_store {
                             if source_name == db_source_name.0 {
@@ -359,7 +359,7 @@ impl TestPackages {
                             let (flat_tree, errors) = cst_parse(&rc_source);
                             let tree = flat_tree.unflatten();
 
-                            let parsed = ParsedPackage::new(
+                            let parsed = ParsedDomain::new(
                                 request,
                                 Box::new(OntolTreeSyntax {
                                     tree,

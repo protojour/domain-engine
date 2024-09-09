@@ -17,7 +17,7 @@ use crate::{
     query::filter::Filter,
     sequence::Sequence,
     tuple::EndoTupleElements,
-    DefId, OntolDefTag, PackageId, PropId,
+    DefId, OntolDefTag, DomainIndex, PropId,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -295,7 +295,7 @@ impl ValueTag {
 
     pub const fn def_id(&self) -> DefId {
         DefId(
-            PackageId(self.first & TagFlags::PKG_MASk.bits()),
+            DomainIndex(self.first & TagFlags::PKG_MASk.bits()),
             self.second,
         )
     }
@@ -308,7 +308,7 @@ impl ValueTag {
     }
 
     pub fn set_def_id(&mut self, def_id: DefId) {
-        self.first = def_id.package_id().0 | (self.first & TagFlags::PKG_MASk.complement().bits());
+        self.first = def_id.domain_index().0 | (self.first & TagFlags::PKG_MASk.complement().bits());
         self.second = def_id.1;
     }
 
@@ -347,7 +347,7 @@ impl From<ValueTag> for DefId {
 impl From<DefId> for ValueTag {
     fn from(value: DefId) -> Self {
         Self {
-            first: value.package_id().0,
+            first: value.domain_index().0,
             second: value.1,
         }
     }

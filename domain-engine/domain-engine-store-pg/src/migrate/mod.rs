@@ -5,7 +5,7 @@ use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::{domain::DefKind, Ontology},
     tuple::CardinalIdx,
-    DefId, DefPropTag, OntolDefTag, PackageId,
+    DefId, DefPropTag, DomainIndex, OntolDefTag,
 };
 use read_registry::read_registry;
 use tokio_postgres::{Client, Transaction};
@@ -32,7 +32,7 @@ const MIGRATIONS_TABLE_NAME: &str = "public.m6mreg_schema_history";
 
 #[derive(Clone, Copy)]
 struct PgDomainIds {
-    pkg_id: PackageId,
+    index: DomainIndex,
     uid: DomainUid,
 }
 
@@ -46,9 +46,9 @@ enum Stage {
 struct MigrationCtx {
     current_version: RegVersion,
     deployed_version: RegVersion,
-    domains: FnvHashMap<PackageId, PgDomain>,
+    domains: FnvHashMap<DomainIndex, PgDomain>,
     steps: Steps,
-    abstract_scalars: FnvHashMap<PackageId, BTreeMap<OntolDefTag, PgType>>,
+    abstract_scalars: FnvHashMap<DomainIndex, BTreeMap<OntolDefTag, PgType>>,
 }
 
 #[derive(Default)]
@@ -122,7 +122,7 @@ enum MigrationStep {
 }
 
 pub async fn migrate(
-    persistent_domains: &BTreeSet<PackageId>,
+    persistent_domains: &BTreeSet<DomainIndex>,
     ontology: &Ontology,
     db_name: &str,
     pg_client: &mut Client,
@@ -166,12 +166,12 @@ pub async fn migrate(
 
     // collect migration steps for persistent domains
     // this improves separation of concerns while also enabling dry run simulations
-    for package_id in [PackageId::ontol()].iter().chain(persistent_domains) {
+    for domain_index in [DomainIndex::ontol()].iter().chain(persistent_domains) {
         let domain = ontology
-            .domain_by_pkg(*package_id)
+            .domain_by_index(*domain_index)
             .ok_or_else(|| anyhow!("domain does not exist"))?;
 
-        steps::migrate_domain_steps(*package_id, domain, ontology, &mut ctx)
+        steps::migrate_domain_steps(*domain_index, domain, ontology, &mut ctx)
             .instrument(debug_span!("migrate", id = %domain.domain_id().ulid))
             .await
             .context("domain migration steps")?;
@@ -196,7 +196,7 @@ pub async fn migrate(
         );
 
         // check edge cardinals for multiple unique indexes (not handled)
-        for (pkg_id, pg_domain) in &ctx.domains {
+        for (domain_index, pg_domain) in &ctx.domains {
             for (edge_tag, edgetable) in &pg_domain.edgetables {
                 let unique_count = edgetable
                     .edge_cardinals
@@ -205,7 +205,7 @@ pub async fn migrate(
                     .count();
 
                 if unique_count > 1 {
-                    let edge_id = DefId(*pkg_id, *edge_tag);
+                    let edge_id = DefId(*domain_index, *edge_tag);
                     return Err(anyhow!(
                         "edge {edge_id:?} has more than one unique cardinal, which doesn't work yet"
                     ));

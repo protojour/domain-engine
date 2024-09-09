@@ -4,7 +4,7 @@ use arcstr::ArcStr;
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
-    interface::discriminator::Discriminant, ontology::ontol::ValueGenerator, DefId, PackageId,
+    interface::discriminator::Discriminant, ontology::ontol::ValueGenerator, DefId, DomainIndex,
     PropId,
 };
 
@@ -78,7 +78,7 @@ pub enum RelObjectConstraint {
 #[derive(Clone, Debug)]
 pub struct TypeParam {
     pub object: DefId,
-    pub definition_site: PackageId,
+    pub definition_site: DomainIndex,
     pub span: SourceSpan,
 }
 

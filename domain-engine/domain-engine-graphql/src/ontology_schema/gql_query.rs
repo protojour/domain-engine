@@ -52,7 +52,7 @@ impl Query {
         };
 
         if let Some((id, _)) = domain {
-            Ok(gql_domain::Domain { pkg_id: id })
+            Ok(gql_domain::Domain { domain_index: id })
         } else {
             Err(field_error("Domain not found"))
         }
@@ -60,8 +60,8 @@ impl Query {
 
     fn domains(ctx: &OntologyCtx) -> FieldResult<Vec<gql_domain::Domain>> {
         let mut domains = vec![];
-        for (package_id, _ontology_domain) in ctx.domains() {
-            let domain = gql_domain::Domain { pkg_id: package_id };
+        for (domain_index, _ontology_domain) in ctx.domains() {
+            let domain = gql_domain::Domain { domain_index };
             domains.push(domain);
         }
         Ok(domains)

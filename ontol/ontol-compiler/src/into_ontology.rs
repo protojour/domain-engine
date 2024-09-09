@@ -17,7 +17,7 @@ use ontol_runtime::{
         Ontology,
     },
     rustdoc::RustDoc,
-    DefId, DefIdSet, FnvIndexMap, OntolDefTag, PackageId, PropId,
+    DefId, DefIdSet, DomainIndex, FnvIndexMap, OntolDefTag, PropId,
 };
 use std::{
     collections::{BTreeSet, HashMap},
@@ -34,7 +34,6 @@ use crate::{
         serde::{serde_generator::SerdeGenerator, SerdeKey, EDGE_PROPERTY},
     },
     namespace::{DocId, Space},
-    package::ONTOL_PKG,
     primitive::PrimitiveKind,
     properties::Properties,
     relation::{rel_def_meta, rel_repr_meta, RelDefMeta, RelId, Relationship, UnionMemberCache},
@@ -45,14 +44,14 @@ use crate::{
 
 impl<'m> Compiler<'m> {
     pub(crate) fn into_ontology_inner(mut self) -> Ontology {
-        let package_ids: Vec<PackageId> = self.domain_ids.keys().copied().collect();
+        let domain_indices: Vec<DomainIndex> = self.domain_ids.keys().copied().collect();
         let unique_domain_names = self.unique_domain_names();
 
         let mut namespaces = std::mem::take(&mut self.namespaces.namespaces);
-        let mut package_config_table = std::mem::take(&mut self.package_config_table);
+        let mut domain_config_table = std::mem::take(&mut self.domain_config_table);
         let mut docs_table = std::mem::take(&mut self.namespaces.docs);
 
-        for def_id in self.defs.iter_package_def_ids(ONTOL_PKG) {
+        for def_id in self.defs.iter_domain_def_ids(DomainIndex::ontol()) {
             match self.defs.def_kind(def_id) {
                 DefKind::Primitive(kind, _ident) => {
                     if let Some(field_docs) = PrimitiveKind::get_field_rustdoc(kind) {
@@ -98,8 +97,8 @@ impl<'m> Compiler<'m> {
         let union_member_cache = {
             let mut cache: FnvHashMap<DefId, BTreeSet<DefId>> = Default::default();
 
-            for package_id in package_ids.iter() {
-                let domain_def_id = self.package_def_ids.get(package_id).cloned().unwrap();
+            for domain_index in domain_indices.iter() {
+                let domain_def_id = self.domain_def_ids.get(domain_index).cloned().unwrap();
                 let namespace = namespaces.get(&domain_def_id).unwrap();
 
                 for (_, union_def_id) in &namespace.types {
@@ -126,19 +125,22 @@ impl<'m> Compiler<'m> {
 
         let map_namespaces: FnvHashMap<_, _> = namespaces
             .iter_mut()
-            .map(|(package_id, namespace)| {
-                (*package_id, std::mem::take(namespace.space_mut(Space::Map)))
+            .map(|(domain_index, namespace)| {
+                (
+                    *domain_index,
+                    std::mem::take(namespace.space_mut(Space::Map)),
+                )
             })
             .collect();
 
         // For now, create serde operators for every domain
-        for package_id in package_ids.iter().cloned() {
-            let domain_def_id = self.package_def_ids.get(&package_id).cloned().unwrap();
+        for domain_index in domain_indices.iter().cloned() {
+            let domain_def_id = self.domain_def_ids.get(&domain_index).cloned().unwrap();
             let domain_name = *unique_domain_names
-                .get(&package_id)
+                .get(&domain_index)
                 .expect("Anonymous domain");
             let mut domain = Domain::new(
-                self.domain_ids.get(&package_id).cloned().unwrap(),
+                self.domain_ids.get(&domain_index).cloned().unwrap(),
                 domain_def_id,
                 domain_name,
             );
@@ -146,11 +148,11 @@ impl<'m> Compiler<'m> {
             let namespace = namespaces.remove(&domain_def_id).unwrap();
             let type_namespace = namespace.types;
 
-            if let Some(package_config) = package_config_table.remove(&package_id) {
-                builder.add_package_config(package_id, package_config);
+            if let Some(package_config) = domain_config_table.remove(&domain_index) {
+                builder.add_domain_config(domain_index, package_config);
             }
 
-            for type_def_id in self.defs.iter_package_def_ids(package_id) {
+            for type_def_id in self.defs.iter_domain_def_ids(domain_index) {
                 if let Some(ReprKind::Union(members, _bound)) =
                     self.repr_ctx.get_repr_kind(&type_def_id)
                 {
@@ -228,7 +230,7 @@ impl<'m> Compiler<'m> {
                 });
             }
 
-            if package_id == ONTOL_PKG {
+            if domain_index == DomainIndex::ontol() {
                 for def_id in self.defs.text_literals.values().copied() {
                     let literal = serde_gen.defs.get_string_representation(def_id);
                     let constant = serde_gen.str_ctx.intern_constant(literal);
@@ -247,31 +249,31 @@ impl<'m> Compiler<'m> {
                 }
             }
 
-            builder.add_domain(package_id, domain);
+            builder.add_domain(domain_index, domain);
         }
 
         // interface handling
         let domain_interfaces = {
-            let mut interfaces: FnvHashMap<PackageId, Vec<DomainInterface>> = Default::default();
-            for package_id in package_ids.iter().cloned() {
-                let domain_def_id = self.package_def_ids.get(&package_id).cloned().unwrap();
-                if package_id == ONTOL_PKG {
+            let mut interfaces: FnvHashMap<DomainIndex, Vec<DomainInterface>> = Default::default();
+            for domain_index in domain_indices.iter().cloned() {
+                let domain_def_id = self.domain_def_ids.get(&domain_index).cloned().unwrap();
+                if domain_index == DomainIndex::ontol() {
                     continue;
                 }
 
                 if let Some(httpjson) = generate_httpjson_interface(
-                    package_id,
+                    domain_index,
                     builder.partial_ontology(),
                     &mut serde_gen,
                 ) {
                     interfaces
-                        .entry(package_id)
+                        .entry(domain_index)
                         .or_default()
                         .push(DomainInterface::HttpJson(httpjson));
                 }
 
                 if let Some(schema) = generate_graphql_schema(
-                    package_id,
+                    domain_index,
                     builder.partial_ontology(),
                     map_namespaces.get(&domain_def_id),
                     &self.code_ctx,
@@ -280,7 +282,7 @@ impl<'m> Compiler<'m> {
                     &mut serde_gen,
                 ) {
                     interfaces
-                        .entry(package_id)
+                        .entry(domain_index)
                         .or_default()
                         .push(DomainInterface::GraphQL(Arc::new(schema)));
                 }
@@ -765,11 +767,14 @@ impl<'m> Compiler<'m> {
         ))
     }
 
-    fn unique_domain_names(&self) -> FnvHashMap<PackageId, TextConstant> {
-        let mut map: HashMap<TextConstant, PackageId> = HashMap::new();
-        map.insert(self.str_ctx.get_constant("ontol").unwrap(), ONTOL_PKG);
+    fn unique_domain_names(&self) -> FnvHashMap<DomainIndex, TextConstant> {
+        let mut map: HashMap<TextConstant, DomainIndex> = HashMap::new();
+        map.insert(
+            self.str_ctx.get_constant("ontol").unwrap(),
+            DomainIndex::ontol(),
+        );
 
-        for (package_id, name) in self.package_names.iter().cloned() {
+        for (domain_index, name) in self.domain_names.iter().cloned() {
             if map.contains_key(&name) {
                 todo!(
                     "Two distinct domains are called `{name}`. This is not handled yet",
@@ -777,12 +782,12 @@ impl<'m> Compiler<'m> {
                 );
             }
 
-            map.insert(name, package_id);
+            map.insert(name, domain_index);
         }
 
         // invert
         map.into_iter()
-            .map(|(name, package_id)| (package_id, name))
+            .map(|(name, domain_index)| (domain_index, name))
             .collect()
     }
 }

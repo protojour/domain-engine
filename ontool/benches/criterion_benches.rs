@@ -134,7 +134,7 @@ pub fn compile_benchmark(c: &mut Criterion) {
 
     c.bench_function("graphql_create_schema", |b| {
         let test = TestPackages::with_static_sources(black_box([TINY])).compile();
-        let (package_id, _) = test
+        let (domain_index, _) = test
             .ontology()
             .domains()
             .find(|domain| {
@@ -145,7 +145,7 @@ pub fn compile_benchmark(c: &mut Criterion) {
         b.iter(|| {
             domain_engine_graphql::create_graphql_schema(
                 black_box(test.ontology_owned()),
-                black_box(package_id),
+                black_box(domain_index),
             )
             .unwrap()
         });
@@ -164,7 +164,7 @@ pub fn compile_benchmark(c: &mut Criterion) {
                     .unwrap(),
             )
         });
-        let (package_id, _) = test
+        let (domain_index, _) = test
             .ontology()
             .domains()
             .find(|domain| {
@@ -173,7 +173,7 @@ pub fn compile_benchmark(c: &mut Criterion) {
             })
             .unwrap();
         let schema =
-            domain_engine_graphql::create_graphql_schema(test.ontology_owned(), package_id)
+            domain_engine_graphql::create_graphql_schema(test.ontology_owned(), domain_index)
                 .unwrap();
         let service_context: ServiceCtx = engine.into();
         b.iter(|| {

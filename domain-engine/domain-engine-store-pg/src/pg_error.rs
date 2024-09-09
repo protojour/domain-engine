@@ -1,6 +1,6 @@
 use arcstr::ArcStr;
 use domain_engine_core::{domain_error::DomainErrorKind, DomainError};
-use ontol_runtime::{tuple::CardinalIdx, DefId, PackageId, PropId};
+use ontol_runtime::{tuple::CardinalIdx, DefId, DomainIndex, PropId};
 use tracing::{error, info, warn};
 
 use crate::pg_model::{EdgeId, PgDomainTableType, PgRegKey};
@@ -146,11 +146,11 @@ impl From<PgInputError> for DomainError {
 #[derive(displaydoc::Display, Debug)]
 pub enum PgModelError {
     /// domain not found for {0:?}
-    DomainNotFound(PackageId),
+    DomainNotFound(DomainIndex),
     /// not found in registry: {0}
     NotFoundInRegistry(PgRegKey),
     /// collection not found for {0:?} => {1:?}
-    CollectionNotFound(PackageId, DefId),
+    CollectionNotFound(DomainIndex, DefId),
     /// edge not found for {0:?}
     EdgeNotFound(EdgeId),
     /// field not found for {1} in {0}

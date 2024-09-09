@@ -131,7 +131,7 @@ impl<'a> TransactCtx<'a> {
 
         let pg = self
             .pg_model
-            .pg_domain_datatable(def_id.package_id(), def_id)?;
+            .pg_domain_datatable(def_id.domain_index(), def_id)?;
 
         let mut row_layout: Vec<Layout> = vec![];
         let mut query_ctx = QueryBuildCtx::default();
@@ -342,7 +342,7 @@ impl<'a> TransactCtx<'a> {
                         let sub_def = self.ontology.def(sub_def_id);
                         let sub_pg = self
                             .pg_model
-                            .pg_domain_datatable(sub_def_id.package_id(), sub_def_id)?;
+                            .pg_domain_datatable(sub_def_id.domain_index(), sub_def_id)?;
                         let sub_alias = query_ctx.alias.incr();
 
                         let mut record_items: Vec<_> =
@@ -415,10 +415,12 @@ impl<'a> TransactCtx<'a> {
                     }
                 }
                 AbstractKind::Scalar { ontol_def_tag, .. } => {
-                    let pkg_id = prop_id.0.package_id();
+                    let domain_index = prop_id.0.domain_index();
                     let sub_def_id = ontol_def_tag.def_id();
 
-                    let sub_pg = self.pg_model.pg_domain_datatable(pkg_id, sub_def_id)?;
+                    let sub_pg = self
+                        .pg_model
+                        .pg_domain_datatable(domain_index, sub_def_id)?;
 
                     // abstract scalar should always be an array
                     output.push(sql::Expr::array(sql::Select {
@@ -570,8 +572,10 @@ impl<'a> TransactCtx<'a> {
             .next_field(&Layout::Scalar(PgType::Integer))?
             .into_i32()?;
 
-        let Some(PgTableKey::Data { pkg_id, def_id }) =
-            self.pg_model.reg_key_to_table_key.get(&def_key)
+        let Some(PgTableKey::Data {
+            domain_index,
+            def_id,
+        }) = self.pg_model.reg_key_to_table_key.get(&def_key)
         else {
             return Err(PgError::InvalidDynamicDataType(def_key).into());
         };
@@ -604,7 +608,7 @@ impl<'a> TransactCtx<'a> {
 
                 if matches!(&include_joined_attrs, IncludeJoinedAttrs::Yes) {
                     // retrieve abstract properties
-                    let pg = self.pg_model.pg_domain_datatable(*pkg_id, *def_id)?;
+                    let pg = self.pg_model.pg_domain_datatable(*domain_index, *def_id)?;
 
                     for (prop_id, rel) in &def.data_relationships {
                         match &rel.kind {
@@ -848,7 +852,7 @@ impl<'a> TransactCtx<'a> {
     fn read_record(&self, sql_val: SqlOutput, select: &Select) -> DomainResult<Value> {
         let sql_record = sql_val.into_record()?;
         let def_key = sql_record.def_key()?;
-        let (_pkg_id, def_id) = self.pg_model.datatable_key_by_def_key(def_key)?;
+        let (_domain_index, def_id) = self.pg_model.datatable_key_by_def_key(def_key)?;
         let pg_def = self.lookup_def(def_id)?;
 
         match select {

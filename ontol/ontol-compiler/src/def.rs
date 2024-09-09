@@ -11,11 +11,11 @@ use ontol_runtime::{
         ontol::TextLikeType,
     },
     var::VarAllocator,
-    DefId, OntolDefTag, PackageId,
+    DefId, DomainIndex, OntolDefTag,
 };
 
 use crate::{
-    mem::Intern, namespace::Space, package::ONTOL_PKG, pattern::PatId, primitive::PrimitiveKind,
+    mem::Intern, namespace::Space, pattern::PatId, primitive::PrimitiveKind,
     regex_util::parse_literal_regex, relation::RelId, source::SourceSpan, strings::StringCtx,
     types::Type, Compiler, SpannedBorrow, NO_SPAN,
 };
@@ -26,14 +26,14 @@ use ontol_parser::U32Span;
 pub struct Def<'m> {
     pub id: DefId,
     #[expect(unused)]
-    pub package: PackageId,
+    pub domain_index: DomainIndex,
     pub kind: DefKind<'m>,
     pub span: SourceSpan,
 }
 
 #[derive(Debug)]
 pub enum DefKind<'m> {
-    Package(PackageId),
+    Domain(DomainIndex),
     /// A namespace in the ONTOL domain
     /// TODO: make it possible also for user domains to have modules?
     BuiltinModule(&'static [&'static str]),
@@ -67,7 +67,7 @@ pub enum DefKind<'m> {
 impl<'m> DefKind<'m> {
     pub fn opt_identifier(&self) -> Option<Cow<str>> {
         match self {
-            Self::Package(_) => None,
+            Self::Domain(_) => None,
             Self::BuiltinModule(_path) => None,
             Self::Primitive(_, path) => path.last().map(|ident| (*ident).into()),
             Self::TextLiteral(lit) => Some(format!("\"{lit}\"").into()),
@@ -92,7 +92,7 @@ impl<'m> DefKind<'m> {
             DefKind::BuiltinRelType(..) => domain::DefKind::Relation(info),
             DefKind::Fn(_) => domain::DefKind::Function(info),
             DefKind::EmptySequence => domain::DefKind::Generator(info),
-            DefKind::Package(_) => domain::DefKind::Domain(info),
+            DefKind::Domain(_) => domain::DefKind::Domain(info),
             _ => domain::DefKind::Data(info),
         }
     }
@@ -218,7 +218,7 @@ pub enum RelationContext {
 }
 
 pub struct Defs<'m> {
-    def_id_allocators: FnvHashMap<PackageId, u16>,
+    def_id_allocators: FnvHashMap<DomainIndex, u16>,
     pub(crate) table: FnvHashMap<DefId, Def<'m>>,
     pub(crate) text_literals: HashMap<&'m str, DefId>,
     pub(crate) regex_strings: HashMap<&'m str, DefId>,
@@ -241,8 +241,8 @@ pub struct RegexMeta<'m> {
 
 impl<'m> Defs<'m> {
     fn new() -> Self {
-        let mut def_id_allocators: FnvHashMap<PackageId, u16> = Default::default();
-        def_id_allocators.insert(ONTOL_PKG, OntolDefTag::_LastEntry as u16);
+        let mut def_id_allocators: FnvHashMap<DomainIndex, u16> = Default::default();
+        def_id_allocators.insert(DomainIndex::ontol(), OntolDefTag::_LastEntry as u16);
 
         Self {
             def_id_allocators,
@@ -287,44 +287,44 @@ impl<'m> Defs<'m> {
         })
     }
 
-    pub fn alloc_def_id(&mut self, package_id: PackageId) -> DefId {
-        let idx = self.def_id_allocators.entry(package_id).or_default();
-        let def_id = DefId(package_id, *idx);
+    pub fn alloc_def_id(&mut self, domain_index: DomainIndex) -> DefId {
+        let idx = self.def_id_allocators.entry(domain_index).or_default();
+        let def_id = DefId(domain_index, *idx);
         *idx += 1;
 
         def_id
     }
 
-    pub fn peek_next_def_id(&self, package_id: PackageId) -> DefId {
+    pub fn peek_next_def_id(&self, domain_index: DomainIndex) -> DefId {
         let idx = self
             .def_id_allocators
-            .get(&package_id)
+            .get(&domain_index)
             .copied()
             .unwrap_or(0);
-        DefId(package_id, idx)
+        DefId(domain_index, idx)
     }
 
-    pub fn iter_packages(&self) -> impl Iterator<Item = PackageId> + '_ {
+    pub fn iter_domain_indices(&self) -> impl Iterator<Item = DomainIndex> + '_ {
         self.def_id_allocators.keys().copied()
     }
 
-    pub fn iter_package_def_ids(&self, package_id: PackageId) -> impl Iterator<Item = DefId> {
+    pub fn iter_domain_def_ids(&self, domain_index: DomainIndex) -> impl Iterator<Item = DefId> {
         let max_idx = self
             .def_id_allocators
-            .get(&package_id)
+            .get(&domain_index)
             .cloned()
             .unwrap_or(0);
 
-        (0..max_idx).map(move |idx| DefId(package_id, idx))
+        (0..max_idx).map(move |idx| DefId(domain_index, idx))
     }
 
-    pub fn add_def(&mut self, kind: DefKind<'m>, package: PackageId, span: SourceSpan) -> DefId {
+    pub fn add_def(&mut self, kind: DefKind<'m>, package: DomainIndex, span: SourceSpan) -> DefId {
         let def_id = self.alloc_def_id(package);
         self.table.insert(
             def_id,
             Def {
                 id: def_id,
-                package,
+                domain_index: package,
                 span,
                 kind,
             },
@@ -338,7 +338,7 @@ impl<'m> Defs<'m> {
             Some(def_id) => *def_id,
             None => {
                 let lit = strings.intern(lit);
-                let def_id = self.add_def(DefKind::TextLiteral(lit), ONTOL_PKG, NO_SPAN);
+                let def_id = self.add_def(DefKind::TextLiteral(lit), DomainIndex::ontol(), NO_SPAN);
                 self.text_literals.insert(lit, def_id);
                 def_id
             }
@@ -356,7 +356,7 @@ impl<'m> Defs<'m> {
             None => {
                 let lit = strings.intern(lit);
                 let hir = parse_literal_regex(lit, span)?;
-                let def_id = self.add_def(DefKind::Regex(lit), ONTOL_PKG, NO_SPAN);
+                let def_id = self.add_def(DefKind::Regex(lit), DomainIndex::ontol(), NO_SPAN);
                 self.regex_strings.insert(lit, def_id);
                 self.literal_regex_meta_table.insert(def_id, hir);
 
@@ -374,12 +374,12 @@ impl<'m> Defs<'m> {
     }
 
     pub fn add_ontol(&mut self, tag: OntolDefTag, kind: DefKind<'m>) -> DefId {
-        let def_id = DefId(ONTOL_PKG, tag as u16);
+        let def_id = DefId(DomainIndex::ontol(), tag as u16);
         self.table.insert(
             def_id,
             Def {
                 id: def_id,
-                package: ONTOL_PKG,
+                domain_index: DomainIndex::ontol(),
                 kind,
                 span: NO_SPAN,
             },
@@ -426,7 +426,7 @@ impl<'m> Compiler<'m> {
         parent: DefId,
         span: SourceSpan,
     ) -> DefId {
-        let def_id = self.defs.alloc_def_id(parent.package_id());
+        let def_id = self.defs.alloc_def_id(parent.domain_index());
         self.namespaces
             .get_namespace_mut(parent, space)
             .insert(name, def_id);
@@ -434,7 +434,7 @@ impl<'m> Compiler<'m> {
             def_id,
             Def {
                 id: def_id,
-                package: parent.package_id(),
+                domain_index: parent.domain_index(),
                 span,
                 kind,
             },
@@ -443,29 +443,27 @@ impl<'m> Compiler<'m> {
         def_id
     }
 
-    pub fn define_package(&mut self, package_def_id: DefId) -> DefId {
-        let package_id = package_def_id.package_id();
-        self.package_def_ids.insert(package_id, package_def_id);
+    pub fn define_domain(&mut self, domain_def_id: DefId) -> DefId {
+        let domain_index = domain_def_id.domain_index();
+        self.domain_def_ids.insert(domain_index, domain_def_id);
         self.defs.table.insert(
-            package_def_id,
+            domain_def_id,
             Def {
-                id: package_def_id,
-                package: package_id,
+                id: domain_def_id,
+                domain_index,
                 span: NO_SPAN,
-                kind: DefKind::Package(package_def_id.package_id()),
+                kind: DefKind::Domain(domain_def_id.domain_index()),
             },
         );
-        let ty = self.ty_ctx.intern(Type::Package);
-        self.def_ty_ctx.def_table.insert(package_def_id, ty);
+        let ty = self.ty_ctx.intern(Type::Domain);
+        self.def_ty_ctx.def_table.insert(domain_def_id, ty);
 
         // make sure the namespace exists
-        let namespace = self
-            .namespaces
-            .get_namespace_mut(package_def_id, Space::Def);
+        let namespace = self.namespaces.get_namespace_mut(domain_def_id, Space::Def);
 
         // The name `ontol` is always defined, and refers to the ontol domain
         namespace.insert("ontol", OntolDefTag::Ontol.def_id());
 
-        package_def_id
+        domain_def_id
     }
 }

@@ -39,7 +39,7 @@ async fn execute_migration_step<'t>(
 ) -> anyhow::Result<()> {
     info!("{step:?}");
 
-    let pkg_id = domain_ids.pkg_id;
+    let domain_index = domain_ids.index;
     let domain_uid = domain_ids.uid;
 
     match step {
@@ -63,7 +63,7 @@ async fn execute_migration_step<'t>(
                 )
                 .await?;
 
-            ctx.domains.get_mut(&pkg_id).unwrap().key = Some(row.get(0));
+            ctx.domains.get_mut(&domain_index).unwrap().key = Some(row.get(0));
         }
         MigrationStep::DeployVertex {
             vertex_def_id,
@@ -72,12 +72,12 @@ async fn execute_migration_step<'t>(
             let vertex_def_tag = vertex_def_id.1 as i32;
             let def_domain_key = ctx
                 .domains
-                .get(&vertex_def_id.package_id())
+                .get(&vertex_def_id.domain_index())
                 .ok_or_else(|| anyhow!("could not find deployed domain for {vertex_def_id:?}"))?
                 .key
                 .ok_or_else(|| anyhow!("deployed domain for {vertex_def_id:?} has no key"))?;
 
-            let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
+            let pg_domain = ctx.domains.get_mut(&domain_index).unwrap();
 
             let key_column = "_key";
 
@@ -131,7 +131,7 @@ async fn execute_migration_step<'t>(
             );
         }
         MigrationStep::DeployVertexFKey { vertex_def_id } => {
-            let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
+            let pg_domain = ctx.domains.get_mut(&domain_index).unwrap();
             let pg_table = pg_domain.datatables.get_mut(&vertex_def_id).unwrap();
 
             let (fprop, fkey) = ("_fprop", "_fkey");
@@ -176,7 +176,7 @@ async fn execute_migration_step<'t>(
             prop_tag,
             data,
         } => {
-            let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
+            let pg_domain = ctx.domains.get_mut(&domain_index).unwrap();
             let pg_table = match table_id {
                 PgTableIdUnion::Def(def_id) => pg_domain.datatables.get_mut(&def_id),
                 PgTableIdUnion::Edge(edge_id) => pg_domain.edgetables.get_mut(&edge_id.def_id().1),
@@ -253,7 +253,7 @@ async fn execute_migration_step<'t>(
             index_type,
             field_tuple,
         } => {
-            let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
+            let pg_domain = ctx.domains.get_mut(&domain_index).unwrap();
             let pg_table = pg_domain.get_table(&table_id).unwrap();
 
             let column_tuple: Vec<_> = field_tuple
@@ -316,7 +316,7 @@ async fn execute_migration_step<'t>(
             edge_tag,
             table_name,
         } => {
-            let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
+            let pg_domain = ctx.domains.get_mut(&domain_index).unwrap();
             txn.execute(
                 &format!(
                     "CREATE TABLE {schema}.{table} ()",
@@ -372,7 +372,7 @@ async fn execute_migration_step<'t>(
             kind,
             index_type,
         } => {
-            let pg_edge_domain = ctx.domains.get(&pkg_id).unwrap();
+            let pg_edge_domain = ctx.domains.get(&domain_index).unwrap();
             let pg_table = pg_edge_domain.edgetables.get(&edge_tag).unwrap();
 
             match &kind {
@@ -429,7 +429,7 @@ async fn execute_migration_step<'t>(
                     pinned_def_id: def_id,
                     key_col_name,
                 } => {
-                    let pg_target_domain = ctx.domains.get(&def_id.package_id()).unwrap();
+                    let pg_target_domain = ctx.domains.get(&def_id.domain_index()).unwrap();
                     let pg_target_datatable = pg_target_domain.datatables.get(def_id).unwrap();
 
                     txn.execute(
@@ -471,7 +471,7 @@ async fn execute_migration_step<'t>(
                     pinned_def_id,
                     key_col_name,
                 } => {
-                    let pinned_domain = ctx.domains.get(&pinned_def_id.package_id()).unwrap();
+                    let pinned_domain = ctx.domains.get(&pinned_def_id.domain_index()).unwrap();
                     let pinned_table = pinned_domain.datatables.get(pinned_def_id).unwrap();
 
                     pinned_domaintable_key = Some(pinned_table.key);
@@ -509,7 +509,7 @@ async fn execute_migration_step<'t>(
 
             let pg_edge = ctx
                 .domains
-                .get_mut(&pkg_id)
+                .get_mut(&domain_index)
                 .unwrap()
                 .edgetables
                 .get_mut(&edge_tag)
@@ -526,7 +526,7 @@ async fn execute_migration_step<'t>(
             );
         }
         MigrationStep::RenameDomainSchema { old, new } => {
-            let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
+            let pg_domain = ctx.domains.get_mut(&domain_index).unwrap();
             let domain_key = pg_domain.key.unwrap();
 
             txn.execute(
@@ -553,7 +553,7 @@ async fn execute_migration_step<'t>(
             old: old_table,
             new: new_table,
         } => {
-            let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
+            let pg_domain = ctx.domains.get_mut(&domain_index).unwrap();
             let domain_key = pg_domain.key.unwrap();
             let pg_datatable = pg_domain.datatables.get_mut(&def_id).unwrap();
 

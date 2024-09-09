@@ -13,7 +13,7 @@ use ontol_runtime::{
     ontology::domain::{DataRelationshipKind, DataRelationshipTarget, Def},
     query::select::Select,
     value::Value,
-    DefId, PackageId, PropId,
+    DefId, DomainIndex, PropId,
 };
 use pin_utils::pin_mut;
 use tokio_postgres::{Row, ToStatement};
@@ -88,16 +88,16 @@ impl<'a> TransactCtx<'a> {
         select: &'a Select,
         cache: &'s mut PgCache,
     ) -> DomainResult<RowValue> {
-        let pkg_id = value.pkg_id;
+        let domain_index = value.domain_index;
         let def_id = value.value.type_def_id();
 
-        let cache_key = (insert_mode, pkg_id, def_id);
+        let cache_key = (insert_mode, domain_index, def_id);
 
         let prepared = if let Some(prepared) = cache.insert.get(&cache_key).cloned() {
             prepared
         } else {
             let prepared = self
-                .prepare_insert(pkg_id, def_id, insert_mode, select, cache)
+                .prepare_insert(domain_index, def_id, insert_mode, select, cache)
                 .await?;
             cache.insert.insert(cache_key, prepared.clone());
             prepared
@@ -188,7 +188,7 @@ impl<'a> TransactCtx<'a> {
         data_key: PgDataKey,
         cache: &'s mut PgCache,
     ) -> DomainResult<RowValue> {
-        let cache_key = (def.id.package_id(), def.id);
+        let cache_key = (def.id.domain_index(), def.id);
 
         let prepared = if let Some(prepared) = cache.update_tentative.get(&cache_key).cloned() {
             prepared
@@ -273,28 +273,34 @@ impl<'a> TransactCtx<'a> {
         if let Some(PgRepr::Scalar(_pg_type, ontol_def_tag)) =
             PgRepr::classify_opt_def_repr(def.repr(), self.ontology)
         {
-            let pkg_id = parent.prop_id.0.package_id();
+            let domain_index = parent.prop_id.0.domain_index();
             let def_id = ontol_def_tag.def_id();
 
             let prepared = if let Some(prepared) = cache
                 .insert
-                .get(&(InsertMode::Insert, pkg_id, def_id))
+                .get(&(InsertMode::Insert, domain_index, def_id))
                 .cloned()
             {
                 prepared
             } else {
                 let prepared = self
-                    .prepare_insert(pkg_id, def_id, InsertMode::Insert, &Select::Unit, cache)
+                    .prepare_insert(
+                        domain_index,
+                        def_id,
+                        InsertMode::Insert,
+                        &Select::Unit,
+                        cache,
+                    )
                     .await?;
                 cache
                     .insert
-                    .insert((InsertMode::Insert, pkg_id, def_id), prepared.clone());
+                    .insert((InsertMode::Insert, domain_index, def_id), prepared.clone());
                 prepared
             };
 
             let parent_prop_key = self
                 .pg_model
-                .datatable(parent.prop_id.0.package_id(), parent.prop_id.0)?
+                .datatable(parent.prop_id.0.domain_index(), parent.prop_id.0)?
                 .abstract_property(&parent.prop_id)?;
 
             let Data::Sql(value) = self.data_from_value(value)? else {
@@ -312,16 +318,22 @@ impl<'a> TransactCtx<'a> {
 
             Ok(())
         } else {
-            let pkg_id = value_def_id.0;
+            let domain_index = value_def_id.0;
             let def_id = value_def_id;
 
-            let cache_key = (InsertMode::Insert, pkg_id, def_id);
+            let cache_key = (InsertMode::Insert, domain_index, def_id);
 
             let prepared = if let Some(prepared) = cache.insert.get(&cache_key).cloned() {
                 prepared
             } else {
                 let prepared = self
-                    .prepare_insert(pkg_id, def_id, InsertMode::Insert, &Select::Unit, cache)
+                    .prepare_insert(
+                        domain_index,
+                        def_id,
+                        InsertMode::Insert,
+                        &Select::Unit,
+                        cache,
+                    )
                     .await?;
                 cache.insert.insert(cache_key, prepared.clone());
                 prepared
@@ -331,7 +343,10 @@ impl<'a> TransactCtx<'a> {
             let (analyzed, pg) = self.analyze_input(
                 Some(parent),
                 def,
-                InDomain { pkg_id, value },
+                InDomain {
+                    domain_index,
+                    value,
+                },
                 &Select::Unit,
                 cache,
             )?;
@@ -401,14 +416,14 @@ impl<'a> TransactCtx<'a> {
 
     pub async fn prepare_insert(
         &self,
-        pkg_id: PackageId,
+        domain_index: DomainIndex,
         def_id: DefId,
         insert_mode: InsertMode,
         select: &'a Select,
         cache: &mut PgCache,
     ) -> DomainResult<PreparedInsert> {
         let def = self.ontology.def(def_id);
-        let pg = self.pg_model.pg_domain_datatable(pkg_id, def_id)?;
+        let pg = self.pg_model.pg_domain_datatable(domain_index, def_id)?;
 
         let mut query_ctx = QueryBuildCtx::default();
         let root_alias = query_ctx.alias;
@@ -593,7 +608,7 @@ impl<'a> TransactCtx<'a> {
     ) -> DomainResult<(AnalyzedInput<'a>, PgDomainTable<'_>)> {
         let pg = self
             .pg_model
-            .pg_domain_datatable(value.pkg_id, value.type_def_id())?;
+            .pg_domain_datatable(value.domain_index, value.type_def_id())?;
         let pg_table = pg.table;
 
         let Value::Struct(mut attrs, _struct_tag) = value.value else {
@@ -612,7 +627,7 @@ impl<'a> TransactCtx<'a> {
 
             let parent_prop_key = self
                 .pg_model
-                .datatable(parent.prop_id.0.package_id(), parent.prop_id.0)?
+                .datatable(parent.prop_id.0.domain_index(), parent.prop_id.0)?
                 .abstract_property(&parent.prop_id)?;
 
             sql_params.extend([SqlScalar::I32(parent_prop_key), SqlScalar::I64(parent.key)]);

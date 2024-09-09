@@ -341,7 +341,7 @@ fn cross_domain_edge_counts(graph: &Graph) -> FnvHashMap<DefId, u32> {
 
         if edges
             .iter()
-            .any(|(map_def, _)| map_def.def_id.package_id() != input.package_id())
+            .any(|(map_def, _)| map_def.def_id.domain_index() != input.domain_index())
         {
             *count += 1;
         }

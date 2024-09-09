@@ -5,7 +5,7 @@ use fnv::FnvHashSet;
 use ontol_runtime::{
     ontology::{domain::DomainId, ontol::TextConstant},
     property::{PropertyCardinality, ValueCardinality},
-    DefId, PackageId,
+    DefId, DomainIndex,
 };
 use tracing::{debug, debug_span, info};
 use ulid::Ulid;
@@ -17,7 +17,7 @@ use crate::{
     lowering::context::LoweringOutcome,
     misc::{MacroExpand, MacroItem, MiscCtx},
     namespace::DocId,
-    package::ParsedPackage,
+    package::ParsedDomain,
     relation::{rel_def_meta, RelId, RelParams, Relationship},
     repr::repr_model::ReprKind,
     thesaurus::{Thesaurus, TypeRelation},
@@ -32,12 +32,12 @@ impl<'m> Compiler<'m> {
     /// and seal the types at the end.
     pub(super) fn lower_and_check_next_domain(
         &mut self,
-        package: ParsedPackage,
+        parsed: ParsedDomain,
         src: Src,
     ) -> Result<(), UnifiedCompileError> {
-        let _entered = debug_span!("pkg", id = ?package.package_id.id()).entered();
+        let _entered = debug_span!("domain", idx = ?parsed.domain_index.index()).entered();
 
-        for error in package.parse_errors {
+        for error in parsed.parse_errors {
             match error {
                 ontol_parser::Error::Lex(lex_error) => {
                     let span = lex_error.span;
@@ -51,20 +51,20 @@ impl<'m> Compiler<'m> {
             .report(self);
         }
 
-        let pkg_def_id = self.defs.alloc_def_id(package.package_id);
-        self.define_package(pkg_def_id);
+        let pkg_def_id = self.defs.alloc_def_id(parsed.domain_index);
+        self.define_domain(pkg_def_id);
 
         self.packages
             .loaded_packages
-            .insert(package.reference, pkg_def_id);
+            .insert(parsed.reference, pkg_def_id);
 
-        self.package_config_table
-            .insert(package.package_id, package.config);
+        self.domain_config_table
+            .insert(parsed.domain_index, parsed.config);
 
-        let outcome = package.syntax.lower(pkg_def_id, src.clone(), Session(self));
+        let outcome = parsed.syntax.lower(pkg_def_id, src.clone(), Session(self));
 
         self.domain_ids
-            .entry(package.package_id)
+            .entry(parsed.domain_index)
             .or_insert_with(|| {
                 let domain_id = Ulid::new();
                 info!("autogenerating unstable domain id `{domain_id}`");
@@ -75,10 +75,10 @@ impl<'m> Compiler<'m> {
             });
 
         self.handle_lowering_outcome(outcome);
-        self.seal_domain(package.package_id);
+        self.seal_domain(parsed.domain_index);
 
-        self.package_names
-            .push((package.package_id, self.str_ctx.intern_constant(&src.name)));
+        self.domain_names
+            .push((parsed.domain_index, self.str_ctx.intern_constant(&src.name)));
 
         self.check_error()
     }
@@ -155,10 +155,10 @@ impl<'m> Compiler<'m> {
         {
             let mut rel_ids = vec![];
 
-            for (pkg_id, rel_map) in outcome.rels {
+            for (domain_index, rel_map) in outcome.rels {
                 for (def_tag, rels) in rel_map {
                     for (rel_tag, relationship, span, docs) in rels {
-                        let rel_id = RelId(DefId(pkg_id, def_tag), rel_tag);
+                        let rel_id = RelId(DefId(domain_index, def_tag), rel_tag);
                         self.rel_ctx.commit_rel(rel_id, relationship, span);
 
                         if let Some(docs) = docs {
@@ -194,33 +194,33 @@ impl<'m> Compiler<'m> {
 
     /// Do all the (remaining) checks and generations for the package/domain and seal it
     /// Initial check_def must be done before this
-    pub(crate) fn seal_domain(&mut self, package_id: PackageId) {
-        debug!("seal {package_id:?}");
+    pub(crate) fn seal_domain(&mut self, domain_index: DomainIndex) {
+        debug!("seal {domain_index:?}");
 
-        self.domain_type_repr_check(package_id);
+        self.domain_type_repr_check(domain_index);
 
         // entity check
         // this is not in the TypeCheck context because it may
         // generate new DefIds
-        for def_id in self.defs.iter_package_def_ids(package_id) {
+        for def_id in self.defs.iter_domain_def_ids(domain_index) {
             self.check_entity(def_id);
         }
 
-        self.domain_no_entity_supertype_check(package_id);
-        self.domain_union_and_extern_check(package_id);
-        self.domain_rel_normalization(package_id);
-        self.domain_entity_rel_force_edge_check(package_id);
-        self.domain_map_check(package_id);
+        self.domain_no_entity_supertype_check(domain_index);
+        self.domain_union_and_extern_check(domain_index);
+        self.domain_rel_normalization(domain_index);
+        self.domain_entity_rel_force_edge_check(domain_index);
+        self.domain_map_check(domain_index);
 
-        self.seal_ctx.mark_domain_sealed(package_id);
+        self.seal_ctx.mark_domain_sealed(domain_index);
     }
 
     /// Check repr for all types in the domain
-    fn domain_type_repr_check(&mut self, package_id: PackageId) {
+    fn domain_type_repr_check(&mut self, domain_index: DomainIndex) {
         let mut type_check = self.type_check();
 
         // pre repr checks
-        for def_id in type_check.defs.iter_package_def_ids(package_id) {
+        for def_id in type_check.defs.iter_domain_def_ids(domain_index) {
             if let Some(def) = type_check.defs.table.get(&def_id) {
                 if let DefKind::Type(_) = &def.kind {
                     type_check.check_domain_type_pre_repr(def_id, def);
@@ -229,12 +229,12 @@ impl<'m> Compiler<'m> {
         }
 
         // repr checks
-        for def_id in type_check.defs.iter_package_def_ids(package_id) {
+        for def_id in type_check.defs.iter_domain_def_ids(domain_index) {
             type_check.repr_check(def_id).check_repr_root();
         }
 
         // domain type checks
-        for def_id in type_check.defs.iter_package_def_ids(package_id) {
+        for def_id in type_check.defs.iter_domain_def_ids(domain_index) {
             if let Some(def) = type_check.defs.table.get(&def_id) {
                 if let DefKind::Type(_) = &def.kind {
                     type_check.check_domain_type_post_repr(def_id, def);
@@ -244,9 +244,9 @@ impl<'m> Compiler<'m> {
     }
 
     /// check that no types use entities as supertypes
-    fn domain_no_entity_supertype_check(&mut self, package_id: PackageId) {
+    fn domain_no_entity_supertype_check(&mut self, domain_index: DomainIndex) {
         for (def_id, is_table) in self.thesaurus.iter() {
-            if def_id.package_id() != package_id {
+            if def_id.domain_index() != domain_index {
                 continue;
             }
 
@@ -268,11 +268,11 @@ impl<'m> Compiler<'m> {
         }
     }
 
-    fn domain_union_and_extern_check(&mut self, package_id: PackageId) {
+    fn domain_union_and_extern_check(&mut self, domain_index: DomainIndex) {
         let mut type_check = self.type_check();
 
         // union and extern checks
-        for def_id in type_check.defs.iter_package_def_ids(package_id) {
+        for def_id in type_check.defs.iter_domain_def_ids(domain_index) {
             match type_check.repr_ctx.get_repr_kind(&def_id) {
                 Some(ReprKind::Union(..)) => {
                     for error in type_check.check_union(def_id) {
@@ -288,8 +288,8 @@ impl<'m> Compiler<'m> {
     }
 
     /// Various cleanup/normalization
-    fn domain_rel_normalization(&mut self, package_id: PackageId) {
-        for def_id in self.defs.iter_package_def_ids(package_id) {
+    fn domain_rel_normalization(&mut self, domain_index: DomainIndex) {
+        for def_id in self.defs.iter_domain_def_ids(domain_index) {
             for rel_id in self.rel_ctx.iter_rel_ids(def_id) {
                 let Some(relationship) = self.rel_ctx.relationship_by_id_mut(rel_id) else {
                     // can happen in error cases
@@ -319,8 +319,8 @@ impl<'m> Compiler<'m> {
         }
     }
 
-    fn domain_entity_rel_force_edge_check(&mut self, package_id: PackageId) {
-        for def_id in self.defs.iter_package_def_ids(package_id) {
+    fn domain_entity_rel_force_edge_check(&mut self, domain_index: DomainIndex) {
+        for def_id in self.defs.iter_domain_def_ids(domain_index) {
             for rel_id in self.rel_ctx.iter_rel_ids(def_id) {
                 if !self.rel_ctx.is_committed(rel_id) {
                     continue;
@@ -366,10 +366,10 @@ impl<'m> Compiler<'m> {
         }
     }
 
-    fn domain_map_check(&mut self, package_id: PackageId) {
+    fn domain_map_check(&mut self, domain_index: DomainIndex) {
         let mut map_defs: Vec<DefId> = vec![];
 
-        for def_id in self.defs.iter_package_def_ids(package_id) {
+        for def_id in self.defs.iter_domain_def_ids(domain_index) {
             {
                 let Some(def) = self.defs.table.get(&def_id) else {
                     // Can happen in error cases

@@ -3,7 +3,7 @@ use std::{collections::BTreeSet, sync::Arc};
 use futures_util::stream::BoxStream;
 use ontol_runtime::{
     ontology::{config::DataStoreConfig, Ontology},
-    PackageId,
+    DomainIndex,
 };
 
 use crate::{
@@ -28,17 +28,17 @@ pub trait DataStoreAPI {
 }
 
 pub struct DataStore {
-    package_ids: BTreeSet<PackageId>,
+    persisted: BTreeSet<DomainIndex>,
     api: Box<dyn DataStoreAPI + Send + Sync>,
 }
 
 impl DataStore {
-    pub fn new(package_ids: BTreeSet<PackageId>, api: Box<dyn DataStoreAPI + Send + Sync>) -> Self {
-        Self { package_ids, api }
+    pub fn new(persisted: BTreeSet<DomainIndex>, api: Box<dyn DataStoreAPI + Send + Sync>) -> Self {
+        Self { persisted, api }
     }
 
-    pub fn package_ids(&self) -> &BTreeSet<PackageId> {
-        &self.package_ids
+    pub fn persisted(&self) -> &BTreeSet<DomainIndex> {
+        &self.persisted
     }
 
     pub fn api(&self) -> &(dyn DataStoreAPI + Send + Sync) {
@@ -56,7 +56,7 @@ pub trait DataStoreFactory {
     /// being migrated before downstream domains.
     async fn new_api(
         &self,
-        persisted: &BTreeSet<PackageId>,
+        persisted: &BTreeSet<DomainIndex>,
         config: DataStoreConfig,
         session: Session,
         ontology: Arc<Ontology>,
@@ -67,7 +67,7 @@ pub trait DataStoreFactory {
 pub trait DataStoreFactorySync {
     fn new_api_sync(
         &self,
-        persisted: &BTreeSet<PackageId>,
+        persisted: &BTreeSet<DomainIndex>,
         config: DataStoreConfig,
         session: Session,
         ontology: Arc<Ontology>,

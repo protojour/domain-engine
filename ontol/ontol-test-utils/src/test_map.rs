@@ -159,11 +159,11 @@ impl<'on, 'p> TestMapper<'on, 'p> {
 
     #[track_caller]
     pub fn named_map_input_binding(&self, name: &str) -> DefBinding<'on> {
-        let (package_id, name) = self.test.parse_test_ident(name);
+        let (domain_index, name) = self.test.parse_test_ident(name);
         let key = self
             .test
             .ontology
-            .find_named_downmap_meta(package_id, name)
+            .find_named_downmap_meta(domain_index, name)
             .unwrap();
 
         DefBinding::from_def_id(key.input.def_id, &self.test.ontology)
@@ -176,11 +176,11 @@ impl<'on, 'p> TestMapper<'on, 'p> {
         input: serde_json::Value,
         expected: serde_json::Value,
     ) {
-        let (package_id, name) = self.test.parse_test_ident(name);
+        let (domain_index, name) = self.test.parse_test_ident(name);
         let key = self
             .test
             .ontology
-            .find_named_downmap_meta(package_id, name)
+            .find_named_downmap_meta(domain_index, name)
             .unwrap();
 
         let input_binding = DefBinding::from_def_id(key.input.def_id, &self.test.ontology);

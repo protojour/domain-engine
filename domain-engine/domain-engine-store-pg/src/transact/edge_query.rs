@@ -147,7 +147,7 @@ impl<'a> TransactCtx<'a> {
                             } => {
                                 let pinned_table = self
                                     .pg_model
-                                    .datatable(pinned_def_id.package_id(), *pinned_def_id)?;
+                                    .datatable(pinned_def_id.domain_index(), *pinned_def_id)?;
 
                                 sql::Expr::Row(vec![
                                     sql::Expr::LiteralInt(pinned_table.key),

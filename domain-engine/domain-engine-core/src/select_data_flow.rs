@@ -10,7 +10,7 @@ use ontol_runtime::{
     },
     property::{PropertyCardinality, ValueCardinality},
     query::select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
-    DefId, MapKey, PackageId, PropId,
+    DefId, DomainIndex, MapKey, PropId,
 };
 use tracing::{debug, trace};
 
@@ -73,7 +73,7 @@ fn translate_struct_select(struct_select: &mut StructSelect, key: &MapKey, ontol
     };
 
     processor.autoselect_output_properties(
-        struct_select.def_id.package_id(),
+        struct_select.def_id.domain_index(),
         &mut struct_select.properties,
     );
 
@@ -97,12 +97,12 @@ struct SelectFlowProcessor<'on> {
 impl<'on> SelectFlowProcessor<'on> {
     fn autoselect_output_properties(
         &self,
-        output_package_id: PackageId,
+        output_domain_index: DomainIndex,
         target: &mut FnvHashMap<PropId, Select>,
     ) {
         for (prop_id, flows) in &self.prop_flow_slice.iter().group_by(|flow| flow.id) {
             // Only consider output properties:
-            if prop_id.0.package_id() != output_package_id {
+            if prop_id.0.domain_index() != output_domain_index {
                 continue;
             }
 

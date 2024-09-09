@@ -665,13 +665,13 @@ mod tests {
         ontology::Ontology,
         value::Value,
         vm::proc::{AddressOffset, Lib, NParams, OpCode},
-        DefId, PackageId,
+        DefId, DomainIndex,
     };
 
     use super::*;
 
     fn def_id(n: u16) -> DefId {
-        DefId(PackageId(0), n)
+        DefId(DomainIndex(0), n)
     }
 
     #[test]

@@ -10,7 +10,7 @@ use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::domain::EdgeCardinalProjection,
     property::{Cardinality, ValueCardinality},
-    DefId, PackageId,
+    DefId, DomainIndex,
 };
 use tracing::trace;
 
@@ -109,13 +109,13 @@ impl RelId {
 /// This forces single-line output even when pretty-printed
 impl ::std::fmt::Debug for RelId {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "rel@{}:{}:{}", self.0 .0.id(), self.0 .1, self.1 .0)
+        write!(f, "rel@{}:{}:{}", self.0 .0.index(), self.0 .1, self.1 .0)
     }
 }
 
 impl ::std::fmt::Display for RelId {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "rel@{}:{}:{}", self.0 .0.id(), self.0 .1, self.1 .0)
+        write!(f, "rel@{}:{}:{}", self.0 .0.index(), self.0 .1, self.1 .0)
     }
 }
 
@@ -126,8 +126,8 @@ impl FromStr for RelId {
         s = s.strip_prefix("rel@").ok_or(())?;
 
         let mut iterator = s.split(':');
-        let Ok(package_id) =
-            PackageId::from_u16(iterator.next().ok_or(())?.parse().map_err(|_| ())?)
+        let Ok(domain_index) =
+            DomainIndex::from_u16(iterator.next().ok_or(())?.parse().map_err(|_| ())?)
         else {
             panic!();
         };
@@ -138,7 +138,7 @@ impl FromStr for RelId {
             return Err(());
         }
 
-        Ok(RelId(DefId(package_id, def_idx), DefRelTag(def_rel_tag)))
+        Ok(RelId(DefId(domain_index, def_idx), DefRelTag(def_rel_tag)))
     }
 }
 

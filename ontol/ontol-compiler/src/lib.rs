@@ -19,13 +19,13 @@ use mem::Mem;
 use namespace::Namespaces;
 use ontol_runtime::{
     ontology::{
-        config::{DataStoreConfig, PackageConfig},
+        config::{DataStoreConfig, DomainConfig},
         domain::DomainId,
         ontol::TextConstant,
         Ontology,
     },
     resolve_path::ResolverGraph,
-    DefId, PackageId,
+    DefId, DomainIndex,
 };
 use package::{PackageTopology, Packages};
 use pattern::Patterns;
@@ -98,11 +98,11 @@ pub fn compile(
     for parsed_package in topology.packages {
         debug!(
             "lower {:?}: {:?}",
-            parsed_package.package_id, parsed_package.reference
+            parsed_package.domain_index, parsed_package.reference
         );
         let source_id = compiler
             .sources
-            .source_id_for_package(parsed_package.package_id)
+            .source_id_for_domain(parsed_package.domain_index)
             .expect("no source id available for package");
         let src = compiler
             .sources
@@ -120,12 +120,12 @@ pub fn compile(
     compiler.persistence_check();
     compiler.check_error()?;
 
-    compiler.package_config_table.clear();
+    compiler.domain_config_table.clear();
 
-    for persistent_pkg_id in &compiler.persistent_domains {
-        compiler.package_config_table.insert(
-            *persistent_pkg_id,
-            PackageConfig {
+    for persistent_domain_index in &compiler.persistent_domains {
+        compiler.domain_config_table.insert(
+            *persistent_domain_index,
+            DomainConfig {
                 data_store: Some(DataStoreConfig::Default),
             },
         );
@@ -147,7 +147,7 @@ impl<'m> Compiled<'m> {
 
     /// Overwrite the data store config of all persistence domains
     pub fn override_data_store(&mut self, config: DataStoreConfig) {
-        for (_, pkg_config) in self.compiler.package_config_table.iter_mut() {
+        for (_, pkg_config) in self.compiler.domain_config_table.iter_mut() {
             if pkg_config.data_store.is_some() {
                 pkg_config.data_store = Some(config.clone());
             }
@@ -165,14 +165,14 @@ struct Compiler<'m> {
     sources: Sources,
 
     packages: Packages,
-    package_names: Vec<(PackageId, TextConstant)>,
+    domain_names: Vec<(DomainIndex, TextConstant)>,
 
-    domain_dep_graph: FnvHashMap<PackageId, FnvHashSet<PackageId>>,
+    domain_dep_graph: FnvHashMap<DomainIndex, FnvHashSet<DomainIndex>>,
     namespaces: Namespaces<'m>,
     defs: Defs<'m>,
-    package_def_ids: FnvHashMap<PackageId, DefId>,
-    domain_ids: BTreeMap<PackageId, DomainId>,
-    package_config_table: FnvHashMap<PackageId, PackageConfig>,
+    domain_def_ids: FnvHashMap<DomainIndex, DefId>,
+    domain_ids: BTreeMap<DomainIndex, DomainId>,
+    domain_config_table: FnvHashMap<DomainIndex, DomainConfig>,
     patterns: Patterns,
 
     str_ctx: StringCtx<'m>,
@@ -191,7 +191,7 @@ struct Compiler<'m> {
     code_ctx: CodeCtx<'m>,
     resolver_graph: ResolverGraph,
 
-    persistent_domains: BTreeSet<PackageId>,
+    persistent_domains: BTreeSet<DomainIndex>,
 
     errors: CompileErrors,
 }
@@ -204,13 +204,13 @@ impl<'m> Compiler<'m> {
         Self {
             sources,
             packages: Default::default(),
-            package_names: Default::default(),
+            domain_names: Default::default(),
             domain_dep_graph: Default::default(),
             namespaces: Default::default(),
             defs,
-            package_def_ids: Default::default(),
+            domain_def_ids: Default::default(),
             domain_ids: Default::default(),
-            package_config_table: Default::default(),
+            domain_config_table: Default::default(),
             patterns: Default::default(),
             str_ctx: StringCtx::new(mem),
             ty_ctx: TypeCtx::new(mem),
@@ -272,13 +272,13 @@ impl<'m> Index<TextConstant> for Compiler<'m> {
 /// Lower the ontol syntax to populate the compiler's data structures
 pub fn lower_ontol_syntax<V: ontol_parser::cst::view::NodeView>(
     ontol_view: V,
-    pkg_def_id: DefId,
+    domain_def_id: DefId,
     src: Src,
     session: Session,
 ) -> LoweringOutcome {
     use ontol_parser::cst::view::NodeViewExt;
 
-    CstLowering::new(pkg_def_id, src, session.0)
+    CstLowering::new(domain_def_id, src, session.0)
         .lower_ontol(ontol_view.node())
         .finish()
 }

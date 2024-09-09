@@ -23,7 +23,7 @@ impl DefId {
             .domain_by_id(self.domain_id)
             .ok_or("def domain not found")?;
         Ok(ontol_runtime::DefId(
-            domain.def_id().package_id(),
+            domain.def_id().domain_index(),
             self.def_tag,
         ))
     }

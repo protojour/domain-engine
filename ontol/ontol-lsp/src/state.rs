@@ -4,7 +4,7 @@ use ontol_compiler::ontol_syntax::OntolTreeSyntax;
 use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
-    package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage, ONTOL_PKG},
+    package::{GraphState, PackageGraphBuilder, PackageReference, ParsedDomain},
     CompileError, SourceId, SourceSpan, Sources, NO_SPAN,
 };
 use ontol_parser::cst::inspect as insp;
@@ -12,7 +12,8 @@ use ontol_parser::cst::tree::{SyntaxNode, TreeNodeView, TreeTokenView};
 use ontol_parser::cst::view::{self, NodeView, NodeViewExt, TokenView};
 use ontol_parser::lexer::kind::Kind;
 use ontol_parser::lexer::Lex;
-use ontol_runtime::ontology::{config::PackageConfig, domain::Def, Ontology};
+use ontol_runtime::ontology::{config::DomainConfig, domain::Def, Ontology};
+use ontol_runtime::DomainIndex;
 use std::fmt::Debug;
 use std::{
     collections::{HashMap, HashSet},
@@ -110,7 +111,7 @@ impl State {
             .unwrap()
             .into_ontology();
 
-        let ontol_domain = ontology.domain_by_pkg(ONTOL_PKG).unwrap();
+        let ontol_domain = ontology.domain_by_index(DomainIndex::ontol()).unwrap();
         let mut ontol_def = HashMap::new();
 
         for def in ontol_domain.defs() {
@@ -218,13 +219,13 @@ impl State {
 
                     for request in requests {
                         let source_name = get_reference_name(&request.reference);
-                        let package_config = PackageConfig::default();
+                        let package_config = DomainConfig::default();
                         let request_uri = build_uri(root_path, source_name);
 
                         if let Some(doc) = self.docs.get(&request_uri) {
                             let (flat_tree, errors) = ontol_parser::cst_parse(&doc.text);
 
-                            let package = ParsedPackage::new(
+                            let package = ParsedDomain::new(
                                 request,
                                 Box::new(OntolTreeSyntax {
                                     tree: flat_tree.unflatten(),

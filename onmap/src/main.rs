@@ -10,7 +10,7 @@ use ontol_runtime::{
     interface::serde::processor::ProcessorMode,
     ontology::Ontology,
     vm::VmState,
-    MapDef, MapDefFlags, MapFlags, MapKey, PackageId,
+    DomainIndex, MapDef, MapDefFlags, MapFlags, MapKey,
 };
 use serde::de::DeserializeSeed;
 
@@ -62,10 +62,10 @@ fn main() -> anyhow::Result<()> {
 
     let args = Args::parse();
     let ontology = Arc::new(load_ontology(args.ontology)?);
-    let Ok(pkg_id) = PackageId::from_u16(1) else {
+    let Ok(domain_index) = DomainIndex::from_u16(1) else {
         return Err(anyhow!("invalid package"));
     };
-    let domain = ontology.domain_by_pkg(pkg_id).unwrap();
+    let domain = ontology.domain_by_index(domain_index).unwrap();
     let from_name = ontology.find_text_constant(args.from.as_str()).unwrap();
     let to_name = ontology.find_text_constant(args.to.as_str()).unwrap();
     let input = MapDef {

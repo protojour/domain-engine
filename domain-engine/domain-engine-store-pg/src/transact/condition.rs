@@ -168,7 +168,7 @@ impl<'a> TransactCtx<'a> {
 
         let pg = self
             .pg_model
-            .pg_domain_datatable(def_id.package_id(), def_id)?;
+            .pg_domain_datatable(def_id.domain_index(), def_id)?;
 
         match (rel_info.kind, pg.table.properties.get(&prop_id.1)) {
             (
@@ -245,7 +245,7 @@ impl<'a> TransactCtx<'a> {
                         let pg_cardinal = pg_edge.table.edge_cardinal(outer_proj.subject)?;
                         let pg_outer = self
                             .pg_model
-                            .pg_domain_datatable(ctx.root_def_id.package_id(), ctx.root_def_id)?;
+                            .pg_domain_datatable(ctx.root_def_id.domain_index(), ctx.root_def_id)?;
 
                         sql_select.where_and(edge_join_condition(
                             sql::Path::from_iter([alias.into()]),
@@ -437,7 +437,7 @@ impl<'a> TransactCtx<'a> {
                         Clause::IsDef(def_id) => {
                             let pg = self
                                 .pg_model
-                                .pg_domain_datatable(def_id.package_id(), *def_id)?;
+                                .pg_domain_datatable(def_id.domain_index(), *def_id)?;
                             if !pg.table.has_fkey {
                                 return Err(PgError::Condition("abstract column not usable").into());
                             }

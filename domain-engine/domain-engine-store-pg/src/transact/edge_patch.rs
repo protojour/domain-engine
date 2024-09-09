@@ -332,7 +332,7 @@ impl<'a> TransactCtx<'a> {
                 let mut sql_ids_param: Vec<SqlScalar> = Vec::with_capacity(foreign_ids.len());
                 let pg_foreign = self
                     .pg_model
-                    .pg_domain_datatable(vertex_def_id.package_id(), vertex_def_id)?;
+                    .pg_domain_datatable(vertex_def_id.domain_index(), vertex_def_id)?;
                 let foreign_def = self.ontology.def(vertex_def_id);
                 let Some(foreign_entity) = foreign_def.entity() else {
                     return Err(PgInputError::NotAnEntity.into());
@@ -434,7 +434,7 @@ impl<'a> TransactCtx<'a> {
                     if matches!(dynamic, Dynamic::Yes { .. }) {
                         let datatable = self
                             .pg_model
-                            .datatable(foreign_def_id.package_id(), foreign_def_id)?;
+                            .datatable(foreign_def_id.domain_index(), foreign_def_id)?;
                         param_buf.push(SqlScalar::I32(datatable.key));
                     }
 
@@ -547,7 +547,7 @@ impl<'a> TransactCtx<'a> {
                         MutationMode::Create(_) | MutationMode::Update => {
                             let object_datatable = self
                                 .pg_model
-                                .datatable(foreign_def_id.package_id(), foreign_def_id)?;
+                                .datatable(foreign_def_id.domain_index(), foreign_def_id)?;
 
                             sql_update.where_and(edge_join_condition(
                                 sql::Path::empty(),
@@ -671,7 +671,7 @@ impl<'a> TransactCtx<'a> {
 
         let (resolve_mode, vertex_def_id, value) = if self
             .pg_model
-            .find_datatable(def_id.package_id(), def_id)
+            .find_datatable(def_id.domain_index(), def_id)
             .is_some()
         {
             let entity = self.ontology.def(def_id).entity().unwrap();
@@ -708,7 +708,7 @@ impl<'a> TransactCtx<'a> {
             )
         } else if def_id == OntolDefTag::Vertex.def_id() {
             let (def_key, data_key) = deserialize_ontol_vertex_address(value)?;
-            let (_pkg_id, def_id) = self.pg_model.datatable_key_by_def_key(def_key)?;
+            let (_domain_index, def_id) = self.pg_model.datatable_key_by_def_key(def_key)?;
 
             return Ok((def_id, def_key, data_key));
         } else {
@@ -721,7 +721,7 @@ impl<'a> TransactCtx<'a> {
                     MutationMode::Create(insert_mode) => {
                         self.insert_vertex(
                             InDomain {
-                                pkg_id: def_id.package_id(),
+                                domain_index: def_id.domain_index(),
                                 value,
                             },
                             insert_mode,
@@ -930,7 +930,7 @@ impl<'a> TransactCtx<'a> {
     ) -> DomainResult<(PgDomainTable<'a>, &'a PgColumn, SqlScalar)> {
         let pg = self
             .pg_model
-            .pg_domain_datatable(vertex_def_id.package_id(), vertex_def_id)?;
+            .pg_domain_datatable(vertex_def_id.domain_index(), vertex_def_id)?;
         let pg_column = pg.table.column(&id_prop_id)?;
 
         let Data::Sql(id_param) = self.data_from_value(id)? else {

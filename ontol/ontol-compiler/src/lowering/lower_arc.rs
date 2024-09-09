@@ -41,7 +41,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         let ident_symbol = ident_path.symbols().next()?;
         let (edge_def_id, coinage, ident) = self.catch(|zelf| {
             zelf.ctx.named_def_id(
-                zelf.ctx.pkg_def_id,
+                zelf.ctx.domain_def_id,
                 Space::Def,
                 ident_symbol.slice(),
                 ident_symbol.span(),

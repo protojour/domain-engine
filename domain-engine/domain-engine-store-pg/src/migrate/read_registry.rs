@@ -1,7 +1,7 @@
 use anyhow::Context;
 use fnv::FnvHashMap;
 use indoc::indoc;
-use ontol_runtime::{ontology::Ontology, tuple::CardinalIdx, DefId, DefPropTag, PackageId};
+use ontol_runtime::{ontology::Ontology, tuple::CardinalIdx, DefId, DefPropTag, DomainIndex};
 use tokio_postgres::Transaction;
 use tracing::info;
 use ulid::Ulid;
@@ -14,7 +14,7 @@ use crate::pg_model::{
 use super::MigrationCtx;
 
 enum TableRef {
-    Vertex(PackageId, DefId),
+    Vertex(DomainIndex, DefId),
     Edge(EdgeId),
 }
 
@@ -24,11 +24,11 @@ pub async fn read_registry<'t>(
     ctx: &mut MigrationCtx,
     txn: &Transaction<'t>,
 ) -> anyhow::Result<()> {
-    let pkg_by_ulid: FnvHashMap<Ulid, PackageId> = ontology
+    let domain_index_by_ulid: FnvHashMap<Ulid, DomainIndex> = ontology
         .domains()
-        .map(|(pkg_id, domain)| (domain.domain_id().ulid, pkg_id))
+        .map(|(domain_index, domain)| (domain.domain_id().ulid, domain_index))
         .collect();
-    let mut domain_pkg_by_key: FnvHashMap<PgRegKey, PackageId> = Default::default();
+    let mut domain_index_by_key: FnvHashMap<PgRegKey, DomainIndex> = Default::default();
     let mut table_by_key: FnvHashMap<PgRegKey, TableRef> = Default::default();
 
     // domains
@@ -41,15 +41,15 @@ pub async fn read_registry<'t>(
         let uid: Ulid = row.get(1);
         let schema_name = row.get(2);
 
-        if let Some(pkg_id) = pkg_by_ulid.get(&uid) {
+        if let Some(domain_index) = domain_index_by_ulid.get(&uid) {
             let pg_domain = PgDomain {
                 key: Some(key),
                 schema_name,
                 datatables: Default::default(),
                 edgetables: Default::default(),
             };
-            ctx.domains.insert(*pkg_id, pg_domain.clone());
-            domain_pkg_by_key.insert(key, *pkg_id);
+            ctx.domains.insert(*domain_index, pg_domain.clone());
+            domain_index_by_key.insert(key, *domain_index);
         } else {
             info!("domain id={uid} is persisted but no longer in the ontology, ignoring");
         }
@@ -79,7 +79,7 @@ pub async fn read_registry<'t>(
         let domain_key: PgRegKey = row.get(1);
         let table_type: PgDomainTableType = row.get(2);
 
-        let Some(owner_pkg_id) = domain_pkg_by_key.get(&domain_key).copied() else {
+        let Some(owner_domain_index) = domain_index_by_key.get(&domain_key).copied() else {
             continue;
         };
 
@@ -98,20 +98,23 @@ pub async fn read_registry<'t>(
             property_indexes: Default::default(),
         };
 
-        let Some(owner_pg_domain) = ctx.domains.get_mut(&owner_pkg_id) else {
+        let Some(owner_pg_domain) = ctx.domains.get_mut(&owner_domain_index) else {
             continue;
         };
 
         match table_type {
             PgDomainTableType::Vertex => {
-                let def_pkg_id = domain_pkg_by_key.get(&def_domain_key).unwrap();
-                let def_id = DefId(*def_pkg_id, def_tag);
+                let def_domain_index = domain_index_by_key.get(&def_domain_key).unwrap();
+                let def_id = DefId(*def_domain_index, def_tag);
                 owner_pg_domain.datatables.insert(def_id, pg_table);
-                table_by_key.insert(key, TableRef::Vertex(owner_pkg_id, def_id));
+                table_by_key.insert(key, TableRef::Vertex(owner_domain_index, def_id));
             }
             PgDomainTableType::Edge => {
                 owner_pg_domain.edgetables.insert(def_tag, pg_table);
-                table_by_key.insert(key, TableRef::Edge(EdgeId(DefId(owner_pkg_id, def_tag))));
+                table_by_key.insert(
+                    key,
+                    TableRef::Edge(EdgeId(DefId(owner_domain_index, def_tag))),
+                );
             }
         }
     }
@@ -142,8 +145,8 @@ pub async fn read_registry<'t>(
         };
 
         match table_by_key.get(&domaintable_key) {
-            Some(TableRef::Vertex(owner_pkg_id, def_id)) => {
-                let pg_domain = ctx.domains.get_mut(owner_pkg_id).unwrap();
+            Some(TableRef::Vertex(owner_domain_index, def_id)) => {
+                let pg_domain = ctx.domains.get_mut(owner_domain_index).unwrap();
 
                 let pg_table = pg_domain
                     .datatables
@@ -153,7 +156,7 @@ pub async fn read_registry<'t>(
                 pg_table.properties.insert(prop_tag, pg_property);
             }
             Some(TableRef::Edge(edge_id)) => {
-                let pg_domain = ctx.domains.get_mut(&edge_id.pkg_id()).unwrap();
+                let pg_domain = ctx.domains.get_mut(&edge_id.domain_index()).unwrap();
                 let pg_table = pg_domain.edgetables.get_mut(&edge_id.def_id().1).unwrap();
 
                 pg_table.properties.insert(prop_tag, pg_property);
@@ -177,14 +180,14 @@ pub async fn read_registry<'t>(
         let index_type: PgIndexType = row.get(3);
         let property_keys: Vec<PgRegKey> = row.get(4);
 
-        let Some(domain_pkg) = domain_pkg_by_key.get(&def_domain_key).copied() else {
+        let Some(domain_index) = domain_index_by_key.get(&def_domain_key).copied() else {
             continue;
         };
-        let index_def_id = DefId(domain_pkg, def_tag);
+        let index_def_id = DefId(domain_index, def_tag);
 
         match table_by_key.get(&domaintable_key) {
-            Some(TableRef::Vertex(owner_pkg_id, def_id)) => {
-                let pg_domain = ctx.domains.get_mut(owner_pkg_id).unwrap();
+            Some(TableRef::Vertex(owner_domain_index, def_id)) => {
+                let pg_domain = ctx.domains.get_mut(owner_domain_index).unwrap();
                 let pg_table = pg_domain.datatables.get_mut(def_id).unwrap();
 
                 pg_table.property_indexes.insert((index_def_id, index_type), PgIndexData {
@@ -239,7 +242,7 @@ pub async fn read_registry<'t>(
             continue;
         };
 
-        let pg_domain = ctx.domains.get_mut(&edge_id.pkg_id()).unwrap();
+        let pg_domain = ctx.domains.get_mut(&edge_id.domain_index()).unwrap();
         let pg_table = pg_domain.edgetables.get_mut(&edge_id.def_id().1).unwrap();
 
         pg_table.edge_cardinals.insert(

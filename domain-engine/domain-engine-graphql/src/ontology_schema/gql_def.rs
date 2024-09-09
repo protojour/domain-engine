@@ -56,7 +56,7 @@ impl Def {
     /// The identifier of this def.
     /// The ID is unique only within this particular ontology.
     fn id(&self, ctx: &OntologyCtx) -> gql_id::DefId {
-        let domain = ctx.domain_by_pkg(self.id.package_id()).unwrap();
+        let domain = ctx.domain_by_index(self.id.domain_index()).unwrap();
         gql_id::DefId {
             domain_id: domain.domain_id().ulid,
             def_tag: self.id.1,
@@ -149,7 +149,7 @@ impl Def {
 
     fn domain(&self) -> gql_domain::Domain {
         gql_domain::Domain {
-            pkg_id: self.id.package_id(),
+            domain_index: self.id.domain_index(),
         }
     }
 }

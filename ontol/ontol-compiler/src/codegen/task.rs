@@ -12,7 +12,7 @@ use ontol_runtime::{
     query::condition::Condition,
     var::VarAllocator,
     vm::proc::{Address, Lib, NParams, OpCode, Procedure},
-    DefId, MapDef, MapDirection, MapFlags, MapKey, PackageId,
+    DefId, DomainIndex, MapDef, MapDirection, MapFlags, MapKey,
 };
 use tracing::{debug, debug_span, warn};
 
@@ -23,7 +23,6 @@ use crate::{
     def::{DefKind, Defs},
     hir_unify::{unify_to_function, UnifierError, UnifierResult},
     map::UndirectedMapKey,
-    package::ONTOL_PKG,
     pattern::PatId,
     type_check::MapArmsKind,
     typed_hir::TypedRootNode,
@@ -52,7 +51,7 @@ pub struct CodeCtx<'m> {
     pub result_lib: Lib,
     pub result_const_procs: FnvHashMap<DefId, Procedure>,
     pub result_map_proc_table: FnvHashMap<MapKey, Procedure>,
-    pub result_named_downmaps: FnvHashMap<(PackageId, TextConstant), MapKey>,
+    pub result_named_downmaps: FnvHashMap<(DomainIndex, TextConstant), MapKey>,
     pub result_propflow_table: FnvHashMap<MapKey, Vec<PropertyFlow>>,
     pub result_static_conditions: FnvHashMap<MapKey, Condition>,
     pub result_metadata_table: FnvHashMap<MapKey, MapOutputMeta>,
@@ -164,7 +163,7 @@ pub struct ConstCodegenTask<'m> {
 /// It goes together with a key.
 pub enum MapCodegenRequest<'m> {
     /// Autogenerate
-    Auto(PackageId),
+    Auto(DomainIndex),
     ExplicitOntol(OntolMap<'m>),
     ExternForward(ExternMap),
     ExternBackward(ExternMap),
@@ -184,7 +183,7 @@ pub enum OntolMapArms<'m> {
 }
 
 pub(super) enum MapCodegenTask<'m> {
-    Auto(PackageId),
+    Auto(DomainIndex),
     Explicit(ExplicitMapCodegenTask<'m>),
 }
 
@@ -200,15 +199,15 @@ pub(super) struct ExplicitMapCodegenTask<'m> {
 }
 
 impl<'m> ExplicitMapCodegenTask<'m> {
-    fn pkg_id(&self) -> Option<PackageId> {
+    fn domain_index(&self) -> Option<DomainIndex> {
         if let Some(ontol_map) = self.ontol_map.as_ref() {
-            Some(ontol_map.map_def_id.package_id())
+            Some(ontol_map.map_def_id.domain_index())
         } else if let Some(ext) = self.forward_extern.as_ref() {
-            Some(ext.map_def_id.package_id())
+            Some(ext.map_def_id.domain_index())
         } else {
             self.backward_extern
                 .as_ref()
-                .map(|ext| ext.map_def_id.package_id())
+                .map(|ext| ext.map_def_id.domain_index())
         }
     }
 }
@@ -257,7 +256,7 @@ pub(super) struct ProcTable {
     pub propflow_table: FnvHashMap<MapKey, Vec<PropertyFlow>>,
     pub metadata_table: FnvHashMap<MapKey, MapOutputMeta>,
     pub static_conditions: FnvHashMap<MapKey, Condition>,
-    pub named_downmaps: FnvHashMap<(PackageId, TextConstant), MapKey>,
+    pub named_downmaps: FnvHashMap<(DomainIndex, TextConstant), MapKey>,
 }
 
 pub struct MapOutputMeta {
@@ -298,10 +297,11 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
         for (key, task) in std::mem::take(&mut compiler.code_ctx.map_tasks) {
             match task {
-                MapCodegenTask::Auto(package_id) => {
-                    let _entered = debug_span!("auto_map", run, pkg = ?package_id.id()).entered();
+                MapCodegenTask::Auto(domain_index) => {
+                    let _entered =
+                        debug_span!("auto_map", run, idx = ?domain_index.index()).entered();
 
-                    if let Some(task) = autogenerate_mapping(key, package_id, compiler) {
+                    if let Some(task) = autogenerate_mapping(key, domain_index, compiler) {
                         explicit_map_tasks.push((key, task));
                     }
                 }
@@ -318,7 +318,8 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
         for (key, task) in explicit_map_tasks {
             let _entered =
-                debug_span!("map", run, pkg = ?task.pkg_id().unwrap_or(ONTOL_PKG).id()).entered();
+                debug_span!("map", run, idx = ?task.domain_index().unwrap_or(DomainIndex::ontol()).index())
+                    .entered();
 
             generate_explicit_map(key, task, &mut proc_table, compiler);
         }
@@ -491,7 +492,7 @@ fn generate_pattern_map<'m>(
             let ident_constant = compiler.str_ctx.intern_constant(ident);
             proc_table
                 .named_downmaps
-                .insert((map_def_id.package_id(), ident_constant), down_key);
+                .insert((map_def_id.domain_index(), ident_constant), down_key);
         }
         (Some(_), _) => {
             CompileError::BUG("Failed to generate forward mapping")

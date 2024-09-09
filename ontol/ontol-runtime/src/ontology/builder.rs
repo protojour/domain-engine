@@ -8,11 +8,11 @@ use crate::{
     },
     query::condition::Condition,
     vm::proc::{Lib, Procedure},
-    DefId, DefIdSet, MapKey, PackageId, PropId,
+    DefId, DefIdSet, DomainIndex, MapKey, PropId,
 };
 
 use super::{
-    config::PackageConfig,
+    config::DomainConfig,
     domain::{Domain, ExtendedEntityInfo},
     map::{Extern, MapMeta, PropertyFlow},
     ontol::{
@@ -31,19 +31,16 @@ impl OntologyBuilder {
         &self.ontology
     }
 
-    pub fn add_domain(&mut self, package_id: PackageId, domain: Domain) {
-        self.ontology.data.domains.insert(package_id, domain);
+    pub fn add_domain(&mut self, index: DomainIndex, domain: Domain) {
+        self.ontology.data.domains.insert(index, domain);
     }
 
-    pub fn domain_mut(&mut self, package_id: PackageId) -> &mut Domain {
-        self.ontology.data.domains.get_mut(&package_id).unwrap()
+    pub fn domain_mut(&mut self, index: DomainIndex) -> &mut Domain {
+        self.ontology.data.domains.get_mut(&index).unwrap()
     }
 
-    pub fn add_package_config(&mut self, package_id: PackageId, config: PackageConfig) {
-        self.ontology
-            .data
-            .package_config_table
-            .insert(package_id, config);
+    pub fn add_domain_config(&mut self, index: DomainIndex, config: DomainConfig) {
+        self.ontology.data.domain_config_table.insert(index, config);
     }
 
     pub fn union_variants(mut self, table: FnvHashMap<DefId, DefIdSet>) -> Self {
@@ -68,7 +65,7 @@ impl OntologyBuilder {
 
     pub fn domain_interfaces(
         mut self,
-        interfaces: FnvHashMap<PackageId, Vec<DomainInterface>>,
+        interfaces: FnvHashMap<DomainIndex, Vec<DomainInterface>>,
     ) -> Self {
         self.data().domain_interfaces = interfaces;
         self
@@ -106,7 +103,7 @@ impl OntologyBuilder {
 
     pub fn named_forward_maps(
         mut self,
-        named_forward_maps: FnvHashMap<(PackageId, TextConstant), MapKey>,
+        named_forward_maps: FnvHashMap<(DomainIndex, TextConstant), MapKey>,
     ) -> Self {
         self.data().named_downmaps = named_forward_maps;
         self
@@ -173,7 +170,7 @@ pub(super) fn new_builder() -> OntologyBuilder {
                 extended_entity_table: Default::default(),
                 union_variants: Default::default(),
                 domain_interfaces: Default::default(),
-                package_config_table: Default::default(),
+                domain_config_table: Default::default(),
                 def_docs: Default::default(),
                 prop_docs: Default::default(),
                 lib: Lib::default(),

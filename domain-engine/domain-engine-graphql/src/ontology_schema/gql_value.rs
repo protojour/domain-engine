@@ -198,7 +198,7 @@ pub fn write_ontol_scalar(
 
                     let mut sorted: Vec<_> = attrs
                         .into_iter()
-                        .filter(|(prop_id, _)| prop_id.0.package_id().id() != 0)
+                        .filter(|(prop_id, _)| prop_id.0.domain_index().index() != 0)
                         .collect();
                     sorted.sort_by_key(|(prop_id, _)| *prop_id);
 

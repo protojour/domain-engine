@@ -2,10 +2,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use ::serde::{Deserialize, Serialize};
 
-use crate::{ontology::Ontology, PackageId};
+use crate::{ontology::Ontology, DomainIndex};
 
 #[derive(Clone, Default, Serialize, Deserialize, Debug)]
-pub struct PackageConfig {
+pub struct DomainConfig {
     pub data_store: Option<DataStoreConfig>,
 }
 
@@ -15,20 +15,20 @@ pub enum DataStoreConfig {
     ByName(String),
 }
 
-pub fn data_store_backed_domains(
+pub fn persisted_domains(
     ontology: &Ontology,
-) -> impl Iterator<Item = (DataStoreConfig, BTreeSet<PackageId>)> {
-    let mut configs: BTreeMap<DataStoreConfig, BTreeSet<PackageId>> = Default::default();
+) -> impl Iterator<Item = (DataStoreConfig, BTreeSet<DomainIndex>)> {
+    let mut configs: BTreeMap<DataStoreConfig, BTreeSet<DomainIndex>> = Default::default();
 
-    for (package_id, _) in ontology.domains() {
-        let Some(config) = ontology.get_package_config(package_id) else {
+    for (index, _) in ontology.domains() {
+        let Some(config) = ontology.get_domain_config(index) else {
             continue;
         };
         let Some(ds_config) = config.data_store.clone() else {
             continue;
         };
 
-        configs.entry(ds_config).or_default().insert(package_id);
+        configs.entry(ds_config).or_default().insert(index);
     }
 
     configs.into_iter()

@@ -2,9 +2,7 @@ use std::{fmt::Debug, ops::Deref, rc::Rc};
 
 use fnv::FnvHashMap;
 use ontol_parser::U32Span;
-use ontol_runtime::PackageId;
-
-use crate::package::ONTOL_PKG;
+use ontol_runtime::DomainIndex;
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 pub struct SourceId(pub u32);
@@ -16,7 +14,7 @@ pub const NATIVE_SOURCE: SourceId = SourceId(0);
 #[derive(Clone, Debug)]
 pub struct Src {
     pub id: SourceId,
-    pub package_id: PackageId,
+    pub domain_index: DomainIndex,
     pub name: Rc<String>,
 }
 
@@ -106,7 +104,7 @@ pub struct SourceCodeRegistry {
 #[derive(Clone)]
 pub struct Sources {
     next_source_id: SourceId,
-    package: PackageId,
+    domain_index: DomainIndex,
     sources: FnvHashMap<SourceId, Src>,
 }
 
@@ -114,7 +112,7 @@ impl Default for Sources {
     fn default() -> Self {
         Self {
             next_source_id: SourceId(1),
-            package: ONTOL_PKG,
+            domain_index: DomainIndex::ontol(),
             sources: Default::default(),
         }
     }
@@ -122,9 +120,9 @@ impl Default for Sources {
 
 impl Sources {
     /// Need this while the architecture is kind of broken
-    pub fn source_id_for_package(&self, package: PackageId) -> Option<SourceId> {
+    pub fn source_id_for_domain(&self, domain_index: DomainIndex) -> Option<SourceId> {
         self.sources.iter().find_map(|(_, src)| {
-            if src.package_id == package {
+            if src.domain_index == domain_index {
                 Some(src.id)
             } else {
                 None
@@ -132,10 +130,10 @@ impl Sources {
         })
     }
 
-    pub fn find_source_by_package_id(&self, package_id: PackageId) -> Option<&Src> {
+    pub fn find_source_by_domain_index(&self, domain_index: DomainIndex) -> Option<&Src> {
         self.sources
             .iter()
-            .find(|(_, src)| src.package_id == package_id)
+            .find(|(_, src)| src.domain_index == domain_index)
             .map(|(_, src)| src)
     }
 
@@ -143,13 +141,13 @@ impl Sources {
         self.sources.get(&id).cloned()
     }
 
-    pub fn add_source(&mut self, package: PackageId, name: String) -> Src {
+    pub fn add_source(&mut self, domain_index: DomainIndex, name: String) -> Src {
         let id = self.next_source_id;
         self.next_source_id.0 += 1;
-        self.package = package;
+        self.domain_index = domain_index;
         let src = Src {
             id,
-            package_id: package,
+            domain_index,
             name: name.into(),
         };
         self.sources.insert(id, src.clone());

@@ -24,7 +24,7 @@ use ontol_runtime::{
     },
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolverGraph},
     var::Var,
-    DefId, MapDefFlags, MapKey, OntolDefTag, PackageId, PropId,
+    DefId, DomainIndex, MapDefFlags, MapKey, OntolDefTag, PropId,
 };
 use thin_vec::thin_vec;
 
@@ -159,7 +159,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
     pub fn register_fundamental_types(
         &mut self,
-        package_id: PackageId,
+        domain_index: DomainIndex,
         partial_ontology: &'c Ontology,
     ) {
         self.schema.query = self.schema.push_type_data(TypeData {
@@ -169,7 +169,10 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             kind: TypeKind::Object(ObjectData {
                 fields: Default::default(),
                 kind: ObjectKind::Query {
-                    domain_def_id: partial_ontology.domain_by_pkg(package_id).unwrap().def_id(),
+                    domain_def_id: partial_ontology
+                        .domain_by_index(domain_index)
+                        .unwrap()
+                        .def_id(),
                 },
                 interface: ObjectInterface::Implements(thin_vec![]),
             }),

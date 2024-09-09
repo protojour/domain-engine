@@ -11,7 +11,7 @@ use ontol_runtime::{
     ontology::Ontology,
     phf::PhfKey,
     resolve_path::ResolverGraph,
-    DefId, MapKey, PackageId,
+    DefId, DomainIndex, MapKey,
 };
 use tracing::{debug_span, trace};
 
@@ -28,7 +28,7 @@ use super::{
 };
 
 pub fn generate_graphql_schema<'c>(
-    package_id: PackageId,
+    domain_index: DomainIndex,
     partial_ontology: &'c Ontology,
     map_namespace: Option<&'c IndexMap<&str, DefId>>,
     code_ctx: &'c CodeCtx,
@@ -36,7 +36,7 @@ pub fn generate_graphql_schema<'c>(
     union_member_cache: &'c UnionMemberCache,
     serde_gen: &mut SerdeGenerator<'c, '_>,
 ) -> Option<GraphqlSchema> {
-    let domain = partial_ontology.domain_by_pkg(package_id).unwrap();
+    let domain = partial_ontology.domain_by_index(domain_index).unwrap();
 
     let contains_entities = domain.defs().any(|def| def.entity().is_some());
 
@@ -49,7 +49,7 @@ pub fn generate_graphql_schema<'c>(
 
             if let Some(map_key) = code_ctx
                 .result_named_downmaps
-                .get(&(package_id, name_constant))
+                .get(&(domain_index, name_constant))
             {
                 named_maps.push((name, *map_key));
             }
@@ -61,11 +61,11 @@ pub fn generate_graphql_schema<'c>(
         return None;
     }
 
-    let _entered = debug_span!("gql", pkg = ?package_id.id()).entered();
+    let _entered = debug_span!("gql", pkg = ?domain_index.index()).entered();
 
-    let mut schema = new_schema_with_capacity(package_id, domain.type_count());
+    let mut schema = new_schema_with_capacity(domain_index, domain.type_count());
     let mut namespace = GraphqlNamespace::with_domain_disambiguation(DomainDisambiguation {
-        root_domain: package_id,
+        root_domain: domain_index,
         ontology: partial_ontology,
     });
 
@@ -95,7 +95,7 @@ pub fn generate_graphql_schema<'c>(
     let mut query_fields: IndexMap<String, FieldData> = Default::default();
     let mut mutation_fields: IndexMap<String, FieldData> = Default::default();
 
-    builder.register_fundamental_types(package_id, partial_ontology);
+    builder.register_fundamental_types(domain_index, partial_ontology);
     builder.register_standard_queries(&mut query_fields);
 
     for def in domain.defs() {
@@ -168,9 +168,9 @@ fn entity_check(schema: &GraphqlSchema, type_ref: UnitTypeRef) -> Option<EntityD
     }
 }
 
-fn new_schema_with_capacity(package_id: PackageId, cap: usize) -> GraphqlSchema {
+fn new_schema_with_capacity(domain_index: DomainIndex, cap: usize) -> GraphqlSchema {
     GraphqlSchema {
-        package_id,
+        domain_index,
         query: TypeAddr(0),
         mutation: TypeAddr(0),
         page_info: TypeAddr(0),

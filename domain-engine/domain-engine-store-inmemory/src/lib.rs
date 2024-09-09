@@ -19,7 +19,7 @@ use ontol_runtime::ontology::domain::EdgeCardinalFlags;
 use ontol_runtime::ontology::{config::DataStoreConfig, Ontology};
 use ontol_runtime::query::select::Select;
 use ontol_runtime::value::Value;
-use ontol_runtime::{DefId, PackageId};
+use ontol_runtime::{DefId, DomainIndex};
 use tokio::sync::RwLock;
 
 use constraint::ConstraintCheck;
@@ -56,15 +56,15 @@ impl DataStoreAPI for InMemoryDb {
 
 impl InMemoryDb {
     fn new(
-        package_ids: &BTreeSet<PackageId>,
+        persisted: &BTreeSet<DomainIndex>,
         ontology: Arc<Ontology>,
         system: ArcSystemApi,
     ) -> Self {
         let mut collections: FnvHashMap<DefId, VertexTable<DynamicKey>> = Default::default();
         let mut hyper_edges: FnvHashMap<DefId, HyperEdgeTable> = Default::default();
 
-        for package_id in package_ids {
-            let domain = ontology.domain_by_pkg(*package_id).unwrap();
+        for domain_index in persisted {
+            let domain = ontology.domain_by_index(*domain_index).unwrap();
 
             for def in domain.defs() {
                 if let Some(entity) = def.entity() {
@@ -285,25 +285,25 @@ pub struct InMemoryDataStoreFactory;
 impl DataStoreFactory for InMemoryDataStoreFactory {
     async fn new_api(
         &self,
-        package_ids: &BTreeSet<PackageId>,
+        persisted: &BTreeSet<DomainIndex>,
         config: DataStoreConfig,
         session: Session,
         ontology: Arc<Ontology>,
         system: ArcSystemApi,
     ) -> DomainResult<Box<dyn DataStoreAPI + Send + Sync>> {
-        self.new_api_sync(package_ids, config, session, ontology, system)
+        self.new_api_sync(persisted, config, session, ontology, system)
     }
 }
 
 impl DataStoreFactorySync for InMemoryDataStoreFactory {
     fn new_api_sync(
         &self,
-        package_ids: &BTreeSet<PackageId>,
+        persisted: &BTreeSet<DomainIndex>,
         _config: DataStoreConfig,
         _session: Session,
         ontology: Arc<Ontology>,
         system: ArcSystemApi,
     ) -> DomainResult<Box<dyn DataStoreAPI + Send + Sync>> {
-        Ok(Box::new(InMemoryDb::new(package_ids, ontology, system)))
+        Ok(Box::new(InMemoryDb::new(persisted, ontology, system)))
     }
 }

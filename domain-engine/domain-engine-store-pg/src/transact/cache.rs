@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use arcstr::ArcStr;
 use fnv::FnvHashMap;
-use ontol_runtime::{DefId, PackageId, PropId};
+use ontol_runtime::{DefId, DomainIndex, PropId};
 
 use crate::{
     pg_model::{PgDataKey, PgRegKey},
@@ -14,8 +14,8 @@ use super::{insert::PreparedInsert, InsertMode};
 
 #[derive(Default)]
 pub struct PgCache {
-    pub insert: FnvHashMap<(InsertMode, PackageId, DefId), PreparedInsert>,
-    pub update_tentative: FnvHashMap<(PackageId, DefId), PreparedStatement>,
+    pub insert: FnvHashMap<(InsertMode, DomainIndex, DefId), PreparedInsert>,
+    pub update_tentative: FnvHashMap<(DomainIndex, DefId), PreparedStatement>,
     pub key_by_id: FnvHashMap<(DefId, PropId), PreparedStatement>,
     pub insert_tmp_id: FnvHashMap<(DefId, PropId), PreparedStatement>,
     pub upsert_self_identifying: FnvHashMap<DefId, PreparedStatement>,

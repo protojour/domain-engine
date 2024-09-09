@@ -4,7 +4,7 @@ use ontol_runtime::{
         serde::{SerdeDef, SerdeModifier},
     },
     ontology::{domain::DefKind, Ontology},
-    DefId, PackageId,
+    DefId, DomainIndex,
 };
 
 use crate::repr::repr_model::ReprKind;
@@ -12,11 +12,11 @@ use crate::repr::repr_model::ReprKind;
 use super::serde::{serde_generator::SerdeGenerator, SerdeKey};
 
 pub fn generate_httpjson_interface(
-    package_id: PackageId,
+    domain_index: DomainIndex,
     partial_ontology: &Ontology,
     serde_gen: &mut SerdeGenerator,
 ) -> Option<HttpJson> {
-    let domain = partial_ontology.domain_by_pkg(package_id).unwrap();
+    let domain = partial_ontology.domain_by_index(domain_index).unwrap();
 
     let contains_entities = domain.defs().any(|def| def.entity().is_some());
     if !contains_entities {

@@ -12,7 +12,7 @@ use ontol_runtime::{
     },
     value::Value,
     var::Var,
-    PackageId,
+    DomainIndex,
 };
 use serde::de::DeserializeSeed;
 
@@ -28,7 +28,7 @@ pub use unimock;
 pub trait DomainEngineTestExt {
     async fn exec_named_map_json(
         self: &Arc<Self>,
-        key: (PackageId, &str),
+        key: (DomainIndex, &str),
         input_json: serde_json::Value,
         find_query: TestFindQuery,
     ) -> serde_json::Value;
@@ -38,15 +38,15 @@ pub trait DomainEngineTestExt {
 impl DomainEngineTestExt for DomainEngine {
     async fn exec_named_map_json(
         self: &Arc<Self>,
-        (package_id, name): (PackageId, &str),
+        (domain_index, name): (DomainIndex, &str),
         input_json: serde_json::Value,
         find_query: TestFindQuery,
     ) -> serde_json::Value {
-        let value = test_exec_named_map(self, (package_id, name), input_json, find_query).await;
+        let value = test_exec_named_map(self, (domain_index, name), input_json, find_query).await;
 
         let ontology = self.ontology();
         let key = ontology
-            .find_named_downmap_meta(package_id, name)
+            .find_named_downmap_meta(domain_index, name)
             .expect("Named map not found");
 
         let output_def = ontology.def(key.output.def_id);
@@ -74,13 +74,13 @@ impl DomainEngineTestExt for DomainEngine {
 
 async fn test_exec_named_map(
     engine: &Arc<DomainEngine>,
-    (package_id, name): (PackageId, &str),
+    (domain_index, name): (DomainIndex, &str),
     input_json: serde_json::Value,
     mut find_query: TestFindQuery,
 ) -> Value {
     let ontology = engine.ontology();
     let key = ontology
-        .find_named_downmap_meta(package_id, name)
+        .find_named_downmap_meta(domain_index, name)
         .expect("Named map not found");
 
     let input_def = ontology.def(key.input.def_id);

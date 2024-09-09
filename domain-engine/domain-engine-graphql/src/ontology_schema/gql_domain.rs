@@ -1,6 +1,6 @@
 use ontol_runtime::{
     ontology::domain::{self, DefKind},
-    PackageId,
+    DomainIndex,
 };
 
 use crate::{gql_scalar::GqlScalar, juniper};
@@ -8,7 +8,7 @@ use crate::{gql_scalar::GqlScalar, juniper};
 use super::{gql_def, OntologyCtx};
 
 pub struct Domain {
-    pub pkg_id: PackageId,
+    pub domain_index: DomainIndex,
 }
 
 #[juniper::graphql_object]
@@ -22,8 +22,8 @@ impl Domain {
         self.data(ctx).domain_id().stable
     }
 
-    fn package_id(&self) -> String {
-        format!("{:?}", self.pkg_id)
+    fn index(&self) -> String {
+        format!("{:?}", self.domain_index)
     }
 
     fn name(&self, ctx: &OntologyCtx) -> String {
@@ -56,7 +56,7 @@ impl Domain {
 
     fn maps(&self, ctx: &OntologyCtx) -> Vec<gql_def::NamedMap> {
         ctx.iter_named_downmaps()
-            .filter(|(package_id, ..)| package_id == &self.pkg_id)
+            .filter(|(domain_index, ..)| domain_index == &self.domain_index)
             .map(|(_, name, _)| gql_def::NamedMap { name })
             .collect()
     }
@@ -64,6 +64,6 @@ impl Domain {
 
 impl Domain {
     fn data<'c>(&self, ctx: &'c OntologyCtx) -> &'c domain::Domain {
-        ctx.domain_by_pkg(self.pkg_id).unwrap()
+        ctx.domain_by_index(self.domain_index).unwrap()
     }
 }

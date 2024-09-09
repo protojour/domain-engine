@@ -1,6 +1,5 @@
-use ontol_compiler::package::ONTOL_PKG;
 use ontol_macros::test;
-use ontol_runtime::{interface::serde::operator::SerdeOperator, PropId};
+use ontol_runtime::{interface::serde::operator::SerdeOperator, DomainIndex, PropId};
 use ontol_test_utils::{
     assert_json_io_matches, def_binding::DefBinding, expect_eq, serde_helper::serde_create,
     src_name, OntolTest, TestCompile, TestPackages,
@@ -32,14 +31,16 @@ fn test_relations_are_distinct_for_different_domains() {
         let [foo, other_foo] = test.bind(["foo", "other.foo"]);
         let ontology = test.ontology();
 
-        let root_domain = ontology.domain_by_pkg(foo.def_id().package_id()).unwrap();
+        let root_domain = ontology
+            .domain_by_index(foo.def_id().domain_index())
+            .unwrap();
         expect_eq!(
             actual = &ontology[root_domain.unique_name()],
             expected = "entry"
         );
 
         let other_domain = ontology
-            .domain_by_pkg(other_foo.def_id().package_id())
+            .domain_by_index(other_foo.def_id().domain_index())
             .unwrap();
         expect_eq!(
             actual = &ontology[other_domain.unique_name()],
@@ -66,8 +67,11 @@ fn test_relations_are_distinct_for_different_domains() {
         let prop = extract_prop_rel_id(&foo, &test);
         let other_prop = extract_prop_rel_id(&other_foo, &test);
 
-        assert_eq!(prop.0.package_id(), foo.def_id().package_id());
-        assert_eq!(other_prop.0.package_id(), other_foo.def_id().package_id());
+        assert_eq!(prop.0.domain_index(), foo.def_id().domain_index());
+        assert_eq!(
+            other_prop.0.domain_index(),
+            other_foo.def_id().domain_index()
+        );
     });
 }
 
@@ -93,7 +97,10 @@ fn ontol_domain_is_defined_in_the_namespace() {
 #[test]
 fn ontol_domain_is_documented() {
     "".compile_then(|test| {
-        let ontol_domain = test.ontology().domain_by_pkg(ONTOL_PKG).unwrap();
+        let ontol_domain = test
+            .ontology()
+            .domain_by_index(DomainIndex::ontol())
+            .unwrap();
         let text = ontol_domain
             .find_def_by_name(test.ontology().find_text_constant("text").unwrap())
             .unwrap();

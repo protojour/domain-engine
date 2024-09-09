@@ -8,14 +8,14 @@ use crate::{
     },
     ontology::OntologyInit,
     phf::PhfMap,
-    DefId, PackageId, PropId,
+    DefId, DomainIndex, PropId,
 };
 
 use super::data::{TypeAddr, TypeData};
 
 #[derive(Serialize, Deserialize)]
 pub struct GraphqlSchema {
-    pub package_id: PackageId,
+    pub domain_index: DomainIndex,
     pub query: TypeAddr,
     pub mutation: TypeAddr,
     pub page_info: TypeAddr,
@@ -52,7 +52,7 @@ impl GraphqlSchema {
 
     pub(crate) fn empty() -> Self {
         Self {
-            package_id: PackageId(0),
+            domain_index: DomainIndex(0),
             query: TypeAddr(0),
             mutation: TypeAddr(0),
             page_info: TypeAddr(0),

@@ -466,7 +466,7 @@ async fn test_artist_and_instrument_pagination(ds: &str) {
         json_map(value, |value| json_prop(value, "name"))
     }
 
-    let by_name = (artist.def_id().package_id(), "artists");
+    let by_name = (artist.def_id().domain_index(), "artists");
 
     expect_eq!(
         actual = extract_names(
@@ -503,7 +503,7 @@ async fn test_artist_and_instrument_filter_condition(ds: &str) {
         json_map(value, |value| json_prop(value, "name"))
     }
 
-    let by_name = (artist.def_id().package_id(), "artists_by_name");
+    let by_name = (artist.def_id().domain_index(), "artists_by_name");
 
     expect_eq!(
         actual = extract_names(

@@ -9,7 +9,7 @@ use ontol_runtime::{
     },
     tuple::CardinalIdx,
     value::Value,
-    DefId, DefPropTag, OntolDefTag, PackageId, PropId,
+    DefId, DefPropTag, DomainIndex, OntolDefTag, PropId,
 };
 use postgres_types::ToSql;
 use tokio_postgres::types::FromSql;
@@ -30,7 +30,7 @@ pub struct EdgeId(pub DefId);
 
 impl EdgeId {
     #[inline]
-    pub fn pkg_id(&self) -> PackageId {
+    pub fn domain_index(&self) -> DomainIndex {
         self.0 .0
     }
 
@@ -41,11 +41,14 @@ impl EdgeId {
 }
 
 pub enum PgTableKey {
-    Data { pkg_id: PackageId, def_id: DefId },
+    Data {
+        domain_index: DomainIndex,
+        def_id: DefId,
+    },
 }
 
 pub struct PgModel {
-    pub(crate) domains: FnvHashMap<PackageId, PgDomain>,
+    pub(crate) domains: FnvHashMap<DomainIndex, PgDomain>,
     /// A map from PG table key to semantic key
     /// This is used for dynamic typing.
     pub(crate) reg_key_to_table_key: FnvHashMap<PgRegKey, PgTableKey>,
@@ -54,17 +57,17 @@ pub struct PgModel {
 
 impl PgModel {
     pub(crate) fn new(
-        domains: FnvHashMap<PackageId, PgDomain>,
+        domains: FnvHashMap<DomainIndex, PgDomain>,
         entity_id_to_entity: FnvHashMap<DefId, DefId>,
     ) -> Self {
         let mut reg_key_to_table_key: FnvHashMap<PgRegKey, PgTableKey> = Default::default();
 
-        for (pkg_id, pg_domain) in &domains {
+        for (domain_index, pg_domain) in &domains {
             for (def_id, pg_table) in &pg_domain.datatables {
                 reg_key_to_table_key.insert(
                     pg_table.key,
                     PgTableKey::Data {
-                        pkg_id: *pkg_id,
+                        domain_index: *domain_index,
                         def_id: *def_id,
                     },
                 );
@@ -78,20 +81,20 @@ impl PgModel {
         }
     }
 
-    pub(crate) fn pg_domain(&self, pkg_id: PackageId) -> DomainResult<&PgDomain> {
+    pub(crate) fn pg_domain(&self, domain_index: DomainIndex) -> DomainResult<&PgDomain> {
         Ok(self
             .domains
-            .get(&pkg_id)
-            .ok_or(PgModelError::DomainNotFound(pkg_id))?)
+            .get(&domain_index)
+            .ok_or(PgModelError::DomainNotFound(domain_index))?)
     }
 
     pub(crate) fn pg_domain_datatable(
         &self,
-        pkg_id: PackageId,
+        domain_index: DomainIndex,
         def_id: DefId,
     ) -> DomainResult<PgDomainTable> {
-        let domain = self.pg_domain(pkg_id)?;
-        let datatable = self.datatable(pkg_id, def_id)?;
+        let domain = self.pg_domain(domain_index)?;
+        let datatable = self.datatable(domain_index, def_id)?;
         Ok(PgDomainTable {
             domain,
             table: datatable,
@@ -99,7 +102,7 @@ impl PgModel {
     }
 
     pub(crate) fn pg_domain_edgetable(&self, edge_id: &EdgeId) -> DomainResult<PgDomainTable> {
-        let domain = self.pg_domain(edge_id.pkg_id())?;
+        let domain = self.pg_domain(edge_id.domain_index())?;
         let datatable = self.edgetable(edge_id)?;
         Ok(PgDomainTable {
             domain,
@@ -107,21 +110,29 @@ impl PgModel {
         })
     }
 
-    pub(crate) fn find_datatable(&self, pkg_id: PackageId, def_id: DefId) -> Option<&PgTable> {
+    pub(crate) fn find_datatable(
+        &self,
+        domain_index: DomainIndex,
+        def_id: DefId,
+    ) -> Option<&PgTable> {
         self.domains
-            .get(&pkg_id)
+            .get(&domain_index)
             .and_then(|pg_domain| pg_domain.datatables.get(&def_id))
     }
 
-    pub(crate) fn datatable(&self, pkg_id: PackageId, def_id: DefId) -> DomainResult<&PgTable> {
+    pub(crate) fn datatable(
+        &self,
+        domain_index: DomainIndex,
+        def_id: DefId,
+    ) -> DomainResult<&PgTable> {
         Ok(self
-            .find_datatable(pkg_id, def_id)
-            .ok_or(PgModelError::CollectionNotFound(pkg_id, def_id))?)
+            .find_datatable(domain_index, def_id)
+            .ok_or(PgModelError::CollectionNotFound(domain_index, def_id))?)
     }
 
     pub(crate) fn find_edgetable(&self, edge_id: &EdgeId) -> Option<&PgTable> {
         self.domains
-            .get(&edge_id.pkg_id())
+            .get(&edge_id.domain_index())
             .and_then(|pg_domain| pg_domain.edgetables.get(&edge_id.def_id().1))
     }
 
@@ -134,19 +145,22 @@ impl PgModel {
     pub(crate) fn datatable_key_by_def_key(
         &self,
         def_key: PgRegKey,
-    ) -> DomainResult<(PackageId, DefId)> {
-        let Some(PgTableKey::Data { pkg_id, def_id }) = self.reg_key_to_table_key.get(&def_key)
+    ) -> DomainResult<(DomainIndex, DefId)> {
+        let Some(PgTableKey::Data {
+            domain_index,
+            def_id,
+        }) = self.reg_key_to_table_key.get(&def_key)
         else {
             return Err(PgModelError::NotFoundInRegistry(def_key).into());
         };
-        Ok((*pkg_id, *def_id))
+        Ok((*domain_index, *def_id))
     }
 }
 
 /// Something belonging to a specific persisted domain
 #[derive(Clone, Copy)]
 pub struct InDomain<T> {
-    pub pkg_id: PackageId,
+    pub domain_index: DomainIndex,
     pub value: T,
 }
 
@@ -161,7 +175,7 @@ impl<T> Deref for InDomain<T> {
 impl From<Value> for InDomain<Value> {
     fn from(value: Value) -> Self {
         Self {
-            pkg_id: value.type_def_id().package_id(),
+            domain_index: value.type_def_id().domain_index(),
             value,
         }
     }

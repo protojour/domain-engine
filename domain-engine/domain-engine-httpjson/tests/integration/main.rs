@@ -34,7 +34,7 @@ impl MakeTestRouter for OntolTest {
     ) -> axum::Router {
         create_httpjson_router::<(), DummySession>(
             domain_engine.clone(),
-            self.get_package_id(source_name.as_str()),
+            self.get_domain_index(source_name.as_str()),
         )
         .unwrap()
         .with_state(())

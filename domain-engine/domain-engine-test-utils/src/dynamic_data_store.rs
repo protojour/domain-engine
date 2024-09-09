@@ -9,7 +9,7 @@ use domain_engine_core::{
 use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use ontol_runtime::{
     ontology::{config::DataStoreConfig, Ontology},
-    PackageId,
+    DomainIndex,
 };
 use tracing::error;
 
@@ -36,7 +36,7 @@ impl DynamicDataStoreFactory {
 impl DataStoreFactory for DynamicDataStoreFactory {
     async fn new_api(
         &self,
-        package_ids: &BTreeSet<PackageId>,
+        persisted: &BTreeSet<DomainIndex>,
         config: DataStoreConfig,
         session: Session,
         ontology: Arc<Ontology>,
@@ -47,19 +47,19 @@ impl DataStoreFactory for DynamicDataStoreFactory {
                 arango::ArangoTestDatastoreFactory {
                     recreate_db: self.recreate_db,
                 }
-                .new_api(package_ids, config, session, ontology, system)
+                .new_api(persisted, config, session, ontology, system)
                 .await
             }
             "inmemory" => {
                 InMemoryDataStoreFactory
-                    .new_api(package_ids, config, session, ontology, system)
+                    .new_api(persisted, config, session, ontology, system)
                     .await
             }
             "pg" => {
                 pg::PgTestDatastoreFactory {
                     recreate_db: self.recreate_db,
                 }
-                .new_api(package_ids, config, session, ontology, system)
+                .new_api(persisted, config, session, ontology, system)
                 .await
             }
             other => Err(DomainErrorKind::UnknownDataStore(other.to_string()).into_error()),
@@ -75,20 +75,16 @@ impl DataStoreFactory for DynamicDataStoreFactory {
 impl DataStoreFactorySync for DynamicDataStoreFactory {
     fn new_api_sync(
         &self,
-        package_ids: &BTreeSet<PackageId>,
+        persisted: &BTreeSet<DomainIndex>,
         config: DataStoreConfig,
         session: Session,
         ontology: Arc<Ontology>,
         system: ArcSystemApi,
     ) -> DomainResult<Box<dyn DataStoreAPI + Send + Sync>> {
         match self.name.as_str() {
-            "inmemory" => InMemoryDataStoreFactory.new_api_sync(
-                package_ids,
-                config,
-                session,
-                ontology,
-                system,
-            ),
+            "inmemory" => {
+                InMemoryDataStoreFactory.new_api_sync(persisted, config, session, ontology, system)
+            }
             other => panic!("cannot synchronously create `{other}` factory"),
         }
     }
@@ -110,7 +106,7 @@ mod arango {
     impl domain_engine_core::data_store::DataStoreFactory for ArangoTestDatastoreFactory {
         async fn new_api(
             &self,
-            package_ids: &BTreeSet<ontol_runtime::PackageId>,
+            persisted: &BTreeSet<ontol_runtime::DomainIndex>,
             _config: ontol_runtime::ontology::config::DataStoreConfig,
             _session: Session,
             ontology: std::sync::Arc<Ontology>,
@@ -134,7 +130,7 @@ mod arango {
                 let _ = client.drop_database(db_name).await;
             }
             let mut db = client.db(db_name, ontology, system);
-            db.init(package_ids, true).await.unwrap();
+            db.init(persisted, true).await.unwrap();
             Ok(Box::new(ArangoDatabaseHandle::from(db)))
         }
     }
@@ -180,7 +176,7 @@ mod pg {
     impl domain_engine_core::data_store::DataStoreFactory for PgTestDatastoreFactory {
         async fn new_api(
             &self,
-            package_ids: &BTreeSet<ontol_runtime::PackageId>,
+            persisted: &BTreeSet<ontol_runtime::DomainIndex>,
             config: ontol_runtime::ontology::config::DataStoreConfig,
             session: Session,
             ontology: std::sync::Arc<Ontology>,
@@ -188,7 +184,7 @@ mod pg {
         ) -> DomainResult<Box<dyn domain_engine_core::data_store::DataStoreAPI + Send + Sync>>
         {
             test_pg_api(
-                package_ids,
+                persisted,
                 config,
                 session,
                 ontology,
@@ -212,7 +208,7 @@ mod pg {
     }
 
     async fn test_pg_api(
-        package_ids: &BTreeSet<ontol_runtime::PackageId>,
+        persisted: &BTreeSet<ontol_runtime::DomainIndex>,
         _config: ontol_runtime::ontology::config::DataStoreConfig,
         _session: Session,
         ontology: std::sync::Arc<Ontology>,
@@ -240,7 +236,7 @@ mod pg {
 
         let test_config = test_pg_config(&test_name);
 
-        let pg_model = connect_and_migrate(package_ids, ontology.as_ref(), &test_config)
+        let pg_model = connect_and_migrate(persisted, ontology.as_ref(), &test_config)
             .await
             .map_err(DomainError::data_store_from_anyhow)
             .with_context(|| "connect and migrate")?;

@@ -24,7 +24,7 @@ use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
     ontol_syntax::OntolTreeSyntax,
-    package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage},
+    package::{GraphState, PackageGraphBuilder, PackageReference, ParsedDomain},
     SourceCodeRegistry, SourceId, Sources,
 };
 use ontol_lsp::Backend;
@@ -32,7 +32,7 @@ use ontol_parser::cst_parse;
 use ontol_runtime::{
     interface::json_schema::build_openapi_schemas,
     ontology::{
-        config::{DataStoreConfig, PackageConfig},
+        config::{DataStoreConfig, DomainConfig},
         Ontology,
     },
 };
@@ -212,7 +212,7 @@ pub async fn run_command(command: Command) -> Result<(), OntoolError> {
 
             let ontology = compile(args.dir, args.files, None)?;
 
-            let (package_id, domain) = ontology
+            let (domain_index, domain) = ontology
                 .domains()
                 .find(|domain| {
                     let name = &ontology[domain.1.unique_name()];
@@ -220,7 +220,7 @@ pub async fn run_command(command: Command) -> Result<(), OntoolError> {
                 })
                 .expect("domain not found");
 
-            let schemas = build_openapi_schemas(&ontology, package_id, domain);
+            let schemas = build_openapi_schemas(&ontology, domain_index, domain);
 
             match args.format {
                 Format::Json => {
@@ -315,14 +315,14 @@ fn compile(
                     if let Some(source_text) = sources_by_name.remove(source_name) {
                         let (flat_tree, errors) = cst_parse(&source_text);
 
-                        let parsed = ParsedPackage::new(
+                        let parsed = ParsedDomain::new(
                             request,
                             Box::new(OntolTreeSyntax {
                                 tree: flat_tree.unflatten(),
                                 source_text: source_text.clone(),
                             }),
                             errors,
-                            PackageConfig::default(),
+                            DomainConfig::default(),
                             &mut ontol_sources,
                         );
                         source_code_registry

@@ -11,7 +11,7 @@ use ontol_runtime::{
         ontol::TextConstant,
         Ontology,
     },
-    DefId, PackageId,
+    DefId, DomainIndex,
 };
 use reqwest::Url;
 use reqwest_middleware::ClientWithMiddleware;
@@ -312,12 +312,12 @@ impl ArangoDatabase {
     /// Initialize collections and database from ontology
     pub async fn init(
         &mut self,
-        package_ids: &BTreeSet<PackageId>,
+        persisted: &BTreeSet<DomainIndex>,
         provision_db: bool,
     ) -> anyhow::Result<()> {
         if self.collections.is_empty() {
-            for package_id in package_ids {
-                self.populate_collections(*package_id)?;
+            for domain_index in persisted {
+                self.populate_collections(*domain_index)?;
             }
         }
 
@@ -363,11 +363,11 @@ impl ArangoDatabase {
     }
 
     /// Populate collection and edge collection names
-    pub fn populate_collections(&mut self, package_id: PackageId) -> anyhow::Result<()> {
+    pub fn populate_collections(&mut self, domain_index: DomainIndex) -> anyhow::Result<()> {
         let domain = self
             .ontology
-            .domain_by_pkg(package_id)
-            .expect("package id should match a domain");
+            .domain_by_index(domain_index)
+            .expect("domain index should match a domain");
 
         let mut subject_names_by_edge_id: HashMap<DefId, TextConstant> = Default::default();
         let mut collection_name_collisions: BTreeSet<String> = Default::default();

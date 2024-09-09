@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use fnv::FnvHashSet;
 use ontol_runtime::{
     var::{Var, VarAllocator},
-    DefId, PackageId,
+    DefId, DomainIndex,
 };
 use tracing::debug;
 
@@ -24,7 +24,7 @@ use super::task::{
 
 pub fn autogenerate_mapping<'m>(
     key_pair: UndirectedMapKey,
-    package_id: PackageId,
+    domain_index: DomainIndex,
     compiler: &mut Compiler<'m>,
 ) -> Option<ExplicitMapCodegenTask<'m>> {
     let first_def_id = key_pair[0].def_id;
@@ -48,7 +48,7 @@ pub fn autogenerate_mapping<'m>(
                 ontol_map: Some(OntolMap {
                     map_def_id: compiler
                         .defs
-                        .add_def(DefKind::AutoMapping, package_id, NO_SPAN),
+                        .add_def(DefKind::AutoMapping, domain_index, NO_SPAN),
                     arms: OntolMapArms::Patterns(arms),
                     span: NO_SPAN,
                 }),
@@ -64,7 +64,7 @@ pub fn autogenerate_mapping<'m>(
                 ontol_map: Some(OntolMap {
                     map_def_id: compiler
                         .defs
-                        .add_def(DefKind::AutoMapping, package_id, NO_SPAN),
+                        .add_def(DefKind::AutoMapping, domain_index, NO_SPAN),
                     arms: OntolMapArms::Patterns([fmt_node, transparent_node]),
                     span: NO_SPAN,
                 }),
@@ -80,7 +80,7 @@ pub fn autogenerate_mapping<'m>(
                 ontol_map: Some(OntolMap {
                     map_def_id: compiler
                         .defs
-                        .add_def(DefKind::AutoMapping, package_id, NO_SPAN),
+                        .add_def(DefKind::AutoMapping, domain_index, NO_SPAN),
                     arms: OntolMapArms::Patterns([transparent_node, fmt_node]),
                     span: NO_SPAN,
                 }),
@@ -156,7 +156,7 @@ pub fn autogenerate_mapping<'m>(
                     ontol_map: Some(OntolMap {
                         map_def_id: compiler.defs.add_def(
                             DefKind::AutoMapping,
-                            package_id,
+                            domain_index,
                             NO_SPAN,
                         ),
                         arms: OntolMapArms::Patterns([
@@ -187,7 +187,7 @@ pub fn autogenerate_mapping<'m>(
                         ontol_map: Some(OntolMap {
                             map_def_id: compiler.defs.add_def(
                                 DefKind::AutoMapping,
-                                package_id,
+                                domain_index,
                                 NO_SPAN,
                             ),
                             arms: OntolMapArms::Template(template_application),

@@ -31,7 +31,7 @@ use ontol_runtime::{
     },
     query::select::Select,
     value::Value,
-    PackageId,
+    DomainIndex,
 };
 use serde::{de::DeserializeSeed, Deserializer};
 use tracing::{debug, error};
@@ -47,7 +47,7 @@ struct Endpoint {
 
 pub fn create_httpjson_router<State, Auth>(
     engine: Arc<DomainEngine>,
-    package_id: PackageId,
+    domain_index: DomainIndex,
 ) -> Option<axum::Router<State>>
 where
     State: Send + Sync + Clone + 'static,
@@ -55,7 +55,7 @@ where
 {
     let httpjson = engine
         .ontology()
-        .domain_interfaces(package_id)
+        .domain_interfaces(domain_index)
         .iter()
         .filter_map(|interface| match interface {
             DomainInterface::HttpJson(httpjson) => Some(httpjson),

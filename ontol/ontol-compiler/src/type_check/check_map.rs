@@ -203,7 +203,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         self.code_ctx.add_map_task(
                             UndirectedMapKey::new([first_def_id.into(), second_def_id.into()]),
-                            MapCodegenRequest::Auto(map_def.0.package_id()),
+                            MapCodegenRequest::Auto(map_def.0.domain_index()),
                             self.defs,
                             self.errors,
                         );

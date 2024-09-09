@@ -15,7 +15,7 @@ use ontol_parser::{
 use ontol_runtime::{
     property::{PropertyCardinality, ValueCardinality},
     var::{Var, VarAllocator},
-    DefId, OntolDefTag, PackageId,
+    DefId, DomainIndex, OntolDefTag,
 };
 use tracing::debug;
 
@@ -30,8 +30,8 @@ use crate::{
 
 pub struct LoweringCtx<'c, 'm> {
     pub compiler: &'c mut Compiler<'m>,
-    pub pkg_def_id: DefId,
-    pub package_id: PackageId,
+    pub domain_def_id: DefId,
+    pub domain_index: DomainIndex,
     pub source_id: SourceId,
     pub anonymous_unions: FnvHashMap<BTreeSet<DefId>, DefId>,
     pub outcome: LoweringOutcome,
@@ -49,7 +49,7 @@ pub type LoweredRel = (DefRelTag, Relationship, SourceSpan, Option<ArcStr>);
 #[derive(Default)]
 pub struct LoweringOutcome {
     pub root_defs: Vec<DefId>,
-    pub rels: BTreeMap<PackageId, BTreeMap<u16, Vec<LoweredRel>>>,
+    pub rels: BTreeMap<DomainIndex, BTreeMap<u16, Vec<LoweredRel>>>,
     pub fmt_chains: Vec<(DefId, FmtChain)>,
 }
 
@@ -61,10 +61,10 @@ impl LoweringOutcome {
         span: SourceSpan,
         docs: Option<ArcStr>,
     ) {
-        let RelId(DefId(pkg_id, def_tag), rel_tag) = rel_id;
+        let RelId(DefId(domain_index, def_tag), rel_tag) = rel_id;
 
         self.rels
-            .entry(pkg_id)
+            .entry(domain_index)
             .or_default()
             .entry(def_tag)
             .or_default()
@@ -151,7 +151,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
     pub fn lookup_ident(&mut self, ident: &str, span: U32Span) -> Result<DefId, LoweringError> {
         // A single ident looks in both ONTOL_PKG and the current package
         match self.compiler.namespaces.lookup(
-            &[self.pkg_def_id, OntolDefTag::Ontol.def_id()],
+            &[self.domain_def_id, OntolDefTag::Ontol.def_id()],
             Space::Def,
             ident,
         ) {
@@ -179,7 +179,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                 .compiler
                 .namespaces
                 .namespaces
-                .get(&self.pkg_def_id)
+                .get(&self.domain_def_id)
                 .unwrap();
 
             let mut def_id;
@@ -190,14 +190,14 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                 if segment_iter.peek().is_some() {
                     match def_id {
                         Some(def_id) => match self.compiler.defs.def_kind(*def_id) {
-                            DefKind::Package(package_id) => {
-                                let package_def_id =
-                                    self.compiler.package_def_ids.get(package_id).unwrap();
+                            DefKind::Domain(domain_index) => {
+                                let domain_def_id =
+                                    self.compiler.domain_def_ids.get(domain_index).unwrap();
                                 namespace = self
                                     .compiler
                                     .namespaces
                                     .namespaces
-                                    .get(package_def_id)
+                                    .get(domain_def_id)
                                     .unwrap();
                             }
                             other => match self.compiler.namespaces.namespaces.get(def_id) {
@@ -246,7 +246,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
         macro_: Macro,
     ) -> Result<DefId, LoweringError> {
         let (def_id, coinage, ident) =
-            self.named_def_id(self.pkg_def_id, Space::Def, ident, ident_span)?;
+            self.named_def_id(self.domain_def_id, Space::Def, ident, ident_span)?;
         if matches!(coinage, Coinage::New) {
             debug!("{def_id:?}: `{}`", ident);
 
@@ -349,7 +349,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
             .entry(ident)
         {
             Entry::Occupied(occupied) => {
-                if occupied.get().package_id() == self.package_id {
+                if occupied.get().domain_index() == self.domain_index {
                     Ok((*occupied.get(), Coinage::Used, ident))
                 } else {
                     Err((
@@ -359,7 +359,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                 }
             }
             Entry::Vacant(vacant) => {
-                let def_id = self.compiler.defs.alloc_def_id(self.package_id);
+                let def_id = self.compiler.defs.alloc_def_id(self.domain_index);
                 vacant.insert(def_id);
                 Ok((def_id, Coinage::New, ident))
             }
@@ -367,14 +367,14 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
     }
 
     pub fn define_anonymous_type(&mut self, type_def: TypeDef<'m>, span: U32Span) -> DefId {
-        let anonymous_def_id = self.compiler.defs.alloc_def_id(self.package_id);
+        let anonymous_def_id = self.compiler.defs.alloc_def_id(self.domain_index);
         self.set_def_kind(anonymous_def_id, DefKind::Type(type_def), span);
         debug!("{anonymous_def_id:?}: <anonymous>");
         anonymous_def_id
     }
 
     pub fn define_anonymous(&mut self, kind: DefKind<'m>, span: U32Span) -> DefId {
-        let def_id = self.compiler.defs.alloc_def_id(self.package_id);
+        let def_id = self.compiler.defs.alloc_def_id(self.domain_index);
         self.set_def_kind(def_id, kind, span);
         def_id
     }
@@ -384,7 +384,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
             def_id,
             Def {
                 id: def_id,
-                package: self.package_id,
+                domain_index: self.domain_index,
                 kind,
                 span: self.source_span(span),
             },

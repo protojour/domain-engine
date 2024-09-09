@@ -9,7 +9,7 @@ use std::collections::{hash_map::Entry, HashMap};
 
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
-use ontol_runtime::{ontology::ontol::TextLikeType, DefId, OntolDefTag};
+use ontol_runtime::{ontology::ontol::TextLikeType, DefId, DomainIndex, OntolDefTag};
 use ordered_float::NotNan;
 use tracing::{debug, debug_span, trace};
 
@@ -17,7 +17,6 @@ use crate::{
     def::{Def, DefKind, Defs, TypeDefFlags},
     error::CompileError,
     misc::MiscCtx,
-    package::ONTOL_PKG,
     primitive::PrimitiveKind,
     properties::{Constructor, PropCtx, Properties},
     relation::{rel_def_meta, RelCtx, RelId, RelParams},
@@ -100,7 +99,8 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
 
         let _entered = debug_span!("repr", id = ?self.root_def_id).entered();
 
-        self.state.do_trace = TRACE_BUILTIN || self.root_def_id.package_id() != ONTOL_PKG;
+        self.state.do_trace =
+            TRACE_BUILTIN || self.root_def_id.domain_index() != DomainIndex::ontol();
 
         self.check_def_repr(
             self.root_def_id,
@@ -546,9 +546,9 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                             }
                             Entry::Occupied(mut occupied) => {
                                 let old = occupied.get();
-                                if type_param.definition_site != self.root_def_id.package_id() {
+                                if type_param.definition_site != self.root_def_id.domain_index() {
                                     // For now: Type parameters from the same package takes precedence
-                                } else if old.definition_site == self.root_def_id.package_id() {
+                                } else if old.definition_site == self.root_def_id.domain_index() {
                                     self.state
                                         .duplicate_type_params
                                         .entry(*relation_def_id)

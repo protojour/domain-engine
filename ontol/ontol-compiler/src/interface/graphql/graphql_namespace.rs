@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::HashMap};
 
 use heck::{AsLowerCamelCase, AsSnakeCase};
 use itertools::Itertools;
-use ontol_runtime::{ontology::Ontology, DefId, PackageId};
+use ontol_runtime::{ontology::Ontology, DefId, DomainIndex};
 
 use crate::{
     def::{DefKind, Defs},
@@ -16,7 +16,7 @@ pub struct GraphqlNamespace<'o> {
 }
 
 pub struct DomainDisambiguation<'o> {
-    pub root_domain: PackageId,
+    pub root_domain: DomainIndex,
     pub ontology: &'o Ontology,
 }
 
@@ -118,16 +118,18 @@ impl<'o> GraphqlNamespace<'o> {
 
         if let Some(domain_disambiguation) = &self.domain_disambiguation {
             if let Some(def_id) = elements.iter().find_map(|elem| elem.def_id()) {
-                let package_id = def_id.0;
-                if package_id != domain_disambiguation.root_domain {
+                let domain_index = def_id.0;
+                if domain_index != domain_disambiguation.root_domain {
                     output.push('_');
-                    if let Some(domain) = domain_disambiguation.ontology.domain_by_pkg(package_id) {
+                    if let Some(domain) =
+                        domain_disambiguation.ontology.domain_by_index(domain_index)
+                    {
                         let domain_name =
                             adapt_graphql_identifier(&ctx.str_ctx[domain.unique_name()])
                                 .into_adapted();
                         output.push_str(&domain_name);
                     } else {
-                        output.push_str(&format!("domain{}", package_id.id()));
+                        output.push_str(&format!("domain{}", domain_index.index()));
                     }
                     output.push('_');
                 }
@@ -221,7 +223,7 @@ impl<'a, 'm> ProcessName for Typename<'a, 'm> {
 fn format_name_pre_rewrite<'k>(def_id: DefId, kind: &'k DefKind) -> Cow<'k, str> {
     match kind.opt_identifier() {
         Some(name) => name,
-        None => Cow::Owned(format!("_anon{}_{}", def_id.0.id(), def_id.1)),
+        None => Cow::Owned(format!("_anon{}_{}", def_id.0.index(), def_id.1)),
     }
 }
 

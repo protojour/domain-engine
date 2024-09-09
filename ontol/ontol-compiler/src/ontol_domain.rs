@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 use ontol_hir::OverloadFunc;
 use ontol_runtime::{
     ontology::{domain::DomainId, ontol::TextLikeType},
-    DefId, OntolDefTag, PackageId,
+    DefId, DomainIndex, OntolDefTag,
 };
 use ulid::Ulid;
 
@@ -15,7 +15,6 @@ use crate::{
     mem::Intern,
     misc::{RelObjectConstraint, RelTypeConstraints, TypeParam},
     namespace::Space,
-    package::ONTOL_PKG,
     properties::Constructor,
     regex_util,
     text_patterns::{store_text_pattern_segment, TextPatternSegment},
@@ -56,11 +55,11 @@ impl<'m> PathNode<'m> {
 impl<'m> Compiler<'m> {
     pub fn register_ontol_domain(&mut self) {
         self.str_ctx.intern_constant("ontol");
-        let def_id = self.define_package(OntolDefTag::Ontol.def_id());
+        let def_id = self.define_domain(OntolDefTag::Ontol.def_id());
 
-        assert_eq!(def_id.package_id(), PackageId::ontol());
+        assert_eq!(def_id.domain_index(), DomainIndex::ontol());
         self.domain_ids.insert(
-            def_id.package_id(),
+            def_id.domain_index(),
             DomainId {
                 ulid: Ulid::from_str(ONTOL_DOMAIN_ID).unwrap(),
                 stable: true,
@@ -74,7 +73,7 @@ impl<'m> Compiler<'m> {
 
         // pre-process primitive definitions
         let mut named_builtin_relations: Vec<DefPath> = vec![];
-        for def_id in self.defs.iter_package_def_ids(ONTOL_PKG) {
+        for def_id in self.defs.iter_domain_def_ids(DomainIndex::ontol()) {
             let Some(def_kind) = self.defs.def_kind_option(def_id) else {
                 continue;
             };
@@ -204,13 +203,13 @@ impl<'m> Compiler<'m> {
             }
         }
 
-        for def_id in self.defs.iter_package_def_ids(ONTOL_PKG) {
+        for def_id in self.defs.iter_domain_def_ids(DomainIndex::ontol()) {
             self.type_check().check_def(def_id);
         }
 
         self.write_namespace(OntolDefTag::Ontol.def_id(), root_path_node);
 
-        self.seal_domain(ONTOL_PKG);
+        self.seal_domain(DomainIndex::ontol());
         self.repr_smoke_test();
     }
 
@@ -264,9 +263,11 @@ impl<'m> Compiler<'m> {
         param: DefId,
         literal: &'static str,
     ) {
-        let literal = self
-            .defs
-            .add_def(DefKind::NumberLiteral(literal), ONTOL_PKG, NO_SPAN);
+        let literal = self.defs.add_def(
+            DefKind::NumberLiteral(literal),
+            DomainIndex::ontol(),
+            NO_SPAN,
+        );
         self.misc_ctx
             .type_params
             .entry(subject)
@@ -274,7 +275,7 @@ impl<'m> Compiler<'m> {
             .insert(
                 param,
                 TypeParam {
-                    definition_site: ONTOL_PKG,
+                    definition_site: DomainIndex::ontol(),
                     object: literal,
                     span: NO_SPAN,
                 },

@@ -2,7 +2,7 @@ use itertools::Itertools;
 use ontol_macros::test;
 use ontol_runtime::{
     attr::AttrRef, ontology::domain::DataRelationshipTarget, tuple::CardinalIdx, value::Value,
-    DefIdSet, PackageId,
+    DefIdSet, DomainIndex,
 };
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches, examples, expect_eq, serde_helper::*, TestCompile,
@@ -605,7 +605,7 @@ fn store_key_in_def_info() {
     "
     .compile_then(|test| {
         let ontology = test.ontology();
-        let domain = ontology.domain_by_pkg(PackageId::second()).unwrap();
+        let domain = ontology.domain_by_index(DomainIndex::second()).unwrap();
 
         for def in domain.defs() {
             if let Some(text_constant) = def.ident() {
@@ -643,7 +643,7 @@ fn store_key_in_def_info() {
 fn edge_entity_simple() {
     let test = examples::EDGE_ENTITY_SIMPLE.1.compile();
     let ontology = test.ontology();
-    let domain = ontology.domain_by_pkg(PackageId::second()).unwrap();
+    let domain = ontology.domain_by_index(DomainIndex::second()).unwrap();
     let [foo_id, foo, bar_id, link] = test.bind(["foo_id", "foo", "bar_id", "link"]);
 
     {
@@ -697,7 +697,7 @@ fn edge_entity_simple() {
 fn edge_entity_union() {
     let test = examples::EDGE_ENTITY_UNION.1.compile();
     let ontology = test.ontology();
-    let domain = ontology.domain_by_pkg(PackageId::second()).unwrap();
+    let domain = ontology.domain_by_index(DomainIndex::second()).unwrap();
 
     let [foo_id, bar_id, baz_id, qux_id] = test.bind(["foo_id", "bar_id", "baz_id", "qux_id"]);
     let [foo, bar, baz, qux, link] = test.bind(["foo", "bar", "baz", "qux", "link"]);

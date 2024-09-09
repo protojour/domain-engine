@@ -1,4 +1,4 @@
-use ontol_runtime::PackageId;
+use ontol_runtime::DomainIndex;
 use thin_vec::thin_vec;
 
 use crate::*;
@@ -534,13 +534,13 @@ fn parse_def_id(next: &str) -> ParseResult<DefId> {
     };
     let (pkg, next) = parse_i64(next)?;
     let (_, next) = parse_expect(next, Token::Colon, Class::Colon)?;
-    let (idx, _) = parse_i64(next)?;
+    let (tag, _) = parse_i64(next)?;
 
-    let Ok(pkg_id) = PackageId::from_u16(pkg.try_into().unwrap()) else {
-        panic!("invalid package id");
+    let Ok(domain_index) = DomainIndex::from_u16(pkg.try_into().unwrap()) else {
+        panic!("invalid domain index");
     };
 
-    Ok((DefId(pkg_id, idx as u16), next_outer))
+    Ok((DefId(domain_index, tag as u16), next_outer))
 }
 
 fn parse_i64(next: &str) -> ParseResult<i64> {

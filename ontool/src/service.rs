@@ -17,7 +17,7 @@ use domain_engine_graphql::{
     CreateSchemaError,
 };
 use juniper_axum::extract::JuniperRequest;
-use ontol_runtime::PackageId;
+use ontol_runtime::DomainIndex;
 use reqwest::header::HeaderName;
 use tracing::info;
 
@@ -26,9 +26,9 @@ pub async fn domains_router(domain_engine: Arc<DomainEngine>, base_url: &str) ->
     let mut router: axum::Router = axum::Router::new();
     let ontology = domain_engine.ontology();
 
-    for (package_id, domain) in ontology
+    for (domain_index, domain) in ontology
         .domains()
-        .filter(|(package_id, _)| *package_id != PackageId::ontol())
+        .filter(|(domain_index, _)| *domain_index != DomainIndex::ontol())
     {
         let domain_path = format!(
             "/{unique_name}",
@@ -36,10 +36,10 @@ pub async fn domains_router(domain_engine: Arc<DomainEngine>, base_url: &str) ->
         );
         router = router.nest(
             &domain_path,
-            domain_router(domain_engine.clone(), &domain_path, package_id).unwrap(),
+            domain_router(domain_engine.clone(), &domain_path, domain_index).unwrap(),
         );
 
-        info!("Domain {package_id:?} served under {base_url}{domain_path}/graphql");
+        info!("Domain {domain_index:?} served under {base_url}{domain_path}/graphql");
     }
     router.layer(tower_http::trace::TraceLayer::new_for_http())
     // let schema = ontology_schema::new(&ontology);
@@ -158,11 +158,11 @@ impl domain_engine_core::system::SystemAPI for System {
 fn domain_router(
     engine: Arc<DomainEngine>,
     _domain_path: &str,
-    package_id: PackageId,
+    domain_index: DomainIndex,
 ) -> anyhow::Result<axum::Router> {
     let mut router: axum::Router = axum::Router::new();
 
-    match domain_engine_graphql::create_graphql_schema(engine.ontology_owned(), package_id) {
+    match domain_engine_graphql::create_graphql_schema(engine.ontology_owned(), domain_index) {
         Err(CreateSchemaError::GraphqlInterfaceNotFound) => {
             // Don't create the graphql endpoints
         }
@@ -180,7 +180,7 @@ fn domain_router(
     };
 
     if let Some(httpjson_router) =
-        domain_engine_httpjson::create_httpjson_router::<(), DummyAuth>(engine, package_id)
+        domain_engine_httpjson::create_httpjson_router::<(), DummyAuth>(engine, domain_index)
     {
         router = router.nest("/api", httpjson_router);
     }

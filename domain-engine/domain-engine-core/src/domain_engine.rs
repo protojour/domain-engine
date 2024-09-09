@@ -4,9 +4,7 @@ use futures_util::{stream::BoxStream, StreamExt, TryStreamExt};
 use ontol_runtime::{
     attr::AttrRef,
     interface::serde::processor::ProcessorMode,
-    ontology::{
-        config::data_store_backed_domains, domain::DataRelationshipKind, map::Extern, Ontology,
-    },
+    ontology::{config::persisted_domains, domain::DataRelationshipKind, map::Extern, Ontology},
     property::ValueCardinality,
     query::{
         condition::Condition,
@@ -364,10 +362,10 @@ impl Builder {
             None => {
                 let mut data_store: Option<DataStore> = None;
 
-                for (config, package_ids) in data_store_backed_domains(&self.ontology) {
+                for (config, persisted_set) in persisted_domains(&self.ontology) {
                     let api = factory
                         .new_api(
-                            &package_ids,
+                            &persisted_set,
                             config.clone(),
                             session.clone(),
                             self.ontology.clone(),
@@ -375,7 +373,7 @@ impl Builder {
                         )
                         .await
                         .with_context(|| format!("Failed to initialize data store {config:?}"))?;
-                    data_store = Some(DataStore::new(package_ids, api));
+                    data_store = Some(DataStore::new(persisted_set, api));
                 }
 
                 data_store
@@ -404,17 +402,17 @@ impl Builder {
             None => {
                 let mut data_store: Option<DataStore> = None;
 
-                for (config, package_ids) in data_store_backed_domains(&self.ontology) {
+                for (config, persisted_set) in persisted_domains(&self.ontology) {
                     let api = factory
                         .new_api_sync(
-                            &package_ids,
+                            &persisted_set,
                             config.clone(),
                             session.clone(),
                             self.ontology.clone(),
                             system.clone(),
                         )
                         .with_context(|| format!("Failed to initialize data store {config:?}"))?;
-                    data_store = Some(DataStore::new(package_ids, api));
+                    data_store = Some(DataStore::new(persisted_set, api));
                 }
 
                 data_store

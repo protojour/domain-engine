@@ -21,7 +21,7 @@ impl<'a> TransactCtx<'a> {
 
         let pg = self
             .pg_model
-            .pg_domain_datatable(def_id.package_id(), def_id)?;
+            .pg_domain_datatable(def_id.domain_index(), def_id)?;
         let pg_id_field = pg.table.column(&entity.id_prop)?;
 
         let Data::Sql(id_param) = self.data_from_value(id)? else {

@@ -10,7 +10,7 @@ use ontol_runtime::{
     },
     property::ValueCardinality,
     tuple::CardinalIdx,
-    DefId, DefPropTag, PackageId,
+    DefId, DefPropTag, DomainIndex,
 };
 use tracing::{error, info, trace_span, Instrument};
 
@@ -25,20 +25,20 @@ use crate::{
 use super::{MigrationCtx, PgDomainIds, Stage};
 
 pub async fn migrate_domain_steps<'t>(
-    pkg_id: PackageId,
+    domain_index: DomainIndex,
     domain: &Domain,
     ontology: &Ontology,
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
     let domain_uid = domain.domain_id().ulid;
     let domain_ids = PgDomainIds {
-        pkg_id,
+        index: domain_index,
         uid: domain_uid,
     };
     let unique_name = &ontology[domain.unique_name()];
     let schema = format!("m6md_{unique_name}").into_boxed_str();
 
-    if let Some(pg_domain) = ctx.domains.get_mut(&pkg_id) {
+    if let Some(pg_domain) = ctx.domains.get_mut(&domain_index) {
         info!("domain already deployed");
 
         if pg_domain.schema_name != schema {
@@ -53,7 +53,7 @@ pub async fn migrate_domain_steps<'t>(
         }
     } else {
         ctx.domains.insert(
-            pkg_id,
+            domain_index,
             PgDomain {
                 key: None,
                 schema_name: schema.clone(),
@@ -88,10 +88,10 @@ pub async fn migrate_domain_steps<'t>(
             .await?;
     }
 
-    migrate_domain_edges_steps(pkg_id, domain, domain_ids, ontology, ctx).await?;
+    migrate_domain_edges_steps(domain_index, domain, domain_ids, ontology, ctx).await?;
 
-    if let Some(abstract_scalar_tags) = ctx.abstract_scalars.remove(&pkg_id) {
-        let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
+    if let Some(abstract_scalar_tags) = ctx.abstract_scalars.remove(&domain_index) {
+        let pg_domain = ctx.domains.get_mut(&domain_index).unwrap();
 
         for (tag, pg_type) in abstract_scalar_tags {
             if pg_domain.datatables.contains_key(&tag.def_id()) {
@@ -134,7 +134,7 @@ async fn migrate_vertex_steps<'t>(
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
     let table_name = format!("v_{}", ident).into_boxed_str();
-    let pg_domain = ctx.domains.get_mut(&domain_ids.pkg_id).unwrap();
+    let pg_domain = ctx.domains.get_mut(&domain_ids.index).unwrap();
 
     let exists = if let Some(datatable) = pg_domain.datatables.get_mut(&vertex_def_id) {
         if datatable.table_name != table_name {
@@ -185,7 +185,7 @@ async fn migrate_vertex_steps<'t>(
         ctx,
     )?;
 
-    let pg_domain = ctx.domains.get(&domain_ids.pkg_id).unwrap();
+    let pg_domain = ctx.domains.get(&domain_ids.index).unwrap();
     if let Some(pg_table) = pg_domain.datatables.get(&vertex_def_id) {
         if pg_table.has_fkey != needs_fkey {
             return Err(anyhow!("fkey state has changed"));
@@ -196,13 +196,13 @@ async fn migrate_vertex_steps<'t>(
 }
 
 async fn migrate_domain_edges_steps<'t>(
-    pkg_id: PackageId,
+    domain_index: DomainIndex,
     domain: &Domain,
     domain_ids: PgDomainIds,
     ontology: &Ontology,
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
-    let pg_domain = ctx.domains.get_mut(&pkg_id).unwrap();
+    let pg_domain = ctx.domains.get_mut(&domain_index).unwrap();
     let mut param_def_ids: Vec<(EdgeId, DefId)> = vec![];
     for (edge_id, edge_info) in domain.edges() {
         let edge_tag = edge_id.1;
@@ -332,7 +332,7 @@ fn migrate_datafields_steps(
     ontology: &Ontology,
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
-    let pg_domain = ctx.domains.get_mut(&domain_ids.pkg_id).unwrap();
+    let pg_domain = ctx.domains.get_mut(&domain_ids.index).unwrap();
     let mut tree_relationships: Vec<_> = def
         .data_relationships
         .iter()
@@ -409,7 +409,7 @@ fn migrate_datafields_steps(
                     }],
                 );
                 ctx.abstract_scalars
-                    .entry(domain_ids.pkg_id)
+                    .entry(domain_ids.index)
                     .or_default()
                     .insert(scalar_tag, pg_type);
             }

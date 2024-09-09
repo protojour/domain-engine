@@ -36,7 +36,7 @@ impl<'m> Compiler<'m> {
                         rel_type_for: None,
                         flags: TypeDefFlags::PUBLIC,
                     }),
-                    def_id.package_id(),
+                    def_id.domain_index(),
                     entity_span,
                 );
 
@@ -52,7 +52,7 @@ impl<'m> Compiler<'m> {
                 // But before the union check!
                 self.type_check().repr_check(order_union).check_repr_root();
 
-                let domain_def_id = self.package_def_ids.get(&def_id.package_id()).unwrap();
+                let domain_def_id = self.domain_def_ids.get(&def_id.domain_index()).unwrap();
                 self.namespaces.add_anonymous(*domain_def_id, order_union);
 
                 self.type_check().check_def(order_union);

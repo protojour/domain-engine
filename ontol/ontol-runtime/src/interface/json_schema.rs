@@ -15,7 +15,7 @@ use crate::{
         domain::{Def, Domain},
         Ontology,
     },
-    DefId, PackageId,
+    DefId, DomainIndex,
 };
 
 use super::serde::operator::SerdePropertyKind;
@@ -24,7 +24,7 @@ use super::serde::{SerdeDef, SerdeModifier};
 
 pub fn build_openapi_schemas<'e>(
     ontology: &'e Ontology,
-    package_id: PackageId,
+    domain_index: DomainIndex,
     domain: &'e Domain,
 ) -> OpenApiSchemas<'e> {
     let mut graph_builder = SchemaGraphBuilder::default();
@@ -37,7 +37,7 @@ pub fn build_openapi_schemas<'e>(
 
     OpenApiSchemas {
         schema_graph: graph_builder.graph,
-        package_id,
+        domain_index,
         ontology,
     }
 }
@@ -68,14 +68,14 @@ type DefMap = BTreeMap<SerdeDef, SerdeOperatorAddr>;
 /// Includes all the schemas in a domain, for use in OpenApi
 pub struct OpenApiSchemas<'e> {
     schema_graph: BTreeMap<SerdeDef, SerdeOperatorAddr>,
-    package_id: PackageId,
+    domain_index: DomainIndex,
     ontology: &'e Ontology,
 }
 
 impl<'e> Serialize for OpenApiSchemas<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let package_id = self.package_id;
-        let next_package_id = PackageId(self.package_id.0 + 1);
+        let domain_index = self.domain_index;
+        let next_domain_index = DomainIndex(self.domain_index.0 + 1);
         let mut map = serializer.serialize_map(None)?;
 
         let ctx = SchemaCtx {
@@ -86,16 +86,16 @@ impl<'e> Serialize for OpenApiSchemas<'e> {
             mode: ProcessorMode::Create,
         };
 
-        // serialize schema definitions belonging to the domain package first
+        // serialize schema definitions belonging to the domain first
         for (def_id, operator_addr) in self.schema_graph.range(
-            SerdeDef::new(DefId(package_id, 0), SerdeModifier::NONE)
-                ..SerdeDef::new(DefId(next_package_id, 0), SerdeModifier::NONE),
+            SerdeDef::new(DefId(domain_index, 0), SerdeModifier::NONE)
+                ..SerdeDef::new(DefId(next_domain_index, 0), SerdeModifier::NONE),
         ) {
             map.serialize_entry(&ctx.format_key(*def_id), &ctx.definition(*operator_addr))?;
         }
 
         for (serde_def, operator_addr) in &self.schema_graph {
-            if serde_def.def_id.0 != self.package_id {
+            if serde_def.def_id.0 != self.domain_index {
                 map.serialize_entry(&ctx.format_key(*serde_def), &ctx.definition(*operator_addr))?;
             }
         }
@@ -223,24 +223,24 @@ impl<'e> SchemaCtx<'e> {
 
         let def_id = serde_def.def_id;
         self.ontology
-            .domain_by_pkg(def_id.0)
+            .domain_by_index(def_id.0)
             .and_then(|domain| domain.def(def_id).ident())
             .map(|constant| &self.ontology[constant])
             .map(|type_name| format!("{type_name}{modifier}"))
     }
 
     fn format_key(&self, serde_def: SerdeDef) -> String {
-        let package_id = serde_def.def_id.0;
+        let domain_index = serde_def.def_id.domain_index();
         match self.type_name(serde_def) {
-            Some(name) => format!("{}_{}", package_id.0, encode(&name)),
+            Some(name) => format!("{}_{}", domain_index.0, encode(&name)),
             None => format!("{}", Key(serde_def)),
         }
     }
 
     fn format_ref_link(&self, serde_def: SerdeDef) -> String {
-        let package_id = serde_def.def_id.0;
+        let domain_index = serde_def.def_id.domain_index();
         match self.type_name(serde_def) {
-            Some(name) => format!("{}{}_{}", self.link_anchor, package_id.0, encode(&name)),
+            Some(name) => format!("{}{}_{}", self.link_anchor, domain_index.0, encode(&name)),
             None => format!("{}{}", self.link_anchor, Key(serde_def)),
         }
     }
@@ -272,9 +272,9 @@ struct Key(SerdeDef);
 impl Display for Key {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let variant = &self.0;
-        let package = self.0.def_id.0;
+        let domain_index = self.0.def_id.domain_index();
 
-        write!(f, "{}_{}", package.0, self.0.def_id.1)?;
+        write!(f, "{}_{}", domain_index.0, self.0.def_id.1)?;
 
         if variant.modifier.contains(SerdeModifier::PRIMARY_ID) {
             write!(f, "_id")?;

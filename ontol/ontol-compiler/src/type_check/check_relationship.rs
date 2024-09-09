@@ -1,4 +1,6 @@
-use ontol_runtime::{property::PropertyCardinality, tuple::CardinalIdx, DefId, PropId};
+use ontol_runtime::{
+    property::PropertyCardinality, tuple::CardinalIdx, DefId, DomainIndex, PropId,
+};
 use tracing::debug;
 
 use crate::{
@@ -7,7 +9,6 @@ use crate::{
     error::CompileError,
     mem::Intern,
     misc::{MacroExpand, TypeParam},
-    package::ONTOL_PKG,
     properties::{Constructor, Property},
     relation::{RelId, Relationship},
     sequence::Sequence,
@@ -89,7 +90,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let subject_ty = self.check_def(subject.0);
         let object_ty = self.check_def(object.0);
 
-        if subject.0.package_id() == ONTOL_PKG {
+        if subject.0.domain_index() == DomainIndex::ontol() {
             CompileError::SubjectMustBeDomainType
                 .span(subject.1)
                 .report(self);
@@ -225,7 +226,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         .span(*span)
                         .report_ty(self);
                 }
-                if subject.0.package_id() != object.0.package_id() {
+                if subject.0.domain_index() != object.0.domain_index() {
                     return CompileError::MustIdentifyWithinDomain
                         .span(*span)
                         .report_ty(self);
@@ -377,7 +378,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .insert(
                         relationship.relation_def_id,
                         TypeParam {
-                            definition_site: rel_id.0.package_id(),
+                            definition_site: rel_id.0.domain_index(),
                             object: object.0,
                             span: *span,
                         },
@@ -448,7 +449,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Type::Tautology
             | Type::BuiltinRelation
             | Type::Function(_)
-            | Type::Package
+            | Type::Domain
             | Type::Infer(_)
             | Type::ValueGenerator(_)
             | Type::MacroDef(_)

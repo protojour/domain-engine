@@ -97,7 +97,7 @@ impl<'a> TransactCtx<'a> {
 
         let pg = self
             .pg_model
-            .pg_domain_datatable(value.pkg_id, value.type_def_id())?;
+            .pg_domain_datatable(value.domain_index, value.type_def_id())?;
 
         let where_: Option<sql::Expr>;
         let mut set: Vec<UpdateColumn> = vec![];

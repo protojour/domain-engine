@@ -76,7 +76,7 @@ impl<'a> TransactCtx<'a> {
         let def = self.ontology.def(def_id);
         let pg = self
             .pg_model
-            .pg_domain_datatable(def_id.package_id(), def_id)?;
+            .pg_domain_datatable(def_id.domain_index(), def_id)?;
 
         Ok(PgDef { def, pg })
     }

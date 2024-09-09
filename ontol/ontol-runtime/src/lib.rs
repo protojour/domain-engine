@@ -33,15 +33,12 @@ mod equality;
 
 extern crate self as ontol_runtime;
 
-/// Identifies one "package" of ONTOL code.
-/// One package represents a domain,
-/// but one package can consist of internal subdomains (probably).
-/// So this is called package id (for now) until we have fleshed out a full architecture..
+/// Identifies one domain of ONTOL code within one ontology or or compiler session.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub struct PackageId(u16);
+pub struct DomainIndex(u16);
 
-impl PackageId {
-    /// The ontol domain is always the first package
+impl DomainIndex {
+    /// The ontol domain is always the first domain in an ontology
     pub const fn ontol() -> Self {
         Self(0)
     }
@@ -67,18 +64,18 @@ impl PackageId {
         }
     }
 
-    pub const fn id(self) -> u16 {
+    pub const fn index(self) -> u16 {
         self.0
     }
 }
 
-impl VecMapKey for PackageId {
+impl VecMapKey for DomainIndex {
     fn index(&self) -> usize {
         self.0 as usize
     }
 }
 
-impl TryFrom<u16> for PackageId {
+impl TryFrom<u16> for DomainIndex {
     type Error = ValueTagError;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
@@ -87,18 +84,18 @@ impl TryFrom<u16> for PackageId {
 }
 
 /// This forces single-line output even when pretty-printed
-impl ::std::fmt::Debug for PackageId {
+impl ::std::fmt::Debug for DomainIndex {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "PackageId({:?})", self.0)
+        write!(f, "DomainIndex({:?})", self.0)
     }
 }
 
 /// One definition inside some ONTOL domain.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub struct DefId(pub PackageId, pub u16);
+pub struct DefId(pub DomainIndex, pub u16);
 
 impl DefId {
-    pub fn package_id(&self) -> PackageId {
+    pub fn domain_index(&self) -> DomainIndex {
         self.0
     }
 }
@@ -116,13 +113,13 @@ impl FromStr for DefId {
     type Err = ParseDefIdError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (package_id, def_id) = s
+        let (domain_idx, def_tag) = s
             .strip_prefix("def@")
             .and_then(|s| s.split_once(':'))
             .ok_or(ParseDefIdError)?;
-        let package_id = package_id.parse::<u16>().map_err(|_| ParseDefIdError)?;
-        let def_id = def_id.parse::<u16>().map_err(|_| ParseDefIdError)?;
-        Ok(DefId(PackageId(package_id), def_id))
+        let domain_idx = domain_idx.parse::<u16>().map_err(|_| ParseDefIdError)?;
+        let def_tag = def_tag.parse::<u16>().map_err(|_| ParseDefIdError)?;
+        Ok(DefId(DomainIndex(domain_idx), def_tag))
     }
 }
 
@@ -131,7 +128,7 @@ impl_ontol_debug!(DefId);
 impl DefId {
     #[inline]
     pub const fn unit() -> Self {
-        DefId(PackageId(0), OntolDefTag::Unit as u16)
+        DefId(DomainIndex(0), OntolDefTag::Unit as u16)
     }
 }
 
@@ -197,7 +194,7 @@ impl_ontol_debug!(OntolDefTag);
 
 impl OntolDefTag {
     pub const fn def_id(self) -> DefId {
-        DefId(PackageId(0), self as u16)
+        DefId(DomainIndex(0), self as u16)
     }
 
     pub const fn prop_id(self, prop_tag: DefPropTag) -> PropId {
@@ -317,7 +314,7 @@ impl FromStr for PropId {
         s = s.strip_prefix("p@").ok_or(())?;
 
         let mut iterator = s.split(':');
-        let package_id = PackageId(iterator.next().ok_or(())?.parse().map_err(|_| ())?);
+        let domain_idx = DomainIndex(iterator.next().ok_or(())?.parse().map_err(|_| ())?);
         let def_idx: u16 = iterator.next().ok_or(())?.parse().map_err(|_| ())?;
         let def_rel_tag: u16 = iterator.next().ok_or(())?.parse().map_err(|_| ())?;
 
@@ -325,7 +322,7 @@ impl FromStr for PropId {
             return Err(());
         }
 
-        Ok(PropId(DefId(package_id, def_idx), DefPropTag(def_rel_tag)))
+        Ok(PropId(DefId(domain_idx, def_idx), DefPropTag(def_rel_tag)))
     }
 }
 
@@ -385,12 +382,12 @@ pub type FnvIndexMap<K, V> = IndexMap<K, V, FnvBuildHasher>;
 
 #[cfg(test)]
 mod tests {
-    use crate::{DefId, PackageId};
+    use crate::{DefId, DomainIndex};
 
     use super::DefIdSet;
 
     fn def(i: u16) -> DefId {
-        DefId(PackageId::ontol(), i)
+        DefId(DomainIndex::ontol(), i)
     }
 
     #[test]

@@ -281,8 +281,8 @@ impl DomainEngine {
     ) -> DomainResult<()> {
         if !self
             .get_data_store()?
-            .package_ids()
-            .contains(&def_id.package_id())
+            .persisted()
+            .contains(&def_id.domain_index())
         {
             // TODO: Do ids need to be translated?
             let up_path = self

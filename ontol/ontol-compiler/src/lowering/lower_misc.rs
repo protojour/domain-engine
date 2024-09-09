@@ -12,13 +12,12 @@ use ontol_parser::{
     lexer::{kind::Kind, unescape::unescape_regex},
     U32Span,
 };
-use ontol_runtime::{property::ValueCardinality, DefId, OntolDefTag};
+use ontol_runtime::{property::ValueCardinality, DefId, DomainIndex, OntolDefTag};
 use tracing::debug;
 
 use crate::{
     def::{DefKind, TypeDef, TypeDefFlags},
     namespace::DocId,
-    package::ONTOL_PKG,
     CompileError,
 };
 
@@ -125,7 +124,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                         let lit = self.ctx.compiler.str_ctx.intern(token.slice());
                         let def_id = self.ctx.compiler.defs.add_def(
                             DefKind::NumberLiteral(lit),
-                            ONTOL_PKG,
+                            DomainIndex::ontol(),
                             self.ctx.source_span(token.span()),
                         );
                         Some(def_id)
@@ -180,7 +179,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 self.ctx
                     .compiler
                     .namespaces
-                    .add_anonymous(self.ctx.pkg_def_id, def_id);
+                    .add_anonymous(self.ctx.domain_def_id, def_id);
                 root_defs.push(def_id);
 
                 let context_fn = || def_id;
@@ -217,7 +216,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 if let Some(union_def_id) = self.ctx.anonymous_unions.get(&members) {
                     Some(*union_def_id)
                 } else {
-                    let union_def_id = self.ctx.compiler.defs.alloc_def_id(self.ctx.package_id);
+                    let union_def_id = self.ctx.compiler.defs.alloc_def_id(self.ctx.domain_index);
                     self.ctx.set_def_kind(
                         union_def_id,
                         DefKind::InlineUnion(members.clone()),
@@ -237,7 +236,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     self.ctx
                         .compiler
                         .namespaces
-                        .add_anonymous(self.ctx.pkg_def_id, union_def_id);
+                        .add_anonymous(self.ctx.domain_def_id, union_def_id);
 
                     Some(union_def_id)
                 }

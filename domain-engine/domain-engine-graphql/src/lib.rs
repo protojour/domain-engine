@@ -24,7 +24,7 @@ use ontol_runtime::{
     ontology::Ontology,
     sequence::Sequence,
     value::ValueDebug,
-    PackageId,
+    DomainIndex,
 };
 use templates::matrix_type::MatrixType;
 use thiserror::Error;
@@ -62,7 +62,7 @@ pub type Schema = juniper::RootNode<
 
 #[derive(Debug, Error)]
 pub enum CreateSchemaError {
-    #[error("GraphQL interface not found for given package")]
+    #[error("GraphQL interface not found for the given domain")]
     GraphqlInterfaceNotFound,
 }
 
@@ -70,10 +70,10 @@ pub trait CreateGraphqlSchema {}
 
 pub fn create_graphql_schema(
     ontology: Arc<Ontology>,
-    package_id: PackageId,
+    domain_index: DomainIndex,
 ) -> Result<Schema, CreateSchemaError> {
     let ontol_interface_schema = ontology
-        .domain_interfaces(package_id)
+        .domain_interfaces(domain_index)
         .iter()
         .filter_map(|interface| match interface {
             DomainInterface::GraphQL(schema) => Some(schema),
