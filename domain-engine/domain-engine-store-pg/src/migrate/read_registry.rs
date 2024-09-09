@@ -3,6 +3,7 @@ use fnv::FnvHashMap;
 use indoc::indoc;
 use ontol_runtime::{ontology::Ontology, tuple::CardinalIdx, DefId, DefPropTag, PackageId};
 use tokio_postgres::Transaction;
+use tracing::info;
 use ulid::Ulid;
 
 use crate::pg_model::{
@@ -49,6 +50,8 @@ pub async fn read_registry<'t>(
             };
             ctx.domains.insert(*pkg_id, pg_domain.clone());
             domain_pkg_by_key.insert(key, *pkg_id);
+        } else {
+            info!("domain id={uid} is persisted but no longer in the ontology, ignoring");
         }
     }
 
@@ -76,7 +79,9 @@ pub async fn read_registry<'t>(
         let domain_key: PgRegKey = row.get(1);
         let table_type: PgDomainTableType = row.get(2);
 
-        let owner_pkg_id = domain_pkg_by_key.get(&domain_key).copied().unwrap();
+        let Some(owner_pkg_id) = domain_pkg_by_key.get(&domain_key).copied() else {
+            continue;
+        };
 
         let def_domain_key: PgRegKey = row.get(3);
         let def_tag: u16 = row.get::<_, i32>(4).try_into()?;
@@ -153,7 +158,7 @@ pub async fn read_registry<'t>(
 
                 pg_table.properties.insert(prop_tag, pg_property);
             }
-            None => unreachable!(),
+            None => {}
         }
     }
 
@@ -172,7 +177,10 @@ pub async fn read_registry<'t>(
         let index_type: PgIndexType = row.get(3);
         let property_keys: Vec<PgRegKey> = row.get(4);
 
-        let index_def_id = DefId(*domain_pkg_by_key.get(&def_domain_key).unwrap(), def_tag);
+        let Some(domain_pkg) = domain_pkg_by_key.get(&def_domain_key).copied() else {
+            continue;
+        };
+        let index_def_id = DefId(domain_pkg, def_tag);
 
         match table_by_key.get(&domaintable_key) {
             Some(TableRef::Vertex(owner_pkg_id, def_id)) => {
@@ -228,7 +236,7 @@ pub async fn read_registry<'t>(
         });
 
         let Some(TableRef::Edge(edge_id)) = table_by_key.get(&domaintable_key) else {
-            panic!()
+            continue;
         };
 
         let pg_domain = ctx.domains.get_mut(&edge_id.pkg_id()).unwrap();

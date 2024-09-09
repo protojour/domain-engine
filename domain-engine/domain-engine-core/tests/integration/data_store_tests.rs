@@ -70,6 +70,38 @@ async fn test_db_remigrate_noop(ds: &str) {
 }
 
 #[ontol_macros::datastore_test(tokio::test)]
+async fn test_db_remove_one_domain(ds: &str) {
+    let test1 = TestPackages::with_static_sources([CONDUIT_DB, ARTIST_AND_INSTRUMENT])
+        .with_roots([CONDUIT_DB.0, ARTIST_AND_INSTRUMENT.0])
+        .compile();
+
+    let domain_engine = DomainEngine::builder(test1.ontology_owned())
+        .system(Box::new(unimock::Unimock::new(())))
+        .build(DynamicDataStoreFactory::new(ds), Session::default())
+        .await
+        .unwrap();
+
+    drop(domain_engine);
+
+    // This time without ARTIST_AND_INSTRUMENT
+    let test2 = TestPackages::with_static_sources([CONDUIT_DB])
+        .with_roots([CONDUIT_DB.0])
+        .compile();
+
+    let domain_engine = DomainEngine::builder(test2.ontology_owned())
+        .system(Box::new(unimock::Unimock::new(())))
+        .build(
+            // important: reuse DB
+            DynamicDataStoreFactory::new(ds).reuse_db(),
+            Session::default(),
+        )
+        .await
+        .unwrap();
+
+    drop(domain_engine);
+}
+
+#[ontol_macros::datastore_test(tokio::test)]
 async fn test_db_multiple_persistent_domains(ds: &str) {
     let test = TestPackages::with_static_sources([CONDUIT_DB, ARTIST_AND_INSTRUMENT])
         .with_roots([CONDUIT_DB.0, ARTIST_AND_INSTRUMENT.0])
