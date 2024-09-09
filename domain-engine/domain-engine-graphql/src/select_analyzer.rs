@@ -555,6 +555,7 @@ impl<'a> SelectAnalyzer<'a> {
                         let Some(field_data) = object_data.fields.get(field_name) else {
                             continue;
                         };
+
                         if let Some(selection) =
                             self.analyze_selection(field_look_ahead, field_data)?
                         {
