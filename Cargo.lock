@@ -1043,6 +1043,7 @@ name = "domain-engine-store-pg"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arcstr",
  "async-stream",
  "async-trait",
  "bincode",

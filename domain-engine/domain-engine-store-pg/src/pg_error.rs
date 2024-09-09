@@ -1,5 +1,4 @@
-use std::sync::Arc;
-
+use arcstr::ArcStr;
 use domain_engine_core::{domain_error::DomainErrorKind, DomainError};
 use ontol_runtime::{tuple::CardinalIdx, DefId, PackageId, PropId};
 use tracing::{error, info, warn};
@@ -95,7 +94,7 @@ pub enum PgError {
     /// edge parameters missing
     EdgeParametersMissing,
     /// statement preparation
-    PrepareStatement(Arc<String>, tokio_postgres::Error),
+    PrepareStatement(ArcStr, tokio_postgres::Error),
     /// condition error: {0}
     Condition(&'static str),
     /// order error: {0}

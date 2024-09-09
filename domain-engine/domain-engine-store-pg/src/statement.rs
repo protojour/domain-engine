@@ -1,5 +1,6 @@
-use std::{fmt::Display, ops::Deref, sync::Arc};
+use std::{fmt::Display, ops::Deref};
 
+use arcstr::ArcStr;
 use domain_engine_core::DomainResult;
 
 use crate::pg_error::PgError;
@@ -7,11 +8,11 @@ use crate::pg_error::PgError;
 #[derive(Clone)]
 pub struct PreparedStatement {
     prepared: tokio_postgres::Statement,
-    src: Arc<String>,
+    src: ArcStr,
 }
 
 impl PreparedStatement {
-    pub fn src(&self) -> &Arc<String> {
+    pub fn src(&self) -> &ArcStr {
         &self.src
     }
 }
@@ -30,11 +31,21 @@ impl Display for PreparedStatement {
     }
 }
 
+pub trait ToArcStr {
+    fn to_arcstr(&self) -> ArcStr;
+}
+
+impl<T: Display> ToArcStr for T {
+    fn to_arcstr(&self) -> ArcStr {
+        arcstr::format!("{self}")
+    }
+}
+
 pub trait Prepare {
     async fn prepare(self, client: &tokio_postgres::Client) -> DomainResult<PreparedStatement>;
 }
 
-impl Prepare for Arc<String> {
+impl Prepare for ArcStr {
     async fn prepare(self, client: &tokio_postgres::Client) -> DomainResult<PreparedStatement> {
         let statement = client
             .prepare(&self)
@@ -45,11 +56,5 @@ impl Prepare for Arc<String> {
             prepared: statement,
             src: self,
         })
-    }
-}
-
-impl Prepare for String {
-    async fn prepare(self, client: &tokio_postgres::Client) -> DomainResult<PreparedStatement> {
-        Arc::new(self).prepare(client).await
     }
 }

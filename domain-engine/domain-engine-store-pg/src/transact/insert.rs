@@ -27,7 +27,7 @@ use crate::{
     sql::{self},
     sql_record::{SqlColumnStream, SqlRecordIterator},
     sql_value::{Layout, SqlScalar},
-    statement::{Prepare, PreparedStatement},
+    statement::{Prepare, PreparedStatement, ToArcStr},
     transact::query::IncludeJoinedAttrs,
 };
 
@@ -216,7 +216,7 @@ impl<'a> TransactCtx<'a> {
                 }
             }
 
-            let prepared = sql_update.to_string().prepare(self.client()).await?;
+            let prepared = sql_update.to_arcstr().prepare(self.client()).await?;
             cache.update_tentative.insert(cache_key, prepared.clone());
             prepared
         };
@@ -553,7 +553,7 @@ impl<'a> TransactCtx<'a> {
                                 },
                                 ..Default::default()
                             }
-                            .to_string()
+                            .to_arcstr()
                             .prepare(self.client())
                             .await?,
                         );
@@ -579,7 +579,7 @@ impl<'a> TransactCtx<'a> {
         };
 
         Ok(PreparedInsert {
-            inherent_stmt: insert.to_string().prepare(self.client()).await?,
+            inherent_stmt: insert.to_arcstr().prepare(self.client()).await?,
             edge_select_stmt,
         })
     }

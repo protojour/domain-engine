@@ -28,6 +28,7 @@ itertools.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 ordered-float.workspace = true
+arcstr.workspace = true
 anyhow = "1"
 bincode = "1"
 refinery = { version = "0.8", default-features = false, features = ["tokio-postgres"] }

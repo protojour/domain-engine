@@ -1,5 +1,6 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
 
+use arcstr::ArcStr;
 use fnv::FnvHashMap;
 use ontol_runtime::{DefId, PackageId, PropId};
 
@@ -18,7 +19,8 @@ pub struct PgCache {
     pub key_by_id: FnvHashMap<(DefId, PropId), PreparedStatement>,
     pub insert_tmp_id: FnvHashMap<(DefId, PropId), PreparedStatement>,
     pub upsert_self_identifying: FnvHashMap<DefId, PreparedStatement>,
-    pub edge_update: FnvHashMap<Arc<String>, PreparedStatement>,
+
+    pub edge_patch: FnvHashMap<ArcStr, PreparedStatement>,
 
     pub tentative_foreign_keys:
         BTreeMap<(PropId, DefId), BTreeMap<SqlScalar, (PgRegKey, PgDataKey)>>,

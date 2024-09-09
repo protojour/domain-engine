@@ -3,6 +3,7 @@ use std::{
     ops::Deref,
 };
 
+use arcstr::ArcStr;
 use domain_engine_core::{domain_error::DomainErrorKind, DomainError, DomainResult};
 use futures_util::{TryFutureExt, TryStreamExt};
 use ontol_runtime::{
@@ -25,7 +26,7 @@ use crate::{
     },
     sql::{self, WhereExt},
     sql_value::SqlScalar,
-    statement::{Prepare, PreparedStatement},
+    statement::{Prepare, PreparedStatement, ToArcStr},
     transact::{data::Data, edge_query::edge_join_condition, InsertMode},
     CountRows, IgnoreRows,
 };
@@ -272,7 +273,7 @@ impl<'a> TransactCtx<'a> {
             }
         }
 
-        let mut insert_sql: Option<String> = None;
+        let mut insert_sql: Option<ArcStr> = None;
 
         let mut param_buf: Vec<SqlScalar> = vec![];
 
@@ -300,7 +301,7 @@ impl<'a> TransactCtx<'a> {
                     &analysis,
                     tuple,
                     &mut param_buf,
-                    insert_sql.get_or_insert_with(|| sql_insert.to_string()),
+                    insert_sql.get_or_insert_with(|| arcstr::format!("{}", sql_insert)),
                     cache,
                 )
                 .await?;
@@ -402,7 +403,7 @@ impl<'a> TransactCtx<'a> {
         analysis: &EdgeAnalysis<'s>,
         tuple: EdgeEndoTuplePatch,
         param_buf: &mut Vec<SqlScalar>,
-        insert_sql: &str,
+        insert_sql: &ArcStr,
         cache: &mut PgCache,
     ) -> DomainResult<()> {
         let is_upsert = tuple.elements.iter().any(|(.., mutation_mode)| {
@@ -464,13 +465,15 @@ impl<'a> TransactCtx<'a> {
             }
         }
 
-        debug!("{insert_sql}");
+        let stmt = self.edge_patch_stmt_cached(insert_sql, cache).await?;
+
+        debug!("{stmt}");
         trace!("{param_buf:?}");
 
         let result = self
             .client()
             .query_raw(
-                insert_sql,
+                stmt.deref(),
                 param_buf.iter().map(|param| param as &dyn ToSql),
             )
             .await
@@ -593,9 +596,9 @@ impl<'a> TransactCtx<'a> {
         }
 
         let stmt = self
-            .edge_update_stmt_cached(
-                if !sql_update.set.is_empty() {
-                    sql_update.to_string()
+            .edge_patch_stmt_cached(
+                &if !sql_update.set.is_empty() {
+                    ArcStr::from(sql_update.to_string())
                 } else {
                     // nothing to update, but it should be proven that the edge exists.
                     debug!("nothing to update");
@@ -609,7 +612,7 @@ impl<'a> TransactCtx<'a> {
                         },
                         ..Default::default()
                     };
-                    sql_select.to_string()
+                    ArcStr::from(sql_select.to_string())
                 },
                 cache,
             )
@@ -637,16 +640,16 @@ impl<'a> TransactCtx<'a> {
         }
     }
 
-    async fn edge_update_stmt_cached(
+    async fn edge_patch_stmt_cached(
         &self,
-        sql: String,
+        sql: &ArcStr,
         cache: &mut PgCache,
     ) -> DomainResult<PreparedStatement> {
-        if let Some(stmt) = cache.edge_update.get(&sql).cloned() {
+        if let Some(stmt) = cache.edge_patch.get(sql).cloned() {
             Ok(stmt)
         } else {
-            let stmt = sql.prepare(self.client()).await?;
-            cache.edge_update.insert(stmt.src().clone(), stmt.clone());
+            let stmt = sql.clone().prepare(self.client()).await?;
+            cache.edge_patch.insert(stmt.src().clone(), stmt.clone());
             Ok(stmt)
         }
     }
@@ -756,7 +759,7 @@ impl<'a> TransactCtx<'a> {
                         )),
                         ..Default::default()
                     }
-                    .to_string()
+                    .to_arcstr()
                     .prepare(self.client())
                     .await?;
 
@@ -794,7 +797,7 @@ impl<'a> TransactCtx<'a> {
                         on_conflict: None,
                         returning: vec![sql::Expr::path1("_key")],
                     }
-                    .to_string()
+                    .to_arcstr()
                     .prepare(self.client())
                     .await?;
 
@@ -853,7 +856,7 @@ impl<'a> TransactCtx<'a> {
                         }),
                         returning: vec![sql::Expr::path1("_key")],
                     }
-                    .to_string()
+                    .to_arcstr()
                     .prepare(self.client())
                     .await?;
 
