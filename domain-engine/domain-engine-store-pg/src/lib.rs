@@ -32,11 +32,9 @@ use tracing::{error, info};
 pub type PgResult<T> = Result<T, tokio_postgres::Error>;
 
 pub struct PostgresDataStore {
-    #[allow(unused)]
     pg_model: PgModel,
     ontology: Arc<Ontology>,
     pool: deadpool_postgres::Pool,
-    #[allow(unused)]
     system: ArcSystemApi,
 }
 
@@ -141,6 +139,7 @@ pub async fn recreate_database(
 }
 
 #[derive(Default)]
+#[expect(unused)]
 struct IgnoreRows;
 
 impl<T> Extend<T> for IgnoreRows {

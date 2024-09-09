@@ -79,7 +79,7 @@ impl<'b> SqlOutput<'b> {
         }
     }
 
-    #[allow(unused)]
+    #[expect(unused)]
     pub fn non_null(self) -> DomainResult<Self> {
         match self {
             Self::Scalar(SqlScalar::Null) => Err(PgError::InvalidType("null").into()),

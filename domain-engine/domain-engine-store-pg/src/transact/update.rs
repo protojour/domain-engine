@@ -28,7 +28,7 @@ use super::{
 
 enum UpdateCondition {
     FieldEq(PropId, Value),
-    #[allow(unused)]
+    #[expect(unused)]
     PgKey(PgDataKey),
 }
 

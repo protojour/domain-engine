@@ -139,7 +139,6 @@ pub enum ConflictTarget<'a> {
 
 pub enum ConflictAction<'a> {
     DoUpdateSet(Vec<UpdateColumn<'a>>),
-    #[allow(unused)]
     DoNothing,
 }
 
@@ -174,7 +173,6 @@ pub enum Expr<'a> {
     Paren(Box<Expr<'a>>),
     Select(Box<Select<'a>>),
     /// a UNION b
-    #[allow(unused)]
     Union(Box<Union<'a>>),
     /// a AND b
     And(Vec<Expr<'a>>),
@@ -187,9 +185,9 @@ pub enum Expr<'a> {
     Row(Vec<Expr<'a>>),
     Any(Box<Expr<'a>>),
     Array(Box<Expr<'a>>),
-    #[allow(unused)]
+    #[expect(unused)]
     ArrayAgg(Box<Expr<'a>>),
-    #[allow(unused)]
+    #[expect(unused)]
     AsIndex(Box<Expr<'a>>, Alias),
     /// count(*) over ()
     CountStarOver,

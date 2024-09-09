@@ -45,7 +45,6 @@ pub enum PgTableKey {
 }
 
 pub struct PgModel {
-    #[allow(unused)]
     pub(crate) domains: FnvHashMap<PackageId, PgDomain>,
     /// A map from PG table key to semantic key
     /// This is used for dynamic typing.
@@ -301,7 +300,6 @@ impl<'a> PgDomainTable<'a> {
 #[derive(Clone, Debug)]
 pub enum PgProperty {
     Column(PgColumn),
-    #[allow(unused)]
     Abstract(PgRegKey),
 }
 
@@ -329,9 +327,9 @@ pub struct PgColumn {
 
 #[derive(Clone, Debug)]
 pub struct PgEdgeCardinal {
-    #[allow(unused)]
+    #[expect(unused)]
     pub key: PgRegKey,
-    #[allow(unused)]
+    #[expect(unused)]
     pub ident: Box<str>,
     pub kind: PgEdgeCardinalKind,
     pub index_type: Option<PgIndexType>,

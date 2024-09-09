@@ -29,7 +29,6 @@ pub struct RowValue {
 
 pub enum Data {
     Sql(SqlScalar),
-    #[allow(unused)]
     Compound(Compound),
 }
 
@@ -46,7 +45,7 @@ impl From<Compound> for Data {
 }
 
 #[derive(Debug)]
-#[allow(unused)]
+#[expect(unused)]
 pub enum Compound {
     Struct(Box<FnvHashMap<PropId, Attr>>, ValueTag),
     Dict(BTreeMap<smartstring::alias::String, Value>, ValueTag),

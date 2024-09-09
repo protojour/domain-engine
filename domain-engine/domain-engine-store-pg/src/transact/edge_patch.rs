@@ -52,7 +52,6 @@ impl EdgePatches {
 
 #[derive(Debug)]
 pub struct ProjectedEdgePatch {
-    #[allow(unused)]
     pub subject: CardinalIdx,
     pub tuples: Vec<EdgeEndoTuplePatch>,
     pub deletes: BTreeMap<CardinalIdx, Vec<Value>>,
