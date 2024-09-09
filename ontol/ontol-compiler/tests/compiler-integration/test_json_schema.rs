@@ -78,7 +78,9 @@ fn test_artist_and_instrument_json_schema() {
         serde_json::to_string(&build_openapi_schemas(
             test.ontology(),
             test.root_package(),
-            test.ontology().domain_by_index(test.root_package()).unwrap(),
+            test.ontology()
+                .domain_by_index(test.root_package())
+                .unwrap(),
         ))
         .unwrap();
     });
