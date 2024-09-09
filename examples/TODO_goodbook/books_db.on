@@ -1,5 +1,5 @@
 def Tag (
-    rel 'id': (rel* is: text)
+    rel. 'id': (rel* is: text)
 )
 
 def Book_id (rel* is: uuid)
