@@ -27,7 +27,6 @@ use super::{
     schema_builder::SchemaBuilder,
 };
 
-#[allow(clippy::too_many_arguments)]
 pub fn generate_graphql_schema<'c>(
     package_id: PackageId,
     partial_ontology: &'c Ontology,

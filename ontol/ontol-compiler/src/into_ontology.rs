@@ -53,7 +53,6 @@ impl<'m> Compiler<'m> {
         let mut docs_table = std::mem::take(&mut self.namespaces.docs);
 
         for def_id in self.defs.iter_package_def_ids(ONTOL_PKG) {
-            #[allow(clippy::single_match)]
             match self.defs.def_kind(def_id) {
                 DefKind::Primitive(kind, _ident) => {
                     if let Some(field_docs) = PrimitiveKind::get_field_rustdoc(kind) {

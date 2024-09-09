@@ -169,7 +169,7 @@ impl<A: OntolDebug, B: OntolDebug> OntolDebug for (A, B) {
 
 #[cfg(test)]
 mod tests {
-    #![allow(dead_code)]
+    #![expect(dead_code)]
 
     use super::*;
     use crate::ontology::Ontology;

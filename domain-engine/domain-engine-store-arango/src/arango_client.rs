@@ -141,7 +141,6 @@ pub struct ArangoCursorResponse<T> {
 
 /// Extra details structure
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct Extra {
     /// Statistics
     pub stats: Stats,
@@ -150,7 +149,6 @@ pub struct Extra {
 /// Stats
 #[derive(Debug, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
-#[allow(dead_code)]
 pub struct Stats {
     /// Number of documents in the result before the last top-level LIMIT
     pub full_count: Option<usize>,
@@ -868,7 +866,7 @@ impl ArangoDatabase {
     }
 
     /// Bulk update multiple documents
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub async fn bulk_update<T: DeserializeOwned + Default>(
         &self,
         collection: &str,

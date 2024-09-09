@@ -110,7 +110,6 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         Some(root_defs)
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn lower_relationship(
         &mut self,
         subject_ty: ResolvedType,
@@ -188,7 +187,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn lower_literal_relationship(
         &mut self,
         subject_ty: ResolvedType,
@@ -400,7 +399,6 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         Some(root_defs)
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn lower_edge_relationship(
         &mut self,
         subject_ty: ResolvedType,

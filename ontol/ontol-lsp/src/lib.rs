@@ -345,7 +345,7 @@ impl LanguageServer for Backend {
                 insp::Statement::MapStatement(_) => SymbolKind::INTERFACE,
             };
 
-            #[allow(deprecated)]
+            #[expect(deprecated)]
             let symbol = SymbolInformation {
                 name,
                 kind,

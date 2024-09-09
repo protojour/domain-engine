@@ -29,7 +29,7 @@ pub enum UnifierError {
     Unimplemented(String),
     MatrixWithoutRows,
     PatternRequiresIteratedVariable(SourceSpan),
-    #[allow(clippy::upper_case_acronyms)]
+    #[expect(clippy::upper_case_acronyms)]
     TODO(String),
 }
 

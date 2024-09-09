@@ -673,7 +673,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
 enum DomainTypeMatchData<'a> {
     Struct(&'a IndexMap<PropId, Property>),
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     Sequence(&'a Sequence),
     ConstructorStringPattern(&'a TextPatternSegment),
     TextLiteral(&'a str),
