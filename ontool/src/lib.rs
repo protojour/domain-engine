@@ -76,11 +76,11 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 #[command(version, about, arg_required_else_help(true))]
 struct Cli {
     #[command(subcommand)]
-    command: Option<Commands>,
+    command: Option<Command>,
 }
 
 #[derive(Subcommand)]
-enum Commands {
+pub enum Command {
     /// Check ONTOL (.on) files for errors
     Check(Check),
     /// Compile ONTOL (.on) files to an ontology
@@ -97,7 +97,7 @@ enum Commands {
 
 #[derive(Args)]
 #[command(arg_required_else_help(true))]
-struct Check {
+pub struct Check {
     /// ONTOL (.on) files to check for errors
     files: Vec<PathBuf>,
 
@@ -108,7 +108,7 @@ struct Check {
 
 #[derive(Args)]
 #[command(arg_required_else_help(true))]
-struct Compile {
+pub struct Compile {
     /// ONTOL (.on) files to compile
     files: Vec<PathBuf>,
 
@@ -127,7 +127,7 @@ struct Compile {
 
 #[derive(Args)]
 #[command(arg_required_else_help(true))]
-struct Generate {
+pub struct Generate {
     /// ONTOL (.on) files to generate schemas from
     files: Vec<PathBuf>,
 
@@ -141,13 +141,13 @@ struct Generate {
 }
 
 #[derive(Clone, ValueEnum)]
-enum Format {
+pub enum Format {
     Json,
 }
 
 #[derive(Args)]
 #[command(arg_required_else_help(true))]
-struct Serve {
+pub struct Serve {
     /// Root file(s) of the ontology
     files: Vec<PathBuf>,
 
@@ -177,8 +177,16 @@ pub enum OntoolError {
 pub async fn run() -> Result<(), OntoolError> {
     let cli = Cli::parse();
 
-    match cli.command {
-        Some(Commands::Check(args)) => {
+    if let Some(command) = cli.command {
+        run_command(command).await
+    } else {
+        Ok(())
+    }
+}
+
+pub async fn run_command(command: Command) -> Result<(), OntoolError> {
+    match command {
+        Command::Check(args) => {
             init_tracing();
 
             compile(args.dir, args.files, None)?;
@@ -186,7 +194,7 @@ pub async fn run() -> Result<(), OntoolError> {
 
             Ok(())
         }
-        Some(Commands::Compile(args)) => {
+        Command::Compile(args) => {
             init_tracing();
 
             let output_file = File::create(args.output)?;
@@ -196,7 +204,7 @@ pub async fn run() -> Result<(), OntoolError> {
 
             Ok(())
         }
-        Some(Commands::Generate(args)) => {
+        Command::Generate(args) => {
             init_tracing();
 
             let first_domain =
@@ -223,25 +231,24 @@ pub async fn run() -> Result<(), OntoolError> {
 
             Ok(())
         }
-        Some(Commands::Serve(args)) => {
+        Command::Serve(args) => {
             init_tracing();
 
             serve(args.dir, args.files, args.port).await?;
 
             Ok(())
         }
-        Some(Commands::GenDomainId) => {
+        Command::GenDomainId => {
             let ulid = Ulid::new();
             println!("{ulid}");
 
             Ok(())
         }
-        Some(Commands::Lsp) => {
+        Command::Lsp => {
             init_tracing_stderr();
 
             lsp().await
         }
-        None => Ok(()),
     }
 }
 
