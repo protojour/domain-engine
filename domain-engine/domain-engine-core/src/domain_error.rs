@@ -107,6 +107,8 @@ pub enum DomainErrorKind {
     EntityNotFound,
     /// edge not found
     EdgeNotFound,
+    /// edge already exists
+    EdgeAlreadyExists,
     /// not an entity
     NotAnEntity(DefId),
     /// entity must be a struct

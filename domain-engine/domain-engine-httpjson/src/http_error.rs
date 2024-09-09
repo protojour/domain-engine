@@ -71,6 +71,9 @@ pub fn domain_error_to_response(error: DomainError) -> http::Response<Body> {
         DomainErrorKind::EntityAlreadyExists => {
             (StatusCode::CONFLICT, json_error("entity already exists")).into_response()
         }
+        DomainErrorKind::EdgeAlreadyExists => {
+            (StatusCode::CONFLICT, json_error("edge already exists")).into_response()
+        }
         DomainErrorKind::InherentIdNotFound => (
             StatusCode::UNPROCESSABLE_ENTITY,
             json_error("inherent id not found"),

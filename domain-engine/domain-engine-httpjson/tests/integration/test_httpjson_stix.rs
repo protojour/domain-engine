@@ -14,7 +14,7 @@ use crate::{
 };
 
 #[datastore_test(tokio::test)]
-async fn test_httpjson_stix(ds: &str) {
+async fn test_put_httpjson_stix(ds: &str) {
     let test = stix_bundle().compile();
     let engine = make_domain_engine(test.ontology_owned(), ds).await;
     let router = test.make_test_router(engine, STIX.0);
@@ -47,6 +47,7 @@ async fn test_httpjson_stix(ds: &str) {
                         testdata::marking_definition(),
                         testdata::course_of_action(),
                         testdata::url2(),
+                        testdata::relationship(),
                     ])))
                     .unwrap(),
             )
@@ -67,7 +68,7 @@ async fn test_httpjson_stix(ds: &str) {
     info!("test jsonlines");
     put_jsonlines_bundle(&router).await;
 
-    info!("test jsonlines UPDATE UPSERT) over last PUT");
+    info!("test jsonlines UPDATE (UPSERT) over last PUT");
     put_jsonlines_bundle(&router).await;
 }
 
@@ -177,6 +178,15 @@ mod testdata {
             "defanged": true,
             "object_marking_refs": [],
             "granular_markings": [],
+        })
+    }
+
+    pub fn relationship() -> serde_json::Value {
+        json!({
+            "id": "relationship--f4293dae-b726-4634-8c0a-f3a7ea7e408a",
+            "type": "relationship",
+            "source_ref": "identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5",
+            "target_ref": "course-of-action--0beabf44-e8d8-4ae4-9122-ef56369a2564",
         })
     }
 }

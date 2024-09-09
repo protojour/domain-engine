@@ -17,14 +17,16 @@ use ontol_runtime::{
 };
 use pin_utils::pin_mut;
 use tokio_postgres::{Row, ToStatement};
-use tracing::{debug, trace, warn};
+use tracing::{debug, info, trace, warn};
 
 use crate::{
     pg_error::{map_row_error, PgError, PgInputError},
-    pg_model::{EdgeId, InDomain, PgColumn, PgDataKey, PgDomainTable, PgRepr},
+    pg_model::{
+        EdgeId, InDomain, PgColumn, PgDataKey, PgDomainTable, PgDomainTableType, PgRepr, PgType,
+    },
     sql::{self},
-    sql_record::SqlColumnStream,
-    sql_value::SqlScalar,
+    sql_record::{SqlColumnStream, SqlRecordIterator},
+    sql_value::{Layout, SqlScalar},
     statement::{Prepare, PreparedStatement},
     transact::query::IncludeJoinedAttrs,
 };
@@ -104,7 +106,7 @@ impl<'a> TransactCtx<'a> {
         self.preprocess_insert_value(insert_mode, &mut value.value)?;
 
         let def = self.ontology.def(value.value.type_def_id());
-        let (analyzed, pg) = self.analyze_input(None, def, value, select, cache)?;
+        let (mut analyzed, pg) = self.analyze_input(None, def, value, select, cache)?;
         let sql_params = analyzed.sql_params;
 
         let mut row_value = match analyzed.query_kind {
@@ -118,8 +120,24 @@ impl<'a> TransactCtx<'a> {
             }
         };
 
-        self.patch_edges(pg.table, row_value.data_key, analyzed.edges, cache)
-            .await?;
+        // patch edges
+        {
+            if matches!(row_value.op, DataOperation::Updated) {
+                for edge_path in analyzed.edges.patches.values_mut() {
+                    for tuple in &mut edge_path.tuples {
+                        for (_, _, mutation_mode) in &mut tuple.elements {
+                            if let MutationMode::Create(InsertMode::Insert) = mutation_mode {
+                                info!("Rewriting edge update to InsertMode::Upsert");
+                                *mutation_mode = MutationMode::Create(InsertMode::Upsert);
+                            }
+                        }
+                    }
+                }
+            }
+
+            self.patch_edges(pg.table, row_value.data_key, analyzed.edges, cache)
+                .await?;
+        }
 
         for (prop_id, value) in analyzed.abstract_values {
             self.insert_abstract_sub_value(
@@ -401,7 +419,10 @@ impl<'a> TransactCtx<'a> {
 
         let mut column_names = vec!["_key"];
         let mut values = vec![sql::Expr::Default];
-        let mut insert_returning = vec![];
+        let mut insert_returning = vec![
+            // The first returned column is `xmax = 0` which is used to determine whether created or updated for UPSERTs
+            sql::Expr::eq(sql::Expr::path1("xmax"), sql::Expr::LiteralInt(0)),
+        ];
         let mut primary_id_column: Option<&PgColumn> = None;
         let mut on_conflict: Option<sql::OnConflict> = None;
 
@@ -749,11 +770,22 @@ impl<'a> TransactCtx<'a> {
     ) -> DomainResult<RowValue> {
         debug!("{}", stmt);
         let row = self.query_one_raw(stmt.deref(), sql_params).await?;
+        let mut column_stream = SqlColumnStream::new(&row);
+
+        // read the initial `xmax = 0` column
+        let inserted = column_stream
+            .next_field(&Layout::Scalar(PgType::Boolean))?
+            .into_bool()?;
+
         self.read_row_value_as_vertex(
-            SqlColumnStream::new(&row),
+            column_stream,
             Some(query_select),
             IncludeJoinedAttrs::No,
-            DataOperation::Inserted,
+            if inserted {
+                DataOperation::Inserted
+            } else {
+                DataOperation::Updated
+            },
         )
     }
 
@@ -774,7 +806,7 @@ impl<'a> TransactCtx<'a> {
         let row = stream
             .try_next()
             .await
-            .map_err(map_row_error)?
+            .map_err(|e| map_row_error(e, PgDomainTableType::Vertex))?
             .ok_or(PgError::NothingInserted)?;
 
         stream

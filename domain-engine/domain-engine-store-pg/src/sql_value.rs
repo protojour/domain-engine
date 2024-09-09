@@ -87,6 +87,13 @@ impl<'b> SqlOutput<'b> {
         }
     }
 
+    pub fn into_bool(self) -> DomainResult<bool> {
+        match self {
+            Self::Scalar(SqlScalar::Bool(b)) => Ok(b),
+            _ => Err(PgError::ExpectedType("boolean").into()),
+        }
+    }
+
     pub fn into_i32(self) -> DomainResult<i32> {
         match self {
             Self::Scalar(SqlScalar::I32(int)) => Ok(int),
@@ -130,14 +137,9 @@ impl<'b> SqlOutput<'b> {
             Layout::Scalar(PgType::DoublePrecision) => {
                 Ok(SqlScalar::F64(postgres_protocol::types::float8_from_sql(raw)?.into()).into())
             }
-            Layout::Scalar(PgType::Boolean) => Ok(SqlScalar::I64(
-                if postgres_protocol::types::bool_from_sql(raw)? {
-                    1
-                } else {
-                    0
-                },
-            )
-            .into()),
+            Layout::Scalar(PgType::Boolean) => {
+                Ok(SqlScalar::Bool(postgres_protocol::types::bool_from_sql(raw)?).into())
+            }
             Layout::Scalar(PgType::Text) => Ok(SqlScalar::Text(
                 postgres_protocol::types::text_from_sql(raw)?.to_string(),
             )

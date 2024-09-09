@@ -4,7 +4,7 @@ use domain_engine_core::{domain_error::DomainErrorKind, DomainError};
 use ontol_runtime::{tuple::CardinalIdx, DefId, PackageId, PropId};
 use tracing::{error, info, warn};
 
-use crate::pg_model::{EdgeId, PgRegKey};
+use crate::pg_model::{EdgeId, PgDomainTableType, PgRegKey};
 
 pub fn ds_err(s: impl Into<String>) -> DomainError {
     DomainError::data_store(s)
@@ -14,20 +14,26 @@ pub fn ds_bad_req(s: impl Into<String>) -> DomainError {
     DomainError::data_store_bad_request(s)
 }
 
-pub fn map_row_error(pg_err: tokio_postgres::Error) -> DomainError {
+pub fn map_row_error(
+    pg_err: tokio_postgres::Error,
+    domain_table_type: PgDomainTableType,
+) -> DomainErrorKind {
     if let Some(db_error) = pg_err.as_db_error() {
         if db_error
             .message()
             .starts_with("duplicate key value violates unique constraint")
         {
-            DomainErrorKind::EntityAlreadyExists.into_error()
+            match domain_table_type {
+                PgDomainTableType::Vertex => DomainErrorKind::EntityAlreadyExists,
+                PgDomainTableType::Edge => DomainErrorKind::EdgeAlreadyExists,
+            }
         } else {
-            info!("row fetch error: {db_error:?}");
-            ds_err("could not fetch row")
+            info!("row fetch DB error: {db_error:?}");
+            DomainErrorKind::DataStore("could not fetch row".to_string())
         }
     } else {
-        error!("row fetch error: {pg_err:?}");
-        ds_err("could not fetch row")
+        error!("row fetch PG error: {pg_err:?}");
+        DomainErrorKind::DataStore("could not fetch row".to_string())
     }
 }
 

@@ -20,13 +20,13 @@ use crate::{
     address::deserialize_ontol_vertex_address,
     pg_error::{ds_bad_req, map_row_error, PgError, PgInputError, PgModelError},
     pg_model::{
-        EdgeId, InDomain, PgColumn, PgDataKey, PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind,
-        PgIndexType, PgRegKey, PgTable,
+        EdgeId, InDomain, PgColumn, PgDataKey, PgDomainTable, PgDomainTableType, PgEdgeCardinal,
+        PgEdgeCardinalKind, PgIndexType, PgRegKey, PgTable,
     },
     sql::{self, WhereExt},
     sql_value::SqlScalar,
     statement::{Prepare, PreparedStatement},
-    transact::{data::Data, edge_query::edge_join_condition},
+    transact::{data::Data, edge_query::edge_join_condition, InsertMode},
     CountRows, IgnoreRows,
 };
 
@@ -405,6 +405,10 @@ impl<'a> TransactCtx<'a> {
         insert_sql: &str,
         cache: &mut PgCache,
     ) -> DomainResult<()> {
+        let is_upsert = tuple.elements.iter().any(|(.., mutation_mode)| {
+            matches!(mutation_mode, MutationMode::Create(InsertMode::Upsert))
+        });
+
         let mut element_iter = tuple.into_element_ops();
 
         for projected_cardinal in &analysis.projected_cardinals {
@@ -463,7 +467,8 @@ impl<'a> TransactCtx<'a> {
         debug!("{insert_sql}");
         trace!("{param_buf:?}");
 
-        self.client()
+        let result = self
+            .client()
             .query_raw(
                 insert_sql,
                 param_buf.iter().map(|param| param as &dyn ToSql),
@@ -471,10 +476,20 @@ impl<'a> TransactCtx<'a> {
             .await
             .map_err(PgError::EdgeInsertion)?
             .try_collect::<IgnoreRows>()
-            .map_err(map_row_error)
-            .await?;
+            .map_err(|e| map_row_error(e, PgDomainTableType::Edge))
+            .await;
 
-        Ok(())
+        match result {
+            Ok(_) => Ok(()),
+            Err(DomainErrorKind::EdgeAlreadyExists) => {
+                if is_upsert {
+                    Ok(())
+                } else {
+                    Err(DomainErrorKind::EdgeAlreadyExists.into_error())
+                }
+            }
+            Err(err_kind) => Err(err_kind.into_error()),
+        }
     }
 
     async fn update_edge<'s>(
@@ -603,7 +618,7 @@ impl<'a> TransactCtx<'a> {
         debug!("{stmt}");
         trace!("{param_buf:?}");
 
-        let count = self
+        let row_count = self
             .client()
             .query_raw(
                 stmt.deref(),
@@ -612,10 +627,10 @@ impl<'a> TransactCtx<'a> {
             .await
             .map_err(PgError::EdgeUpdate)?
             .try_collect::<CountRows>()
-            .map_err(map_row_error)
+            .map_err(|e| map_row_error(e, PgDomainTableType::Edge))
             .await?;
 
-        if count.0 == 1 {
+        if row_count.0 == 1 {
             Ok(())
         } else {
             Err(DomainErrorKind::EdgeNotFound.into_error())
@@ -636,8 +651,8 @@ impl<'a> TransactCtx<'a> {
         }
     }
 
-    pub async fn resolve_linked_vertex<'s>(
-        &'s self,
+    pub async fn resolve_linked_vertex(
+        &self,
         value: Value,
         mode: MutationMode,
         select: Select,
