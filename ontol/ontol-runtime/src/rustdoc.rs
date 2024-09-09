@@ -28,14 +28,14 @@ mod tests {
     #[derive(RustDoc)]
     enum DataEnum {
         /// Doc
-        #[allow(unused)]
+        #[expect(unused)]
         Variant(u8),
     }
 
     #[derive(RustDoc)]
     struct Struct {
         /// Doc
-        #[allow(unused)]
+        #[expect(unused)]
         field: u8,
     }
 

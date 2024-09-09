@@ -23,9 +23,9 @@ use ontol_parser::U32Span;
 
 /// A definition in some package
 #[derive(Debug)]
-#[allow(unused)]
 pub struct Def<'m> {
     pub id: DefId,
+    #[expect(unused)]
     pub package: PackageId,
     pub kind: DefKind<'m>,
     pub span: SourceSpan,

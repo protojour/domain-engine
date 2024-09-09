@@ -23,7 +23,7 @@ impl Is {
         matches!(self.rel, TypeRelation::Super | TypeRelation::ImplicitSuper)
     }
 
-    #[allow(unused)]
+    #[expect(unused)]
     pub fn is_sub(&self) -> bool {
         matches!(self.rel, TypeRelation::Subset | TypeRelation::SubVariant)
     }
@@ -47,7 +47,7 @@ pub struct Entries<'a> {
 }
 
 impl<'a> Entries<'a> {
-    #[allow(unused)]
+    #[expect(unused)]
     pub fn is_empty(&self) -> bool {
         self.builtin_entries.is_empty() && self.domain_entries.is_empty()
     }

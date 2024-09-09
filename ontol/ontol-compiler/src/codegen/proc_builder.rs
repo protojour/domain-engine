@@ -81,7 +81,7 @@ impl ProcBuilder {
         Local(self.stack_size as u16 - 1 + plus)
     }
 
-    #[allow(unused)]
+    #[expect(unused)]
     pub fn top_minus(&self, minus: u16) -> Local {
         Local(self.stack_size as u16 - 1 - minus)
     }

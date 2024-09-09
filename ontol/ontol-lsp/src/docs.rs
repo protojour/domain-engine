@@ -3,7 +3,7 @@ use ontol_runtime::ontology::domain::DefKind;
 
 use crate::state::{HoverDoc, State};
 
-#[allow(unused)]
+#[expect(unused)]
 pub fn get_ontol_var(ident: &str) -> HoverDoc {
     HoverDoc::from(ident, "#### Variable\nLocal variable or type reference.")
 }

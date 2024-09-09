@@ -25,7 +25,7 @@ pub(super) enum FilterVal<'d> {
         dynamic_key: Option<&'d DynamicKey>,
         prop_tree: &'d FnvHashMap<PropId, Attr>,
     },
-    #[allow(unused)]
+    #[expect(unused)]
     Sequence(&'d [Value]),
     Scalar(&'d Value),
 }

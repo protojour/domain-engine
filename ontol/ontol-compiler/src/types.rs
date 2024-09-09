@@ -35,10 +35,10 @@ pub enum Type<'m> {
     Regex(DefId),
     TextLike(DefId, TextLikeType),
     Seq(TypeRef<'m>),
-    #[allow(unused)]
+    #[expect(unused)]
     Tuple(&'m [TypeRef<'m>]),
     Matrix(&'m [TypeRef<'m>]),
-    #[allow(unused)]
+    #[expect(unused)]
     Option(TypeRef<'m>),
     Function(FunctionType),
     // User-defined data type from a domain:

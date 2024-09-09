@@ -84,9 +84,9 @@ pub enum TypeError<'m> {
     MustBeSequence(TypeRef<'m>),
     VariableMustBeSequenceEnclosed(TypeRef<'m>),
     NotEnoughInformation,
-    #[allow(unused)]
+    #[expect(unused)]
     NotConvertibleFromNumber(TypeRef<'m>),
-    #[allow(unused)]
+    #[expect(unused)]
     NoRelationParametersExpected,
     StructTypeNotInferrable,
 }

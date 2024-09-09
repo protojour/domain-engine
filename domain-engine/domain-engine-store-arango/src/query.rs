@@ -301,7 +301,7 @@ impl<'a> MetaQuery<'a> {
 #[derive(Debug)]
 pub enum AttrMut<'a> {
     Unit(&'a mut Value),
-    #[allow(unused)]
+    #[expect(unused)]
     Tuple(&'a mut [Value]),
     Matrix(&'a mut [Sequence<Value>]),
 }

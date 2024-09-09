@@ -46,7 +46,6 @@ pub struct ReprCheck<'c, 'm> {
     pub thesaurus: &'c Thesaurus,
     pub repr_ctx: &'c mut ReprCtx,
 
-    #[allow(unused)]
     pub errors: &'c mut CompileErrors,
 
     pub state: State,

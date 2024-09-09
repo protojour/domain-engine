@@ -71,7 +71,7 @@ pub struct RelTypeConstraints {
 pub enum RelObjectConstraint {
     /// The object type must be a constant of the subject type
     ConstantOfSubjectType,
-    #[allow(unused)]
+    #[expect(unused)]
     Generator,
 }
 

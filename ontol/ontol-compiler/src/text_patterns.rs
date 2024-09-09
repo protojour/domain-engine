@@ -38,7 +38,7 @@ pub enum TextPatternSegment {
         segment: Box<TextPatternSegment>,
     },
     Concat(Vec<TextPatternSegment>),
-    #[allow(unused)]
+    #[expect(unused)]
     Alternation(Vec<TextPatternSegment>),
 }
 

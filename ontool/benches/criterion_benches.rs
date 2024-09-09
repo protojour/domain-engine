@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use std::sync::Arc;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
@@ -8,19 +6,8 @@ use domain_engine_graphql::context::ServiceCtx;
 use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use domain_engine_test_utils::graphql_test_utils::Exec;
 use indoc::indoc;
-use ontol_compiler::{
-    mem::Mem,
-    package::{GraphState, PackageGraphBuilder, ParsedPackage},
-    SourceCodeRegistry, Sources,
-};
 use ontol_runtime::{
-    attr::AttrRef,
-    interface::serde::operator::SerdeOperatorAddr,
-    ontology::{
-        config::{DataStoreConfig, PackageConfig},
-        Ontology,
-    },
-    PackageId,
+    attr::AttrRef, interface::serde::operator::SerdeOperatorAddr, ontology::Ontology,
 };
 use ontol_test_utils::{
     examples::conduit::{BLOG_POST_PUBLIC, CONDUIT_DB, FEED_PUBLIC},

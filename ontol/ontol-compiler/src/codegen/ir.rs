@@ -14,7 +14,6 @@ pub struct BlockOffset(pub u32);
 /// Some opcodes that involve branching use addresses,
 /// but these are not computed until the whole procedure is computed.
 #[derive(OntolDebug)]
-#[allow(unused)]
 pub enum Ir {
     /// Raw OpCode.
     /// Ir should not contain raw opcodes that refer to raw addresses.

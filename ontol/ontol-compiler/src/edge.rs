@@ -32,13 +32,12 @@ pub struct EdgeCtx {
 }
 
 impl EdgeCtx {
-    #[allow(unused)]
     pub fn edge_id_by_symbol(&self, symbol: DefId) -> Option<EdgeId> {
         self.symbols.get(&symbol).copied()
     }
 
     /// Look up an edge using a symbol from that edge
-    #[allow(unused)]
+    #[expect(unused)]
     pub fn edge_by_symbol(&self, symbol: DefId) -> Option<(EdgeId, &SymbolicEdge)> {
         let edge_id = self.symbols.get(&symbol)?;
         self.symbolic_edges
@@ -91,7 +90,7 @@ impl SymbolicEdge {
 }
 
 #[derive(Clone, Copy, Debug)]
-#[allow(unused)]
+#[expect(unused)]
 pub struct Slot {
     pub clause_idx: usize,
     pub left: CardinalIdx,

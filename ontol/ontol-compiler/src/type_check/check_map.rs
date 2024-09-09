@@ -40,7 +40,7 @@ pub enum MapOutputClass {
     FilterMatch,
 }
 
-#[allow(unused)]
+#[expect(unused)]
 #[derive(Debug)]
 pub enum CheckMapError {
     DepthExceeded,

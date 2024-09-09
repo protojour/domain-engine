@@ -38,9 +38,8 @@ use super::{
 
 /// Unifier that strives to produce Static Single-Assignment form flat hir blocks
 pub struct SsaUnifier<'c, 'm> {
-    #[allow(unused)]
     pub(super) types: &'c mut TypeCtx<'m>,
-    #[allow(unused)]
+    #[expect(unused)]
     pub(super) rel_ctx: &'c RelCtx,
     pub(super) prop_ctx: &'c PropCtx,
     pub(super) repr_ctx: &'c ReprCtx,

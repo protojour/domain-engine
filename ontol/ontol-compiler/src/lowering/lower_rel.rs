@@ -531,7 +531,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
 struct RelParamsScan {
     has_def_receiver: bool,
-    #[allow(unused)]
+    #[expect(unused)]
     has_rel_receiver: bool,
 }
 

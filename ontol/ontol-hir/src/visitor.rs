@@ -6,12 +6,12 @@ use crate::{
 };
 
 pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     fn visit_node(&mut self, index: usize, node_ref: NodeRef<'h, 'a, L>) {
         self.traverse_node(node_ref);
     }
 
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     fn visit_prop(
         &mut self,
         flags: PropFlags,
@@ -23,31 +23,29 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
         self.traverse_prop(struct_var, prop_id, variant, arena);
     }
 
-    #[allow(unused_variables)]
     fn visit_prop_variant(&mut self, variant: &PropVariant, arena: &'h Arena<'a, L>) {
         self.traverse_prop_variant(variant, arena);
     }
 
-    #[allow(unused_variables)]
     fn visit_set_entry(&mut self, index: usize, entry: &MatrixRow<'a, L>, arena: &'h Arena<'a, L>) {
         self.traverse_set_entry(index, entry, arena);
     }
 
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     fn visit_pattern_binding(&mut self, index: usize, binding: &Binding<'a, L>) {
         self.traverse_pattern_binding(binding);
     }
 
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     fn visit_property_id(&mut self, prop_id: PropId) {}
 
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     fn visit_binder(&mut self, var: Var) {}
 
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     fn visit_var(&mut self, var: Var) {}
 
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     fn visit_label(&mut self, label: Label) {}
 
     fn traverse_node(&mut self, node_ref: NodeRef<'h, 'a, L>) {
@@ -220,7 +218,6 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
         }
     }
 
-    #[allow(unused_variables)]
     fn traverse_prop(
         &mut self,
         struct_var: Var,
@@ -249,7 +246,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
         }
     }
 
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     fn traverse_set_entry(
         &mut self,
         index: usize,

@@ -172,7 +172,7 @@ mod pg {
     struct PgTestDatastore {
         handle: PostgresHandle,
         /// As long as this datastore still lives, it will hold this permit
-        #[allow(unused)]
+        #[expect(unused)]
         permit: OwnedSemaphorePermit,
     }
 
