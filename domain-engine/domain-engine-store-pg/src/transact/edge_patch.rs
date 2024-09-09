@@ -28,7 +28,7 @@ use crate::{
     sql_value::SqlScalar,
     statement::{Prepare, PreparedStatement, ToArcStr},
     transact::{data::Data, edge_query::edge_join_condition, InsertMode},
-    CountRows, IgnoreRows,
+    CountRows,
 };
 
 use super::{cache::PgCache, MutationMode, TransactCtx};
@@ -162,8 +162,11 @@ impl<'a> TransactCtx<'a> {
             as_: None,
             column_names: vec![],
             values: vec![],
-            on_conflict: None,
-            returning: vec![],
+            on_conflict: Some(sql::OnConflict {
+                target: None,
+                action: sql::ConflictAction::DoNothing,
+            }),
+            returning: vec![sql::Expr::LiteralInt(0)],
         };
 
         let mut analysis = EdgeAnalysis::default();
@@ -470,7 +473,7 @@ impl<'a> TransactCtx<'a> {
         debug!("{stmt}");
         trace!("{param_buf:?}");
 
-        let result = self
+        let row_count = self
             .client()
             .query_raw(
                 stmt.deref(),
@@ -478,20 +481,14 @@ impl<'a> TransactCtx<'a> {
             )
             .await
             .map_err(PgError::EdgeInsertion)?
-            .try_collect::<IgnoreRows>()
+            .try_collect::<CountRows>()
             .map_err(|e| map_row_error(e, PgDomainTableType::Edge))
-            .await;
+            .await?;
 
-        match result {
-            Ok(_) => Ok(()),
-            Err(DomainErrorKind::EdgeAlreadyExists) => {
-                if is_upsert {
-                    Ok(())
-                } else {
-                    Err(DomainErrorKind::EdgeAlreadyExists.into_error())
-                }
-            }
-            Err(err_kind) => Err(err_kind.into_error()),
+        if row_count.0 == 1 || is_upsert {
+            Ok(())
+        } else {
+            Err(DomainErrorKind::EdgeAlreadyExists.into_error())
         }
     }
 

@@ -17,7 +17,7 @@ use ontol_runtime::{
 };
 use pin_utils::pin_mut;
 use tokio_postgres::{Row, ToStatement};
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, trace, warn};
 
 use crate::{
     pg_error::{map_row_error, PgError, PgInputError},
@@ -127,7 +127,6 @@ impl<'a> TransactCtx<'a> {
                     for tuple in &mut edge_path.tuples {
                         for (_, _, mutation_mode) in &mut tuple.elements {
                             if let MutationMode::Create(InsertMode::Insert) = mutation_mode {
-                                info!("Rewriting edge update to InsertMode::Upsert");
                                 *mutation_mode = MutationMode::Create(InsertMode::Upsert);
                             }
                         }

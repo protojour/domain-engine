@@ -46,8 +46,8 @@ async fn test_put_httpjson_stix(ds: &str) {
                         testdata::identity(),
                         testdata::marking_definition(),
                         testdata::course_of_action(),
-                        testdata::url2(),
                         testdata::relationship(),
+                        testdata::url2(),
                     ])))
                     .unwrap(),
             )
