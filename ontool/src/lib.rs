@@ -99,45 +99,45 @@ pub enum Command {
 #[command(arg_required_else_help(true))]
 pub struct Check {
     /// ONTOL (.on) files to check for errors
-    files: Vec<PathBuf>,
+    pub files: Vec<PathBuf>,
 
     /// Search directory for ONTOL files
     #[arg(short('w'), long, default_value = ".")]
-    dir: PathBuf,
+    pub dir: PathBuf,
 }
 
 #[derive(Args)]
 #[command(arg_required_else_help(true))]
 pub struct Compile {
     /// ONTOL (.on) files to compile
-    files: Vec<PathBuf>,
+    pub files: Vec<PathBuf>,
 
     /// Search directory for ONTOL files
     #[arg(short('w'), long, default_value = ".")]
-    dir: PathBuf,
+    pub dir: PathBuf,
 
     /// Specify a data store backend [inmemory, arangodb, ..]
     #[arg(short('b'), long)]
-    backend: Option<String>,
+    pub backend: Option<String>,
 
     /// Ontology output file
     #[arg(short, long, default_value = "ontology")]
-    output: PathBuf,
+    pub output: PathBuf,
 }
 
 #[derive(Args)]
 #[command(arg_required_else_help(true))]
 pub struct Generate {
     /// ONTOL (.on) files to generate schemas from
-    files: Vec<PathBuf>,
+    pub files: Vec<PathBuf>,
 
     /// Search directory for ONTOL files
     #[arg(short('w'), long, default_value = ".")]
-    dir: PathBuf,
+    pub dir: PathBuf,
 
     /// Output format for JSON schema
     #[arg(short('f'), long, default_value = "json")]
-    format: Format,
+    pub format: Format,
 }
 
 #[derive(Clone, ValueEnum)]
@@ -149,15 +149,15 @@ pub enum Format {
 #[command(arg_required_else_help(true))]
 pub struct Serve {
     /// Root file(s) of the ontology
-    files: Vec<PathBuf>,
+    pub files: Vec<PathBuf>,
 
     /// Search directory for ONTOL files
     #[arg(short('w'), long, default_value = ".")]
-    dir: PathBuf,
+    pub dir: PathBuf,
 
     /// Specify a port for the server
     #[arg(short('p'), long, default_value = "5000")]
-    port: u16,
+    pub port: u16,
 }
 
 #[derive(Debug, Error)]
