@@ -17,10 +17,10 @@ use crate::{
     lowering::context::LoweringOutcome,
     misc::{MacroExpand, MacroItem, MiscCtx},
     namespace::DocId,
-    package::ParsedDomain,
     relation::{rel_def_meta, RelId, RelParams, Relationship},
     repr::repr_model::ReprKind,
     thesaurus::{Thesaurus, TypeRelation},
+    topology::ParsedDomain,
     type_check::MapArmsKind,
     types::Type,
     CompileError, Compiler, Session, SourceSpan, Src, UnifiedCompileError,
@@ -51,17 +51,19 @@ impl<'m> Compiler<'m> {
             .report(self);
         }
 
-        let pkg_def_id = self.defs.alloc_def_id(parsed.domain_index);
-        self.define_domain(pkg_def_id);
+        let domain_def_id = self.defs.alloc_def_id(parsed.domain_index);
+        self.define_domain(domain_def_id);
 
-        self.packages
-            .loaded_packages
-            .insert(parsed.reference, pkg_def_id);
+        self.loaded
+            .by_reference
+            .insert(parsed.reference, domain_def_id);
 
         self.domain_config_table
             .insert(parsed.domain_index, parsed.config);
 
-        let outcome = parsed.syntax.lower(pkg_def_id, src.clone(), Session(self));
+        let outcome = parsed
+            .syntax
+            .lower(domain_def_id, src.clone(), Session(self));
 
         self.domain_ids
             .entry(parsed.domain_index)

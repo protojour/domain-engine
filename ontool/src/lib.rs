@@ -24,7 +24,7 @@ use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
     ontol_syntax::OntolTreeSyntax,
-    package::{GraphState, PackageGraphBuilder, PackageReference, ParsedDomain},
+    topology::{DepGraphBuilder, DomainReference, GraphState, ParsedDomain},
     SourceCodeRegistry, SourceId, Sources,
 };
 use ontol_lsp::Backend;
@@ -295,7 +295,7 @@ fn compile(
 
     let mut source_code_registry = SourceCodeRegistry::default();
     let mut package_graph_builder =
-        PackageGraphBuilder::with_roots(root_files.iter().map(|path| get_source_name(path)));
+        DepGraphBuilder::with_roots(root_files.iter().map(|path| get_source_name(path)));
 
     let topology = loop {
         let graph_state = package_graph_builder.transition().map_err(|err| {
@@ -309,7 +309,7 @@ fn compile(
 
                 for request in requests {
                     let source_name = match &request.reference {
-                        PackageReference::Named(source_name) => source_name.as_str(),
+                        DomainReference::Named(source_name) => source_name.as_str(),
                     };
 
                     if let Some(source_text) = sources_by_name.remove(source_name) {
@@ -328,7 +328,7 @@ fn compile(
                         source_code_registry
                             .registry
                             .insert(parsed.src.id, source_text);
-                        package_graph_builder.provide_package(parsed);
+                        package_graph_builder.provide_domain(parsed);
                     } else {
                         eprintln!("Could not load `{source_name}`");
                     }

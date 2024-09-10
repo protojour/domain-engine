@@ -11,7 +11,7 @@ use ulid::Ulid;
 use crate::{
     edge::{CardinalKind, EdgeId},
     namespace::{DocId, Space},
-    package::PackageReference,
+    topology::DomainReference,
     CompileError, Compiler, Src,
 };
 
@@ -45,11 +45,11 @@ enum Section {
 }
 
 impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
-    pub fn new(pkg_def_id: DefId, src: Src, compiler: &'c mut Compiler<'m>) -> Self {
+    pub fn new(domain_def_id: DefId, src: Src, compiler: &'c mut Compiler<'m>) -> Self {
         Self {
             ctx: LoweringCtx {
                 compiler,
-                domain_def_id: pkg_def_id,
+                domain_def_id,
                 domain_index: src.domain_index,
                 source_id: src.id,
                 anonymous_unions: Default::default(),
@@ -223,9 +223,9 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 let name = use_stmt.name()?;
                 let name_text = name.text().and_then(|result| self.ctx.unescape(result))?;
 
-                let reference = PackageReference::Named(name_text);
+                let reference = DomainReference::Named(name_text);
                 let Some(used_package_def_id) =
-                    self.ctx.compiler.packages.loaded_packages.get(&reference)
+                    self.ctx.compiler.loaded.by_reference.get(&reference)
                 else {
                     CompileError::PackageNotFound(reference)
                         .span_report(name.0.span(), &mut self.ctx);

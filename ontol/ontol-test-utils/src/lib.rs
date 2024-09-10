@@ -13,7 +13,7 @@ use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
     ontol_syntax::OntolTreeSyntax,
-    package::{GraphState, PackageGraphBuilder, PackageReference, PackageTopology, ParsedDomain},
+    topology::{DepGraphBuilder, DomainReference, DomainTopology, GraphState, ParsedDomain},
     SourceCodeRegistry, Sources,
 };
 use ontol_parser::cst_parse;
@@ -319,8 +319,8 @@ impl TestPackages {
         self
     }
 
-    fn load_topology(&mut self) -> Result<(PackageTopology, DomainIndex), UnifiedCompileError> {
-        let mut package_graph_builder = PackageGraphBuilder::with_roots(
+    fn load_topology(&mut self) -> Result<(DomainTopology, DomainIndex), UnifiedCompileError> {
+        let mut package_graph_builder = DepGraphBuilder::with_roots(
             self.root_package_names
                 .iter()
                 .map(|name| name.0.clone().into()),
@@ -334,7 +334,7 @@ impl TestPackages {
 
                     for request in requests {
                         let source_name = match &request.reference {
-                            PackageReference::Named(source_name) => source_name.as_str(),
+                            DomainReference::Named(source_name) => source_name.as_str(),
                         };
 
                         self.packages_by_source_name
@@ -373,7 +373,7 @@ impl TestPackages {
                                 .registry
                                 .insert(parsed.src.id, rc_source);
 
-                            package_graph_builder.provide_package(parsed);
+                            package_graph_builder.provide_domain(parsed);
                         }
                     }
                 }

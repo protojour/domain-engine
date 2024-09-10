@@ -4,7 +4,7 @@ use ontol_compiler::ontol_syntax::OntolTreeSyntax;
 use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
-    package::{GraphState, PackageGraphBuilder, PackageReference, ParsedDomain},
+    topology::{DepGraphBuilder, DomainReference, GraphState, ParsedDomain},
     CompileError, SourceId, SourceSpan, Sources, NO_SPAN,
 };
 use ontol_parser::cst::inspect as insp;
@@ -210,7 +210,7 @@ impl State {
         let root_name = get_domain_name(filename);
 
         let mut ontol_sources = Sources::default();
-        let mut package_graph_builder = PackageGraphBuilder::with_roots([root_name.into()]);
+        let mut package_graph_builder = DepGraphBuilder::with_roots([root_name.into()]);
 
         let topology = loop {
             match package_graph_builder.transition()? {
@@ -236,7 +236,7 @@ impl State {
                                 &mut ontol_sources,
                             );
                             self.srcref.insert(package.src.id, request_uri);
-                            package_graph_builder.provide_package(package);
+                            package_graph_builder.provide_domain(package);
                         }
                     }
                 }
@@ -492,9 +492,9 @@ pub fn read_file(uri: &str) -> Result<String, Error> {
 }
 
 /// Get source name for a PackageReference
-pub fn get_reference_name(reference: &PackageReference) -> &str {
+pub fn get_reference_name(reference: &DomainReference) -> &str {
     match reference {
-        PackageReference::Named(source_name) => source_name.as_str(),
+        DomainReference::Named(source_name) => source_name.as_str(),
     }
 }
 

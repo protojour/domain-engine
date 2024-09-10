@@ -2,12 +2,12 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use fnv::FnvHashMap;
 use ontol_parser::cst::inspect as insp;
 use ontol_parser::cst::view::NodeView;
 use ontol_parser::cst::view::NodeViewExt;
 use ontol_parser::U32Span;
 use ontol_runtime::ontology::config::DomainConfig;
+use ontol_runtime::vec_map::VecMap;
 use ontol_runtime::DefId;
 use ontol_runtime::DomainIndex;
 
@@ -19,35 +19,31 @@ use crate::Sources;
 use crate::Src;
 use crate::NO_SPAN;
 
-/// The compiler's loaded packages
+/// The compiler's loaded domains, by reference,
+/// to be able to compile `use` statements
 #[derive(Default)]
-pub(crate) struct Packages {
-    pub loaded_packages: HashMap<PackageReference, DefId>,
-}
-
-#[derive(Debug)]
-pub struct Package {
-    pub name: String,
+pub(crate) struct LoadedDomains {
+    pub by_reference: HashMap<DomainReference, DefId>,
 }
 
 pub enum GraphState {
     RequestPackages {
-        builder: PackageGraphBuilder,
-        requests: Vec<PackageRequest>,
+        builder: DepGraphBuilder,
+        requests: Vec<DomainRequest>,
     },
-    Built(PackageTopology),
+    Built(DomainTopology),
 }
 
 /// A package request originating from a source file.
 /// ONTOL itself does not know how to fetch any packages.
-pub struct PackageRequest {
+pub struct DomainRequest {
     pub domain_index: DomainIndex,
-    pub reference: PackageReference,
+    pub reference: DomainReference,
 }
 
-/// The reference by which a package is requested (file name, URL, etc)
+/// The reference by which a domain is requested (file name, URL, etc)
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub enum PackageReference {
+pub enum DomainReference {
     Named(String),
 }
 
@@ -55,7 +51,7 @@ pub enum PackageReference {
 /// The parsed form is needed to know which dependencies to request.
 pub struct ParsedDomain {
     pub domain_index: DomainIndex,
-    pub reference: PackageReference,
+    pub reference: DomainReference,
     pub config: DomainConfig,
     pub src: Src,
     pub syntax: Box<dyn OntolSyntax>,
@@ -64,7 +60,7 @@ pub struct ParsedDomain {
 
 impl ParsedDomain {
     pub fn new(
-        request: PackageRequest,
+        request: DomainRequest,
         syntax: Box<dyn OntolSyntax>,
         parse_errors: Vec<ontol_parser::Error>,
         config: DomainConfig,
@@ -73,7 +69,7 @@ impl ParsedDomain {
         let domain_index = request.domain_index;
 
         let source_name = match &request.reference {
-            PackageReference::Named(source_name) => source_name.to_string(),
+            DomainReference::Named(source_name) => source_name.to_string(),
         };
 
         let src = sources.add_source(domain_index, source_name);
@@ -89,8 +85,8 @@ impl ParsedDomain {
     }
 }
 
-pub fn extract_ontol_dependentices<V: NodeView>(ontol_view: V) -> Vec<(PackageReference, U32Span)> {
-    let mut deps: Vec<(PackageReference, U32Span)> = vec![];
+pub fn extract_ontol_dependencies<V: NodeView>(ontol_view: V) -> Vec<(DomainReference, U32Span)> {
+    let mut deps: Vec<(DomainReference, U32Span)> = vec![];
 
     if let insp::Node::Ontol(ontol) = ontol_view.node() {
         for statement in ontol.statements() {
@@ -113,7 +109,7 @@ pub fn extract_ontol_dependentices<V: NodeView>(ontol_view: V) -> Vec<(PackageRe
                         continue;
                     };
 
-                    let pkg_ref = PackageReference::Named(text);
+                    let pkg_ref = DomainReference::Named(text);
 
                     deps.push((pkg_ref, name.0.span()));
                 }
@@ -127,8 +123,8 @@ pub fn extract_ontol_dependentices<V: NodeView>(ontol_view: V) -> Vec<(PackageRe
 
 /// Topological sort of the built package graph
 #[derive(Default)]
-pub struct PackageTopology {
-    pub packages: Vec<ParsedDomain>,
+pub struct DomainTopology {
+    pub parsed_domains: Vec<ParsedDomain>,
 }
 
 #[derive(Debug)]
@@ -136,14 +132,14 @@ pub enum PackageGraphError {
     PackageNotFound(DomainIndex),
 }
 
-pub struct PackageGraphBuilder {
+pub struct DepGraphBuilder {
     next_domain_index: DomainIndex,
     generation: usize,
-    parsed_packages: FnvHashMap<DomainIndex, ParsedDomain>,
-    package_graph: HashMap<PackageReference, PackageNode>,
+    parsed_packages: VecMap<DomainIndex, ParsedDomain>,
+    request_graph: HashMap<DomainReference, RequestedDomain>,
 }
 
-impl PackageGraphBuilder {
+impl DepGraphBuilder {
     /// Create an empty builder, seeded with the given root package names,
     /// which will the builder will attempt to resolve in the next transition.
     pub fn with_roots(root_package_names: impl IntoIterator<Item = String>) -> Self {
@@ -157,8 +153,8 @@ impl PackageGraphBuilder {
                 }
 
                 (
-                    PackageReference::Named(package_name),
-                    PackageNode {
+                    DomainReference::Named(package_name),
+                    RequestedDomain {
                         domain_index,
                         use_source_span: NO_SPAN,
                         requested_at_generation: 0,
@@ -173,21 +169,21 @@ impl PackageGraphBuilder {
             next_domain_index,
             generation: 0,
             parsed_packages: Default::default(),
-            package_graph,
+            request_graph: package_graph,
         }
     }
 
     /// Provide a package
-    pub fn provide_package(&mut self, package: ParsedDomain) {
-        let mut children: HashSet<PackageReference> = HashSet::default();
+    pub fn provide_domain(&mut self, package: ParsedDomain) {
+        let mut children: HashSet<DomainReference> = HashSet::default();
 
         for (pkg_ref, span) in package.syntax.dependencies() {
-            self.request_package(pkg_ref.clone(), package.src.span(span));
+            self.request_domain(pkg_ref.clone(), package.src.span(span));
             children.insert(pkg_ref);
         }
 
         let node = self
-            .package_graph
+            .request_graph
             .get_mut(&package.reference)
             .expect("package not requested");
         node.found = true;
@@ -202,7 +198,7 @@ impl PackageGraphBuilder {
         let mut requests = vec![];
         let mut load_errors = vec![];
 
-        for (reference, requested_package) in &self.package_graph {
+        for (reference, requested_package) in &self.request_graph {
             if !requested_package.found {
                 if requested_package.requested_at_generation < self.generation {
                     load_errors.push(
@@ -210,7 +206,7 @@ impl PackageGraphBuilder {
                             .span(requested_package.use_source_span),
                     );
                 } else {
-                    requests.push(PackageRequest {
+                    requests.push(DomainRequest {
                         domain_index: requested_package.domain_index,
                         reference: reference.clone(),
                     })
@@ -237,14 +233,14 @@ impl PackageGraphBuilder {
     }
 
     /// Finish the package graph with a topological sort of packages
-    fn topo_sort(mut self) -> PackageTopology {
+    fn topo_sort(mut self) -> DomainTopology {
         let mut visited: HashSet<DomainIndex> = Default::default();
         let mut topological_sort: Vec<ParsedDomain> = vec![];
 
         fn traverse_graph(
-            reference: &PackageReference,
-            package_graph: &HashMap<PackageReference, PackageNode>,
-            parsed_packages: &mut FnvHashMap<DomainIndex, ParsedDomain>,
+            reference: &DomainReference,
+            package_graph: &HashMap<DomainReference, RequestedDomain>,
+            parsed_packages: &mut VecMap<DomainIndex, ParsedDomain>,
             visited: &mut HashSet<DomainIndex>,
             topological_sort: &mut Vec<ParsedDomain>,
         ) {
@@ -268,35 +264,35 @@ impl PackageGraphBuilder {
             topological_sort.push(parsed_package);
         }
 
-        for reference in self.package_graph.keys() {
+        for reference in self.request_graph.keys() {
             traverse_graph(
                 reference,
-                &self.package_graph,
+                &self.request_graph,
                 &mut self.parsed_packages,
                 &mut visited,
                 &mut topological_sort,
             );
         }
 
-        PackageTopology {
-            packages: topological_sort,
+        DomainTopology {
+            parsed_domains: topological_sort,
         }
     }
 
-    fn request_package(
+    fn request_domain(
         &mut self,
-        source: PackageReference,
+        source: DomainReference,
         use_source_span: SourceSpan,
     ) -> DomainIndex {
-        match self.package_graph.entry(source) {
+        match self.request_graph.entry(source) {
             Entry::Occupied(occupied) => occupied.get().domain_index,
             Entry::Vacant(vacant) => {
                 let domain_index = self.next_domain_index;
                 if self.next_domain_index.increase().is_err() {
-                    panic!("package numbers exceeded");
+                    panic!("max domain count exceeded");
                 }
 
-                vacant.insert(PackageNode {
+                vacant.insert(RequestedDomain {
                     domain_index,
                     use_source_span,
                     requested_at_generation: self.generation,
@@ -309,10 +305,10 @@ impl PackageGraphBuilder {
     }
 }
 
-struct PackageNode {
+struct RequestedDomain {
     domain_index: DomainIndex,
     use_source_span: SourceSpan,
     requested_at_generation: usize,
-    dependencies: HashSet<PackageReference>,
+    dependencies: HashSet<DomainReference>,
     found: bool,
 }

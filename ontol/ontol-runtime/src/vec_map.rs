@@ -36,6 +36,13 @@ impl<K, V> VecMap<K, V> {
         self.elements.get_mut(key.index())?.as_mut()
     }
 
+    pub fn remove(&mut self, key: &K) -> Option<V>
+    where
+        K: VecMapKey,
+    {
+        self.elements.get_mut(key.index())?.take()
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = (usize, &V)> {
         self.elements
             .iter()

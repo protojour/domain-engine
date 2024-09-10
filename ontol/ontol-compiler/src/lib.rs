@@ -27,7 +27,6 @@ use ontol_runtime::{
     resolve_path::ResolverGraph,
     DefId, DomainIndex,
 };
-use package::{PackageTopology, Packages};
 use pattern::Patterns;
 use relation::RelCtx;
 use repr::repr_ctx::ReprCtx;
@@ -35,6 +34,7 @@ pub use source::*;
 use strings::StringCtx;
 use text_patterns::{compile_all_text_patterns, TextPatterns};
 use thesaurus::Thesaurus;
+use topology::{DomainTopology, LoadedDomains};
 use tracing::debug;
 use type_check::seal::SealCtx;
 use types::{DefTypeCtx, TypeCtx};
@@ -44,9 +44,9 @@ use crate::lowering::context::CstLowering;
 pub mod error;
 pub mod mem;
 pub mod ontol_syntax;
-pub mod package;
 pub mod primitive;
 pub mod source;
+pub mod topology;
 
 mod codegen;
 mod compile_domain;
@@ -85,7 +85,7 @@ mod types;
 ///
 /// The errors produces by the compiler mark places in source files according to the [Sources] that is passed in.
 pub fn compile(
-    topology: PackageTopology,
+    topology: DomainTopology,
     sources: Sources,
     mem: &Mem,
 ) -> Result<Compiled, UnifiedCompileError> {
@@ -95,7 +95,7 @@ pub fn compile(
     // There could be errors in the ontol domain, this is useful for development:
     compiler.check_error()?;
 
-    for parsed_package in topology.packages {
+    for parsed_package in topology.parsed_domains {
         debug!(
             "lower {:?}: {:?}",
             parsed_package.domain_index, parsed_package.reference
@@ -164,7 +164,7 @@ pub struct Session<'c, 'm>(&'c mut Compiler<'m>);
 struct Compiler<'m> {
     sources: Sources,
 
-    packages: Packages,
+    loaded: LoadedDomains,
     domain_names: Vec<(DomainIndex, TextConstant)>,
 
     domain_dep_graph: FnvHashMap<DomainIndex, FnvHashSet<DomainIndex>>,
@@ -203,7 +203,7 @@ impl<'m> Compiler<'m> {
 
         Self {
             sources,
-            packages: Default::default(),
+            loaded: Default::default(),
             domain_names: Default::default(),
             domain_dep_graph: Default::default(),
             namespaces: Default::default(),

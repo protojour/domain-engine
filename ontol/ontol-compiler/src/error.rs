@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use ontol_runtime::format_utils::CommaSeparated;
 
-use crate::{package::PackageReference, source::SourceSpan};
+use crate::{source::SourceSpan, topology::DomainReference};
 
 pub struct UnifiedCompileError {
     pub errors: Vec<SpannedCompileError>,
@@ -54,7 +54,7 @@ pub enum CompileError {
     /// number parse error: {0}
     NumberParse(String),
     /// package not found
-    PackageNotFound(PackageReference),
+    PackageNotFound(DomainReference),
     /// persisted domain is missing domain header
     PersistedDomainIsMissingDomainHeader,
     /// using `.` requires a contextual block

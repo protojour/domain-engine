@@ -6,7 +6,7 @@ use ontol_runtime::DefId;
 use crate::{
     lower_ontol_syntax,
     lowering::context::LoweringOutcome,
-    package::{extract_ontol_dependentices, PackageReference},
+    topology::{extract_ontol_dependencies, DomainReference},
     Session, Src,
 };
 
@@ -15,7 +15,7 @@ use crate::{
 /// It's whatever that can produce syntax nodes to fulfill
 /// the methods of the trait.
 pub trait OntolSyntax: UnwindSafe {
-    fn dependencies(&self) -> Vec<(PackageReference, U32Span)>;
+    fn dependencies(&self) -> Vec<(DomainReference, U32Span)>;
     fn lower(&self, pkg_def_id: DefId, src: Src, session: Session) -> LoweringOutcome;
 }
 
@@ -26,8 +26,8 @@ pub struct OntolTreeSyntax<S> {
 }
 
 impl<S: Borrow<String> + UnwindSafe> OntolSyntax for OntolTreeSyntax<S> {
-    fn dependencies(&self) -> Vec<(PackageReference, U32Span)> {
-        extract_ontol_dependentices(self.tree.view(self.source_text.borrow()))
+    fn dependencies(&self) -> Vec<(DomainReference, U32Span)> {
+        extract_ontol_dependencies(self.tree.view(self.source_text.borrow()))
     }
 
     fn lower(&self, pkg_def_id: DefId, src: Src, session: Session) -> LoweringOutcome {
