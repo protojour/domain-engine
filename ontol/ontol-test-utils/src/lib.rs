@@ -8,9 +8,7 @@ use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
     ontol_syntax::OntolTreeSyntax,
-    topology::{
-        DepGraphBuilder, DomainReferenceParser, DomainTopology, DomainUrl, GraphState, ParsedDomain,
-    },
+    topology::{DepGraphBuilder, DomainTopology, DomainUrl, GraphState, ParsedDomain},
     SourceCodeRegistry, Sources,
 };
 use ontol_parser::cst_parse;
@@ -193,17 +191,11 @@ pub trait TestCompile: Sized {
 }
 
 pub fn file_url(name: &str) -> DomainUrl {
-    DomainReferenceParser::default()
-        .parse(name)
-        .unwrap_or_else(|_| panic!("invalid name"))
-        .as_url()
+    DomainUrl::parse(name)
 }
 
 pub fn default_file_url() -> DomainUrl {
-    DomainReferenceParser::default()
-        .parse("test_root.on")
-        .unwrap_or_else(|_| panic!("invalid name"))
-        .as_url()
+    DomainUrl::parse("test_root.on")
 }
 
 pub fn default_short_name() -> &'static str {
@@ -235,7 +227,7 @@ impl TestPackages {
                 }
 
                 let source_name = line.strip_prefix("//@ src_name=").unwrap();
-                cur_url = DomainUrl::local(source_name);
+                cur_url = DomainUrl::parse(source_name);
             } else {
                 cur_source.push_str(line);
                 cur_source.push('\n');

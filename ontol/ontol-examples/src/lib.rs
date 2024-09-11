@@ -1,15 +1,12 @@
 use conduit::{blog_post_public, conduit_db};
-use ontol_compiler::topology::{DomainReferenceParser, DomainUrl};
+use ontol_compiler::topology::DomainUrl;
 use stix::stix_bundle;
 use url::Url;
 
 type Example = (DomainUrl, &'static str);
 
 fn file_url(name: &str) -> DomainUrl {
-    DomainReferenceParser::default()
-        .parse(name)
-        .unwrap_or_else(|_| panic!("invalid name"))
-        .as_url()
+    DomainUrl::parse(name)
 }
 
 pub mod stix {

@@ -26,7 +26,7 @@ use crate::{
     namespace::Space,
     pattern::{Pattern, PatternKind},
     relation::{DefRelTag, RelId, RelParams, Relationship},
-    topology::{DomainReferenceParser, DomainUrl},
+    topology::{DomainUrl, DomainUrlParser},
     CompileError, Compiler, SourceId, SourceSpan,
 };
 
@@ -38,7 +38,7 @@ pub struct LoweringCtx<'c, 'm> {
     pub source_id: SourceId,
     pub anonymous_unions: FnvHashMap<BTreeSet<DefId>, DefId>,
     pub outcome: LoweringOutcome,
-    pub domain_reference_parser: DomainReferenceParser,
+    pub domain_url_parser: DomainUrlParser,
 }
 
 pub struct CstLowering<'c, 'm, V: NodeView> {

@@ -6,7 +6,7 @@ use ontol_runtime::DefId;
 use crate::{
     lower_ontol_syntax,
     lowering::context::LoweringOutcome,
-    topology::{extract_ontol_dependencies, DomainReference, DomainUrl},
+    topology::{extract_ontol_dependencies, DomainUrl},
     Session, Src,
 };
 
@@ -15,10 +15,7 @@ use crate::{
 /// It's whatever that can produce syntax nodes to fulfill
 /// the methods of the trait.
 pub trait OntolSyntax: UnwindSafe {
-    fn dependencies(
-        &self,
-        errors: &mut Vec<ontol_parser::Error>,
-    ) -> Vec<(DomainReference, U32Span)>;
+    fn dependencies(&self, errors: &mut Vec<ontol_parser::Error>) -> Vec<(DomainUrl, U32Span)>;
     fn lower(
         &self,
         url: Rc<DomainUrl>,
@@ -35,10 +32,7 @@ pub struct OntolTreeSyntax<S> {
 }
 
 impl<S: Borrow<String> + UnwindSafe> OntolSyntax for OntolTreeSyntax<S> {
-    fn dependencies(
-        &self,
-        errors: &mut Vec<ontol_parser::Error>,
-    ) -> Vec<(DomainReference, U32Span)> {
+    fn dependencies(&self, errors: &mut Vec<ontol_parser::Error>) -> Vec<(DomainUrl, U32Span)> {
         extract_ontol_dependencies(self.tree.view(self.source_text.borrow()), errors)
     }
 

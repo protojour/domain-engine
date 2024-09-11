@@ -45,11 +45,11 @@ pub struct DomainRequest {
     pub url: DomainUrl,
 }
 
-pub struct DomainReferenceParser {
+pub struct DomainUrlParser {
     base_url: url::Url,
 }
 
-impl Default for DomainReferenceParser {
+impl Default for DomainUrlParser {
     fn default() -> Self {
         Self {
             base_url: url::Url::parse("file://").unwrap(),
@@ -57,39 +57,14 @@ impl Default for DomainReferenceParser {
     }
 }
 
-impl DomainReferenceParser {
-    pub fn parse(&self, uri: &str) -> Result<DomainReference, CompileError> {
+impl DomainUrlParser {
+    pub fn parse(&self, uri: &str) -> Result<DomainUrl, CompileError> {
         let url = url::Url::options()
             .base_url(Some(&self.base_url))
             .parse(uri)
             .map_err(|_| CompileError::InvalidDomainReference)?;
 
-        Ok(DomainReference::Url(DomainUrl(url)))
-    }
-}
-
-/// The reference by which a domain is requested (file name, URL, etc)
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub enum DomainReference {
-    Url(DomainUrl),
-    Internal,
-}
-
-impl Display for DomainReference {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Url(url) => write!(f, "{}", url.0),
-            Self::Internal => write!(f, "<ontol>"),
-        }
-    }
-}
-
-impl DomainReference {
-    pub fn as_url(&self) -> DomainUrl {
-        match self {
-            Self::Url(url) => url.clone(),
-            Self::Internal => panic!(),
-        }
+        Ok(DomainUrl(url))
     }
 }
 
@@ -101,11 +76,10 @@ impl DomainUrl {
         Self(url)
     }
 
-    pub fn local(name: &str) -> Self {
-        DomainReferenceParser::default()
+    pub fn parse(name: &str) -> Self {
+        DomainUrlParser::default()
             .parse(name)
             .unwrap_or_else(|_| panic!())
-            .as_url()
     }
 
     pub fn short_name(&self) -> &str {
@@ -122,35 +96,26 @@ impl DomainUrl {
         &self.0
     }
 
-    pub fn as_reference(&self) -> DomainReference {
-        DomainReference::Url(self.clone())
-    }
+    pub fn join(&self, other: &DomainUrl) -> Self {
+        match other.0.scheme() {
+            "file" => {
+                let mut next_url = self.0.clone();
 
-    pub fn join(&self, reference: &DomainReference) -> Self {
-        match reference {
-            DomainReference::Url(domain_url) => match domain_url.0.scheme() {
-                "file" => {
-                    let mut next_url = self.0.clone();
+                {
+                    let mut segments = next_url.path_segments_mut().unwrap();
 
-                    {
-                        let mut segments = next_url.path_segments_mut().unwrap();
+                    segments.pop();
 
-                        segments.pop();
-
-                        if let Some(orig_segments) = domain_url.0.path_segments() {
-                            if let Some(yo) = orig_segments.last() {
-                                segments.push(yo);
-                            }
+                    if let Some(orig_segments) = other.0.path_segments() {
+                        if let Some(yo) = orig_segments.last() {
+                            segments.push(yo);
                         }
                     }
-
-                    Self(next_url)
                 }
-                _ => Self(domain_url.0.clone()),
-            },
-            DomainReference::Internal => {
-                panic!()
+
+                Self(next_url)
             }
+            _ => other.clone(),
         }
     }
 }
@@ -201,10 +166,10 @@ impl ParsedDomain {
 pub fn extract_ontol_dependencies<V: NodeView>(
     ontol_view: V,
     parse_errors: &mut Vec<ontol_parser::Error>,
-) -> Vec<(DomainReference, U32Span)> {
-    let mut deps: Vec<(DomainReference, U32Span)> = vec![];
+) -> Vec<(DomainUrl, U32Span)> {
+    let mut deps: Vec<(DomainUrl, U32Span)> = vec![];
 
-    let parser = DomainReferenceParser::default();
+    let parser = DomainUrlParser::default();
 
     if let insp::Node::Ontol(ontol) = ontol_view.node() {
         for statement in ontol.statements() {
@@ -330,7 +295,7 @@ impl DepGraphBuilder {
             if !requested_package.found {
                 if requested_package.requested_at_generation < self.generation {
                     load_errors.push(
-                        CompileError::PackageNotFound(url.clone())
+                        CompileError::DomainNotFound(url.clone())
                             .span(requested_package.use_source_span),
                     );
                 } else {

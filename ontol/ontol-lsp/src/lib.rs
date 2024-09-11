@@ -76,7 +76,7 @@ impl Backend {
 
                         // handle missing packages if any
                         let mut data: Value = json!({});
-                        if let ontol_compiler::CompileError::PackageNotFound(url) = &err.error {
+                        if let ontol_compiler::CompileError::DomainNotFound(url) = &err.error {
                             let (path, _) = get_path_and_name(url.short_name());
                             let source_name = url.short_name();
                             let ref_uri = build_uri(path, source_name);

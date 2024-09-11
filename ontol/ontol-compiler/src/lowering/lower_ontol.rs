@@ -60,7 +60,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 source_id: src.id,
                 anonymous_unions: Default::default(),
                 outcome: Default::default(),
-                domain_reference_parser: Default::default(),
+                domain_url_parser: Default::default(),
             },
             _phantom: PhantomData,
         }
@@ -230,14 +230,14 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 let uri = use_stmt.uri()?;
                 let uri_text = uri.text().and_then(|result| self.ctx.unescape(result))?;
 
-                let Ok(reference) = self.ctx.domain_reference_parser.parse(&uri_text) else {
+                let Ok(reference) = self.ctx.domain_url_parser.parse(&uri_text) else {
                     return None;
                 };
 
                 let url = self.ctx.url.join(&reference);
 
                 let Some(used_package_def_id) = self.ctx.compiler.loaded.by_url.get(&url) else {
-                    CompileError::PackageNotFound(url).span_report(uri.0.span(), &mut self.ctx);
+                    CompileError::DomainNotFound(url).span_report(uri.0.span(), &mut self.ctx);
                     return None;
                 };
 

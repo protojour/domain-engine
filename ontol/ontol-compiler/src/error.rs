@@ -55,8 +55,8 @@ pub enum CompileError {
     NumberParse(String),
     /// invalid domain reference
     InvalidDomainReference,
-    /// package not found
-    PackageNotFound(DomainUrl),
+    /// domain not found
+    DomainNotFound(DomainUrl),
     /// persisted domain is missing domain header
     PersistedDomainIsMissingDomainHeader,
     /// using `.` requires a contextual block

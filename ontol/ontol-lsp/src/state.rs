@@ -211,7 +211,7 @@ impl State {
         let root_name = get_domain_name(filename);
 
         let mut ontol_sources = Sources::default();
-        let mut package_graph_builder = DepGraphBuilder::with_roots([DomainUrl::local(root_name)]);
+        let mut package_graph_builder = DepGraphBuilder::with_roots([DomainUrl::parse(root_name)]);
 
         let topology = loop {
             match package_graph_builder.transition()? {

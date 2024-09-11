@@ -24,7 +24,7 @@ use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
     ontol_syntax::OntolTreeSyntax,
-    topology::{DepGraphBuilder, DomainReference, DomainUrl, GraphState, ParsedDomain},
+    topology::{DepGraphBuilder, DomainUrl, DomainUrlParser, GraphState, ParsedDomain},
     SourceCodeRegistry, SourceId, Sources,
 };
 use ontol_examples::FakeAtlasServer;
@@ -40,10 +40,11 @@ use ontol_runtime::{
 use service::{domains_router, ontology_router};
 use std::{
     collections::HashMap,
+    fmt::Display,
     fs::{self, read_dir, File},
     io::{stdout, Stdout, Write},
     net::SocketAddr,
-    path::{Path, PathBuf},
+    path::PathBuf,
     rc::Rc,
     sync::{Arc, Mutex},
     time::Duration,
@@ -99,8 +100,8 @@ pub enum Command {
 #[derive(Args)]
 #[command(arg_required_else_help(true))]
 pub struct Check {
-    /// ONTOL (.on) files to check for errors
-    pub files: Vec<PathBuf>,
+    /// ONTOL domain URLs to compile. Base URL is file:///, i.e. default directory.
+    pub domains: Vec<String>,
 
     /// Search directory for ONTOL files
     #[arg(short('w'), long, default_value = ".")]
@@ -110,8 +111,8 @@ pub struct Check {
 #[derive(Args)]
 #[command(arg_required_else_help(true))]
 pub struct Compile {
-    /// ONTOL (.on) files to compile
-    pub files: Vec<PathBuf>,
+    /// ONTOL domain URLs to compile. Base URL is file:///, i.e. default directory.
+    pub domains: Vec<String>,
 
     /// Search directory for ONTOL files
     #[arg(short('w'), long, default_value = ".")]
@@ -129,8 +130,8 @@ pub struct Compile {
 #[derive(Args)]
 #[command(arg_required_else_help(true))]
 pub struct Generate {
-    /// ONTOL (.on) files to generate schemas from
-    pub files: Vec<PathBuf>,
+    /// ONTOL domain URIs to generate schemas from. Base URL is file:///, i.e. default directory.
+    pub domains: Vec<String>,
 
     /// Search directory for ONTOL files
     #[arg(short('w'), long, default_value = ".")]
@@ -149,8 +150,8 @@ pub enum Format {
 #[derive(Args)]
 #[command(arg_required_else_help(true))]
 pub struct Serve {
-    /// Root file(s) of the ontology
-    pub files: Vec<PathBuf>,
+    /// ONTOL domain URIs to serve.
+    pub domains: Vec<String>,
 
     /// Search directory for ONTOL files
     #[arg(short('w'), long, default_value = ".")]
@@ -165,6 +166,8 @@ pub struct Serve {
 pub enum OntoolError {
     #[error("No input files")]
     NoInputFiles,
+    #[error("Invalid domain reference")]
+    InvalidDomainReference,
     #[error("Parse error")]
     Parse,
     #[error("Compile error")]
@@ -194,7 +197,7 @@ pub async fn run() -> Result<(), OntoolError> {
 pub async fn run_command(command: Command) -> Result<(), OntoolError> {
     match command {
         Command::Check(args) => {
-            compile(args.dir, args.files, None)?;
+            compile(args.dir, args.domains, None)?;
             println!("No errors found.");
 
             Ok(())
@@ -202,16 +205,21 @@ pub async fn run_command(command: Command) -> Result<(), OntoolError> {
         Command::Compile(args) => {
             let output_file = File::create(args.output)?;
 
-            let ontology = compile(args.dir, args.files, args.backend)?;
+            let ontology = compile(args.dir, args.domains, args.backend)?;
             ontology.try_serialize_to_bincode(output_file).unwrap();
 
             Ok(())
         }
         Command::Generate(args) => {
-            let first_domain =
-                get_source_url(args.files.as_slice().iter().next().expect("no input files"));
+            let first_domain = get_source_url(
+                args.domains
+                    .as_slice()
+                    .iter()
+                    .next()
+                    .expect("no input files"),
+            )?;
 
-            let ontology = compile(args.dir, args.files, None)?;
+            let ontology = compile(args.dir, args.domains, None)?;
 
             let (domain_index, domain) = ontology
                 .domains()
@@ -233,7 +241,7 @@ pub async fn run_command(command: Command) -> Result<(), OntoolError> {
             Ok(())
         }
         Command::Serve(args) => {
-            serve(args.dir, args.files, args.port).await?;
+            serve(args.dir, args.domains, args.port).await?;
 
             Ok(())
         }
@@ -267,10 +275,10 @@ fn init_tracing_stderr() {
 
 fn compile(
     root_dir: PathBuf,
-    root_files: Vec<PathBuf>,
+    domains: Vec<String>,
     backend: Option<String>,
 ) -> Result<Ontology, OntoolError> {
-    if root_files.is_empty() {
+    if domains.is_empty() {
         return Err(OntoolError::NoInputFiles);
     }
 
@@ -289,16 +297,20 @@ fn compile(
         // TODO: only insert needed ontol files
         if matches!(path.extension(), Some(ext) if ext == "on") {
             let source = fs::read_to_string(&path)?;
-            let source_url = get_source_url(&path);
+            let source_url = get_source_url(path.to_str().unwrap())?;
 
             sources_by_url.insert(source_url.clone(), Rc::new(source));
             paths_by_url.insert(source_url, path);
         }
     }
 
+    let mut roots = vec![];
+    for domain_ref in domains {
+        roots.push(get_source_url(&domain_ref)?);
+    }
+
     let mut source_code_registry = SourceCodeRegistry::default();
-    let mut package_graph_builder =
-        DepGraphBuilder::with_roots(root_files.iter().map(|path| get_source_url(path)));
+    let mut package_graph_builder = DepGraphBuilder::with_roots(roots);
 
     let topology = loop {
         let graph_state = package_graph_builder.transition().map_err(|err| {
@@ -358,12 +370,26 @@ fn compile(
 
 /// Get a source name from a path.
 /// Strips away the path and removes the `.on` suffix (if present)
-fn get_source_url(path: &Path) -> DomainUrl {
-    let file_name = path.file_name().unwrap().to_str().unwrap().to_string();
+fn get_source_url(uri: &str) -> Result<DomainUrl, OntoolError> {
+    let parser = DomainUrlParser::default();
+    let Ok(domain_url) = parser.parse(uri) else {
+        return Err(OntoolError::InvalidDomainReference);
+    };
+    match domain_url.url().scheme() {
+        "file" => {
+            let mut path_segments = domain_url.url().path_segments().expect("invalid URI");
+            if path_segments.clone().count() != 1 {
+                return Err(OntoolError::InvalidDomainReference);
+            }
 
-    match file_name.strip_suffix(".on") {
-        Some(stripped) => DomainUrl::local(stripped),
-        None => DomainUrl::local(&file_name),
+            let file_name = path_segments.next_back().unwrap();
+
+            match file_name.strip_suffix(".on") {
+                Some(stripped) => Ok(DomainUrl::parse(stripped)),
+                None => Ok(DomainUrl::parse(file_name)),
+            }
+        }
+        _ => Ok(domain_url),
     }
 }
 
@@ -378,45 +404,60 @@ fn print_unified_compile_error(
         let span = err_span.span.start as usize..err_span.span.end as usize;
         let message = error.error.to_string();
 
-        let (source_name, literal_source) =
+        let (origin, literal_source) =
             report_source_name(err_span.source_id, ontol_sources, source_code_registry);
 
-        Report::build(ReportKind::Error, &source_name, span.start)
+        Report::build(ReportKind::Error, &origin, span.start)
             .with_label(
-                Label::new((&source_name, span))
+                Label::new((&origin, span))
                     .with_message(message)
                     .with_color(colors.next()),
             )
             .finish()
-            .eprint((&source_name, Source::from(literal_source.as_ref())))?;
+            .eprint((&origin, Source::from(literal_source.as_ref())))?;
 
         for note in error.notes {
             let note_span = note.span();
             let span = note.span().span.start as usize..note.span().span.end as usize;
             let message = note.into_note().to_string();
 
-            let (source_name, literal_source) =
+            let (origin, literal_source) =
                 report_source_name(note_span.source_id, ontol_sources, source_code_registry);
 
-            Report::build(ReportKind::Advice, &source_name, span.start)
+            Report::build(ReportKind::Advice, &origin, span.start)
                 .with_label(
-                    Label::new((&source_name, span))
+                    Label::new((&origin, span))
                         .with_message(message)
                         .with_color(colors.next()),
                 )
                 .finish()
-                .eprint((&source_name, Source::from(literal_source.as_ref())))?;
+                .eprint((&origin, Source::from(literal_source.as_ref())))?;
         }
     }
 
     Ok(())
 }
 
+#[derive(PartialEq, Eq, Hash, Debug)]
+enum DomainUrlOrigin {
+    Domain(Rc<DomainUrl>),
+    CliArg,
+}
+
+impl Display for DomainUrlOrigin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Domain(url) => write!(f, "{url}"),
+            Self::CliArg => write!(f, "<arg>"),
+        }
+    }
+}
+
 fn report_source_name(
     source_id: SourceId,
     ontol_sources: &Sources,
     registry: &SourceCodeRegistry,
-) -> (Rc<DomainReference>, Rc<String>) {
+) -> (DomainUrlOrigin, Rc<String>) {
     // FIXME: If the error can't be mapped to a source file,
     // things will look quite strange. Fix later..
     match ontol_sources.get_source(source_id) {
@@ -424,15 +465,15 @@ fn report_source_name(
             let literal_source = registry.registry.get(&source_id);
 
             (
-                Rc::new(ontol_source.url().as_reference()),
+                DomainUrlOrigin::Domain(ontol_source.url.clone()),
                 literal_source
                     .cloned()
                     .unwrap_or_else(|| Rc::new("<ontol>".to_string())),
             )
         }
         None => {
-            let ontol = Rc::new("<ontol>".to_string());
-            (Rc::new(DomainReference::Internal), ontol)
+            let ontol = Rc::new("<arg>".to_string());
+            (DomainUrlOrigin::CliArg, ontol)
         }
     }
 }
@@ -448,7 +489,7 @@ fn clear_term(stdout: &mut Stdout) {
     stdout.flush().unwrap();
 }
 
-async fn serve(root_dir: PathBuf, root_files: Vec<PathBuf>, port: u16) -> Result<(), OntoolError> {
+async fn serve(root_dir: PathBuf, domains: Vec<String>, port: u16) -> Result<(), OntoolError> {
     let mut stdout = stdout();
     let (tx, rx) = std::sync::mpsc::channel();
     let (reload_tx, _reload_rx) = broadcast::channel::<ChannelMessage>(16);
@@ -493,7 +534,7 @@ async fn serve(root_dir: PathBuf, root_files: Vec<PathBuf>, port: u16) -> Result
 
     // initial compilation
     let backend = Some(String::from("inmemory"));
-    let ontology_result = compile(root_dir.clone(), root_files.clone(), backend.clone());
+    let ontology_result = compile(root_dir.clone(), domains.clone(), backend.clone());
     match ontology_result {
         Ok(ontology) => {
             reload_routes(ontology, &dynamic_routers, &base_url).await;
@@ -516,7 +557,7 @@ async fn serve(root_dir: PathBuf, root_files: Vec<PathBuf>, port: u16) -> Result
                         clear_term(&mut stdout);
 
                         let ontology_result =
-                            compile(root_dir.clone(), root_files.clone(), backend.clone());
+                            compile(root_dir.clone(), domains.clone(), backend.clone());
                         match ontology_result {
                             Ok(ontology) => {
                                 reload_routes(ontology, &dynamic_routers, &base_url).await;
