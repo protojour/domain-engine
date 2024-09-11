@@ -6,8 +6,9 @@ use domain_engine_graphql::{
 };
 use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema};
 use juniper::graphql_value;
+use ontol_examples::stix::stix_bundle;
 use ontol_macros::datastore_test;
-use ontol_test_utils::{examples::stix::stix_bundle, expect_eq};
+use ontol_test_utils::expect_eq;
 use tracing::info;
 
 use crate::mk_engine_default;

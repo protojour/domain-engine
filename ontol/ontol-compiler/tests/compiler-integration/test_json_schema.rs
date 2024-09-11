@@ -1,8 +1,9 @@
+use ontol_examples::artist_and_instrument;
 use ontol_macros::test;
 use ontol_runtime::interface::{
     json_schema::build_openapi_schemas, serde::processor::ProcessorMode::*,
 };
-use ontol_test_utils::{examples::artist_and_instrument, expect_eq, TestCompile};
+use ontol_test_utils::{expect_eq, TestCompile};
 use serde_json::json;
 
 #[test]

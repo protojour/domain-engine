@@ -4,6 +4,7 @@ use domain_engine_test_utils::{
     dynamic_data_store::DynamicDataStoreFactory, system::mock_current_time_monotonic, unimock,
     DomainEngineTestExt, TestFindQuery,
 };
+use ontol_examples as examples;
 use ontol_runtime::{
     attr::AttrRef,
     interface::serde::processor::{ProcessorProfile, ProcessorProfileFlags},
@@ -14,7 +15,7 @@ use ontol_runtime::{
 use ontol_test_utils::{
     assert_error_msg,
     def_binding::DefBinding,
-    examples, expect_eq,
+    expect_eq,
     json_utils::{json_map, json_prop},
     serde_helper::{serde_create, serde_read},
     TestCompile, TestPackages,

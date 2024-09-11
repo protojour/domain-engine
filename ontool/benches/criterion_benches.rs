@@ -7,13 +7,11 @@ use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use domain_engine_test_utils::graphql_test_utils::Exec;
 use indoc::indoc;
 use ontol_compiler::topology::DomainUrl;
+use ontol_examples::conduit::{blog_post_public, conduit_db, feed_public};
 use ontol_runtime::{
     attr::AttrRef, interface::serde::operator::SerdeOperatorAddr, ontology::Ontology,
 };
-use ontol_test_utils::{
-    examples::conduit::{blog_post_public, conduit_db, feed_public},
-    file_url, TestCompile, TestPackages,
-};
+use ontol_test_utils::{file_url, TestCompile, TestPackages};
 use ontool::System;
 use serde::de::DeserializeSeed;
 use tokio::runtime::Runtime;

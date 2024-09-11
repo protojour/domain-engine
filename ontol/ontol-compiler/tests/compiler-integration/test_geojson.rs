@@ -1,10 +1,7 @@
+use ontol_examples::{geojson, wgs};
 use ontol_macros::test;
 use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches,
-    examples::{geojson, wgs},
-    file_url,
-    serde_helper::*,
-    TestCompile, TestPackages,
+    assert_error_msg, assert_json_io_matches, file_url, serde_helper::*, TestCompile, TestPackages,
 };
 use serde_json::json;
 

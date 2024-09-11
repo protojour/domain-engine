@@ -26,7 +26,6 @@ use tracing::info;
 
 pub mod def_binding;
 pub mod diagnostics;
-pub mod examples;
 pub mod json_utils;
 pub mod serde_helper;
 pub mod test_extensions;
@@ -400,6 +399,20 @@ impl TestPackages {
                 panic!("Compile failed, but the test used compile_ok(), so it should not fail.");
             }
         }
+    }
+}
+
+impl TestCompile for Vec<(DomainUrl, &'static str)> {
+    fn compile(self) -> OntolTest {
+        TestPackages::with_static_sources(self).compile_topology_ok()
+    }
+
+    fn compile_fail(self) -> Vec<AnnotatedCompileError> {
+        TestPackages::with_static_sources(self).compile_fail()
+    }
+
+    fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
+        TestPackages::with_static_sources(self).compile_fail_then(validator)
     }
 }
 

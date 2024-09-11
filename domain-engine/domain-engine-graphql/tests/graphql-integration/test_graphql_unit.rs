@@ -7,6 +7,7 @@ use domain_engine_graphql::{
     juniper::{self, graphql_value},
     Schema,
 };
+use ontol_examples::{artist_and_instrument, geojson, guitar_synth_union, municipalities, wgs};
 use ontol_macros::test;
 use ontol_runtime::{
     attr::AttrMatrix,
@@ -14,11 +15,7 @@ use ontol_runtime::{
     sequence::{Sequence, SubSequence},
     value::Value,
 };
-use ontol_test_utils::{
-    default_file_url, default_short_name,
-    examples::{artist_and_instrument, geojson, guitar_synth_union, municipalities, wgs},
-    expect_eq, file_url, TestPackages,
-};
+use ontol_test_utils::{default_file_url, default_short_name, expect_eq, file_url, TestPackages};
 use serde_json::json;
 use unimock::*;
 

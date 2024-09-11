@@ -1,11 +1,12 @@
 use itertools::Itertools;
+use ontol_examples as examples;
 use ontol_macros::test;
 use ontol_runtime::{
     attr::AttrRef, ontology::domain::DataRelationshipTarget, tuple::CardinalIdx, value::Value,
     DefIdSet, DomainIndex,
 };
 use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches, examples, expect_eq, serde_helper::*, TestCompile,
+    assert_error_msg, assert_json_io_matches, expect_eq, serde_helper::*, TestCompile,
 };
 use serde_json::json;
 

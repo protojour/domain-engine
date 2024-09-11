@@ -3,7 +3,6 @@
 use ontol_test_utils::{file_url, TestCompile, TestPackages};
 use std::{fs, path::PathBuf};
 
-mod examples;
 mod interface;
 mod test_bugs;
 mod test_conduit;

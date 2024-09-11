@@ -47,6 +47,7 @@ domain-engine-test-utils.path = "../domain-engine-test-utils"
 ontol-macros.path = "../../ontol/ontol-macros"
 domain-engine-graphql.path = "../domain-engine-graphql"
 ontol-test-utils.path = "../../ontol/ontol-test-utils"
+ontol-examples.path = "../../ontol/ontol-examples"
 juniper.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 pretty_assertions = "1"

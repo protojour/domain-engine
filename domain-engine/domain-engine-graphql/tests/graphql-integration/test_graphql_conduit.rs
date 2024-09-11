@@ -16,12 +16,10 @@ use domain_engine_test_utils::{
     unimock,
     unimock::MockFn,
 };
+use ontol_examples::conduit::{blog_post_public, conduit_db, feed_public};
 use ontol_macros::datastore_test;
 use ontol_runtime::ontology::Ontology;
-use ontol_test_utils::{
-    examples::conduit::{blog_post_public, conduit_db, feed_public},
-    expect_eq, TestPackages,
-};
+use ontol_test_utils::{expect_eq, TestPackages};
 use tracing::info;
 
 fn conduit_db_only() -> TestPackages {

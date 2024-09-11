@@ -1,5 +1,6 @@
 use assert_matches::assert_matches;
 use fnv::FnvHashMap;
+use ontol_examples::{artist_and_instrument, gitmesh};
 use ontol_macros::test;
 use ontol_runtime::{
     interface::serde::processor::{
@@ -9,11 +10,7 @@ use ontol_runtime::{
     value::{OctetSequence, Value},
 };
 use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches,
-    examples::{artist_and_instrument, gitmesh},
-    expect_eq,
-    serde_helper::*,
-    TestCompile,
+    assert_error_msg, assert_json_io_matches, expect_eq, serde_helper::*, TestCompile,
 };
 use serde::de::DeserializeSeed;
 use serde_json::json;

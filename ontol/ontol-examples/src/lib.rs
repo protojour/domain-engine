@@ -1,12 +1,15 @@
-use ontol_compiler::topology::DomainUrl;
-
-use crate::file_url;
+use ontol_compiler::topology::{DomainReferenceParser, DomainUrl};
 
 type Example = (DomainUrl, &'static str);
 
-pub mod stix {
-    use crate::TestPackages;
+fn file_url(name: &str) -> DomainUrl {
+    DomainReferenceParser::default()
+        .parse(name)
+        .unwrap_or_else(|_| panic!("invalid name"))
+        .as_url()
+}
 
+pub mod stix {
     use super::*;
 
     pub fn stix() -> Example {
@@ -44,15 +47,15 @@ pub mod stix {
         )
     }
 
-    pub fn stix_bundle() -> TestPackages {
-        TestPackages::with_static_sources([
+    pub fn stix_bundle() -> Vec<Example> {
+        vec![
             stix(),
             stix_edges(),
             stix_interface(),
             stix_common(),
             stix_open_vocab(),
             super::si(),
-        ])
+        ]
     }
 }
 

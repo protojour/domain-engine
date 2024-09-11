@@ -11,8 +11,9 @@ use domain_engine_test_utils::{
     },
     graphql_value_unordered,
 };
+use ontol_examples::gitmesh;
 use ontol_macros::{datastore_test, test};
-use ontol_test_utils::{default_short_name, examples::gitmesh, expect_eq, TestPackages};
+use ontol_test_utils::{default_short_name, expect_eq, TestPackages};
 use tracing::info;
 
 use crate::mk_engine_default;

@@ -1,3 +1,4 @@
+use ontol_examples::{demo, findings, gitmesh};
 use ontol_macros::test;
 use ontol_runtime::{
     interface::serde::{
@@ -6,10 +7,7 @@ use ontol_runtime::{
     },
     ontology::domain::{DataRelationshipKind, DefKind, EdgeCardinalFlags},
 };
-use ontol_test_utils::{
-    examples::{demo, findings, gitmesh},
-    TestCompile,
-};
+use ontol_test_utils::TestCompile;
 use serde_json::json;
 
 #[test]

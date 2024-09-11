@@ -1,4 +1,5 @@
 use assert_matches::assert_matches;
+use ontol_examples::{artist_and_instrument, edge_entity_union, findings};
 use ontol_macros::test;
 use ontol_runtime::{
     debug::OntolDebug,
@@ -11,9 +12,7 @@ use ontol_runtime::{
     },
 };
 use ontol_test_utils::{
-    default_file_url, default_short_name,
-    examples::{artist_and_instrument, edge_entity_union, findings},
-    expect_eq, file_url,
+    default_file_url, default_short_name, expect_eq, file_url,
     test_extensions::{
         graphql::{ObjectDataExt, TypeDataExt, UnitTypeRefExt},
         serde::SerdeOperatorExt,

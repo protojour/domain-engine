@@ -9,8 +9,9 @@ use domain_engine_test_utils::{
     graphql_test_utils::{Exec, TestCompileSchema, TestCompileSingletonSchema},
     system::mock_current_time_monotonic,
 };
+use ontol_examples::demo;
 use ontol_macros::test;
-use ontol_test_utils::{examples::demo, file_url, TestPackages};
+use ontol_test_utils::{file_url, TestPackages};
 use unimock::Unimock;
 
 #[test]

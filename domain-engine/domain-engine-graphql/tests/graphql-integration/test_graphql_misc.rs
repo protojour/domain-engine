@@ -4,12 +4,10 @@ use domain_engine_test_utils::{
     graphql_test_utils::{Exec, GraphqlValueResultExt, TestCompileSchema},
     graphql_value_unordered,
 };
+use ontol_examples::{edge_entity_simple, edge_entity_union, entity_subtype, guitar_synth_union};
 use ontol_macros::datastore_test;
 use ontol_test_utils::{default_file_url, default_short_name};
-use ontol_test_utils::{
-    examples::{edge_entity_simple, edge_entity_union, entity_subtype, guitar_synth_union},
-    expect_eq, TestPackages,
-};
+use ontol_test_utils::{expect_eq, TestPackages};
 use tracing::info;
 
 use crate::mk_engine_default;

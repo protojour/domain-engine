@@ -888,6 +888,7 @@ dependencies = [
  "fnv",
  "futures-util",
  "itertools 0.12.1",
+ "ontol-examples",
  "ontol-macros",
  "ontol-runtime",
  "ontol-test-utils",
@@ -915,6 +916,7 @@ dependencies = [
  "futures-util",
  "graphql-parser",
  "juniper",
+ "ontol-examples",
  "ontol-macros",
  "ontol-runtime",
  "ontol-test-utils",
@@ -961,6 +963,7 @@ dependencies = [
  "http-body",
  "http-body-util",
  "mime",
+ "ontol-examples",
  "ontol-macros",
  "ontol-runtime",
  "ontol-test-utils",
@@ -993,6 +996,7 @@ dependencies = [
  "indoc",
  "itertools 0.12.1",
  "juniper",
+ "ontol-examples",
  "ontol-macros",
  "ontol-runtime",
  "ontol-test-utils",
@@ -2316,6 +2320,7 @@ dependencies = [
  "indexmap",
  "indoc",
  "itertools 0.12.1",
+ "ontol-examples",
  "ontol-hir",
  "ontol-macros",
  "ontol-parser",
@@ -2353,6 +2358,13 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "ontol-examples"
+version = "0.1.0"
+dependencies = [
+ "ontol-compiler",
 ]
 
 [[package]]
@@ -2513,6 +2525,7 @@ dependencies = [
  "juniper_axum",
  "notify-debouncer-full",
  "ontol-compiler",
+ "ontol-examples",
  "ontol-lsp",
  "ontol-parser",
  "ontol-runtime",

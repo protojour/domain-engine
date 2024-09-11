@@ -39,6 +39,7 @@ url = "2"
 
 [dev-dependencies]
 ontol-test-utils.path = "../ontol-test-utils"
+ontol-examples.path = "../ontol-examples"
 serde_json.workspace = true
 tracing-subscriber.workspace = true
 unimock.workspace = true

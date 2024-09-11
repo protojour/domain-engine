@@ -26,6 +26,7 @@ async-stream = "0.3"
 [dev-dependencies]
 ontol-test-utils.path = "../../ontol/ontol-test-utils"
 ontol-macros.path = "../../ontol/ontol-macros"
+ontol-examples.path = "../../ontol/ontol-examples"
 domain-engine-test-utils.path = "../domain-engine-test-utils"
 tracing-subscriber.workspace = true
 tokio.workspace = true

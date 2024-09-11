@@ -9,6 +9,7 @@ members = [
     "domain-engine/domain-engine-store-pg",
     "domain-engine/domain-engine-test-utils",
     "ontol/ontol-compiler",
+    "ontol/ontol-examples",
     "ontol/ontol-faker",
     "ontol/ontol-hir",
     "ontol/ontol-lsp",

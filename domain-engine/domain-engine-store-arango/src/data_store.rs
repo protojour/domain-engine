@@ -454,9 +454,7 @@ mod tests {
     use super::*;
     use domain_engine_test_utils::unimock::Unimock;
     use indoc::indoc;
-    use ontol_test_utils::{
-        examples, expect_eq, serde_helper::serde_raw, TestCompile, TestPackages,
-    };
+    use ontol_test_utils::{expect_eq, serde_helper::serde_raw, TestCompile, TestPackages};
     use reqwest::Client;
     use reqwest_middleware::ClientWithMiddleware;
     use serde_json::json;
@@ -466,7 +464,7 @@ mod tests {
     }
 
     fn artist_and_instrument() -> TestPackages {
-        TestPackages::with_static_sources([examples::artist_and_instrument()])
+        TestPackages::with_static_sources([ontol_examples::artist_and_instrument()])
     }
 
     #[test]

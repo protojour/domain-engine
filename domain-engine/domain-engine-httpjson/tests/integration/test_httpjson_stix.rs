@@ -1,6 +1,7 @@
 use http::{header::CONTENT_TYPE, Request, StatusCode};
+use ontol_examples::stix::stix_bundle;
 use ontol_macros::datastore_test;
-use ontol_test_utils::{examples::stix::stix_bundle, TestCompile};
+use ontol_test_utils::TestCompile;
 use serde_json::json;
 use tower::ServiceExt;
 use tracing::info;
