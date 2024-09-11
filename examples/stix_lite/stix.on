@@ -12,7 +12,7 @@ use 'stix_edges' as edges
 use 'stix_interface' as interface
 use 'stix_open_vocab' as ov
 
-use 'SI' as SI
+use 'atlas:/protojour/SI/SI' as SI
 
 sym {
     id,

@@ -1,4 +1,7 @@
+use conduit::{blog_post_public, conduit_db};
 use ontol_compiler::topology::{DomainReferenceParser, DomainUrl};
+use stix::stix_bundle;
+use url::Url;
 
 type Example = (DomainUrl, &'static str);
 
@@ -54,7 +57,7 @@ pub mod stix {
             stix_interface(),
             stix_common(),
             stix_open_vocab(),
-            super::si(),
+            super::si().as_atlas("SI"),
         ]
     }
 }
@@ -181,5 +184,85 @@ pub mod entity_subtype {
             file_url("derived"),
             include_str!("../../../examples/entity_subtype/derived.on"),
         )
+    }
+}
+
+pub trait AsAtlas {
+    fn as_atlas(&self, bundle_name: &str) -> Self;
+}
+
+impl AsAtlas for DomainUrl {
+    fn as_atlas(&self, bundle_name: &str) -> Self {
+        if self.url().scheme() == "atlas" {
+            self.clone()
+        } else {
+            let path_segments = self.url().path_segments().unwrap();
+            let file_name = path_segments.last().unwrap();
+
+            DomainUrl::new(
+                Url::parse(&format!("atlas:/protojour/{bundle_name}/{file_name}")).unwrap(),
+            )
+        }
+    }
+}
+
+impl AsAtlas for Example {
+    fn as_atlas(&self, bundle_name: &str) -> Self {
+        (self.0.as_atlas(bundle_name), self.1)
+    }
+}
+
+impl AsAtlas for Vec<Example> {
+    fn as_atlas(&self, bundle_name: &str) -> Self {
+        self.iter()
+            .map(|example| example.as_atlas(bundle_name))
+            .collect()
+    }
+}
+
+/// A "resolver" that can resolve Atlas URLs to example files
+pub struct FakeAtlasServer {
+    sources: Vec<(DomainUrl, &'static str)>,
+}
+
+impl FakeAtlasServer {
+    pub fn lookup(&self, url: &DomainUrl) -> Option<&'static str> {
+        self.sources.iter().find_map(
+            |(atlas_url, src)| {
+                if atlas_url == url {
+                    Some(*src)
+                } else {
+                    None
+                }
+            },
+        )
+    }
+}
+
+impl Default for FakeAtlasServer {
+    fn default() -> Self {
+        let mut sources = vec![];
+
+        add_atlas("geojson", geojson(), &mut sources);
+        add_atlas("wgs", wgs(), &mut sources);
+        add_atlas("SI", si(), &mut sources);
+
+        for example in stix_bundle() {
+            add_atlas("stix", example, &mut sources);
+        }
+
+        add_atlas("conduit", conduit_db(), &mut sources);
+        add_atlas("conduit", blog_post_public(), &mut sources);
+        add_atlas("gitmesh", gitmesh(), &mut sources);
+        add_atlas("findings", findings(), &mut sources);
+
+        Self { sources }
+    }
+}
+
+fn add_atlas(bundle_name: &str, example: Example, sources: &mut Vec<(DomainUrl, &'static str)>) {
+    let (atlas_url, src) = example.as_atlas(bundle_name);
+    if !sources.iter().any(|(url, _)| url == &atlas_url) {
+        sources.push((atlas_url, src));
     }
 }

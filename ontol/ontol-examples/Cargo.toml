@@ -10,3 +10,4 @@ doctest = false
 
 [dependencies]
 ontol-compiler.path = "../ontol-compiler"
+url = "2"

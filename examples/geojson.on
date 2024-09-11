@@ -8,7 +8,7 @@ domain 01GQNEWZ00HWPTCVJ7VTAV0NHR (
     rel. version: '0.1.0'
 )
 
-use 'wgs' as wgs
+use 'atlas:/protojour/wgs/wgs' as wgs
 
 def @private longitude (
     rel* is: f64

@@ -27,6 +27,7 @@ use ontol_compiler::{
     topology::{DepGraphBuilder, DomainReference, DomainUrl, GraphState, ParsedDomain},
     SourceCodeRegistry, SourceId, Sources,
 };
+use ontol_examples::FakeAtlasServer;
 use ontol_lsp::Backend;
 use ontol_parser::cst_parse;
 use ontol_runtime::{
@@ -277,6 +278,8 @@ fn compile(
     let mut sources_by_url: HashMap<DomainUrl, Rc<String>> = Default::default();
     let mut paths_by_url: HashMap<DomainUrl, PathBuf> = Default::default();
 
+    let fake_atlas_server = FakeAtlasServer::default();
+
     for entry in read_dir(root_dir)? {
         let entry = entry?;
         let path = entry.path();
@@ -308,7 +311,11 @@ fn compile(
                 package_graph_builder = builder;
 
                 for request in requests {
-                    if let Some(source_text) = sources_by_url.remove(&request.url) {
+                    if let Some(source_text) =
+                        sources_by_url.remove(&request.url).or(fake_atlas_server
+                            .lookup(&request.url)
+                            .map(|src| Rc::new(src.to_string())))
+                    {
                         let (flat_tree, errors) = cst_parse(&source_text);
 
                         let parsed = ParsedDomain::new(

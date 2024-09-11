@@ -1,4 +1,4 @@
-use ontol_examples::{geojson, wgs};
+use ontol_examples::{geojson, wgs, AsAtlas};
 use ontol_macros::test;
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches, file_url, serde_helper::*, TestCompile, TestPackages,
@@ -8,7 +8,7 @@ use serde_json::json;
 #[test]
 fn test_geojson() {
     TestPackages::with_static_sources(
-        [geojson(), wgs()]
+        [geojson(), wgs().as_atlas("wgs")]
     ).compile_then(|test| {
         let [geometry] = test.bind(["Geometry"]);
         assert_json_io_matches!(serde_create(&geometry), {
@@ -81,7 +81,7 @@ fn test_municipalities() {
             ",
         ),
         geojson(),
-        wgs(),
+        wgs().as_atlas("wgs"),
     ])
     .compile_then(|_test| {});
 }

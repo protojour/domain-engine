@@ -10,6 +10,7 @@ ontol-compiler.path = "../ontol/ontol-compiler"
 ontol-parser.path = "../ontol/ontol-parser"
 ontol-runtime.path = "../ontol/ontol-runtime"
 ontol-lsp.path = "../ontol/ontol-lsp"
+ontol-examples.path = "../ontol/ontol-examples"
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

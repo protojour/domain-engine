@@ -2365,6 +2365,7 @@ name = "ontol-examples"
 version = "0.1.0"
 dependencies = [
  "ontol-compiler",
+ "url",
 ]
 
 [[package]]

@@ -118,6 +118,10 @@ impl DomainUrl {
         "<none>"
     }
 
+    pub fn url(&self) -> &Url {
+        &self.0
+    }
+
     pub fn as_reference(&self) -> DomainReference {
         DomainReference::Url(self.clone())
     }

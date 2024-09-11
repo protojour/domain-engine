@@ -1,4 +1,4 @@
-use ontol_examples::{geojson, guitar_synth_union, wgs};
+use ontol_examples::{geojson, guitar_synth_union, wgs, AsAtlas};
 use ontol_macros::test;
 use ontol_runtime::{attr::AttrRef, interface::serde::processor::ProcessorMode};
 use ontol_test_utils::{expect_eq, serde_helper::*, TestCompile, TestPackages};
@@ -46,7 +46,7 @@ fn test_fake_text_like_types() {
 
 #[test]
 fn test_fake_geojson() {
-    let test = TestPackages::with_static_sources([geojson(), wgs()]).compile();
+    let test = TestPackages::with_static_sources([geojson(), wgs().as_atlas("wgs")]).compile();
     let [geometry] = test.bind(["Geometry"]);
     expect_eq!(
         actual =
