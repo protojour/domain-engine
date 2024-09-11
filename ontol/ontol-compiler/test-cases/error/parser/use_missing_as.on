@@ -1,1 +1,1 @@
-use 'foobar' // ERROR parse error: expected symbol `as`// ERROR package not found
+use 'foobar' // ERROR parse error: expected symbol `as`// ERROR domain not found

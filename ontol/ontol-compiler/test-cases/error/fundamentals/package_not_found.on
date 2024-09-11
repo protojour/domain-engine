@@ -1,3 +1,0 @@
-use
-'pkg' // ERROR package not found
-as foo

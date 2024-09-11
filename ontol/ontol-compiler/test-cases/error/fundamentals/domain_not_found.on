@@ -1,0 +1,3 @@
+use
+'pkg' // ERROR domain not found
+as foo
