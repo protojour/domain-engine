@@ -1,6 +1,6 @@
 domain 01GQNEWZ00N7FMHACAWZ973DT7 ()
 
-use 'geojson' as geojson
+use 'atlas:/protojour/geojson/geojson' as geojson
 
 def code (
     fmt '' => text => .

@@ -7,7 +7,9 @@ use domain_engine_graphql::{
     juniper::{self, graphql_value},
     Schema,
 };
-use ontol_examples::{artist_and_instrument, geojson, guitar_synth_union, municipalities, wgs};
+use ontol_examples::{
+    artist_and_instrument, geojson, guitar_synth_union, municipalities, wgs, AsAtlas,
+};
 use ontol_macros::test;
 use ontol_runtime::{
     attr::AttrMatrix,
@@ -1295,8 +1297,12 @@ async fn guitar_synth_union_input_error_span() {
 
 #[test(tokio::test)]
 async fn test_municipalities() {
-    let (test, [schema]) = TestPackages::with_static_sources([municipalities(), geojson(), wgs()])
-        .compile_schemas(["municipalities"]);
+    let (test, [schema]) = TestPackages::with_static_sources([
+        municipalities(),
+        geojson().as_atlas("geojson"),
+        wgs().as_atlas("wgs"),
+    ])
+    .compile_schemas(["municipalities"]);
 
     expect_eq!(
         actual = "{
@@ -1341,8 +1347,12 @@ async fn test_municipalities() {
 
 #[test(tokio::test)]
 async fn municipalities_named_query() {
-    let (test, [schema]) = TestPackages::with_static_sources([municipalities(), geojson(), wgs()])
-        .compile_schemas(["municipalities"]);
+    let (test, [schema]) = TestPackages::with_static_sources([
+        municipalities(),
+        geojson().as_atlas("geojson"),
+        wgs().as_atlas("wgs"),
+    ])
+    .compile_schemas(["municipalities"]);
     let [municipality] = test.bind(["municipality"]);
 
     async fn fetch_osl(
@@ -1437,8 +1447,12 @@ async fn municipalities_named_query() {
 
 #[test]
 fn municipalities_geojson_union() {
-    let (_test, [schema]) = TestPackages::with_static_sources([municipalities(), geojson(), wgs()])
-        .compile_schemas(["municipalities"]);
+    let (_test, [schema]) = TestPackages::with_static_sources([
+        municipalities(),
+        geojson().as_atlas("geojson"),
+        wgs().as_atlas("wgs"),
+    ])
+    .compile_schemas(["municipalities"]);
 
     let document = schema.as_document();
 
