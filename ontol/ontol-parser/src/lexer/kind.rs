@@ -200,6 +200,8 @@ pub enum Kind {
     /// `2` in `1..2`
     RangeEnd,
     /// `'file'` in `use 'file' as foo`
+    Uri,
+    /// `'file'` in `use 'file' as foo`
     Name,
     /// `foo`, `foo.bar`
     IdentPath,
@@ -375,6 +377,7 @@ impl Display for Kind {
             Kind::NumberRange => write!(f, "number range"),
             Kind::RangeStart => write!(f, "start of range"),
             Kind::RangeEnd => write!(f, "end of range"),
+            Kind::Uri => write!(f, "uri"),
             Kind::Name => write!(f, "name"),
             Kind::IdentPath => write!(f, "ident path"),
             Kind::Ulid => write!(f, "unique identifier"),

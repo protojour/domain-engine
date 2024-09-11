@@ -41,10 +41,44 @@ pub struct DomainRequest {
     pub reference: DomainReference,
 }
 
+pub struct DomainReferenceParser {
+    base_url: url::Url,
+}
+
+impl Default for DomainReferenceParser {
+    fn default() -> Self {
+        Self {
+            base_url: url::Url::parse("file://").unwrap(),
+        }
+    }
+}
+
+impl DomainReferenceParser {
+    pub fn parse(&self, uri: &str) -> Result<DomainReference, CompileError> {
+        let url = url::Url::options()
+            .base_url(Some(&self.base_url))
+            .parse(uri)
+            .map_err(|_| CompileError::InvalidDomainReference)?;
+
+        match url.scheme() {
+            "file" => {
+                if let Some(mut segments) = url.path_segments() {
+                    if let Some(first) = segments.next() {
+                        return Ok(DomainReference::Local(first.to_string()));
+                    }
+                }
+
+                return Err(CompileError::InvalidDomainReference);
+            }
+            _ => Err(CompileError::InvalidDomainReference),
+        }
+    }
+}
+
 /// The reference by which a domain is requested (file name, URL, etc)
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum DomainReference {
-    Named(String),
+    Local(String),
 }
 
 /// A package in its parsed form.
@@ -69,7 +103,7 @@ impl ParsedDomain {
         let domain_index = request.domain_index;
 
         let source_name = match &request.reference {
-            DomainReference::Named(source_name) => source_name.to_string(),
+            DomainReference::Local(source_name) => source_name.to_string(),
         };
 
         let src = sources.add_source(domain_index, source_name);
@@ -102,16 +136,16 @@ pub fn extract_ontol_dependencies<V: NodeView>(ontol_view: V) -> Vec<(DomainRefe
                         continue;
                     }
 
-                    let Some(name) = use_stmt.name() else {
+                    let Some(uri) = use_stmt.uri() else {
                         continue;
                     };
-                    let Some(Ok(text)) = name.text() else {
+                    let Some(Ok(text)) = uri.text() else {
                         continue;
                     };
 
-                    let pkg_ref = DomainReference::Named(text);
+                    let pkg_ref = DomainReference::Local(text);
 
-                    deps.push((pkg_ref, name.0.span()));
+                    deps.push((pkg_ref, uri.0.span()));
                 }
                 _ => break,
             }
@@ -153,7 +187,7 @@ impl DepGraphBuilder {
                 }
 
                 (
-                    DomainReference::Named(package_name),
+                    DomainReference::Local(package_name),
                     RequestedDomain {
                         domain_index,
                         use_source_span: NO_SPAN,

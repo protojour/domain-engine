@@ -334,7 +334,7 @@ impl TestPackages {
 
                     for request in requests {
                         let source_name = match &request.reference {
-                            DomainReference::Named(source_name) => source_name.as_str(),
+                            DomainReference::Local(source_name) => source_name.as_str(),
                         };
 
                         self.packages_by_source_name

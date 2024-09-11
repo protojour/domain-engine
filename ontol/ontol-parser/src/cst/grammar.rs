@@ -118,7 +118,7 @@ fn use_statement(p: &mut CstParser) {
     p.eat(K![use]);
     p.eat_trivia();
 
-    let location = p.start(Kind::Name);
+    let location = p.start(Kind::Uri);
     p.eat_text_literal();
     p.end(location);
 

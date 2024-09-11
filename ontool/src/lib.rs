@@ -309,7 +309,7 @@ fn compile(
 
                 for request in requests {
                     let source_name = match &request.reference {
-                        DomainReference::Named(source_name) => source_name.as_str(),
+                        DomainReference::Local(source_name) => source_name.as_str(),
                     };
 
                     if let Some(source_text) = sources_by_name.remove(source_name) {

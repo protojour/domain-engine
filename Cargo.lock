@@ -2338,6 +2338,7 @@ dependencies = [
  "tracing-subscriber",
  "ulid",
  "unimock",
+ "url",
 ]
 
 [[package]]

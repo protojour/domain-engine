@@ -151,10 +151,10 @@ impl State {
                     match statement {
                         insp::Statement::DomainStatement(_) => {}
                         insp::Statement::UseStatement(stmt @ insp::UseStatement(_view)) => {
-                            if let Some(Ok(name)) = stmt.name().and_then(|name| name.text()) {
+                            if let Some(Ok(uri)) = stmt.uri().and_then(|uri| uri.text()) {
                                 if let Some(ident_path) = stmt.ident_path() {
                                     if let Some(last_sym) = ident_path.symbols().last() {
-                                        aliases.insert(last_sym.slice().to_string(), name);
+                                        aliases.insert(last_sym.slice().to_string(), uri);
                                     }
                                 }
                             }
@@ -494,7 +494,7 @@ pub fn read_file(uri: &str) -> Result<String, Error> {
 /// Get source name for a PackageReference
 pub fn get_reference_name(reference: &DomainReference) -> &str {
     match reference {
-        DomainReference::Named(source_name) => source_name.as_str(),
+        DomainReference::Local(source_name) => source_name.as_str(),
     }
 }
 

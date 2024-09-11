@@ -53,6 +53,8 @@ pub enum CompileError {
     Parse(String),
     /// number parse error: {0}
     NumberParse(String),
+    /// invalid domain reference
+    InvalidDomainReference,
     /// package not found
     PackageNotFound(DomainReference),
     /// persisted domain is missing domain header

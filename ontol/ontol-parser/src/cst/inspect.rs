@@ -133,6 +133,7 @@ nodes!(Node {
     NumberRange,
     RangeStart,
     RangeEnd,
+    Uri,
     Name,
     IdentPath,
     Ulid,
@@ -215,8 +216,8 @@ impl<V: NodeView> DomainStatement<V> {
 }
 
 impl<V: NodeView> UseStatement<V> {
-    pub fn name(&self) -> Option<Name<V>> {
-        self.view().sub_nodes().find_map(Name::from_view)
+    pub fn uri(&self) -> Option<Uri<V>> {
+        self.view().sub_nodes().find_map(Uri::from_view)
     }
 
     pub fn ident_path(&self) -> Option<IdentPath<V>> {
@@ -520,6 +521,12 @@ impl<V: NodeView> PatBinary<V> {
     }
 }
 
+impl<V: NodeView> Uri<V> {
+    pub fn text(&self) -> Option<UnescapeTextResult> {
+        self.view().local_tokens().next()?.literal_text()
+    }
+}
+
 impl<V: NodeView> Name<V> {
     pub fn text(&self) -> Option<UnescapeTextResult> {
         self.view().local_tokens().next()?.literal_text()
@@ -611,7 +618,7 @@ mod tests {
             panic!()
         };
 
-        assert_eq!(use_stmt.name().unwrap().text().unwrap().unwrap(), "a");
+        assert_eq!(use_stmt.uri().unwrap().text().unwrap().unwrap(), "a");
 
         assert_eq!(
             use_stmt

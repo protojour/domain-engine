@@ -220,15 +220,15 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         match statement {
             insp::Statement::DomainStatement(stmt) => Some(PreDefinedStmt::Domain(stmt)),
             insp::Statement::UseStatement(use_stmt) => {
-                let name = use_stmt.name()?;
-                let name_text = name.text().and_then(|result| self.ctx.unescape(result))?;
+                let uri = use_stmt.uri()?;
+                let name_text = uri.text().and_then(|result| self.ctx.unescape(result))?;
 
-                let reference = DomainReference::Named(name_text);
+                let reference = DomainReference::Local(name_text);
                 let Some(used_package_def_id) =
                     self.ctx.compiler.loaded.by_reference.get(&reference)
                 else {
                     CompileError::PackageNotFound(reference)
-                        .span_report(name.0.span(), &mut self.ctx);
+                        .span_report(uri.0.span(), &mut self.ctx);
                     return None;
                 };
 

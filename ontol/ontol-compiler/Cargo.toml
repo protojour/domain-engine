@@ -35,6 +35,7 @@ phf_generator = "0.11"
 indoc = "2"
 displaydoc = "0.2"
 ulid = "1"
+url = "2"
 
 [dev-dependencies]
 ontol-test-utils.path = "../ontol-test-utils"
