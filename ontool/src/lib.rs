@@ -24,7 +24,7 @@ use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
     ontol_syntax::OntolTreeSyntax,
-    topology::{DepGraphBuilder, DomainReference, GraphState, ParsedDomain},
+    topology::{DepGraphBuilder, DomainReference, DomainUrl, GraphState, ParsedDomain},
     SourceCodeRegistry, SourceId, Sources,
 };
 use ontol_lsp::Backend;
@@ -208,7 +208,7 @@ pub async fn run_command(command: Command) -> Result<(), OntoolError> {
         }
         Command::Generate(args) => {
             let first_domain =
-                get_source_name(args.files.as_slice().iter().next().expect("no input files"));
+                get_source_url(args.files.as_slice().iter().next().expect("no input files"));
 
             let ontology = compile(args.dir, args.files, None)?;
 
@@ -216,7 +216,7 @@ pub async fn run_command(command: Command) -> Result<(), OntoolError> {
                 .domains()
                 .find(|domain| {
                     let name = &ontology[domain.1.unique_name()];
-                    name == first_domain
+                    name == first_domain.short_name()
                 })
                 .expect("domain not found");
 
@@ -274,8 +274,8 @@ fn compile(
     }
 
     let mut ontol_sources = Sources::default();
-    let mut sources_by_name: HashMap<String, Rc<String>> = Default::default();
-    let mut paths_by_name: HashMap<String, PathBuf> = Default::default();
+    let mut sources_by_url: HashMap<DomainUrl, Rc<String>> = Default::default();
+    let mut paths_by_url: HashMap<DomainUrl, PathBuf> = Default::default();
 
     for entry in read_dir(root_dir)? {
         let entry = entry?;
@@ -286,16 +286,16 @@ fn compile(
         // TODO: only insert needed ontol files
         if matches!(path.extension(), Some(ext) if ext == "on") {
             let source = fs::read_to_string(&path)?;
-            let source_name = get_source_name(&path);
+            let source_url = get_source_url(&path);
 
-            sources_by_name.insert(source_name.clone(), Rc::new(source));
-            paths_by_name.insert(source_name, path);
+            sources_by_url.insert(source_url.clone(), Rc::new(source));
+            paths_by_url.insert(source_url, path);
         }
     }
 
     let mut source_code_registry = SourceCodeRegistry::default();
     let mut package_graph_builder =
-        DepGraphBuilder::with_roots(root_files.iter().map(|path| get_source_name(path)));
+        DepGraphBuilder::with_roots(root_files.iter().map(|path| get_source_url(path)));
 
     let topology = loop {
         let graph_state = package_graph_builder.transition().map_err(|err| {
@@ -308,11 +308,7 @@ fn compile(
                 package_graph_builder = builder;
 
                 for request in requests {
-                    let source_name = match &request.reference {
-                        DomainReference::Local(source_name) => source_name.as_str(),
-                    };
-
-                    if let Some(source_text) = sources_by_name.remove(source_name) {
+                    if let Some(source_text) = sources_by_url.remove(&request.url) {
                         let (flat_tree, errors) = cst_parse(&source_text);
 
                         let parsed = ParsedDomain::new(
@@ -330,7 +326,7 @@ fn compile(
                             .insert(parsed.src.id, source_text);
                         package_graph_builder.provide_domain(parsed);
                     } else {
-                        eprintln!("Could not load `{source_name}`");
+                        eprintln!("Could not load `{}`", request.url);
                     }
                 }
             }
@@ -355,12 +351,12 @@ fn compile(
 
 /// Get a source name from a path.
 /// Strips away the path and removes the `.on` suffix (if present)
-fn get_source_name(path: &Path) -> String {
+fn get_source_url(path: &Path) -> DomainUrl {
     let file_name = path.file_name().unwrap().to_str().unwrap().to_string();
 
     match file_name.strip_suffix(".on") {
-        Some(stripped) => stripped.to_string(),
-        None => file_name,
+        Some(stripped) => DomainUrl::local(stripped),
+        None => DomainUrl::local(&file_name),
     }
 }
 
@@ -413,7 +409,7 @@ fn report_source_name(
     source_id: SourceId,
     ontol_sources: &Sources,
     registry: &SourceCodeRegistry,
-) -> (Rc<String>, Rc<String>) {
+) -> (Rc<DomainReference>, Rc<String>) {
     // FIXME: If the error can't be mapped to a source file,
     // things will look quite strange. Fix later..
     match ontol_sources.get_source(source_id) {
@@ -421,7 +417,7 @@ fn report_source_name(
             let literal_source = registry.registry.get(&source_id);
 
             (
-                ontol_source.name.clone(),
+                Rc::new(ontol_source.url().as_reference()),
                 literal_source
                     .cloned()
                     .unwrap_or_else(|| Rc::new("<ontol>".to_string())),
@@ -429,7 +425,7 @@ fn report_source_name(
         }
         None => {
             let ontol = Rc::new("<ontol>".to_string());
-            (ontol.clone(), ontol)
+            (Rc::new(DomainReference::Internal), ontol)
         }
     }
 }

@@ -1,10 +1,7 @@
 use domain_engine_graphql::{context::ServiceCtx, juniper::graphql_value};
 use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema};
 use ontol_macros::datastore_test;
-use ontol_test_utils::{
-    examples::stix::{stix_bundle, STIX},
-    expect_eq,
-};
+use ontol_test_utils::{examples::stix::stix_bundle, expect_eq};
 
 use crate::mk_engine_default;
 
@@ -13,7 +10,7 @@ use crate::mk_engine_default;
 /// FIXME: GraphQL mutations do not run in the same transaction, so foreign key defer does not work
 #[datastore_test(tokio::test)]
 async fn test_graphql_stix(ds: &str) {
-    let (test, [schema]) = stix_bundle().compile_schemas([STIX.0]);
+    let (test, [schema]) = stix_bundle().compile_schemas(["stix"]);
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     // first, create an identity

@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, marker::PhantomData, str::FromStr};
+use std::{collections::BTreeMap, marker::PhantomData, rc::Rc, str::FromStr};
 
 use ontol_parser::cst::{
     inspect::{self as insp},
@@ -11,7 +11,7 @@ use ulid::Ulid;
 use crate::{
     edge::{CardinalKind, EdgeId},
     namespace::{DocId, Space},
-    topology::DomainReference,
+    topology::DomainUrl,
     CompileError, Compiler, Src,
 };
 
@@ -45,15 +45,22 @@ enum Section {
 }
 
 impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
-    pub fn new(domain_def_id: DefId, src: Src, compiler: &'c mut Compiler<'m>) -> Self {
+    pub fn new(
+        url: Rc<DomainUrl>,
+        domain_def_id: DefId,
+        src: Src,
+        compiler: &'c mut Compiler<'m>,
+    ) -> Self {
         Self {
             ctx: LoweringCtx {
                 compiler,
+                url,
                 domain_def_id,
                 domain_index: src.domain_index,
                 source_id: src.id,
                 anonymous_unions: Default::default(),
                 outcome: Default::default(),
+                domain_reference_parser: Default::default(),
             },
             _phantom: PhantomData,
         }
@@ -221,14 +228,16 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             insp::Statement::DomainStatement(stmt) => Some(PreDefinedStmt::Domain(stmt)),
             insp::Statement::UseStatement(use_stmt) => {
                 let uri = use_stmt.uri()?;
-                let name_text = uri.text().and_then(|result| self.ctx.unescape(result))?;
+                let uri_text = uri.text().and_then(|result| self.ctx.unescape(result))?;
 
-                let reference = DomainReference::Local(name_text);
-                let Some(used_package_def_id) =
-                    self.ctx.compiler.loaded.by_reference.get(&reference)
-                else {
-                    CompileError::PackageNotFound(reference)
-                        .span_report(uri.0.span(), &mut self.ctx);
+                let Ok(reference) = self.ctx.domain_reference_parser.parse(&uri_text) else {
+                    return None;
+                };
+
+                let url = self.ctx.url.join(&reference);
+
+                let Some(used_package_def_id) = self.ctx.compiler.loaded.by_url.get(&url) else {
+                    CompileError::PackageNotFound(url).span_report(uri.0.span(), &mut self.ctx);
                     return None;
                 };
 

@@ -12,14 +12,14 @@ use domain_engine_test_utils::{
     graphql_value_unordered,
 };
 use ontol_macros::{datastore_test, test};
-use ontol_test_utils::{examples::GITMESH, expect_eq, SrcName, TestPackages};
+use ontol_test_utils::{default_short_name, examples::gitmesh, expect_eq, TestPackages};
 use tracing::info;
 
 use crate::mk_engine_default;
 
 #[test(tokio::test)]
 async fn gitmesh_id_error() {
-    let (test, schema) = GITMESH.1.compile_single_schema();
+    let (test, schema) = gitmesh().1.compile_single_schema();
 
     expect_eq!(
         actual = r#"mutation {
@@ -37,7 +37,7 @@ async fn gitmesh_id_error() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(&test, &[SrcName::default()], ())
+            &gql_ctx_mock_data_store(&test, &[default_short_name()], ())
         )
         .await
         .unwrap_first_exec_error_msg(),
@@ -49,7 +49,7 @@ async fn gitmesh_id_error() {
 #[datastore_test(tokio::test)]
 async fn misc(ds: &str) {
     let (test, [schema]) =
-        TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
+        TestPackages::with_static_sources([gitmesh()]).compile_schemas(["gitmesh"]);
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     info!("Create two users");
@@ -290,7 +290,7 @@ async fn misc(ds: &str) {
 #[datastore_test(tokio::test)]
 async fn fancy_filters(ds: &str) {
     let (test, [schema]) =
-        TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
+        TestPackages::with_static_sources([gitmesh()]).compile_schemas(["gitmesh"]);
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     r#"mutation {
@@ -360,7 +360,7 @@ async fn fancy_filters(ds: &str) {
 #[datastore_test(tokio::test)]
 async fn update_owner_relation(ds: &str) {
     let (test, [schema]) =
-        TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
+        TestPackages::with_static_sources([gitmesh()]).compile_schemas(["gitmesh"]);
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     let response = r#"mutation {
@@ -441,7 +441,7 @@ async fn update_owner_relation(ds: &str) {
 #[datastore_test(tokio::test)]
 async fn patch_members(ds: &str) {
     let (test, [schema]) =
-        TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
+        TestPackages::with_static_sources([gitmesh()]).compile_schemas(["gitmesh"]);
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     r#"mutation {
@@ -586,7 +586,7 @@ async fn patch_members(ds: &str) {
 #[datastore_test(tokio::test)]
 async fn ownership_transfer(ds: &str) {
     let (test, [schema]) =
-        TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
+        TestPackages::with_static_sources([gitmesh()]).compile_schemas(["gitmesh"]);
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     let response = r#"mutation {

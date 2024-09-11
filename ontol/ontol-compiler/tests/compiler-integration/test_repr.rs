@@ -3,13 +3,13 @@ use ontol_runtime::{
     debug::OntolDebug,
     ontology::domain::{DefRepr, DefReprUnionBound},
 };
-use ontol_test_utils::{src_name, TestCompile, TestPackages};
+use ontol_test_utils::{file_url, TestCompile, TestPackages};
 
 #[test]
 fn test_repr_valid_mesh1() {
     TestPackages::with_static_sources([
         (
-            src_name("entry"),
+            file_url("entry"),
             "
             domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
             use 'si' as si
@@ -26,7 +26,7 @@ fn test_repr_valid_mesh1() {
             ",
         ),
         (
-            src_name("si"),
+            file_url("si"),
             "
             domain 22222222222TEST22222222222 ()
             def meters (rel* is: number)

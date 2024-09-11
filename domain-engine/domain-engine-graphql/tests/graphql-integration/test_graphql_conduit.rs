@@ -19,13 +19,13 @@ use domain_engine_test_utils::{
 use ontol_macros::datastore_test;
 use ontol_runtime::ontology::Ontology;
 use ontol_test_utils::{
-    examples::conduit::{BLOG_POST_PUBLIC, CONDUIT_DB, FEED_PUBLIC},
+    examples::conduit::{blog_post_public, conduit_db, feed_public},
     expect_eq, TestPackages,
 };
 use tracing::info;
 
 fn conduit_db_only() -> TestPackages {
-    TestPackages::with_static_sources([CONDUIT_DB])
+    TestPackages::with_static_sources([conduit_db()])
 }
 
 async fn make_domain_engine(
@@ -41,9 +41,9 @@ async fn make_domain_engine(
 }
 
 #[datastore_test(tokio::test)]
-async fn conduit_db(ds: &str) {
+async fn conduit_db_general(ds: &str) {
     let test_packages = conduit_db_only();
-    let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
+    let (test, [schema]) = test_packages.compile_schemas(["conduit_db"]);
     let ctx: ServiceCtx =
         make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds)
             .await
@@ -109,7 +109,7 @@ async fn conduit_db(ds: &str) {
 #[datastore_test(tokio::test)]
 async fn conduit_db_create_with_foreign_reference(ds: &str) {
     let test_packages = conduit_db_only();
-    let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
+    let (test, [schema]) = test_packages.compile_schemas(["conduit_db"]);
     let ctx: ServiceCtx =
         make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds)
             .await
@@ -178,7 +178,7 @@ async fn conduit_db_create_with_foreign_reference(ds: &str) {
 #[datastore_test(tokio::test)]
 async fn conduit_db_query_article_with_tags(ds: &str) {
     let test_packages = conduit_db_only();
-    let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
+    let (test, [schema]) = test_packages.compile_schemas(["conduit_db"]);
     let ctx: ServiceCtx =
         make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds)
             .await
@@ -250,11 +250,11 @@ struct ConduitBundle {
 impl ConduitBundle {
     async fn new(mock_clauses: impl unimock::Clause, ds: &str) -> Self {
         let test_packages =
-            TestPackages::with_static_sources([BLOG_POST_PUBLIC, FEED_PUBLIC, CONDUIT_DB])
-                .with_roots([BLOG_POST_PUBLIC.0, FEED_PUBLIC.0]);
+            TestPackages::with_static_sources([blog_post_public(), feed_public(), conduit_db()])
+                .with_roots([blog_post_public().0, feed_public().0]);
 
         let (test, [blog_schema, feed_schema, db_schema]) =
-            test_packages.compile_schemas([BLOG_POST_PUBLIC.0, FEED_PUBLIC.0, CONDUIT_DB.0]);
+            test_packages.compile_schemas(["blog_post_public", "feed_public", "conduit_db"]);
 
         Self {
             domain_engine: Arc::new(
@@ -530,7 +530,7 @@ async fn blog_post_order(ds: &str) {
 #[datastore_test(tokio::test)]
 async fn conduit_db_article_shallow_update(ds: &str) {
     let test_packages = conduit_db_only();
-    let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
+    let (test, [schema]) = test_packages.compile_schemas(["conduit_db"]);
     let ctx: ServiceCtx =
         make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds)
             .await
@@ -642,7 +642,7 @@ async fn conduit_db_article_shallow_update(ds: &str) {
 #[datastore_test(tokio::test)]
 async fn conduit_db_user_deletion(ds: &str) {
     let test_packages = conduit_db_only();
-    let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
+    let (test, [schema]) = test_packages.compile_schemas(["conduit_db"]);
     let ctx: ServiceCtx =
         make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds)
             .await

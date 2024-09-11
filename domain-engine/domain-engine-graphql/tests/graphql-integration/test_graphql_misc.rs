@@ -5,10 +5,10 @@ use domain_engine_test_utils::{
     graphql_value_unordered,
 };
 use ontol_macros::datastore_test;
-use ontol_test_utils::examples::EDGE_ENTITY_UNION;
+use ontol_test_utils::{default_file_url, default_short_name};
 use ontol_test_utils::{
-    examples::{entity_subtype, EDGE_ENTITY_SIMPLE, GUITAR_SYNTH_UNION},
-    expect_eq, SrcName, TestPackages,
+    examples::{edge_entity_simple, edge_entity_union, entity_subtype, guitar_synth_union},
+    expect_eq, TestPackages,
 };
 use tracing::info;
 
@@ -16,8 +16,8 @@ use crate::mk_engine_default;
 
 #[datastore_test(tokio::test)]
 async fn test_guitar_synth_union_mutation_and_query(ds: &str) {
-    let (test, [schema]) = TestPackages::with_static_sources([GUITAR_SYNTH_UNION])
-        .compile_schemas([GUITAR_SYNTH_UNION.0]);
+    let (test, [schema]) = TestPackages::with_static_sources([guitar_synth_union()])
+        .compile_schemas(["guitar_synth_union"]);
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     expect_eq!(
@@ -137,8 +137,8 @@ async fn test_guitar_synth_union_mutation_and_query(ds: &str) {
 #[datastore_test(tokio::test)]
 async fn test_entity_subtype(ds: &str) {
     let (test, [derived_schema, db_schema]) =
-        TestPackages::with_static_sources([entity_subtype::DERIVED, entity_subtype::DB])
-            .compile_schemas([entity_subtype::DERIVED.0, entity_subtype::DB.0]);
+        TestPackages::with_static_sources([entity_subtype::derived(), entity_subtype::db()])
+            .compile_schemas(["derived", "db"]);
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     r#"mutation {
@@ -183,7 +183,7 @@ async fn test_entity_subtype(ds: &str) {
 #[datastore_test(tokio::test)]
 async fn arc_simple(ds: &str) {
     let (test, [schema]) = TestPackages::with_static_sources([(
-        SrcName::default(),
+        default_file_url(),
         "
         domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
         arc just_testing {
@@ -206,7 +206,7 @@ async fn arc_simple(ds: &str) {
         )
         ",
     )])
-    .compile_schemas([SrcName::default()]);
+    .compile_schemas([default_short_name()]);
 
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
@@ -253,8 +253,8 @@ async fn arc_simple(ds: &str) {
 /// FIXME: implement for arango
 #[datastore_test(tokio::test)]
 async fn edge_entity_simple_happy_path(ds: &str) {
-    let (test, [schema]) = TestPackages::with_static_sources([EDGE_ENTITY_SIMPLE])
-        .compile_schemas([EDGE_ENTITY_SIMPLE.0]);
+    let (test, [schema]) =
+        TestPackages::with_static_sources([edge_entity_simple()]).compile_schemas(["edge_entity"]);
 
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
@@ -330,8 +330,8 @@ async fn edge_entity_simple_happy_path(ds: &str) {
 
 #[datastore_test(tokio::test)]
 async fn edge_entity_simple_foreign_violation(ds: &str) {
-    let (test, [schema]) = TestPackages::with_static_sources([EDGE_ENTITY_SIMPLE])
-        .compile_schemas([EDGE_ENTITY_SIMPLE.0]);
+    let (test, [schema]) =
+        TestPackages::with_static_sources([edge_entity_simple()]).compile_schemas(["edge_entity"]);
 
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
@@ -352,8 +352,8 @@ async fn edge_entity_simple_foreign_violation(ds: &str) {
 /// FIXME: implement for arango
 #[datastore_test(tokio::test)]
 async fn edge_entity_union_happy_path(ds: &str) {
-    let (test, [schema]) = TestPackages::with_static_sources([EDGE_ENTITY_UNION])
-        .compile_schemas([EDGE_ENTITY_UNION.0]);
+    let (test, [schema]) = TestPackages::with_static_sources([edge_entity_union()])
+        .compile_schemas(["edge_entity_union"]);
 
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
@@ -446,8 +446,8 @@ async fn edge_entity_union_happy_path(ds: &str) {
 
 #[datastore_test(tokio::test)]
 async fn edge_entity_union_foreign_violation(ds: &str) {
-    let (test, [schema]) = TestPackages::with_static_sources([EDGE_ENTITY_UNION])
-        .compile_schemas([EDGE_ENTITY_UNION.0]);
+    let (test, [schema]) = TestPackages::with_static_sources([edge_entity_union()])
+        .compile_schemas(["edge_entity_union"]);
 
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 

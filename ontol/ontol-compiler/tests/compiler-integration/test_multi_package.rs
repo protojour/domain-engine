@@ -1,6 +1,6 @@
 use ontol_macros::test;
 use ontol_test_utils::{
-    assert_json_io_matches, expect_eq, serde_helper::serde_create, src_name, TestCompile,
+    assert_json_io_matches, expect_eq, file_url, serde_helper::serde_create, TestCompile,
     TestPackages,
 };
 
@@ -8,7 +8,7 @@ use ontol_test_utils::{
 fn load_package() {
     TestPackages::with_static_sources([
         (
-            src_name("root"),
+            file_url("root"),
             "
             use 'pkg' as other
 
@@ -18,7 +18,7 @@ fn load_package() {
             ",
         ),
         (
-            src_name("pkg"),
+            file_url("pkg"),
             "
             def foo (
                 rel* 'prop': i64
@@ -40,7 +40,7 @@ fn load_package() {
 fn dependency_dag() {
     TestPackages::with_static_sources([
         (
-            src_name("root"),
+            file_url("root"),
             "
             use 'a' as a
             use 'b' as b
@@ -52,7 +52,7 @@ fn dependency_dag() {
             ",
         ),
         (
-            src_name("a"),
+            file_url("a"),
             "
             use 'c' as domain_c
             def a (
@@ -61,7 +61,7 @@ fn dependency_dag() {
             ",
         ),
         (
-            src_name("b"),
+            file_url("b"),
             "
             use 'c' as c
             def b (
@@ -69,7 +69,7 @@ fn dependency_dag() {
             )
             ",
         ),
-        (src_name("c"), "def c (rel* is: i64)"),
+        (file_url("c"), "def c (rel* is: i64)"),
     ])
     .compile_then(|test| {
         // four user domains, plus `ontol`:
@@ -87,27 +87,27 @@ fn dependency_dag() {
 fn multiple_roots() {
     TestPackages::with_static_sources([
         (
-            src_name("foo"),
+            file_url("foo"),
             "
             use 'baz' as baz
             def foo ()
             ",
         ),
         (
-            src_name("bar"),
+            file_url("bar"),
             "
             use 'baz' as baz
             def bar ()
             ",
         ),
         (
-            src_name("baz"),
+            file_url("baz"),
             "
             def baz ()
             ",
         ),
     ])
-    .with_roots([src_name("foo"), src_name("bar")])
+    .with_roots([file_url("foo"), file_url("bar")])
     .compile_then(|test| {
         let _ = test.bind(["foo.foo", "bar.bar", "baz.baz"]);
     });

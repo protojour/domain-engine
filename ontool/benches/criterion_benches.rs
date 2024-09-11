@@ -6,51 +6,54 @@ use domain_engine_graphql::context::ServiceCtx;
 use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use domain_engine_test_utils::graphql_test_utils::Exec;
 use indoc::indoc;
+use ontol_compiler::topology::DomainUrl;
 use ontol_runtime::{
     attr::AttrRef, interface::serde::operator::SerdeOperatorAddr, ontology::Ontology,
 };
 use ontol_test_utils::{
-    examples::conduit::{BLOG_POST_PUBLIC, CONDUIT_DB, FEED_PUBLIC},
-    src_name, SrcName, TestCompile, TestPackages,
+    examples::conduit::{blog_post_public, conduit_db, feed_public},
+    file_url, TestCompile, TestPackages,
 };
 use ontool::System;
 use serde::de::DeserializeSeed;
 use tokio::runtime::Runtime;
 
-const TINY: (SrcName, &str) = (
-    src_name("tiny"),
-    indoc! {r#"
-        domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
-        def @macro created (
-            rel* 'created'[rel* gen: create_time]?: datetime
-        )
+fn tiny() -> (DomainUrl, &'static str) {
+    (
+        file_url("tiny"),
+        indoc! {r#"
+            domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
+            def @macro created (
+                rel* 'created'[rel* gen: create_time]?: datetime
+            )
 
-        def foo_id (
-            fmt '' => 'foos/' => uuid => .
-        )
+            def foo_id (
+                fmt '' => 'foos/' => uuid => .
+            )
 
-        /// This is the documentation string for...
-        /// .. foo!
-        def foo (
-            rel. '_id'[rel* gen: auto]: foo_id
-            rel* is: created
-            rel* 'name': text
-        )
+            /// This is the documentation string for...
+            /// .. foo!
+            def foo (
+                rel. '_id'[rel* gen: auto]: foo_id
+                rel* is: created
+                rel* 'name': text
+            )
 
-        map foos (
-            (),
-            foo { ..@match foo() }
-        )
-        "#,
-    },
-);
+            map foos (
+                (),
+                foo { ..@match foo() }
+            )
+            "#,
+        },
+    )
+}
 
 fn foo_operator_addr(ontology: &Ontology) -> SerdeOperatorAddr {
     let (_, domain) = ontology
         .domains()
         .find(|domain| {
             let name = &ontology[domain.1.unique_name()];
-            name == TINY.0.as_str()
+            name == "tiny"
         })
         .unwrap();
     let def = domain
@@ -62,7 +65,7 @@ fn foo_operator_addr(ontology: &Ontology) -> SerdeOperatorAddr {
 pub fn compile_benchmark(c: &mut Criterion) {
     c.bench_function("compile_tiny", |b| {
         b.iter(|| {
-            TestPackages::with_static_sources(black_box([TINY]))
+            TestPackages::with_static_sources(black_box([tiny()]))
                 .bench_disable_ontology_serde()
                 .compile();
         })
@@ -70,9 +73,9 @@ pub fn compile_benchmark(c: &mut Criterion) {
     c.bench_function("compile_conduit", |b| {
         b.iter(|| {
             TestPackages::with_static_sources(black_box([
-                BLOG_POST_PUBLIC,
-                FEED_PUBLIC,
-                CONDUIT_DB,
+                blog_post_public(),
+                feed_public(),
+                conduit_db(),
             ]))
             .bench_disable_ontology_serde()
             .compile();
@@ -80,7 +83,7 @@ pub fn compile_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function("serialize_ontology_bincode", |b| {
-        let test = TestPackages::with_static_sources(black_box([TINY])).compile();
+        let test = TestPackages::with_static_sources(black_box([tiny()])).compile();
         b.iter(|| {
             let mut binary_ontology: Vec<u8> = Vec::new();
             test.ontology()
@@ -91,7 +94,7 @@ pub fn compile_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function("serde_json_deserialize", |b| {
-        let test = TestPackages::with_static_sources(black_box([TINY])).compile();
+        let test = TestPackages::with_static_sources(black_box([tiny()])).compile();
         let processor = test.ontology().new_serde_processor(
             foo_operator_addr(test.ontology()),
             ontol_runtime::interface::serde::processor::ProcessorMode::Create,
@@ -107,7 +110,7 @@ pub fn compile_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function("serde_json_serialize", |b| {
-        let test = TestPackages::with_static_sources(black_box([TINY])).compile();
+        let test = TestPackages::with_static_sources(black_box([tiny()])).compile();
         let processor = test.ontology().new_serde_processor(
             foo_operator_addr(test.ontology()),
             ontol_runtime::interface::serde::processor::ProcessorMode::Raw,
@@ -133,13 +136,13 @@ pub fn compile_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function("graphql_create_schema", |b| {
-        let test = TestPackages::with_static_sources(black_box([TINY])).compile();
+        let test = TestPackages::with_static_sources(black_box([tiny()])).compile();
         let (domain_index, _) = test
             .ontology()
             .domains()
             .find(|domain| {
                 let name = &test.ontology()[domain.1.unique_name()];
-                name == TINY.0.as_str()
+                name == "tiny"
             })
             .unwrap();
         b.iter(|| {
@@ -152,7 +155,7 @@ pub fn compile_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function("graphql_create_entity", |b| {
-        let test = TestPackages::with_static_sources(black_box([TINY])).compile();
+        let test = TestPackages::with_static_sources(black_box([tiny()])).compile();
         let rt = Runtime::new().unwrap();
 
         let engine = rt.block_on(async {
@@ -169,7 +172,7 @@ pub fn compile_benchmark(c: &mut Criterion) {
             .domains()
             .find(|domain| {
                 let name = &test.ontology()[domain.1.unique_name()];
-                name == TINY.0.as_str()
+                name == "tiny"
             })
             .unwrap();
         let schema =

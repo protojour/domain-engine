@@ -1,7 +1,7 @@
 use ontol_macros::test;
 use ontol_runtime::{attr::AttrRef, interface::serde::processor::ProcessorMode};
 use ontol_test_utils::{
-    examples::{GEOJSON, GUITAR_SYNTH_UNION, WGS},
+    examples::{geojson, guitar_synth_union, wgs},
     expect_eq,
     serde_helper::*,
     TestCompile, TestPackages,
@@ -50,7 +50,7 @@ fn test_fake_text_like_types() {
 
 #[test]
 fn test_fake_geojson() {
-    let test = TestPackages::with_static_sources([GEOJSON, WGS]).compile();
+    let test = TestPackages::with_static_sources([geojson(), wgs()]).compile();
     let [geometry] = test.bind(["Geometry"]);
     expect_eq!(
         actual =
@@ -70,7 +70,7 @@ fn test_fake_geojson() {
 
 #[test]
 fn test_fake_guitar_synth() {
-    let test = GUITAR_SYNTH_UNION.1.compile();
+    let test = guitar_synth_union().1.compile();
     let [artist] = test.bind(["artist"]);
     expect_eq!(
         actual = serde_read(&artist).as_json(AttrRef::Unit(&artist.new_fake(ProcessorMode::Raw))),

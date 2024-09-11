@@ -7,8 +7,8 @@ use ontol_parser::cst::view::{NodeView, NodeViewExt};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use state::{
-    build_uri, get_domain_name, get_path_and_name, get_range, get_reference_name, get_span_range,
-    read_file, Document, State,
+    build_uri, get_domain_name, get_path_and_name, get_range, get_span_range, read_file, Document,
+    State,
 };
 use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
@@ -76,10 +76,9 @@ impl Backend {
 
                         // handle missing packages if any
                         let mut data: Value = json!({});
-                        if let ontol_compiler::CompileError::PackageNotFound(reference) = &err.error
-                        {
-                            let (path, _) = get_path_and_name(url.as_str());
-                            let source_name = get_reference_name(reference);
+                        if let ontol_compiler::CompileError::PackageNotFound(url) = &err.error {
+                            let (path, _) = get_path_and_name(url.short_name());
+                            let source_name = url.short_name();
                             let ref_uri = build_uri(path, source_name);
 
                             if cfg!(feature = "wasm") {

@@ -2,7 +2,7 @@ use ontol_runtime::interface::graphql::{
     data::{ObjectData, ObjectInterface, TypeData, TypeKind},
     schema::{GraphqlSchema, QueryLevel},
 };
-use ontol_test_utils::{test_extensions::graphql::TypeDataExt, OntolTest, SrcName};
+use ontol_test_utils::{test_extensions::graphql::TypeDataExt, OntolTest};
 
 mod test_graphql_interface;
 
@@ -46,10 +46,10 @@ impl<'o> SchemaTest<'o> {
     }
 }
 
-fn schema_test(
-    test: &OntolTest,
-    source_name: impl Into<SrcName>,
-) -> (&GraphqlSchema, SchemaTest<'_>) {
-    let schema = test.graphql_schema(source_name);
+fn schema_test<'o>(
+    test: &'o OntolTest,
+    domain_short_name: &str,
+) -> (&'o GraphqlSchema, SchemaTest<'o>) {
+    let schema = test.graphql_schema(domain_short_name);
     (schema, SchemaTest { test, schema })
 }

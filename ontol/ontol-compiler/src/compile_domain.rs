@@ -54,16 +54,17 @@ impl<'m> Compiler<'m> {
         let domain_def_id = self.defs.alloc_def_id(parsed.domain_index);
         self.define_domain(domain_def_id);
 
-        self.loaded
-            .by_reference
-            .insert(parsed.reference, domain_def_id);
+        self.loaded.by_url.insert(parsed.url.clone(), domain_def_id);
 
         self.domain_config_table
             .insert(parsed.domain_index, parsed.config);
 
-        let outcome = parsed
-            .syntax
-            .lower(domain_def_id, src.clone(), Session(self));
+        let outcome = parsed.syntax.lower(
+            parsed.url.clone(),
+            domain_def_id,
+            src.clone(),
+            Session(self),
+        );
 
         self.domain_ids
             .entry(parsed.domain_index)
@@ -79,8 +80,10 @@ impl<'m> Compiler<'m> {
         self.handle_lowering_outcome(outcome);
         self.seal_domain(parsed.domain_index);
 
-        self.domain_names
-            .push((parsed.domain_index, self.str_ctx.intern_constant(&src.name)));
+        self.domain_names.push((
+            parsed.domain_index,
+            self.str_ctx.intern_constant(src.url().short_name()),
+        ));
 
         self.check_error()
     }

@@ -9,7 +9,7 @@ use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema, Valu
 use juniper::{graphql_value, InputValue};
 use ontol_macros::datastore_test;
 use ontol_test_utils::{
-    examples::{FINDINGS, GUITAR_SYNTH_UNION},
+    examples::{findings, guitar_synth_union},
     expect_eq, TestPackages,
 };
 use tracing::info;
@@ -17,11 +17,11 @@ use tracing::info;
 use crate::{mk_engine_default, test_graphql_ontology::OntologyParams};
 
 #[datastore_test(tokio::test)]
-async fn findings(ds: &str) {
+async fn test_findings(ds: &str) {
     let (test, [findings_schema, guitar_schema]) =
-        TestPackages::with_static_sources([FINDINGS, GUITAR_SYNTH_UNION])
-            .with_roots([FINDINGS.0, GUITAR_SYNTH_UNION.0])
-            .compile_schemas([FINDINGS.0, GUITAR_SYNTH_UNION.0]);
+        TestPackages::with_static_sources([findings(), guitar_synth_union()])
+            .with_roots([findings().0, guitar_synth_union().0])
+            .compile_schemas(["findings", "guitar_synth_union"]);
     let engine = mk_engine_default(test.ontology_owned(), ds).await;
     let domain_ctx: ServiceCtx = engine.clone().into();
     let ontology_ctx = OntologyCtx::new(engine, Session::default());

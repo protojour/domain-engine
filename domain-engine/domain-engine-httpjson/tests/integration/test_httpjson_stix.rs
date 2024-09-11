@@ -1,9 +1,6 @@
 use http::{header::CONTENT_TYPE, Request, StatusCode};
 use ontol_macros::datastore_test;
-use ontol_test_utils::{
-    examples::stix::{stix_bundle, STIX},
-    TestCompile,
-};
+use ontol_test_utils::{examples::stix::stix_bundle, TestCompile};
 use serde_json::json;
 use tower::ServiceExt;
 use tracing::info;
@@ -17,7 +14,7 @@ use crate::{
 async fn test_put_httpjson_stix(ds: &str) {
     let test = stix_bundle().compile();
     let engine = make_domain_engine(test.ontology_owned(), ds).await;
-    let router = test.make_test_router(engine, STIX.0);
+    let router = test.make_test_router(engine, "stix");
 
     async fn put_one_url(router: &axum::Router) {
         let put_json_response = router
@@ -76,7 +73,7 @@ async fn test_put_httpjson_stix(ds: &str) {
 async fn test_httpjson_stix_jsonlines_unresolved_foreign_key(ds: &str) {
     let test = stix_bundle().compile();
     let engine = make_domain_engine(test.ontology_owned(), ds).await;
-    let router = test.make_test_router(engine, STIX.0);
+    let router = test.make_test_router(engine, "stix");
     let put_jsonlines_response = router
         .oneshot(
             Request::put("/stix-object")

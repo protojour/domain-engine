@@ -1,11 +1,6 @@
 #![forbid(unsafe_code)]
 
-use std::{
-    borrow::{Borrow, Cow},
-    collections::HashMap,
-    rc::Rc,
-    sync::Arc,
-};
+use std::{borrow::Cow, collections::HashMap, rc::Rc, sync::Arc};
 
 use def_binding::DefBinding;
 use diagnostics::AnnotatedCompileError;
@@ -13,7 +8,9 @@ use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
     ontol_syntax::OntolTreeSyntax,
-    topology::{DepGraphBuilder, DomainReference, DomainTopology, GraphState, ParsedDomain},
+    topology::{
+        DepGraphBuilder, DomainReferenceParser, DomainTopology, DomainUrl, GraphState, ParsedDomain,
+    },
     SourceCodeRegistry, Sources,
 };
 use ontol_parser::cst_parse;
@@ -95,7 +92,7 @@ pub struct OntolTest {
     ontology: Arc<Ontology>,
     root_package: DomainIndex,
     compile_json_schema: bool,
-    packages_by_source_name: HashMap<String, DomainIndex>,
+    domains_by_url: HashMap<DomainUrl, DomainIndex>,
 }
 
 impl OntolTest {
@@ -127,17 +124,18 @@ impl OntolTest {
         }
     }
 
-    pub fn get_domain_index(&self, source_name: &str) -> DomainIndex {
-        self.packages_by_source_name
-            .get(source_name)
-            .cloned()
-            .unwrap_or_else(|| {
-                panic!(
-                    "PackageId for `{}` not found in {:?}",
-                    source_name,
-                    self.packages_by_source_name.keys()
-                )
-            })
+    pub fn get_domain_index(&self, domain_short_name: &str) -> DomainIndex {
+        for (url, domain_index) in &self.domains_by_url {
+            if url.short_name() == domain_short_name {
+                return *domain_index;
+            }
+        }
+
+        panic!(
+            "PackageId for `{}` not found in {:?}",
+            domain_short_name,
+            self.domains_by_url.keys()
+        );
     }
 
     /// Make new type bindings with the given type names.
@@ -159,9 +157,9 @@ impl OntolTest {
     }
 
     /// Get the ontol_runtime GraphQL schema
-    pub fn graphql_schema(&self, source_name: impl Into<SrcName>) -> &GraphqlSchema {
+    pub fn graphql_schema(&self, domain_short_name: &str) -> &GraphqlSchema {
         self.ontology
-            .domain_interfaces(self.get_domain_index(&source_name.into().0))
+            .domain_interfaces(self.get_domain_index(domain_short_name))
             .iter()
             .filter_map(|interface| match interface {
                 DomainInterface::GraphQL(schema) => Some(schema),
@@ -195,74 +193,65 @@ pub trait TestCompile: Sized {
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>));
 }
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub struct SrcName(pub Cow<'static, str>);
-
-pub const fn src_name(name: &'static str) -> SrcName {
-    SrcName(Cow::Borrowed(name))
+pub fn file_url(name: &str) -> DomainUrl {
+    DomainReferenceParser::default()
+        .parse(name)
+        .unwrap_or_else(|_| panic!("invalid name"))
+        .as_url()
 }
 
-impl From<&'static str> for SrcName {
-    fn from(value: &'static str) -> Self {
-        SrcName(Cow::Borrowed(value))
-    }
+pub fn default_file_url() -> DomainUrl {
+    DomainReferenceParser::default()
+        .parse("test_root.on")
+        .unwrap_or_else(|_| panic!("invalid name"))
+        .as_url()
 }
 
-impl SrcName {
-    pub fn as_str(&self) -> &str {
-        self.0.borrow()
-    }
-}
-
-impl Default for SrcName {
-    fn default() -> Self {
-        SrcName(Cow::Borrowed("test_root.on"))
-    }
+pub fn default_short_name() -> &'static str {
+    "test_root.on"
 }
 
 pub struct TestPackages {
-    sources_by_name: HashMap<Cow<'static, str>, Cow<'static, str>>,
-    root_package_names: Vec<SrcName>,
+    sources_by_url: HashMap<DomainUrl, Cow<'static, str>>,
+    root_urls: Vec<DomainUrl>,
     sources: Sources,
     source_code_registry: SourceCodeRegistry,
-    data_store: Option<(SrcName, DataStoreConfig)>,
-    packages_by_source_name: HashMap<String, DomainIndex>,
+    data_store: Option<(DomainUrl, DataStoreConfig)>,
+    domains_by_url: HashMap<DomainUrl, DomainIndex>,
     disable_ontology_serde: bool,
 }
 
 impl TestPackages {
     /// Parse a string/file with `//@` directives
-    pub fn parse_multi_ontol(default_name: SrcName, contents: &str) -> Self {
-        let mut sources_by_name: Vec<(SrcName, Cow<'static, str>)> = vec![];
-        let mut cur_name = default_name;
+    pub fn parse_multi_ontol(default_url: DomainUrl, contents: &str) -> Self {
+        let mut sources_by_url: Vec<(DomainUrl, Cow<'static, str>)> = vec![];
+        let mut cur_url = default_url;
         let mut cur_source = String::new();
 
         for (line_no, line) in contents.lines().enumerate() {
             if line.starts_with("//@") {
                 if line_no > 1 {
-                    sources_by_name.push((
-                        std::mem::take(&mut cur_name),
-                        Cow::Owned(std::mem::take(&mut cur_source)),
-                    ));
+                    sources_by_url
+                        .push((cur_url.clone(), Cow::Owned(std::mem::take(&mut cur_source))));
                 }
 
                 let source_name = line.strip_prefix("//@ src_name=").unwrap();
-                cur_name = SrcName(Cow::Owned(source_name.into()));
+                cur_url = DomainUrl::local(source_name);
             } else {
                 cur_source.push_str(line);
                 cur_source.push('\n');
             }
         }
 
-        sources_by_name.push((cur_name, Cow::Owned(cur_source)));
+        sources_by_url.push((cur_url, Cow::Owned(cur_source)));
 
-        Self::new(sources_by_name)
+        Self::new(sources_by_url)
     }
 
     /// Configure with an explicit set of named sources.
     /// By default, the first one is chosen as the only root source.
     pub fn with_sources(
-        sources_by_name: impl IntoIterator<Item = (SrcName, Cow<'static, str>)>,
+        sources_by_name: impl IntoIterator<Item = (DomainUrl, Cow<'static, str>)>,
     ) -> Self {
         Self::new(sources_by_name.into_iter().collect())
     }
@@ -272,7 +261,7 @@ impl TestPackages {
     ///
     /// This version requires the ONTOL sources to be &'static str.
     pub fn with_static_sources(
-        sources_by_name: impl IntoIterator<Item = (SrcName, &'static str)>,
+        sources_by_name: impl IntoIterator<Item = (DomainUrl, &'static str)>,
     ) -> Self {
         Self::new(
             sources_by_name
@@ -282,19 +271,19 @@ impl TestPackages {
         )
     }
 
-    fn new(sources_by_name: Vec<(SrcName, Cow<'static, str>)>) -> Self {
-        let default_root = sources_by_name.first().map(|(name, _)| name.clone());
+    fn new(sources_by_name: Vec<(DomainUrl, Cow<'static, str>)>) -> Self {
+        let default_root = sources_by_name.first().map(|(url, _)| url.clone());
 
         Self {
-            sources_by_name: sources_by_name
+            sources_by_url: sources_by_name
                 .into_iter()
-                .map(|(name, text)| (name.0.clone(), text))
+                .map(|(url, text)| (url.clone(), text))
                 .collect(),
-            root_package_names: default_root.into_iter().collect(),
+            root_urls: default_root.into_iter().collect(),
             sources: Default::default(),
             source_code_registry: Default::default(),
             data_store: None,
-            packages_by_source_name: Default::default(),
+            domains_by_url: Default::default(),
             disable_ontology_serde: false,
         }
     }
@@ -303,8 +292,8 @@ impl TestPackages {
     /// By default, the first source file is the only root file, and all other files will be loaded from that file.
     ///
     /// This method can configure any number of root sources which will be used to seed the package topology resolver.
-    pub fn with_roots(mut self, roots: impl IntoIterator<Item = SrcName>) -> Self {
-        self.root_package_names = roots.into_iter().collect();
+    pub fn with_roots(mut self, roots: impl IntoIterator<Item = DomainUrl>) -> Self {
+        self.root_urls = roots.into_iter().collect();
         self
     }
 
@@ -320,11 +309,7 @@ impl TestPackages {
     }
 
     fn load_topology(&mut self) -> Result<(DomainTopology, DomainIndex), UnifiedCompileError> {
-        let mut package_graph_builder = DepGraphBuilder::with_roots(
-            self.root_package_names
-                .iter()
-                .map(|name| name.0.clone().into()),
-        );
+        let mut package_graph_builder = DepGraphBuilder::with_roots(self.root_urls.iter().cloned());
         let mut root_package = None;
 
         loop {
@@ -333,28 +318,24 @@ impl TestPackages {
                     package_graph_builder = builder;
 
                     for request in requests {
-                        let source_name = match &request.reference {
-                            DomainReference::Local(source_name) => source_name.as_str(),
-                        };
+                        self.domains_by_url
+                            .insert(request.url.clone(), request.domain_index);
 
-                        self.packages_by_source_name
-                            .insert(source_name.to_string(), request.domain_index);
-
-                        if let Some(first_root) = self.root_package_names.first() {
-                            if source_name == first_root.0 {
+                        if let Some(first_root) = self.root_urls.first() {
+                            if &request.url == first_root {
                                 root_package = Some(request.domain_index);
                             }
                         }
 
                         let mut package_config = DomainConfig::default();
 
-                        if let Some((db_source_name, data_store_config)) = &self.data_store {
-                            if source_name == db_source_name.0 {
+                        if let Some((db_domain_url, data_store_config)) = &self.data_store {
+                            if &request.url == db_domain_url {
                                 package_config.data_store = Some(data_store_config.clone());
                             }
                         }
 
-                        if let Some(source_text) = self.sources_by_name.remove(source_name) {
+                        if let Some(source_text) = self.sources_by_url.remove(&request.url) {
                             let rc_source = Rc::new(source_text.as_ref().to_string());
                             let (flat_tree, errors) = cst_parse(&rc_source);
                             let tree = flat_tree.unflatten();
@@ -402,7 +383,7 @@ impl TestPackages {
             root_package,
             // NOTE: waiting on https://github.com/Stranger6667/jsonschema-rs/issues/420
             compile_json_schema: false,
-            packages_by_source_name: self.packages_by_source_name.clone(),
+            domains_by_url: self.domains_by_url.clone(),
         })
     }
 
@@ -454,29 +435,29 @@ impl TestCompile for TestPackages {
 
 impl TestCompile for &'static str {
     fn compile(self) -> OntolTest {
-        TestPackages::with_static_sources([(SrcName::default(), self)]).compile()
+        TestPackages::with_static_sources([(default_file_url(), self)]).compile()
     }
 
     fn compile_fail(self) -> Vec<AnnotatedCompileError> {
-        TestPackages::with_static_sources([(SrcName::default(), self)]).compile_fail()
+        TestPackages::with_static_sources([(default_file_url(), self)]).compile_fail()
     }
 
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
-        TestPackages::with_static_sources([(SrcName::default(), self)]).compile_fail_then(validator)
+        TestPackages::with_static_sources([(default_file_url(), self)]).compile_fail_then(validator)
     }
 }
 
 impl TestCompile for String {
     fn compile(self) -> OntolTest {
-        TestPackages::with_sources([(SrcName::default(), self.into())]).compile()
+        TestPackages::with_sources([(default_file_url(), self.into())]).compile()
     }
 
     fn compile_fail(self) -> Vec<AnnotatedCompileError> {
-        TestPackages::with_sources([(SrcName::default(), self.into())]).compile_fail()
+        TestPackages::with_sources([(default_file_url(), self.into())]).compile_fail()
     }
 
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
-        TestPackages::with_sources([(SrcName::default(), self.into())]).compile_fail_then(validator)
+        TestPackages::with_sources([(default_file_url(), self.into())]).compile_fail_then(validator)
     }
 }
 

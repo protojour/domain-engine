@@ -8,7 +8,7 @@ Ontol
         Whitespace
         KwUse `use`
         Whitespace
-        Name
+        Uri
             SingleQuoteText `'a'`
         Whitespace
         Symbol `as`

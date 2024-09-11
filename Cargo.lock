@@ -2485,6 +2485,7 @@ dependencies = [
  "serde_json",
  "tracing",
  "unimock",
+ "url",
 ]
 
 [[package]]

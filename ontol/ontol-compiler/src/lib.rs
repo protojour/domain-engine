@@ -11,6 +11,7 @@ use properties::PropCtx;
 use std::{
     collections::{BTreeMap, BTreeSet},
     ops::{Deref, Index},
+    rc::Rc,
 };
 
 use codegen::task::{execute_codegen_tasks, CodeCtx};
@@ -34,7 +35,7 @@ pub use source::*;
 use strings::StringCtx;
 use text_patterns::{compile_all_text_patterns, TextPatterns};
 use thesaurus::Thesaurus;
-use topology::{DomainTopology, LoadedDomains};
+use topology::{DomainTopology, DomainUrl, LoadedDomains};
 use tracing::debug;
 use type_check::seal::SealCtx;
 use types::{DefTypeCtx, TypeCtx};
@@ -97,8 +98,8 @@ pub fn compile(
 
     for parsed_package in topology.parsed_domains {
         debug!(
-            "lower {:?}: {:?}",
-            parsed_package.domain_index, parsed_package.reference
+            "lower {:?}: {}",
+            parsed_package.domain_index, parsed_package.url
         );
         let source_id = compiler
             .sources
@@ -272,13 +273,14 @@ impl<'m> Index<TextConstant> for Compiler<'m> {
 /// Lower the ontol syntax to populate the compiler's data structures
 pub fn lower_ontol_syntax<V: ontol_parser::cst::view::NodeView>(
     ontol_view: V,
+    url: Rc<DomainUrl>,
     domain_def_id: DefId,
     src: Src,
     session: Session,
 ) -> LoweringOutcome {
     use ontol_parser::cst::view::NodeViewExt;
 
-    CstLowering::new(domain_def_id, src, session.0)
+    CstLowering::new(url, domain_def_id, src, session.0)
         .lower_ontol(ontol_view.node())
         .finish()
 }

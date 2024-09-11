@@ -15,8 +15,9 @@ use ontol_runtime::{
     value::Value,
 };
 use ontol_test_utils::{
-    examples::{ARTIST_AND_INSTRUMENT, GEOJSON, GUITAR_SYNTH_UNION, MUNICIPALITIES, WGS},
-    expect_eq, src_name, SrcName, TestPackages,
+    default_file_url, default_short_name,
+    examples::{artist_and_instrument, geojson, guitar_synth_union, municipalities, wgs},
+    expect_eq, file_url, TestPackages,
 };
 use serde_json::json;
 use unimock::*;
@@ -34,8 +35,8 @@ use domain_engine_test_utils::{
     },
 };
 
-fn root() -> SrcName {
-    SrcName::default()
+fn root() -> &'static str {
+    default_short_name()
 }
 
 #[test]
@@ -704,7 +705,7 @@ async fn docs_introspection() {
 
 #[test(tokio::test)]
 async fn artist_and_instrument_connections() {
-    let (test, schema) = ARTIST_AND_INSTRUMENT.1.compile_single_schema();
+    let (test, schema) = artist_and_instrument().1.compile_single_schema();
     let [artist, instrument, play_params] = test.bind(["artist", "instrument", "play_params"]);
     let ziggy: Value = artist
         .entity_builder(
@@ -870,7 +871,7 @@ async fn artist_and_instrument_connections() {
 
 #[test(tokio::test)]
 async fn unified_mutation_error_on_unrecognized_arg() {
-    let (test, schema) = ARTIST_AND_INSTRUMENT.1.compile_single_schema();
+    let (test, schema) = artist_and_instrument().1.compile_single_schema();
 
     expect_eq!(
         actual = "mutation { artist(bogus: null) { deleted } }"
@@ -883,7 +884,7 @@ async fn unified_mutation_error_on_unrecognized_arg() {
 
 #[test(tokio::test)]
 async fn unified_mutation_create() {
-    let (test, schema) = ARTIST_AND_INSTRUMENT.1.compile_single_schema();
+    let (test, schema) = artist_and_instrument().1.compile_single_schema();
     let ziggy: Value = test.bind(["artist"])[0]
         .entity_builder(
             json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
@@ -953,7 +954,7 @@ async fn unified_mutation_create() {
 async fn create_through_mapped_domain() {
     let (test, [schema]) = TestPackages::with_static_sources([
         (
-            root(),
+            default_file_url(),
             "
             use 'artist_and_instrument' as ai
 
@@ -974,7 +975,7 @@ async fn create_through_mapped_domain() {
             )
         ",
         ),
-        ARTIST_AND_INSTRUMENT,
+        artist_and_instrument(),
     ])
     .compile_schemas([root()]);
 
@@ -999,7 +1000,7 @@ async fn create_through_mapped_domain() {
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
-                &[ARTIST_AND_INSTRUMENT.0],
+                &["artist_and_instrument"],
                 LinearTransactMock::transact
                     .next_call(matching!(_, [Ok(ReqMessage::Insert(0, _)), ..], _session))
                     .returns(respond_inserted([ziggy]))
@@ -1024,7 +1025,7 @@ async fn create_through_mapped_domain() {
 async fn create_through_three_domains() {
     let (test, [schema]) = TestPackages::with_static_sources([
         (
-            root(),
+            default_file_url(),
             "
             use 'player' as player
 
@@ -1040,7 +1041,7 @@ async fn create_through_three_domains() {
         ",
         ),
         (
-            src_name("player"),
+            file_url("player"),
             "
             use 'artist_and_instrument' as ai
 
@@ -1055,7 +1056,7 @@ async fn create_through_three_domains() {
             )
         ",
         ),
-        ARTIST_AND_INSTRUMENT,
+        artist_and_instrument(),
     ])
     .compile_schemas([root()]);
 
@@ -1080,7 +1081,7 @@ async fn create_through_three_domains() {
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
-                &[ARTIST_AND_INSTRUMENT.0],
+                &["artist_and_instrument"],
                 LinearTransactMock::transact
                     .next_call(matching!(_, [Ok(ReqMessage::Insert(0, _)), ..], _session))
                     .returns(respond_inserted([ziggy]))
@@ -1103,7 +1104,7 @@ async fn create_through_three_domains() {
 
 #[test(tokio::test)]
 async fn guitar_synth_union_selection() {
-    let (test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema();
+    let (test, schema) = guitar_synth_union().1.compile_single_schema();
     let [artist] = test.bind(["artist"]);
 
     let query_mock = LinearTransactMock::transact
@@ -1181,7 +1182,7 @@ async fn guitar_synth_union_selection() {
 
 #[test]
 fn guitar_synth_union_input_union_field_list() {
-    let (_test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema();
+    let (_test, schema) = guitar_synth_union().1.compile_single_schema();
     let document = schema.as_document();
 
     let instrument_edge_input = find_input_object_type(&document, "instrumentEdgeInput").unwrap();
@@ -1213,7 +1214,7 @@ fn guitar_synth_union_input_union_field_list() {
 
 #[test(tokio::test)]
 async fn graphql_guitar_synth_union_input_exec() {
-    let (test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema();
+    let (test, schema) = guitar_synth_union().1.compile_single_schema();
     let [artist] = test.bind(["artist"]);
     let store_entity_mock = LinearTransactMock::transact
         .next_call(matching!(_, [Ok(ReqMessage::Insert(..)), ..], _session))
@@ -1270,7 +1271,7 @@ async fn graphql_guitar_synth_union_input_exec() {
 
 #[test(tokio::test)]
 async fn guitar_synth_union_input_error_span() {
-    let (test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema();
+    let (test, schema) = guitar_synth_union().1.compile_single_schema();
 
     expect_eq!(
         actual = r#"mutation {
@@ -1296,9 +1297,9 @@ async fn guitar_synth_union_input_error_span() {
 }
 
 #[test(tokio::test)]
-async fn municipalities() {
-    let (test, [schema]) = TestPackages::with_static_sources([MUNICIPALITIES, GEOJSON, WGS])
-        .compile_schemas([MUNICIPALITIES.0]);
+async fn test_municipalities() {
+    let (test, [schema]) = TestPackages::with_static_sources([municipalities(), geojson(), wgs()])
+        .compile_schemas(["municipalities"]);
 
     expect_eq!(
         actual = "{
@@ -1328,7 +1329,7 @@ async fn municipalities() {
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
-                &[MUNICIPALITIES.0],
+                &["municipalities"],
                 mock_data_store_query_entities_empty()
             )
         )
@@ -1343,8 +1344,8 @@ async fn municipalities() {
 
 #[test(tokio::test)]
 async fn municipalities_named_query() {
-    let (test, [schema]) = TestPackages::with_static_sources([MUNICIPALITIES, GEOJSON, WGS])
-        .compile_schemas([MUNICIPALITIES.0]);
+    let (test, [schema]) = TestPackages::with_static_sources([municipalities(), geojson(), wgs()])
+        .compile_schemas(["municipalities"]);
     let [municipality] = test.bind(["municipality"]);
 
     async fn fetch_osl(
@@ -1387,7 +1388,7 @@ async fn municipalities_named_query() {
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
-                &[MUNICIPALITIES.0],
+                &["municipalities"],
                 mock_data_store_query_entities_empty()
             )
         )
@@ -1422,7 +1423,7 @@ async fn municipalities_named_query() {
     expect_eq!(
         actual = fetch_osl(
             &schema,
-            &gql_ctx_mock_data_store(&test, &[MUNICIPALITIES.0], query_mock)
+            &gql_ctx_mock_data_store(&test, &["municipalities"], query_mock)
         )
         .await,
         expected = Ok(graphql_value!({
@@ -1439,8 +1440,8 @@ async fn municipalities_named_query() {
 
 #[test]
 fn municipalities_geojson_union() {
-    let (_test, [schema]) = TestPackages::with_static_sources([MUNICIPALITIES, GEOJSON, WGS])
-        .compile_schemas([MUNICIPALITIES.0]);
+    let (_test, [schema]) = TestPackages::with_static_sources([municipalities(), geojson(), wgs()])
+        .compile_schemas(["municipalities"]);
 
     let document = schema.as_document();
 
@@ -1566,7 +1567,7 @@ async fn open_data_disabled() {
 async fn test_extension_and_member_from_foreign_domain() {
     let (_test, [_]) = TestPackages::with_static_sources([
         (
-            src_name("entry"),
+            file_url("entry"),
             "
             domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
             use 'helper' as helper
@@ -1579,7 +1580,7 @@ async fn test_extension_and_member_from_foreign_domain() {
         ",
         ),
         (
-            src_name("helper"),
+            file_url("helper"),
             "
             domain 22222222222TEST22222222222 ()
             def @macro ext (rel* 'ext-field': text)
@@ -1587,7 +1588,7 @@ async fn test_extension_and_member_from_foreign_domain() {
             ",
         ),
     ])
-    .compile_schemas([src_name("entry")]);
+    .compile_schemas(["entry"]);
 }
 
 /// Regresssion test for `no PatchEdges available for relation sequence "targets"``
@@ -1623,7 +1624,7 @@ async fn test_const_in_union_bug() {
 async fn test_constant_index_panic() {
     let (test, [schema]) = TestPackages::with_static_sources([
         (
-            src_name("events"),
+            file_url("events"),
             "
             use 'events_db' as db
 
@@ -1650,7 +1651,7 @@ async fn test_constant_index_panic() {
             ",
         ),
         (
-            src_name("events_db"),
+            file_url("events_db"),
             "
             domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
             def event (
@@ -1660,7 +1661,7 @@ async fn test_constant_index_panic() {
             ",
         ),
     ])
-    .compile_schemas([src_name("events")]);
+    .compile_schemas(["events"]);
 
     let [event] = test.bind(["events_db.event"]);
 
@@ -1674,7 +1675,7 @@ async fn test_constant_index_panic() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(&test, &[src_name("events")], store_entity_mock),
+            &gql_ctx_mock_data_store(&test, &["events"], store_entity_mock),
         )
         .await;
 }
@@ -1682,7 +1683,7 @@ async fn test_constant_index_panic() {
 #[test(tokio::test)]
 async fn flattened_union_entity() {
     let (test, [schema]) = TestPackages::with_static_sources([(
-        SrcName::default(),
+        default_file_url(),
         "
         domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
         def kind ()
@@ -1712,7 +1713,7 @@ async fn flattened_union_entity() {
         )
         ",
     )])
-    .compile_schemas([SrcName::default()]);
+    .compile_schemas([default_short_name()]);
 
     let document = schema.as_document();
 
@@ -1790,7 +1791,7 @@ async fn flattened_union_entity() {
 #[test(tokio::test)]
 async fn schema_bug1() {
     let (_test, [_schema]) = TestPackages::with_static_sources([(
-        SrcName::default(),
+        default_file_url(),
         "
         domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
         def foo (rel. 'id': (rel* is: text))
@@ -1807,5 +1808,5 @@ async fn schema_bug1() {
         rel {bar} e2.foo2?: {bar}
         ",
     )])
-    .compile_schemas([SrcName::default()]);
+    .compile_schemas([default_short_name()]);
 }

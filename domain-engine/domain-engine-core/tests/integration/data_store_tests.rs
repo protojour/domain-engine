@@ -14,8 +14,7 @@ use ontol_runtime::{
 use ontol_test_utils::{
     assert_error_msg,
     def_binding::DefBinding,
-    examples::{conduit::CONDUIT_DB, stix::stix_bundle, ARTIST_AND_INSTRUMENT},
-    expect_eq,
+    examples, expect_eq,
     json_utils::{json_map, json_prop},
     serde_helper::{serde_create, serde_read},
     TestCompile, TestPackages,
@@ -25,11 +24,11 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 fn conduit_db() -> TestPackages {
-    TestPackages::with_static_sources([CONDUIT_DB])
+    TestPackages::with_static_sources([examples::conduit::conduit_db()])
 }
 
 fn artist_and_instrument() -> TestPackages {
-    TestPackages::with_static_sources([ARTIST_AND_INSTRUMENT])
+    TestPackages::with_static_sources([examples::artist_and_instrument()])
 }
 
 async fn make_domain_engine(
@@ -48,7 +47,7 @@ async fn make_domain_engine(
 
 #[ontol_macros::datastore_test(tokio::test)]
 async fn test_db_remigrate_noop(ds: &str) {
-    let test = stix_bundle().compile();
+    let test = examples::stix::stix_bundle().compile();
     let domain_engine = DomainEngine::builder(test.ontology_owned())
         .system(Box::new(unimock::Unimock::new(())))
         .build(DynamicDataStoreFactory::new(ds), Session::default())
@@ -71,9 +70,15 @@ async fn test_db_remigrate_noop(ds: &str) {
 
 #[ontol_macros::datastore_test(tokio::test)]
 async fn test_db_remove_one_domain(ds: &str) {
-    let test1 = TestPackages::with_static_sources([CONDUIT_DB, ARTIST_AND_INSTRUMENT])
-        .with_roots([CONDUIT_DB.0, ARTIST_AND_INSTRUMENT.0])
-        .compile();
+    let test1 = TestPackages::with_static_sources([
+        examples::conduit::conduit_db(),
+        examples::artist_and_instrument(),
+    ])
+    .with_roots([
+        examples::conduit::conduit_db().0,
+        examples::artist_and_instrument().0,
+    ])
+    .compile();
 
     let domain_engine = DomainEngine::builder(test1.ontology_owned())
         .system(Box::new(unimock::Unimock::new(())))
@@ -84,8 +89,8 @@ async fn test_db_remove_one_domain(ds: &str) {
     drop(domain_engine);
 
     // This time without ARTIST_AND_INSTRUMENT
-    let test2 = TestPackages::with_static_sources([CONDUIT_DB])
-        .with_roots([CONDUIT_DB.0])
+    let test2 = TestPackages::with_static_sources([examples::conduit::conduit_db()])
+        .with_roots([examples::conduit::conduit_db().0])
         .compile();
 
     let domain_engine = DomainEngine::builder(test2.ontology_owned())
@@ -103,9 +108,15 @@ async fn test_db_remove_one_domain(ds: &str) {
 
 #[ontol_macros::datastore_test(tokio::test)]
 async fn test_db_multiple_persistent_domains(ds: &str) {
-    let test = TestPackages::with_static_sources([CONDUIT_DB, ARTIST_AND_INSTRUMENT])
-        .with_roots([CONDUIT_DB.0, ARTIST_AND_INSTRUMENT.0])
-        .compile();
+    let test = TestPackages::with_static_sources([
+        examples::conduit::conduit_db(),
+        examples::artist_and_instrument(),
+    ])
+    .with_roots([
+        examples::conduit::conduit_db().0,
+        examples::artist_and_instrument().0,
+    ])
+    .compile();
     let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds).await;
     let [conduit_user, ai_artist] = test.bind(["conduit_db.User", "artist_and_instrument.artist"]);
 

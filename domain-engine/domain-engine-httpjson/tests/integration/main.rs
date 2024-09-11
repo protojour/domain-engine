@@ -12,29 +12,21 @@ use futures_util::{Stream, StreamExt};
 use http::StatusCode;
 use http_body_util::StreamBody;
 use ontol_runtime::ontology::Ontology;
-use ontol_test_utils::{OntolTest, SrcName};
+use ontol_test_utils::OntolTest;
 use tracing::debug;
 
 mod test_httpjson_error;
 mod test_httpjson_stix;
 
 trait MakeTestRouter {
-    fn make_test_router(
-        &self,
-        domain_engine: Arc<DomainEngine>,
-        source_name: SrcName,
-    ) -> axum::Router;
+    fn make_test_router(&self, domain_engine: Arc<DomainEngine>, short_name: &str) -> axum::Router;
 }
 
 impl MakeTestRouter for OntolTest {
-    fn make_test_router(
-        &self,
-        domain_engine: Arc<DomainEngine>,
-        source_name: SrcName,
-    ) -> axum::Router {
+    fn make_test_router(&self, domain_engine: Arc<DomainEngine>, short_name: &str) -> axum::Router {
         create_httpjson_router::<(), DummySession>(
             domain_engine.clone(),
-            self.get_domain_index(source_name.as_str()),
+            self.get_domain_index(short_name),
         )
         .unwrap()
         .with_state(())

@@ -1,6 +1,6 @@
 use http::{header::CONTENT_TYPE, StatusCode};
 use ontol_macros::datastore_test;
-use ontol_test_utils::{examples::ARTIST_AND_INSTRUMENT, SrcName, TestCompile};
+use ontol_test_utils::{default_short_name, examples, TestCompile};
 use serde_json::json;
 use tokio::task::JoinSet;
 
@@ -8,9 +8,9 @@ use crate::{jsonlines_stream, make_domain_engine, MakeTestRouter};
 
 #[datastore_test(tokio::test)]
 async fn test_httpjson_put_stream_transaction_error(ds: &str) {
-    let test = ARTIST_AND_INSTRUMENT.1.compile();
+    let test = examples::artist_and_instrument().1.compile();
     let engine = make_domain_engine(test.ontology_owned(), ds).await;
-    let router = test.make_test_router(engine, SrcName::default());
+    let router = test.make_test_router(engine, default_short_name());
 
     let mut artist_docs = vec![
         json!({

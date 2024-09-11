@@ -1,10 +1,11 @@
 use crate::docs::get_core_completions;
 use lsp_types::{CompletionItem, Location, MarkedString, Position, Range, Url};
 use ontol_compiler::ontol_syntax::OntolTreeSyntax;
+use ontol_compiler::topology::DomainUrl;
 use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
-    topology::{DepGraphBuilder, DomainReference, GraphState, ParsedDomain},
+    topology::{DepGraphBuilder, GraphState, ParsedDomain},
     CompileError, SourceId, SourceSpan, Sources, NO_SPAN,
 };
 use ontol_parser::cst::inspect as insp;
@@ -210,7 +211,7 @@ impl State {
         let root_name = get_domain_name(filename);
 
         let mut ontol_sources = Sources::default();
-        let mut package_graph_builder = DepGraphBuilder::with_roots([root_name.into()]);
+        let mut package_graph_builder = DepGraphBuilder::with_roots([DomainUrl::local(root_name)]);
 
         let topology = loop {
             match package_graph_builder.transition()? {
@@ -218,7 +219,7 @@ impl State {
                     package_graph_builder = builder;
 
                     for request in requests {
-                        let source_name = get_reference_name(&request.reference);
+                        let source_name = request.url.short_name();
                         let package_config = DomainConfig::default();
                         let request_uri = build_uri(root_path, source_name);
 
@@ -489,13 +490,6 @@ pub fn read_file(uri: &str) -> Result<String, Error> {
     let path = get_base_path(uri);
     let text = std::fs::read_to_string(std::path::Path::new(&path))?;
     Ok(text)
-}
-
-/// Get source name for a PackageReference
-pub fn get_reference_name(reference: &DomainReference) -> &str {
-    match reference {
-        DomainReference::Local(source_name) => source_name.as_str(),
-    }
 }
 
 /// Split URI into schema/path and filename

@@ -10,7 +10,9 @@ use domain_engine_graphql::{
 };
 use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use juniper::ScalarValue;
-use ontol_test_utils::{OntolTest, SrcName, TestCompile, TestPackages};
+use ontol_test_utils::{
+    default_file_url, default_short_name, OntolTest, TestCompile, TestPackages,
+};
 use ordered_float::NotNan;
 use tracing::info;
 use unimock::*;
@@ -18,18 +20,12 @@ use unimock::*;
 use crate::mock_datastore::LinearDataStoreAdapter;
 
 pub trait TestCompileSchema {
-    fn compile_schemas<const N: usize>(
-        self,
-        source_names: [SrcName; N],
-    ) -> (OntolTest, [Schema; N]);
+    fn compile_schemas<const N: usize>(self, source_names: [&str; N]) -> (OntolTest, [Schema; N]);
 }
 
 impl<T: TestCompile> TestCompileSchema for T {
     #[track_caller]
-    fn compile_schemas<const N: usize>(
-        self,
-        source_names: [SrcName; N],
-    ) -> (OntolTest, [Schema; N]) {
+    fn compile_schemas<const N: usize>(self, source_names: [&str; N]) -> (OntolTest, [Schema; N]) {
         compile_schemas_inner(self.compile(), source_names)
     }
 }
@@ -42,8 +38,8 @@ impl TestCompileSingletonSchema for &'static str {
     #[track_caller]
     fn compile_single_schema(self) -> (OntolTest, Schema) {
         let (ontol_test, [schema]) = compile_schemas_inner(
-            TestPackages::with_static_sources([(SrcName::default(), self)]).compile(),
-            [SrcName::default()],
+            TestPackages::with_static_sources([(default_file_url(), self)]).compile(),
+            [default_short_name()],
         );
         (ontol_test, schema)
     }
@@ -51,15 +47,15 @@ impl TestCompileSingletonSchema for &'static str {
 
 fn compile_schemas_inner<const N: usize>(
     mut ontol_test: OntolTest,
-    source_names: [SrcName; N],
+    short_names: [&str; N],
 ) -> (OntolTest, [Schema; N]) {
     // Don't want JSON schema noise in GraphQL tests:
     ontol_test.set_compile_json_schema(false);
 
-    let schemas: [Schema; N] = source_names.map(|source_name| {
+    let schemas: [Schema; N] = short_names.map(|short_name| {
         create_graphql_schema(
             ontol_test.ontology_owned(),
-            ontol_test.get_domain_index(&source_name.0),
+            ontol_test.get_domain_index(short_name),
         )
         .unwrap()
     });
@@ -102,7 +98,7 @@ impl Display for TestError<GqlScalar> {
 
 pub fn gql_ctx_mock_data_store(
     ontol_test: &OntolTest,
-    data_store_packages: &[SrcName],
+    data_store_packages: &[&str],
     setup: impl unimock::Clause,
 ) -> ServiceCtx {
     let unimock = Unimock::new(setup);
@@ -110,7 +106,7 @@ pub fn gql_ctx_mock_data_store(
         .data_store(DataStore::new(
             data_store_packages
                 .iter()
-                .map(|src_name| ontol_test.get_domain_index(src_name.0.as_ref()))
+                .map(|src_name| ontol_test.get_domain_index(src_name.as_ref()))
                 .collect(),
             Box::new(LinearDataStoreAdapter::new(unimock.clone())),
         ))

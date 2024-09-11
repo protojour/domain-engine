@@ -11,13 +11,14 @@ use ontol_runtime::{
     },
 };
 use ontol_test_utils::{
-    examples::{ARTIST_AND_INSTRUMENT, EDGE_ENTITY_UNION, FINDINGS},
-    expect_eq, src_name,
+    default_file_url, default_short_name,
+    examples::{artist_and_instrument, edge_entity_union, findings},
+    expect_eq, file_url,
     test_extensions::{
         graphql::{ObjectDataExt, TypeDataExt, UnitTypeRefExt},
         serde::SerdeOperatorExt,
     },
-    SrcName, TestCompile, TestPackages,
+    TestCompile, TestPackages,
 };
 
 use super::schema_test;
@@ -34,7 +35,7 @@ fn test_domain_docs_as_query_docs() {
     )
     "
     .compile_then(|test| {
-        let (_schema, test) = schema_test(&test, SrcName::default());
+        let (_schema, test) = schema_test(&test, default_short_name());
         let ontology = test.test.ontology();
         let query_data = test.query_object_data();
         let ObjectKind::Query { domain_def_id } = &query_data.kind else {
@@ -61,7 +62,7 @@ fn test_graphql_small_range_number_becomes_int() {
     )
     "
     .compile_then(|test| {
-        let (_schema, test) = schema_test(&test, SrcName::default());
+        let (_schema, test) = schema_test(&test, default_short_name());
         let foo_type = test.type_data("foo", QueryLevel::Node);
         let foo_object = foo_type.object_data();
 
@@ -83,7 +84,7 @@ fn test_graphql_i64_custom_scalar() {
     )
     "
     .compile_then(|test| {
-        let (schema, test) = schema_test(&test, SrcName::default());
+        let (schema, test) = schema_test(&test, default_short_name());
         let ontology = test.test.ontology();
         let foo_type = test.type_data("foo", QueryLevel::Node);
         let foo_object = foo_type.object_data();
@@ -111,7 +112,7 @@ fn test_graphql_default_scalar() {
     )
     "
     .compile_then(|test| {
-        let (_schema, test) = schema_test(&test, SrcName::default());
+        let (_schema, test) = schema_test(&test, default_short_name());
         let foo_type = test.type_data("foo", QueryLevel::Node);
         let foo_object = foo_type.object_data();
 
@@ -133,7 +134,7 @@ fn test_graphql_scalar_array() {
     )
     "
     .compile_then(|test| {
-        let (_schema, test) = schema_test(&test, SrcName::default());
+        let (_schema, test) = schema_test(&test, default_short_name());
         let foo_type = test.type_data("foo", QueryLevel::Node);
         let foo_object = foo_type.object_data();
 
@@ -161,7 +162,7 @@ fn test_graphql_serde_renaming() {
     )
     "
     .compile_then(|test| {
-        let (_schema, schema_test) = schema_test(&test, SrcName::default());
+        let (_schema, schema_test) = schema_test(&test, default_short_name());
         let foo_node = schema_test
             .type_data("foo", QueryLevel::Node)
             .object_data()
@@ -196,7 +197,7 @@ fn test_query_map_empty_input_becomes_hidden_arg() {
     )
     "
     .compile_then(|test| {
-        let (schema, _test) = schema_test(&test, SrcName::default());
+        let (schema, _test) = schema_test(&test, default_short_name());
 
         let query = schema.type_data(schema.query).object_data();
         let my_query = query.fields.get("my_query").unwrap();
@@ -210,8 +211,8 @@ fn test_query_map_empty_input_becomes_hidden_arg() {
 
 #[test]
 fn test_graphql_artist_and_instrument() {
-    let test = ARTIST_AND_INSTRUMENT.1.compile();
-    let (schema, test) = schema_test(&test, SrcName::default());
+    let test = artist_and_instrument().1.compile();
+    let (schema, test) = schema_test(&test, default_short_name());
     let ontology = test.test.ontology();
     let query_object = test.query_object_data();
 
@@ -247,7 +248,7 @@ fn test_graphql_artist_and_instrument() {
 fn test_imperfect_mapping_mutation() {
     let test = TestPackages::with_static_sources([
         (
-            SrcName::default(),
+            default_file_url(),
             "
             use 'lower' as lower
 
@@ -269,7 +270,7 @@ fn test_imperfect_mapping_mutation() {
             ",
         ),
         (
-            src_name("lower"),
+            file_url("lower"),
             "
             domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
             def lower (
@@ -281,7 +282,7 @@ fn test_imperfect_mapping_mutation() {
         ),
     ])
     .compile();
-    let (_schema, test) = schema_test(&test, SrcName::default());
+    let (_schema, test) = schema_test(&test, default_short_name());
     let mutation_object = test.mutation_object_data();
     let upper_field = mutation_object.fields.get("upper").unwrap();
     let FieldKind::EntityMutation(field) = &upper_field.kind else {
@@ -323,7 +324,7 @@ fn incompatible_edge_types_are_distinct() {
     )
     "
     .compile_then(|test| {
-        let (schema, test) = schema_test(&test, SrcName::default());
+        let (schema, test) = schema_test(&test, default_short_name());
         let ontology = test.test.ontology();
 
         let query = schema.type_data(schema.query).object_data();
@@ -407,7 +408,7 @@ fn graphql_flattened_union() {
     )
     "
     .compile_then(|test| {
-        let (_schema, schema_test) = schema_test(&test, SrcName::default());
+        let (_schema, schema_test) = schema_test(&test, default_short_name());
         let foo_interface = schema_test.type_data("foo", QueryLevel::Node).object_data();
 
         let ObjectInterface::Interface = &foo_interface.interface else {
@@ -452,7 +453,7 @@ fn graphql_flattened_union_pascal_casing() {
     def Qux (rel* 'kind': 'qux')
     "
     .compile_then(|test| {
-        let (_schema, schema_test) = schema_test(&test, SrcName::default());
+        let (_schema, schema_test) = schema_test(&test, default_short_name());
         let foo_interface = schema_test.type_data("Foo", QueryLevel::Node).object_data();
 
         assert_eq!(foo_interface.field_names(), vec!["id", "kind"]);
@@ -468,8 +469,8 @@ fn graphql_flattened_union_pascal_casing() {
 
 #[test]
 fn test_edge_entity_union() {
-    let test = EDGE_ENTITY_UNION.1.compile();
-    let (schema, test) = schema_test(&test, SrcName::default());
+    let test = edge_entity_union().1.compile();
+    let (schema, test) = schema_test(&test, default_short_name());
     let ontology = test.test.ontology();
 
     {
@@ -505,8 +506,8 @@ fn test_edge_entity_union() {
 
 #[test]
 fn test_vertex() {
-    let test = FINDINGS.1.compile();
-    let (schema, test) = schema_test(&test, SrcName::default());
+    let test = findings().1.compile();
+    let (schema, test) = schema_test(&test, default_short_name());
 
     let finding_session = test
         .type_data("FindingSession", QueryLevel::Node)

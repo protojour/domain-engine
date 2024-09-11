@@ -1,5 +1,5 @@
 use ontol_macros::test;
-use ontol_test_utils::{src_name, TestCompile, TestPackages};
+use ontol_test_utils::{file_url, TestCompile, TestPackages};
 use serde_json::json;
 
 #[test]
@@ -264,7 +264,7 @@ fn test_map_relation_sequence_default_fallback() {
 fn test_map_generate_edge() {
     TestPackages::with_static_sources([
         (
-            src_name("outer"),
+            file_url("outer"),
             "
             domain ZZZZZZZZZZZTEST1ZZZZZZZZZZ ()
             use 'inner' as inner
@@ -302,7 +302,7 @@ fn test_map_generate_edge() {
             ",
         ),
         (
-            src_name("inner"),
+            file_url("inner"),
             "
             domain ZZZZZZZZZZZTEST2ZZZZZZZZZZ ()
             arc edge {
@@ -391,7 +391,7 @@ arc link {
 fn test_map_invert() {
     TestPackages::with_static_sources([
         (
-            src_name("entry"),
+            file_url("entry"),
             "
             use 'link' as link
             use 'work' as work
@@ -417,9 +417,9 @@ fn test_map_invert() {
             )
             ",
         ),
-        (src_name("work"), WORK),
-        (src_name("dev"), DEV),
-        (src_name("link"), LINK),
+        (file_url("work"), WORK),
+        (file_url("dev"), DEV),
+        (file_url("link"), LINK),
     ])
     .compile_fail();
 }

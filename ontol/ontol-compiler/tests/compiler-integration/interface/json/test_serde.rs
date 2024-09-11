@@ -10,7 +10,7 @@ use ontol_runtime::{
 };
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches,
-    examples::{ARTIST_AND_INSTRUMENT, GITMESH},
+    examples::{artist_and_instrument, gitmesh},
     expect_eq,
     serde_helper::*,
     TestCompile,
@@ -1033,7 +1033,7 @@ fn test_serialize_raw_tree_only() {
 
 #[test]
 fn test_serialize_raw_tree_only_artist_and_instrument() {
-    ARTIST_AND_INSTRUMENT.1.compile_then(|test| {
+    artist_and_instrument().1.compile_then(|test| {
         let [artist] = test.bind(["artist"]);
         let entity = serde_raw(&artist)
             .to_attr_nocheck(json!({
@@ -1062,7 +1062,7 @@ fn test_serialize_raw_tree_only_artist_and_instrument() {
 
 #[test]
 fn test_serde_gitmesh_id_union() {
-    GITMESH.1.compile_then(|test| {
+    gitmesh().1.compile_then(|test| {
         let [repository] = test.bind(["Repository"]);
         assert_json_io_matches!(serde_create(&repository), {
             "handle": "repo1",

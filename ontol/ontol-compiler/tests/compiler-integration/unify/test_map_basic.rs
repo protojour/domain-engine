@@ -1,6 +1,6 @@
 use ontol_macros::test;
 use ontol_test_utils::{
-    serde_helper::serde_raw, src_name, test_map::AsKey, TestCompile, TestPackages,
+    file_url, serde_helper::serde_raw, test_map::AsKey, TestCompile, TestPackages,
 };
 use serde_json::json;
 
@@ -669,7 +669,7 @@ fn test_map_complex_flow() {
 fn test_map_delegation() {
     TestPackages::with_static_sources([
         (
-            src_name("root"),
+            file_url("root"),
             "
             use 'SI' as SI
 
@@ -683,7 +683,7 @@ fn test_map_delegation() {
             ",
         ),
         (
-            src_name("SI"),
+            file_url("SI"),
             "
             def meters (rel* is: f64)
             def millimeters (rel* is: f64)
@@ -713,7 +713,7 @@ fn test_map_delegation() {
 fn test_map_abstract_scalar_repr_templating() {
     TestPackages::with_static_sources([
         (
-            src_name("vehicle"),
+            file_url("vehicle"),
             "
             use 'car' as car
             use 'SI' as SI
@@ -738,7 +738,7 @@ fn test_map_abstract_scalar_repr_templating() {
             ",
         ),
         (
-            src_name("car"),
+            file_url("car"),
             "
             use 'SI' as SI
 
@@ -757,7 +757,7 @@ fn test_map_abstract_scalar_repr_templating() {
             ",
         ),
         (
-            src_name("SI"),
+            file_url("SI"),
             "
             def meters (rel* is: number)
             def millimeters (rel* is: number)
@@ -787,7 +787,7 @@ fn test_map_abstract_scalar_repr_templating() {
 fn test_map_abstract_scalar_trivial() {
     TestPackages::with_static_sources([
         (
-            src_name("vehicle"),
+            file_url("vehicle"),
             "
             use 'car' as car
             use 'SI' as SI
@@ -807,7 +807,7 @@ fn test_map_abstract_scalar_trivial() {
             ",
         ),
         (
-            src_name("car"),
+            file_url("car"),
             "
             use 'SI' as SI
 
@@ -821,7 +821,7 @@ fn test_map_abstract_scalar_trivial() {
             ",
         ),
         (
-            src_name("SI"),
+            file_url("SI"),
             "
             def meters (rel* is: number)
             def millimeters (rel* is: number)

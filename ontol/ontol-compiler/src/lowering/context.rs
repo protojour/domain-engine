@@ -3,6 +3,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     marker::PhantomData,
+    rc::Rc,
 };
 
 use arcstr::ArcStr;
@@ -25,16 +26,19 @@ use crate::{
     namespace::Space,
     pattern::{Pattern, PatternKind},
     relation::{DefRelTag, RelId, RelParams, Relationship},
+    topology::{DomainReferenceParser, DomainUrl},
     CompileError, Compiler, SourceId, SourceSpan,
 };
 
 pub struct LoweringCtx<'c, 'm> {
     pub compiler: &'c mut Compiler<'m>,
+    pub url: Rc<DomainUrl>,
     pub domain_def_id: DefId,
     pub domain_index: DomainIndex,
     pub source_id: SourceId,
     pub anonymous_unions: FnvHashMap<BTreeSet<DefId>, DefId>,
     pub outcome: LoweringOutcome,
+    pub domain_reference_parser: DomainReferenceParser,
 }
 
 pub struct CstLowering<'c, 'm, V: NodeView> {

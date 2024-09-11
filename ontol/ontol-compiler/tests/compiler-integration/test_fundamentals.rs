@@ -1,15 +1,15 @@
 use ontol_macros::test;
 use ontol_runtime::{interface::serde::operator::SerdeOperator, DomainIndex, PropId};
 use ontol_test_utils::{
-    assert_json_io_matches, def_binding::DefBinding, expect_eq, serde_helper::serde_create,
-    src_name, OntolTest, TestCompile, TestPackages,
+    assert_json_io_matches, def_binding::DefBinding, expect_eq, file_url,
+    serde_helper::serde_create, OntolTest, TestCompile, TestPackages,
 };
 
 #[test]
 fn test_relations_are_distinct_for_different_domains() {
     TestPackages::with_static_sources([
         (
-            src_name("entry"),
+            file_url("entry"),
             "
             use 'other' as other
 
@@ -19,7 +19,7 @@ fn test_relations_are_distinct_for_different_domains() {
             ",
         ),
         (
-            src_name("other"),
+            file_url("other"),
             "
             def foo (
                 rel* 'prop': text

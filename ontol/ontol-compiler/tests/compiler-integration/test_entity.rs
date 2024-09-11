@@ -128,7 +128,7 @@ fn entity_id_inline_fmt_serial() {
 
 #[test]
 fn artist_and_instrument_io_artist() {
-    let test = examples::ARTIST_AND_INSTRUMENT.1.compile();
+    let test = examples::artist_and_instrument().1.compile();
     let [artist] = test.bind(["artist"]);
     assert_json_io_matches!(serde_create(&artist), {
         "name": "Zappa",
@@ -145,7 +145,7 @@ fn artist_and_instrument_io_artist() {
 
 #[test]
 fn artist_and_instrument_io_instrument() {
-    let test = examples::ARTIST_AND_INSTRUMENT.1.compile();
+    let test = examples::artist_and_instrument().1.compile();
     let [instrument] = test.bind(["instrument"]);
     assert_json_io_matches!(serde_create(&instrument), {
         "name": "guitar",
@@ -162,7 +162,7 @@ fn artist_and_instrument_io_instrument() {
 
 #[test]
 fn artist_and_instrument_error_artist() {
-    let test = examples::ARTIST_AND_INSTRUMENT.1.compile();
+    let test = examples::artist_and_instrument().1.compile();
     let [artist] = test.bind(["artist"]);
     assert_error_msg!(
         serde_create(&artist).to_value(json!({
@@ -175,7 +175,7 @@ fn artist_and_instrument_error_artist() {
 
 #[test]
 fn artist_and_instrument_id_as_relation_object_ok() {
-    let test = examples::ARTIST_AND_INSTRUMENT.1.compile();
+    let test = examples::artist_and_instrument().1.compile();
     let [artist, instrument_id] = test.bind(["artist", "instrument-id"]);
     let plays = artist.find_property("plays").unwrap();
     let example_id = "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8";
@@ -241,7 +241,7 @@ fn artist_and_instrument_id_as_relation_object_ok() {
 
 #[test]
 fn artist_and_instrument_id_as_relation_object_invalid_id_format() {
-    let test = examples::ARTIST_AND_INSTRUMENT.1.compile();
+    let test = examples::artist_and_instrument().1.compile();
     let [artist] = test.bind(["artist"]);
 
     assert_error_msg!(
@@ -368,7 +368,7 @@ fn test_entity_self_relationship_mandatory_object() {
 
 #[test]
 fn entity_union_simple() {
-    let test = examples::GUITAR_SYNTH_UNION.1.compile();
+    let test = examples::guitar_synth_union().1.compile();
     let [instrument] = test.bind(["instrument"]);
     assert_json_io_matches!(
         serde_create(&instrument),
@@ -417,7 +417,7 @@ fn entity_union_with_union_def_id_larger_than_id() {
 
 #[test]
 fn entity_union_with_object_relation() {
-    let test = examples::GUITAR_SYNTH_UNION.1.compile();
+    let test = examples::guitar_synth_union().1.compile();
     let [instrument] = test.bind(["instrument"]);
     assert_json_io_matches!(serde_create(&instrument), {
         "type": "synth",
@@ -430,7 +430,7 @@ fn entity_union_with_object_relation() {
 
 #[test]
 fn entity_union_in_relation_with_ids() {
-    let test = examples::GUITAR_SYNTH_UNION.1.compile();
+    let test = examples::guitar_synth_union().1.compile();
     let [artist, guitar_id, synth_id] = test.bind(["artist", "guitar_id", "synth_id"]);
     let plays = artist.find_property("plays").unwrap();
 
@@ -641,7 +641,7 @@ fn store_key_in_def_info() {
 
 #[test]
 fn edge_entity_simple() {
-    let test = examples::EDGE_ENTITY_SIMPLE.1.compile();
+    let test = examples::edge_entity_simple().1.compile();
     let ontology = test.ontology();
     let domain = ontology.domain_by_index(DomainIndex::second()).unwrap();
     let [foo_id, foo, bar_id, link] = test.bind(["foo_id", "foo", "bar_id", "link"]);
@@ -695,7 +695,7 @@ fn edge_entity_simple() {
 
 #[test]
 fn edge_entity_union() {
-    let test = examples::EDGE_ENTITY_UNION.1.compile();
+    let test = examples::edge_entity_union().1.compile();
     let ontology = test.ontology();
     let domain = ontology.domain_by_index(DomainIndex::second()).unwrap();
 
@@ -768,7 +768,7 @@ fn edge_entity_union() {
 
 #[test]
 fn edge_entity_subtype_db() {
-    let test = examples::entity_subtype::DB.1.compile();
+    let test = examples::entity_subtype::db().1.compile();
     let [foo] = test.bind(["foo"]);
 
     let data_rels = &foo.def.data_relationships;

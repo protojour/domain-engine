@@ -7,10 +7,7 @@ use domain_engine_graphql::{
 use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema};
 use juniper::graphql_value;
 use ontol_macros::datastore_test;
-use ontol_test_utils::{
-    examples::stix::{stix_bundle, STIX},
-    expect_eq,
-};
+use ontol_test_utils::{examples::stix::stix_bundle, expect_eq};
 use tracing::info;
 
 use crate::mk_engine_default;
@@ -32,7 +29,7 @@ impl From<OntologyParams> for juniper::Variables<GqlScalar> {
 
 #[datastore_test(tokio::test)]
 async fn test_stix_ontology(ds: &str) {
-    let (test, [stix_schema]) = stix_bundle().compile_schemas([STIX.0]);
+    let (test, [stix_schema]) = stix_bundle().compile_schemas(["stix"]);
     let [identity] = test.bind(["identity"]);
 
     let engine = mk_engine_default(test.ontology_owned(), ds).await;

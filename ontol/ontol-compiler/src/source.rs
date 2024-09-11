@@ -4,6 +4,8 @@ use fnv::FnvHashMap;
 use ontol_parser::U32Span;
 use ontol_runtime::DomainIndex;
 
+use crate::topology::DomainUrl;
+
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 pub struct SourceId(pub u32);
 
@@ -15,12 +17,12 @@ pub const NATIVE_SOURCE: SourceId = SourceId(0);
 pub struct Src {
     pub id: SourceId,
     pub domain_index: DomainIndex,
-    pub name: Rc<String>,
+    pub url: Rc<DomainUrl>,
 }
 
 impl Src {
-    pub fn name(&self) -> &str {
-        self.name.as_str()
+    pub fn url(&self) -> Rc<DomainUrl> {
+        self.url.clone()
     }
 
     pub fn span(&self, span: U32Span) -> SourceSpan {
@@ -141,14 +143,14 @@ impl Sources {
         self.sources.get(&id).cloned()
     }
 
-    pub fn add_source(&mut self, domain_index: DomainIndex, name: String) -> Src {
+    pub fn add_source(&mut self, domain_index: DomainIndex, url: Rc<DomainUrl>) -> Src {
         let id = self.next_source_id;
         self.next_source_id.0 += 1;
         self.domain_index = domain_index;
         let src = Src {
             id,
             domain_index,
-            name: name.into(),
+            url,
         };
         self.sources.insert(id, src.clone());
         src

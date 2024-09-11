@@ -7,14 +7,14 @@ use ontol_runtime::{
     ontology::domain::{DataRelationshipKind, DefKind, EdgeCardinalFlags},
 };
 use ontol_test_utils::{
-    examples::{DEMO, FINDINGS, GITMESH},
+    examples::{demo, findings, gitmesh},
     TestCompile,
 };
 use serde_json::json;
 
 #[test]
 fn test_demo() {
-    let test = DEMO.1.compile();
+    let test = demo().1.compile();
     test.mapper().assert_map_eq(
         ("archive_group", "ArchiveCollection"),
         json!({
@@ -92,7 +92,7 @@ fn test_demo() {
 
 #[test]
 fn test_gitmesh() {
-    let test = GITMESH.1.compile();
+    let test = gitmesh().1.compile();
 
     let [repository, user, organization] = test.bind(["Repository", "User", "Organization"]);
     let repository_entity = repository.def.entity().unwrap();
@@ -115,7 +115,7 @@ fn test_gitmesh() {
 
 #[test]
 fn test_findings() {
-    let test = FINDINGS.1.compile();
+    let test = findings().1.compile();
 
     let [session, finding] = test.bind(["FindingSession", "Finding"]);
     let DefKind::Edge(edge_info) = &finding.def.kind else {

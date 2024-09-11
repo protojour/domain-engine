@@ -1,7 +1,7 @@
 #![allow(clippy::disallowed_names)]
 
-use ontol_test_utils::{SrcName, TestCompile, TestPackages};
-use std::{borrow::Cow, fs, path::PathBuf};
+use ontol_test_utils::{file_url, TestCompile, TestPackages};
+use std::{fs, path::PathBuf};
 
 mod examples;
 mod interface;
@@ -27,11 +27,9 @@ fn main() {}
 fn compile(#[files("test-cases/compile/**/*.on")] path: PathBuf) {
     let contents = fs::read_to_string(&path).unwrap();
 
-    let file_name = SrcName(Cow::Owned(
-        path.file_name().unwrap().to_str().unwrap().into(),
-    ));
+    let file_url = file_url(path.file_name().unwrap().to_str().unwrap());
 
-    TestPackages::parse_multi_ontol(file_name, &contents).compile();
+    TestPackages::parse_multi_ontol(file_url, &contents).compile();
 }
 
 #[rstest::rstest]
@@ -39,9 +37,7 @@ fn compile(#[files("test-cases/compile/**/*.on")] path: PathBuf) {
 fn error(#[files("test-cases/error/**/*.on")] path: PathBuf) {
     let contents = fs::read_to_string(&path).unwrap();
 
-    let file_name = SrcName(Cow::Owned(
-        path.file_name().unwrap().to_str().unwrap().into(),
-    ));
+    let file_url = file_url(path.file_name().unwrap().to_str().unwrap());
 
-    TestPackages::parse_multi_ontol(file_name, &contents).compile_fail();
+    TestPackages::parse_multi_ontol(file_url, &contents).compile_fail();
 }

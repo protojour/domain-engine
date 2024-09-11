@@ -144,7 +144,7 @@ pub fn diff_errors(
         let source = sources.get_source(*source_id).unwrap();
         let source_text = source_code_registry.registry.get(source_id).unwrap();
 
-        let source_header = format!("\n// source '{}':\n", source.name);
+        let source_header = format!("\n// source '{}':\n", source.url.short_name());
 
         original.push_str(&source_header);
         original += source_text;
