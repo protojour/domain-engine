@@ -1,0 +1,40 @@
+/// Memoriam domain for object storage file metadata
+domain 01J358NG2T3XCNG45JF1TVNY0C ()
+
+/// Represents a file in object storage
+def FileMetaData (
+    /// File id
+    rel. 'id': (rel* is: text)
+    /// Name of S3 host where file is stored
+    rel* 'host': text
+    /// Name of S3 bucket where file is stored
+    rel* 'bucket_name': text
+    /// Name of S3 object
+    rel* 'object_name': text
+    /// File size in bytes
+    rel* 'size': i64 // TODO: u64 when available
+    /// Inferred or given MIME type
+    rel* 'mimetype'?: text
+    /// SHA256 hash as Base64-encoded octet sequence
+    rel* 'sha256'?: Sha256
+)
+
+def Sha256 (
+    rel* is: octets
+    rel* is: ontol.format.base64
+)
+
+/// Get FileMetaData for a given `id`,
+/// or all matching `bucket_name`
+map fileMetaData (
+    (
+        'id'?: id,
+        'bucket_name'?: bucket_name,
+    ),
+    FileMetaData {
+        ..@match FileMetaData(
+            'id'?: id,
+            'bucket_name'?: bucket_name,
+        ),
+    }
+)

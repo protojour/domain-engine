@@ -4,6 +4,7 @@ use ontol_test_utils::{file_url, TestCompile, TestPackages};
 use std::{fs, path::PathBuf};
 
 mod interface;
+mod test_atlas;
 mod test_bugs;
 mod test_conduit;
 mod test_demo;

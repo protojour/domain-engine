@@ -109,6 +109,13 @@ pub fn demo() -> Example {
     (file_url("demo"), include_str!("../../../examples/demo.on"))
 }
 
+pub fn filemeta() -> Example {
+    (
+        file_url("filemeta"),
+        include_str!("../../../examples/filemeta.on"),
+    )
+}
+
 pub fn findings() -> Example {
     (
         file_url("findings"),
@@ -243,6 +250,8 @@ impl Default for FakeAtlasServer {
         add_atlas("geojson", geojson(), &mut sources);
         add_atlas("wgs", wgs(), &mut sources);
         add_atlas("SI", si(), &mut sources);
+        add_atlas("filemeta", filemeta(), &mut sources);
+        add_atlas("findings", findings(), &mut sources);
 
         for example in stix_bundle() {
             add_atlas("stix", example, &mut sources);
@@ -251,7 +260,6 @@ impl Default for FakeAtlasServer {
         add_atlas("conduit", conduit_db(), &mut sources);
         add_atlas("conduit", blog_post_public(), &mut sources);
         add_atlas("gitmesh", gitmesh(), &mut sources);
-        add_atlas("findings", findings(), &mut sources);
 
         Self { sources }
     }

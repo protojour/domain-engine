@@ -1,11 +1,8 @@
-use ontol_examples::{demo, findings, gitmesh};
+use ontol_examples::{demo, gitmesh};
 use ontol_macros::test;
-use ontol_runtime::{
-    interface::serde::{
-        operator::{SerdeOperator, SerdeStructFlags},
-        processor::ProcessorMode,
-    },
-    ontology::domain::{DataRelationshipKind, DefKind, EdgeCardinalFlags},
+use ontol_runtime::interface::serde::{
+    operator::{SerdeOperator, SerdeStructFlags},
+    processor::ProcessorMode,
 };
 use ontol_test_utils::TestCompile;
 use serde_json::json;
@@ -109,36 +106,4 @@ fn test_gitmesh() {
         panic!();
     };
     assert!(!org_op.flags.contains(SerdeStructFlags::PROPER_ENTITY));
-}
-
-#[test]
-fn test_findings() {
-    let test = findings().1.compile();
-
-    let [session, finding] = test.bind(["FindingSession", "Finding"]);
-    let DefKind::Edge(edge_info) = &finding.def.kind else {
-        panic!()
-    };
-
-    {
-        let (_prop_id, rel_info) = session
-            .def
-            .data_relationship_by_name("findings", test.ontology())
-            .unwrap();
-
-        let DataRelationshipKind::Edge(_) = rel_info.kind else {
-            panic!(
-                "should be an edge data relationship, but was: {:?}",
-                rel_info.kind
-            );
-        };
-    }
-
-    {
-        let session_cardinal = &edge_info.cardinals[0];
-        let finding_cardinal = &edge_info.cardinals[1];
-
-        assert_eq!(session_cardinal.flags, EdgeCardinalFlags::ENTITY);
-        assert_eq!(finding_cardinal.flags, EdgeCardinalFlags::ENTITY);
-    }
 }
