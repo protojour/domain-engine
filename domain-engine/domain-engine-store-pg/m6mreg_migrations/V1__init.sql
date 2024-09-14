@@ -65,6 +65,10 @@ CREATE TABLE m6mreg.domaintable
     fprop_column text,
     -- the name of the foreign key column, if specified
     fkey_column text,
+    -- the name of the created timestamp column, if specified
+    created_at_column text,
+    -- the name of the updated timestamp column, if specified
+    updated_at_column text,
 
     UNIQUE(def_domain_key, def_tag),
 

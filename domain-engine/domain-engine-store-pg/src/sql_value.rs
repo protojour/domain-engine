@@ -44,7 +44,7 @@ pub enum SqlScalar {
     F64(OrderedFloat<f64>),
     Text(String),
     Octets(OctetSequence),
-    DateTime(chrono::DateTime<chrono::Utc>),
+    Timestamp(chrono::DateTime<chrono::Utc>),
     Date(chrono::NaiveDate),
     Time(chrono::NaiveTime),
 }
@@ -148,7 +148,7 @@ impl<'b> SqlOutput<'b> {
                 postgres_protocol::types::bytea_from_sql(raw).into(),
             ))
             .into()),
-            Layout::Scalar(PgType::TimestampTz) => Ok(SqlScalar::DateTime(FromSql::from_sql(
+            Layout::Scalar(PgType::TimestampTz) => Ok(SqlScalar::Timestamp(FromSql::from_sql(
                 &Type::from_oid(wellknown_oid::TIMESTAMPTZ).unwrap(),
                 raw,
             )?)
@@ -183,7 +183,7 @@ impl ToSql for SqlScalar {
             Self::F64(f) => f.to_sql(ty, out),
             Self::Text(s) => s.as_str().to_sql(ty, out),
             Self::Octets(s) => s.0.as_slice().to_sql(ty, out),
-            Self::DateTime(dt) => dt.to_sql(ty, out),
+            Self::Timestamp(dt) => dt.to_sql(ty, out),
             Self::Date(d) => d.to_sql(ty, out),
             Self::Time(t) => t.to_sql(ty, out),
         }
@@ -209,7 +209,7 @@ impl ToSql for SqlScalar {
             Self::F64(f) => f.to_sql_checked(ty, out),
             Self::Text(s) => s.as_str().to_sql_checked(ty, out),
             Self::Octets(s) => s.0.as_slice().to_sql_checked(ty, out),
-            Self::DateTime(dt) => dt.to_sql_checked(ty, out),
+            Self::Timestamp(dt) => dt.to_sql_checked(ty, out),
             Self::Date(d) => d.to_sql_checked(ty, out),
             Self::Time(t) => t.to_sql_checked(ty, out),
         }

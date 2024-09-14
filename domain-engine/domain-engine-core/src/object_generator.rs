@@ -21,7 +21,7 @@ pub struct ObjectGenerator<'e> {
     mode: ProcessorMode,
 
     /// All generated times get the same value
-    current_time: chrono::DateTime<chrono::Utc>,
+    current_time: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl<'e> ObjectGenerator<'e> {
@@ -30,7 +30,20 @@ impl<'e> ObjectGenerator<'e> {
             ontology,
             system,
             mode,
-            current_time: system.current_time(),
+            current_time: Some(system.current_time()),
+        }
+    }
+
+    pub fn without_timestamps(
+        mode: ProcessorMode,
+        ontology: &'e Ontology,
+        system: &'e dyn SystemAPI,
+    ) -> Self {
+        Self {
+            ontology,
+            system,
+            mode,
+            current_time: None,
         }
     }
 
@@ -119,26 +132,27 @@ impl<'e> ObjectGenerator<'e> {
                         }
                         Some(ValueGenerator::CreatedAtTime) => {
                             // FIXME: upsert semantics!
-                            if matches!(self.mode, ProcessorMode::Create) {
-                                struct_map.insert(
-                                    property.id,
-                                    Value::ChronoDateTime(
-                                        self.current_time,
-                                        self.property_tag(property),
-                                    )
-                                    .into(),
-                                );
+                            if let Some(timestamp) = self.current_time {
+                                if matches!(self.mode, ProcessorMode::Create) {
+                                    struct_map.insert(
+                                        property.id,
+                                        Value::ChronoDateTime(
+                                            timestamp,
+                                            self.property_tag(property),
+                                        )
+                                        .into(),
+                                    );
+                                }
                             }
                         }
                         Some(ValueGenerator::UpdatedAtTime) => {
-                            struct_map.insert(
-                                property.id,
-                                Value::ChronoDateTime(
-                                    self.current_time,
-                                    self.property_tag(property),
-                                )
-                                .into(),
-                            );
+                            if let Some(timestamp) = self.current_time {
+                                struct_map.insert(
+                                    property.id,
+                                    Value::ChronoDateTime(timestamp, self.property_tag(property))
+                                        .into(),
+                                );
+                            }
                         }
                         None => {
                             panic!("No generator for {key}", key = key.arc_str())

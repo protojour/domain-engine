@@ -159,8 +159,8 @@ impl<'a> TransactCtx<'a> {
             with: None,
             into: pg_edge.table_name(),
             as_: None,
-            column_names: vec![],
-            values: vec![],
+            column_names: vec!["_created", "_updated"],
+            values: vec![sql::Expr::param(0), sql::Expr::param(0)],
             on_conflict: Some(sql::OnConflict {
                 target: None,
                 action: sql::ConflictAction::DoNothing,
@@ -170,7 +170,7 @@ impl<'a> TransactCtx<'a> {
 
         let mut analysis = EdgeAnalysis::default();
 
-        let mut param_index: usize = 0;
+        let mut param_index: usize = 1;
 
         for (index, pg_cardinal) in &pg_edge.table.edge_cardinals {
             match &pg_cardinal.kind {
@@ -277,10 +277,11 @@ impl<'a> TransactCtx<'a> {
 
         let mut insert_sql: Option<ArcStr> = None;
 
-        let mut param_buf: Vec<SqlScalar> = vec![];
+        let mut sql_params: Vec<SqlScalar> = vec![];
 
         for tuple in patch.tuples {
-            param_buf.clear();
+            sql_params.clear();
+            sql_params.push(SqlScalar::Timestamp(self.system.current_time()));
 
             if tuple.elements.iter().any(|(_, _, mutation_mode)| {
                 matches!(
@@ -293,7 +294,7 @@ impl<'a> TransactCtx<'a> {
                     (subject_datatable, subject_data_key),
                     &analysis,
                     tuple,
-                    &mut param_buf,
+                    &mut sql_params,
                     cache,
                 )
                 .await?;
@@ -302,7 +303,7 @@ impl<'a> TransactCtx<'a> {
                     (subject_datatable, subject_data_key),
                     &analysis,
                     tuple,
-                    &mut param_buf,
+                    &mut sql_params,
                     insert_sql.get_or_insert_with(|| arcstr::format!("{}", sql_insert)),
                     cache,
                 )
@@ -788,8 +789,12 @@ impl<'a> TransactCtx<'a> {
                         with: None,
                         into: pg.table_name(),
                         as_: None,
-                        column_names: vec![&pg_column.col_name],
-                        values: vec![sql::Expr::param(0)],
+                        column_names: vec!["_created", "_updated", &pg_column.col_name],
+                        values: vec![
+                            sql::Expr::param(0),
+                            sql::Expr::param(0),
+                            sql::Expr::param(1),
+                        ],
                         on_conflict: None,
                         returning: vec![sql::Expr::path1("_key")],
                     }
@@ -802,10 +807,12 @@ impl<'a> TransactCtx<'a> {
                 };
 
                 debug!("{insert_stmt}");
+                let timestamp = SqlScalar::Timestamp(self.system.current_time());
+                let sql_params: [&(dyn ToSql + Sync); 2] = [&timestamp, &id_param];
 
                 let row = self
                     .client()
-                    .query_one(insert_stmt.deref(), &[&id_param])
+                    .query_one(insert_stmt.deref(), &sql_params)
                     .await
                     .map_err(PgError::TentativeForeignKey)?;
 
@@ -841,8 +848,12 @@ impl<'a> TransactCtx<'a> {
                         with: None,
                         into: pg.table_name(),
                         as_: None,
-                        column_names: vec![&pg_column.col_name],
-                        values: vec![sql::Expr::param(0)],
+                        column_names: vec!["_created", "_updated", &pg_column.col_name],
+                        values: vec![
+                            sql::Expr::param(0),
+                            sql::Expr::param(0),
+                            sql::Expr::param(1),
+                        ],
                         on_conflict: Some(sql::OnConflict {
                             target: Some(sql::ConflictTarget::Columns(vec![&pg_column.col_name])),
                             action: sql::ConflictAction::DoUpdateSet(vec![sql::UpdateColumn(
@@ -863,11 +874,14 @@ impl<'a> TransactCtx<'a> {
                 };
 
                 debug!("{stmt}");
-                trace!("resolve linked vertex {:?}", [&id_param]);
+                let timestamp = SqlScalar::Timestamp(self.system.current_time());
+
+                let sql_params: [&(dyn ToSql + Sync); 2] = [&timestamp, &id_param];
+                trace!("resolve linked vertex {:?}", sql_params);
 
                 let row = self
                     .client()
-                    .query_opt(stmt.deref(), &[&id_param])
+                    .query_opt(stmt.deref(), &sql_params)
                     .await
                     .map_err(PgError::ForeignKeyLookup)?
                     .ok_or_else(|| self.unresolved_foreign_error(def_id, id_param))?;

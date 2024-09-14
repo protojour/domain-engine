@@ -10,7 +10,6 @@ use ontol_runtime::{
     value::{Serial, Value, ValueTag},
     DefId, PropId,
 };
-use tracing::trace;
 
 use crate::{
     pg_error::{ds_bad_req, ds_err},
@@ -56,7 +55,6 @@ pub enum Compound {
 
 impl<'a> TransactCtx<'a> {
     pub fn deserialize_sql(&self, def_id: DefId, sql_val: SqlOutput) -> DomainResult<Value> {
-        trace!("pg deserialize sql {def_id:?}");
         let tag = ValueTag::from(def_id);
 
         match &self.ontology.def(def_id).kind {
@@ -94,7 +92,7 @@ impl<'a> TransactCtx<'a> {
                 (SqlOutput::Scalar(SqlScalar::Octets(seq)), _) => {
                     Ok(Value::OctetSequence(seq, tag))
                 }
-                (SqlOutput::Scalar(SqlScalar::DateTime(dt)), _) => {
+                (SqlOutput::Scalar(SqlScalar::Timestamp(dt)), _) => {
                     Ok(Value::ChronoDateTime(dt, tag))
                 }
                 (SqlOutput::Scalar(SqlScalar::Date(d)), _) => Ok(Value::ChronoDate(d, tag)),
@@ -128,7 +126,7 @@ impl<'a> TransactCtx<'a> {
             (Value::Rational(_, _), _) => Err(ds_bad_req("rational not supported yet")),
             (Value::Text(s, _), _) => Ok(SqlScalar::Text(s.into()).into()),
             (Value::OctetSequence(seq, _), _) => Ok(SqlScalar::Octets(seq).into()),
-            (Value::ChronoDateTime(dt, _), _) => Ok(SqlScalar::DateTime(dt).into()),
+            (Value::ChronoDateTime(dt, _), _) => Ok(SqlScalar::Timestamp(dt).into()),
             (Value::ChronoDate(d, _), _) => Ok(SqlScalar::Date(d).into()),
             (Value::ChronoTime(t, _), _) => Ok(SqlScalar::Time(t).into()),
             (Value::Struct(map, tag), DefKind::Data(basic_def)) => match &basic_def.repr {

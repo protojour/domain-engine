@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context};
-use indoc::indoc;
+use indoc::{formatdoc, indoc};
 use itertools::Itertools;
 use tokio_postgres::Transaction;
 use tracing::{info, info_span, Instrument};
@@ -80,10 +80,16 @@ async fn execute_migration_step<'t>(
             let pg_domain = ctx.domains.get_mut(&domain_index).unwrap();
 
             let key_column = "_key";
+            let created_at_column = "_created";
+            let updated_at_column = "_updated";
 
             txn.execute(
                 &format!(
-                    "CREATE TABLE {schema}.{table} (_key bigserial PRIMARY KEY)",
+                    "CREATE TABLE {schema}.{table} (
+                        {key_column} bigserial PRIMARY KEY,
+                        {created_at_column} timestamptz NOT NULL,
+                        {updated_at_column} timestamptz NOT NULL
+                    )",
                     schema = sql::Ident(&pg_domain.schema_name),
                     table = sql::Ident(&table_name),
                 ),
@@ -101,8 +107,10 @@ async fn execute_migration_step<'t>(
                             def_domain_key,
                             def_tag,
                             table_name,
-                            key_column
-                        ) VALUES($1, $2, $3, $4, $5, $6)
+                            key_column,
+                            created_at_column,
+                            updated_at_column
+                        ) VALUES($1, $2, $3, $4, $5, $6, $7, $8)
                         RETURNING key
                     "},
                     &[
@@ -112,6 +120,8 @@ async fn execute_migration_step<'t>(
                         &vertex_def_tag,
                         &table_name,
                         &key_column,
+                        &created_at_column,
+                        &updated_at_column,
                     ],
                 )
                 .await
@@ -137,8 +147,10 @@ async fn execute_migration_step<'t>(
             let (fprop, fkey) = ("_fprop", "_fkey");
 
             txn.execute(
-                &format!(
-                    "ALTER TABLE {schema}.{table} ADD COLUMN {fprop} int NOT NULL, ADD COLUMN {fkey} bigint NOT NULL",
+                &formatdoc!(
+                    "ALTER TABLE {schema}.{table}
+                        ADD COLUMN {fprop} int NOT NULL,
+                        ADD COLUMN {fkey} bigint NOT NULL",
                     schema = sql::Ident(&pg_domain.schema_name),
                     table = sql::Ident(&pg_table.table_name),
                     fprop = sql::Ident(fprop),
@@ -216,15 +228,15 @@ async fn execute_migration_step<'t>(
 
             let key = txn
                 .query_one(
-                    indoc! { "
-                    INSERT INTO m6mreg.property (
-                        domaintable_key,
-                        prop_tag,
-                        pg_type,
-                        column_name
-                    ) VALUES($1, $2, $3, $4)
-                    RETURNING key
-                "},
+                    indoc! {"
+                        INSERT INTO m6mreg.property (
+                            domaintable_key,
+                            prop_tag,
+                            pg_type,
+                            column_name
+                        ) VALUES($1, $2, $3, $4)
+                        RETURNING key
+                    "},
                     &[&pg_table.key, &(prop_tag.0 as i32), &pg_type, &column_name],
                 )
                 .await
@@ -316,10 +328,16 @@ async fn execute_migration_step<'t>(
             edge_tag,
             table_name,
         } => {
+            let created_at_column = "_created";
+            let updated_at_column = "_updated";
+
             let pg_domain = ctx.domains.get_mut(&domain_index).unwrap();
             txn.execute(
-                &format!(
-                    "CREATE TABLE {schema}.{table} ()",
+                &formatdoc!(
+                    "CREATE TABLE {schema}.{table} (
+                        {created_at_column} timestamptz NOT NULL,
+                        {updated_at_column} timestamptz NOT NULL
+                    )",
                     schema = sql::Ident(&pg_domain.schema_name),
                     table = sql::Ident(&table_name),
                 ),
@@ -336,8 +354,10 @@ async fn execute_migration_step<'t>(
                             table_type,
                             def_domain_key,
                             def_tag,
-                            table_name
-                        ) VALUES($1, $2, $3, $4, $5)
+                            table_name,
+                            created_at_column,
+                            updated_at_column
+                        ) VALUES($1, $2, $3, $4, $5, $6, $7)
                         RETURNING key
                     "},
                     &[
@@ -346,6 +366,8 @@ async fn execute_migration_step<'t>(
                         &pg_domain.key,
                         &(edge_tag as i32),
                         &table_name,
+                        &created_at_column,
+                        &updated_at_column,
                     ],
                 )
                 .await

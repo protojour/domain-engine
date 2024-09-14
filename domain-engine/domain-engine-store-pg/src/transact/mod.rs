@@ -206,21 +206,21 @@ pub async fn transact(
                 ReqMessage::Argument(mut value) => {
                     match state.as_ref() {
                         Some(State::Insert(_, select)) => {
-                            ObjectGenerator::new(ProcessorMode::Create, ctx.ontology, ctx.system)
+                            ObjectGenerator::without_timestamps(ProcessorMode::Create, ctx.ontology, ctx.system)
                                 .generate_objects(&mut value);
 
                             let row = ctx.insert_vertex(value.into(), InsertMode::Insert, select, &mut cache).await?;
                             yield RespMessage::Element(row.value, row.op);
                         }
                         Some(State::Update(_, select)) => {
-                            ObjectGenerator::new(ProcessorMode::Update, ctx.ontology, ctx.system)
+                            ObjectGenerator::without_timestamps(ProcessorMode::Update, ctx.ontology, ctx.system)
                                 .generate_objects(&mut value);
 
                             let value = ctx.update_vertex_with_select(value.into(), select, &mut cache).await?;
                             yield RespMessage::Element(value, DataOperation::Updated);
                         }
                         Some(State::Upsert(_, select)) => {
-                            ObjectGenerator::new(ProcessorMode::Create, ctx.ontology, ctx.system)
+                            ObjectGenerator::without_timestamps(ProcessorMode::Create, ctx.ontology, ctx.system)
                                 .generate_objects(&mut value);
 
                             let row = ctx.insert_vertex(value.into(), InsertMode::Upsert, select, &mut cache).await?;

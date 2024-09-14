@@ -431,8 +431,10 @@ impl<'a> TransactCtx<'a> {
 
         let mut edge_select_stmt: Option<PreparedStatement> = None;
 
-        let mut column_names = vec!["_key"];
-        let mut values = vec![sql::Expr::Default];
+        self.system.current_time();
+
+        let mut column_names = vec!["_key", "_created", "_updated"];
+        let mut values = vec![sql::Expr::Default, sql::Expr::param(0), sql::Expr::param(0)];
         let mut insert_returning = vec![
             // The first returned column is `xmax = 0` which is used to determine whether created or updated for UPSERTs
             sql::Expr::eq(sql::Expr::path1("xmax"), sql::Expr::LiteralInt(0)),
@@ -440,7 +442,7 @@ impl<'a> TransactCtx<'a> {
         let mut primary_id_column: Option<&PgColumn> = None;
         let mut on_conflict: Option<sql::OnConflict> = None;
 
-        let mut param_idx = 0;
+        let mut param_idx = 1;
 
         if pg.table.has_fkey {
             column_names.extend(["_fprop", "_fkey"]);
@@ -481,7 +483,8 @@ impl<'a> TransactCtx<'a> {
 
         // UPSERT / ON CONFLICT clause handling
         if let (InsertMode::Upsert, Some(primary_id_column)) = (insert_mode, primary_id_column) {
-            let mut update_columns: Vec<sql::UpdateColumn> = vec![];
+            let mut update_columns: Vec<sql::UpdateColumn> =
+                vec![sql::UpdateColumn("_updated", sql::Expr::param(0))];
             let mut param_idx = 0;
 
             for (prop_id, rel_info) in &def.data_relationships {
@@ -615,7 +618,9 @@ impl<'a> TransactCtx<'a> {
             return Err(DomainErrorKind::EntityMustBeStruct.into_error());
         };
 
-        let mut sql_params: Vec<SqlScalar> = vec![];
+        let timestamp = self.system.current_time();
+
+        let mut sql_params: Vec<SqlScalar> = vec![SqlScalar::Timestamp(timestamp)];
         let mut update_tentative: Option<PgDataKey> = None;
         let mut edge_patches = EdgePatches::default();
         let mut abstract_values: Vec<(PropId, Value)> = vec![];
