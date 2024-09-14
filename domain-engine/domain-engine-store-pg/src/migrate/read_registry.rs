@@ -30,6 +30,7 @@ pub async fn read_registry<'t>(
         .collect();
     let mut domain_index_by_key: FnvHashMap<PgRegKey, DomainIndex> = Default::default();
     let mut table_by_key: FnvHashMap<PgRegKey, TableRef> = Default::default();
+    let mut next_schema_disambiguator: i32 = 0;
 
     // domains
     for row in txn
@@ -40,6 +41,8 @@ pub async fn read_registry<'t>(
         let key: PgRegKey = row.get(0);
         let uid: Ulid = row.get(1);
         let schema_name = row.get(2);
+
+        next_schema_disambiguator = i32::max(next_schema_disambiguator, key);
 
         if let Some(domain_index) = domain_index_by_ulid.get(&uid) {
             let pg_domain = PgDomain {
@@ -54,6 +57,8 @@ pub async fn read_registry<'t>(
             info!("domain id={uid} is persisted but no longer in the ontology, ignoring");
         }
     }
+
+    ctx.next_schema_disambiguator = next_schema_disambiguator + 1;
 
     // domaintables
     for row in txn

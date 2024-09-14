@@ -36,18 +36,31 @@ pub async fn migrate_domain_steps<'t>(
         uid: domain_uid,
     };
     let unique_name = &ontology[domain.unique_name()];
-    let schema = format!("m6md_{unique_name}").into_boxed_str();
+    let pg_domain = ctx.domains.get_mut(&domain_index);
 
-    if let Some(pg_domain) = ctx.domains.get_mut(&domain_index) {
+    let schema_name = {
+        // disambiguate schema names with a unique number, in case domains have the same name.
+        // (unique_name might disappear some day, as requiring unique names is unrealistic)
+        let schema_disambiguator = if let Some(pg_domain) = pg_domain.as_ref() {
+            pg_domain.key.unwrap()
+        } else {
+            let key = ctx.next_schema_disambiguator;
+            ctx.next_schema_disambiguator += 1;
+            key
+        };
+        format!("m6md{schema_disambiguator}_{unique_name}").into_boxed_str()
+    };
+
+    if let Some(pg_domain) = pg_domain {
         info!("domain already deployed");
 
-        if pg_domain.schema_name != schema {
+        if pg_domain.schema_name != schema_name {
             ctx.steps.extend(
                 Stage::Domain,
                 domain_ids,
                 [MigrationStep::RenameDomainSchema {
                     old: pg_domain.schema_name.clone(),
-                    new: schema,
+                    new: schema_name,
                 }],
             );
         }
@@ -56,7 +69,7 @@ pub async fn migrate_domain_steps<'t>(
             domain_index,
             PgDomain {
                 key: None,
-                schema_name: schema.clone(),
+                schema_name: schema_name.clone(),
                 datatables: Default::default(),
                 edgetables: Default::default(),
             },
@@ -67,7 +80,7 @@ pub async fn migrate_domain_steps<'t>(
             domain_ids,
             [MigrationStep::DeployDomain {
                 name: ontology[domain.unique_name()].into(),
-                schema_name: schema,
+                schema_name,
             }],
         );
     };

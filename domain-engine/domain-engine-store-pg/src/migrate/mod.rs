@@ -49,6 +49,7 @@ struct MigrationCtx {
     domains: FnvHashMap<DomainIndex, PgDomain>,
     steps: Steps,
     abstract_scalars: FnvHashMap<DomainIndex, BTreeMap<OntolDefTag, PgType>>,
+    next_schema_disambiguator: i32,
 }
 
 #[derive(Default)]
@@ -145,6 +146,7 @@ pub async fn migrate(
             domains: Default::default(),
             steps: Default::default(),
             abstract_scalars: Default::default(),
+            next_schema_disambiguator: 0,
         };
         assert_eq!(RegVersion::current(), ctx.current_version);
         ctx
