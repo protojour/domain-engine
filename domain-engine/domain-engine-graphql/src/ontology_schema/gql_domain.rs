@@ -46,7 +46,13 @@ impl Domain {
     }
 
     fn defs(&self, kind: Option<gql_def::DefKind>, ctx: &OntologyCtx) -> Vec<gql_def::Def> {
-        let defs = self.data(ctx).defs().map(|def| gql_def::Def { id: def.id });
+        let defs = self.data(ctx).defs().filter_map(|def| {
+            if def.ident().is_some() {
+                Some(gql_def::Def { id: def.id })
+            } else {
+                None
+            }
+        });
         if let Some(kind) = kind {
             defs.filter(|def| def.kind(ctx) == kind).collect()
         } else {

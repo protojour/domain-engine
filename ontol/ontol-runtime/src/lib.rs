@@ -180,9 +180,12 @@ pub enum OntolDefTag {
     UnionDirection = 36,
     SymAscending = 37,
     SymDescending = 38,
-    GeneratorAuto = 39,
-    GeneratorCreateTime = 40,
-    GeneratorUpdateTime = 41,
+    /// The `auto` value generator mode
+    Auto = 39,
+    /// Create time for generators, can also be used as a domain-independent property
+    CreateTime = 40,
+    /// Update time for generators, can also be used as a domain-independent property
+    UpdateTime = 41,
     Format = 42,
     FormatHex = 43,
     FormatBase64 = 44,

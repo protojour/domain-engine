@@ -256,14 +256,14 @@ fn register_ontol_def_tag(tag: OntolDefTag, defs: &mut Defs) {
         OntolDefTag::SymDescending => {
             defs.add_builtin_symbol(tag, "descending");
         }
-        OntolDefTag::GeneratorAuto => {
-            defs.add_ontol(OntolDefTag::GeneratorAuto, DefKind::EmptySequence);
+        OntolDefTag::Auto => {
+            defs.add_ontol(OntolDefTag::Auto, DefKind::EmptySequence);
         }
-        OntolDefTag::GeneratorCreateTime => {
-            defs.add_ontol(OntolDefTag::GeneratorCreateTime, DefKind::EmptySequence);
+        OntolDefTag::CreateTime => {
+            defs.add_ontol(OntolDefTag::CreateTime, DefKind::EmptySequence);
         }
-        OntolDefTag::GeneratorUpdateTime => {
-            defs.add_ontol(OntolDefTag::GeneratorUpdateTime, DefKind::EmptySequence);
+        OntolDefTag::UpdateTime => {
+            defs.add_ontol(OntolDefTag::UpdateTime, DefKind::EmptySequence);
         }
         OntolDefTag::Format => {
             defs.add_ontol(tag, DefKind::BuiltinModule(&["format"]));

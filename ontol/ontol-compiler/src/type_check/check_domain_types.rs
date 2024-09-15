@@ -255,7 +255,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         match generator_def_id {
-            _ if generator_def_id == OntolDefTag::GeneratorAuto.def_id() => {
+            _ if generator_def_id == OntolDefTag::Auto.def_id() => {
                 match self.def_ty_ctx.def_table.get(&scalar_def_id) {
                     Some(Type::Primitive(PrimitiveKind::Serial, _)) => {
                         Ok(ValueGenerator::Autoincrement)
@@ -270,7 +270,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     },
                 }
             }
-            _ if generator_def_id == OntolDefTag::GeneratorCreateTime.def_id() => {
+            _ if generator_def_id == OntolDefTag::CreateTime.def_id() => {
                 match self.def_ty_ctx.def_table.get(&scalar_def_id) {
                     Some(Type::TextLike(_, TextLikeType::DateTime)) => {
                         Ok(ValueGenerator::CreatedAtTime)
@@ -278,7 +278,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     _ => Err(()),
                 }
             }
-            _ if generator_def_id == OntolDefTag::GeneratorUpdateTime.def_id() => {
+            _ if generator_def_id == OntolDefTag::UpdateTime.def_id() => {
                 match self.def_ty_ctx.def_table.get(&scalar_def_id) {
                     Some(Type::TextLike(_, TextLikeType::DateTime)) => {
                         Ok(ValueGenerator::UpdatedAtTime)
@@ -312,7 +312,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 output_generator.ok_or(())
             }
             TextPatternSegment::Attribute { type_def_id, .. } => {
-                self.determine_value_generator(OntolDefTag::GeneratorAuto.def_id(), *type_def_id)
+                self.determine_value_generator(OntolDefTag::Auto.def_id(), *type_def_id)
             }
             _ => Err(()),
         }

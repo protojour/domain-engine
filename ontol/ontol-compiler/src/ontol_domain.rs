@@ -55,11 +55,11 @@ impl<'m> PathNode<'m> {
 impl<'m> Compiler<'m> {
     pub fn register_ontol_domain(&mut self) {
         self.str_ctx.intern_constant("ontol");
-        let def_id = self.define_domain(OntolDefTag::Ontol.def_id());
+        let ontol_def_id = self.define_domain(OntolDefTag::Ontol.def_id());
 
-        assert_eq!(def_id.domain_index(), DomainIndex::ontol());
+        assert_eq!(ontol_def_id.domain_index(), DomainIndex::ontol());
         self.domain_ids.insert(
-            def_id.domain_index(),
+            ontol_def_id.domain_index(),
             DomainId {
                 ulid: Ulid::from_str(ONTOL_DOMAIN_ID).unwrap(),
                 stable: true,
@@ -124,6 +124,8 @@ impl<'m> Compiler<'m> {
                         // self.namespaces
                         //     .get_namespace_mut(OntolDefTag::Ontol.def_id(), Space::Def)
                         //     .insert(ident, def_id);
+                    } else {
+                        self.namespaces.add_anonymous(ontol_def_id, def_id);
                     }
                 }
                 _ => {}
@@ -170,25 +172,19 @@ impl<'m> Compiler<'m> {
 
         root_path_node.insert(DefPath(
             &["auto"],
-            self.register_def_type(OntolDefTag::GeneratorAuto.def_id(), Type::ValueGenerator)
+            self.register_def_type(OntolDefTag::Auto.def_id(), Type::ValueGenerator)
                 .0,
         ));
         root_path_node.insert(DefPath(
             &["create_time"],
-            self.register_def_type(
-                OntolDefTag::GeneratorCreateTime.def_id(),
-                Type::ValueGenerator,
-            )
-            .0,
+            self.register_def_type(OntolDefTag::CreateTime.def_id(), Type::ValueGenerator)
+                .0,
         ));
 
         root_path_node.insert(DefPath(
             &["update_time"],
-            self.register_def_type(
-                OntolDefTag::GeneratorUpdateTime.def_id(),
-                Type::ValueGenerator,
-            )
-            .0,
+            self.register_def_type(OntolDefTag::UpdateTime.def_id(), Type::ValueGenerator)
+                .0,
         ));
 
         // union setup

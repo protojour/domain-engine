@@ -9,8 +9,13 @@ use thin_vec::ThinVec;
 use ulid::Ulid;
 
 use crate::{
-    impl_ontol_debug, interface::serde::operator::SerdeOperatorAddr, property::Cardinality,
-    query::order::Direction, tuple::CardinalIdx, DefId, DefIdSet, FnvIndexMap, PropId,
+    impl_ontol_debug,
+    interface::serde::operator::SerdeOperatorAddr,
+    property::Cardinality,
+    query::order::Direction,
+    tuple::CardinalIdx,
+    vec_map::{VecMap, VecMapKey},
+    DefId, DefIdSet, FnvIndexMap, PropId,
 };
 
 use super::{
@@ -33,7 +38,15 @@ pub struct Domain {
     unique_name: TextConstant,
 
     /// Types by def tag (the type's index within the domain)
-    defs: Vec<Def>,
+    defs: VecMap<DefTag, Def>,
+}
+
+struct DefTag(pub u16);
+
+impl VecMapKey for DefTag {
+    fn index(&self) -> usize {
+        self.0 as usize
+    }
 }
 
 impl Domain {
@@ -63,19 +76,22 @@ impl Domain {
     }
 
     pub fn def(&self, def_id: DefId) -> &Def {
-        &self.defs[def_id.1 as usize]
+        match self.defs.get(&DefTag(def_id.1)) {
+            Some(def) => def,
+            None => panic!("{def_id:?} is not in the ontology"),
+        }
     }
 
     pub fn def_option(&self, def_id: DefId) -> Option<&Def> {
-        self.defs.get(def_id.1 as usize)
+        self.defs.get(&DefTag(def_id.1))
     }
 
     pub fn defs(&self) -> impl Iterator<Item = &Def> {
-        self.defs.iter()
+        self.defs.iter().map(|(_idx, def)| def)
     }
 
     pub fn edges(&self) -> impl Iterator<Item = (&DefId, &EdgeInfo)> {
-        self.defs.iter().filter_map(|def| {
+        self.defs().filter_map(|def| {
             if let DefKind::Edge(edge_info) = &def.kind {
                 Some((&def.id, edge_info))
             } else {
@@ -94,31 +110,15 @@ impl Domain {
     }
 
     pub fn find_def_by_name(&self, name: TextConstant) -> Option<&Def> {
-        self.defs.iter().find(|info| info.ident() == Some(name))
+        self.defs().find(|info| info.ident() == Some(name))
     }
 
     pub fn add_def(&mut self, info: Def) {
         self.register_def(info);
     }
 
-    fn register_def(&mut self, info: Def) {
-        let index = info.id.1 as usize;
-
-        // pad the vector
-        let new_size = std::cmp::max(self.defs.len(), index + 1);
-        self.defs.resize_with(new_size, || Def {
-            id: DefId(info.id.0, 0),
-            public: false,
-            kind: DefKind::Data(BasicDef {
-                ident: None,
-                repr: DefRepr::Unit,
-            }),
-            store_key: None,
-            operator_addr: None,
-            data_relationships: Default::default(),
-        });
-
-        self.defs[index] = info;
+    fn register_def(&mut self, def: Def) {
+        self.defs.insert(DefTag(def.id.1), def);
     }
 }
 

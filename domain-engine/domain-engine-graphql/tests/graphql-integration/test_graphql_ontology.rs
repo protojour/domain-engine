@@ -8,10 +8,10 @@ use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema};
 use juniper::graphql_value;
 use ontol_examples::stix::stix_bundle;
 use ontol_macros::datastore_test;
-use ontol_test_utils::expect_eq;
+use ontol_test_utils::{expect_eq, TestCompile};
 use tracing::info;
 
-use crate::mk_engine_default;
+use crate::{mk_engine_default, mk_engine_with_mock};
 
 #[derive(Default)]
 pub struct OntologyParams {
@@ -28,8 +28,137 @@ impl From<OntologyParams> for juniper::Variables<GqlScalar> {
     }
 }
 
+fn expected_defs() -> juniper::Value<GqlScalar> {
+    #[derive(Default)]
+    struct Builder {
+        next_tag: usize,
+        list: Vec<juniper::Value<GqlScalar>>,
+    }
+
+    impl Builder {
+        fn add(&mut self, ident: &str, kind: &str) {
+            let mut obj = juniper::Object::with_capacity(2);
+            obj.add_field(
+                "id",
+                format!("01GNYFZP30ED0EZ1579TH0D55P:{}", self.next_tag).into(),
+            );
+            obj.add_field("ident", ident.into());
+            obj.add_field("kind", kind.into());
+
+            self.next_tag += 1;
+            self.list.push(juniper::Value::Object(obj));
+        }
+
+        fn skip(&mut self, n: usize) {
+            self.next_tag += n;
+        }
+    }
+
+    let mut b = Builder::default();
+
+    b.add("ontol", "DOMAIN");
+    b.skip(1);
+    b.add("false", "DATA");
+    b.add("true", "DATA");
+    b.add("boolean", "DATA");
+    b.skip(2);
+    b.add("number", "DATA");
+    b.add("integer", "DATA");
+    b.add("i64", "DATA");
+    b.add("float", "DATA");
+    b.add("f32", "DATA");
+    b.add("f64", "DATA");
+    b.add("serial", "DATA");
+    b.add("text", "DATA");
+    b.add("octets", "DATA");
+    b.add("vertex", "DATA");
+    b.add("uuid", "DATA");
+    b.add("ulid", "DATA");
+    b.add("datetime", "DATA");
+    b.skip(3);
+    b.add("is", "RELATION");
+    b.skip(3);
+    b.add("store_key", "RELATION");
+    b.add("min", "RELATION");
+    b.add("max", "RELATION");
+    b.add("default", "RELATION");
+    b.add("gen", "RELATION");
+    b.add("order", "RELATION");
+    b.add("direction", "RELATION");
+    b.add("example", "RELATION");
+    b.skip(2);
+    b.add("ascending", "DATA");
+    b.add("descending", "DATA");
+    b.add("auto", "GENERATOR");
+    b.add("create_time", "GENERATOR");
+    b.add("update_time", "GENERATOR");
+    b.add("format", "DATA");
+    b.skip(8);
+    b.add("+", "FUNCTION");
+    b.add("-", "FUNCTION");
+    b.add("*", "FUNCTION");
+    b.add("/", "FUNCTION");
+    b.add("append", "FUNCTION");
+
+    juniper::Value::List(b.list)
+}
+
 #[datastore_test(tokio::test)]
-async fn test_stix_ontology(ds: &str) {
+async fn test_ontology_ontol(ds: &str) {
+    let test = "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
+    "
+    .compile();
+    let engine = mk_engine_with_mock(test.ontology_owned(), (), ds).await;
+    let ontology_ctx = OntologyCtx::new(engine, Session::default());
+    let ontology_schema = OntologySchema::new_with_scalar_value(
+        Default::default(),
+        Default::default(),
+        Default::default(),
+    );
+
+    expect_eq!(
+        actual = r"{ domains { id name } }"
+            .exec([], &ontology_schema, &ontology_ctx)
+            .await,
+        expected = Ok(graphql_value!({
+            "domains": [
+                {
+                    "id": "01GNYFZP30ED0EZ1579TH0D55P",
+                    "name": "ontol",
+                },
+                {
+                    "id": "7ZZZZZZZZZZTESTZZZZZZZZZZZ",
+                    "name": "test_root.on"
+                }
+            ]
+        }))
+    );
+
+    expect_eq!(
+        actual = r#"
+            {
+                domain(id: "01GNYFZP30ED0EZ1579TH0D55P") {
+                    defs {
+                        id
+                        ident
+                        kind
+                    }
+                }
+            }
+        "#
+        .exec([], &ontology_schema, &ontology_ctx)
+        .await,
+        expected = Ok(graphql_value!({
+            "domain": {
+                "defs": expected_defs()
+            }
+        }))
+    );
+}
+
+#[datastore_test(tokio::test)]
+async fn test_ontology_stix(ds: &str) {
     let (test, [stix_schema]) = stix_bundle().compile_schemas(["stix"]);
     let [identity] = test.bind(["identity"]);
 
