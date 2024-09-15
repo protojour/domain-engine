@@ -1,11 +1,9 @@
 use domain_engine_core::DomainResult;
-use itertools::Itertools;
 use ontol_runtime::{
-    ontology::domain::{DataRelationshipTarget, Def, FieldPath},
-    value::Value,
+    ontology::domain::{DataRelationshipTarget, Def, EntityOrder, FieldPath},
     DefId,
 };
-use tracing::{debug, error, warn};
+use tracing::{debug, error};
 
 use crate::{
     pg_error::PgError,
@@ -19,27 +17,15 @@ impl<'a> TransactCtx<'a> {
     pub fn select_order(
         &self,
         def_id: DefId,
-        order_symbols: &[Value],
+        entity_order_tuple: &[EntityOrder],
     ) -> DomainResult<sql::OrderBy<'a>> {
-        if order_symbols.is_empty() {
+        if entity_order_tuple.is_empty() {
             return Ok(Default::default());
         }
-
-        debug!("select order for {def_id:?}");
 
         let pg = self
             .pg_model
             .pg_domain_datatable(def_id.domain_index(), def_id)?;
-
-        let Some(info) = self.ontology.extended_entity_info(def_id) else {
-            warn!("no extended entity info; cannot order");
-            return Ok(Default::default());
-        };
-
-        let entity_order_tuple = order_symbols
-            .iter()
-            .map(|sym| info.order_table.get(&sym.type_def_id()).unwrap())
-            .collect_vec();
 
         let mut order_by = sql::OrderBy::default();
 

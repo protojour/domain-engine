@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use futures_util::{stream::BoxStream, Stream, StreamExt};
 use ontol_runtime::{
-    query::select::{EntitySelect, Select},
+    query::{
+        filter::Filter,
+        select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
+    },
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolvePath},
     sequence::{Sequence, SubSequence},
     value::Value,
@@ -185,6 +188,8 @@ impl DomainEngine {
                     translate_entity_select(&mut select, &map_key, self.ontology());
                 }
 
+                self.datastore_transform_entity_select(&mut select)?;
+
                 send_upmap(op_seq, resolve_path, upmaps_tx).await?;
                 *cur_downmap = None;
 
@@ -192,7 +197,7 @@ impl DomainEngine {
             }
             ReqMessage::Insert(op_seq, mut select) => {
                 *updating = false;
-                self.setup_duplex(
+                self.setup_duplex_map(
                     op_seq,
                     &mut select,
                     ProbeFilter::Complete,
@@ -204,7 +209,7 @@ impl DomainEngine {
             }
             ReqMessage::Update(op_seq, mut select) => {
                 *updating = true;
-                self.setup_duplex(
+                self.setup_duplex_map(
                     op_seq,
                     &mut select,
                     ProbeFilter::Pure,
@@ -216,7 +221,7 @@ impl DomainEngine {
             }
             ReqMessage::Upsert(op_seq, mut select) => {
                 *updating = false;
-                self.setup_duplex(
+                self.setup_duplex_map(
                     op_seq,
                     &mut select,
                     ProbeFilter::Complete,
@@ -244,7 +249,7 @@ impl DomainEngine {
         }
     }
 
-    async fn setup_duplex(
+    async fn setup_duplex_map(
         &self,
         op_seq: OpSequence,
         select: &mut Select,
@@ -266,6 +271,8 @@ impl DomainEngine {
         for map_key in up_path.iter() {
             translate_select(select, &map_key, ontology);
         }
+
+        self.datastore_transform_select(select)?;
 
         *cur_downmap = Some(DownMap(down_path));
         send_upmap(op_seq, up_path, upmaps_tx).await?;
@@ -382,6 +389,77 @@ impl DomainEngine {
         }
 
         Ok(value)
+    }
+
+    fn datastore_transform_select(&self, select: &mut Select) -> DomainResult<()> {
+        match select {
+            Select::Unit => {}
+            Select::EntityId => {}
+            Select::VertexAddress => {}
+            Select::Leaf => {}
+            Select::Struct(struct_select) => {
+                self.datastore_transform_struct_select(struct_select)?;
+            }
+            Select::StructUnion(_, struct_selects) => {
+                for struct_select in struct_selects {
+                    self.datastore_transform_struct_select(struct_select)?;
+                }
+            }
+            Select::Entity(entity_select) => {
+                self.datastore_transform_entity_select(entity_select)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn datastore_transform_entity_select(
+        &self,
+        entity_select: &mut EntitySelect,
+    ) -> DomainResult<()> {
+        match &mut entity_select.source {
+            StructOrUnionSelect::Struct(struct_select) => {
+                self.datastore_transform_filter(&mut entity_select.filter, struct_select.def_id)?;
+                self.datastore_transform_struct_select(struct_select)?;
+            }
+            StructOrUnionSelect::Union(_, struct_selects) => {
+                entity_select.filter.set_entity_order(vec![]);
+
+                for struct_select in struct_selects {
+                    self.datastore_transform_struct_select(struct_select)?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn datastore_transform_struct_select(
+        &self,
+        struct_select: &mut StructSelect,
+    ) -> DomainResult<()> {
+        for select in struct_select.properties.values_mut() {
+            self.datastore_transform_select(select)?;
+        }
+
+        Ok(())
+    }
+
+    pub(super) fn datastore_transform_filter(
+        &self,
+        filter: &mut Filter,
+        def_id: DefId,
+    ) -> DomainResult<()> {
+        let symbolic_order = filter.symbolic_order().unwrap();
+
+        let info = self.ontology().extended_entity_info(def_id).unwrap();
+        let order_vec = symbolic_order
+            .iter()
+            .map(|sym| info.order_table.get(&sym.type_def_id()).unwrap().clone())
+            .collect::<Vec<_>>();
+
+        filter.set_entity_order(order_vec);
+        Ok(())
     }
 }
 

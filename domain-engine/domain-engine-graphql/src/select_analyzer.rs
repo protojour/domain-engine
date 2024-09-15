@@ -146,7 +146,7 @@ impl<'a> SelectAnalyzer<'a> {
                             *var,
                             EntitySelect {
                                 source: StructOrUnionSelect::Struct(struct_select),
-                                filter: Filter::default(),
+                                filter: Filter::default_for_domain(),
                                 limit: self.default_query_limit(),
                                 after_cursor: None,
                                 include_total_len: false,
@@ -241,7 +241,7 @@ impl<'a> SelectAnalyzer<'a> {
                         select: match self.analyze_data(look_ahead.children(), &type_data.kind)? {
                             Select::Struct(struct_select) => Select::Entity(EntitySelect {
                                 source: StructOrUnionSelect::Struct(struct_select),
-                                filter: Filter::default(),
+                                filter: Filter::default_for_domain(),
                                 limit: 1,
                                 after_cursor: None,
                                 include_total_len: false,
@@ -596,7 +596,7 @@ impl<'a> SelectAnalyzer<'a> {
                 Select::Struct(object) => {
                     return Ok(Select::Entity(EntitySelect {
                         source: StructOrUnionSelect::Struct(object),
-                        filter: Filter::default(),
+                        filter: Filter::default_for_domain(),
                         limit,
                         after_cursor,
                         include_total_len,
@@ -605,7 +605,7 @@ impl<'a> SelectAnalyzer<'a> {
                 Select::StructUnion(def_id, variants) => {
                     return Ok(Select::Entity(EntitySelect {
                         source: StructOrUnionSelect::Union(def_id, variants),
-                        filter: Filter::default(),
+                        filter: Filter::default_for_domain(),
                         limit,
                         after_cursor,
                         include_total_len,

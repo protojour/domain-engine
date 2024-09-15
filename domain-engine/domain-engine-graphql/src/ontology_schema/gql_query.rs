@@ -122,7 +122,7 @@ impl Query {
                     def_id,
                     properties: Default::default(),
                 }),
-                filter: Filter::default(),
+                filter: Filter::default_for_datastore(),
                 limit: first.try_into().map_err(field_error)?,
                 after_cursor: match after {
                     Some(after) => Some(

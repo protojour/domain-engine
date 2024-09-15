@@ -8,6 +8,7 @@ use ontol_runtime::{
     interface::serde::processor::ProcessorMode,
     query::{
         condition::Condition,
+        filter::Filter,
         select::{EntitySelect, StructOrUnionSelect, StructSelect},
     },
     value::Value,
@@ -136,7 +137,7 @@ impl domain_engine_core::FindEntitySelect for TestFindQuery {
                 def_id,
                 properties: Default::default(),
             }),
-            filter: Default::default(),
+            filter: Filter::default_for_domain(),
             limit: self.limit,
             after_cursor: None,
             include_total_len: self.include_total_len,

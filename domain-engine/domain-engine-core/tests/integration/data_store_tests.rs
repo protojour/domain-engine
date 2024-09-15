@@ -286,9 +286,14 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
     .unwrap()
     .cast_into();
 
-    let users = test_util::query_entities(&engine, user_def.struct_select([]).into())
-        .await
-        .unwrap();
+    let users = test_util::query_entities(
+        &engine,
+        user_def
+            .struct_select([])
+            .into_default_domain_entity_select(),
+    )
+    .await
+    .unwrap();
 
     let new_user_id = users.elements()[1]
         .get_attribute(user_def.find_property("user_id").unwrap())
@@ -304,7 +309,7 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
                 &engine,
                 user_def
                     .struct_select([("authored_articles", Select::Leaf)])
-                    .into(),
+                    .into_default_domain_entity_select()
             )
             .await
             .unwrap()
@@ -322,9 +327,14 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
         })
     );
 
-    let comments = test_util::query_entities(&engine, comment_def.struct_select([]).into())
-        .await
-        .unwrap();
+    let comments = test_util::query_entities(
+        &engine,
+        comment_def
+            .struct_select([])
+            .into_default_domain_entity_select(),
+    )
+    .await
+    .unwrap();
 
     let comment_id = comments.elements()[0]
         .get_attribute(comment_def.find_property("id").unwrap())
@@ -352,7 +362,7 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
                                 .struct_select([("comments", comment_def.struct_select([]).into())])
                                 .into()
                         )])
-                        .into(),
+                        .into_default_domain_entity_select(),
                 )
                 .await
                 .unwrap()

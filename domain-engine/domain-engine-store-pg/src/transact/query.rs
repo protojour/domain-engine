@@ -1,4 +1,6 @@
-use domain_engine_core::{filter::walker::ConditionWalker, transact::DataOperation, DomainResult};
+use domain_engine_core::{
+    filter::walker::ConditionWalker, transact::DataOperation, DomainError, DomainResult,
+};
 use fnv::FnvHashMap;
 use futures_util::Stream;
 use ontol_runtime::{
@@ -205,7 +207,10 @@ impl<'a> TransactCtx<'a> {
                     sql_select.where_and(condition);
                 }
 
-                sql_select.order_by = self.select_order(def_id, filter.order())?;
+                let entity_order_tuple = filter
+                    .entity_order()
+                    .ok_or_else(|| DomainError::data_store("entity order undefined"))?;
+                sql_select.order_by = self.select_order(def_id, entity_order_tuple)?;
             }
 
             sql_select.with = query_ctx.with();

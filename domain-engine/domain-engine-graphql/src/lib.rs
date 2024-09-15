@@ -203,12 +203,7 @@ async fn mutation(
             let mut op_seq = 0;
 
             for entity_mutation in entity_mutations {
-                let values: Vec<_> = entity_mutation
-                    .inputs
-                    .into_elements()
-                    .into_iter()
-                    // .map(|attr| attr.val)
-                    .collect();
+                let values: Vec<_> = entity_mutation.inputs.into_elements().into_iter().collect();
 
                 match entity_mutation.kind {
                     EntityMutationKind::Create => {

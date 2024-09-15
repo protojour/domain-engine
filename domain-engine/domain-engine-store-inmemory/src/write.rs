@@ -229,7 +229,7 @@ impl InMemoryStore {
                 let target_dynamic_key = Self::extract_dynamic_key(&entity_id)?;
                 let entity_seq = self.query_single_vertex_collection(
                     struct_select,
-                    &Filter::default(),
+                    &Filter::default_for_datastore(),
                     Limit(usize::MAX),
                     Option::<Cursor>::None,
                     IncludeTotalLen(false),

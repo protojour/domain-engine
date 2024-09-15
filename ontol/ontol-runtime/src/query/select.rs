@@ -52,12 +52,13 @@ pub struct StructSelect {
 }
 
 impl StructSelect {
-    pub fn into_entity_select(self, limit: usize, after_cursor: Option<Box<[u8]>>) -> EntitySelect {
+    /// Method should only be used in test code
+    pub fn into_default_domain_entity_select(self) -> EntitySelect {
         EntitySelect {
             source: StructOrUnionSelect::Struct(self),
-            filter: Filter::default(),
-            limit,
-            after_cursor,
+            filter: Filter::default_for_domain(),
+            limit: 20,
+            after_cursor: None,
             include_total_len: false,
         }
     }
@@ -66,17 +67,5 @@ impl StructSelect {
 impl From<StructSelect> for Select {
     fn from(value: StructSelect) -> Self {
         Select::Struct(value)
-    }
-}
-
-impl From<StructSelect> for EntitySelect {
-    fn from(value: StructSelect) -> Self {
-        EntitySelect {
-            source: StructOrUnionSelect::Struct(value),
-            filter: Filter::default(),
-            limit: 20,
-            after_cursor: None,
-            include_total_len: false,
-        }
     }
 }

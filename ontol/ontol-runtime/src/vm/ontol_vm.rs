@@ -14,7 +14,10 @@ use crate::{
     debug::OntolDebug,
     ontology::{ontol::TextConstant, Ontology},
     property::ValueCardinality,
-    query::condition::{Clause, ClausePair, CondTerm},
+    query::{
+        condition::{Clause, ClausePair, CondTerm},
+        filter::Filter,
+    },
     sequence::Sequence,
     tuple::{EndoTuple, EndoTupleElements},
     value::{Value, ValueDebug, ValueTag},
@@ -210,7 +213,7 @@ impl<'o> Processor for OntolProcessor<'o> {
                     let relationship = key.0;
 
                     if relationship == OntolDefTag::RelationOrder.def_id() {
-                        filter.set_order(value);
+                        filter.set_symbolic_order(value);
                     } else if relationship == OntolDefTag::RelationDirection.def_id() {
                         filter
                             .set_direction(value)
@@ -261,7 +264,7 @@ impl<'o> Processor for OntolProcessor<'o> {
                 let relationship = key.0;
 
                 if relationship == OntolDefTag::RelationOrder.def_id() && arity == 1 {
-                    filter.set_order(Value::Sequence(
+                    filter.set_symbolic_order(Value::Sequence(
                         columns.into_iter().next().unwrap(),
                         ValueTag::unit(),
                     ));
@@ -531,7 +534,7 @@ impl<'o> OntolProcessor<'o> {
             BuiltinProc::NewStruct => Value::Struct(Default::default(), tag),
             BuiltinProc::NewSeq => Value::Sequence(Default::default(), tag),
             BuiltinProc::NewUnit => Value::Unit(tag),
-            BuiltinProc::NewFilter => Value::Filter(Default::default(), tag),
+            BuiltinProc::NewFilter => Value::Filter(Box::new(Filter::default_for_domain()), tag),
             BuiltinProc::NewVoid => Value::Void(tag),
         }
     }

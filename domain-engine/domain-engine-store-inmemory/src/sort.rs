@@ -2,7 +2,6 @@ use std::cmp::Ordering;
 
 use domain_engine_core::{DomainError, DomainResult};
 use fnv::FnvHashMap;
-use itertools::Itertools;
 use ontol_runtime::{
     attr::Attr, ontology::domain::EntityOrder, query::filter::Filter, value::Value, DefId, PropId,
 };
@@ -13,26 +12,18 @@ type Attrs = FnvHashMap<PropId, Attr>;
 
 pub(super) fn sort_props_vec(
     raw_props_slice: &mut [(&DynamicKey, FnvHashMap<PropId, Attr>)],
-    def_id: DefId,
+    _def_id: DefId,
     filter: &Filter,
-    ctx: &DbContext,
+    _ctx: &DbContext,
 ) -> DomainResult<()> {
-    let order_symbols = filter.order();
-
-    if order_symbols.is_empty() {
-        return Ok(());
-    }
-
-    let info = ctx.ontology.extended_entity_info(def_id).unwrap();
-    let entity_orders = order_symbols
-        .iter()
-        .map(|sym| info.order_table.get(&sym.type_def_id()).unwrap())
-        .collect_vec();
+    let entity_orders = filter
+        .entity_order()
+        .ok_or_else(|| DomainError::data_store("entity order not defined"))?;
 
     let mut cmp_error: Option<DomainError> = None;
 
     raw_props_slice.sort_by(
-        |(_, a), (_, b)| match compare_order_tuple(a, b, &entity_orders) {
+        |(_, a), (_, b)| match compare_order_tuple(a, b, entity_orders) {
             Ok(ordering) => filter.direction().reorder(ordering),
             Err(error) => {
                 cmp_error.get_or_insert(error);
@@ -52,7 +43,7 @@ pub(super) fn sort_props_vec(
 fn compare_order_tuple(
     a: &Attrs,
     b: &Attrs,
-    entity_orders: &[&EntityOrder],
+    entity_orders: &[EntityOrder],
 ) -> DomainResult<Ordering> {
     for entity_order in entity_orders {
         match compare_entity_order(a, b, entity_order)? {
