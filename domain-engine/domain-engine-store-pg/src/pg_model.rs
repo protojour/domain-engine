@@ -4,7 +4,8 @@ use domain_engine_core::DomainResult;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::{
-        domain::{Def, DefKind, DefRepr, DefReprUnionBound},
+        domain::{DataRelationshipInfo, Def, DefKind, DefRepr, DefReprUnionBound},
+        ontol::ValueGenerator,
         Ontology,
     },
     tuple::CardinalIdx,
@@ -383,6 +384,8 @@ pub enum PgRepr {
     Unit,
     /// A scalar-like data field that can be stored in a column
     Scalar(PgType, OntolDefTag),
+    CreatedAtColumn,
+    UpdatedAtColumn,
     /// Something that will be stored in an abstracted manner in "child table"
     Abstract,
     /// PG can't represent it (yet?)
@@ -390,7 +393,23 @@ pub enum PgRepr {
 }
 
 impl PgRepr {
-    pub fn classify(def_id: DefId, ontology: &Ontology) -> Self {
+    pub fn classify_property(
+        rel_info: &DataRelationshipInfo,
+        def_id: DefId,
+        ontology: &Ontology,
+    ) -> Self {
+        match rel_info.generator {
+            Some(ValueGenerator::CreatedAtTime) => Self::CreatedAtColumn,
+            Some(ValueGenerator::UpdatedAtTime) => Self::UpdatedAtColumn,
+            _ => Self::classify_def_id(def_id, ontology),
+        }
+    }
+
+    pub fn classify_opt_def_repr(def_repr: Option<&DefRepr>, ontology: &Ontology) -> Option<Self> {
+        def_repr.map(|r| Self::classify_def_repr(r, ontology))
+    }
+
+    fn classify_def_id(def_id: DefId, ontology: &Ontology) -> Self {
         let def = ontology.get_def(def_id).unwrap();
         let def_repr = match &def.kind {
             DefKind::Data(basic_def) => &basic_def.repr,
@@ -400,7 +419,7 @@ impl PgRepr {
         Self::classify_def_repr(def_repr, ontology)
     }
 
-    pub fn classify_def_repr(def_repr: &DefRepr, ontology: &Ontology) -> Self {
+    fn classify_def_repr(def_repr: &DefRepr, ontology: &Ontology) -> Self {
         match def_repr {
             DefRepr::Unit => Self::Unit,
             DefRepr::I64 => Self::Scalar(PgType::BigInt, OntolDefTag::I64),
@@ -411,7 +430,9 @@ impl PgRepr {
             DefRepr::TextConstant(_) => Self::Unit,
             DefRepr::Octets => Self::Scalar(PgType::Bytea, OntolDefTag::Octets),
             DefRepr::DateTime => Self::Scalar(PgType::TimestampTz, OntolDefTag::DateTime),
-            DefRepr::FmtStruct(Some((_prop_id, def_id))) => Self::classify(*def_id, ontology),
+            DefRepr::FmtStruct(Some((_prop_id, def_id))) => {
+                Self::classify_def_id(*def_id, ontology)
+            }
             DefRepr::FmtStruct(None) => Self::Unit,
             DefRepr::Seq => todo!("seq"),
             DefRepr::Struct => Self::Abstract,
@@ -426,10 +447,6 @@ impl PgRepr {
             DefRepr::Vertex => Self::NotSupported("vertex"),
             DefRepr::Unknown => Self::NotSupported("unknown"),
         }
-    }
-
-    pub fn classify_opt_def_repr(def_repr: Option<&DefRepr>, ontology: &Ontology) -> Option<Self> {
-        def_repr.map(|r| Self::classify_def_repr(r, ontology))
     }
 }
 

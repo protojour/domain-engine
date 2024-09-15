@@ -11,10 +11,10 @@ use tracing::warn;
 
 use crate::{
     pg_error::PgModelError,
-    pg_model::{PgDomainTable, PgRepr, PgTable, PgType},
+    pg_model::{PgDataKey, PgDomainTable, PgRepr, PgTable, PgType},
     sql,
     sql_record::SqlRecordIterator,
-    sql_value::Layout,
+    sql_value::{Layout, PgTimestamp, SqlOutput, SqlScalar},
 };
 
 use super::TransactCtx;
@@ -33,8 +33,15 @@ pub enum AbstractKind<'a> {
     },
 }
 
+pub struct StandardFields {
+    #[expect(unused)]
+    pub data_key: PgDataKey,
+    pub created_at: PgTimestamp,
+    pub updated_at: PgTimestamp,
+}
+
 impl<'a> TransactCtx<'a> {
-    pub fn initial_standard_data_fields(&self, pg: PgDomainTable<'a>) -> [sql::Expr<'a>; 2] {
+    pub fn initial_standard_data_fields(&self, pg: PgDomainTable<'a>) -> [sql::Expr<'a>; 4] {
         [
             // Always present: the def key of the vertex.
             // This is known ahead of time.
@@ -42,6 +49,8 @@ impl<'a> TransactCtx<'a> {
             sql::Expr::LiteralInt(pg.table.key),
             // Always present: the data key of the vertex
             sql::Expr::path1("_key"),
+            sql::Expr::path1("_created"),
+            sql::Expr::path1("_updated"),
         ]
     }
 
@@ -81,12 +90,13 @@ impl<'a> TransactCtx<'a> {
         def: &Def,
         record_iter: &mut impl SqlRecordIterator<'b>,
         attrs: &mut FnvHashMap<PropId, Attr>,
+        standard_fields: Option<&StandardFields>,
     ) -> DomainResult<()> {
         for (prop_id, rel_info) in &def.data_relationships {
             if let (DataRelationshipKind::Id | DataRelationshipKind::Tree, ValueCardinality::Unit) =
                 (&rel_info.kind, &rel_info.cardinality.1)
             {
-                if let Some(value) = self.read_field(rel_info, record_iter)? {
+                if let Some(value) = self.read_field(rel_info, record_iter, standard_fields)? {
                     attrs.insert(*prop_id, Attr::Unit(value));
                 }
             }
@@ -99,13 +109,14 @@ impl<'a> TransactCtx<'a> {
         &self,
         rel_info: &DataRelationshipInfo,
         record_iter: &mut impl SqlRecordIterator<'b>,
+        standard_fields: Option<&StandardFields>,
     ) -> DomainResult<Option<Value>> {
         let target_def_id = rel_info.target.def_id();
 
         // TODO: Might be able to cache this in some way,
         // e.g. a Vec<PgType> for the property columns in each PgTable.
         // But is the increased memory usage worth it?
-        let pg_repr = PgRepr::classify(target_def_id, self.ontology);
+        let pg_repr = PgRepr::classify_property(rel_info, target_def_id, self.ontology);
 
         match pg_repr {
             PgRepr::Scalar(pg_type, _) => {
@@ -124,6 +135,24 @@ impl<'a> TransactCtx<'a> {
                     Ok(None)
                 }
             },
+            PgRepr::CreatedAtColumn => {
+                let Some(standard_fields) = standard_fields else {
+                    return Ok(None);
+                };
+                Ok(Some(self.deserialize_sql(
+                    target_def_id,
+                    SqlOutput::Scalar(SqlScalar::Timestamp(standard_fields.created_at)),
+                )?))
+            }
+            PgRepr::UpdatedAtColumn => {
+                let Some(standard_fields) = standard_fields else {
+                    return Ok(None);
+                };
+                Ok(Some(self.deserialize_sql(
+                    target_def_id,
+                    SqlOutput::Scalar(SqlScalar::Timestamp(standard_fields.updated_at)),
+                )?))
+            }
             PgRepr::Abstract => Ok(None),
             PgRepr::NotSupported(msg) => Err(PgModelError::DataTypeNotSupported(msg).into()),
         }

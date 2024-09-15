@@ -14,7 +14,7 @@ use crate::{
     pg_error::{PgError, PgInputError},
     pg_model::{EdgeId, InDomain, PgDataKey},
     sql::{self, UpdateColumn},
-    sql_value::SqlScalar,
+    sql_value::{PgTimestamp, SqlScalar},
     transact::query::{QueryFrame, QuerySelect},
 };
 
@@ -40,6 +40,7 @@ impl<'a> TransactCtx<'a> {
         &'s self,
         value: InDomain<Value>,
         select: &'s Select,
+        timestamp: PgTimestamp,
         cache: &mut PgCache,
     ) -> DomainResult<Value> {
         let def_id = value.type_def_id();
@@ -56,6 +57,7 @@ impl<'a> TransactCtx<'a> {
             .update_datatable(
                 value,
                 UpdateCondition::FieldEq(entity.id_prop, entity_id),
+                timestamp,
                 cache,
             )
             .await?;
@@ -90,6 +92,7 @@ impl<'a> TransactCtx<'a> {
         &'s self,
         value: InDomain<Value>,
         update_condition: UpdateCondition,
+        timestamp: PgTimestamp,
         cache: &mut PgCache,
     ) -> DomainResult<PgDataKey> {
         let def_id = value.type_def_id();
@@ -121,6 +124,9 @@ impl<'a> TransactCtx<'a> {
                 update_params.push(SqlScalar::I64(key));
             }
         }
+
+        set.push(sql::UpdateColumn("_updated", sql::Expr::param(1)));
+        update_params.push(SqlScalar::Timestamp(timestamp));
 
         let Value::Struct(data_struct, _) = value.value else {
             return Err(PgInputError::VertexMustBeStruct.into());
@@ -207,6 +213,7 @@ impl<'a> TransactCtx<'a> {
             }
             .to_string();
             debug!("{sql}");
+            trace!("{update_params:?}");
 
             self.client()
                 .query_raw(&sql, update_params.iter().map(|param| param as &dyn ToSql))
@@ -244,7 +251,8 @@ impl<'a> TransactCtx<'a> {
 
         if key_rows.len() == 1 {
             let key = key_rows[0].get(0);
-            self.patch_edges(pg.table, key, edge_patches, cache).await?;
+            self.patch_edges(pg.table, key, edge_patches, timestamp, cache)
+                .await?;
 
             Ok(key)
         } else {

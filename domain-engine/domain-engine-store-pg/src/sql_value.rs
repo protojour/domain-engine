@@ -44,10 +44,12 @@ pub enum SqlScalar {
     F64(OrderedFloat<f64>),
     Text(String),
     Octets(OctetSequence),
-    Timestamp(chrono::DateTime<chrono::Utc>),
+    Timestamp(PgTimestamp),
     Date(chrono::NaiveDate),
     Time(chrono::NaiveTime),
 }
+
+pub type PgTimestamp = chrono::DateTime<chrono::Utc>;
 
 /// Something read out of PG
 #[derive(Debug)]
@@ -105,6 +107,13 @@ impl<'b> SqlOutput<'b> {
         match self {
             Self::Scalar(SqlScalar::I64(int)) => Ok(int),
             _ => Err(PgError::ExpectedType("i64").into()),
+        }
+    }
+
+    pub fn into_timestamp(self) -> DomainResult<PgTimestamp> {
+        match self {
+            Self::Scalar(SqlScalar::Timestamp(ts)) => Ok(ts),
+            _ => Err(PgError::ExpectedType("timestamp").into()),
         }
     }
 

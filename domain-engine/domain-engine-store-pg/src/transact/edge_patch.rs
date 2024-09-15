@@ -25,7 +25,7 @@ use crate::{
         PgEdgeCardinalKind, PgIndexType, PgRegKey, PgTable,
     },
     sql::{self, WhereExt},
-    sql_value::SqlScalar,
+    sql_value::{PgTimestamp, SqlScalar},
     statement::{Prepare, PreparedStatement, ToArcStr},
     transact::{data::Data, edge_query::edge_join_condition, InsertMode},
     CountRows,
@@ -123,13 +123,21 @@ impl<'a> TransactCtx<'a> {
         subject_datatable: &PgTable,
         subject_data_key: PgDataKey,
         patches: EdgePatches,
+        timestamp: PgTimestamp,
         cache: &mut PgCache,
     ) -> DomainResult<()> {
         // debug!("patch edges: {patches:#?}");
 
         for (edge_id, patch) in patches.patches {
-            self.patch_edge(edge_id, subject_datatable, subject_data_key, patch, cache)
-                .await?;
+            self.patch_edge(
+                edge_id,
+                subject_datatable,
+                subject_data_key,
+                patch,
+                timestamp,
+                cache,
+            )
+            .await?;
         }
 
         Ok(())
@@ -141,6 +149,7 @@ impl<'a> TransactCtx<'a> {
         subject_datatable: &PgTable,
         subject_data_key: PgDataKey,
         patch: ProjectedEdgePatch,
+        timestamp: PgTimestamp,
         cache: &mut PgCache,
     ) -> DomainResult<()> {
         let subject_index = patch.subject;
@@ -281,7 +290,6 @@ impl<'a> TransactCtx<'a> {
 
         for tuple in patch.tuples {
             sql_params.clear();
-            sql_params.push(SqlScalar::Timestamp(self.system.current_time()));
 
             if tuple.elements.iter().any(|(_, _, mutation_mode)| {
                 matches!(
@@ -295,6 +303,7 @@ impl<'a> TransactCtx<'a> {
                     &analysis,
                     tuple,
                     &mut sql_params,
+                    timestamp,
                     cache,
                 )
                 .await?;
@@ -305,6 +314,7 @@ impl<'a> TransactCtx<'a> {
                     tuple,
                     &mut sql_params,
                     insert_sql.get_or_insert_with(|| arcstr::format!("{}", sql_insert)),
+                    timestamp,
                     cache,
                 )
                 .await?;
@@ -405,41 +415,44 @@ impl<'a> TransactCtx<'a> {
         (subject_datatable, subject_data_key): (&PgTable, PgDataKey),
         analysis: &EdgeAnalysis<'s>,
         tuple: EdgeEndoTuplePatch,
-        param_buf: &mut Vec<SqlScalar>,
+        sql_params: &mut Vec<SqlScalar>,
         insert_sql: &ArcStr,
+        timestamp: PgTimestamp,
         cache: &mut PgCache,
     ) -> DomainResult<()> {
         let is_upsert = tuple.elements.iter().any(|(.., mutation_mode)| {
             matches!(mutation_mode, MutationMode::Create(InsertMode::Upsert))
         });
 
+        sql_params.push(SqlScalar::Timestamp(timestamp));
+
         let mut element_iter = tuple.into_element_ops();
 
         for projected_cardinal in &analysis.projected_cardinals {
             match projected_cardinal {
                 ProjectedEdgeCardinal::Subject(_, Dynamic::Yes { .. }) => {
-                    param_buf.extend([
+                    sql_params.extend([
                         SqlScalar::I32(subject_datatable.key),
                         SqlScalar::I64(subject_data_key),
                     ]);
                 }
                 ProjectedEdgeCardinal::Subject(_, Dynamic::No) => {
-                    param_buf.push(SqlScalar::I64(subject_data_key));
+                    sql_params.push(SqlScalar::I64(subject_data_key));
                 }
                 ProjectedEdgeCardinal::Object(.., dynamic) => {
                     let (value, mode) = element_iter.next().unwrap();
                     let (foreign_def_id, _, foreign_key) = self
-                        .resolve_linked_vertex(value, mode, Select::EntityId, cache)
+                        .resolve_linked_vertex(value, mode, Select::EntityId, timestamp, cache)
                         .await?;
 
                     if matches!(dynamic, Dynamic::Yes { .. }) {
                         let datatable = self
                             .pg_model
                             .datatable(foreign_def_id.domain_index(), foreign_def_id)?;
-                        param_buf.push(SqlScalar::I32(datatable.key));
+                        sql_params.push(SqlScalar::I32(datatable.key));
                     }
 
-                    param_buf.push(SqlScalar::I64(foreign_key));
+                    sql_params.push(SqlScalar::I64(foreign_key));
                 }
                 ProjectedEdgeCardinal::Parameters => {
                     let Some((Value::Struct(mut map, _), _op)) = element_iter.next() else {
@@ -457,7 +470,7 @@ impl<'a> TransactCtx<'a> {
 
                         match data {
                             Data::Sql(sql_val) => {
-                                param_buf.push(sql_val);
+                                sql_params.push(sql_val);
                             }
                             Data::Compound(_) => {
                                 return Err(ds_bad_req("non-scalar value in edge parameter"));
@@ -471,13 +484,13 @@ impl<'a> TransactCtx<'a> {
         let stmt = self.edge_patch_stmt_cached(insert_sql, cache).await?;
 
         debug!("{stmt}");
-        trace!("{param_buf:?}");
+        trace!("{sql_params:?}");
 
         let row_count = self
             .client()
             .query_raw(
                 stmt.deref(),
-                param_buf.iter().map(|param| param as &dyn ToSql),
+                sql_params.iter().map(|param| param as &dyn ToSql),
             )
             .await
             .map_err(PgError::EdgeInsertion)?
@@ -498,7 +511,8 @@ impl<'a> TransactCtx<'a> {
         (subject_datatable, subject_data_key): (&PgTable, PgDataKey),
         analysis: &EdgeAnalysis<'s>,
         tuple: EdgeEndoTuplePatch,
-        param_buf: &mut Vec<SqlScalar>,
+        sql_params: &mut Vec<SqlScalar>,
+        timestamp: PgTimestamp,
         cache: &mut PgCache,
     ) -> DomainResult<()> {
         let mut element_iter = tuple.into_element_ops();
@@ -511,6 +525,11 @@ impl<'a> TransactCtx<'a> {
             returning: vec![sql::Expr::LiteralInt(0)],
         };
 
+        sql_update
+            .set
+            .push(sql::UpdateColumn("_updated", sql::Expr::param(0)));
+        sql_params.push(SqlScalar::Timestamp(timestamp));
+
         for projected_cardinal in &analysis.projected_cardinals {
             match projected_cardinal {
                 ProjectedEdgeCardinal::Subject(pg_cardinal, _) => {
@@ -518,15 +537,15 @@ impl<'a> TransactCtx<'a> {
                         sql::Path::empty(),
                         pg_cardinal,
                         subject_datatable,
-                        sql::Expr::param(param_buf.len()),
+                        sql::Expr::param(sql_params.len()),
                     ));
-                    param_buf.push(SqlScalar::I64(subject_data_key));
+                    sql_params.push(SqlScalar::I64(subject_data_key));
                 }
                 ProjectedEdgeCardinal::Object(pg_cardinal, dynamic) => {
                     // for objects, the edge itself is not updated
                     let (value, mode) = element_iter.next().unwrap();
                     let (foreign_def_id, foreign_def_key, foreign_data_key) = self
-                        .resolve_linked_vertex(value, mode, Select::EntityId, cache)
+                        .resolve_linked_vertex(value, mode, Select::EntityId, timestamp, cache)
                         .await?;
 
                     match mode {
@@ -534,16 +553,16 @@ impl<'a> TransactCtx<'a> {
                             if let Dynamic::Yes { def_col_name } = dynamic {
                                 sql_update.set.push(sql::UpdateColumn(
                                     def_col_name,
-                                    sql::Expr::param(param_buf.len()),
+                                    sql::Expr::param(sql_params.len()),
                                 ));
-                                param_buf.push(SqlScalar::I32(foreign_def_key));
+                                sql_params.push(SqlScalar::I32(foreign_def_key));
                             }
 
                             sql_update.set.push(sql::UpdateColumn(
                                 pg_cardinal.key_col_name().unwrap(),
-                                sql::Expr::param(param_buf.len()),
+                                sql::Expr::param(sql_params.len()),
                             ));
-                            param_buf.push(SqlScalar::I64(foreign_data_key));
+                            sql_params.push(SqlScalar::I64(foreign_data_key));
                         }
                         MutationMode::Create(_) | MutationMode::Update => {
                             let object_datatable = self
@@ -554,9 +573,9 @@ impl<'a> TransactCtx<'a> {
                                 sql::Path::empty(),
                                 pg_cardinal,
                                 object_datatable,
-                                sql::Expr::param(param_buf.len()),
+                                sql::Expr::param(sql_params.len()),
                             ));
-                            param_buf.push(SqlScalar::I64(foreign_data_key));
+                            sql_params.push(SqlScalar::I64(foreign_data_key));
                         }
                     }
                 }
@@ -579,9 +598,9 @@ impl<'a> TransactCtx<'a> {
                                 let field = pg_edge.table.column(prop_id)?;
                                 sql_update.set.push(sql::UpdateColumn(
                                     &field.col_name,
-                                    sql::Expr::param(param_buf.len()),
+                                    sql::Expr::param(sql_params.len()),
                                 ));
-                                param_buf.push(sql_val);
+                                sql_params.push(sql_val);
                             }
                             Data::Compound(_) => {
                                 return Err(ds_bad_req("non-scalar value in edge parameter"));
@@ -616,13 +635,13 @@ impl<'a> TransactCtx<'a> {
             .await?;
 
         debug!("{stmt}");
-        trace!("{param_buf:?}");
+        trace!("{sql_params:?}");
 
         let row_count = self
             .client()
             .query_raw(
                 stmt.deref(),
-                param_buf.iter().map(|param| param as &dyn ToSql),
+                sql_params.iter().map(|param| param as &dyn ToSql),
             )
             .await
             .map_err(PgError::EdgeUpdate)?
@@ -656,6 +675,7 @@ impl<'a> TransactCtx<'a> {
         value: Value,
         mode: MutationMode,
         select: Select,
+        timestamp: PgTimestamp,
         cache: &mut PgCache,
     ) -> DomainResult<(DefId, PgRegKey, PgDataKey)> {
         let def_id = value.type_def_id();
@@ -727,6 +747,7 @@ impl<'a> TransactCtx<'a> {
                             },
                             insert_mode,
                             &select,
+                            timestamp,
                             cache,
                         )
                         .await?
@@ -807,7 +828,6 @@ impl<'a> TransactCtx<'a> {
                 };
 
                 debug!("{insert_stmt}");
-                let timestamp = SqlScalar::Timestamp(self.system.current_time());
                 let sql_params: [&(dyn ToSql + Sync); 2] = [&timestamp, &id_param];
 
                 let row = self
@@ -858,7 +878,7 @@ impl<'a> TransactCtx<'a> {
                             target: Some(sql::ConflictTarget::Columns(vec![&pg_column.col_name])),
                             action: sql::ConflictAction::DoUpdateSet(vec![sql::UpdateColumn(
                                 &pg_column.col_name,
-                                sql::Expr::param(0),
+                                sql::Expr::param(1),
                             )]),
                         }),
                         returning: vec![sql::Expr::path1("_key")],
@@ -874,7 +894,6 @@ impl<'a> TransactCtx<'a> {
                 };
 
                 debug!("{stmt}");
-                let timestamp = SqlScalar::Timestamp(self.system.current_time());
 
                 let sql_params: [&(dyn ToSql + Sync); 2] = [&timestamp, &id_param];
                 trace!("resolve linked vertex {:?}", sql_params);

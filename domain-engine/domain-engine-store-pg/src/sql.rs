@@ -380,7 +380,7 @@ impl<'a> Display for Update<'a> {
             f,
             "UPDATE {table_name} SET {set}",
             table_name = self.table_name,
-            set = self.set.iter().format(",")
+            set = self.set.iter().format(", ")
         )?;
 
         if let Some(condition) = &self.where_ {
@@ -520,7 +520,7 @@ impl<'a> Display for UpdateColumn<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{column_name} = {expr}",
+            "{column_name}={expr}",
             column_name = Ident(self.0),
             expr = self.1
         )
@@ -548,7 +548,7 @@ impl<'a> Display for Expr<'a> {
             Self::Union(union) => write!(f, "{union}"),
             Self::And(clauses) => write!(f, "{}", clauses.iter().format(" AND ")),
             Self::Or(clauses) => write!(f, "{}", clauses.iter().format(" OR ")),
-            Self::Eq(a, b) => write!(f, "{a} = {b}"),
+            Self::Eq(a, b) => write!(f, "{a}={b}"),
             Self::In(a, b) => write!(f, "{a} IN {b}"),
             Self::Exists(expr) => write!(f, "EXISTS({expr})"),
             Self::Row(fields) => write!(f, "ROW({})", fields.iter().format(",")),

@@ -35,9 +35,7 @@ use self::{
     config::DomainConfig,
     domain::{Def, Domain, ExtendedEntityInfo},
     map::{Extern, MapMeta, PropertyFlow},
-    ontol::{
-        text_pattern::TextPattern, OntolDomainMeta, TextConstant, TextLikeType, ValueGenerator,
-    },
+    ontol::{text_pattern::TextPattern, OntolDomainMeta, TextConstant, TextLikeType},
 };
 
 pub mod builder;
@@ -77,7 +75,6 @@ pub struct Data {
     prop_docs: FnvHashMap<PropId, TextConstant>,
     serde_operators: Vec<SerdeOperator>,
     dynamic_sequence_operator_addr: SerdeOperatorAddr,
-    value_generators: FnvHashMap<PropId, ValueGenerator>,
     property_flows: Vec<PropertyFlow>,
 }
 
@@ -265,10 +262,6 @@ impl Ontology {
 
     pub fn dynamic_sequence_operator_addr(&self) -> SerdeOperatorAddr {
         self.data.dynamic_sequence_operator_addr
-    }
-
-    pub fn get_value_generator(&self, prop_id: PropId) -> Option<&ValueGenerator> {
-        self.data.value_generators.get(&prop_id)
     }
 
     pub fn get_extern(&self, def_id: DefId) -> Option<&Extern> {

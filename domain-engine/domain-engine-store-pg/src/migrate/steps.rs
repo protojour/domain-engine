@@ -374,7 +374,7 @@ fn migrate_datafields_steps(
             pg_domain
                 .get_table(&table_id)
                 .and_then(|datatable| datatable.properties.get(prop_tag)),
-            PgRepr::classify(target_def_id, ontology),
+            PgRepr::classify_property(rel_info, target_def_id, ontology),
             rel_info.cardinality.1,
         ) {
             (_, PgRepr::Unit, _) => {
@@ -439,6 +439,9 @@ fn migrate_datafields_steps(
                         },
                     }],
                 );
+            }
+            (_, PgRepr::CreatedAtColumn | PgRepr::UpdatedAtColumn, _) => {
+                // has standard columns ("_created", "_updated")
             }
             (None, PgRepr::Abstract, _) => {
                 ctx.steps.extend(

@@ -14,7 +14,7 @@ use ontol_runtime::{
 use crate::{
     pg_error::{ds_bad_req, ds_err},
     pg_model::{PgDataKey, PgRegKey},
-    sql_value::{SqlOutput, SqlScalar},
+    sql_value::{PgTimestamp, SqlOutput, SqlScalar},
 };
 
 use super::TransactCtx;
@@ -23,6 +23,7 @@ pub struct RowValue {
     pub value: Value,
     pub def_key: PgRegKey,
     pub data_key: PgDataKey,
+    pub updated_at: PgTimestamp,
     pub op: DataOperation,
 }
 

@@ -13,7 +13,7 @@ use ontol_runtime::{
             EdgeCardinalFlags, EdgeCardinalProjection, EdgeInfo, Entity,
         },
         map::MapMeta,
-        ontol::{OntolDomainMeta, TextConstant, TextLikeType, ValueGenerator},
+        ontol::{OntolDomainMeta, TextConstant, TextLikeType},
         Ontology,
     },
     rustdoc::RustDoc,
@@ -341,16 +341,9 @@ impl<'m> Compiler<'m> {
             }
         }
 
-        let mut value_generators: FnvHashMap<PropId, ValueGenerator> = Default::default();
         for properties in self.prop_ctx.properties_by_def_id.values() {
             if let Some(table) = &properties.table {
                 for (prop_id, property) in table {
-                    if let Some(value_generator) =
-                        self.misc_ctx.value_generators.remove(&property.rel_id)
-                    {
-                        value_generators.insert(*prop_id, value_generator);
-                    }
-
                     if let Some(docs) = docs_table.get(&DocId::Rel(property.rel_id)) {
                         prop_docs.insert(*prop_id, str_ctx.intern_constant(docs));
                     }
@@ -383,7 +376,6 @@ impl<'m> Compiler<'m> {
             .text_like_types(self.defs.text_like_types)
             .text_patterns(self.text_patterns.text_patterns)
             .externs(self.def_ty_ctx.ontology_externs)
-            .value_generators(value_generators)
             .domain_interfaces(domain_interfaces)
             .build()
     }
@@ -532,6 +524,8 @@ impl<'m> Compiler<'m> {
                 ),
             };
 
+        let generator = self.misc_ctx.value_generators.get(&rel_id).cloned();
+
         // collect relationship
         relationships.insert(
             prop_id,
@@ -541,6 +535,7 @@ impl<'m> Compiler<'m> {
                 cardinality: meta.relationship.subject_cardinality,
                 source,
                 target,
+                generator,
             },
         );
     }

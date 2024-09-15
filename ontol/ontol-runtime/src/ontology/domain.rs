@@ -261,6 +261,7 @@ pub struct DataRelationshipInfo {
     pub cardinality: Cardinality,
     pub source: DataRelationshipSource,
     pub target: DataRelationshipTarget,
+    pub generator: Option<ValueGenerator>,
 }
 
 impl DataRelationshipInfo {

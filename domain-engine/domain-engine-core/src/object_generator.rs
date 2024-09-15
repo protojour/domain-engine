@@ -108,7 +108,12 @@ impl<'e> ObjectGenerator<'e> {
                         continue;
                     }
 
-                    match self.ontology.get_value_generator(property.id) {
+                    let generator = def
+                        .data_relationships
+                        .get(&property.id)
+                        .and_then(|rel_info| rel_info.generator);
+
+                    match generator {
                         Some(ValueGenerator::DefaultProc(_)) => {}
                         Some(ValueGenerator::Uuid) => {
                             struct_map.insert(

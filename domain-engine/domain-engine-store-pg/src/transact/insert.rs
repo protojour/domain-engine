@@ -10,7 +10,10 @@ use fnv::FnvHashMap;
 use futures_util::{future::BoxFuture, TryStreamExt};
 use ontol_runtime::{
     attr::Attr,
-    ontology::domain::{DataRelationshipKind, DataRelationshipTarget, Def},
+    ontology::{
+        domain::{DataRelationshipKind, DataRelationshipTarget, Def},
+        ontol::ValueGenerator,
+    },
     query::select::Select,
     value::Value,
     DefId, DomainIndex, PropId,
@@ -26,7 +29,7 @@ use crate::{
     },
     sql::{self},
     sql_record::{SqlColumnStream, SqlRecordIterator},
-    sql_value::{Layout, SqlScalar},
+    sql_value::{Layout, PgTimestamp, SqlScalar},
     statement::{Prepare, PreparedStatement, ToArcStr},
     transact::query::IncludeJoinedAttrs,
 };
@@ -51,6 +54,7 @@ struct AnalyzedInput<'a> {
     edges: EdgePatches,
     abstract_values: Vec<(PropId, Value)>,
     query_select: QuerySelect<'a>,
+    timestamp: PgTimestamp,
 }
 
 enum InsertQueryKind {
@@ -71,11 +75,12 @@ impl<'a> TransactCtx<'a> {
         value: InDomain<Value>,
         insert_mode: InsertMode,
         select: &'a Select,
+        timestamp: PgTimestamp,
         cache: &'s mut PgCache,
     ) -> BoxFuture<'_, DomainResult<RowValue>> {
         Box::pin(async move {
             let _def_id = value.value.type_def_id();
-            self.insert_vertex_impl(value, insert_mode, select, cache)
+            self.insert_vertex_impl(value, insert_mode, select, timestamp, cache)
                 // .instrument(debug_span!("ins", id = ?def_id))
                 .await
         })
@@ -86,6 +91,7 @@ impl<'a> TransactCtx<'a> {
         mut value: InDomain<Value>,
         insert_mode: InsertMode,
         select: &'a Select,
+        timestamp: PgTimestamp,
         cache: &'s mut PgCache,
     ) -> DomainResult<RowValue> {
         let domain_index = value.domain_index;
@@ -106,7 +112,7 @@ impl<'a> TransactCtx<'a> {
         self.preprocess_insert_value(insert_mode, &mut value.value)?;
 
         let def = self.ontology.def(value.value.type_def_id());
-        let (mut analyzed, pg) = self.analyze_input(None, def, value, select, cache)?;
+        let (mut analyzed, pg) = self.analyze_input(None, def, value, select, timestamp, cache)?;
         let sql_params = analyzed.sql_params;
 
         let mut row_value = match analyzed.query_kind {
@@ -115,8 +121,15 @@ impl<'a> TransactCtx<'a> {
                     .await?
             }
             InsertQueryKind::UpdateTentative(data_key) => {
-                self.update_tentative_vertex(def, pg, sql_params, data_key, cache)
-                    .await?
+                self.update_tentative_vertex(
+                    def,
+                    pg,
+                    sql_params,
+                    data_key,
+                    analyzed.timestamp,
+                    cache,
+                )
+                .await?
             }
         };
 
@@ -134,8 +147,14 @@ impl<'a> TransactCtx<'a> {
                 }
             }
 
-            self.patch_edges(pg.table, row_value.data_key, analyzed.edges, cache)
-                .await?;
+            self.patch_edges(
+                pg.table,
+                row_value.data_key,
+                analyzed.edges,
+                analyzed.timestamp,
+                cache,
+            )
+            .await?;
         }
 
         for (prop_id, value) in analyzed.abstract_values {
@@ -145,6 +164,7 @@ impl<'a> TransactCtx<'a> {
                     key: row_value.data_key,
                 },
                 value,
+                row_value.updated_at,
                 cache,
             )
             .await?;
@@ -186,6 +206,7 @@ impl<'a> TransactCtx<'a> {
         pg: PgDomainTable<'a>,
         mut sql_params: Vec<SqlScalar>,
         data_key: PgDataKey,
+        timestamp: PgTimestamp,
         cache: &'s mut PgCache,
     ) -> DomainResult<RowValue> {
         let cache_key = (def.id.domain_index(), def.id);
@@ -196,14 +217,17 @@ impl<'a> TransactCtx<'a> {
             let mut sql_update = sql::Update {
                 with: None,
                 table_name: pg.table_name(),
-                set: vec![],
+                set: vec![
+                    sql::UpdateColumn("_created", sql::Expr::param(0)),
+                    sql::UpdateColumn("_updated", sql::Expr::param(0)),
+                ],
                 where_: Some(sql::Expr::eq(
                     sql::Expr::path1("_key"),
                     sql::Expr::param(sql_params.len()),
                 )),
                 returning: vec![sql::Expr::LiteralInt(0)],
             };
-            let mut param_idx = 0;
+            let mut param_idx = 1;
 
             for prop_id in def.data_relationships.keys() {
                 if let Some(pg_column) = pg.table.find_column(prop_id) {
@@ -220,7 +244,7 @@ impl<'a> TransactCtx<'a> {
             prepared
         };
 
-        let mut param_idx = 0;
+        let mut param_idx = 1;
 
         let mut attrs: FnvHashMap<PropId, Attr> =
             FnvHashMap::with_capacity_and_hasher(def.data_relationships.len(), Default::default());
@@ -233,6 +257,19 @@ impl<'a> TransactCtx<'a> {
                     self.deserialize_sql(rel_info.target.def_id(), input_param.clone().into())?;
                 attrs.insert(*prop_id, Attr::Unit(unit_val));
                 param_idx += 1;
+            } else {
+                match rel_info.generator {
+                    Some(ValueGenerator::CreatedAtTime | ValueGenerator::UpdatedAtTime) => {
+                        let input_param = sql_params.get(0).unwrap();
+
+                        let unit_val = self.deserialize_sql(
+                            rel_info.target.def_id(),
+                            input_param.clone().into(),
+                        )?;
+                        attrs.insert(*prop_id, Attr::Unit(unit_val));
+                    }
+                    _ => {}
+                }
             }
         }
 
@@ -241,6 +278,7 @@ impl<'a> TransactCtx<'a> {
         sql_params.push(SqlScalar::I64(data_key));
 
         debug!("{prepared}");
+        trace!("{sql_params:?}");
 
         self.query_one_raw(prepared.deref(), &sql_params).await?;
 
@@ -248,6 +286,7 @@ impl<'a> TransactCtx<'a> {
             value: Value::Struct(Box::new(attrs), def.id.into()),
             def_key: pg.table.key,
             data_key,
+            updated_at: timestamp,
             op: DataOperation::Inserted,
         })
     }
@@ -256,15 +295,17 @@ impl<'a> TransactCtx<'a> {
         &'s self,
         parent: ParentProp,
         value: Value,
+        timestamp: PgTimestamp,
         cache: &'s mut PgCache,
     ) -> BoxFuture<'_, DomainResult<()>> {
-        Box::pin(self.insert_abstract_sub_value_impl(parent, value, cache))
+        Box::pin(self.insert_abstract_sub_value_impl(parent, value, timestamp, cache))
     }
 
     async fn insert_abstract_sub_value_impl(
         &self,
         parent: ParentProp,
         value: Value,
+        timestamp: PgTimestamp,
         cache: &mut PgCache,
     ) -> DomainResult<()> {
         let value_def_id = value.type_def_id();
@@ -308,6 +349,7 @@ impl<'a> TransactCtx<'a> {
             };
 
             let sql_params = vec![
+                SqlScalar::Timestamp(timestamp),
                 SqlScalar::I32(parent_prop_key),
                 SqlScalar::I64(parent.key),
                 value,
@@ -348,6 +390,7 @@ impl<'a> TransactCtx<'a> {
                     value,
                 },
                 &Select::Unit,
+                timestamp,
                 cache,
             )?;
 
@@ -359,8 +402,14 @@ impl<'a> TransactCtx<'a> {
                 )
                 .await?;
 
-            self.patch_edges(pg.table, row_value.data_key, analyzed.edges, cache)
-                .await?;
+            self.patch_edges(
+                pg.table,
+                row_value.data_key,
+                analyzed.edges,
+                analyzed.timestamp,
+                cache,
+            )
+            .await?;
 
             for (prop_id, value) in analyzed.abstract_values {
                 self.insert_abstract_sub_value(
@@ -369,6 +418,7 @@ impl<'a> TransactCtx<'a> {
                         key: row_value.data_key,
                     },
                     value,
+                    row_value.updated_at,
                     cache,
                 )
                 .await?;
@@ -431,8 +481,6 @@ impl<'a> TransactCtx<'a> {
 
         let mut edge_select_stmt: Option<PreparedStatement> = None;
 
-        self.system.current_time();
-
         let mut column_names = vec!["_key", "_created", "_updated"];
         let mut values = vec![sql::Expr::Default, sql::Expr::param(0), sql::Expr::param(0)];
         let mut insert_returning = vec![
@@ -446,7 +494,7 @@ impl<'a> TransactCtx<'a> {
 
         if pg.table.has_fkey {
             column_names.extend(["_fprop", "_fkey"]);
-            values.extend([sql::Expr::param(0), sql::Expr::param(1)]);
+            values.extend([sql::Expr::param(1), sql::Expr::param(2)]);
             param_idx += 2;
         }
 
@@ -485,7 +533,7 @@ impl<'a> TransactCtx<'a> {
         if let (InsertMode::Upsert, Some(primary_id_column)) = (insert_mode, primary_id_column) {
             let mut update_columns: Vec<sql::UpdateColumn> =
                 vec![sql::UpdateColumn("_updated", sql::Expr::param(0))];
-            let mut param_idx = 0;
+            let mut param_idx = 1;
 
             for (prop_id, rel_info) in &def.data_relationships {
                 match rel_info.kind {
@@ -607,6 +655,7 @@ impl<'a> TransactCtx<'a> {
         def: &Def,
         value: InDomain<Value>,
         select: &'a Select,
+        timestamp: PgTimestamp,
         cache: &mut PgCache,
     ) -> DomainResult<(AnalyzedInput<'a>, PgDomainTable<'_>)> {
         let pg = self
@@ -617,8 +666,6 @@ impl<'a> TransactCtx<'a> {
         let Value::Struct(mut attrs, _struct_tag) = value.value else {
             return Err(DomainErrorKind::EntityMustBeStruct.into_error());
         };
-
-        let timestamp = self.system.current_time();
 
         let mut sql_params: Vec<SqlScalar> = vec![SqlScalar::Timestamp(timestamp)];
         let mut update_tentative: Option<PgDataKey> = None;
@@ -721,7 +768,10 @@ impl<'a> TransactCtx<'a> {
                 _ => {
                     match &rel_info.target {
                         DataRelationshipTarget::Unambiguous(def_id) => {
-                            if matches!(PgRepr::classify(*def_id, self.ontology), PgRepr::Unit) {
+                            if matches!(
+                                PgRepr::classify_property(rel_info, *def_id, self.ontology),
+                                PgRepr::Unit
+                            ) {
                                 continue;
                             }
                         }
@@ -776,6 +826,7 @@ impl<'a> TransactCtx<'a> {
                 edges: edge_patches,
                 abstract_values,
                 query_select,
+                timestamp,
             },
             pg,
         ))

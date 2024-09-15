@@ -15,9 +15,7 @@ use super::{
     config::DomainConfig,
     domain::{Domain, ExtendedEntityInfo},
     map::{Extern, MapMeta, PropertyFlow},
-    ontol::{
-        text_pattern::TextPattern, OntolDomainMeta, TextConstant, TextLikeType, ValueGenerator,
-    },
+    ontol::{text_pattern::TextPattern, OntolDomainMeta, TextConstant, TextLikeType},
     Data, Ontology,
 };
 
@@ -139,11 +137,6 @@ impl OntologyBuilder {
         self
     }
 
-    pub fn value_generators(mut self, generators: FnvHashMap<PropId, ValueGenerator>) -> Self {
-        self.data().value_generators = generators;
-        self
-    }
-
     fn data(&mut self) -> &mut Data {
         &mut self.ontology.data
     }
@@ -176,7 +169,6 @@ pub(super) fn new_builder() -> OntologyBuilder {
                 lib: Lib::default(),
                 serde_operators: Default::default(),
                 dynamic_sequence_operator_addr: SerdeOperatorAddr(u32::MAX),
-                value_generators: Default::default(),
                 property_flows: Default::default(),
             },
         },

@@ -209,21 +209,24 @@ pub async fn transact(
                             ObjectGenerator::without_timestamps(ProcessorMode::Create, ctx.ontology, ctx.system)
                                 .generate_objects(&mut value);
 
-                            let row = ctx.insert_vertex(value.into(), InsertMode::Insert, select, &mut cache).await?;
+                            let timestamp = ctx.system.current_time();
+                            let row = ctx.insert_vertex(value.into(), InsertMode::Insert, select, timestamp, &mut cache).await?;
                             yield RespMessage::Element(row.value, row.op);
                         }
                         Some(State::Update(_, select)) => {
                             ObjectGenerator::without_timestamps(ProcessorMode::Update, ctx.ontology, ctx.system)
                                 .generate_objects(&mut value);
 
-                            let value = ctx.update_vertex_with_select(value.into(), select, &mut cache).await?;
+                            let timestamp = ctx.system.current_time();
+                            let value = ctx.update_vertex_with_select(value.into(), select, timestamp, &mut cache).await?;
                             yield RespMessage::Element(value, DataOperation::Updated);
                         }
                         Some(State::Upsert(_, select)) => {
                             ObjectGenerator::without_timestamps(ProcessorMode::Create, ctx.ontology, ctx.system)
                                 .generate_objects(&mut value);
 
-                            let row = ctx.insert_vertex(value.into(), InsertMode::Upsert, select, &mut cache).await?;
+                            let timestamp = ctx.system.current_time();
+                            let row = ctx.insert_vertex(value.into(), InsertMode::Upsert, select, timestamp, &mut cache).await?;
                             yield RespMessage::Element(row.value, row.op);
                         }
                         Some(State::Delete(_, def_id)) => {

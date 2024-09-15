@@ -34,7 +34,7 @@ use super::{
     edge_query::{
         CardinalSelect, EdgeUnionSelectBuilder, EdgeUnionVariantSelectBuilder, PgEdgeProjection,
     },
-    fields::AbstractKind,
+    fields::{AbstractKind, StandardFields},
     TransactCtx,
 };
 
@@ -584,12 +584,25 @@ impl<'a> TransactCtx<'a> {
         let data_key = iterator
             .next_field(&Layout::Scalar(PgType::BigInt))?
             .into_i64()?;
+        let created_at = iterator
+            .next_field(&Layout::Scalar(PgType::TimestampTz))?
+            .into_timestamp()?;
+        let updated_at = iterator
+            .next_field(&Layout::Scalar(PgType::TimestampTz))?
+            .into_timestamp()?;
+
+        let standard_fields = StandardFields {
+            data_key,
+            created_at,
+            updated_at,
+        };
 
         match query_select {
             Some(QuerySelect::Unit) => Ok(RowValue {
                 value: Value::unit(),
                 def_key,
                 data_key,
+                updated_at,
                 op,
             }),
             Some(QuerySelect::Struct(properties)) => {
@@ -604,7 +617,12 @@ impl<'a> TransactCtx<'a> {
                 );
 
                 // retrieve data properties
-                self.read_inherent_struct_fields(def, &mut iterator, &mut attrs)?;
+                self.read_inherent_struct_fields(
+                    def,
+                    &mut iterator,
+                    &mut attrs,
+                    Some(&standard_fields),
+                )?;
 
                 if matches!(&include_joined_attrs, IncludeJoinedAttrs::Yes) {
                     // retrieve abstract properties
@@ -710,6 +728,7 @@ impl<'a> TransactCtx<'a> {
                     value,
                     def_key,
                     data_key,
+                    updated_at,
                     op,
                 })
             }
@@ -720,6 +739,7 @@ impl<'a> TransactCtx<'a> {
                             .get(&prop_id)
                             .ok_or(PgModelError::NonExistentField(prop_id))?,
                         &mut iterator,
+                        Some(&standard_fields),
                     )?
                     .ok_or(PgError::MissingField(prop_id))?;
 
@@ -727,6 +747,7 @@ impl<'a> TransactCtx<'a> {
                     value: field_value,
                     def_key,
                     data_key,
+                    updated_at,
                     op,
                 })
             }
@@ -734,6 +755,7 @@ impl<'a> TransactCtx<'a> {
                 value: Value::Void(DefId::unit().into()),
                 def_key,
                 data_key,
+                updated_at,
                 op,
             }),
         }
@@ -832,7 +854,12 @@ impl<'a> TransactCtx<'a> {
                     let struct_record = sql_field.into_record()?;
 
                     // retrieve data properties
-                    self.read_inherent_struct_fields(def, &mut struct_record.fields(), &mut attrs)?;
+                    self.read_inherent_struct_fields(
+                        def,
+                        &mut struct_record.fields(),
+                        &mut attrs,
+                        None,
+                    )?;
 
                     return Ok(Attr::Tuple(Box::new(EndoTuple {
                         elements: smallvec![
