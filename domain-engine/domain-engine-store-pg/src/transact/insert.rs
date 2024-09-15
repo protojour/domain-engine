@@ -257,19 +257,14 @@ impl<'a> TransactCtx<'a> {
                     self.deserialize_sql(rel_info.target.def_id(), input_param.clone().into())?;
                 attrs.insert(*prop_id, Attr::Unit(unit_val));
                 param_idx += 1;
-            } else {
-                match rel_info.generator {
-                    Some(ValueGenerator::CreatedAtTime | ValueGenerator::UpdatedAtTime) => {
-                        let input_param = sql_params.get(0).unwrap();
+            } else if let Some(ValueGenerator::CreatedAtTime | ValueGenerator::UpdatedAtTime) =
+                rel_info.generator
+            {
+                let input_param = sql_params.first().unwrap();
 
-                        let unit_val = self.deserialize_sql(
-                            rel_info.target.def_id(),
-                            input_param.clone().into(),
-                        )?;
-                        attrs.insert(*prop_id, Attr::Unit(unit_val));
-                    }
-                    _ => {}
-                }
+                let unit_val =
+                    self.deserialize_sql(rel_info.target.def_id(), input_param.clone().into())?;
+                attrs.insert(*prop_id, Attr::Unit(unit_val));
             }
         }
 

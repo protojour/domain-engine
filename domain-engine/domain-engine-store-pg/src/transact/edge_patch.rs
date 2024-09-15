@@ -410,6 +410,7 @@ impl<'a> TransactCtx<'a> {
         Ok(())
     }
 
+    #[expect(clippy::too_many_arguments)]
     async fn insert_edge<'s>(
         &'s self,
         (subject_datatable, subject_data_key): (&PgTable, PgDataKey),
@@ -505,6 +506,7 @@ impl<'a> TransactCtx<'a> {
         }
     }
 
+    #[expect(clippy::too_many_arguments)]
     async fn update_edge<'s>(
         &'s self,
         pg_edge: PgDomainTable<'_>,

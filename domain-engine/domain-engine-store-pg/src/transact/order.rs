@@ -92,7 +92,7 @@ impl<'a> TransactCtx<'a> {
                         }
                     };
 
-                    match PgRepr::classify_property(rel_info, target_def_id, &self.ontology) {
+                    match PgRepr::classify_property(rel_info, target_def_id, self.ontology) {
                         PgRepr::CreatedAtColumn => {
                             return Ok(Some(sql::Expr::path1("_created")));
                         }
