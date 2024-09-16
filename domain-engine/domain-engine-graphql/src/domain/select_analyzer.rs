@@ -1,4 +1,4 @@
-use std::collections::hash_map::Entry;
+use std::collections::{btree_map::Entry, BTreeMap};
 
 use fnv::{FnvHashMap, FnvHashSet};
 use juniper::{FieldError, LookAheadChildren};
@@ -431,8 +431,7 @@ impl<'a> SelectAnalyzer<'a> {
                 self.analyze_object_data(look_ahead_children, object_data)
             }
             TypeKind::Union(union_data) => {
-                let mut union_map: FnvHashMap<DefId, FnvHashMap<PropId, Select>> =
-                    FnvHashMap::default();
+                let mut union_map: BTreeMap<DefId, BTreeMap<PropId, Select>> = BTreeMap::default();
 
                 for field_look_ahead in look_ahead_children {
                     let field_name = field_look_ahead.field_original_name();
@@ -494,7 +493,7 @@ impl<'a> SelectAnalyzer<'a> {
     ) -> Result<Select, FieldError<GqlScalar>> {
         match &object_data.kind {
             ObjectKind::Node(node_data) => {
-                let mut properties: FnvHashMap<PropId, Select> = FnvHashMap::default();
+                let mut properties: BTreeMap<PropId, Select> = BTreeMap::default();
 
                 for field_look_ahead in look_ahead_children {
                     let field_name = field_look_ahead.field_original_name();

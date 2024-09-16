@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use domain_engine_core::{
     filter::walker::ConditionWalker, transact::DataOperation, DomainError, DomainResult,
 };
@@ -73,7 +75,7 @@ pub enum Cursor {
 #[derive(Clone, Copy)]
 pub enum QuerySelect<'a> {
     Unit,
-    Struct(&'a FnvHashMap<PropId, Select>),
+    Struct(&'a BTreeMap<PropId, Select>),
     Field(PropId),
 }
 
@@ -283,7 +285,7 @@ impl<'a> TransactCtx<'a> {
     pub(super) fn sql_select_vertex_expressions_with_alias(
         &self,
         def_id: DefId,
-        properties: &FnvHashMap<PropId, Select>,
+        properties: &BTreeMap<PropId, Select>,
         pg: PgDomainTable<'a>,
         query_ctx: &mut QueryBuildCtx<'a>,
         cache: &mut PgCache,
@@ -324,7 +326,7 @@ impl<'a> TransactCtx<'a> {
         (def, pg): (&Def, PgDomainTable<'a>),
         parent_alias: sql::Alias,
         // currently abstract properties are selected unconditionally
-        _properties: &FnvHashMap<PropId, Select>,
+        _properties: &BTreeMap<PropId, Select>,
         query_ctx: &mut QueryBuildCtx<'a>,
         output: &mut Vec<sql::Expr<'a>>,
     ) -> DomainResult<()> {
@@ -458,7 +460,7 @@ impl<'a> TransactCtx<'a> {
         &self,
         (def, pg): (&Def, PgDomainTable<'a>),
         data_alias: sql::Alias,
-        properties: &FnvHashMap<PropId, Select>,
+        properties: &BTreeMap<PropId, Select>,
         query_ctx: &mut QueryBuildCtx<'a>,
         output: &mut Vec<sql::Expr<'a>>,
         cache: &mut PgCache,
@@ -770,7 +772,7 @@ impl<'a> TransactCtx<'a> {
         &self,
         record_iter: &mut impl SqlRecordIterator<'b>,
         def: &Def,
-        properties: &FnvHashMap<PropId, Select>,
+        properties: &BTreeMap<PropId, Select>,
         attrs: &mut FnvHashMap<PropId, Attr>,
     ) -> DomainResult<()> {
         for (prop_id, select) in properties {
@@ -940,7 +942,7 @@ impl<'a> TransactCtx<'a> {
     fn read_record_as_struct(
         &self,
         sql_record: SqlRecord,
-        select_properties: &FnvHashMap<PropId, Select>,
+        select_properties: &BTreeMap<PropId, Select>,
     ) -> DomainResult<Value> {
         let row_value = self.read_row_value_as_vertex(
             sql_record.fields(),

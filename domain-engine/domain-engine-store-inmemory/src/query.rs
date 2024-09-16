@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
@@ -165,7 +165,7 @@ impl InMemoryStore {
         vertex_key: VertexKey<&DynamicKey>,
         mut properties: FnvHashMap<PropId, Attr>,
         struct_def_id: DefId,
-        select_properties: &FnvHashMap<PropId, Select>,
+        select_properties: &BTreeMap<PropId, Select>,
         ctx: &DbContext,
     ) -> DomainResult<Value> {
         let _entered = debug_span!("struct_sel", id = ?struct_def_id).entered();

@@ -1,6 +1,5 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::BTreeMap};
 
-use fnv::FnvHashMap;
 use itertools::Itertools;
 use ontol_runtime::{
     debug::OntolDebug,
@@ -97,7 +96,7 @@ impl<'on> SelectFlowProcessor<'on> {
     fn autoselect_output_properties(
         &self,
         output_domain_index: DomainIndex,
-        target: &mut FnvHashMap<PropId, Select>,
+        target: &mut BTreeMap<PropId, Select>,
     ) {
         for (prop_id, flows) in &self.prop_flow_slice.iter().group_by(|flow| flow.id) {
             // Only consider output properties:
@@ -133,7 +132,7 @@ impl<'on> SelectFlowProcessor<'on> {
         prop_id: PropId,
         select: Select,
         is_dep: IsDep,
-        target: &mut FnvHashMap<PropId, Select>,
+        target: &mut BTreeMap<PropId, Select>,
     ) {
         let mut has_parent = false;
 
@@ -187,16 +186,16 @@ impl<'on> SelectFlowProcessor<'on> {
     fn with_parent_select(
         &self,
         prop_id: PropId,
-        target: &mut FnvHashMap<PropId, Select>,
+        target: &mut BTreeMap<PropId, Select>,
         parent_predicate: &dyn Fn(PropId) -> bool,
-        child_func: &dyn Fn(&mut FnvHashMap<PropId, Select>),
+        child_func: &dyn Fn(&mut BTreeMap<PropId, Select>),
     ) {
         fn handle_child_select(
-            target: &mut FnvHashMap<PropId, Select>,
+            target: &mut BTreeMap<PropId, Select>,
             prop_id: PropId,
             parent_def_id: DefId,
             parent_predicate: impl Fn(PropId) -> bool,
-            child_func: impl Fn(&mut FnvHashMap<PropId, Select>),
+            child_func: impl Fn(&mut BTreeMap<PropId, Select>),
         ) {
             if !parent_predicate(prop_id) {
                 return;

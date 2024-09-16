@@ -1,4 +1,5 @@
-use fnv::FnvHashMap;
+use std::collections::BTreeMap;
+
 use jsonschema::JSONSchema;
 use ontol_faker::new_constant_fake;
 use ontol_runtime::{
@@ -141,7 +142,7 @@ impl<'on> DefBinding<'on> {
     ) -> StructSelect {
         StructSelect {
             def_id: self.def.id,
-            properties: FnvHashMap::from_iter(
+            properties: BTreeMap::from_iter(
                 properties
                     .into_iter()
                     .map(|(prop_name, query)| (self.find_property(prop_name).unwrap(), query)),

@@ -1,4 +1,5 @@
-use fnv::FnvHashMap;
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use super::filter::Filter;
@@ -51,7 +52,7 @@ pub struct StructSelect {
     pub def_id: DefId,
     /// TODO: It should be possible to select ONTOL attributes,
     /// and attributes may be multivalued.
-    pub properties: FnvHashMap<PropId, Select>,
+    pub properties: BTreeMap<PropId, Select>,
 }
 
 impl StructSelect {
