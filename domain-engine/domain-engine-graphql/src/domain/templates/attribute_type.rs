@@ -26,13 +26,15 @@ use serde::Serialize;
 use tracing::{trace, trace_span, warn};
 
 use crate::{
-    context::{SchemaCtx, SchemaType},
+    domain::{
+        context::{SchemaCtx, SchemaType},
+        registry_ctx::RegistryCtx,
+        templates::{page_info_type::PageInfoType, resolve_schema_type_field},
+        value_serializer::JuniperValueSerializer,
+        ServiceCtx,
+    },
     field_error,
     gql_scalar::GqlScalar,
-    registry_ctx::RegistryCtx,
-    templates::{page_info_type::PageInfoType, resolve_schema_type_field},
-    value_serializer::JuniperValueSerializer,
-    ServiceCtx,
 };
 
 use super::{input_type::InputType, matrix_type::MatrixType};

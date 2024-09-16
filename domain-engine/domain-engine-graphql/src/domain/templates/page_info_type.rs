@@ -1,7 +1,9 @@
 use ontol_runtime::{attr::AttrMatrixRef, sequence::SubSequence};
 
 use crate::{
-    context::SchemaType, cursor_util::serialize_cursor, gql_scalar::GqlScalar, ServiceCtx,
+    cursor_util::serialize_cursor,
+    domain::{context::SchemaType, ServiceCtx},
+    gql_scalar::GqlScalar,
 };
 
 pub struct PageInfoType<'v> {

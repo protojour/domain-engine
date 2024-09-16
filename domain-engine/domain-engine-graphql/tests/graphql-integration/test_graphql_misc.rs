@@ -1,4 +1,4 @@
-use domain_engine_graphql::{context::ServiceCtx, juniper::graphql_value};
+use domain_engine_graphql::{domain::context::ServiceCtx, juniper::graphql_value};
 use domain_engine_test_utils::graphql_test_utils::GraphqlTestResultExt;
 use domain_engine_test_utils::{
     graphql_test_utils::{Exec, GraphqlValueResultExt, TestCompileSchema},

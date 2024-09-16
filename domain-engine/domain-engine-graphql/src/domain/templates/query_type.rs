@@ -1,8 +1,8 @@
 use tracing::{debug_span, Instrument};
 
 use crate::{
-    context::SchemaType, gql_scalar::GqlScalar, macros::impl_graphql_value,
-    registry_ctx::RegistryCtx,
+    domain::{context::SchemaType, macros::impl_graphql_value, registry_ctx::RegistryCtx},
+    gql_scalar::GqlScalar,
 };
 
 pub struct QueryType;
@@ -47,7 +47,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
         executor: &'a juniper::Executor<Self::Context, GqlScalar>,
     ) -> juniper::BoxFuture<'a, juniper::ExecutionResult<GqlScalar>> {
         Box::pin(
-            crate::query(info, field_name, executor)
+            crate::domain::query(info, field_name, executor)
                 .instrument(debug_span!("query", name = %field_name)),
         )
     }

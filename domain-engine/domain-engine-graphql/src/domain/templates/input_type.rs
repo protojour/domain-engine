@@ -11,10 +11,12 @@ use ontol_runtime::interface::graphql::{
 use tracing::{debug, trace_span};
 
 use crate::{
-    context::SchemaType,
+    domain::{
+        context::SchemaType,
+        macros::impl_graphql_value,
+        registry_ctx::{ArgumentFilter, RegistryCtx},
+    },
     gql_scalar::GqlScalar,
-    macros::impl_graphql_value,
-    registry_ctx::{ArgumentFilter, RegistryCtx},
 };
 
 /// GraphQL input types for things in the SchemaCtx.

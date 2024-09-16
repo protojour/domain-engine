@@ -1,4 +1,4 @@
-use crate::context::SchemaType;
+use super::context::SchemaType;
 
 pub mod attribute_type;
 pub mod input_type;

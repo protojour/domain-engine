@@ -11,10 +11,10 @@ use crate::graphql::{domain_graphql_handler, graphiql_handler, GraphqlService};
 use axum::{extract::FromRequestParts, routing::post, Extension};
 use domain_engine_core::{domain_error::DomainErrorKind, DomainEngine, DomainResult, Session};
 use domain_engine_graphql::{
+    domain::CreateSchemaError,
     gql_scalar::GqlScalar,
     juniper,
-    ontology_schema::{OntologyCtx, OntologySchema},
-    CreateSchemaError,
+    ontology::{OntologyCtx, OntologySchema},
 };
 use juniper_axum::extract::JuniperRequest;
 use ontol_runtime::DomainIndex;
@@ -162,7 +162,10 @@ fn domain_router(
 ) -> anyhow::Result<axum::Router> {
     let mut router: axum::Router = axum::Router::new();
 
-    match domain_engine_graphql::create_graphql_schema(engine.ontology_owned(), domain_index) {
+    match domain_engine_graphql::domain::create_graphql_schema(
+        engine.ontology_owned(),
+        domain_index,
+    ) {
         Err(CreateSchemaError::GraphqlInterfaceNotFound) => {
             // Don't create the graphql endpoints
         }

@@ -1,8 +1,10 @@
 use ontol_runtime::interface::graphql::data::TypeKind;
 use tracing::{debug_span, Instrument};
 
-use crate::context::SchemaType;
-use crate::{gql_scalar::GqlScalar, macros::impl_graphql_value, registry_ctx::RegistryCtx};
+use crate::{
+    domain::{context::SchemaType, macros::impl_graphql_value, registry_ctx::RegistryCtx},
+    gql_scalar::GqlScalar,
+};
 
 pub struct MutationType;
 
@@ -49,7 +51,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
         executor: &'a juniper::Executor<Self::Context, GqlScalar>,
     ) -> juniper::BoxFuture<'a, juniper::ExecutionResult<GqlScalar>> {
         Box::pin(
-            crate::mutation(info, field_name, executor)
+            crate::domain::mutation(info, field_name, executor)
                 .instrument(debug_span!("mutation", name = %field_name)),
         )
     }

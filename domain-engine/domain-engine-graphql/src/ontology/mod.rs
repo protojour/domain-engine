@@ -1,3 +1,5 @@
+//! The Ontology GraphQL schema
+
 use std::{ops::Deref, sync::Arc};
 
 use crate::{

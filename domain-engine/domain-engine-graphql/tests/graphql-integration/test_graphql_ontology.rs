@@ -1,8 +1,8 @@
 use domain_engine_core::Session;
 use domain_engine_graphql::{
-    context::ServiceCtx,
+    domain::context::ServiceCtx,
     gql_scalar::GqlScalar,
-    ontology_schema::{OntologyCtx, OntologySchema},
+    ontology::{OntologyCtx, OntologySchema},
 };
 use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema};
 use juniper::graphql_value;

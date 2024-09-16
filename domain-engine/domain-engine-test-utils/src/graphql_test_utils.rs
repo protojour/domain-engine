@@ -6,7 +6,9 @@ use std::{
 
 use domain_engine_core::{data_store::DataStore, DomainEngine, Session};
 use domain_engine_graphql::{
-    context::ServiceCtx, create_graphql_schema, gql_scalar::GqlScalar, juniper, Schema,
+    domain::{context::ServiceCtx, create_graphql_schema, DomainSchema},
+    gql_scalar::GqlScalar,
+    juniper,
 };
 use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use juniper::ScalarValue;
@@ -20,23 +22,29 @@ use unimock::*;
 use crate::mock_datastore::LinearDataStoreAdapter;
 
 pub trait TestCompileSchema {
-    fn compile_schemas<const N: usize>(self, source_names: [&str; N]) -> (OntolTest, [Schema; N]);
+    fn compile_schemas<const N: usize>(
+        self,
+        source_names: [&str; N],
+    ) -> (OntolTest, [DomainSchema; N]);
 }
 
 impl<T: TestCompile> TestCompileSchema for T {
     #[track_caller]
-    fn compile_schemas<const N: usize>(self, source_names: [&str; N]) -> (OntolTest, [Schema; N]) {
+    fn compile_schemas<const N: usize>(
+        self,
+        source_names: [&str; N],
+    ) -> (OntolTest, [DomainSchema; N]) {
         compile_schemas_inner(self.compile(), source_names)
     }
 }
 
 pub trait TestCompileSingletonSchema {
-    fn compile_single_schema(self) -> (OntolTest, Schema);
+    fn compile_single_schema(self) -> (OntolTest, DomainSchema);
 }
 
 impl TestCompileSingletonSchema for &'static str {
     #[track_caller]
-    fn compile_single_schema(self) -> (OntolTest, Schema) {
+    fn compile_single_schema(self) -> (OntolTest, DomainSchema) {
         let (ontol_test, [schema]) = compile_schemas_inner(
             TestPackages::with_static_sources([(default_file_url(), self)]).compile(),
             [default_short_name()],
@@ -48,11 +56,11 @@ impl TestCompileSingletonSchema for &'static str {
 fn compile_schemas_inner<const N: usize>(
     mut ontol_test: OntolTest,
     short_names: [&str; N],
-) -> (OntolTest, [Schema; N]) {
+) -> (OntolTest, [DomainSchema; N]) {
     // Don't want JSON schema noise in GraphQL tests:
     ontol_test.set_compile_json_schema(false);
 
-    let schemas: [Schema; N] = short_names.map(|short_name| {
+    let schemas: [DomainSchema; N] = short_names.map(|short_name| {
         create_graphql_schema(
             ontol_test.ontology_owned(),
             ontol_test.get_domain_index(short_name),

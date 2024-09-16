@@ -1,5 +1,5 @@
 use domain_engine_graphql::{
-    context::ServiceCtx,
+    domain::context::ServiceCtx,
     juniper::{graphql_value, InputValue},
 };
 use domain_engine_test_utils::graphql_test_utils::{

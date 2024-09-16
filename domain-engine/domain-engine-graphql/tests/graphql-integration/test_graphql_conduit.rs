@@ -4,10 +4,9 @@ use std::sync::Arc;
 
 use domain_engine_core::{system::SystemApiMock, DomainEngine, Session};
 use domain_engine_graphql::{
-    context::ServiceCtx,
+    domain::{context::ServiceCtx, DomainSchema},
     gql_scalar::GqlScalar,
     juniper::{graphql_value, InputValue, ScalarValue, Value},
-    Schema,
 };
 use domain_engine_test_utils::{
     dynamic_data_store::DynamicDataStoreFactory,
@@ -240,9 +239,9 @@ async fn conduit_db_query_article_with_tags(ds: &str) {
 
 struct ConduitBundle {
     domain_engine: Arc<DomainEngine>,
-    db_schema: Schema,
-    blog_schema: Schema,
-    feed_schema: Schema,
+    db_schema: DomainSchema,
+    blog_schema: DomainSchema,
+    feed_schema: DomainSchema,
 }
 
 impl ConduitBundle {

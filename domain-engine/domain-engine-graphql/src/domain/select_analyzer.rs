@@ -24,8 +24,9 @@ use ontol_runtime::{
 use tracing::{debug, error, trace};
 
 use crate::{
-    context::SchemaCtx, cursor_util::GraphQLCursor, gql_scalar::GqlScalar,
-    look_ahead_utils::ArgsWrapper, ServiceCtx,
+    cursor_util::GraphQLCursor,
+    domain::{context::SchemaCtx, look_ahead_utils::ArgsWrapper, ServiceCtx},
+    gql_scalar::GqlScalar,
 };
 
 pub(crate) struct KeyedPropertySelection {

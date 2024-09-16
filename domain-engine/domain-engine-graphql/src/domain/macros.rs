@@ -1,8 +1,8 @@
 macro_rules! impl_graphql_value {
     ($ident:ident $(<$generics:tt>)?) => {
         impl $(<$generics>)? ::juniper::GraphQLValue<crate::gql_scalar::GqlScalar> for $ident $(<$generics>)? {
-            type Context = crate::context::ServiceCtx;
-            type TypeInfo = crate::context::SchemaType;
+            type Context = crate::domain::context::ServiceCtx;
+            type TypeInfo = crate::domain::context::SchemaType;
 
             fn type_name<'i>(&self, info: &'i Self::TypeInfo) -> Option<&'i str> {
                 Some(info.typename())
@@ -10,7 +10,7 @@ macro_rules! impl_graphql_value {
 
             fn resolve_field(
                 &self,
-                type_info: &crate::context::SchemaType,
+                type_info: &crate::domain::context::SchemaType,
                 field_name: &str,
                 _arguments: &juniper::Arguments<crate::gql_scalar::GqlScalar>,
                 _executor: &juniper::Executor<Self::Context, crate::gql_scalar::GqlScalar>,

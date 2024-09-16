@@ -29,11 +29,11 @@ use ontol_runtime::{
 };
 use tracing::{debug, trace, trace_span};
 
-use crate::{
+use crate::domain::{
     context::{SchemaCtx, SchemaType},
-    gql_scalar::GqlScalar,
     templates::{attribute_type::AttributeType, input_type::InputType},
 };
+use crate::gql_scalar::GqlScalar;
 
 /// SchemaCtx and juniper Registry combined together to provide more ergonimic API
 pub(crate) struct RegistryCtx<'a, 'r> {

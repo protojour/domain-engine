@@ -1,9 +1,8 @@
 use domain_engine_core::Session;
 use domain_engine_graphql::{
-    context::ServiceCtx,
+    domain::{context::ServiceCtx, DomainSchema},
     gql_scalar::GqlScalar,
-    ontology_schema::{OntologyCtx, OntologySchema},
-    Schema,
+    ontology::{OntologyCtx, OntologySchema},
 };
 use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema, ValueExt};
 use juniper::{graphql_value, InputValue};
@@ -167,7 +166,7 @@ async fn test_findings(ds: &str) {
 async fn add_finding(
     finding_session_id: &GqlScalar,
     found_id: &GqlScalar,
-    findings_schema: &Schema,
+    findings_schema: &DomainSchema,
     domain_ctx: &ServiceCtx,
 ) {
     r#"mutation addFinding($sessionId: ID!, $found: ID!) {

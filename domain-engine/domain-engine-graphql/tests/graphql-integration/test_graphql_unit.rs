@@ -2,10 +2,9 @@
 
 use domain_engine_core::transact::{DataOperation, ReqMessage, RespMessage, TransactionMode};
 use domain_engine_graphql::{
-    context::ServiceCtx,
+    domain::{context::ServiceCtx, DomainSchema},
     gql_scalar::GqlScalar,
     juniper::{self, graphql_value},
-    Schema,
 };
 use ontol_examples::{
     artist_and_instrument, geojson, guitar_synth_union, municipalities, wgs, AsAtlas,
@@ -1356,7 +1355,7 @@ async fn municipalities_named_query() {
     let [municipality] = test.bind(["municipality"]);
 
     async fn fetch_osl(
-        schema: &Schema,
+        schema: &DomainSchema,
         ctx: &ServiceCtx,
     ) -> Result<juniper::Value<GqlScalar>, TestError<GqlScalar>> {
         // NOTE: Here it's apparent that geojson can't be modelled

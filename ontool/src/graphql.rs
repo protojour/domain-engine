@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use axum::Extension;
 use domain_engine_core::DomainEngine;
-use domain_engine_graphql::{context::ServiceCtx, gql_scalar::GqlScalar, juniper};
+use domain_engine_graphql::{domain::context::ServiceCtx, gql_scalar::GqlScalar, juniper};
 use juniper_axum::extract::JuniperRequest;
 
 pub struct GraphqlService {
-    pub schema: domain_engine_graphql::Schema,
+    pub schema: domain_engine_graphql::domain::DomainSchema,
     pub domain_engine: Arc<DomainEngine>,
 }
 

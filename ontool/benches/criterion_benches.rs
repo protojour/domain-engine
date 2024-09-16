@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use domain_engine_core::{DomainEngine, Session};
-use domain_engine_graphql::context::ServiceCtx;
+use domain_engine_graphql::domain::context::ServiceCtx;
 use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use domain_engine_test_utils::graphql_test_utils::Exec;
 use indoc::indoc;
@@ -144,7 +144,7 @@ pub fn compile_benchmark(c: &mut Criterion) {
             })
             .unwrap();
         b.iter(|| {
-            domain_engine_graphql::create_graphql_schema(
+            domain_engine_graphql::domain::create_graphql_schema(
                 black_box(test.ontology_owned()),
                 black_box(domain_index),
             )
@@ -173,9 +173,11 @@ pub fn compile_benchmark(c: &mut Criterion) {
                 name == "tiny"
             })
             .unwrap();
-        let schema =
-            domain_engine_graphql::create_graphql_schema(test.ontology_owned(), domain_index)
-                .unwrap();
+        let schema = domain_engine_graphql::domain::create_graphql_schema(
+            test.ontology_owned(),
+            domain_index,
+        )
+        .unwrap();
         let service_context: ServiceCtx = engine.into();
         b.iter(|| {
             rt.block_on(async {
