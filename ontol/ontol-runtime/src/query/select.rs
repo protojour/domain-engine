@@ -6,10 +6,13 @@ use crate::{DefId, PropId};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Select {
+    /// Some kind of unit/scalar attribute.
+    /// For a struct value that is a vertex, this dynamically resolves to domain entity id.
     Unit,
+    /// Explicitly selects the domain entity id of the vertex
     EntityId,
+    /// Selects the vertex address of the vertex
     VertexAddress,
-    Leaf,
     Struct(StructSelect),
     StructUnion(DefId, Vec<StructSelect>),
     Entity(EntitySelect),

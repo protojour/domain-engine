@@ -938,7 +938,7 @@ impl<'a> MetaQuery<'a> {
                     None => Expr::complex(format!("{}[0]", self.var)),
                 }
             }
-            Select::Leaf => {
+            Select::Unit => {
                 self.return_var = Expr::complex(format!("{{ _key: {}._key }}", self.var));
             }
             Select::Struct(ref struct_select) => {

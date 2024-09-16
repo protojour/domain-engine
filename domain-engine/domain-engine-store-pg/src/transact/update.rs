@@ -64,7 +64,7 @@ impl<'a> TransactCtx<'a> {
 
         let query_select = match select {
             Select::Struct(sel) => QuerySelect::Struct(&sel.properties),
-            Select::Leaf | Select::EntityId => QuerySelect::Field(entity.id_prop),
+            Select::Unit | Select::EntityId => QuerySelect::Field(entity.id_prop),
             _ => todo!(),
         };
 

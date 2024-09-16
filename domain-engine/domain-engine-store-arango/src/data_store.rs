@@ -478,7 +478,7 @@ mod tests {
         database.populate_collections(test.root_package()).unwrap();
 
         let [artist] = test.bind(["artist"]);
-        let select: Select = artist.struct_select([("plays", Select::Leaf)]).into();
+        let select: Select = artist.struct_select([("plays", Select::Unit)]).into();
 
         let aql = AqlQuery::build_query(&select, test.ontology(), &database).unwrap();
 

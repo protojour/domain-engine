@@ -888,7 +888,7 @@ impl<'a> TransactCtx<'a> {
         let pg_def = self.lookup_def(def_id)?;
 
         match select {
-            Select::Leaf => {
+            Select::Unit | Select::EntityId => {
                 let Some(entity) = pg_def.def.entity() else {
                     return Err(PgInputError::NotAnEntity.into());
                 };
@@ -934,7 +934,6 @@ impl<'a> TransactCtx<'a> {
 
                 self.read_record_as_struct(sql_record, &actual_select.properties)
             }
-            sel => todo!("unhandled select: {sel:?}"),
         }
     }
 

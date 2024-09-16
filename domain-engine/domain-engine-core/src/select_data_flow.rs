@@ -32,7 +32,6 @@ pub fn translate_select(select: &mut Select, key: &MapKey, ontology: &Ontology) 
             }
         }
         Select::EntityId => {}
-        Select::Leaf => {}
         Select::VertexAddress => {}
     }
 }
@@ -115,12 +114,12 @@ impl<'on> SelectFlowProcessor<'on> {
                             self.depends_on_mandatory_entity(parent_property_id, IsDep(false))
                         },
                         &|target| {
-                            target.insert(property_flow.id, Select::Leaf);
+                            target.insert(property_flow.id, Select::Unit);
                         },
                     ),
                     PropertyFlowData::UnitType(_) | PropertyFlowData::DependentOn(_) => {
                         if self.depends_on_mandatory_entity(prop_id, IsDep(false)) {
-                            target.insert(property_flow.id, Select::Leaf);
+                            target.insert(property_flow.id, Select::Unit);
                         }
                     }
                     _ => {}
@@ -160,7 +159,7 @@ impl<'on> SelectFlowProcessor<'on> {
                             target,
                             &|_| true,
                             &|target| {
-                                target.insert(property_flow.id, Select::Leaf);
+                                target.insert(property_flow.id, Select::Unit);
                             },
                         );
                         has_parent = true;
@@ -181,7 +180,7 @@ impl<'on> SelectFlowProcessor<'on> {
         }
 
         if !has_parent && is_dep.0 {
-            target.insert(prop_id, Select::Leaf);
+            target.insert(prop_id, Select::Unit);
         }
     }
 

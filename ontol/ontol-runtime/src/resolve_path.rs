@@ -128,7 +128,6 @@ impl ResolverGraph {
         filter: ProbeFilter,
     ) -> Option<ResolvePath> {
         match select {
-            Select::Unit => None,
             Select::Entity(
                 EntitySelect {
                     source: StructOrUnionSelect::Struct(struct_select),
@@ -165,7 +164,7 @@ impl ResolverGraph {
             ) => {
                 todo!()
             }
-            Select::Leaf | Select::EntityId | Select::VertexAddress => {
+            Select::Unit | Select::EntityId | Select::VertexAddress => {
                 Some(ResolvePath { path: vec![] })
             }
         }

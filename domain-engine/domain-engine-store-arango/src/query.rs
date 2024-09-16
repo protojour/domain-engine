@@ -66,11 +66,10 @@ impl<'a> MetaQuery<'a> {
     /// Add a Select to MetaQuery
     pub fn query_select(&mut self, select: &Select) -> DomainResult<()> {
         match select {
-            Select::Unit => {}
             Select::EntityId | Select::VertexAddress => {
                 self.return_var = Expr::complex(format!("{}[0]", self.var));
             }
-            Select::Leaf => {
+            Select::Unit => {
                 self.return_var = Expr::complex(format!("{{ _key: {}._key }}", self.var));
             }
             Select::Struct(struct_select) => {
@@ -329,7 +328,7 @@ pub fn apply_select(attr: AttrMut, select: &Select, db: &ArangoDatabase) -> Doma
                 }
             }
         }
-        (AttrMut::Unit(val), Select::EntityId | Select::Leaf) => {
+        (AttrMut::Unit(val), Select::EntityId | Select::Unit) => {
             let def_id = val.type_def_id();
             if let Value::Struct(ref mut attr_map, _) = val {
                 let def = db.ontology.def(def_id);

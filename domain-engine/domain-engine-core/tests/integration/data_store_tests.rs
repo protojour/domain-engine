@@ -308,7 +308,7 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
             &test_util::query_entities(
                 &engine,
                 user_def
-                    .struct_select([("authored_articles", Select::Leaf)])
+                    .struct_select([("authored_articles", Select::EntityId)])
                     .into_default_domain_entity_select()
             )
             .await

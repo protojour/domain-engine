@@ -396,7 +396,6 @@ impl DomainEngine {
             Select::Unit => {}
             Select::EntityId => {}
             Select::VertexAddress => {}
-            Select::Leaf => {}
             Select::Struct(struct_select) => {
                 self.datastore_transform_struct_select(struct_select)?;
             }

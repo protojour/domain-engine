@@ -299,7 +299,6 @@ impl InMemoryStore {
             .ok_or(DomainErrorKind::NotAnEntity(vertex_key.type_def_id).into_error())?;
 
         match select {
-            Select::Unit => Ok(Some(Value::unit())),
             Select::VertexAddress => {
                 let bytes = bincode::serialize(&vertex_key).unwrap();
                 Ok(Some(Value::OctetSequence(
@@ -307,7 +306,7 @@ impl InMemoryStore {
                     OntolDefTag::Vertex.def_id().into(),
                 )))
             }
-            Select::Leaf => {
+            Select::Unit | Select::EntityId => {
                 if let Some(properties) =
                     self.look_up_vertex(vertex_key.type_def_id, vertex_key.dynamic_key)
                 {
@@ -361,7 +360,6 @@ impl InMemoryStore {
 
                 Ok(None)
             }
-            Select::EntityId => Err(DomainError::data_store("entity id")),
             Select::Entity(entity_select) => match &entity_select.source {
                 StructOrUnionSelect::Struct(struct_select) => {
                     let properties = self

@@ -307,7 +307,7 @@ impl<'a> SelectAnalyzer<'a> {
 
                 Ok(Some(selection.unwrap_or_else(|| KeyedPropertySelection {
                     key: unit_property(),
-                    select: Select::Leaf,
+                    select: Select::Unit,
                 })))
             }
             (FieldKind::Node | FieldKind::Nodes, Ok(type_data)) => {
@@ -319,7 +319,7 @@ impl<'a> SelectAnalyzer<'a> {
             (FieldKind::Node | FieldKind::Nodes, Err(_scalar_ref)) => {
                 Ok(Some(KeyedPropertySelection {
                     key: unit_property(),
-                    select: Select::Leaf,
+                    select: Select::Unit,
                 }))
             }
             (
@@ -348,7 +348,7 @@ impl<'a> SelectAnalyzer<'a> {
                 Err(_scalar_ref),
             ) => Ok(Some(KeyedPropertySelection {
                 key: *property_id,
-                select: Select::Leaf,
+                select: Select::Unit,
             })),
             (
                 FieldKind::FlattenedProperty {
@@ -358,12 +358,12 @@ impl<'a> SelectAnalyzer<'a> {
                 Err(_scalar_ref),
             ) => Ok(Some(KeyedPropertySelection {
                 key: *relationship_id,
-                select: Select::Leaf,
+                select: Select::Unit,
             })),
             (FieldKind::Id(id_property_data), Err(_scalar_ref)) => {
                 Ok(Some(KeyedPropertySelection {
                     key: id_property_data.prop_id,
-                    select: Select::Leaf,
+                    select: Select::Unit,
                 }))
             }
             (
@@ -391,7 +391,7 @@ impl<'a> SelectAnalyzer<'a> {
         let after_cursor = args_wrapper
             .deserialize_optional::<GraphQLCursor>(after_arg.name(&self.schema_ctx.ontology))?;
 
-        let mut inner_select = Select::Leaf;
+        let mut inner_select = Select::Unit;
         let mut include_total_len = false;
 
         for field_look_ahead in look_ahead.children() {
@@ -482,7 +482,7 @@ impl<'a> SelectAnalyzer<'a> {
             }
             TypeKind::CustomScalar(_) => {
                 assert!(look_ahead_children.is_empty());
-                Ok(Select::Leaf)
+                Ok(Select::Unit)
             }
         }
     }
@@ -592,7 +592,6 @@ impl<'a> SelectAnalyzer<'a> {
 
         loop {
             match inner_select {
-                Select::Unit => return Ok(Select::Unit),
                 Select::VertexAddress => return Ok(Select::VertexAddress),
                 Select::Struct(object) => {
                     return Ok(Select::Entity(EntitySelect {
@@ -613,11 +612,11 @@ impl<'a> SelectAnalyzer<'a> {
                     }))
                 }
                 Select::Entity(_) | Select::EntityId => panic!("Select in select"),
-                Select::Leaf if !empty_handled => {
+                Select::Unit if !empty_handled => {
                     inner_select = self.empty_entity_select(object_data)?;
                     empty_handled = true;
                 }
-                Select::Leaf => return Ok(Select::Leaf),
+                Select::Unit => return Ok(Select::Unit),
             }
         }
     }
@@ -643,7 +642,7 @@ impl<'a> SelectAnalyzer<'a> {
                 {
                     Ok(Select::VertexAddress)
                 }
-                _ => Ok(Select::Leaf),
+                _ => Ok(Select::Unit),
             },
             _ => self.analyze_object_data(LookAheadChildren::default(), object_data),
         }
@@ -679,7 +678,7 @@ fn merge_selects(existing: &mut Select, new: Select) {
                 }
             }
         }
-        (existing @ Select::Leaf, any_other) => {
+        (existing @ Select::Unit, any_other) => {
             *existing = any_other;
         }
         (existing, new) => {
