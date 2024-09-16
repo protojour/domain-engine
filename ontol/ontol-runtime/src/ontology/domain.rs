@@ -314,16 +314,16 @@ pub struct ExtendedEntityInfo {
     pub order_union: Option<DefId>,
 
     /// The `order` definitions on the entity.
-    pub order_table: FnvHashMap<DefId, EntityOrder>,
+    pub order_table: FnvHashMap<DefId, VertexOrder>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct EntityOrder {
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct VertexOrder {
     pub tuple: Box<[FieldPath]>,
     pub direction: Direction,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct FieldPath(pub Box<[PropId]>);
 
 #[derive(Clone, Serialize, Deserialize)]

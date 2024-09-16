@@ -1,5 +1,5 @@
 use ontol_runtime::{
-    ontology::domain::{EntityOrder, FieldPath},
+    ontology::domain::{VertexOrder, FieldPath},
     query::order::Direction,
     DefId, OntolDefTag, PropId,
 };
@@ -22,7 +22,7 @@ impl<'m> Compiler<'m> {
         entity_def_id: DefId,
         order_relationship: RelId,
         order_union: DefId,
-    ) -> Option<(DefId, EntityOrder)> {
+    ) -> Option<(DefId, VertexOrder)> {
         let domain_index = entity_def_id.domain_index();
         let meta = rel_def_meta(order_relationship, &self.rel_ctx, &self.defs);
         let object = meta.relationship.object;
@@ -70,7 +70,7 @@ impl<'m> Compiler<'m> {
         entity_def_id: DefId,
         params_def_id: DefId,
         rel_span: SourceSpan,
-    ) -> Option<EntityOrder> {
+    ) -> Option<VertexOrder> {
         let Some(properties) = self.prop_ctx.properties_by_def_id(params_def_id) else {
             CompileError::EntityOrderMustSpecifyParameters
                 .span(rel_span)
@@ -144,7 +144,7 @@ impl<'m> Compiler<'m> {
 
         info!("ordering: {tuple:?} {direction:?}");
 
-        Some(EntityOrder {
+        Some(VertexOrder {
             tuple: tuple.into(),
             direction,
         })

@@ -1,4 +1,4 @@
-use ::juniper::{FieldResult, GraphQLObject};
+use ::juniper::{FieldResult, GraphQLEnum, GraphQLInputObject, GraphQLObject};
 use ontol_runtime::{sequence::Sequence, value::Value};
 
 use crate::{cursor_util::serialize_cursor, gql_scalar::GqlScalar, juniper};
@@ -47,4 +47,16 @@ impl VertexConnection {
             }),
         })
     }
+}
+
+#[derive(GraphQLInputObject)]
+pub struct VertexOrder {
+    pub field_paths: Vec<Vec<String>>,
+    pub direction: Option<VertexOrderDirection>,
+}
+
+#[derive(GraphQLEnum)]
+pub enum VertexOrderDirection {
+    Ascending,
+    Descending,
 }

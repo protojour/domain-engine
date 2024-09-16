@@ -207,10 +207,10 @@ impl<'a> TransactCtx<'a> {
                     sql_select.where_and(condition);
                 }
 
-                let entity_order_tuple = filter
-                    .entity_order()
-                    .ok_or_else(|| DomainError::data_store("entity order undefined"))?;
-                sql_select.order_by = self.select_order(def_id, entity_order_tuple)?;
+                let vertex_order_tuple = filter
+                    .vertex_order()
+                    .ok_or_else(|| DomainError::data_store("vertex order undefined"))?;
+                sql_select.order_by = self.select_order(def_id, vertex_order_tuple)?;
             }
 
             sql_select.with = query_ctx.with();

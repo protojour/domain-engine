@@ -47,17 +47,17 @@ impl<'a> MetaQuery<'a> {
 
         self.eval_cond_var(&mut filter_query, Var(0), walker, false)?;
 
-        let entity_order_tuple = filter
-            .entity_order()
-            .ok_or_else(|| DomainError::data_store("no property order"))?;
-        if entity_order_tuple.is_empty() {
+        let vertex_order_tuple = filter
+            .vertex_order()
+            .ok_or_else(|| DomainError::data_store("no vertex order found"))?;
+        if vertex_order_tuple.is_empty() {
             return Ok(());
         }
 
         let def = self.ontology.def(def_id);
         let mut sorts = vec![];
 
-        for order in entity_order_tuple {
+        for order in vertex_order_tuple {
             for field_path in order.tuple.iter() {
                 let mut path = vec![self.var.to_string()];
 

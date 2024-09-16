@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::str::FromStr;
 
 use crate::cursor_util::GraphQLCursor;
 use crate::field_error;
@@ -10,10 +11,13 @@ use domain_engine_core::transact::ReqMessage;
 use domain_engine_core::transact::TransactionMode;
 use futures_util::StreamExt;
 use futures_util::TryStreamExt;
+use ontol_runtime::ontology::domain::{FieldPath, VertexOrder};
 use ontol_runtime::query::filter::Filter;
+use ontol_runtime::query::order::Direction;
 use ontol_runtime::query::select::EntitySelect;
 use ontol_runtime::query::select::StructOrUnionSelect;
 use ontol_runtime::query::select::StructSelect;
+use ontol_runtime::PropId;
 use serde::de::value::StringDeserializer;
 use serde::Deserialize;
 use ulid::Ulid;
@@ -22,7 +26,7 @@ use super::gql_dictionary;
 use super::gql_dictionary::DefDictionaryEntry;
 use super::gql_domain;
 use super::gql_value::ValueScalarCfg;
-use super::gql_vertex;
+use super::gql_vertex::{self, VertexOrderDirection};
 use super::OntologyCtx;
 use super::{gql_def, gql_id};
 
@@ -102,6 +106,7 @@ impl Query {
         after: Option<String>,
         with_address: Option<bool>,
         with_def_id: Option<bool>,
+        order: Option<Vec<gql_vertex::VertexOrder>>,
         ctx: &OntologyCtx,
     ) -> FieldResult<gql_vertex::VertexConnection> {
         let data_store = ctx.data_store().map_err(field_error)?;
@@ -115,6 +120,38 @@ impl Query {
             with_def_id: with_def_id.unwrap_or(true),
         };
 
+        let mut filter = Filter::default_for_datastore();
+
+        if let Some(order) = order {
+            let mut vertex_order_chain = vec![];
+            for vertex_order in order {
+                let mut field_path_tuple = vec![];
+
+                for vertex_order in vertex_order.field_paths {
+                    let mut field_path = vec![];
+
+                    for prop in vertex_order {
+                        let prop_id = PropId::from_str(&prop)
+                            .map_err(|_| "invalid property id in vertex order")?;
+
+                        field_path.push(prop_id);
+                    }
+
+                    field_path_tuple.push(FieldPath(field_path.into_boxed_slice()));
+                }
+
+                vertex_order_chain.push(VertexOrder {
+                    tuple: field_path_tuple.into_boxed_slice(),
+                    direction: match vertex_order.direction {
+                        Some(VertexOrderDirection::Ascending) | None => Direction::Ascending,
+                        Some(VertexOrderDirection::Descending) => Direction::Descending,
+                    },
+                })
+            }
+
+            filter.set_vertex_order(vertex_order_chain);
+        }
+
         let messages = [Ok(ReqMessage::Query(
             0,
             EntitySelect {
@@ -122,7 +159,7 @@ impl Query {
                     def_id,
                     properties: Default::default(),
                 }),
-                filter: Filter::default_for_datastore(),
+                filter,
                 limit: first.try_into().map_err(field_error)?,
                 after_cursor: match after {
                     Some(after) => Some(

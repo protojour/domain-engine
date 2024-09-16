@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use domain_engine_core::{DomainError, DomainResult};
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    attr::Attr, ontology::domain::EntityOrder, query::filter::Filter, value::Value, DefId, PropId,
+    attr::Attr, ontology::domain::VertexOrder, query::filter::Filter, value::Value, DefId, PropId,
 };
 
 use crate::core::{DbContext, DynamicKey};
@@ -16,14 +16,14 @@ pub(super) fn sort_props_vec(
     filter: &Filter,
     _ctx: &DbContext,
 ) -> DomainResult<()> {
-    let entity_orders = filter
-        .entity_order()
-        .ok_or_else(|| DomainError::data_store("entity order not defined"))?;
+    let vertex_order_tuple = filter
+        .vertex_order()
+        .ok_or_else(|| DomainError::data_store("vertex order not defined"))?;
 
     let mut cmp_error: Option<DomainError> = None;
 
     raw_props_slice.sort_by(
-        |(_, a), (_, b)| match compare_order_tuple(a, b, entity_orders) {
+        |(_, a), (_, b)| match compare_order_tuple(a, b, vertex_order_tuple) {
             Ok(ordering) => filter.direction().reorder(ordering),
             Err(error) => {
                 cmp_error.get_or_insert(error);
@@ -43,14 +43,14 @@ pub(super) fn sort_props_vec(
 fn compare_order_tuple(
     a: &Attrs,
     b: &Attrs,
-    entity_orders: &[EntityOrder],
+    vertex_order_tuple: &[VertexOrder],
 ) -> DomainResult<Ordering> {
-    for entity_order in entity_orders {
-        match compare_entity_order(a, b, entity_order)? {
+    for vertex_order in vertex_order_tuple {
+        match compare_vertex_order(a, b, vertex_order)? {
             Ordering::Equal => {
                 continue;
             }
-            unequal => return Ok(entity_order.direction.reorder(unequal)),
+            unequal => return Ok(vertex_order.direction.reorder(unequal)),
         }
     }
 
@@ -58,14 +58,17 @@ fn compare_order_tuple(
 }
 
 /// Compare by one `order` relation (which can include a tuple of fields)
-fn compare_entity_order(a: &Attrs, b: &Attrs, order: &EntityOrder) -> DomainResult<Ordering> {
+fn compare_vertex_order(a: &Attrs, b: &Attrs, order: &VertexOrder) -> DomainResult<Ordering> {
     for field_path in order.tuple.iter() {
-        let first = attr_by_path(a, &field_path.0)?;
-        let second = attr_by_path(b, &field_path.0)?;
-
-        match first.partial_cmp(second) {
-            None | Some(Ordering::Equal) => continue,
-            Some(unequal) => return Ok(unequal),
+        match (
+            attr_by_path(a, &field_path.0),
+            attr_by_path(b, &field_path.0),
+        ) {
+            (Ok(first), Ok(second)) => match first.partial_cmp(second) {
+                None | Some(Ordering::Equal) => continue,
+                Some(unequal) => return Ok(unequal),
+            },
+            _ => continue,
         }
     }
 

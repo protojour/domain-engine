@@ -4,7 +4,7 @@ use domain_engine_graphql::{
     gql_scalar::GqlScalar,
     ontology::{OntologyCtx, OntologySchema},
 };
-use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema};
+use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema, ValueExt};
 use juniper::graphql_value;
 use ontol_examples::stix::stix_bundle;
 use ontol_macros::datastore_test;
@@ -160,7 +160,7 @@ async fn test_ontology_ontol(ds: &str) {
 #[datastore_test(tokio::test)]
 async fn test_ontology_stix(ds: &str) {
     let (test, [stix_schema]) = stix_bundle().compile_schemas(["stix"]);
-    let [identity] = test.bind(["identity"]);
+    let [identity, url] = test.bind(["identity", "url"]);
 
     let engine = mk_engine_default(test.ontology_owned(), ds).await;
     let domain_ctx: ServiceCtx = engine.clone().into();
@@ -194,6 +194,32 @@ async fn test_ontology_stix(ds: &str) {
             }
         ]) {
             node { id }
+        }
+    }"#
+    .exec([], &stix_schema, &domain_ctx)
+    .await
+    .unwrap();
+
+    r#"mutation {
+        url(create:[
+            {
+                type: "url"
+                id: "url--6bd10f1e-0c23-4278-8349-19d27c46817c"
+                value: "http://first"
+                defanged: true
+                object_marking_refs: []
+                granular_markings: []
+            },
+            {
+                type: "url"
+                id: "url--c28dfe9f-aa02-4dc5-81ee-b69da50f2cc9"
+                value: "http://second"
+                defanged: true
+                object_marking_refs: []
+                granular_markings: []
+            }
+        ]) {
+            node { defanged }
         }
     }"#
     .exec([], &stix_schema, &domain_ctx)
@@ -288,10 +314,16 @@ async fn test_ontology_stix(ds: &str) {
         }))
     );
 
+    info!("vertices");
     expect_eq!(
         actual = r#"
             query vertices($defId: DefId!) {
-                vertices(defId: $defId, first: 100, withAddress: false, withDefId: false) {
+                vertices(
+                    defId: $defId,
+                    first: 100,
+                    withAddress: false,
+                    withDefId: false
+                ) {
                     elements
                 }
             }
@@ -400,6 +432,7 @@ async fn test_ontology_stix(ds: &str) {
         }))
     );
 
+    info!("vertices (identity) with address");
     {
         let vertices_with_address = r#"
             query vertices($defId: DefId!) {
@@ -422,23 +455,93 @@ async fn test_ontology_stix(ds: &str) {
         .await
         .unwrap();
 
-        let vertices = vertices_with_address
-            .as_object_value()
-            .unwrap()
-            .get_field_value("vertices")
-            .unwrap()
-            .as_object_value()
-            .unwrap();
-        let elements = vertices
-            .get_field_value("elements")
-            .unwrap()
-            .as_list_value()
-            .unwrap();
-        let vertex = elements.first().unwrap().as_object_value().unwrap();
-        let address: &juniper::Value<GqlScalar> = vertex.get_field_value("address").unwrap();
+        let address = vertices_with_address
+            .field("vertices")
+            .field("elements")
+            .element(0)
+            .field("address");
         let juniper::Value::Scalar(GqlScalar::String(address)) = address else {
             panic!("address was not a string: {address:?}");
         };
         info!("address is `{address}`");
+    }
+
+    info!("vertices (url) ordered by updated");
+    // FIXME: Sort by update timestamp not implemented for inmemory yet
+    if ds != "inmemory" {
+        let ontol_update_time = r#"
+            {
+                domain(id: "01GNYFZP30ED0EZ1579TH0D55P") {
+                    defs(ident: "update_time") {
+                        propId
+                    }
+                }
+            }
+            "#
+        .exec([], &ontology_schema, &ontology_ctx)
+        .await
+        .unwrap();
+
+        let update_time_prop_id = ontol_update_time
+            .field("domain")
+            .field("defs")
+            .element(0)
+            .field("propId")
+            .as_scalar_value()
+            .unwrap()
+            .to_string();
+
+        expect_eq!(
+            actual = format!(
+                r#"
+                query vertices($defId: DefId!) {{
+                    vertices(
+                        defId: $defId,
+                        first: 100,
+                        withAddress: false,
+                        withDefId: false,
+                        order: [{{
+                            fieldPaths: ["{update_time_prop_id}"],
+                            direction: DESCENDING
+                        }}]
+                    ) {{
+                        elements
+                    }}
+                }}
+                "#
+            )
+            .exec(
+                OntologyParams {
+                    def_id: Some(url.graphql_def_id()),
+                },
+                &ontology_schema,
+                &ontology_ctx,
+            )
+            .await,
+            expected = Ok(graphql_value!({
+                "vertices": {
+                    "elements": [
+                        {
+                            "type": "struct",
+                            "attrs": [
+                                { "propId": "p@1:83:0", "attr": "unit", "type": "text", "value": "url" },
+                                { "propId": "p@1:83:1", "attr": "unit", "type": "text", "value": "url--c28dfe9f-aa02-4dc5-81ee-b69da50f2cc9" },
+                                { "propId": "p@1:83:2", "attr": "unit", "type": "i64", "value": "1" },
+                                { "propId": "p@1:83:5", "attr": "unit", "type": "text", "value": "http://second" },
+                            ]
+                        },
+                        {
+                            "type": "struct",
+                            "attrs": [
+                                { "propId": "p@1:83:0", "attr": "unit", "type": "text", "value": "url" },
+                                { "propId": "p@1:83:1", "attr": "unit", "type": "text", "value": "url--6bd10f1e-0c23-4278-8349-19d27c46817c" },
+                                { "propId": "p@1:83:2", "attr": "unit", "type": "i64", "value": "1" },
+                                { "propId": "p@1:83:5", "attr": "unit", "type": "text", "value": "http://first" },
+                            ]
+                        },
+                    ]
+                }
+            }))
+        );
     }
 }

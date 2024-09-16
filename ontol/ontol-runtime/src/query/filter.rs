@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     format_utils::Literal,
-    ontology::domain::EntityOrder,
+    ontology::domain::VertexOrder,
     value::{Value, ValueDebug},
     OntolDefTag,
 };
@@ -33,7 +33,7 @@ impl Filter {
     pub fn default_for_datastore() -> Self {
         Self {
             condition: Condition::default(),
-            order: Order::EntityOrder(vec![]),
+            order: Order::VertexOrder(vec![]),
             direction: None,
         }
     }
@@ -46,15 +46,15 @@ impl Filter {
     pub fn symbolic_order(&self) -> Option<&[Value]> {
         match &self.order {
             Order::Symbolic(symbols) => Some(symbols.as_slice()),
-            Order::EntityOrder(_) => None,
+            Order::VertexOrder(_) => None,
         }
     }
 
-    /// Entity order is the order format expected inside the data stores
-    pub fn entity_order(&self) -> Option<&[EntityOrder]> {
+    /// Vertex order is the order format expected inside the data stores
+    pub fn vertex_order(&self) -> Option<&[VertexOrder]> {
         match &self.order {
             Order::Symbolic(_) => None,
-            Order::EntityOrder(paths) => Some(paths.as_slice()),
+            Order::VertexOrder(paths) => Some(paths.as_slice()),
         }
     }
 
@@ -73,8 +73,8 @@ impl Filter {
         };
     }
 
-    pub fn set_entity_order(&mut self, order: Vec<EntityOrder>) {
-        self.order = Order::EntityOrder(order);
+    pub fn set_vertex_order(&mut self, order: Vec<VertexOrder>) {
+        self.order = Order::VertexOrder(order);
     }
 
     pub fn set_direction(&mut self, direction: Value) -> Result<(), InvalidDirection> {
@@ -97,14 +97,14 @@ pub enum Order {
     /// This is the ordering while in domain-space.
     Symbolic(Vec<Value>),
     /// This is the ordering in data-store space.
-    EntityOrder(Vec<EntityOrder>),
+    VertexOrder(Vec<VertexOrder>),
 }
 
 impl Order {
     pub fn is_empty(&self) -> bool {
         match self {
             Self::Symbolic(vals) => vals.is_empty(),
-            Self::EntityOrder(props) => props.is_empty(),
+            Self::VertexOrder(props) => props.is_empty(),
         }
     }
 }
@@ -126,8 +126,8 @@ impl Display for Filter {
                         write!(f, " {}", ValueDebug(order))?;
                     }
                 }
-                Order::EntityOrder(_paths) => {
-                    write!(f, "(field-paths)")?;
+                Order::VertexOrder(paths) => {
+                    write!(f, "(vertex-order len={})", paths.len())?;
                 }
             }
             writeln!(f, ")")?;

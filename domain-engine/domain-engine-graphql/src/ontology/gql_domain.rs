@@ -45,10 +45,24 @@ impl Domain {
         entities
     }
 
-    fn defs(&self, kind: Option<gql_def::DefKind>, ctx: &OntologyCtx) -> Vec<gql_def::Def> {
+    fn defs(
+        &self,
+        kind: Option<gql_def::DefKind>,
+        ident: Option<String>,
+        ctx: &OntologyCtx,
+    ) -> Vec<gql_def::Def> {
         let defs = self.data(ctx).defs().filter_map(|def| {
-            if def.ident().is_some() {
-                Some(gql_def::Def { id: def.id })
+            if let Some(def_ident) = def.ident() {
+                if let Some(ident_filter) = ident.as_ref() {
+                    let def_ident = &ctx[def_ident];
+                    if def_ident == ident_filter {
+                        Some(gql_def::Def { id: def.id })
+                    } else {
+                        None
+                    }
+                } else {
+                    Some(gql_def::Def { id: def.id })
+                }
             } else {
                 None
             }

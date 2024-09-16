@@ -423,7 +423,7 @@ impl DomainEngine {
                 self.datastore_transform_struct_select(struct_select)?;
             }
             StructOrUnionSelect::Union(_, struct_selects) => {
-                entity_select.filter.set_entity_order(vec![]);
+                entity_select.filter.set_vertex_order(vec![]);
 
                 for struct_select in struct_selects {
                     self.datastore_transform_struct_select(struct_select)?;
@@ -458,7 +458,7 @@ impl DomainEngine {
             .map(|sym| info.order_table.get(&sym.type_def_id()).unwrap().clone())
             .collect::<Vec<_>>();
 
-        filter.set_entity_order(order_vec);
+        filter.set_vertex_order(order_vec);
         Ok(())
     }
 }

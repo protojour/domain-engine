@@ -2,7 +2,7 @@
 
 use ontol_runtime::{
     ontology::{domain, map::MapMeta, ontol::TextConstant},
-    DefId, MapKey, PropId,
+    DefId, DefPropTag, MapKey, PropId,
 };
 
 use crate::gql_scalar::GqlScalar;
@@ -77,6 +77,11 @@ impl Def {
     fn doc(&self, ctx: &OntologyCtx) -> Option<String> {
         ctx.get_def_docs(self.id)
             .map(|docs_constant| ctx[docs_constant].into())
+    }
+
+    /// The prop-id if this Def is used directly as a property
+    fn prop_id(&self) -> String {
+        PropId(self.id, DefPropTag(0)).to_string()
     }
 
     /// The optional entity represented by this def
