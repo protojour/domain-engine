@@ -1,4 +1,4 @@
-use std::{collections::hash_map::Entry, ops::Deref};
+use std::{borrow::Cow, collections::hash_map::Entry, ops::Deref};
 
 use domain_engine_core::{
     domain_error::DomainErrorKind,
@@ -38,7 +38,8 @@ use super::{
     cache::PgCache,
     data::{Data, RowValue},
     edge_patch::{EdgeEndoTuplePatch, EdgePatches},
-    query::{QueryBuildCtx, QuerySelect},
+    query::{DefAliasKey, QueryBuildCtx},
+    query_select::{QuerySelect, QuerySelectRef},
     InsertMode, MutationMode, TransactCtx,
 };
 
@@ -48,12 +49,12 @@ pub struct PreparedInsert {
     edge_select_stmt: Option<PreparedStatement>,
 }
 
-struct AnalyzedInput<'a> {
+struct AnalyzedInput {
     sql_params: Vec<SqlScalar>,
     query_kind: InsertQueryKind,
     edges: EdgePatches,
     abstract_values: Vec<(PropId, Value)>,
-    query_select: QuerySelect<'a>,
+    query_select: QuerySelect,
     timestamp: PgTimestamp,
 }
 
@@ -117,8 +118,12 @@ impl<'a> TransactCtx<'a> {
 
         let mut row_value = match analyzed.query_kind {
             InsertQueryKind::Insert => {
-                self.insert_row(&prepared.inherent_stmt, &sql_params, analyzed.query_select)
-                    .await?
+                self.insert_row(
+                    &prepared.inherent_stmt,
+                    &sql_params,
+                    analyzed.query_select.as_ref(),
+                )
+                .await?
             }
             InsertQueryKind::UpdateTentative(data_key) => {
                 self.update_tentative_vertex(
@@ -170,11 +175,9 @@ impl<'a> TransactCtx<'a> {
             .await?;
         }
 
-        if let (Some(edge_select_stmt), QuerySelect::Struct(properties)) =
+        if let (Some(edge_select_stmt), QuerySelect::Vertex(vertex_select)) =
             (prepared.edge_select_stmt, analyzed.query_select)
         {
-            debug!("{edge_select_stmt}");
-
             let row = self
                 .client()
                 .query_one(
@@ -190,7 +193,7 @@ impl<'a> TransactCtx<'a> {
                 unreachable!();
             };
 
-            self.read_edge_attributes(&mut column_stream, def, properties, attrs.as_mut())?;
+            self.read_edge_attributes(&mut column_stream, def, &vertex_select, attrs.as_mut())?;
         }
 
         Ok(row_value)
@@ -350,7 +353,7 @@ impl<'a> TransactCtx<'a> {
                 value,
             ];
 
-            self.insert_row(&prepared.inherent_stmt, &sql_params, QuerySelect::Unit)
+            self.insert_row(&prepared.inherent_stmt, &sql_params, QuerySelectRef::Unit)
                 .await?;
 
             Ok(())
@@ -393,7 +396,7 @@ impl<'a> TransactCtx<'a> {
                 .insert_row(
                     &prepared.inherent_stmt,
                     &analyzed.sql_params,
-                    analyzed.query_select,
+                    analyzed.query_select.as_ref(),
                 )
                 .await?;
 
@@ -472,7 +475,16 @@ impl<'a> TransactCtx<'a> {
 
         let mut query_ctx = QueryBuildCtx::default();
         let root_alias = query_ctx.alias;
-        query_ctx.with_def_aliases.insert(def_id, root_alias);
+
+        let vertex_select = self.analyze_vertex_select(def, &pg.table, select)?;
+
+        query_ctx.with_def_aliases.insert(
+            DefAliasKey {
+                def_id,
+                inherent_set: Cow::Owned(vertex_select.inherent_set.clone()),
+            },
+            root_alias,
+        );
 
         let mut edge_select_stmt: Option<PreparedStatement> = None;
 
@@ -559,74 +571,59 @@ impl<'a> TransactCtx<'a> {
             });
         }
 
-        // RETURNING is based on select, etc
-        match select {
-            Select::EntityId => {
-                let entity = def.entity().ok_or_else(|| {
-                    warn!("not an entity");
-                    DomainErrorKind::NotAnEntity(def_id).into_error()
-                })?;
+        // returning
+        {
+            insert_returning.extend(self.initial_standard_data_fields(pg));
+            self.select_inherent_vertex_fields(
+                pg.table,
+                &vertex_select,
+                &mut insert_returning,
+                None,
+            );
 
-                if let Some(field) = pg.table.find_column(&entity.id_prop) {
-                    insert_returning.extend(self.initial_standard_data_fields(pg));
-                    insert_returning.push(sql::Expr::path1(field.col_name.as_ref()));
+            if !vertex_select.edge_set.is_empty() {
+                let mut ctx = QueryBuildCtx::default();
+                let root_alias = ctx.alias;
+                let mut expressions = sql::Expressions {
+                    items: vec![],
+                    multiline: true,
+                };
+
+                self.sql_select_edge_properties(
+                    (def, pg),
+                    root_alias,
+                    &vertex_select,
+                    &mut ctx,
+                    &mut expressions.items,
+                    cache,
+                )?;
+
+                if !expressions.items.is_empty() {
+                    edge_select_stmt = Some(
+                        sql::Select {
+                            with: ctx.with(),
+                            expressions,
+                            from: vec![sql::FromItem::TableNameAs(
+                                pg.table_name(),
+                                sql::Name::Alias(root_alias),
+                            )],
+                            where_: Some(sql::Expr::eq(
+                                sql::Expr::path1("_key"),
+                                sql::Expr::param(0),
+                            )),
+                            limit: sql::Limit {
+                                limit: Some(1),
+                                offset: None,
+                            },
+                            ..Default::default()
+                        }
+                        .to_arcstr()
+                        .prepare(self.client())
+                        .await?,
+                    );
                 }
             }
-            Select::Struct(sel) => {
-                insert_returning.extend(self.initial_standard_data_fields(pg));
-                let select_stats =
-                    self.select_inherent_struct_fields(def, pg.table, &mut insert_returning, None)?;
-
-                if select_stats.edge_count > 0 {
-                    let mut ctx = QueryBuildCtx::default();
-                    let root_alias = ctx.alias;
-                    let mut expressions = sql::Expressions {
-                        items: vec![],
-                        multiline: true,
-                    };
-
-                    self.sql_select_edge_properties(
-                        (def, pg),
-                        root_alias,
-                        &sel.properties,
-                        &mut ctx,
-                        &mut expressions.items,
-                        cache,
-                    )?;
-
-                    if !expressions.items.is_empty() {
-                        edge_select_stmt = Some(
-                            sql::Select {
-                                with: ctx.with(),
-                                expressions,
-                                from: vec![sql::FromItem::TableNameAs(
-                                    pg.table_name(),
-                                    sql::Name::Alias(root_alias),
-                                )],
-                                where_: Some(sql::Expr::eq(
-                                    sql::Expr::path1("_key"),
-                                    sql::Expr::param(0),
-                                )),
-                                limit: sql::Limit {
-                                    limit: Some(1),
-                                    offset: None,
-                                },
-                                ..Default::default()
-                            }
-                            .to_arcstr()
-                            .prepare(self.client())
-                            .await?,
-                        );
-                    }
-                }
-            }
-            Select::Unit => {
-                insert_returning.extend(self.initial_standard_data_fields(pg));
-            }
-            select => {
-                todo!("{select:?}")
-            }
-        };
+        }
 
         let insert = sql::Insert {
             with: query_ctx.with(),
@@ -652,7 +649,7 @@ impl<'a> TransactCtx<'a> {
         select: &'a Select,
         timestamp: PgTimestamp,
         cache: &mut PgCache,
-    ) -> DomainResult<(AnalyzedInput<'a>, PgDomainTable<'_>)> {
+    ) -> DomainResult<(AnalyzedInput, PgDomainTable<'_>)> {
         let pg = self
             .pg_model
             .pg_domain_datatable(value.domain_index, value.type_def_id())?;
@@ -805,7 +802,9 @@ impl<'a> TransactCtx<'a> {
 
                 QuerySelect::Field(entity.id_prop)
             }
-            Select::Struct(sel) => QuerySelect::Struct(&sel.properties),
+            select @ Select::Struct(_) => {
+                QuerySelect::Vertex(self.analyze_vertex_select(def, &pg.table, select)?)
+            }
             Select::Unit => QuerySelect::Unit,
             select => todo!("{select:?}"),
         };
@@ -831,7 +830,7 @@ impl<'a> TransactCtx<'a> {
         &self,
         stmt: &PreparedStatement,
         sql_params: &[SqlScalar],
-        query_select: QuerySelect<'a>,
+        query_select: QuerySelectRef<'a>,
     ) -> DomainResult<RowValue> {
         debug!("{}", stmt);
         let row = self.query_one_raw(stmt.deref(), sql_params).await?;
@@ -842,9 +841,9 @@ impl<'a> TransactCtx<'a> {
             .next_field(&Layout::Scalar(PgType::Boolean))?
             .into_bool()?;
 
-        self.read_row_value_as_vertex(
+        self.read_vertex_row_value(
             column_stream,
-            Some(query_select),
+            query_select,
             IncludeJoinedAttrs::No,
             if inserted {
                 DataOperation::Inserted

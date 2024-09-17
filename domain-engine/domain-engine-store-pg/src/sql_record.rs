@@ -27,10 +27,6 @@ impl<'b> SqlRecord<'b> {
         Ok(SqlRecord { field_count, buf })
     }
 
-    pub fn field_count(&self) -> usize {
-        self.field_count
-    }
-
     pub fn def_key(&self) -> CodecResult<PgRegKey> {
         let mut buf = self.buf;
         let SqlOutput::Scalar(SqlScalar::I32(def_key)) =

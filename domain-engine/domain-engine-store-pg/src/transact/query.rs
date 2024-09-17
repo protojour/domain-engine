@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{borrow::Cow, collections::BTreeSet};
 
 use domain_engine_core::{
     filter::walker::ConditionWalker, transact::DataOperation, DomainError, DomainResult,
@@ -11,34 +11,36 @@ use ontol_runtime::{
     property::{PropertyCardinality, ValueCardinality},
     query::{
         filter::Filter,
-        select::{EntitySelect, Select, StructOrUnionSelect},
+        select::{EntitySelect, StructOrUnionSelect},
     },
     sequence::SubSequence,
-    tuple::{CardinalIdx, EndoTuple},
+    tuple::EndoTuple,
     value::Value,
-    DefId, PropId,
+    DefId, DomainIndex, PropId,
 };
 use pin_utils::pin_mut;
 use serde::{Deserialize, Serialize};
-use smallvec::smallvec;
+use smallvec::SmallVec;
 use tracing::{debug, trace};
 
 use crate::{
     address::make_ontol_vertex_address,
     pg_error::{PgError, PgInputError, PgModelError},
-    pg_model::{EdgeId, PgDataKey, PgDomainTable, PgEdgeCardinalKind, PgTable, PgTableKey, PgType},
+    pg_model::{
+        EdgeId, PgDataKey, PgDomainTable, PgEdgeCardinalKind, PgRegKey, PgTable, PgTableKey, PgType,
+    },
     sql::{self, FromItem, WhereExt},
     sql_record::{SqlColumnStream, SqlRecord, SqlRecordIterator},
-    sql_value::{Layout, SqlOutput, SqlScalar},
+    sql_value::{Layout, SqlScalar},
+    transact::query_select::QuerySelectRef,
 };
 
 use super::{
     cache::PgCache,
     data::RowValue,
-    edge_query::{
-        CardinalSelect, EdgeUnionSelectBuilder, EdgeUnionVariantSelectBuilder, PgEdgeProjection,
-    },
-    fields::{AbstractKind, StandardFields},
+    edge_query::{EdgeUnionSelectBuilder, EdgeUnionVariantSelectBuilder, PgEdgeProjection},
+    fields::{AbstractKind, StandardAttrs},
+    query_select::{CardinalSelect, QuerySelect, VertexSelect},
     TransactCtx,
 };
 
@@ -50,8 +52,14 @@ pub enum QueryFrame {
 #[derive(Default)]
 pub(super) struct QueryBuildCtx<'a> {
     pub alias: sql::Alias,
-    pub with_def_aliases: FnvHashMap<DefId, sql::Alias>,
+    pub with_def_aliases: FnvHashMap<DefAliasKey<'static>, sql::Alias>,
     pub with_queries: Vec<sql::WithQuery<'a>>,
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct DefAliasKey<'a> {
+    pub def_id: DefId,
+    pub inherent_set: Cow<'a, BTreeSet<PropId>>,
 }
 
 impl<'a> QueryBuildCtx<'a> {
@@ -70,13 +78,6 @@ pub enum Cursor {
     /// Future improvements include value pagination (WHERE (set of values) > (cursor values))
     /// for a specific ordering.
     Offset(usize),
-}
-
-#[derive(Clone, Copy)]
-pub enum QuerySelect<'a> {
-    Unit,
-    Struct(&'a BTreeMap<PropId, Select>),
-    Field(PropId),
 }
 
 pub enum IncludeJoinedAttrs {
@@ -108,6 +109,15 @@ impl<'a> TransactCtx<'a> {
             None => None,
         };
 
+        let def_id = struct_select.def_id;
+        let pg = self
+            .pg_model
+            .pg_domain_datatable(def_id.domain_index(), def_id)?;
+        let def = self.ontology.def(def_id);
+
+        let vertex_select =
+            self.analyze_vertex_select_properties(def, &pg.table, &struct_select.properties)?;
+
         self.query(
             struct_select.def_id,
             Query {
@@ -117,7 +127,7 @@ impl<'a> TransactCtx<'a> {
                 native_id_condition: None,
             },
             Some(&entity_select.filter),
-            Some(QuerySelect::Struct(&struct_select.properties)),
+            QuerySelect::Vertex(vertex_select),
             cache,
         )
         .await
@@ -128,7 +138,7 @@ impl<'a> TransactCtx<'a> {
         def_id: DefId,
         q: Query,
         filter: Option<&Filter>,
-        query_select: Option<QuerySelect<'s>>,
+        query_select: QuerySelect,
         cache: &mut PgCache,
     ) -> DomainResult<impl Stream<Item = DomainResult<QueryFrame>> + 's> {
         debug!("query {def_id:?} after cursor: {:?}", q.after_cursor);
@@ -153,16 +163,24 @@ impl<'a> TransactCtx<'a> {
             }
 
             let (from, alias, tail_expressions) = {
-                match query_select {
-                    Some(QuerySelect::Struct(properties)) => self
-                        .sql_select_vertex_expressions_with_alias(
+                match query_select.as_ref() {
+                    QuerySelectRef::VertexUnion(vertex_selects) => {
+                        // no disambiguation should be needed here, since at root level
+                        let vertex_select = vertex_selects.iter().next().unwrap();
+                        self.sql_select_vertex_expressions_with_alias(
                             def_id,
-                            properties,
+                            &vertex_select,
                             pg,
                             &mut query_ctx,
                             cache,
-                        )?,
-                    Some(QuerySelect::Field(prop_id)) => {
+                        )?
+                    }
+                    QuerySelectRef::VertexAddress => (
+                        pg.table_name().into(),
+                        sql::Alias(0),
+                        vec![sql::Expr::path1("_key")],
+                    ),
+                    QuerySelectRef::Field(prop_id) => {
                         let mut fields: Vec<_> = self.initial_standard_data_fields(pg).into();
                         fields.push(sql::Expr::path1(
                             pg.table.column(&prop_id)?.col_name.as_ref(),
@@ -170,7 +188,7 @@ impl<'a> TransactCtx<'a> {
 
                         (pg.table_name().into(), sql::Alias(0), fields)
                     }
-                    Some(QuerySelect::Unit) | None => {
+                    QuerySelectRef::Unit => {
                         let fields: Vec<_> = self.initial_standard_data_fields(pg).into();
                         (pg.table_name().into(), sql::Alias(0), fields)
                     }
@@ -249,8 +267,7 @@ impl<'a> TransactCtx<'a> {
                 }
 
                 if observed_rows < q.limit {
-                    let row_value = self.read_row_value_as_vertex(row_iter, query_select, IncludeJoinedAttrs::Yes, DataOperation::Queried)?;
-                    trace!("query returned row value {:?}", row_value.value);
+                    let row_value = self.read_vertex_row_value(row_iter, query_select.as_ref(), IncludeJoinedAttrs::Yes, DataOperation::Queried)?;
                     yield QueryFrame::Row(row_value);
 
                     observed_values += 1;
@@ -285,7 +302,7 @@ impl<'a> TransactCtx<'a> {
     pub(super) fn sql_select_vertex_expressions_with_alias(
         &self,
         def_id: DefId,
-        properties: &BTreeMap<PropId, Select>,
+        vertex_select: &VertexSelect,
         pg: PgDomainTable<'a>,
         query_ctx: &mut QueryBuildCtx<'a>,
         cache: &mut PgCache,
@@ -294,13 +311,14 @@ impl<'a> TransactCtx<'a> {
 
         // select data properties
         let mut sql_expressions = vec![];
-        let data_alias = self.select_inherent_fields_as_alias((def, pg), query_ctx)?;
+        let data_alias =
+            self.select_inherent_fields_as_alias((def, pg), vertex_select, query_ctx)?;
         sql_expressions.push(sql::Expr::path2(data_alias, sql::PathSegment::Asterisk));
 
         self.sql_select_abstract_properties(
             (def, pg),
             data_alias,
-            properties,
+            vertex_select,
             query_ctx,
             &mut sql_expressions,
         )?;
@@ -308,7 +326,7 @@ impl<'a> TransactCtx<'a> {
         self.sql_select_edge_properties(
             (def, pg),
             data_alias,
-            properties,
+            vertex_select,
             query_ctx,
             &mut sql_expressions,
             cache,
@@ -326,22 +344,21 @@ impl<'a> TransactCtx<'a> {
         (def, pg): (&Def, PgDomainTable<'a>),
         parent_alias: sql::Alias,
         // currently abstract properties are selected unconditionally
-        _properties: &BTreeMap<PropId, Select>,
+        vertex_select: &VertexSelect,
         query_ctx: &mut QueryBuildCtx<'a>,
         output: &mut Vec<sql::Expr<'a>>,
     ) -> DomainResult<()> {
         // TODO: The abstract props can be cached in PgTable
-        for (prop_id, rel) in &def.data_relationships {
-            match &rel.kind {
-                DataRelationshipKind::Id | DataRelationshipKind::Tree => {}
-                DataRelationshipKind::Edge(_) => continue,
+        for (prop_id, sub_select) in &vertex_select.abstract_set {
+            let Some(rel_info) = def.data_relationships.get(prop_id) else {
+                continue;
             };
 
             let Some(prop_key) = pg.table.find_abstract_property(prop_id) else {
                 continue;
             };
 
-            match self.abstract_kind(&rel.target) {
+            match self.abstract_kind(&rel_info.target) {
                 AbstractKind::VertexUnion(def_ids) => {
                     let mut union_operands: Vec<sql::Expr> = vec![];
 
@@ -355,17 +372,17 @@ impl<'a> TransactCtx<'a> {
                         let mut record_items: Vec<_> =
                             self.initial_standard_data_fields(sub_pg).into();
 
-                        self.select_inherent_struct_fields(
-                            sub_def,
+                        self.select_inherent_vertex_fields(
                             sub_pg.table,
+                            sub_select,
                             &mut record_items,
                             Some(sub_alias),
-                        )?;
+                        );
 
                         self.sql_select_abstract_properties(
                             (sub_def, sub_pg),
                             sub_alias,
-                            &Default::default(),
+                            sub_select,
                             query_ctx,
                             &mut record_items,
                         )?;
@@ -407,7 +424,7 @@ impl<'a> TransactCtx<'a> {
                             }));
                         }
 
-                        output.push(match rel.cardinality.1 {
+                        output.push(match rel_info.cardinality.1 {
                             ValueCardinality::Unit => sql::Expr::paren(sql::Expr::Limit(
                                 Box::new(union_expr),
                                 sql::Limit {
@@ -460,12 +477,12 @@ impl<'a> TransactCtx<'a> {
         &self,
         (def, pg): (&Def, PgDomainTable<'a>),
         data_alias: sql::Alias,
-        properties: &BTreeMap<PropId, Select>,
+        vertex_select: &VertexSelect,
         query_ctx: &mut QueryBuildCtx<'a>,
         output: &mut Vec<sql::Expr<'a>>,
         cache: &mut PgCache,
     ) -> DomainResult<()> {
-        for (prop_id, select) in properties {
+        for (prop_id, cardinal_selects) in &vertex_select.edge_set {
             let Some(rel_info) = def.data_relationships.get(prop_id) else {
                 continue;
             };
@@ -480,8 +497,6 @@ impl<'a> TransactCtx<'a> {
 
             let pg_proj = PgEdgeProjection {
                 id: EdgeId(proj.edge_id),
-                subject_index: proj.subject,
-                object_index: proj.object,
                 pg_subj_data: pg,
                 pg_subj_cardinal,
                 subj_alias: data_alias,
@@ -489,13 +504,13 @@ impl<'a> TransactCtx<'a> {
                 pg_edge,
                 edge_alias,
             };
-            let cardinal_select = CardinalSelect::from_select(select);
 
             let mut union_builder = EdgeUnionSelectBuilder::default();
 
             self.sql_select_edge_cardinals(
-                (CardinalIdx(0), &pg_proj),
-                cardinal_select,
+                &pg_proj,
+                cardinal_selects,
+                0,
                 EdgeUnionVariantSelectBuilder::default(),
                 &mut union_builder,
                 query_ctx,
@@ -538,9 +553,13 @@ impl<'a> TransactCtx<'a> {
     fn select_inherent_fields_as_alias(
         &self,
         (def, pg): (&Def, PgDomainTable<'a>),
+        vertex_select: &VertexSelect,
         query_ctx: &mut QueryBuildCtx<'a>,
     ) -> DomainResult<sql::Alias> {
-        if let Some(with_alias) = query_ctx.with_def_aliases.get(&def.id) {
+        if let Some(with_alias) = query_ctx.with_def_aliases.get(&DefAliasKey {
+            def_id: def.id,
+            inherent_set: Cow::Borrowed(&vertex_select.inherent_set),
+        }) {
             Ok(*with_alias)
         } else {
             let with_alias = query_ctx.alias.incr();
@@ -550,7 +569,12 @@ impl<'a> TransactCtx<'a> {
                 multiline: false,
             };
 
-            self.select_inherent_struct_fields(def, pg.table, &mut expressions.items, None)?;
+            self.select_inherent_vertex_fields(
+                pg.table,
+                vertex_select,
+                &mut expressions.items,
+                None,
+            );
 
             query_ctx.with_queries.push(sql::WithQuery {
                 name: with_alias.into(),
@@ -562,31 +586,28 @@ impl<'a> TransactCtx<'a> {
                 }),
             });
 
-            query_ctx.with_def_aliases.insert(def.id, with_alias);
+            query_ctx.with_def_aliases.insert(
+                DefAliasKey {
+                    def_id: def.id,
+                    inherent_set: Cow::Owned(vertex_select.inherent_set.clone()),
+                },
+                with_alias,
+            );
 
             Ok(with_alias)
         }
     }
 
-    pub fn read_row_value_as_vertex<'b>(
+    pub fn read_vertex_row_value<'b>(
         &self,
         mut iterator: impl SqlRecordIterator<'b>,
-        query_select: Option<QuerySelect>,
+        query_select: QuerySelectRef,
         include_joined_attrs: IncludeJoinedAttrs,
         op: DataOperation,
     ) -> DomainResult<RowValue> {
         let def_key = iterator
             .next_field(&Layout::Scalar(PgType::Integer))?
             .into_i32()?;
-
-        let Some(PgTableKey::Data {
-            domain_index,
-            def_id,
-        }) = self.pg_model.reg_key_to_table_key.get(&def_key)
-        else {
-            return Err(PgError::InvalidDynamicDataType(def_key).into());
-        };
-        let def = self.ontology.def(*def_id);
 
         let data_key = iterator
             .next_field(&Layout::Scalar(PgType::BigInt))?
@@ -598,155 +619,62 @@ impl<'a> TransactCtx<'a> {
             .next_field(&Layout::Scalar(PgType::TimestampTz))?
             .into_timestamp()?;
 
-        let standard_fields = StandardFields {
+        let standard_attrs = StandardAttrs {
             data_key,
             created_at,
             updated_at,
         };
 
         match query_select {
-            Some(QuerySelect::Unit) => Ok(RowValue {
+            QuerySelectRef::Unit => Ok(RowValue {
                 value: Value::unit(),
                 def_key,
                 data_key,
                 updated_at,
                 op,
             }),
-            Some(QuerySelect::Struct(properties)) => {
-                let mut attrs: FnvHashMap<PropId, Attr> = FnvHashMap::with_capacity_and_hasher(
-                    def.data_relationships.len(),
-                    Default::default(),
-                );
-
-                attrs.insert(
-                    PropId::data_store_address(),
-                    Attr::Unit(make_ontol_vertex_address(def_key, data_key)),
-                );
-
-                // retrieve data properties
-                self.read_inherent_struct_fields(
-                    def,
-                    &mut iterator,
-                    &mut attrs,
-                    Some(&standard_fields),
-                )?;
-
-                if matches!(&include_joined_attrs, IncludeJoinedAttrs::Yes) {
-                    // retrieve abstract properties
-                    let pg = self.pg_model.pg_domain_datatable(*domain_index, *def_id)?;
-
-                    for (prop_id, rel) in &def.data_relationships {
-                        match &rel.kind {
-                            DataRelationshipKind::Id | DataRelationshipKind::Tree => {}
-                            DataRelationshipKind::Edge(_) => continue,
-                        };
-
-                        if pg.table.find_abstract_property(prop_id).is_none() {
-                            continue;
-                        }
-
-                        // FIXME: the datastore clients should send the actual
-                        // inherent fields it's interested in
-                        let sub_query_select_properties = Default::default();
-                        let sub_query_select =
-                            Some(QuerySelect::Struct(&sub_query_select_properties));
-
-                        match (self.abstract_kind(&rel.target), &rel.cardinality.1) {
-                            (AbstractKind::VertexUnion(_), ValueCardinality::Unit) => {
-                                if let Some(sql_val) =
-                                    iterator.next_field(&Layout::Record)?.null_filter()
-                                {
-                                    let sql_record = sql_val.into_record()?;
-                                    let row_value = self.read_row_value_as_vertex(
-                                        sql_record.fields(),
-                                        sub_query_select,
-                                        IncludeJoinedAttrs::Yes,
-                                        DataOperation::Queried,
-                                    )?;
-
-                                    attrs.insert(*prop_id, Attr::Unit(row_value.value));
-                                }
-                            }
-                            (
-                                AbstractKind::VertexUnion(_),
-                                ValueCardinality::IndexSet | ValueCardinality::List,
-                            ) => {
-                                let sql_array =
-                                    iterator.next_field(&Layout::Array)?.into_array()?;
-                                let mut matrix = AttrMatrix::default();
-                                matrix.columns.push(Default::default());
-
-                                for result in sql_array.elements(&Layout::Record) {
-                                    let sql_record = result?.into_record()?;
-
-                                    let row_value = self.read_row_value_as_vertex(
-                                        sql_record.fields(),
-                                        sub_query_select,
-                                        IncludeJoinedAttrs::Yes,
-                                        op,
-                                    )?;
-
-                                    matrix.columns[0].push(row_value.value);
-                                }
-
-                                if matches!(rel.cardinality.0, PropertyCardinality::Mandatory)
-                                    || !matrix.columns[0].elements().is_empty()
-                                {
-                                    attrs.insert(*prop_id, Attr::Matrix(matrix));
-                                }
-                            }
-                            (
-                                AbstractKind::Scalar {
-                                    pg_type,
-                                    target_def_id,
-                                    ..
-                                },
-                                _,
-                            ) => {
-                                let sql_array =
-                                    iterator.next_field(&Layout::Array)?.into_array()?;
-
-                                let mut matrix = AttrMatrix::default();
-                                matrix.columns.push(Default::default());
-
-                                for result in sql_array.elements(&Layout::Scalar(pg_type)) {
-                                    let sql_val = result?;
-
-                                    let value = self.deserialize_sql(target_def_id, sql_val)?;
-
-                                    matrix.columns[0].push(value);
-                                }
-
-                                if matches!(rel.cardinality.0, PropertyCardinality::Mandatory)
-                                    || !matrix.columns[0].elements().is_empty()
-                                {
-                                    attrs.insert(*prop_id, Attr::Matrix(matrix));
-                                }
-                            }
-                        }
-                    }
-
-                    self.read_edge_attributes(&mut iterator, def, properties, &mut attrs)?;
+            QuerySelectRef::VertexAddress => todo!("vertex address"),
+            QuerySelectRef::VertexUnion(vertex_selects) => {
+                let Some(PgTableKey::Data {
+                    domain_index,
+                    def_id,
+                }) = self.pg_model.reg_key_to_table_key.get(&def_key)
+                else {
+                    return Err(PgError::InvalidDynamicDataType(def_key).into());
+                };
+                match vertex_selects.iter().find(|vs| vs.def_id == *def_id) {
+                    Some(vertex_select) => self.read_row_value_with_vertex_select(
+                        iterator,
+                        (def_key, *domain_index, *def_id),
+                        standard_attrs,
+                        vertex_select,
+                        include_joined_attrs,
+                        op,
+                    ),
+                    None => Ok(RowValue {
+                        value: Value::Void(DefId::unit().into()),
+                        def_key,
+                        data_key,
+                        updated_at,
+                        op,
+                    }),
                 }
-
-                let value = Value::Struct(Box::new(attrs), def.id.into());
-
-                Ok(RowValue {
-                    value,
-                    def_key,
-                    data_key,
-                    updated_at,
-                    op,
-                })
             }
-            Some(QuerySelect::Field(prop_id)) => {
+            QuerySelectRef::Field(prop_id) => {
+                let Some(PgTableKey::Data { def_id, .. }) =
+                    self.pg_model.reg_key_to_table_key.get(&def_key)
+                else {
+                    return Err(PgError::InvalidDynamicDataType(def_key).into());
+                };
+                let def = self.ontology.def(*def_id);
+
                 let field_value = self
                     .read_field(
                         def.data_relationships
                             .get(&prop_id)
                             .ok_or(PgModelError::NonExistentField(prop_id))?,
                         &mut iterator,
-                        Some(&standard_fields),
+                        Some(&standard_attrs),
                     )?
                     .ok_or(PgError::MissingField(prop_id))?;
 
@@ -758,24 +686,148 @@ impl<'a> TransactCtx<'a> {
                     op,
                 })
             }
-            None => Ok(RowValue {
-                value: Value::Void(DefId::unit().into()),
-                def_key,
-                data_key,
-                updated_at,
-                op,
-            }),
         }
+    }
+
+    pub fn read_row_value_with_vertex_select<'b>(
+        &self,
+        mut iterator: impl SqlRecordIterator<'b>,
+        (def_key, domain_index, def_id): (PgRegKey, DomainIndex, DefId),
+        standard_attrs: StandardAttrs,
+        vertex_select: &VertexSelect,
+        include_joined_attrs: IncludeJoinedAttrs,
+        op: DataOperation,
+    ) -> DomainResult<RowValue> {
+        let def = self.ontology.def(def_id);
+
+        let mut attrs: FnvHashMap<PropId, Attr> =
+            FnvHashMap::with_capacity_and_hasher(def.data_relationships.len(), Default::default());
+
+        attrs.insert(
+            PropId::data_store_address(),
+            Attr::Unit(make_ontol_vertex_address(def_key, standard_attrs.data_key)),
+        );
+
+        // retrieve data properties
+        self.read_inherent_vertex_fields(
+            &mut iterator,
+            def,
+            vertex_select,
+            &mut attrs,
+            Some(&standard_attrs),
+        )?;
+
+        if matches!(&include_joined_attrs, IncludeJoinedAttrs::Yes) {
+            // retrieve abstract properties
+            let pg = self.pg_model.pg_domain_datatable(domain_index, def_id)?;
+
+            for (prop_id, vertex_select) in &vertex_select.abstract_set {
+                if pg.table.find_abstract_property(prop_id).is_none() {
+                    continue;
+                }
+
+                let Some(rel_info) = def.data_relationships.get(prop_id) else {
+                    continue;
+                };
+
+                match (
+                    self.abstract_kind(&rel_info.target),
+                    &rel_info.cardinality.1,
+                ) {
+                    (AbstractKind::VertexUnion(_), ValueCardinality::Unit) => {
+                        if let Some(sql_val) = iterator.next_field(&Layout::Record)?.null_filter() {
+                            let sql_record = sql_val.into_record()?;
+                            let row_value = self.read_vertex_row_value(
+                                sql_record.fields(),
+                                QuerySelectRef::VertexUnion(std::slice::from_ref(vertex_select)),
+                                IncludeJoinedAttrs::Yes,
+                                DataOperation::Queried,
+                            )?;
+
+                            debug!("abstract value: {:?}", row_value.value);
+
+                            attrs.insert(*prop_id, Attr::Unit(row_value.value));
+                        }
+                    }
+                    (
+                        AbstractKind::VertexUnion(_),
+                        ValueCardinality::IndexSet | ValueCardinality::List,
+                    ) => {
+                        let sql_array = iterator.next_field(&Layout::Array)?.into_array()?;
+                        let mut matrix = AttrMatrix::default();
+                        matrix.columns.push(Default::default());
+
+                        for result in sql_array.elements(&Layout::Record) {
+                            let sql_record = result?.into_record()?;
+
+                            let row_value = self.read_vertex_row_value(
+                                sql_record.fields(),
+                                QuerySelectRef::VertexUnion(std::slice::from_ref(vertex_select)),
+                                IncludeJoinedAttrs::Yes,
+                                op,
+                            )?;
+
+                            matrix.columns[0].push(row_value.value);
+                        }
+
+                        if matches!(rel_info.cardinality.0, PropertyCardinality::Mandatory)
+                            || !matrix.columns[0].elements().is_empty()
+                        {
+                            attrs.insert(*prop_id, Attr::Matrix(matrix));
+                        }
+                    }
+                    (
+                        AbstractKind::Scalar {
+                            pg_type,
+                            target_def_id,
+                            ..
+                        },
+                        _,
+                    ) => {
+                        let sql_array = iterator.next_field(&Layout::Array)?.into_array()?;
+
+                        let mut matrix = AttrMatrix::default();
+                        matrix.columns.push(Default::default());
+
+                        for result in sql_array.elements(&Layout::Scalar(pg_type)) {
+                            let sql_val = result?;
+
+                            let value = self.deserialize_sql(target_def_id, sql_val)?;
+
+                            matrix.columns[0].push(value);
+                        }
+
+                        if matches!(rel_info.cardinality.0, PropertyCardinality::Mandatory)
+                            || !matrix.columns[0].elements().is_empty()
+                        {
+                            attrs.insert(*prop_id, Attr::Matrix(matrix));
+                        }
+                    }
+                }
+            }
+
+            self.read_edge_attributes(&mut iterator, def, vertex_select, &mut attrs)?;
+        }
+
+        let value = Value::Struct(Box::new(attrs), def.id.into());
+
+        Ok(RowValue {
+            value,
+            def_key,
+            data_key: standard_attrs.data_key,
+            updated_at: standard_attrs.updated_at,
+            op,
+        })
     }
 
     pub fn read_edge_attributes<'b>(
         &self,
         record_iter: &mut impl SqlRecordIterator<'b>,
         def: &Def,
-        properties: &BTreeMap<PropId, Select>,
+        vertex_select: &VertexSelect,
         attrs: &mut FnvHashMap<PropId, Attr>,
     ) -> DomainResult<()> {
-        for (prop_id, select) in properties {
+        for (prop_id, cardinal_selects) in &vertex_select.edge_set {
             let Some(rel_info) = def.data_relationships.get(prop_id) else {
                 continue;
             };
@@ -791,7 +843,11 @@ impl<'a> TransactCtx<'a> {
                         record_iter.next_field(&Layout::Record)?.null_filter()
                     {
                         let sql_edge_tuple = sql_edge_tuple.into_record()?;
-                        let attr = self.read_edge_tuple_as_attr(sql_edge_tuple, select, pg_edge)?;
+                        let attr = self.read_edge_tuple_as_attr(
+                            sql_edge_tuple,
+                            &cardinal_selects,
+                            pg_edge,
+                        )?;
                         attrs.insert(*prop_id, attr);
                     }
                 }
@@ -804,7 +860,11 @@ impl<'a> TransactCtx<'a> {
                     for result in sql_array.elements(&Layout::Record) {
                         let sql_edge_tuple = result?.into_record()?;
 
-                        match self.read_edge_tuple_as_attr(sql_edge_tuple, select, pg_edge)? {
+                        match self.read_edge_tuple_as_attr(
+                            sql_edge_tuple,
+                            &cardinal_selects,
+                            pg_edge,
+                        )? {
                             Attr::Unit(value) => {
                                 matrix.columns[0].push(value);
                             }
@@ -838,59 +898,69 @@ impl<'a> TransactCtx<'a> {
     fn read_edge_tuple_as_attr(
         &self,
         sql_edge_tuple: SqlRecord,
-        select: &Select,
+        cardinal_selects: &[CardinalSelect],
         pg_edge: &PgTable,
     ) -> DomainResult<Attr> {
-        let mut fields = sql_edge_tuple.fields();
+        let mut tuple_fields = sql_edge_tuple.fields();
+        let len = cardinal_selects.len();
+        let mut tup_elements: SmallVec<Value, 1> = Default::default();
 
-        let sql_field = fields.next_field(&Layout::Record)?;
-        let value = self.read_record(sql_field, select)?;
+        debug!("read edge tuple {cardinal_selects:#?}");
 
-        if sql_edge_tuple.field_count() > 1 {
-            // handle parameters
-            let sql_field = fields.next_field(&Layout::Record)?;
+        for cardinal_select in cardinal_selects {
+            let sql_record = tuple_fields.next_field(&Layout::Record)?.into_record()?;
+            let Some(pg_cardinal) = pg_edge.edge_cardinals.get(&cardinal_select.cardinal_idx)
+            else {
+                continue;
+            };
 
-            for cardinal in pg_edge.edge_cardinals.values() {
-                if let PgEdgeCardinalKind::Parameters(def_id) = &cardinal.kind {
+            let value = match &pg_cardinal.kind {
+                PgEdgeCardinalKind::Parameters(def_id) => {
                     let def = self.ontology.def(*def_id);
                     let mut attrs: FnvHashMap<PropId, Attr> = FnvHashMap::with_capacity_and_hasher(
                         def.data_relationships.len(),
                         Default::default(),
                     );
 
-                    let struct_record = sql_field.into_record()?;
-
                     // retrieve data properties
-                    self.read_inherent_struct_fields(
-                        def,
-                        &mut struct_record.fields(),
-                        &mut attrs,
-                        None,
-                    )?;
+                    if let QuerySelect::Vertex(vertex_select) = &cardinal_select.select {
+                        self.read_inherent_vertex_fields(
+                            &mut sql_record.fields(),
+                            def,
+                            vertex_select,
+                            &mut attrs,
+                            None,
+                        )?;
+                    }
 
-                    return Ok(Attr::Tuple(Box::new(EndoTuple {
-                        elements: smallvec![
-                            value,
-                            Value::Struct(Box::new(attrs), (*def_id).into())
-                        ],
-                    })));
+                    Value::Struct(Box::new(attrs), (*def_id).into())
                 }
-            }
+                _ => self.read_edge_cardinal(sql_record, cardinal_select.select.as_ref())?,
+            };
 
-            Err(PgError::EdgeParametersMissing.into())
-        } else {
-            Ok(Attr::Unit(value))
+            if len == 1 {
+                return Ok(Attr::Unit(value));
+            } else {
+                tup_elements.push(value);
+            }
         }
+
+        Ok(Attr::Tuple(Box::new(EndoTuple {
+            elements: tup_elements,
+        })))
     }
 
-    fn read_record(&self, sql_val: SqlOutput, select: &Select) -> DomainResult<Value> {
-        let sql_record = sql_val.into_record()?;
+    fn read_edge_cardinal(
+        &self,
+        sql_record: SqlRecord,
+        select: QuerySelectRef,
+    ) -> DomainResult<Value> {
         let def_key = sql_record.def_key()?;
         let (_domain_index, def_id) = self.pg_model.datatable_key_by_def_key(def_key)?;
         let pg_def = self.lookup_def(def_id)?;
 
         match select {
-            Select::Unit | Select::EntityId => {
+            QuerySelectRef::Unit => {
                 let Some(entity) = pg_def.def.entity() else {
                     return Err(PgInputError::NotAnEntity.into());
                 };
@@ -902,7 +972,7 @@ impl<'a> TransactCtx<'a> {
 
                 self.deserialize_sql(entity.id_value_def_id, sql_field)
             }
-            Select::VertexAddress => {
+            QuerySelectRef::VertexAddress => {
                 let mut fields = sql_record.fields();
 
                 let _ = fields.next_field(&Layout::Scalar(PgType::Integer))?;
@@ -912,45 +982,22 @@ impl<'a> TransactCtx<'a> {
 
                 Ok(make_ontol_vertex_address(def_key, data_key))
             }
-            Select::Struct(struct_select) => {
-                self.read_record_as_struct(sql_record, &struct_select.properties)
-            }
-            Select::Entity(entity_select) => match &entity_select.source {
-                StructOrUnionSelect::Struct(struct_select) => {
-                    self.read_record_as_struct(sql_record, &struct_select.properties)
-                }
-                StructOrUnionSelect::Union(_, variants) => {
-                    let actual_select = variants
-                        .iter()
-                        .find(|sel| sel.def_id == def_id)
-                        .ok_or(PgInputError::UnionVariantNotFound)?;
-
-                    self.read_record_as_struct(sql_record, &actual_select.properties)
-                }
-            },
-            Select::StructUnion(_, variants) => {
-                let actual_select = variants
+            QuerySelectRef::VertexUnion(variants) => {
+                let vertex_select = variants
                     .iter()
                     .find(|sel| sel.def_id == def_id)
                     .ok_or(PgInputError::UnionVariantNotFound)?;
 
-                self.read_record_as_struct(sql_record, &actual_select.properties)
+                let row_value = self.read_vertex_row_value(
+                    sql_record.fields(),
+                    QuerySelectRef::VertexUnion(std::slice::from_ref(vertex_select)),
+                    IncludeJoinedAttrs::Yes,
+                    DataOperation::Queried,
+                )?;
+
+                Ok(row_value.value)
             }
+            QuerySelectRef::Field(_) => todo!(),
         }
-    }
-
-    fn read_record_as_struct(
-        &self,
-        sql_record: SqlRecord,
-        select_properties: &BTreeMap<PropId, Select>,
-    ) -> DomainResult<Value> {
-        let row_value = self.read_row_value_as_vertex(
-            sql_record.fields(),
-            Some(QuerySelect::Struct(select_properties)),
-            IncludeJoinedAttrs::Yes,
-            DataOperation::Queried,
-        )?;
-
-        Ok(row_value.value)
     }
 }

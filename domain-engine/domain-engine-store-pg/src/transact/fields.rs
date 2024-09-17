@@ -2,8 +2,7 @@ use domain_engine_core::DomainResult;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     attr::Attr,
-    ontology::domain::{DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget, Def},
-    property::ValueCardinality,
+    ontology::domain::{DataRelationshipInfo, DataRelationshipTarget, Def},
     value::Value,
     DefId, OntolDefTag, PropId,
 };
@@ -17,12 +16,7 @@ use crate::{
     sql_value::{Layout, PgTimestamp, SqlOutput, SqlScalar},
 };
 
-use super::TransactCtx;
-
-#[derive(Default)]
-pub struct SelectStats {
-    pub edge_count: usize,
-}
+use super::{query_select::VertexSelect, TransactCtx};
 
 pub enum AbstractKind<'a> {
     VertexUnion(&'a [DefId]),
@@ -33,8 +27,7 @@ pub enum AbstractKind<'a> {
     },
 }
 
-pub struct StandardFields {
-    #[expect(unused)]
+pub struct StandardAttrs {
     pub data_key: PgDataKey,
     pub created_at: PgTimestamp,
     pub updated_at: PgTimestamp,
@@ -55,50 +48,38 @@ impl<'a> TransactCtx<'a> {
     }
 
     /// Select the columns in the order of the data relationships in the Def.
-    pub fn select_inherent_struct_fields(
+    pub fn select_inherent_vertex_fields(
         &self,
-        def: &Def,
         pg_datatable: &'a PgTable,
+        vertex_select: &VertexSelect,
         output: &mut Vec<sql::Expr<'a>>,
         table_alias: Option<sql::Alias>,
-    ) -> DomainResult<SelectStats> {
-        let mut stats = SelectStats { edge_count: 0 };
-
-        for (prop_id, rel) in &def.data_relationships {
-            match &rel.kind {
-                DataRelationshipKind::Id | DataRelationshipKind::Tree => {
-                    if let Some(pg_column) = pg_datatable.find_column(prop_id) {
-                        if let Some(table_alias) = table_alias {
-                            output.push(sql::Expr::path2(table_alias, pg_column.col_name.as_ref()));
-                        } else {
-                            output.push(sql::Expr::path1(pg_column.col_name.as_ref()));
-                        }
-                    }
-                }
-                DataRelationshipKind::Edge(_) => {
-                    stats.edge_count += 1;
+    ) {
+        for prop_id in &vertex_select.inherent_set {
+            if let Some(pg_column) = pg_datatable.find_column(prop_id) {
+                if let Some(table_alias) = table_alias {
+                    output.push(sql::Expr::path2(table_alias, pg_column.col_name.as_ref()));
+                } else {
+                    output.push(sql::Expr::path1(pg_column.col_name.as_ref()));
                 }
             }
         }
-
-        Ok(stats)
     }
 
-    /// Read the columns in the order of the data relationships in the Def.
-    pub fn read_inherent_struct_fields<'b>(
+    /// Read the columns in the order of the VertexSelect.
+    pub fn read_inherent_vertex_fields<'b>(
         &self,
-        def: &Def,
         record_iter: &mut impl SqlRecordIterator<'b>,
+        def: &Def,
+        vertex_select: &VertexSelect,
         attrs: &mut FnvHashMap<PropId, Attr>,
-        standard_fields: Option<&StandardFields>,
+        standard_fields: Option<&StandardAttrs>,
     ) -> DomainResult<()> {
-        for (prop_id, rel_info) in &def.data_relationships {
-            if let (DataRelationshipKind::Id | DataRelationshipKind::Tree, ValueCardinality::Unit) =
-                (&rel_info.kind, &rel_info.cardinality.1)
-            {
-                if let Some(value) = self.read_field(rel_info, record_iter, standard_fields)? {
-                    attrs.insert(*prop_id, Attr::Unit(value));
-                }
+        for prop_id in &vertex_select.inherent_set {
+            let rel_info = def.data_relationships.get(prop_id).unwrap();
+
+            if let Some(value) = self.read_field(rel_info, record_iter, standard_fields)? {
+                attrs.insert(*prop_id, Attr::Unit(value));
             }
         }
 
@@ -109,7 +90,7 @@ impl<'a> TransactCtx<'a> {
         &self,
         rel_info: &DataRelationshipInfo,
         record_iter: &mut impl SqlRecordIterator<'b>,
-        standard_fields: Option<&StandardFields>,
+        standard_fields: Option<&StandardAttrs>,
     ) -> DomainResult<Option<Value>> {
         let target_def_id = rel_info.target.def_id();
 

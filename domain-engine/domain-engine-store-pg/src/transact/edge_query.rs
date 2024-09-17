@@ -1,46 +1,18 @@
 use domain_engine_core::DomainResult;
-use ontol_runtime::{
-    ontology::domain::EdgeInfo,
-    query::select::{Select, StructOrUnionSelect, StructSelect},
-    tuple::CardinalIdx,
-};
+use ontol_runtime::ontology::domain::EdgeInfo;
 use tracing::trace;
 
 use crate::{
-    pg_error::{ds_err, PgInputError, PgModelError},
+    pg_error::{PgInputError, PgModelError},
     pg_model::{EdgeId, PgDomainTable, PgEdgeCardinal, PgEdgeCardinalKind, PgTable},
     sql,
+    transact::query_select::{QuerySelect, QuerySelectRef},
 };
 
-use super::{cache::PgCache, query::QueryBuildCtx, TransactCtx};
-
-#[derive(Clone, Copy, Debug)]
-pub enum CardinalSelect<'a> {
-    Leaf,
-    VertexAddress,
-    StructUnion(&'a [StructSelect]),
-}
-
-impl<'a> CardinalSelect<'a> {
-    pub fn from_select(select: &'a Select) -> Self {
-        match select {
-            Select::Unit => Self::Leaf,
-            Select::EntityId => Self::Leaf,
-            Select::VertexAddress => Self::VertexAddress,
-            Select::Struct(s) => Self::StructUnion(std::slice::from_ref(s)),
-            Select::StructUnion(_, u) => Self::StructUnion(u),
-            Select::Entity(e) => match &e.source {
-                StructOrUnionSelect::Struct(s) => Self::StructUnion(std::slice::from_ref(s)),
-                StructOrUnionSelect::Union(_, u) => Self::StructUnion(u),
-            },
-        }
-    }
-}
+use super::{cache::PgCache, query::QueryBuildCtx, query_select::CardinalSelect, TransactCtx};
 
 pub struct PgEdgeProjection<'a> {
     pub id: EdgeId,
-    pub subject_index: CardinalIdx,
-    pub object_index: CardinalIdx,
 
     pub pg_subj_data: PgDomainTable<'a>,
     pub pg_subj_cardinal: &'a PgEdgeCardinal,
@@ -88,22 +60,33 @@ pub enum EdgeUnionCardinalVariantSelect<'a> {
 
 impl<'a> TransactCtx<'a> {
     /// produces a cartesian product-UNION ALL using recursion
-    pub(super) fn sql_select_edge_cardinals(
+    pub(super) fn sql_select_edge_cardinals<'b>(
         &self,
-        (cardinal_idx, pg_proj): (CardinalIdx, &PgEdgeProjection<'a>),
-        select: CardinalSelect,
+        pg_proj: &PgEdgeProjection<'a>,
+        cardinal_selects: &[CardinalSelect],
+        index_level: usize,
         variant_builder: EdgeUnionVariantSelectBuilder<'a>,
         union_builder: &mut EdgeUnionSelectBuilder<'a>,
         query_ctx: &mut QueryBuildCtx<'a>,
         cache: &mut PgCache,
     ) -> DomainResult<()> {
-        let Some(pg_cardinal) = pg_proj.pg_edge.table.edge_cardinals.get(&cardinal_idx) else {
+        let Some(cardinal_select) = cardinal_selects.get(index_level) else {
             self.finalize(pg_proj, variant_builder, union_builder);
             return Ok(());
         };
+        let cardinal_idx = cardinal_select.cardinal_idx;
+
+        let Some(pg_cardinal) = pg_proj
+            .pg_edge
+            .table
+            .edge_cardinals
+            .get(&cardinal_select.cardinal_idx)
+        else {
+            panic!()
+        };
 
         trace!(
-            "select edge {:?} cardinal {cardinal_idx} {select:?}",
+            "select edge {:?} cardinal {cardinal_idx} {cardinal_select:?}",
             pg_proj.id
         );
         /*
@@ -115,21 +98,8 @@ impl<'a> TransactCtx<'a> {
 
         match &pg_cardinal.kind {
             PgEdgeCardinalKind::Dynamic { .. } | PgEdgeCardinalKind::PinnedDef { .. } => {
-                // potentially skip cardinal
-                // FIXME: select more than one non-parameter cardinal, but CardinalSelect model has to improve
-                if cardinal_idx == pg_proj.subject_index || cardinal_idx != pg_proj.object_index {
-                    return self.sql_select_edge_cardinals(
-                        (next_cardinal_idx(cardinal_idx), pg_proj),
-                        select,
-                        variant_builder,
-                        union_builder,
-                        query_ctx,
-                        cache,
-                    );
-                }
-
-                match select {
-                    CardinalSelect::VertexAddress => {
+                match cardinal_select.select.as_ref() {
+                    QuerySelectRef::VertexAddress => {
                         let edge_path = sql::Path::from_iter([pg_proj.edge_alias.into()]);
 
                         let expr = match &pg_cardinal.kind {
@@ -159,8 +129,9 @@ impl<'a> TransactCtx<'a> {
                         };
 
                         self.sql_select_edge_cardinals(
-                            (next_cardinal_idx(cardinal_idx), pg_proj),
-                            select,
+                            pg_proj,
+                            cardinal_selects,
+                            index_level + 1,
                             variant_builder.append(EdgeUnionCardinalVariantSelect::VertexAddress {
                                 expr,
                                 where_condition: Some(sql::Expr::arc(edge_join_condition(
@@ -175,7 +146,7 @@ impl<'a> TransactCtx<'a> {
                             cache,
                         )?;
                     }
-                    CardinalSelect::Leaf => {
+                    QuerySelectRef::Unit => {
                         let edge_cardinal = pg_proj
                             .edge_info
                             .cardinals
@@ -193,8 +164,9 @@ impl<'a> TransactCtx<'a> {
                             let leaf_alias = query_ctx.alias.incr();
 
                             self.sql_select_edge_cardinals(
-                                (next_cardinal_idx(cardinal_idx), pg_proj),
-                                select,
+                                pg_proj,
+                                cardinal_selects,
+                                index_level + 1,
                                 variant_builder.append(EdgeUnionCardinalVariantSelect::Vertex {
                                     expr: sql::Expr::Row(vec![
                                         sql::Expr::LiteralInt(pg_def.pg.table.key),
@@ -220,24 +192,23 @@ impl<'a> TransactCtx<'a> {
                             )?;
                         }
                     }
-                    CardinalSelect::StructUnion(union) => {
-                        let cardinal_idx = pg_proj.object_index;
-
-                        for struct_select in union {
-                            let target_def_id = struct_select.def_id;
-                            let pg_def = self.lookup_def(struct_select.def_id)?;
+                    QuerySelectRef::VertexUnion(union) => {
+                        for vertex_select in union {
+                            let target_def_id = vertex_select.def_id;
+                            let pg_def = self.lookup_def(vertex_select.def_id)?;
 
                             let (from, vertex_alias, expressions) = self
                                 .sql_select_vertex_expressions_with_alias(
                                     target_def_id,
-                                    &struct_select.properties,
+                                    &vertex_select,
                                     pg_def.pg,
                                     query_ctx,
                                     cache,
                                 )?;
                             self.sql_select_edge_cardinals(
-                                (next_cardinal_idx(cardinal_idx), pg_proj),
-                                select,
+                                pg_proj,
+                                cardinal_selects,
+                                index_level + 1,
                                 variant_builder.append(EdgeUnionCardinalVariantSelect::Vertex {
                                     expr: sql::Expr::arc(sql::Expr::Row(expressions)),
                                     from,
@@ -260,33 +231,24 @@ impl<'a> TransactCtx<'a> {
                             )?;
                         }
                     }
+                    QuerySelectRef::Field(_) => todo!(),
                 }
             }
             PgEdgeCardinalKind::Parameters(_) => {
-                let edge_cardinal = pg_proj
-                    .edge_info
-                    .cardinals
-                    .get(cardinal_idx.0 as usize)
-                    .ok_or_else(|| ds_err("no edge cardinal for parameters"))?;
-
-                let params_def_id = *edge_cardinal
-                    .target
-                    .iter()
-                    .next()
-                    .ok_or_else(|| ds_err("no target for edge cardinal"))?;
-                let params_def = self.ontology.def(params_def_id);
-
                 let mut sql_expressions = vec![];
-                self.select_inherent_struct_fields(
-                    params_def,
-                    pg_proj.pg_edge.table,
-                    &mut sql_expressions,
-                    Some(pg_proj.edge_alias),
-                )?;
+                if let QuerySelect::Vertex(vertex_select) = &cardinal_select.select {
+                    self.select_inherent_vertex_fields(
+                        pg_proj.pg_edge.table,
+                        vertex_select,
+                        &mut sql_expressions,
+                        Some(pg_proj.edge_alias),
+                    );
+                }
 
                 return self.sql_select_edge_cardinals(
-                    (next_cardinal_idx(cardinal_idx), pg_proj),
-                    select,
+                    pg_proj,
+                    cardinal_selects,
+                    index_level + 1,
                     variant_builder.append(EdgeUnionCardinalVariantSelect::Parameters {
                         expr: sql::Expr::arc(sql::Expr::Row(sql_expressions)),
                     }),
@@ -385,8 +347,4 @@ pub fn edge_join_condition<'a>(
         }
         PgEdgeCardinalKind::Parameters(_params_def_id) => unreachable!(),
     }
-}
-
-fn next_cardinal_idx(idx: CardinalIdx) -> CardinalIdx {
-    CardinalIdx(idx.0 + 1)
 }

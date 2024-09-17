@@ -32,6 +32,7 @@ mod fields;
 mod insert;
 mod order;
 mod query;
+mod query_select;
 mod update;
 
 #[derive(Clone, Copy, Debug)]

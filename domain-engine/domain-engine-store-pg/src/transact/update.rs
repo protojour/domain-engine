@@ -15,7 +15,7 @@ use crate::{
     pg_model::{EdgeId, InDomain, PgDataKey},
     sql::{self, UpdateColumn},
     sql_value::{PgTimestamp, SqlScalar},
-    transact::query::{QueryFrame, QuerySelect},
+    transact::query::QueryFrame,
 };
 
 use super::{
@@ -23,6 +23,7 @@ use super::{
     data::{Data, RowValue},
     edge_patch::{EdgeEndoTuplePatch, EdgePatches},
     query::Query,
+    query_select::QuerySelect,
     MutationMode, TransactCtx,
 };
 
@@ -43,6 +44,7 @@ impl<'a> TransactCtx<'a> {
         timestamp: PgTimestamp,
         cache: &mut PgCache,
     ) -> DomainResult<Value> {
+        let domain_index = value.domain_index;
         let def_id = value.type_def_id();
         let def = self.ontology.def(def_id);
         let entity = def.entity().ok_or_else(|| {
@@ -63,7 +65,11 @@ impl<'a> TransactCtx<'a> {
             .await?;
 
         let query_select = match select {
-            Select::Struct(sel) => QuerySelect::Struct(&sel.properties),
+            select @ Select::Struct(_) => {
+                let pg = self.pg_model.pg_domain_datatable(domain_index, def_id)?;
+                let vertex_select = self.analyze_vertex_select(def, &pg.table, select)?;
+                QuerySelect::Vertex(vertex_select)
+            }
             Select::Unit | Select::EntityId => QuerySelect::Field(entity.id_prop),
             _ => todo!(),
         };
@@ -78,7 +84,7 @@ impl<'a> TransactCtx<'a> {
                     native_id_condition: Some(key),
                 },
                 None,
-                Some(query_select),
+                query_select,
                 cache,
             )
             .await?,
