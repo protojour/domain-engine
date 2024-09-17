@@ -9,9 +9,9 @@ use ontol_runtime::{
 };
 use smallvec::{smallvec, SmallVec};
 
-use crate::pg_model::{EdgeId, PgEdgeCardinalKind, PgTable, PgTableKey};
+use crate::pg_model::{EdgeId, PgEdgeCardinalKind, PgTable};
 
-use super::TransactCtx;
+use super::{fields::AbstractKind, TransactCtx};
 
 #[derive(Debug)]
 pub enum QuerySelect {
@@ -48,7 +48,7 @@ pub enum QuerySelectRef<'a> {
 pub struct VertexSelect {
     pub def_id: DefId,
     pub inherent_set: BTreeSet<PropId>,
-    pub abstract_set: BTreeMap<PropId, VertexSelect>,
+    pub abstract_set: BTreeMap<PropId, QuerySelect>,
     pub edge_set: BTreeMap<PropId, SmallVec<CardinalSelect, 2>>,
 }
 
@@ -155,17 +155,34 @@ impl<'a> TransactCtx<'a> {
             if let Some(rel_info) = def.data_relationships.get(prop_id) {
                 match &rel_info.kind {
                     DataRelationshipKind::Id | DataRelationshipKind::Tree => {
-                        if let Some(reg_key) = pg_datatable.find_abstract_property(prop_id) {
-                            let PgTableKey::Data {
-                                domain_index,
-                                def_id,
-                            } = self.pg_model.reg_key_to_table_key.get(&reg_key).unwrap();
-                            let pg = self.pg_model.datatable(*domain_index, *def_id)?;
-                            let def = self.ontology.def(*def_id);
+                        if pg_datatable.find_abstract_property(prop_id).is_some() {
+                            match self.abstract_kind(&rel_info.target) {
+                                AbstractKind::VertexUnion(variants) => {
+                                    let mut variant_selects = Vec::with_capacity(variants.len());
 
-                            output
-                                .abstract_set
-                                .insert(*prop_id, self.analyze_vertex_select(def, pg, sub_sel)?);
+                                    for variant_def_id in variants {
+                                        let variant_def = self.ontology.def(*variant_def_id);
+                                        let pg = self.pg_model.datatable(
+                                            variant_def_id.domain_index(),
+                                            *variant_def_id,
+                                        )?;
+
+                                        variant_selects.push(self.analyze_vertex_select(
+                                            variant_def,
+                                            pg,
+                                            sub_sel,
+                                        )?);
+                                    }
+
+                                    output.abstract_set.insert(
+                                        *prop_id,
+                                        QuerySelect::VertexUnion(variant_selects),
+                                    );
+                                }
+                                AbstractKind::Scalar { .. } => {
+                                    output.abstract_set.insert(*prop_id, QuerySelect::Unit);
+                                }
+                            }
                         } else {
                             output.inherent_set.insert(*prop_id);
                         }

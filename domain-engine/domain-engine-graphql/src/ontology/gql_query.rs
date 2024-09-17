@@ -6,6 +6,7 @@ use crate::field_error;
 use crate::gql_scalar::GqlScalar;
 use crate::juniper::{self, graphql_object, FieldResult};
 
+use domain_engine_core::domain_select::domain_select_no_edges;
 use domain_engine_core::transact::AccumulateSequences;
 use domain_engine_core::transact::ReqMessage;
 use domain_engine_core::transact::TransactionMode;
@@ -14,9 +15,9 @@ use futures_util::TryStreamExt;
 use ontol_runtime::ontology::domain::{FieldPath, VertexOrder};
 use ontol_runtime::query::filter::Filter;
 use ontol_runtime::query::order::Direction;
-use ontol_runtime::query::select::EntitySelect;
 use ontol_runtime::query::select::StructOrUnionSelect;
 use ontol_runtime::query::select::StructSelect;
+use ontol_runtime::query::select::{EntitySelect, Select};
 use ontol_runtime::PropId;
 use serde::de::value::StringDeserializer;
 use serde::Deserialize;
@@ -152,13 +153,18 @@ impl Query {
             filter.set_vertex_order(vertex_order_chain);
         }
 
+        let struct_select = match domain_select_no_edges(def_id, ctx) {
+            Select::Struct(struct_select) => struct_select,
+            _ => StructSelect {
+                def_id,
+                properties: Default::default(),
+            },
+        };
+
         let messages = [Ok(ReqMessage::Query(
             0,
             EntitySelect {
-                source: StructOrUnionSelect::Struct(StructSelect {
-                    def_id,
-                    properties: Default::default(),
-                }),
+                source: StructOrUnionSelect::Struct(struct_select),
                 filter,
                 limit: first.try_into().map_err(field_error)?,
                 after_cursor: match after {

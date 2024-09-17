@@ -117,7 +117,7 @@ impl<'a> TransactCtx<'a> {
         let def = self.ontology.def(def_id);
 
         let vertex_select =
-            self.analyze_vertex_select_properties(def, &pg.table, &struct_select.properties)?;
+            self.analyze_vertex_select_properties(def, pg.table, &struct_select.properties)?;
 
         self.query(
             struct_select.def_id,
@@ -170,7 +170,7 @@ impl<'a> TransactCtx<'a> {
                         let vertex_select = vertex_selects.iter().next().unwrap();
                         self.sql_select_vertex_expressions_with_alias(
                             def_id,
-                            &vertex_select,
+                            vertex_select,
                             pg,
                             &mut query_ctx,
                             cache,
@@ -375,23 +375,39 @@ impl<'a> TransactCtx<'a> {
                             .pg_domain_datatable(sub_def_id.domain_index(), sub_def_id)?;
                         let sub_alias = query_ctx.alias.incr();
 
-                        let mut record_items: Vec<_> =
-                            self.initial_standard_data_fields(sub_pg).into();
+                        let mut record_items: Vec<_> = vec![];
 
-                        self.select_inherent_vertex_fields(
-                            sub_pg.table,
-                            sub_select,
-                            &mut record_items,
-                            Some(sub_alias),
-                        );
+                        match sub_select.as_ref() {
+                            QuerySelectRef::Unit => {
+                                record_items.extend(self.initial_standard_data_fields(sub_pg));
+                            }
+                            QuerySelectRef::VertexUnion(vertex_selects) => {
+                                let Some(vertex_select) =
+                                    vertex_selects.iter().find(|sel| sel.def_id == sub_def_id)
+                                else {
+                                    continue;
+                                };
 
-                        self.sql_select_abstract_properties(
-                            (sub_def, sub_pg),
-                            sub_alias,
-                            sub_select,
-                            query_ctx,
-                            &mut record_items,
-                        )?;
+                                record_items.extend(self.initial_standard_data_fields(sub_pg));
+
+                                self.select_inherent_vertex_fields(
+                                    sub_pg.table,
+                                    vertex_select,
+                                    &mut record_items,
+                                    Some(sub_alias),
+                                );
+
+                                self.sql_select_abstract_properties(
+                                    (sub_def, sub_pg),
+                                    sub_alias,
+                                    vertex_select,
+                                    query_ctx,
+                                    &mut record_items,
+                                )?;
+                            }
+                            QuerySelectRef::VertexAddress => todo!(),
+                            QuerySelectRef::EntityId => todo!(),
+                        };
 
                         union_operands.push(
                             sql::Select {
@@ -515,8 +531,7 @@ impl<'a> TransactCtx<'a> {
 
             self.sql_select_edge_cardinals(
                 &pg_proj,
-                cardinal_selects,
-                0,
+                (cardinal_selects, 0),
                 EdgeUnionVariantSelectBuilder::default(),
                 &mut union_builder,
                 query_ctx,
@@ -730,7 +745,7 @@ impl<'a> TransactCtx<'a> {
             // retrieve abstract properties
             let pg = self.pg_model.pg_domain_datatable(domain_index, def_id)?;
 
-            for (prop_id, vertex_select) in &vertex_select.abstract_set {
+            for (prop_id, abstract_select) in &vertex_select.abstract_set {
                 if pg.table.find_abstract_property(prop_id).is_none() {
                     continue;
                 }
@@ -748,7 +763,7 @@ impl<'a> TransactCtx<'a> {
                             let sql_record = sql_val.into_record()?;
                             let row_value = self.read_vertex_row_value(
                                 sql_record.fields(),
-                                QuerySelectRef::VertexUnion(std::slice::from_ref(vertex_select)),
+                                abstract_select.as_ref(),
                                 IncludeJoinedAttrs::Yes,
                                 DataOperation::Queried,
                             )?;
@@ -771,7 +786,7 @@ impl<'a> TransactCtx<'a> {
 
                             let row_value = self.read_vertex_row_value(
                                 sql_record.fields(),
-                                QuerySelectRef::VertexUnion(std::slice::from_ref(vertex_select)),
+                                abstract_select.as_ref(),
                                 IncludeJoinedAttrs::Yes,
                                 op,
                             )?;
@@ -854,7 +869,7 @@ impl<'a> TransactCtx<'a> {
                         let sql_edge_tuple = sql_edge_tuple.into_record()?;
                         let attr = self.read_edge_tuple_as_attr(
                             sql_edge_tuple,
-                            &cardinal_selects,
+                            cardinal_selects,
                             pg_edge,
                         )?;
                         attrs.insert(*prop_id, attr);
@@ -871,7 +886,7 @@ impl<'a> TransactCtx<'a> {
 
                         match self.read_edge_tuple_as_attr(
                             sql_edge_tuple,
-                            &cardinal_selects,
+                            cardinal_selects,
                             pg_edge,
                         )? {
                             Attr::Unit(value) => {

@@ -60,11 +60,10 @@ pub enum EdgeUnionCardinalVariantSelect<'a> {
 
 impl<'a> TransactCtx<'a> {
     /// produces a cartesian product-UNION ALL using recursion
-    pub(super) fn sql_select_edge_cardinals<'b>(
+    pub(super) fn sql_select_edge_cardinals(
         &self,
         pg_proj: &PgEdgeProjection<'a>,
-        cardinal_selects: &[CardinalSelect],
-        index_level: usize,
+        (cardinal_selects, index_level): (&[CardinalSelect], usize),
         variant_builder: EdgeUnionVariantSelectBuilder<'a>,
         union_builder: &mut EdgeUnionSelectBuilder<'a>,
         query_ctx: &mut QueryBuildCtx<'a>,
@@ -130,8 +129,7 @@ impl<'a> TransactCtx<'a> {
 
                         self.sql_select_edge_cardinals(
                             pg_proj,
-                            cardinal_selects,
-                            index_level + 1,
+                            (cardinal_selects, index_level + 1),
                             variant_builder.append(EdgeUnionCardinalVariantSelect::VertexAddress {
                                 expr,
                                 where_condition: Some(sql::Expr::arc(edge_join_condition(
@@ -165,8 +163,7 @@ impl<'a> TransactCtx<'a> {
 
                             self.sql_select_edge_cardinals(
                                 pg_proj,
-                                cardinal_selects,
-                                index_level + 1,
+                                (cardinal_selects, index_level + 1),
                                 variant_builder.append(EdgeUnionCardinalVariantSelect::Vertex {
                                     expr: sql::Expr::Row(vec![
                                         sql::Expr::LiteralInt(pg_def.pg.table.key),
@@ -200,15 +197,14 @@ impl<'a> TransactCtx<'a> {
                             let (from, vertex_alias, expressions) = self
                                 .sql_select_vertex_expressions_with_alias(
                                     target_def_id,
-                                    &vertex_select,
+                                    vertex_select,
                                     pg_def.pg,
                                     query_ctx,
                                     cache,
                                 )?;
                             self.sql_select_edge_cardinals(
                                 pg_proj,
-                                cardinal_selects,
-                                index_level + 1,
+                                (cardinal_selects, index_level + 1),
                                 variant_builder.append(EdgeUnionCardinalVariantSelect::Vertex {
                                     expr: sql::Expr::arc(sql::Expr::Row(expressions)),
                                     from,
@@ -246,8 +242,7 @@ impl<'a> TransactCtx<'a> {
 
                 return self.sql_select_edge_cardinals(
                     pg_proj,
-                    cardinal_selects,
-                    index_level + 1,
+                    (cardinal_selects, index_level + 1),
                     variant_builder.append(EdgeUnionCardinalVariantSelect::Parameters {
                         expr: sql::Expr::arc(sql::Expr::Row(sql_expressions)),
                     }),

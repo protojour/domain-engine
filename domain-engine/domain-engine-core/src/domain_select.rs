@@ -13,6 +13,11 @@ pub fn domain_select(def_id: DefId, ontology: &Ontology) -> Select {
     builder.domain_select(def_id, true)
 }
 
+pub fn domain_select_no_edges(def_id: DefId, ontology: &Ontology) -> Select {
+    let builder = DomainSelectBuilder { ontology };
+    builder.domain_select(def_id, false)
+}
+
 struct DomainSelectBuilder<'o> {
     ontology: &'o Ontology,
 }

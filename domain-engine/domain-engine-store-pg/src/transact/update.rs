@@ -67,7 +67,7 @@ impl<'a> TransactCtx<'a> {
         let query_select = match select {
             select @ Select::Struct(_) => {
                 let pg = self.pg_model.pg_domain_datatable(domain_index, def_id)?;
-                let vertex_select = self.analyze_vertex_select(def, &pg.table, select)?;
+                let vertex_select = self.analyze_vertex_select(def, pg.table, select)?;
                 QuerySelect::Vertex(vertex_select)
             }
             Select::Unit | Select::EntityId => QuerySelect::EntityId,

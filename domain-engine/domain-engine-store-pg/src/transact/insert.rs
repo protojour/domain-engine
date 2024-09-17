@@ -476,7 +476,7 @@ impl<'a> TransactCtx<'a> {
         let mut query_ctx = QueryBuildCtx::default();
         let root_alias = query_ctx.alias;
 
-        let vertex_select = self.analyze_vertex_select(def, &pg.table, select)?;
+        let vertex_select = self.analyze_vertex_select(def, pg.table, select)?;
 
         query_ctx.with_def_aliases.insert(
             DefAliasKey {
@@ -796,7 +796,7 @@ impl<'a> TransactCtx<'a> {
         let query_select = match select {
             Select::EntityId => QuerySelect::EntityId,
             select @ Select::Struct(_) => {
-                QuerySelect::Vertex(self.analyze_vertex_select(def, &pg.table, select)?)
+                QuerySelect::Vertex(self.analyze_vertex_select(def, pg.table, select)?)
             }
             Select::Unit => QuerySelect::Unit,
             select => todo!("{select:?}"),
