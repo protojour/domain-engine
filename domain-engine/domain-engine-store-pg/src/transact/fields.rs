@@ -76,10 +76,28 @@ impl<'a> TransactCtx<'a> {
         standard_fields: Option<&StandardAttrs>,
     ) -> DomainResult<()> {
         for prop_id in &vertex_select.inherent_set {
-            let rel_info = def.data_relationships.get(prop_id).unwrap();
-
-            if let Some(value) = self.read_field(rel_info, record_iter, standard_fields)? {
-                attrs.insert(*prop_id, Attr::Unit(value));
+            if let Some(rel_info) = def.data_relationships.get(prop_id) {
+                if let Some(value) = self.read_field(rel_info, record_iter, standard_fields)? {
+                    attrs.insert(*prop_id, Attr::Unit(value));
+                }
+            } else if prop_id.0 == OntolDefTag::CreateTime.def_id() {
+                let standard_fields = standard_fields.unwrap();
+                attrs.insert(
+                    *prop_id,
+                    Attr::Unit(Value::ChronoDateTime(
+                        standard_fields.created_at,
+                        OntolDefTag::DateTime.def_id().into(),
+                    )),
+                );
+            } else if prop_id.0 == OntolDefTag::UpdateTime.def_id() {
+                let standard_fields = standard_fields.unwrap();
+                attrs.insert(
+                    *prop_id,
+                    Attr::Unit(Value::ChronoDateTime(
+                        standard_fields.updated_at,
+                        OntolDefTag::DateTime.def_id().into(),
+                    )),
+                );
             }
         }
 

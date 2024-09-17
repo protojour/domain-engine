@@ -18,7 +18,7 @@ use ontol_runtime::query::order::Direction;
 use ontol_runtime::query::select::StructOrUnionSelect;
 use ontol_runtime::query::select::StructSelect;
 use ontol_runtime::query::select::{EntitySelect, Select};
-use ontol_runtime::PropId;
+use ontol_runtime::{DefPropTag, OntolDefTag, PropId};
 use serde::de::value::StringDeserializer;
 use serde::Deserialize;
 use ulid::Ulid;
@@ -101,12 +101,15 @@ impl Query {
             .collect()
     }
 
+    #[expect(clippy::too_many_arguments)]
     async fn vertices(
         def_id: gql_id::DefId,
         first: i32,
         after: Option<String>,
         with_address: Option<bool>,
         with_def_id: Option<bool>,
+        with_create_time: Option<bool>,
+        with_update_time: Option<bool>,
         order: Option<Vec<gql_vertex::VertexOrder>>,
         ctx: &OntologyCtx,
     ) -> FieldResult<gql_vertex::VertexConnection> {
@@ -153,13 +156,25 @@ impl Query {
             filter.set_vertex_order(vertex_order_chain);
         }
 
-        let struct_select = match domain_select_no_edges(def_id, ctx) {
+        let mut struct_select = match domain_select_no_edges(def_id, ctx) {
             Select::Struct(struct_select) => struct_select,
             _ => StructSelect {
                 def_id,
                 properties: Default::default(),
             },
         };
+
+        if with_create_time.unwrap_or(false) {
+            struct_select
+                .properties
+                .insert(OntolDefTag::CreateTime.prop_id(DefPropTag(0)), Select::Unit);
+        }
+
+        if with_update_time.unwrap_or(false) {
+            struct_select
+                .properties
+                .insert(OntolDefTag::UpdateTime.prop_id(DefPropTag(0)), Select::Unit);
+        }
 
         let messages = [Ok(ReqMessage::Query(
             0,

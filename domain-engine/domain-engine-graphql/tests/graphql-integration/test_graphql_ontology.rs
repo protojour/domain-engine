@@ -466,6 +466,30 @@ async fn test_ontology_stix(ds: &str) {
         info!("address is `{address}`");
     }
 
+    let update_time_prop_id = {
+        let ontol_update_time = r#"
+        {
+            domain(id: "01GNYFZP30ED0EZ1579TH0D55P") {
+                defs(ident: "update_time") {
+                    propId
+                }
+            }
+        }
+        "#
+        .exec([], &ontology_schema, &ontology_ctx)
+        .await
+        .unwrap();
+
+        ontol_update_time
+            .field("domain")
+            .field("defs")
+            .element(0)
+            .field("propId")
+            .as_scalar_value()
+            .unwrap()
+            .to_string()
+    };
+
     info!("vertices (url) ordered by updated");
     // FIXME: Sort by update timestamp not implemented for inmemory yet
     if ds != "inmemory" {
@@ -537,6 +561,60 @@ async fn test_ontology_stix(ds: &str) {
                                 { "propId": "p@1:83:1", "attr": "unit", "type": "text", "value": "url--6bd10f1e-0c23-4278-8349-19d27c46817c" },
                                 { "propId": "p@1:83:2", "attr": "unit", "type": "i64", "value": "1" },
                                 { "propId": "p@1:83:5", "attr": "unit", "type": "text", "value": "http://first" },
+                            ]
+                        },
+                    ]
+                }
+            }))
+        );
+    }
+
+    info!("vertices (url) with updated timestamp");
+    // FIXME: Domain-external properties and standard timestamps not implemented for inmemory yet
+    if ds != "inmemory" {
+        expect_eq!(
+            actual = r#"
+                query vertices($defId: DefId!) {
+                    vertices(
+                        defId: $defId,
+                        first: 100,
+                        withAddress: false,
+                        withDefId: false,
+                        withUpdateTime: true,
+                    ) {
+                        elements
+                    }
+                }
+            "#
+            .exec(
+                OntologyParams {
+                    def_id: Some(url.graphql_def_id()),
+                },
+                &ontology_schema,
+                &ontology_ctx,
+            )
+            .await,
+            expected = Ok(graphql_value!({
+                "vertices": {
+                    "elements": [
+                        {
+                            "type": "struct",
+                            "attrs": [
+                                { "propId": update_time_prop_id.clone(), "attr": "unit", "type": "datetime", "value": "1971-01-01T00:00:00Z" },
+                                { "propId": "p@1:83:0", "attr": "unit", "type": "text", "value": "url" },
+                                { "propId": "p@1:83:1", "attr": "unit", "type": "text", "value": "url--6bd10f1e-0c23-4278-8349-19d27c46817c" },
+                                { "propId": "p@1:83:2", "attr": "unit", "type": "i64", "value": "1" },
+                                { "propId": "p@1:83:5", "attr": "unit", "type": "text", "value": "http://first" },
+                            ]
+                        },
+                        {
+                            "type": "struct",
+                            "attrs": [
+                                { "propId": update_time_prop_id, "attr": "unit", "type": "datetime", "value": "1972-01-01T00:00:00Z" },
+                                { "propId": "p@1:83:0", "attr": "unit", "type": "text", "value": "url" },
+                                { "propId": "p@1:83:1", "attr": "unit", "type": "text", "value": "url--c28dfe9f-aa02-4dc5-81ee-b69da50f2cc9" },
+                                { "propId": "p@1:83:2", "attr": "unit", "type": "i64", "value": "1" },
+                                { "propId": "p@1:83:5", "attr": "unit", "type": "text", "value": "http://second" },
                             ]
                         },
                     ]

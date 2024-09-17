@@ -6,7 +6,7 @@ use ontol_runtime::{
     interface::serde::processor::ProcessorMode,
     ontology::domain::DefRepr,
     value::{FormatValueAsText, Value},
-    PropId,
+    OntolDefTag, PropId,
 };
 
 use crate::{field_error, gql_scalar::GqlScalar};
@@ -198,7 +198,9 @@ pub fn write_ontol_scalar(
 
                     let mut sorted: Vec<_> = attrs
                         .into_iter()
-                        .filter(|(prop_id, _)| prop_id.0.domain_index().index() != 0)
+                        .filter(|(prop_id, _)| {
+                            prop_id.0 != OntolDefTag::RelationDataStoreAddress.def_id()
+                        })
                         .collect();
                     sorted.sort_by_key(|(prop_id, _)| *prop_id);
 

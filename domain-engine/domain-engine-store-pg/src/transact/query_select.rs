@@ -5,7 +5,7 @@ use ontol_runtime::{
     ontology::domain::{DataRelationshipKind, Def},
     query::select::{Select, StructOrUnionSelect, StructSelect},
     tuple::CardinalIdx,
-    DefId, PropId,
+    DefId, OntolDefTag, PropId,
 };
 use smallvec::{smallvec, SmallVec};
 
@@ -242,6 +242,10 @@ impl<'a> TransactCtx<'a> {
                         output.edge_set.insert(*prop_id, cardinal_selects);
                     }
                 }
+            } else if prop_id.0 == OntolDefTag::CreateTime.def_id()
+                || prop_id.0 == OntolDefTag::UpdateTime.def_id()
+            {
+                output.inherent_set.insert(*prop_id);
             }
         }
 
