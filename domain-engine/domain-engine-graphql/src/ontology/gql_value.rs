@@ -6,7 +6,7 @@ use ontol_runtime::{
     interface::serde::processor::ProcessorMode,
     ontology::domain::DefRepr,
     value::{FormatValueAsText, Value},
-    OntolDefTag, PropId,
+    DefPropTag, OntolDefTag, PropId,
 };
 
 use crate::{field_error, gql_scalar::GqlScalar};
@@ -17,6 +17,8 @@ use super::OntologyCtx;
 pub struct ValueScalarCfg {
     pub with_address: bool,
     pub with_def_id: bool,
+    pub with_create_time: bool,
+    pub with_update_time: bool,
 }
 
 #[derive(juniper::GraphQLScalar)]
@@ -72,6 +74,8 @@ const PROP_ID: &str = "propId";
 const ATTR: &str = "attr";
 const TYPE: &str = "type";
 const ADDRESS: &str = "address";
+const CREATE_TIME: &str = "create_time";
+const UPDATE_TIME: &str = "update_time";
 const VALUE: &str = "value";
 
 fn put_string(gobj: &mut juniper::Object<GqlScalar>, key: &str, value: impl Display) {
@@ -196,11 +200,43 @@ pub fn write_ontol_scalar(
                         }
                     }
 
+                    if cfg.with_create_time {
+                        if let Some(value) = attrs
+                            .get(&OntolDefTag::CreateTime.prop_id(DefPropTag(0)))
+                            .and_then(|attr| attr.as_unit())
+                        {
+                            put_string(
+                                gobj,
+                                CREATE_TIME,
+                                &FormatValueAsText {
+                                    value,
+                                    type_def_id: value.type_def_id(),
+                                    ontology: ctx,
+                                },
+                            );
+                        }
+                    }
+
+                    if cfg.with_update_time {
+                        if let Some(value) = attrs
+                            .get(&OntolDefTag::UpdateTime.prop_id(DefPropTag(0)))
+                            .and_then(|attr| attr.as_unit())
+                        {
+                            put_string(
+                                gobj,
+                                UPDATE_TIME,
+                                &FormatValueAsText {
+                                    value,
+                                    type_def_id: value.type_def_id(),
+                                    ontology: ctx,
+                                },
+                            );
+                        }
+                    }
+
                     let mut sorted: Vec<_> = attrs
                         .into_iter()
-                        .filter(|(prop_id, _)| {
-                            prop_id.0 != OntolDefTag::RelationDataStoreAddress.def_id()
-                        })
+                        .filter(|(prop_id, _)| prop_id.0.domain_index().index() != 0)
                         .collect();
                     sorted.sort_by_key(|(prop_id, _)| *prop_id);
 

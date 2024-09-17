@@ -122,6 +122,8 @@ impl Query {
         let cfg = ValueScalarCfg {
             with_address: with_address.unwrap_or(true),
             with_def_id: with_def_id.unwrap_or(true),
+            with_create_time: with_create_time.unwrap_or(false),
+            with_update_time: with_update_time.unwrap_or(false),
         };
 
         let mut filter = Filter::default_for_datastore();
@@ -164,13 +166,13 @@ impl Query {
             },
         };
 
-        if with_create_time.unwrap_or(false) {
+        if cfg.with_create_time {
             struct_select
                 .properties
                 .insert(OntolDefTag::CreateTime.prop_id(DefPropTag(0)), Select::Unit);
         }
 
-        if with_update_time.unwrap_or(false) {
+        if cfg.with_update_time {
             struct_select
                 .properties
                 .insert(OntolDefTag::UpdateTime.prop_id(DefPropTag(0)), Select::Unit);
