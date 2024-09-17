@@ -146,7 +146,7 @@ impl<'a> TransactCtx<'a> {
                             cache,
                         )?;
                     }
-                    QuerySelectRef::Unit => {
+                    QuerySelectRef::Unit | QuerySelectRef::EntityId => {
                         let edge_cardinal = pg_proj
                             .edge_info
                             .cardinals
@@ -231,7 +231,6 @@ impl<'a> TransactCtx<'a> {
                             )?;
                         }
                     }
-                    QuerySelectRef::Field(_) => todo!(),
                 }
             }
             PgEdgeCardinalKind::Parameters(_) => {

@@ -289,7 +289,7 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
     let users = test_util::query_entities(
         &engine,
         user_def
-            .struct_select([])
+            .struct_select([("user_id", Select::Unit)])
             .into_default_domain_entity_select(),
     )
     .await
@@ -308,7 +308,14 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
             &test_util::query_entities(
                 &engine,
                 user_def
-                    .struct_select([("authored_articles", Select::EntityId)])
+                    .struct_select([
+                        ("user_id", Select::Unit),
+                        ("username", Select::Unit),
+                        ("email", Select::Unit),
+                        ("password_hash", Select::Unit),
+                        ("bio", Select::Unit),
+                        ("authored_articles", Select::EntityId)
+                    ])
                     .into_default_domain_entity_select()
             )
             .await
@@ -330,7 +337,7 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
     let comments = test_util::query_entities(
         &engine,
         comment_def
-            .struct_select([])
+            .struct_select([("id", Select::Unit)])
             .into_default_domain_entity_select(),
     )
     .await
@@ -356,12 +363,38 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
                 &test_util::query_entities(
                     &engine,
                     user_def
-                        .struct_select([(
-                            "authored_articles",
-                            article_def
-                                .struct_select([("comments", comment_def.struct_select([]).into())])
-                                .into()
-                        )])
+                        .struct_select([
+                            ("user_id", Select::Unit),
+                            ("username", Select::Unit),
+                            ("password_hash", Select::Unit),
+                            ("email", Select::Unit),
+                            ("bio", Select::Unit),
+                            (
+                                "authored_articles",
+                                article_def
+                                    .struct_select([
+                                        ("article_id", Select::Unit),
+                                        ("title", Select::Unit),
+                                        ("description", Select::Unit),
+                                        ("body", Select::Unit),
+                                        ("slug", Select::Unit),
+                                        ("created_at", Select::Unit),
+                                        ("updated_at", Select::Unit),
+                                        (
+                                            "comments",
+                                            comment_def
+                                                .struct_select([
+                                                    ("id", Select::Unit),
+                                                    ("body", Select::Unit),
+                                                    ("created_at", Select::Unit),
+                                                    ("updated_at", Select::Unit)
+                                                ])
+                                                .into()
+                                        )
+                                    ])
+                                    .into()
+                            )
+                        ])
                         .into_default_domain_entity_select(),
                 )
                 .await
@@ -493,7 +526,11 @@ async fn test_artist_and_instrument_pagination(ds: &str) {
     expect_eq!(
         actual = extract_names(
             engine
-                .exec_named_map_json(by_name, json!({}), TestFindQuery::default().limit(1))
+                .exec_named_map_json(
+                    by_name,
+                    json!({}),
+                    TestFindQuery::new(test.ontology_owned()).limit(1)
+                )
                 .await
         ),
         expected = json!(["Larry Young"])
@@ -530,7 +567,11 @@ async fn test_artist_and_instrument_filter_condition(ds: &str) {
     expect_eq!(
         actual = extract_names(
             engine
-                .exec_named_map_json(by_name, json!({ "name": "N/A" }), TestFindQuery::default())
+                .exec_named_map_json(
+                    by_name,
+                    json!({ "name": "N/A" }),
+                    TestFindQuery::new(test.ontology_owned())
+                )
                 .await
         ),
         expected = json!([])
@@ -542,7 +583,7 @@ async fn test_artist_and_instrument_filter_condition(ds: &str) {
                 .exec_named_map_json(
                     by_name,
                     json!({ "name": "Larry Young" }),
-                    TestFindQuery::default()
+                    TestFindQuery::new(test.ontology_owned())
                 )
                 .await
         ),

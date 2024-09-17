@@ -2,6 +2,7 @@
 
 pub mod data_store;
 pub mod domain_error;
+pub mod domain_select;
 pub mod entity_id_utils;
 pub mod filter;
 pub mod object_generator;

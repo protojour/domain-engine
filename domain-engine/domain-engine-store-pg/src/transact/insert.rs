@@ -794,14 +794,7 @@ impl<'a> TransactCtx<'a> {
         }
 
         let query_select = match select {
-            Select::EntityId => {
-                let entity = def.entity().ok_or_else(|| {
-                    warn!("not an entity");
-                    DomainErrorKind::NotAnEntity(def.id).into_error()
-                })?;
-
-                QuerySelect::Field(entity.id_prop)
-            }
+            Select::EntityId => QuerySelect::EntityId,
             select @ Select::Struct(_) => {
                 QuerySelect::Vertex(self.analyze_vertex_select(def, &pg.table, select)?)
             }

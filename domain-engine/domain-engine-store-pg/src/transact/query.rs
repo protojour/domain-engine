@@ -1,7 +1,8 @@
 use std::{borrow::Cow, collections::BTreeSet};
 
 use domain_engine_core::{
-    filter::walker::ConditionWalker, transact::DataOperation, DomainError, DomainResult,
+    domain_error::DomainErrorKind, filter::walker::ConditionWalker, transact::DataOperation,
+    DomainError, DomainResult,
 };
 use fnv::FnvHashMap;
 use futures_util::Stream;
@@ -180,10 +181,15 @@ impl<'a> TransactCtx<'a> {
                         sql::Alias(0),
                         vec![sql::Expr::path1("_key")],
                     ),
-                    QuerySelectRef::Field(prop_id) => {
+                    QuerySelectRef::EntityId => {
                         let mut fields: Vec<_> = self.initial_standard_data_fields(pg).into();
+                        let def = self.ontology.def(def_id);
+                        let Some(entity) = def.entity() else {
+                            return Err(DomainErrorKind::NotAnEntity(def_id).into_error());
+                        };
+
                         fields.push(sql::Expr::path1(
-                            pg.table.column(&prop_id)?.col_name.as_ref(),
+                            pg.table.column(&entity.id_prop)?.col_name.as_ref(),
                         ));
 
                         (pg.table_name().into(), sql::Alias(0), fields)
@@ -660,23 +666,26 @@ impl<'a> TransactCtx<'a> {
                     }),
                 }
             }
-            QuerySelectRef::Field(prop_id) => {
+            QuerySelectRef::EntityId => {
                 let Some(PgTableKey::Data { def_id, .. }) =
                     self.pg_model.reg_key_to_table_key.get(&def_key)
                 else {
                     return Err(PgError::InvalidDynamicDataType(def_key).into());
                 };
                 let def = self.ontology.def(*def_id);
+                let Some(entity) = def.entity() else {
+                    return Err(DomainErrorKind::NotAnEntity(*def_id).into_error());
+                };
 
                 let field_value = self
                     .read_field(
                         def.data_relationships
-                            .get(&prop_id)
-                            .ok_or(PgModelError::NonExistentField(prop_id))?,
+                            .get(&entity.id_prop)
+                            .ok_or(PgModelError::NonExistentField(entity.id_prop))?,
                         &mut iterator,
                         Some(&standard_attrs),
                     )?
-                    .ok_or(PgError::MissingField(prop_id))?;
+                    .ok_or(PgError::MissingField(entity.id_prop))?;
 
                 Ok(RowValue {
                     value: field_value,
@@ -960,7 +969,7 @@ impl<'a> TransactCtx<'a> {
         let pg_def = self.lookup_def(def_id)?;
 
         match select {
-            QuerySelectRef::Unit => {
+            QuerySelectRef::Unit | QuerySelectRef::EntityId => {
                 let Some(entity) = pg_def.def.entity() else {
                     return Err(PgInputError::NotAnEntity.into());
                 };
@@ -997,7 +1006,6 @@ impl<'a> TransactCtx<'a> {
 
                 Ok(row_value.value)
             }
-            QuerySelectRef::Field(_) => todo!(),
         }
     }
 }

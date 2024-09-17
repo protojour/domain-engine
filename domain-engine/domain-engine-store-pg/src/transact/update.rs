@@ -70,7 +70,7 @@ impl<'a> TransactCtx<'a> {
                 let vertex_select = self.analyze_vertex_select(def, &pg.table, select)?;
                 QuerySelect::Vertex(vertex_select)
             }
-            Select::Unit | Select::EntityId => QuerySelect::Field(entity.id_prop),
+            Select::Unit | Select::EntityId => QuerySelect::EntityId,
             _ => todo!(),
         };
 

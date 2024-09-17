@@ -2,14 +2,15 @@
 
 use std::sync::Arc;
 
-use domain_engine_core::{DomainEngine, SelectMode, Session};
+use domain_engine_core::{domain_select::domain_select, DomainEngine, SelectMode, Session};
 use ontol_runtime::{
     attr::AttrRef,
     interface::serde::processor::ProcessorMode,
+    ontology::Ontology,
     query::{
         condition::Condition,
         filter::Filter,
-        select::{EntitySelect, StructOrUnionSelect, StructSelect},
+        select::{EntitySelect, Select, StructOrUnionSelect},
     },
     value::Value,
     var::Var,
@@ -100,11 +101,20 @@ async fn test_exec_named_map(
 }
 
 pub struct TestFindQuery {
+    ontology: Arc<Ontology>,
     limit: usize,
     include_total_len: bool,
 }
 
 impl TestFindQuery {
+    pub fn new(ontology: Arc<Ontology>) -> Self {
+        Self {
+            ontology,
+            limit: 20,
+            include_total_len: false,
+        }
+    }
+
     pub fn limit(self, limit: usize) -> Self {
         Self { limit, ..self }
     }
@@ -117,26 +127,19 @@ impl TestFindQuery {
     }
 }
 
-impl Default for TestFindQuery {
-    fn default() -> Self {
-        Self {
-            limit: 20,
-            include_total_len: false,
-        }
-    }
-}
-
 impl domain_engine_core::FindEntitySelect for TestFindQuery {
     fn find_select(&mut self, _match_var: Var, condition: &Condition) -> SelectMode {
         let def_id = condition
             .root_def_id()
             .expect("Unable to detect an entity being queried");
 
+        let struct_select = match domain_select(def_id, &self.ontology) {
+            Select::Struct(struct_select) => struct_select,
+            _ => panic!("must be struct select"),
+        };
+
         SelectMode::Dynamic(EntitySelect {
-            source: StructOrUnionSelect::Struct(StructSelect {
-                def_id,
-                properties: Default::default(),
-            }),
+            source: StructOrUnionSelect::Struct(struct_select),
             filter: Filter::default_for_domain(),
             limit: self.limit,
             after_cursor: None,

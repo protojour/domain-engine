@@ -19,7 +19,7 @@ pub enum QuerySelect {
     Vertex(VertexSelect),
     VertexUnion(Vec<VertexSelect>),
     VertexAddress,
-    Field(PropId),
+    EntityId,
 }
 
 impl QuerySelect {
@@ -31,7 +31,7 @@ impl QuerySelect {
             }
             Self::VertexUnion(vertex_selects) => QuerySelectRef::VertexUnion(vertex_selects),
             Self::VertexAddress => QuerySelectRef::VertexAddress,
-            Self::Field(prop_id) => QuerySelectRef::Field(*prop_id),
+            Self::EntityId => QuerySelectRef::EntityId,
         }
     }
 }
@@ -41,7 +41,7 @@ pub enum QuerySelectRef<'a> {
     Unit,
     VertexUnion(&'a [VertexSelect]),
     VertexAddress,
-    Field(PropId),
+    EntityId,
 }
 
 #[derive(Debug)]
@@ -91,7 +91,7 @@ impl<'a> TransactCtx<'a> {
             }
             Select::Unit => Ok(QuerySelect::Unit),
             Select::VertexAddress => Ok(QuerySelect::VertexAddress),
-            sel => todo!("other: {sel:?}"),
+            Select::EntityId => Ok(QuerySelect::EntityId),
         }
     }
 
