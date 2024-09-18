@@ -1060,6 +1060,10 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                             let val = self.gen_eval_cond_term(val, arena, span, block);
                             Clause::Member(rel, val)
                         }
+                        Clause::SetPredicate(predicate, term) => {
+                            let term = self.gen_eval_cond_term(term, arena, span, block);
+                            Clause::SetPredicate(*predicate, term)
+                        }
                     };
 
                     let Ok(clause_local) = self.var_local(*var, &span) else {

@@ -459,6 +459,10 @@ impl<'o> Processor for OntolProcessor<'o> {
                 let val = self.opcode_term_to_cond_term(val)?;
                 Clause::Member(rel, val)
             }
+            Clause::SetPredicate(predicate, term) => {
+                let term = self.opcode_term_to_cond_term(term)?;
+                Clause::SetPredicate(*predicate, term)
+            }
         };
 
         let Value::Filter(filter, _) = &mut self.local_mut(filter_local) else {

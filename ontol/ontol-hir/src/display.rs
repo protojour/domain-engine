@@ -411,6 +411,10 @@ impl<'h, 'a, L: Lang> Print<ClausePair<Var, EvalCondTerm>> for Printer<'h, 'a, L
                 self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
             }
+            Clause::SetPredicate(..) => {
+                write!(f, "(set-predicate)")?;
+                Ok(Multiline(true))
+            }
         }
     }
 }

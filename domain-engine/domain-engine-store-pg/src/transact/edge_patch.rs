@@ -21,7 +21,7 @@ use crate::{
     address::deserialize_ontol_vertex_address,
     pg_error::{ds_bad_req, map_row_error, PgError, PgInputError, PgModelError},
     pg_model::{
-        EdgeId, InDomain, PgColumn, PgDataKey, PgDomainTable, PgDomainTableType, PgEdgeCardinal,
+        EdgeId, InDomain, PgColumnRef, PgDataKey, PgDomainTable, PgDomainTableType, PgEdgeCardinal,
         PgEdgeCardinalKind, PgIndexType, PgRegKey, PgTable,
     },
     sql::{self, WhereExt},
@@ -971,7 +971,7 @@ impl<'a> TransactCtx<'a> {
         vertex_def_id: DefId,
         id_prop_id: PropId,
         id: Value,
-    ) -> DomainResult<(PgDomainTable<'a>, &'a PgColumn, SqlScalar)> {
+    ) -> DomainResult<(PgDomainTable<'a>, PgColumnRef<'a>, SqlScalar)> {
         let pg = self
             .pg_model
             .pg_domain_datatable(vertex_def_id.domain_index(), vertex_def_id)?;

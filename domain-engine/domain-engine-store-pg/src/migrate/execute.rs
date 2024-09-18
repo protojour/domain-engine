@@ -286,6 +286,7 @@ async fn execute_migration_step<'t>(
                         .properties
                         .get(prop_tag)
                         .unwrap()
+                        .as_ref()
                         .as_column()
                         .unwrap()
                 })
@@ -302,7 +303,7 @@ async fn execute_migration_step<'t>(
                     table = sql::Ident(&pg_table.table_name),
                     columns = column_tuple
                         .iter()
-                        .map(|pg_column| pg_column.col_name.as_ref())
+                        .map(|pg_column| pg_column.col_name)
                         .map(sql::Ident)
                         .format(","),
                 ),

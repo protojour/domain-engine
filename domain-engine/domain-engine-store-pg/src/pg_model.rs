@@ -239,10 +239,38 @@ impl PgDomain {
 }
 
 impl PgTable {
-    pub fn find_column(&self, prop_id: &PropId) -> Option<&PgColumn> {
-        self.properties
+    pub fn find_property_ref(&self, prop_id: &PropId) -> Option<PgPropertyRef<'_>> {
+        match self
+            .properties
             .get(&prop_id.tag())
-            .and_then(PgProperty::as_column)
+            .map(|prop| prop.as_ref())
+        {
+            Some(property) => Some(property),
+            None => {
+                if prop_id == &OntolDefTag::CreateTime.prop_id(DefPropTag(0)) {
+                    Some(PgPropertyRef::Column(PgColumnRef {
+                        key: -1,
+                        col_name: "_created",
+                        pg_type: PgType::TimestampTz,
+                        standard: true,
+                    }))
+                } else if prop_id == &OntolDefTag::UpdateTime.prop_id(DefPropTag(0)) {
+                    Some(PgPropertyRef::Column(PgColumnRef {
+                        key: -1,
+                        col_name: "_updated",
+                        pg_type: PgType::TimestampTz,
+                        standard: true,
+                    }))
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    pub fn find_column(&self, prop_id: &PropId) -> Option<PgColumnRef> {
+        self.find_property_ref(prop_id)
+            .and_then(|p_ref| p_ref.as_column())
     }
 
     pub fn find_abstract_property(&self, prop_id: &PropId) -> Option<PgRegKey> {
@@ -252,7 +280,7 @@ impl PgTable {
         }
     }
 
-    pub fn column(&self, prop_id: &PropId) -> DomainResult<&PgColumn> {
+    pub fn column(&self, prop_id: &PropId) -> DomainResult<PgColumnRef> {
         self.find_column(prop_id).ok_or_else(|| {
             debug!("field not found in {:?}", self.properties);
 
@@ -266,10 +294,11 @@ impl PgTable {
             .ok_or_else(|| PgModelError::PropertyNotFound(self.table_name.clone(), *prop_id))?)
     }
 
-    pub fn column_by_key(&self, key: PgRegKey) -> Option<&PgColumn> {
+    pub fn column_by_key(&self, key: PgRegKey) -> Option<PgColumnRef> {
         self.properties
             .values()
-            .filter_map(PgProperty::as_column)
+            .map(PgProperty::as_ref)
+            .filter_map(PgPropertyRef::as_column)
             .find(|datafield| datafield.key == key)
     }
 
@@ -318,6 +347,12 @@ pub enum PgProperty {
     Abstract(PgRegKey),
 }
 
+#[derive(Clone, Copy)]
+pub enum PgPropertyRef<'a> {
+    Column(PgColumnRef<'a>),
+    Abstract(PgRegKey),
+}
+
 #[derive(Debug)]
 pub enum PgPropertyData {
     Scalar { col_name: Box<str>, pg_type: PgType },
@@ -325,7 +360,21 @@ pub enum PgPropertyData {
 }
 
 impl PgProperty {
-    pub fn as_column(&self) -> Option<&PgColumn> {
+    pub fn as_ref(&self) -> PgPropertyRef {
+        match self {
+            Self::Column(column) => PgPropertyRef::Column(PgColumnRef {
+                key: column.key,
+                col_name: &column.col_name,
+                pg_type: column.pg_type,
+                standard: false,
+            }),
+            Self::Abstract(reg_key) => PgPropertyRef::Abstract(*reg_key),
+        }
+    }
+}
+
+impl<'a> PgPropertyRef<'a> {
+    pub fn as_column(self) -> Option<PgColumnRef<'a>> {
         match self {
             Self::Column(column) => Some(column),
             Self::Abstract(_) => None,
@@ -338,6 +387,14 @@ pub struct PgColumn {
     pub key: PgRegKey,
     pub col_name: Box<str>,
     pub pg_type: PgType,
+}
+
+#[derive(Clone, Copy)]
+pub struct PgColumnRef<'a> {
+    pub key: PgRegKey,
+    pub col_name: &'a str,
+    pub pg_type: PgType,
+    pub standard: bool,
 }
 
 #[derive(Clone, Debug)]

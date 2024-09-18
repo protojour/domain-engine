@@ -600,4 +600,49 @@ async fn test_ontology_stix(ds: &str) {
             }))
         );
     }
+
+    info!("filter updated after");
+    // FIXME: Domain-external properties and standard timestamps not implemented for inmemory yet
+    if ds != "inmemory" {
+        expect_eq!(
+            actual = r#"
+                query vertices($defId: DefId!) {
+                    vertices(
+                        defId: $defId,
+                        first: 100,
+                        withAddress: false,
+                        withDefId: false,
+                        withUpdateTime: true,
+                        updatedAfter: "1974-01-01T00:00:00Z"
+                    ) {
+                        elements
+                    }
+                }
+            "#
+            .exec(
+                OntologyParams {
+                    def_id: Some(url.graphql_def_id()),
+                },
+                &ontology_schema,
+                &ontology_ctx,
+            )
+            .await,
+            expected = Ok(graphql_value!({
+                "vertices": {
+                    "elements": [
+                        {
+                            "update_time": "1975-01-01T00:00:00Z",
+                            "type": "struct",
+                            "attrs": [
+                                { "propId": "p@1:83:0", "attr": "unit", "type": "text", "value": "url" },
+                                { "propId": "p@1:83:1", "attr": "unit", "type": "text", "value": "url--c28dfe9f-aa02-4dc5-81ee-b69da50f2cc9" },
+                                { "propId": "p@1:83:2", "attr": "unit", "type": "i64", "value": "1" },
+                                { "propId": "p@1:83:5", "attr": "unit", "type": "text", "value": "http://second" },
+                            ]
+                        },
+                    ]
+                }
+            }))
+        );
+    }
 }

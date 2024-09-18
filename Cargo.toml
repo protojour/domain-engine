@@ -57,7 +57,7 @@ rstest = { version = "0.21", default-features = false }
 git = "https://github.com/protojour/juniper"
 branch = "protojour-mods"
 default-features = false
-features = ["schema-language"]
+features = ["schema-language", "chrono"]
 
 [patch.crates-io]
 tokio-postgres = { git = "https://github.com/audunhalland/rust-postgres.git", branch = "pub_col_buffer" }

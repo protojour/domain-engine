@@ -13,11 +13,13 @@ use domain_engine_core::transact::TransactionMode;
 use futures_util::StreamExt;
 use futures_util::TryStreamExt;
 use ontol_runtime::ontology::domain::{FieldPath, VertexOrder};
+use ontol_runtime::query::condition::{Clause, CondTerm, SetOperator, SetPredicate};
 use ontol_runtime::query::filter::Filter;
 use ontol_runtime::query::order::Direction;
 use ontol_runtime::query::select::StructOrUnionSelect;
 use ontol_runtime::query::select::StructSelect;
 use ontol_runtime::query::select::{EntitySelect, Select};
+use ontol_runtime::value::Value;
 use ontol_runtime::{DefPropTag, OntolDefTag, PropId};
 use serde::de::value::StringDeserializer;
 use serde::Deserialize;
@@ -110,6 +112,7 @@ impl Query {
         with_def_id: Option<bool>,
         with_create_time: Option<bool>,
         with_update_time: Option<bool>,
+        updated_after: Option<chrono::DateTime<chrono::Utc>>,
         order: Option<Vec<gql_vertex::VertexOrder>>,
         ctx: &OntologyCtx,
     ) -> FieldResult<gql_vertex::VertexConnection> {
@@ -127,6 +130,35 @@ impl Query {
         };
 
         let mut filter = Filter::default_for_datastore();
+
+        // condition
+        {
+            let condition = filter.condition_mut();
+            let root_var = condition.mk_cond_var();
+            condition.add_clause(root_var, Clause::Root);
+
+            if let Some(updated_after) = updated_after {
+                let set_var = condition.mk_cond_var();
+                condition.add_clause(
+                    root_var,
+                    Clause::MatchProp(
+                        OntolDefTag::UpdateTime.prop_id(DefPropTag(0)),
+                        SetOperator::ElementIn,
+                        set_var,
+                    ),
+                );
+                condition.add_clause(
+                    set_var,
+                    Clause::SetPredicate(
+                        SetPredicate::Gt,
+                        CondTerm::Value(Value::ChronoDateTime(
+                            updated_after,
+                            OntolDefTag::DateTime.def_id().into(),
+                        )),
+                    ),
+                );
+            }
+        }
 
         if let Some(order) = order {
             let mut vertex_order_chain = vec![];

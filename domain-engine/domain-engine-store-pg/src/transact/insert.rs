@@ -25,7 +25,7 @@ use tracing::{debug, trace, warn};
 use crate::{
     pg_error::{map_row_error, PgError, PgInputError},
     pg_model::{
-        EdgeId, InDomain, PgColumn, PgDataKey, PgDomainTable, PgDomainTableType, PgRepr, PgType,
+        EdgeId, InDomain, PgColumnRef, PgDataKey, PgDomainTable, PgDomainTableType, PgRepr, PgType,
     },
     sql::{self},
     sql_record::{SqlColumnStream, SqlRecordIterator},
@@ -502,7 +502,7 @@ impl<'a> TransactCtx<'a> {
             // The first returned column is `xmax = 0` which is used to determine whether created or updated for UPSERTs
             sql::Expr::eq(sql::Expr::path1("xmax"), sql::Expr::LiteralInt(0)),
         ];
-        let mut primary_id_column: Option<&PgColumn> = None;
+        let mut primary_id_column: Option<PgColumnRef> = None;
         let mut on_conflict: Option<sql::OnConflict> = None;
 
         let mut param_idx = 1;

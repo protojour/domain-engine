@@ -904,6 +904,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
+ "chrono",
  "domain-engine-core",
  "domain-engine-store-inmemory",
  "domain-engine-test-utils",
@@ -1794,6 +1795,7 @@ source = "git+https://github.com/protojour/juniper?branch=protojour-mods#a658e67
 dependencies = [
  "async-trait",
  "auto_enums",
+ "chrono",
  "fnv",
  "futures",
  "graphql-parser",

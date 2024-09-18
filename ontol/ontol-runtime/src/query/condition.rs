@@ -44,6 +44,9 @@ impl Condition {
                 self.register_term(rel);
                 self.register_term(val);
             }
+            Clause::SetPredicate(_, term) => {
+                self.register_term(term);
+            }
             Clause::MatchProp(.., set_var) => {
                 self.expansions.entry(*set_var).or_default().incoming_count += 1;
             }
@@ -97,6 +100,10 @@ impl Condition {
                 let rel = self.merge_term(rel, rewrite_table);
                 let val = self.merge_term(val, rewrite_table);
                 self.add_clause(cond_var, Clause::Member(rel, val));
+            }
+            Clause::SetPredicate(predicate, term) => {
+                let term = self.merge_term(term, rewrite_table);
+                self.add_clause(cond_var, Clause::SetPredicate(predicate, term));
             }
         }
     }
@@ -167,6 +174,20 @@ pub enum Clause<V, Term> {
     MatchProp(PropId, SetOperator, V),
     /// An attribute (rel, val) is a member of the set
     Member(Term, Term),
+    /// A set predicate that "produces" members
+    SetPredicate(SetPredicate, Term),
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+pub enum SetPredicate {
+    /// less than
+    Lt,
+    /// less than or equal
+    Lte,
+    /// greater than
+    Gt,
+    /// greater than or equal
+    Gte,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -226,6 +247,9 @@ where
             }
             Clause::Member(rel, val) => {
                 write!(f, "(member {var} ({rel} {val}))")
+            }
+            Clause::SetPredicate(..) => {
+                write!(f, "(set-predicate {var})")
             }
         }
     }

@@ -57,6 +57,10 @@ impl<'a> TransactCtx<'a> {
     ) {
         for prop_id in &vertex_select.inherent_set {
             if let Some(pg_column) = pg_datatable.find_column(prop_id) {
+                if pg_column.standard {
+                    continue;
+                }
+
                 if let Some(table_alias) = table_alias {
                     output.push(sql::Expr::path2(table_alias, pg_column.col_name.as_ref()));
                 } else {

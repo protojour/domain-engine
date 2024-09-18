@@ -21,6 +21,7 @@ smartstring = { version = "1", features = ["serde"] }
 base64 = "0.22"
 futures-util = "0.3"
 ulid = "1"
+chrono = "0.4"
 
 [dev-dependencies]
 ontol-test-utils.path = "../../ontol/ontol-test-utils"

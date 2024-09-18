@@ -179,6 +179,14 @@ pub enum Expr<'a> {
     Or(Vec<Expr<'a>>),
     /// a = b
     Eq(Box<Expr<'a>>, Box<Expr<'a>>),
+    /// a < b
+    Lt(Box<Expr<'a>>, Box<Expr<'a>>),
+    /// a <= b
+    Lte(Box<Expr<'a>>, Box<Expr<'a>>),
+    /// a > b
+    Gt(Box<Expr<'a>>, Box<Expr<'a>>),
+    /// a >= b
+    Gte(Box<Expr<'a>>, Box<Expr<'a>>),
     /// a IN b
     In(Box<Expr<'a>>, Box<Expr<'a>>),
     Exists(Box<Expr<'a>>),
@@ -549,6 +557,10 @@ impl<'a> Display for Expr<'a> {
             Self::And(clauses) => write!(f, "{}", clauses.iter().format(" AND ")),
             Self::Or(clauses) => write!(f, "{}", clauses.iter().format(" OR ")),
             Self::Eq(a, b) => write!(f, "{a}={b}"),
+            Self::Lt(a, b) => write!(f, "{a}<{b}"),
+            Self::Lte(a, b) => write!(f, "{a}<={b}"),
+            Self::Gt(a, b) => write!(f, "{a}>{b}"),
+            Self::Gte(a, b) => write!(f, "{a}>={b}"),
             Self::In(a, b) => write!(f, "{a} IN {b}"),
             Self::Exists(expr) => write!(f, "EXISTS({expr})"),
             Self::Row(fields) => write!(f, "ROW({})", fields.iter().format(",")),

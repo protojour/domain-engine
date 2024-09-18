@@ -72,7 +72,9 @@ pub async fn read_registry<'t>(
                     def_tag,
                     table_name,
                     fprop_column,
-                    fkey_column
+                    fkey_column,
+                    created_at_column,
+                    updated_at_column
                 FROM m6mreg.domaintable"
             },
             &[],

@@ -1,7 +1,7 @@
 use domain_engine_core::{filter::walker::ConditionWalker, DomainResult};
 use ontol_runtime::{
     ontology::domain::{DataRelationshipInfo, DataRelationshipKind, Def, EdgeCardinalProjection},
-    query::condition::{Clause, CondTerm, SetOperator},
+    query::condition::{Clause, CondTerm, SetOperator, SetPredicate},
     tuple::CardinalIdx,
     var::Var,
     DefId, PropId,
@@ -10,7 +10,7 @@ use tracing::{debug, error};
 
 use crate::{
     pg_error::PgError,
-    pg_model::{EdgeId, PgColumn, PgProperty, PgRegKey},
+    pg_model::{EdgeId, PgColumnRef, PgPropertyRef, PgRegKey},
     sql::{self, WhereExt},
     sql_value::SqlScalar,
     transact::{data::Data, edge_query::edge_join_condition},
@@ -144,7 +144,7 @@ impl<'a> TransactCtx<'a> {
                         ctx,
                     )?;
                 }
-                Clause::Member(_rel, _val) => {
+                Clause::Member(..) | Clause::SetPredicate(..) => {
                     return Err(PgError::Condition("weird member term").into())
                 }
             }
@@ -162,19 +162,12 @@ impl<'a> TransactCtx<'a> {
         path_builder: PathBuilder,
         ctx: &mut ConditionCtx<'a, '_>,
     ) -> DomainResult<()> {
-        let Some(rel_info) = def.data_relationships.get(&prop_id) else {
-            return Ok(());
-        };
-
         let pg = self
             .pg_model
             .pg_domain_datatable(def_id.domain_index(), def_id)?;
 
-        match (rel_info.kind, pg.table.properties.get(&prop_id.1)) {
-            (
-                DataRelationshipKind::Id | DataRelationshipKind::Tree,
-                Some(PgProperty::Column(pg_column)),
-            ) => {
+        match pg.table.find_property_ref(&prop_id) {
+            Some(PgPropertyRef::Column(pg_column)) => {
                 debug!("compare column: {:?} in {def_id:?}", path_builder.items);
 
                 if path_builder.items.is_empty() {
@@ -263,10 +256,11 @@ impl<'a> TransactCtx<'a> {
                         .push(sql::Expr::Exists(Box::new(sql_select.into())));
                 }
             }
-            (
-                DataRelationshipKind::Id | DataRelationshipKind::Tree,
-                Some(PgProperty::Abstract(_reg_key)),
-            ) => {
+            Some(PgPropertyRef::Abstract(_reg_key)) => {
+                let Some(rel_info) = def.data_relationships.get(&prop_id) else {
+                    return Ok(());
+                };
+
                 let prop_key = pg.table.abstract_property(&prop_id)?;
 
                 if path_builder.items.is_empty() {
@@ -304,9 +298,16 @@ impl<'a> TransactCtx<'a> {
                     return Err(PgError::Condition("abstract property under edge").into());
                 }
             }
-            (DataRelationshipKind::Edge(proj), None) => {
+            None => {
+                let Some(rel_info) = def.data_relationships.get(&prop_id) else {
+                    return Ok(());
+                };
+                let DataRelationshipKind::Edge(proj) = &rel_info.kind else {
+                    return Ok(());
+                };
+
                 let path_builder = path_builder.add(CondPathItem::EdgeJoin {
-                    proj,
+                    proj: proj.clone(),
                     idx: CardinalIdx(0),
                 });
                 let edge = self.ontology.find_edge(proj.edge_id).unwrap();
@@ -367,7 +368,6 @@ impl<'a> TransactCtx<'a> {
                     }
                 }
             }
-            _ => {}
         }
 
         Ok(())
@@ -377,7 +377,7 @@ impl<'a> TransactCtx<'a> {
         &self,
         cond_var: Var,
         leaf_alias: sql::Alias,
-        pg_column: &'a PgColumn,
+        pg_column: PgColumnRef<'a>,
         set_operator: SetOperator,
         walker: ConditionWalker,
         ctx: &mut ConditionCtx<'a, '_>,
@@ -394,6 +394,24 @@ impl<'a> TransactCtx<'a> {
                                 sql::Expr::path2(leaf_alias, pg_column.col_name.as_ref()),
                                 sql::Expr::param(param_idx),
                             ));
+                            let Data::Sql(sql_val) = self.data_from_value(value.clone())? else {
+                                return Err(PgError::Condition("compound condition value").into());
+                            };
+                            ctx.sql_params.push(sql_val);
+                        }
+                        Clause::SetPredicate(predicate, CondTerm::Value(value)) => {
+                            let param_idx = ctx.sql_params.len();
+                            let left =
+                                Box::new(sql::Expr::path2(leaf_alias, pg_column.col_name.as_ref()));
+                            let right = Box::new(sql::Expr::param(param_idx));
+
+                            or_exprs.push(match predicate {
+                                SetPredicate::Lt => sql::Expr::Lt(left, right),
+                                SetPredicate::Lte => sql::Expr::Lte(left, right),
+                                SetPredicate::Gt => sql::Expr::Gt(left, right),
+                                SetPredicate::Gte => sql::Expr::Gte(left, right),
+                            });
+
                             let Data::Sql(sql_val) = self.data_from_value(value.clone())? else {
                                 return Err(PgError::Condition("compound condition value").into());
                             };
@@ -466,6 +484,9 @@ impl<'a> TransactCtx<'a> {
                         }
                         Clause::Member(_, _) => {
                             todo!("member!");
+                        }
+                        Clause::SetPredicate(..) => {
+                            todo!("set predicate!");
                         }
                     }
                 }
