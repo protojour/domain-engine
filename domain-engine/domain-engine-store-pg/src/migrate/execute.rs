@@ -98,6 +98,17 @@ async fn execute_migration_step<'t>(
             .await
             .context("create vertex table")?;
 
+            txn.execute(
+                &format!(
+                    "CREATE INDEX ON {schema}.{table} ({updated_at_column})",
+                    schema = sql::Ident(&pg_domain.schema_name),
+                    table = sql::Ident(&table_name),
+                ),
+                &[],
+            )
+            .await
+            .context("create index on _updated")?;
+
             let row = txn
                 .query_one(
                     indoc! { "
