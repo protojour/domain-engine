@@ -307,7 +307,7 @@ impl<'a> TransactCtx<'a> {
                 };
 
                 let path_builder = path_builder.add(CondPathItem::EdgeJoin {
-                    proj: proj.clone(),
+                    proj: *proj,
                     idx: CardinalIdx(0),
                 });
                 let edge = self.ontology.find_edge(proj.edge_id).unwrap();
@@ -391,7 +391,7 @@ impl<'a> TransactCtx<'a> {
                         Clause::Member(_, CondTerm::Value(value)) => {
                             let param_idx = ctx.sql_params.len();
                             or_exprs.push(sql::Expr::eq(
-                                sql::Expr::path2(leaf_alias, pg_column.col_name.as_ref()),
+                                sql::Expr::path2(leaf_alias, pg_column.col_name),
                                 sql::Expr::param(param_idx),
                             ));
                             let Data::Sql(sql_val) = self.data_from_value(value.clone())? else {
@@ -401,8 +401,7 @@ impl<'a> TransactCtx<'a> {
                         }
                         Clause::SetPredicate(predicate, CondTerm::Value(value)) => {
                             let param_idx = ctx.sql_params.len();
-                            let left =
-                                Box::new(sql::Expr::path2(leaf_alias, pg_column.col_name.as_ref()));
+                            let left = Box::new(sql::Expr::path2(leaf_alias, pg_column.col_name));
                             let right = Box::new(sql::Expr::param(param_idx));
 
                             or_exprs.push(match predicate {

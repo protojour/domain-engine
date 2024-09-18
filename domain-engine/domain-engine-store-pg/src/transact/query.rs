@@ -88,7 +88,7 @@ pub enum IncludeJoinedAttrs {
 
 pub struct Query {
     pub include_total_len: bool,
-    pub limit: usize,
+    pub limit: Option<usize>,
     pub after_cursor: Option<Cursor>,
     pub native_id_condition: Option<PgDataKey>,
 }
@@ -188,9 +188,7 @@ impl<'a> TransactCtx<'a> {
                             return Err(DomainErrorKind::NotAnEntity(def_id).into_error());
                         };
 
-                        fields.push(sql::Expr::path1(
-                            pg.table.column(&entity.id_prop)?.col_name.as_ref(),
-                        ));
+                        fields.push(sql::Expr::path1(pg.table.column(&entity.id_prop)?.col_name));
 
                         (pg.table_name().into(), sql::Alias(0), fields)
                     }
@@ -207,7 +205,7 @@ impl<'a> TransactCtx<'a> {
                 expressions,
                 from: vec![from],
                 limit: sql::Limit {
-                    limit: Some(q.limit + 1),
+                    limit: q.limit.map(|limit| limit + 1),
                     offset: match &q.after_cursor {
                         Some(Cursor::Offset(offset)) => Some(*offset),
                         _ => None,
@@ -272,7 +270,7 @@ impl<'a> TransactCtx<'a> {
                     );
                 }
 
-                if observed_rows < q.limit {
+                if q.limit.map(|limit| observed_rows < limit).unwrap_or(false) {
                     let row_value = self.read_vertex_row_value(row_iter, query_select.as_ref(), IncludeJoinedAttrs::Yes, DataOperation::Queried)?;
                     yield QueryFrame::Row(row_value);
 
@@ -298,7 +296,11 @@ impl<'a> TransactCtx<'a> {
                 Some(Box::new(SubSequence {
                     end_cursor,
                     // The actual SQL limit is (input limit) + 1
-                    has_next: observed_rows > observed_values,
+                    has_next: if q.limit.is_some() {
+                        observed_rows > observed_values
+                    } else {
+                        false
+                    },
                     total_len
                 }))
             );

@@ -38,7 +38,7 @@ impl<'a> TransactCtx<'a> {
         let sql_delete = sql::Delete {
             from: pg.table_name(),
             where_: Some(sql::Expr::eq(
-                sql::Expr::path1(pg_id_field.col_name.as_ref()),
+                sql::Expr::path1(pg_id_field.col_name),
                 sql::Expr::param(0),
             )),
             returning: vec![sql::Expr::path1("_key")],

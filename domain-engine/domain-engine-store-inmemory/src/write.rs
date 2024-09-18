@@ -31,7 +31,7 @@ use crate::{
     core::{
         find_data_relationship, DbContext, EdgeColumnMatch, EdgeData, EdgeVectorData, VertexKey,
     },
-    query::{Cursor, IncludeTotalLen, Limit},
+    query::{Cursor, IncludeTotalLen},
 };
 
 use super::core::InMemoryStore;
@@ -231,7 +231,7 @@ impl InMemoryStore {
                 let entity_seq = self.query_single_vertex_collection(
                     struct_select,
                     &Filter::default_for_datastore(),
-                    Limit(usize::MAX),
+                    None,
                     Option::<Cursor>::None,
                     IncludeTotalLen(false),
                     ctx,

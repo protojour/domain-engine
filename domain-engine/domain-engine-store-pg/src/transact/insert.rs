@@ -238,7 +238,7 @@ impl<'a> TransactCtx<'a> {
                 for prop_id in def.data_relationships.keys() {
                     if let Some(pg_column) = pg.table.find_column(prop_id) {
                         sql_update.set.push(sql::UpdateColumn(
-                            &pg_column.col_name,
+                            pg_column.col_name,
                             sql::Expr::param(param_idx),
                         ));
                         param_idx += 1;
@@ -532,7 +532,7 @@ impl<'a> TransactCtx<'a> {
                     }
 
                     if let Some(pg_column) = pg_column {
-                        column_names.push(pg_column.col_name.as_ref());
+                        column_names.push(pg_column.col_name);
                         if pg_column.pg_type.insert_default() {
                             values.push(sql::Expr::Default);
                         } else {
@@ -561,7 +561,7 @@ impl<'a> TransactCtx<'a> {
                         // TODO: Make sure not to write "write-once" columns like Created time
                         if let Some(pg_column) = pg.table.find_column(prop_id) {
                             update_columns.push(sql::UpdateColumn(
-                                &pg_column.col_name,
+                                pg_column.col_name,
                                 sql::Expr::param(param_idx),
                             ));
                             param_idx += 1;

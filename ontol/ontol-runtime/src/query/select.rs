@@ -27,7 +27,7 @@ pub enum Select {
 pub struct EntitySelect {
     pub source: StructOrUnionSelect,
     pub filter: Filter,
-    pub limit: usize,
+    pub limit: Option<usize>,
     pub after_cursor: Option<Box<[u8]>>,
     pub include_total_len: bool,
 }
@@ -61,7 +61,7 @@ impl StructSelect {
         EntitySelect {
             source: StructOrUnionSelect::Struct(self),
             filter: Filter::default_for_domain(),
-            limit: 20,
+            limit: Some(20),
             after_cursor: None,
             include_total_len: false,
         }

@@ -81,7 +81,7 @@ impl<'a> TransactCtx<'a> {
                 def_id,
                 Query {
                     include_total_len: false,
-                    limit: 1,
+                    limit: Some(1),
                     after_cursor: None,
                     native_id_condition: Some(key),
                 },
@@ -119,7 +119,7 @@ impl<'a> TransactCtx<'a> {
             UpdateCondition::FieldEq(prop_id, value) => {
                 let pg_column = pg.table.column(&prop_id)?;
                 where_ = Some(sql::Expr::eq(
-                    sql::Expr::path1(pg_column.col_name.as_ref()),
+                    sql::Expr::path1(pg_column.col_name),
                     sql::Expr::param(0),
                 ));
                 let Data::Sql(sql_value) = self.data_from_value(value)? else {
@@ -157,7 +157,7 @@ impl<'a> TransactCtx<'a> {
                     let param_index = update_params.len();
 
                     set.push(sql::UpdateColumn(
-                        &pg_column.col_name,
+                        pg_column.col_name,
                         sql::Expr::path1(sql::Param(param_index)),
                     ));
                     match attr {

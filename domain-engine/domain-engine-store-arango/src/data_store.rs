@@ -272,19 +272,21 @@ impl ArangoDatabase {
                         false => cursor.count.unwrap(),
                     },
                 };
-                let has_next = match select_cursor {
-                    Some(cursor) => (cursor.offset + select.limit) < full_count,
-                    None => select.limit < full_count,
+                let has_next = match (select.limit, select_cursor) {
+                    (Some(limit), Some(cursor)) => (cursor.offset + limit) < full_count,
+                    (Some(limit), None) => limit < full_count,
+                    (None, _) => false,
                 };
-                let end_cursor = match select_cursor {
-                    Some(cursor) => Some(Cursor {
-                        offset: cursor.offset + select.limit,
+                let end_cursor = match (select.limit, select_cursor) {
+                    (Some(limit), Some(cursor)) => Some(Cursor {
+                        offset: cursor.offset + limit,
                         full_count: Some(full_count),
                     }),
-                    None => Some(Cursor {
-                        offset: select.limit,
+                    (Some(limit), None) => Some(Cursor {
+                        offset: limit,
                         full_count: Some(full_count),
                     }),
+                    (None, _) => None,
                 };
 
                 let mut sequence = Sequence::with_capacity(cursor.result.len());

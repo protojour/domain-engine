@@ -62,9 +62,9 @@ impl<'a> TransactCtx<'a> {
                 }
 
                 if let Some(table_alias) = table_alias {
-                    output.push(sql::Expr::path2(table_alias, pg_column.col_name.as_ref()));
+                    output.push(sql::Expr::path2(table_alias, pg_column.col_name));
                 } else {
-                    output.push(sql::Expr::path1(pg_column.col_name.as_ref()));
+                    output.push(sql::Expr::path1(pg_column.col_name));
                 }
             }
         }

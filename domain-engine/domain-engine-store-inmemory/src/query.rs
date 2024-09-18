@@ -30,8 +30,6 @@ pub struct Cursor {
     offset: usize,
 }
 
-pub struct Limit(pub usize);
-
 pub struct IncludeTotalLen(pub bool);
 
 impl InMemoryStore {
@@ -44,7 +42,7 @@ impl InMemoryStore {
             StructOrUnionSelect::Struct(struct_select) => self.query_single_vertex_collection(
                 struct_select,
                 &select.filter,
-                Limit(select.limit),
+                select.limit,
                 select
                     .after_cursor
                     .as_deref()
@@ -64,7 +62,7 @@ impl InMemoryStore {
         &self,
         struct_select: &StructSelect,
         filter: &Filter,
-        Limit(limit): Limit,
+        limit: Option<usize>,
         after_cursor: Option<Cursor>,
         IncludeTotalLen(include_total_len): IncludeTotalLen,
         ctx: &DbContext,
@@ -108,31 +106,49 @@ impl InMemoryStore {
             Some(Cursor { offset }) => offset + 1,
         };
 
-        if start_offset > 0 {
-            raw_props_vec = raw_props_vec
-                .into_iter()
-                .skip(start_offset)
-                .take(limit)
-                .collect();
-        } else if limit < total_size {
-            raw_props_vec = raw_props_vec.into_iter().take(limit).collect();
+        match limit {
+            Some(limit) => {
+                if start_offset > 0 {
+                    raw_props_vec = raw_props_vec
+                        .into_iter()
+                        .skip(start_offset)
+                        .take(limit)
+                        .collect();
+                } else if limit < total_size {
+                    raw_props_vec = raw_props_vec.into_iter().take(limit).collect();
+                }
+            }
+            None => {
+                if start_offset > 0 {
+                    raw_props_vec = raw_props_vec.into_iter().skip(start_offset).collect();
+                }
+            }
         }
 
         let mut entity_sequence =
             Sequence::with_capacity(raw_props_vec.len()).with_sub(SubSequence {
-                end_cursor: if limit > 0 {
-                    Some(
-                        bincode::serialize(&Cursor {
-                            offset: start_offset + limit - 1,
-                        })
-                        .unwrap()
-                        .into(),
-                    )
-                } else {
-                    after_cursor
-                        .map(|after_cursor| bincode::serialize(&after_cursor).unwrap().into())
+                end_cursor: match limit {
+                    Some(limit) => {
+                        if limit > 0 {
+                            Some(
+                                bincode::serialize(&Cursor {
+                                    offset: start_offset + limit - 1,
+                                })
+                                .unwrap()
+                                .into(),
+                            )
+                        } else {
+                            after_cursor.map(|after_cursor| {
+                                bincode::serialize(&after_cursor).unwrap().into()
+                            })
+                        }
+                    }
+                    None => None,
                 },
-                has_next: start_offset + limit < total_size,
+                has_next: match limit {
+                    Some(limit) => start_offset + limit < total_size,
+                    None => false,
+                },
                 total_len: if include_total_len {
                     Some(total_size)
                 } else {

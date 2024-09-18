@@ -106,7 +106,7 @@ impl Query {
     #[expect(clippy::too_many_arguments)]
     async fn vertices(
         def_id: gql_id::DefId,
-        first: i32,
+        first: Option<i32>,
         after: Option<String>,
         with_address: Option<bool>,
         with_def_id: Option<bool>,
@@ -215,7 +215,10 @@ impl Query {
             EntitySelect {
                 source: StructOrUnionSelect::Struct(struct_select),
                 filter,
-                limit: first.try_into().map_err(field_error)?,
+                limit: match first {
+                    Some(first) => Some(first.try_into().map_err(field_error)?),
+                    None => None,
+                },
                 after_cursor: match after {
                     Some(after) => Some(
                         GraphQLCursor::deserialize(StringDeserializer::<serde_json::Error>::new(

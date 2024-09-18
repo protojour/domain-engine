@@ -205,7 +205,7 @@ pub enum SortDirection {
 #[derive(Clone, Default, Debug)]
 pub struct Limit {
     pub skip: usize,
-    pub limit: usize,
+    pub limit: Option<usize>,
 }
 
 /// AQL UPSERT statement
@@ -529,11 +529,15 @@ impl Display for Sort {
 
 impl Display for Limit {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "LIMIT")?;
-        if self.skip > 0 {
-            write!(f, " {},", self.skip)?;
+        if let Some(limit) = self.limit {
+            write!(f, "LIMIT")?;
+            if self.skip > 0 {
+                write!(f, " {},", self.skip)?;
+            }
+            write!(f, " {}", limit)?;
         }
-        write!(f, " {}", self.limit)
+
+        Ok(())
     }
 }
 
@@ -830,7 +834,7 @@ mod tests {
                     ],
                 }),
                 Operation::Limit(Limit {
-                    limit: 100,
+                    limit: Some(100),
                     ..Default::default()
                 }),
             ]),
@@ -900,7 +904,7 @@ mod tests {
                 }),
                 Operation::Limit(Limit {
                     skip: 10,
-                    limit: 100,
+                    limit: Some(100),
                 }),
             ]),
             returns: Return {

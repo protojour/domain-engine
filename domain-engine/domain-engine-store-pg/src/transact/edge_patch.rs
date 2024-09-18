@@ -243,7 +243,7 @@ impl<'a> TransactCtx<'a> {
                             match &rel_info.target {
                                 DataRelationshipTarget::Unambiguous(def_id) => {
                                     let pg_column = pg_edge.table.column(prop_id)?;
-                                    sql_insert.column_names.push(&pg_column.col_name);
+                                    sql_insert.column_names.push(pg_column.col_name);
                                     sql_insert.values.push(sql::Expr::param(param_index));
                                     analysis.param_order.insert((*prop_id, *def_id));
                                     param_index += 1;
@@ -272,7 +272,7 @@ impl<'a> TransactCtx<'a> {
                         def_col_name,
                         key_col_name,
                     } => {
-                        unique_columns.extend([def_col_name.as_ref(), key_col_name.as_ref()]);
+                        unique_columns.extend([def_col_name, key_col_name.as_ref()]);
                     }
                     _ => return Err(PgModelError::InvalidUniqueCardinal.into()),
                 }
@@ -390,7 +390,7 @@ impl<'a> TransactCtx<'a> {
                         expressions: vec![sql::Expr::path1("_key")].into(),
                         from: vec![pg_foreign.table_name().into()],
                         where_: Some(sql::Expr::eq(
-                            sql::Expr::path1(pg_foreign_id.col_name.as_ref()),
+                            sql::Expr::path1(pg_foreign_id.col_name),
                             sql::Expr::Any(Box::new(sql::Expr::param(0))),
                         )),
                         ..Default::default()
@@ -599,7 +599,7 @@ impl<'a> TransactCtx<'a> {
                             Data::Sql(sql_val) => {
                                 let field = pg_edge.table.column(prop_id)?;
                                 sql_update.set.push(sql::UpdateColumn(
-                                    &field.col_name,
+                                    field.col_name,
                                     sql::Expr::param(sql_params.len()),
                                 ));
                                 sql_params.push(sql_val);
@@ -778,7 +778,7 @@ impl<'a> TransactCtx<'a> {
                             },
                             from: vec![pg.table_name().into()],
                             where_: Some(sql::Expr::eq(
-                                sql::Expr::path1(pg_column.col_name.as_ref()),
+                                sql::Expr::path1(pg_column.col_name),
                                 sql::Expr::param(0),
                             )),
                             ..Default::default()
@@ -887,7 +887,7 @@ impl<'a> TransactCtx<'a> {
                         on_conflict: Some(sql::OnConflict {
                             target: Some(sql::ConflictTarget::Columns(vec![&pg_column.col_name])),
                             action: sql::ConflictAction::DoUpdateSet(vec![sql::UpdateColumn(
-                                &pg_column.col_name,
+                                pg_column.col_name,
                                 sql::Expr::param(1),
                             )]),
                         }),

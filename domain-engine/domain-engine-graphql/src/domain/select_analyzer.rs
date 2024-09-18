@@ -148,7 +148,7 @@ impl<'a> SelectAnalyzer<'a> {
                             EntitySelect {
                                 source: StructOrUnionSelect::Struct(struct_select),
                                 filter: Filter::default_for_domain(),
-                                limit: self.default_query_limit(),
+                                limit: Some(self.default_query_limit()),
                                 after_cursor: None,
                                 include_total_len: false,
                             },
@@ -243,7 +243,7 @@ impl<'a> SelectAnalyzer<'a> {
                             Select::Struct(struct_select) => Select::Entity(EntitySelect {
                                 source: StructOrUnionSelect::Struct(struct_select),
                                 filter: Filter::default_for_domain(),
-                                limit: 1,
+                                limit: Some(1),
                                 after_cursor: None,
                                 include_total_len: false,
                             }),
@@ -596,7 +596,7 @@ impl<'a> SelectAnalyzer<'a> {
                     return Ok(Select::Entity(EntitySelect {
                         source: StructOrUnionSelect::Struct(object),
                         filter: Filter::default_for_domain(),
-                        limit,
+                        limit: Some(limit),
                         after_cursor,
                         include_total_len,
                     }));
@@ -605,7 +605,7 @@ impl<'a> SelectAnalyzer<'a> {
                     return Ok(Select::Entity(EntitySelect {
                         source: StructOrUnionSelect::Union(def_id, variants),
                         filter: Filter::default_for_domain(),
-                        limit,
+                        limit: Some(limit),
                         after_cursor,
                         include_total_len,
                     }))

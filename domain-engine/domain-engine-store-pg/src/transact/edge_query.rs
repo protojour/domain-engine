@@ -167,7 +167,7 @@ impl<'a> TransactCtx<'a> {
                                 variant_builder.append(EdgeUnionCardinalVariantSelect::Vertex {
                                     expr: sql::Expr::Row(vec![
                                         sql::Expr::LiteralInt(pg_def.pg.table.key),
-                                        sql::Expr::path2(leaf_alias, pg_id.col_name.as_ref()),
+                                        sql::Expr::path2(leaf_alias, pg_id.col_name),
                                     ]),
                                     from: pg_def.pg.table_name().as_(leaf_alias),
                                     join_condition: edge_join_condition(

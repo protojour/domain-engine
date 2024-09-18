@@ -141,7 +141,7 @@ impl domain_engine_core::FindEntitySelect for TestFindQuery {
         SelectMode::Dynamic(EntitySelect {
             source: StructOrUnionSelect::Struct(struct_select),
             filter: Filter::default_for_domain(),
-            limit: self.limit,
+            limit: Some(self.limit),
             after_cursor: None,
             include_total_len: self.include_total_len,
         })

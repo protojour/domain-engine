@@ -161,7 +161,7 @@ impl DomainEngine {
                                     source: StructOrUnionSelect::Struct(struct_select),
                                     filter,
                                     after_cursor: None,
-                                    limit: self.system().default_query_limit(),
+                                    limit: Some(self.system().default_query_limit()),
                                     include_total_len: false,
                                 };
 
