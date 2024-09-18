@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 
 use futures_util::{stream::BoxStream, Stream, StreamExt};
 use ontol_runtime::{
@@ -17,8 +17,9 @@ use tracing::trace;
 use crate::{
     domain_error::DomainErrorKind,
     select_data_flow::{translate_entity_select, translate_select},
+    system::SystemAPI,
     update::sanitize_update,
-    DomainEngine, DomainError, DomainResult, Session,
+    DomainEngine, DomainError, DomainResult, Session, VertexAddr,
 };
 
 /// The kind of data store transaction
@@ -37,6 +38,10 @@ pub enum TransactionMode {
 impl TransactionMode {
     pub fn is_atomic(&self) -> bool {
         matches!(self, Self::ReadOnlyAtomic | Self::ReadWriteAtomic)
+    }
+
+    pub fn is_write(&self) -> bool {
+        matches!(self, Self::ReadWrite | Self::ReadWriteAtomic)
     }
 }
 
@@ -67,6 +72,8 @@ pub enum RespMessage {
     SequenceStart(OpSequence),
     Element(Value, DataOperation),
     SequenceEnd(OpSequence, Option<Box<SubSequence>>),
+    /// Write transaction complete and committed
+    WriteComplete(Box<WriteStats>),
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -75,6 +82,63 @@ pub enum DataOperation {
     Inserted,
     Updated,
     Deleted,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct WriteStats {
+    start: chrono::DateTime<chrono::Utc>,
+    end: chrono::DateTime<chrono::Utc>,
+    mutated: BTreeSet<DefId>,
+    deleted: Vec<VertexAddr>,
+}
+
+impl WriteStats {
+    pub fn builder(mode: TransactionMode, system: &dyn SystemAPI) -> WriteStatsBuilder {
+        WriteStatsBuilder {
+            mode,
+            start: if mode.is_write() {
+                system.current_time()
+            } else {
+                Default::default()
+            },
+            mutated: Default::default(),
+            deleted: Default::default(),
+        }
+    }
+
+    pub fn start(&self) -> chrono::DateTime<chrono::Utc> {
+        self.start
+    }
+}
+
+pub struct WriteStatsBuilder {
+    mode: TransactionMode,
+    start: chrono::DateTime<chrono::Utc>,
+    deleted: Vec<VertexAddr>,
+    mutated: BTreeSet<DefId>,
+}
+
+impl WriteStatsBuilder {
+    pub fn mark_mutated(&mut self, def_id: DefId) {
+        self.mutated.insert(def_id);
+    }
+
+    pub fn mark_deleted(&mut self, address: VertexAddr) {
+        self.deleted.push(address);
+    }
+
+    pub fn finish(self, system: &dyn SystemAPI) -> Option<WriteStats> {
+        if self.mode.is_write() {
+            Some(WriteStats {
+                start: self.start,
+                end: system.current_time(),
+                mutated: self.mutated,
+                deleted: self.deleted,
+            })
+        } else {
+            None
+        }
+    }
 }
 
 pub trait AccumulateSequences<'a> {
@@ -105,6 +169,7 @@ impl<'a> AccumulateSequences<'a> for BoxStream<'a, DomainResult<RespMessage>> {
                             yield current;
                         }
                     }
+                    RespMessage::WriteComplete(_) => {}
                 }
             }
 
@@ -161,6 +226,9 @@ impl DomainEngine {
                     }
                     RespMessage::SequenceEnd(op_seq, sub_sequence) => {
                         yield RespMessage::SequenceEnd(op_seq, sub_sequence);
+                    }
+                    RespMessage::WriteComplete(stats) => {
+                        yield RespMessage::WriteComplete(stats);
                     }
                 };
             }

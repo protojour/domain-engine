@@ -596,8 +596,8 @@ async fn conduit_db_article_shallow_update(ds: &str) {
                     "slug": "the-slug",
                     "title": "THE NEW TITLE",
                     // Note: The TestSystem counts one year between successive reads of the time :)
-                    "created_at": "1970-01-01T00:00:00Z",
-                    "updated_at": "1971-01-01T00:00:00Z",
+                    "created_at": "1971-01-01T00:00:00Z",
+                    "updated_at": "1974-01-01T00:00:00Z",
                     "author": {
                         "username": "u1"
                     }

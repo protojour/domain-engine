@@ -18,7 +18,8 @@ use smallvec::SmallVec;
 use tracing::{debug, warn};
 
 use domain_engine_core::{
-    domain_error::DomainErrorKind, system::SystemAPI, DomainError, DomainResult,
+    domain_error::DomainErrorKind, system::SystemAPI, transact::WriteStatsBuilder, DomainError,
+    DomainResult, VertexAddr,
 };
 
 use crate::constraint::ConstraintCheck;
@@ -33,6 +34,7 @@ pub(super) struct DbContext<'a> {
     pub ontology: &'a Ontology,
     pub system: &'a dyn SystemAPI,
     pub check: ConstraintCheck,
+    pub write_stats: WriteStatsBuilder,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
@@ -136,7 +138,12 @@ impl InMemoryStore {
         }
     }
 
-    pub fn delete_entities(&mut self, ids: Vec<Value>, def_id: DefId) -> DomainResult<Vec<bool>> {
+    pub fn delete_entities(
+        &mut self,
+        ids: Vec<Value>,
+        def_id: DefId,
+        ctx: &mut DbContext,
+    ) -> DomainResult<Vec<bool>> {
         let mut result_vec = Vec::with_capacity(ids.len());
         let mut deleted_set: HashSet<VertexKey> = HashSet::with_capacity(ids.len());
 
@@ -159,6 +166,12 @@ impl InMemoryStore {
             };
 
             result_vec.push(status);
+        }
+
+        for vertex_key in &deleted_set {
+            let mut vertex_addr: VertexAddr = Default::default();
+            bincode::serialize_into(&mut vertex_addr, vertex_key).unwrap();
+            ctx.write_stats.mark_deleted(vertex_addr);
         }
 
         // cascade delete all edges

@@ -889,6 +889,7 @@ dependencies = [
  "pretty_assertions",
  "serde",
  "serde_json",
+ "smallvec 2.0.0-alpha.7",
  "thiserror",
  "tokio",
  "tracing",

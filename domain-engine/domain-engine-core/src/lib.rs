@@ -23,6 +23,7 @@ use ontol_runtime::{
     var::Var,
     DefId,
 };
+use smallvec::SmallVec;
 
 /// A session that's passed through the DomainEngine APIs into the data store layer.
 #[derive(Clone)]
@@ -57,3 +58,5 @@ impl<A: BuildHasher> FindEntitySelect for HashMap<Var, EntitySelect, A> {
         }
     }
 }
+
+pub type VertexAddr = SmallVec<u8, 12>;

@@ -3,16 +3,23 @@ use ontol_runtime::{value::Value, DefId};
 use tracing::{debug, warn};
 
 use crate::{
+    address::make_vertex_addr,
     pg_error::{PgError, PgInputError},
+    pg_model::PgDataKey,
     sql,
     transact::data::Data,
 };
 
-use super::TransactCtx;
+use super::{mut_ctx::PgMutCtx, TransactCtx};
 
 impl<'a> TransactCtx<'a> {
     /// TODO: prepare statement(s)?
-    pub async fn delete_vertex(&self, def_id: DefId, id: Value) -> DomainResult<bool> {
+    pub async fn delete_vertex(
+        &self,
+        def_id: DefId,
+        id: Value,
+        mut_ctx: &mut PgMutCtx,
+    ) -> DomainResult<bool> {
         let def = self.ontology.def(def_id);
         let entity = def.entity().ok_or_else(|| {
             warn!("not an entity");
@@ -46,6 +53,17 @@ impl<'a> TransactCtx<'a> {
             .await
             .map_err(PgError::EdgeDeletion)?;
 
-        Ok(!rows.is_empty())
+        if rows.is_empty() {
+            Ok(false)
+        } else {
+            for row in rows {
+                let data_key: PgDataKey = row.get(0);
+
+                let vertex_addr = make_vertex_addr(pg.table.key, data_key);
+                mut_ctx.write_stats.mark_deleted(vertex_addr);
+            }
+
+            Ok(true)
+        }
     }
 }

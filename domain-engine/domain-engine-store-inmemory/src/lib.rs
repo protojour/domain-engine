@@ -8,7 +8,7 @@ use domain_engine_core::data_store::{DataStoreFactory, DataStoreFactorySync};
 use domain_engine_core::object_generator::ObjectGenerator;
 use domain_engine_core::system::ArcSystemApi;
 use domain_engine_core::transact::{
-    DataOperation, OpSequence, ReqMessage, RespMessage, TransactionMode,
+    DataOperation, OpSequence, ReqMessage, RespMessage, TransactionMode, WriteStats,
 };
 use domain_engine_core::{DomainError, Session};
 use fnv::{FnvHashMap, FnvHashSet};
@@ -164,7 +164,8 @@ impl InMemoryDb {
                 check: match mode {
                     TransactionMode::ReadOnly | TransactionMode::ReadWrite => ConstraintCheck::Disabled,
                     TransactionMode::ReadOnlyAtomic | TransactionMode::ReadWriteAtomic => ConstraintCheck::Deferred(Default::default()),
-                }
+                },
+                write_stats: WriteStats::builder(mode, self.system.as_ref())
             };
 
             for await req in messages {
@@ -257,7 +258,7 @@ impl InMemoryDb {
                                 yield RespMessage::Element(value, reason);
                             }
                             Some(State::Delete(_, def_id)) => {
-                                let deleted = store.delete_entities(vec![value], *def_id)?;
+                                let deleted = store.delete_entities(vec![value], *def_id, &mut ctx)?;
 
                                 for deleted in deleted {
                                     yield RespMessage::Element(Value::boolean(deleted), DataOperation::Deleted);
@@ -273,6 +274,10 @@ impl InMemoryDb {
 
             let store = self.store.read().await;
             ctx.check.check_deferred(&store, &self.ontology)?;
+
+            if let Some(write_stats) = ctx.write_stats.finish(ctx.system) {
+                yield RespMessage::WriteComplete(Box::new(write_stats));
+            }
         }
         .boxed())
     }

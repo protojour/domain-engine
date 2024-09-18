@@ -25,6 +25,7 @@ futures-util = "0.3"
 tokio.workspace = true
 async-stream = "0.3"
 displaydoc = "0.2"
+smallvec = { version = "2.0.0-alpha.7", features = ["std"] }
 
 [dev-dependencies]
 ontol-macros.path = "../../ontol/ontol-macros"

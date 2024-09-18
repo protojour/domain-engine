@@ -19,9 +19,9 @@ use crate::{
 };
 
 use super::{
-    cache::PgCache,
     data::{Data, RowValue},
     edge_patch::{EdgeEndoTuplePatch, EdgePatches},
+    mut_ctx::PgMutCtx,
     query::Query,
     query_select::QuerySelect,
     MutationMode, TransactCtx,
@@ -42,7 +42,7 @@ impl<'a> TransactCtx<'a> {
         value: InDomain<Value>,
         select: &'s Select,
         timestamp: PgTimestamp,
-        cache: &mut PgCache,
+        mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<Value> {
         let domain_index = value.domain_index;
         let def_id = value.type_def_id();
@@ -55,12 +55,14 @@ impl<'a> TransactCtx<'a> {
         let entity_id = find_inherent_entity_id(&value, self.ontology)?
             .ok_or_else(|| DomainErrorKind::EntityNotFound.into_error())?;
 
+        mut_ctx.write_stats.mark_mutated(def_id);
+
         let key = self
             .update_datatable(
                 value,
                 UpdateCondition::FieldEq(entity.id_prop, entity_id),
                 timestamp,
-                cache,
+                mut_ctx,
             )
             .await?;
 
@@ -85,7 +87,7 @@ impl<'a> TransactCtx<'a> {
                 },
                 None,
                 query_select,
-                cache,
+                mut_ctx,
             )
             .await?,
         )
@@ -99,7 +101,7 @@ impl<'a> TransactCtx<'a> {
         value: InDomain<Value>,
         update_condition: UpdateCondition,
         timestamp: PgTimestamp,
-        cache: &mut PgCache,
+        mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<PgDataKey> {
         let def_id = value.type_def_id();
         let def = self.ontology.def(def_id);
@@ -257,7 +259,7 @@ impl<'a> TransactCtx<'a> {
 
         if key_rows.len() == 1 {
             let key = key_rows[0].get(0);
-            self.patch_edges(pg.table, key, edge_patches, timestamp, cache)
+            self.patch_edges(pg.table, key, edge_patches, timestamp, mut_ctx)
                 .await?;
 
             Ok(key)

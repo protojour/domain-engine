@@ -576,7 +576,7 @@ async fn test_ontology_stix(ds: &str) {
                 "vertices": {
                     "elements": [
                         {
-                            "update_time": "1971-01-01T00:00:00Z",
+                            "update_time": "1974-01-01T00:00:00Z",
                             "type": "struct",
                             "attrs": [
                                 { "propId": "p@1:83:0", "attr": "unit", "type": "text", "value": "url" },
@@ -586,7 +586,7 @@ async fn test_ontology_stix(ds: &str) {
                             ]
                         },
                         {
-                            "update_time": "1972-01-01T00:00:00Z",
+                            "update_time": "1975-01-01T00:00:00Z",
                             "type": "struct",
                             "attrs": [
                                 { "propId": "p@1:83:0", "attr": "unit", "type": "text", "value": "url" },

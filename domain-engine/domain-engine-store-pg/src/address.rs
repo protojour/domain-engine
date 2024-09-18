@@ -1,4 +1,4 @@
-use domain_engine_core::DomainResult;
+use domain_engine_core::{DomainResult, VertexAddr};
 use ontol_runtime::{
     value::{OctetSequence, Value},
     OntolDefTag,
@@ -14,6 +14,16 @@ use crate::{
 struct Address {
     data_key: PgDataKey,
     def_key: PgRegKey,
+}
+
+pub fn make_vertex_addr(def_key: PgRegKey, data_key: PgDataKey) -> VertexAddr {
+    let address = Address { data_key, def_key };
+    let mut vertex_addr = VertexAddr::default();
+    bincode::serialize_into(&mut vertex_addr, &address).unwrap();
+
+    // PG vertex addr should fit exactly in VertexAddr inline size
+    assert_eq!(vertex_addr.len(), VertexAddr::inline_size());
+    vertex_addr
 }
 
 pub fn make_ontol_vertex_address(def_key: PgRegKey, data_key: PgDataKey) -> Value {

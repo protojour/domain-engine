@@ -37,10 +37,10 @@ use crate::{
 };
 
 use super::{
-    cache::PgCache,
     data::RowValue,
     edge_query::{EdgeUnionSelectBuilder, EdgeUnionVariantSelectBuilder, PgEdgeProjection},
     fields::{AbstractKind, StandardAttrs},
+    mut_ctx::PgMutCtx,
     query_select::{CardinalSelect, QuerySelect, VertexSelect},
     TransactCtx,
 };
@@ -97,7 +97,7 @@ impl<'a> TransactCtx<'a> {
     pub async fn query_vertex<'s>(
         &'s self,
         entity_select: &'s EntitySelect,
-        cache: &mut PgCache,
+        mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<impl Stream<Item = DomainResult<QueryFrame>> + '_> {
         let struct_select = match &entity_select.source {
             StructOrUnionSelect::Struct(struct_select) => struct_select,
@@ -129,7 +129,7 @@ impl<'a> TransactCtx<'a> {
             },
             Some(&entity_select.filter),
             QuerySelect::Vertex(vertex_select),
-            cache,
+            mut_ctx,
         )
         .await
     }
@@ -140,7 +140,7 @@ impl<'a> TransactCtx<'a> {
         q: Query,
         filter: Option<&Filter>,
         query_select: QuerySelect,
-        cache: &mut PgCache,
+        mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<impl Stream<Item = DomainResult<QueryFrame>> + 's> {
         debug!("query {def_id:?} after cursor: {:?}", q.after_cursor);
 
@@ -173,7 +173,7 @@ impl<'a> TransactCtx<'a> {
                             vertex_select,
                             pg,
                             &mut query_ctx,
-                            cache,
+                            mut_ctx,
                         )?
                     }
                     QuerySelectRef::VertexAddress => (
@@ -311,7 +311,7 @@ impl<'a> TransactCtx<'a> {
         vertex_select: &VertexSelect,
         pg: PgDomainTable<'a>,
         query_ctx: &mut QueryBuildCtx<'a>,
-        cache: &mut PgCache,
+        mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<(sql::FromItem<'a>, sql::Alias, Vec<sql::Expr<'a>>)> {
         let def = self.ontology.def(def_id);
 
@@ -335,7 +335,7 @@ impl<'a> TransactCtx<'a> {
             vertex_select,
             query_ctx,
             &mut sql_expressions,
-            cache,
+            mut_ctx,
         )?;
 
         Ok((
@@ -502,7 +502,7 @@ impl<'a> TransactCtx<'a> {
         vertex_select: &VertexSelect,
         query_ctx: &mut QueryBuildCtx<'a>,
         output: &mut Vec<sql::Expr<'a>>,
-        cache: &mut PgCache,
+        mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<()> {
         for (prop_id, cardinal_selects) in &vertex_select.edge_set {
             let Some(rel_info) = def.data_relationships.get(prop_id) else {
@@ -535,7 +535,7 @@ impl<'a> TransactCtx<'a> {
                 EdgeUnionVariantSelectBuilder::default(),
                 &mut union_builder,
                 query_ctx,
-                cache,
+                mut_ctx,
             )?;
 
             let mut union_iter = union_builder.union_exprs.into_iter();

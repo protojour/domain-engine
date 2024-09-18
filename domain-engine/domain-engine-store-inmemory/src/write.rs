@@ -96,6 +96,7 @@ impl InMemoryStore {
         let entity_id = find_inherent_entity_id(&value, ctx.ontology)?
             .ok_or_else(|| DomainErrorKind::EntityNotFound.into_error())?;
         let def = ctx.ontology.def(value.type_def_id());
+        ctx.write_stats.mark_mutated(def.id);
         let vertex_key = VertexKey {
             type_def_id: def.id,
             dynamic_key: Self::extract_dynamic_key(&entity_id)?,
@@ -267,6 +268,7 @@ impl InMemoryStore {
         debug!("value: {}", ValueDebug(&vertex));
 
         let def = ctx.ontology.def(vertex.type_def_id());
+        ctx.write_stats.mark_mutated(def.id);
         let entity = def
             .entity()
             .ok_or(DomainErrorKind::NotAnEntity(vertex.type_def_id()).into_error())?;

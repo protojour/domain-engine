@@ -153,6 +153,7 @@ pub mod system {
 
     use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
     use domain_engine_core::system::SystemApiMock;
+    use tracing::trace;
     use unimock::*;
 
     /// Mock [domain_engine_core::system::SystemApi::current_time] in a way that increases the year with every call.
@@ -170,13 +171,17 @@ pub mod system {
                     year
                 };
 
-                DateTime::<Utc>::from_naive_utc_and_offset(
+                let dt = DateTime::<Utc>::from_naive_utc_and_offset(
                     NaiveDateTime::new(
                         NaiveDate::from_ymd_opt(year, 1, 1).unwrap(),
                         NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
                     ),
                     Utc,
-                )
+                );
+
+                trace!("mock current time: {dt}");
+
+                dt
             }))
     }
 }

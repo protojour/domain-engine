@@ -9,7 +9,7 @@ use crate::{
     transact::query_select::{QuerySelect, QuerySelectRef},
 };
 
-use super::{cache::PgCache, query::QueryBuildCtx, query_select::CardinalSelect, TransactCtx};
+use super::{mut_ctx::PgMutCtx, query::QueryBuildCtx, query_select::CardinalSelect, TransactCtx};
 
 pub struct PgEdgeProjection<'a> {
     pub id: EdgeId,
@@ -67,7 +67,7 @@ impl<'a> TransactCtx<'a> {
         variant_builder: EdgeUnionVariantSelectBuilder<'a>,
         union_builder: &mut EdgeUnionSelectBuilder<'a>,
         query_ctx: &mut QueryBuildCtx<'a>,
-        cache: &mut PgCache,
+        mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<()> {
         let Some(cardinal_select) = cardinal_selects.get(index_level) else {
             self.finalize(pg_proj, variant_builder, union_builder);
@@ -141,7 +141,7 @@ impl<'a> TransactCtx<'a> {
                             }),
                             union_builder,
                             query_ctx,
-                            cache,
+                            mut_ctx,
                         )?;
                     }
                     QuerySelectRef::Unit | QuerySelectRef::EntityId => {
@@ -185,7 +185,7 @@ impl<'a> TransactCtx<'a> {
                                 }),
                                 union_builder,
                                 query_ctx,
-                                cache,
+                                mut_ctx,
                             )?;
                         }
                     }
@@ -200,7 +200,7 @@ impl<'a> TransactCtx<'a> {
                                     vertex_select,
                                     pg_def.pg,
                                     query_ctx,
-                                    cache,
+                                    mut_ctx,
                                 )?;
                             self.sql_select_edge_cardinals(
                                 pg_proj,
@@ -223,7 +223,7 @@ impl<'a> TransactCtx<'a> {
                                 }),
                                 union_builder,
                                 query_ctx,
-                                cache,
+                                mut_ctx,
                             )?;
                         }
                     }
@@ -248,7 +248,7 @@ impl<'a> TransactCtx<'a> {
                     }),
                     union_builder,
                     query_ctx,
-                    cache,
+                    mut_ctx,
                 );
             }
         }

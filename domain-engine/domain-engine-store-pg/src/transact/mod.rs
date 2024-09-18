@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use cache::PgCache;
 use domain_engine_core::{
     object_generator::ObjectGenerator,
     system::SystemAPI,
@@ -8,6 +7,7 @@ use domain_engine_core::{
     DomainError, DomainResult,
 };
 use futures_util::{stream::BoxStream, StreamExt};
+use mut_ctx::PgMutCtx;
 use ontol_runtime::{
     interface::serde::processor::ProcessorMode, ontology::Ontology, query::select::Select,
     value::Value, DefId,
@@ -22,7 +22,6 @@ use crate::{
     PgModel, PostgresDataStore,
 };
 
-mod cache;
 mod condition;
 mod data;
 mod delete;
@@ -30,6 +29,7 @@ mod edge_patch;
 mod edge_query;
 mod fields;
 mod insert;
+mod mut_ctx;
 mod order;
 mod query;
 mod query_select;
@@ -131,7 +131,6 @@ pub async fn transact(
         .map_err(|e| PgError::DbConnectionAcquire(e.into()))?;
 
     Ok(async_stream::try_stream! {
-        let mut cache = PgCache::default();
         let connection_state = match mode {
             TransactionMode::ReadOnly | TransactionMode::ReadWrite => {
                 ConnectionState::NonAtomic(connection)
@@ -155,17 +154,18 @@ pub async fn transact(
             pg_model: &store.pg_model,
             ontology: &store.ontology,
             system: store.system.as_ref(),
-            connection_state
+            connection_state,
         };
+        let mut mut_ctx = PgMutCtx::new(mode, store.system.as_ref());
 
         let mut state: Option<State> = None;
 
         for await message in messages {
             match message? {
                 ReqMessage::Query(op_seq, entity_select) => {
-                    cache.clear_select_dependent();
+                    mut_ctx.cache.clear_select_dependent();
                     state = None;
-                    let stream = ctx.query_vertex(&entity_select, &mut cache).await?;
+                    let stream = ctx.query_vertex(&entity_select, &mut mut_ctx).await?;
 
                     yield RespMessage::SequenceStart(op_seq);
 
@@ -181,25 +181,25 @@ pub async fn transact(
                     }
                 }
                 ReqMessage::Insert(op_seq, select) => {
-                    cache.clear_select_dependent();
+                    mut_ctx.cache.clear_select_dependent();
                     for msg in write_state(op_seq, State::Insert(op_seq, select), &mut state) {
                         yield msg;
                     }
                 }
                 ReqMessage::Update(op_seq, select) => {
-                    cache.clear_select_dependent();
+                    mut_ctx.cache.clear_select_dependent();
                     for msg in write_state(op_seq, State::Update(op_seq, select), &mut state) {
                         yield msg;
                     }
                 }
                 ReqMessage::Upsert(op_seq, select) => {
-                    cache.clear_select_dependent();
+                    mut_ctx.cache.clear_select_dependent();
                     for msg in write_state(op_seq, State::Upsert(op_seq, select), &mut state) {
                         yield msg;
                     }
                 }
                 ReqMessage::Delete(op_seq, def_id) => {
-                    cache.clear_select_dependent();
+                    mut_ctx.cache.clear_select_dependent();
                     for msg in write_state(op_seq, State::Delete(op_seq, def_id), &mut state) {
                         yield msg;
                     }
@@ -211,7 +211,7 @@ pub async fn transact(
                                 .generate_objects(&mut value);
 
                             let timestamp = ctx.system.current_time();
-                            let row = ctx.insert_vertex(value.into(), InsertMode::Insert, select, timestamp, &mut cache).await?;
+                            let row = ctx.insert_vertex(value.into(), InsertMode::Insert, select, timestamp, &mut mut_ctx).await?;
                             yield RespMessage::Element(row.value, row.op);
                         }
                         Some(State::Update(_, select)) => {
@@ -219,7 +219,7 @@ pub async fn transact(
                                 .generate_objects(&mut value);
 
                             let timestamp = ctx.system.current_time();
-                            let value = ctx.update_vertex_with_select(value.into(), select, timestamp, &mut cache).await?;
+                            let value = ctx.update_vertex_with_select(value.into(), select, timestamp, &mut mut_ctx).await?;
                             yield RespMessage::Element(value, DataOperation::Updated);
                         }
                         Some(State::Upsert(_, select)) => {
@@ -227,11 +227,11 @@ pub async fn transact(
                                 .generate_objects(&mut value);
 
                             let timestamp = ctx.system.current_time();
-                            let row = ctx.insert_vertex(value.into(), InsertMode::Upsert, select, timestamp, &mut cache).await?;
+                            let row = ctx.insert_vertex(value.into(), InsertMode::Upsert, select, timestamp, &mut mut_ctx).await?;
                             yield RespMessage::Element(row.value, row.op);
                         }
                         Some(State::Delete(_, def_id)) => {
-                            let deleted = ctx.delete_vertex(*def_id, value).await?;
+                            let deleted = ctx.delete_vertex(*def_id, value, &mut mut_ctx).await?;
 
                             yield RespMessage::Element(Value::boolean(deleted), DataOperation::Deleted);
                         }
@@ -243,11 +243,15 @@ pub async fn transact(
             }
         }
 
-        ctx.check_unresolved_foreign_keys(&cache)?;
+        ctx.check_unresolved_foreign_keys(&mut_ctx)?;
 
         if let ConnectionState::Transaction(txn) = ctx.connection_state {
             txn.commit().await.map_err(PgError::CommitTransaction)?;
             trace!("COMMIT OK");
+        }
+
+        if let Some(write_stats) = mut_ctx.write_stats.finish(ctx.system) {
+            yield RespMessage::WriteComplete(Box::new(write_stats));
         }
     }
     .boxed())

@@ -31,7 +31,7 @@ use crate::{
     CountRows,
 };
 
-use super::{cache::PgCache, MutationMode, TransactCtx};
+use super::{mut_ctx::PgMutCtx, MutationMode, TransactCtx};
 
 #[derive(Default, Debug)]
 pub struct EdgePatches {
@@ -124,7 +124,7 @@ impl<'a> TransactCtx<'a> {
         subject_data_key: PgDataKey,
         patches: EdgePatches,
         timestamp: PgTimestamp,
-        cache: &mut PgCache,
+        mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<()> {
         // debug!("patch edges: {patches:#?}");
 
@@ -135,7 +135,7 @@ impl<'a> TransactCtx<'a> {
                 subject_data_key,
                 patch,
                 timestamp,
-                cache,
+                mut_ctx,
             )
             .await?;
         }
@@ -150,7 +150,7 @@ impl<'a> TransactCtx<'a> {
         subject_data_key: PgDataKey,
         patch: ProjectedEdgePatch,
         timestamp: PgTimestamp,
-        cache: &mut PgCache,
+        mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<()> {
         let subject_index = patch.subject;
         let pg_edge = self.pg_model.pg_domain_edgetable(&edge_id)?;
@@ -304,7 +304,7 @@ impl<'a> TransactCtx<'a> {
                     tuple,
                     &mut sql_params,
                     timestamp,
-                    cache,
+                    mut_ctx,
                 )
                 .await?;
             } else {
@@ -315,7 +315,7 @@ impl<'a> TransactCtx<'a> {
                     &mut sql_params,
                     insert_sql.get_or_insert_with(|| arcstr::format!("{}", sql_insert)),
                     timestamp,
-                    cache,
+                    mut_ctx,
                 )
                 .await?;
             }
@@ -419,7 +419,7 @@ impl<'a> TransactCtx<'a> {
         sql_params: &mut Vec<SqlScalar>,
         insert_sql: &ArcStr,
         timestamp: PgTimestamp,
-        cache: &mut PgCache,
+        mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<()> {
         let is_upsert = tuple.elements.iter().any(|(.., mutation_mode)| {
             matches!(mutation_mode, MutationMode::Create(InsertMode::Upsert))
@@ -443,7 +443,7 @@ impl<'a> TransactCtx<'a> {
                 ProjectedEdgeCardinal::Object(.., dynamic) => {
                     let (value, mode) = element_iter.next().unwrap();
                     let (foreign_def_id, _, foreign_key) = self
-                        .resolve_linked_vertex(value, mode, Select::EntityId, timestamp, cache)
+                        .resolve_linked_vertex(value, mode, Select::EntityId, timestamp, mut_ctx)
                         .await?;
 
                     if matches!(dynamic, Dynamic::Yes { .. }) {
@@ -482,7 +482,7 @@ impl<'a> TransactCtx<'a> {
             }
         }
 
-        let stmt = self.edge_patch_stmt_cached(insert_sql, cache).await?;
+        let stmt = self.edge_patch_stmt_cached(insert_sql, mut_ctx).await?;
 
         debug!("{stmt}");
         trace!("{sql_params:?}");
@@ -515,7 +515,7 @@ impl<'a> TransactCtx<'a> {
         tuple: EdgeEndoTuplePatch,
         sql_params: &mut Vec<SqlScalar>,
         timestamp: PgTimestamp,
-        cache: &mut PgCache,
+        mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<()> {
         let mut element_iter = tuple.into_element_ops();
 
@@ -547,7 +547,7 @@ impl<'a> TransactCtx<'a> {
                     // for objects, the edge itself is not updated
                     let (value, mode) = element_iter.next().unwrap();
                     let (foreign_def_id, foreign_def_key, foreign_data_key) = self
-                        .resolve_linked_vertex(value, mode, Select::EntityId, timestamp, cache)
+                        .resolve_linked_vertex(value, mode, Select::EntityId, timestamp, mut_ctx)
                         .await?;
 
                     match mode {
@@ -632,7 +632,7 @@ impl<'a> TransactCtx<'a> {
                     };
                     ArcStr::from(sql_select.to_string())
                 },
-                cache,
+                mut_ctx,
             )
             .await?;
 
@@ -661,13 +661,16 @@ impl<'a> TransactCtx<'a> {
     async fn edge_patch_stmt_cached(
         &self,
         sql: &ArcStr,
-        cache: &mut PgCache,
+        mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<PreparedStatement> {
-        if let Some(stmt) = cache.edge_patch.get(sql).cloned() {
+        if let Some(stmt) = mut_ctx.cache.edge_patch.get(sql).cloned() {
             Ok(stmt)
         } else {
             let stmt = sql.clone().prepare(self.client()).await?;
-            cache.edge_patch.insert(stmt.src().clone(), stmt.clone());
+            mut_ctx
+                .cache
+                .edge_patch
+                .insert(stmt.src().clone(), stmt.clone());
             Ok(stmt)
         }
     }
@@ -678,7 +681,7 @@ impl<'a> TransactCtx<'a> {
         mode: MutationMode,
         select: Select,
         timestamp: PgTimestamp,
-        cache: &mut PgCache,
+        mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<(DefId, PgRegKey, PgDataKey)> {
         let def_id = value.type_def_id();
 
@@ -750,7 +753,7 @@ impl<'a> TransactCtx<'a> {
                             insert_mode,
                             &select,
                             timestamp,
-                            cache,
+                            mut_ctx,
                         )
                         .await?
                     }
@@ -764,28 +767,29 @@ impl<'a> TransactCtx<'a> {
                     self.prepare_id_check(vertex_def_id, id_prop_id, value)?;
 
                 let stmt_key = (vertex_def_id, id_prop_id);
-                let select_stmt = if let Some(stmt) = cache.key_by_id.get(&stmt_key).cloned() {
-                    stmt
-                } else {
-                    let stmt = sql::Select {
-                        expressions: sql::Expressions {
-                            items: vec![sql::Expr::path1("_key")],
-                            multiline: false,
-                        },
-                        from: vec![pg.table_name().into()],
-                        where_: Some(sql::Expr::eq(
-                            sql::Expr::path1(pg_column.col_name.as_ref()),
-                            sql::Expr::param(0),
-                        )),
-                        ..Default::default()
-                    }
-                    .to_arcstr()
-                    .prepare(self.client())
-                    .await?;
+                let select_stmt =
+                    if let Some(stmt) = mut_ctx.cache.key_by_id.get(&stmt_key).cloned() {
+                        stmt
+                    } else {
+                        let stmt = sql::Select {
+                            expressions: sql::Expressions {
+                                items: vec![sql::Expr::path1("_key")],
+                                multiline: false,
+                            },
+                            from: vec![pg.table_name().into()],
+                            where_: Some(sql::Expr::eq(
+                                sql::Expr::path1(pg_column.col_name.as_ref()),
+                                sql::Expr::param(0),
+                            )),
+                            ..Default::default()
+                        }
+                        .to_arcstr()
+                        .prepare(self.client())
+                        .await?;
 
-                    cache.key_by_id.insert(stmt_key, stmt.clone());
-                    stmt
-                };
+                        mut_ctx.cache.key_by_id.insert(stmt_key, stmt.clone());
+                        stmt
+                    };
 
                 debug!("{select_stmt}");
                 trace!("resolve linked vertex {:?}", [&id_param]);
@@ -805,29 +809,30 @@ impl<'a> TransactCtx<'a> {
                 // Key does not exist based on the ID, and the transaction is atomic.
                 // Now, create a row that just maps a key to the ID,
                 // and then assert before the transaction is committed that it's actually written.
-                let insert_stmt = if let Some(stmt) = cache.insert_tmp_id.get(&stmt_key).cloned() {
-                    stmt
-                } else {
-                    let stmt = sql::Insert {
-                        with: None,
-                        into: pg.table_name(),
-                        as_: None,
-                        column_names: vec!["_created", "_updated", &pg_column.col_name],
-                        values: vec![
-                            sql::Expr::param(0),
-                            sql::Expr::param(0),
-                            sql::Expr::param(1),
-                        ],
-                        on_conflict: None,
-                        returning: vec![sql::Expr::path1("_key")],
-                    }
-                    .to_arcstr()
-                    .prepare(self.client())
-                    .await?;
+                let insert_stmt =
+                    if let Some(stmt) = mut_ctx.cache.insert_tmp_id.get(&stmt_key).cloned() {
+                        stmt
+                    } else {
+                        let stmt = sql::Insert {
+                            with: None,
+                            into: pg.table_name(),
+                            as_: None,
+                            column_names: vec!["_created", "_updated", &pg_column.col_name],
+                            values: vec![
+                                sql::Expr::param(0),
+                                sql::Expr::param(0),
+                                sql::Expr::param(1),
+                            ],
+                            on_conflict: None,
+                            returning: vec![sql::Expr::path1("_key")],
+                        }
+                        .to_arcstr()
+                        .prepare(self.client())
+                        .await?;
 
-                    cache.insert_tmp_id.insert(stmt_key, stmt.clone());
-                    stmt
-                };
+                        mut_ctx.cache.insert_tmp_id.insert(stmt_key, stmt.clone());
+                        stmt
+                    };
 
                 debug!("{insert_stmt}");
                 let sql_params: [&(dyn ToSql + Sync); 2] = [&timestamp, &id_param];
@@ -846,7 +851,7 @@ impl<'a> TransactCtx<'a> {
                     data_key
                 );
 
-                cache
+                mut_ctx
                     .tentative_foreign_keys
                     .entry((id_prop_id, def_id))
                     .or_default()
@@ -858,8 +863,11 @@ impl<'a> TransactCtx<'a> {
                 let (pg, pg_column, id_param) =
                     self.prepare_id_check(vertex_def_id, id_prop_id, value)?;
 
-                let stmt = if let Some(stmt) =
-                    cache.upsert_self_identifying.get(&vertex_def_id).cloned()
+                let stmt = if let Some(stmt) = mut_ctx
+                    .cache
+                    .upsert_self_identifying
+                    .get(&vertex_def_id)
+                    .cloned()
                 {
                     stmt
                 } else {
@@ -889,7 +897,8 @@ impl<'a> TransactCtx<'a> {
                     .prepare(self.client())
                     .await?;
 
-                    cache
+                    mut_ctx
+                        .cache
                         .upsert_self_identifying
                         .insert(vertex_def_id, stmt.clone());
                     stmt
@@ -912,7 +921,7 @@ impl<'a> TransactCtx<'a> {
         }
     }
 
-    pub fn check_unresolved_foreign_keys(&self, cache: &PgCache) -> DomainResult<()> {
+    pub fn check_unresolved_foreign_keys(&self, mut_ctx: &PgMutCtx) -> DomainResult<()> {
         if !self.txn_mode.is_atomic() {
             return Ok(());
         }
@@ -920,7 +929,7 @@ impl<'a> TransactCtx<'a> {
         const MAX_REPORTED: usize = 2;
         let mut values: Vec<Value> = vec![];
 
-        'outer: for ((_, def_id), scalars) in &cache.tentative_foreign_keys {
+        'outer: for ((_, def_id), scalars) in &mut_ctx.tentative_foreign_keys {
             for scalar in scalars.keys() {
                 values.push(self.deserialize_sql(*def_id, scalar.clone().into())?);
 

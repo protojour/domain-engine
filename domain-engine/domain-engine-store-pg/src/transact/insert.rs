@@ -35,9 +35,9 @@ use crate::{
 };
 
 use super::{
-    cache::PgCache,
     data::{Data, RowValue},
     edge_patch::{EdgeEndoTuplePatch, EdgePatches},
+    mut_ctx::PgMutCtx,
     query::{DefAliasKey, QueryBuildCtx},
     query_select::{QuerySelect, QuerySelectRef},
     InsertMode, MutationMode, TransactCtx,
@@ -77,11 +77,10 @@ impl<'a> TransactCtx<'a> {
         insert_mode: InsertMode,
         select: &'a Select,
         timestamp: PgTimestamp,
-        cache: &'s mut PgCache,
+        mut_ctx: &'s mut PgMutCtx,
     ) -> BoxFuture<'_, DomainResult<RowValue>> {
         Box::pin(async move {
-            let _def_id = value.value.type_def_id();
-            self.insert_vertex_impl(value, insert_mode, select, timestamp, cache)
+            self.insert_vertex_impl(value, insert_mode, select, timestamp, mut_ctx)
                 // .instrument(debug_span!("ins", id = ?def_id))
                 .await
         })
@@ -93,27 +92,30 @@ impl<'a> TransactCtx<'a> {
         insert_mode: InsertMode,
         select: &'a Select,
         timestamp: PgTimestamp,
-        cache: &'s mut PgCache,
+        mut_ctx: &'s mut PgMutCtx,
     ) -> DomainResult<RowValue> {
         let domain_index = value.domain_index;
         let def_id = value.value.type_def_id();
 
+        mut_ctx.write_stats.mark_mutated(def_id);
+
         let cache_key = (insert_mode, domain_index, def_id);
 
-        let prepared = if let Some(prepared) = cache.insert.get(&cache_key).cloned() {
+        let prepared = if let Some(prepared) = mut_ctx.cache.insert.get(&cache_key).cloned() {
             prepared
         } else {
             let prepared = self
-                .prepare_insert(domain_index, def_id, insert_mode, select, cache)
+                .prepare_insert(domain_index, def_id, insert_mode, select, mut_ctx)
                 .await?;
-            cache.insert.insert(cache_key, prepared.clone());
+            mut_ctx.cache.insert.insert(cache_key, prepared.clone());
             prepared
         };
 
         self.preprocess_insert_value(insert_mode, &mut value.value)?;
 
         let def = self.ontology.def(value.value.type_def_id());
-        let (mut analyzed, pg) = self.analyze_input(None, def, value, select, timestamp, cache)?;
+        let (mut analyzed, pg) =
+            self.analyze_input(None, def, value, select, timestamp, mut_ctx)?;
         let sql_params = analyzed.sql_params;
 
         let mut row_value = match analyzed.query_kind {
@@ -132,7 +134,7 @@ impl<'a> TransactCtx<'a> {
                     sql_params,
                     data_key,
                     analyzed.timestamp,
-                    cache,
+                    mut_ctx,
                 )
                 .await?
             }
@@ -157,7 +159,7 @@ impl<'a> TransactCtx<'a> {
                 row_value.data_key,
                 analyzed.edges,
                 analyzed.timestamp,
-                cache,
+                mut_ctx,
             )
             .await?;
         }
@@ -170,7 +172,7 @@ impl<'a> TransactCtx<'a> {
                 },
                 value,
                 row_value.updated_at,
-                cache,
+                mut_ctx,
             )
             .await?;
         }
@@ -210,42 +212,46 @@ impl<'a> TransactCtx<'a> {
         mut sql_params: Vec<SqlScalar>,
         data_key: PgDataKey,
         timestamp: PgTimestamp,
-        cache: &'s mut PgCache,
+        mut_ctx: &'s mut PgMutCtx,
     ) -> DomainResult<RowValue> {
         let cache_key = (def.id.domain_index(), def.id);
 
-        let prepared = if let Some(prepared) = cache.update_tentative.get(&cache_key).cloned() {
-            prepared
-        } else {
-            let mut sql_update = sql::Update {
-                with: None,
-                table_name: pg.table_name(),
-                set: vec![
-                    sql::UpdateColumn("_created", sql::Expr::param(0)),
-                    sql::UpdateColumn("_updated", sql::Expr::param(0)),
-                ],
-                where_: Some(sql::Expr::eq(
-                    sql::Expr::path1("_key"),
-                    sql::Expr::param(sql_params.len()),
-                )),
-                returning: vec![sql::Expr::LiteralInt(0)],
-            };
-            let mut param_idx = 1;
+        let prepared =
+            if let Some(prepared) = mut_ctx.cache.update_tentative.get(&cache_key).cloned() {
+                prepared
+            } else {
+                let mut sql_update = sql::Update {
+                    with: None,
+                    table_name: pg.table_name(),
+                    set: vec![
+                        sql::UpdateColumn("_created", sql::Expr::param(0)),
+                        sql::UpdateColumn("_updated", sql::Expr::param(0)),
+                    ],
+                    where_: Some(sql::Expr::eq(
+                        sql::Expr::path1("_key"),
+                        sql::Expr::param(sql_params.len()),
+                    )),
+                    returning: vec![sql::Expr::LiteralInt(0)],
+                };
+                let mut param_idx = 1;
 
-            for prop_id in def.data_relationships.keys() {
-                if let Some(pg_column) = pg.table.find_column(prop_id) {
-                    sql_update.set.push(sql::UpdateColumn(
-                        &pg_column.col_name,
-                        sql::Expr::param(param_idx),
-                    ));
-                    param_idx += 1;
+                for prop_id in def.data_relationships.keys() {
+                    if let Some(pg_column) = pg.table.find_column(prop_id) {
+                        sql_update.set.push(sql::UpdateColumn(
+                            &pg_column.col_name,
+                            sql::Expr::param(param_idx),
+                        ));
+                        param_idx += 1;
+                    }
                 }
-            }
 
-            let prepared = sql_update.to_arcstr().prepare(self.client()).await?;
-            cache.update_tentative.insert(cache_key, prepared.clone());
-            prepared
-        };
+                let prepared = sql_update.to_arcstr().prepare(self.client()).await?;
+                mut_ctx
+                    .cache
+                    .update_tentative
+                    .insert(cache_key, prepared.clone());
+                prepared
+            };
 
         let mut param_idx = 1;
 
@@ -294,9 +300,9 @@ impl<'a> TransactCtx<'a> {
         parent: ParentProp,
         value: Value,
         timestamp: PgTimestamp,
-        cache: &'s mut PgCache,
+        mut_ctx: &'s mut PgMutCtx,
     ) -> BoxFuture<'_, DomainResult<()>> {
-        Box::pin(self.insert_abstract_sub_value_impl(parent, value, timestamp, cache))
+        Box::pin(self.insert_abstract_sub_value_impl(parent, value, timestamp, mut_ctx))
     }
 
     async fn insert_abstract_sub_value_impl(
@@ -304,7 +310,7 @@ impl<'a> TransactCtx<'a> {
         parent: ParentProp,
         value: Value,
         timestamp: PgTimestamp,
-        cache: &mut PgCache,
+        mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<()> {
         let value_def_id = value.type_def_id();
         let def = self.ontology.def(value_def_id);
@@ -315,7 +321,8 @@ impl<'a> TransactCtx<'a> {
             let domain_index = parent.prop_id.0.domain_index();
             let def_id = ontol_def_tag.def_id();
 
-            let prepared = if let Some(prepared) = cache
+            let prepared = if let Some(prepared) = mut_ctx
+                .cache
                 .insert
                 .get(&(InsertMode::Insert, domain_index, def_id))
                 .cloned()
@@ -328,10 +335,11 @@ impl<'a> TransactCtx<'a> {
                         def_id,
                         InsertMode::Insert,
                         &Select::Unit,
-                        cache,
+                        mut_ctx,
                     )
                     .await?;
-                cache
+                mut_ctx
+                    .cache
                     .insert
                     .insert((InsertMode::Insert, domain_index, def_id), prepared.clone());
                 prepared
@@ -363,7 +371,7 @@ impl<'a> TransactCtx<'a> {
 
             let cache_key = (InsertMode::Insert, domain_index, def_id);
 
-            let prepared = if let Some(prepared) = cache.insert.get(&cache_key).cloned() {
+            let prepared = if let Some(prepared) = mut_ctx.cache.insert.get(&cache_key).cloned() {
                 prepared
             } else {
                 let prepared = self
@@ -372,10 +380,10 @@ impl<'a> TransactCtx<'a> {
                         def_id,
                         InsertMode::Insert,
                         &Select::Unit,
-                        cache,
+                        mut_ctx,
                     )
                     .await?;
-                cache.insert.insert(cache_key, prepared.clone());
+                mut_ctx.cache.insert.insert(cache_key, prepared.clone());
                 prepared
             };
 
@@ -389,7 +397,7 @@ impl<'a> TransactCtx<'a> {
                 },
                 &Select::Unit,
                 timestamp,
-                cache,
+                mut_ctx,
             )?;
 
             let row_value = self
@@ -405,7 +413,7 @@ impl<'a> TransactCtx<'a> {
                 row_value.data_key,
                 analyzed.edges,
                 analyzed.timestamp,
-                cache,
+                mut_ctx,
             )
             .await?;
 
@@ -417,7 +425,7 @@ impl<'a> TransactCtx<'a> {
                     },
                     value,
                     row_value.updated_at,
-                    cache,
+                    mut_ctx,
                 )
                 .await?;
             }
@@ -468,7 +476,7 @@ impl<'a> TransactCtx<'a> {
         def_id: DefId,
         insert_mode: InsertMode,
         select: &'a Select,
-        cache: &mut PgCache,
+        mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<PreparedInsert> {
         let def = self.ontology.def(def_id);
         let pg = self.pg_model.pg_domain_datatable(domain_index, def_id)?;
@@ -595,7 +603,7 @@ impl<'a> TransactCtx<'a> {
                     &vertex_select,
                     &mut ctx,
                     &mut expressions.items,
-                    cache,
+                    mut_ctx,
                 )?;
 
                 if !expressions.items.is_empty() {
@@ -648,7 +656,7 @@ impl<'a> TransactCtx<'a> {
         value: InDomain<Value>,
         select: &'a Select,
         timestamp: PgTimestamp,
-        cache: &mut PgCache,
+        mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<(AnalyzedInput, PgDomainTable<'_>)> {
         let pg = self
             .pg_model
@@ -729,7 +737,7 @@ impl<'a> TransactCtx<'a> {
                                 Data::Sql(scalar) => {
                                     // register inserted/known ID
                                     if matches!(kind, DataRelationshipKind::Id) {
-                                        if let Some(tentative_foreign_ids) = cache
+                                        if let Some(tentative_foreign_ids) = mut_ctx
                                             .tentative_foreign_keys
                                             .get_mut(&(*prop_id, type_def_id))
                                         {
