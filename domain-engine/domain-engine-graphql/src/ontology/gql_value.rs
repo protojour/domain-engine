@@ -6,7 +6,7 @@ use ontol_runtime::{
     interface::serde::processor::ProcessorMode,
     ontology::domain::DefRepr,
     value::{FormatValueAsText, Value},
-    DefPropTag, OntolDefTag, PropId,
+    OntolDefTag, PropId,
 };
 
 use crate::{field_error, gql_scalar::GqlScalar};
@@ -202,7 +202,7 @@ pub fn write_ontol_scalar(
 
                     if cfg.with_create_time {
                         if let Some(value) = attrs
-                            .get(&OntolDefTag::CreateTime.prop_id(DefPropTag(0)))
+                            .get(&OntolDefTag::CreateTime.prop_id_0())
                             .and_then(|attr| attr.as_unit())
                         {
                             put_string(
@@ -219,7 +219,7 @@ pub fn write_ontol_scalar(
 
                     if cfg.with_update_time {
                         if let Some(value) = attrs
-                            .get(&OntolDefTag::UpdateTime.prop_id(DefPropTag(0)))
+                            .get(&OntolDefTag::UpdateTime.prop_id_0())
                             .and_then(|attr| attr.as_unit())
                         {
                             put_string(

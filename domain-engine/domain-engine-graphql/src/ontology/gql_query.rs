@@ -20,7 +20,7 @@ use ontol_runtime::query::select::StructOrUnionSelect;
 use ontol_runtime::query::select::StructSelect;
 use ontol_runtime::query::select::{EntitySelect, Select};
 use ontol_runtime::value::Value;
-use ontol_runtime::{DefPropTag, OntolDefTag, PropId};
+use ontol_runtime::{OntolDefTag, PropId};
 use serde::de::value::StringDeserializer;
 use serde::Deserialize;
 use ulid::Ulid;
@@ -142,7 +142,7 @@ impl Query {
                 condition.add_clause(
                     root_var,
                     Clause::MatchProp(
-                        OntolDefTag::UpdateTime.prop_id(DefPropTag(0)),
+                        OntolDefTag::UpdateTime.prop_id_0(),
                         SetOperator::ElementIn,
                         set_var,
                     ),
@@ -201,13 +201,13 @@ impl Query {
         if cfg.with_create_time {
             struct_select
                 .properties
-                .insert(OntolDefTag::CreateTime.prop_id(DefPropTag(0)), Select::Unit);
+                .insert(OntolDefTag::CreateTime.prop_id_0(), Select::Unit);
         }
 
         if cfg.with_update_time {
             struct_select
                 .properties
-                .insert(OntolDefTag::UpdateTime.prop_id(DefPropTag(0)), Select::Unit);
+                .insert(OntolDefTag::UpdateTime.prop_id_0(), Select::Unit);
         }
 
         let messages = [Ok(ReqMessage::Query(

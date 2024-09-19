@@ -200,8 +200,8 @@ impl OntolDefTag {
         DefId(DomainIndex(0), self as u16)
     }
 
-    pub const fn prop_id(self, prop_tag: DefPropTag) -> PropId {
-        PropId(self.def_id(), prop_tag)
+    pub const fn prop_id_0(self) -> PropId {
+        PropId(self.def_id(), DefPropTag(0))
     }
 }
 

@@ -4,7 +4,7 @@ use core::{DbContext, EdgeColumn, EdgeVectorData};
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use domain_engine_core::data_store::{DataStoreFactory, DataStoreFactorySync};
+use domain_engine_core::data_store::{DataStoreFactory, DataStoreFactorySync, DataStoreParams};
 use domain_engine_core::object_generator::ObjectGenerator;
 use domain_engine_core::system::ArcSystemApi;
 use domain_engine_core::transact::{
@@ -16,7 +16,7 @@ use futures_util::stream::BoxStream;
 use futures_util::StreamExt;
 use ontol_runtime::interface::serde::processor::ProcessorMode;
 use ontol_runtime::ontology::domain::EdgeCardinalFlags;
-use ontol_runtime::ontology::{config::DataStoreConfig, Ontology};
+use ontol_runtime::ontology::Ontology;
 use ontol_runtime::query::select::Select;
 use ontol_runtime::value::Value;
 use ontol_runtime::{DefId, DomainIndex};
@@ -40,6 +40,7 @@ pub struct InMemoryDb {
     store: Arc<RwLock<InMemoryStore>>,
     ontology: Arc<Ontology>,
     system: ArcSystemApi,
+    datastore_mutated: tokio::sync::watch::Sender<()>,
 }
 
 #[async_trait::async_trait]
@@ -59,6 +60,7 @@ impl InMemoryDb {
         persisted: &BTreeSet<DomainIndex>,
         ontology: Arc<Ontology>,
         system: ArcSystemApi,
+        datastore_mutated: tokio::sync::watch::Sender<()>,
     ) -> Self {
         let mut collections: FnvHashMap<DefId, VertexTable<DynamicKey>> = Default::default();
         let mut hyper_edges: FnvHashMap<DefId, HyperEdgeTable> = Default::default();
@@ -116,6 +118,7 @@ impl InMemoryDb {
             })),
             ontology,
             system,
+            datastore_mutated,
         }
     }
 
@@ -277,6 +280,7 @@ impl InMemoryDb {
 
             if let Some(write_stats) = ctx.write_stats.finish(ctx.system) {
                 yield RespMessage::WriteComplete(Box::new(write_stats));
+                let _ = self.datastore_mutated.send(());
             }
         }
         .boxed())
@@ -291,12 +295,9 @@ impl DataStoreFactory for InMemoryDataStoreFactory {
     async fn new_api(
         &self,
         persisted: &BTreeSet<DomainIndex>,
-        config: DataStoreConfig,
-        session: Session,
-        ontology: Arc<Ontology>,
-        system: ArcSystemApi,
-    ) -> DomainResult<Box<dyn DataStoreAPI + Send + Sync>> {
-        self.new_api_sync(persisted, config, session, ontology, system)
+        params: DataStoreParams,
+    ) -> DomainResult<Arc<dyn DataStoreAPI + Send + Sync>> {
+        self.new_api_sync(persisted, params)
     }
 }
 
@@ -304,11 +305,13 @@ impl DataStoreFactorySync for InMemoryDataStoreFactory {
     fn new_api_sync(
         &self,
         persisted: &BTreeSet<DomainIndex>,
-        _config: DataStoreConfig,
-        _session: Session,
-        ontology: Arc<Ontology>,
-        system: ArcSystemApi,
-    ) -> DomainResult<Box<dyn DataStoreAPI + Send + Sync>> {
-        Ok(Box::new(InMemoryDb::new(persisted, ontology, system)))
+        params: DataStoreParams,
+    ) -> DomainResult<Arc<dyn DataStoreAPI + Send + Sync>> {
+        Ok(Arc::new(InMemoryDb::new(
+            persisted,
+            params.ontology,
+            params.system,
+            params.datastore_mutated,
+        )))
     }
 }

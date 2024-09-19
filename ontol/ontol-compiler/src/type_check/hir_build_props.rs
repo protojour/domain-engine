@@ -4,7 +4,7 @@ use ontol_runtime::{
     property::{Cardinality, PropertyCardinality, ValueCardinality},
     query::condition::SetOperator,
     var::Var,
-    DefId, DefPropTag, OntolDefTag, PropId,
+    DefId, OntolDefTag, PropId,
 };
 use smallvec::smallvec;
 use tracing::{debug, info};
@@ -329,7 +329,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 match_attributes.insert(
                     MatchAttributeKey::Def(OntolDefTag::RelationOrder.def_id()),
                     MatchAttribute {
-                        prop_id: OntolDefTag::RelationOrder.prop_id(DefPropTag(0)),
+                        prop_id: OntolDefTag::RelationOrder.prop_id_0(),
                         rel_id: RelId(DefId::unit(), DefRelTag(0)),
                         cardinality: (PropertyCardinality::Optional, ValueCardinality::IndexSet),
                         rel_params_def: None,
@@ -342,7 +342,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             match_attributes.insert(
                 MatchAttributeKey::Def(OntolDefTag::RelationDirection.def_id()),
                 MatchAttribute {
-                    prop_id: OntolDefTag::RelationDirection.prop_id(DefPropTag(0)),
+                    prop_id: OntolDefTag::RelationDirection.prop_id_0(),
                     rel_id: RelId(DefId::unit(), DefRelTag(0)),
                     cardinality: (PropertyCardinality::Optional, ValueCardinality::Unit),
                     rel_params_def: None,

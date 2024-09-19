@@ -36,6 +36,7 @@ pub struct PostgresDataStore {
     ontology: Arc<Ontology>,
     pool: deadpool_postgres::Pool,
     system: ArcSystemApi,
+    datastore_mutated: tokio::sync::watch::Sender<()>,
 }
 
 impl PostgresDataStore {
@@ -44,12 +45,14 @@ impl PostgresDataStore {
         ontology: Arc<Ontology>,
         pool: deadpool_postgres::Pool,
         system: ArcSystemApi,
+        datastore_mutated: tokio::sync::watch::Sender<()>,
     ) -> Self {
         Self {
             pg_model,
             ontology,
             pool,
             system,
+            datastore_mutated,
         }
     }
 }
@@ -100,7 +103,13 @@ impl DataStoreAPI for PostgresHandle {
         messages: BoxStream<'static, DomainResult<ReqMessage>>,
         _session: Session,
     ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
-        transact::transact(self.store.clone(), mode, messages).await
+        transact::transact(
+            self.store.clone(),
+            mode,
+            messages,
+            self.store.datastore_mutated.clone(),
+        )
+        .await
     }
 }
 

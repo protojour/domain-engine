@@ -7,6 +7,7 @@ members = [
     "domain-engine/domain-engine-store-arango",
     "domain-engine/domain-engine-store-inmemory",
     "domain-engine/domain-engine-store-pg",
+    "domain-engine/domain-engine-tantivy",
     "domain-engine/domain-engine-test-utils",
     "ontol/ontol-compiler",
     "ontol/ontol-examples",

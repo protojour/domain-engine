@@ -29,11 +29,11 @@ pub trait DataStoreAPI {
 
 pub struct DataStore {
     persisted: BTreeSet<DomainIndex>,
-    api: Box<dyn DataStoreAPI + Send + Sync>,
+    api: Arc<dyn DataStoreAPI + Send + Sync>,
 }
 
 impl DataStore {
-    pub fn new(persisted: BTreeSet<DomainIndex>, api: Box<dyn DataStoreAPI + Send + Sync>) -> Self {
+    pub fn new(persisted: BTreeSet<DomainIndex>, api: Arc<dyn DataStoreAPI + Send + Sync>) -> Self {
         Self { persisted, api }
     }
 
@@ -44,6 +44,17 @@ impl DataStore {
     pub fn api(&self) -> &(dyn DataStoreAPI + Send + Sync) {
         self.api.as_ref()
     }
+}
+
+#[non_exhaustive]
+#[derive(Clone)]
+pub struct DataStoreParams {
+    pub config: DataStoreConfig,
+    pub session: Session,
+    pub ontology: Arc<Ontology>,
+    pub system: ArcSystemApi,
+    pub datastore_mutated: tokio::sync::watch::Sender<()>,
+    pub index_mutated: tokio::sync::watch::Sender<()>,
 }
 
 /// Trait for creating data store APIs
@@ -57,20 +68,14 @@ pub trait DataStoreFactory {
     async fn new_api(
         &self,
         persisted: &BTreeSet<DomainIndex>,
-        config: DataStoreConfig,
-        session: Session,
-        ontology: Arc<Ontology>,
-        system: ArcSystemApi,
-    ) -> DomainResult<Box<dyn DataStoreAPI + Send + Sync>>;
+        params: DataStoreParams,
+    ) -> DomainResult<Arc<dyn DataStoreAPI + Send + Sync>>;
 }
 
 pub trait DataStoreFactorySync {
     fn new_api_sync(
         &self,
         persisted: &BTreeSet<DomainIndex>,
-        config: DataStoreConfig,
-        session: Session,
-        ontology: Arc<Ontology>,
-        system: ArcSystemApi,
-    ) -> DomainResult<Box<dyn DataStoreAPI + Send + Sync>>;
+        params: DataStoreParams,
+    ) -> DomainResult<Arc<dyn DataStoreAPI + Send + Sync>>;
 }

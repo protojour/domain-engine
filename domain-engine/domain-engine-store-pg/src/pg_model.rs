@@ -247,14 +247,14 @@ impl PgTable {
         {
             Some(property) => Some(property),
             None => {
-                if prop_id == &OntolDefTag::CreateTime.prop_id(DefPropTag(0)) {
+                if prop_id == &OntolDefTag::CreateTime.prop_id_0() {
                     Some(PgPropertyRef::Column(PgColumnRef {
                         key: -1,
                         col_name: "_created",
                         pg_type: PgType::TimestampTz,
                         standard: true,
                     }))
-                } else if prop_id == &OntolDefTag::UpdateTime.prop_id(DefPropTag(0)) {
+                } else if prop_id == &OntolDefTag::UpdateTime.prop_id_0() {
                     Some(PgPropertyRef::Column(PgColumnRef {
                         key: -1,
                         col_name: "_updated",

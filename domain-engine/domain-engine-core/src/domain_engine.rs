@@ -20,7 +20,7 @@ use serde::de::DeserializeSeed;
 use tracing::{debug, error};
 
 use crate::{
-    data_store::{DataStore, DataStoreFactory, DataStoreFactorySync},
+    data_store::{DataStore, DataStoreFactory, DataStoreFactorySync, DataStoreParams},
     domain_error::{DomainErrorContext, DomainErrorKind, DomainResult},
     select_data_flow::translate_entity_select,
     system::{ArcSystemApi, SystemAPI},
@@ -33,6 +33,8 @@ pub struct DomainEngine {
     pub(crate) resolver_graph: ResolverGraph,
     data_store: Option<DataStore>,
     system: ArcSystemApi,
+    datastore_mutated_signal: tokio::sync::watch::Receiver<()>,
+    index_mutated_signal: tokio::sync::watch::Receiver<()>,
 }
 
 impl DomainEngine {
@@ -54,6 +56,14 @@ impl DomainEngine {
 
     pub fn system(&self) -> &dyn SystemAPI {
         self.system.as_ref()
+    }
+
+    pub fn datastore_mutated_signal(&self) -> &tokio::sync::watch::Receiver<()> {
+        &self.datastore_mutated_signal
+    }
+
+    pub fn index_mutated_signal(&self) -> &tokio::sync::watch::Receiver<()> {
+        &self.index_mutated_signal
     }
 
     pub fn get_data_store(&self) -> DomainResult<&DataStore> {
@@ -357,6 +367,9 @@ impl Builder {
     ) -> DomainResult<DomainEngine> {
         let system = self.system.expect("No system API provided!");
 
+        let (datastore_mutated_tx, datastore_mutated_rx) = tokio::sync::watch::channel(());
+        let (index_mutated_tx, index_mutated_rx) = tokio::sync::watch::channel(());
+
         let data_store = match self.data_store {
             Some(data_store) => Some(data_store),
             None => {
@@ -366,10 +379,14 @@ impl Builder {
                     let api = factory
                         .new_api(
                             &persisted_set,
-                            config.clone(),
-                            session.clone(),
-                            self.ontology.clone(),
-                            system.clone(),
+                            DataStoreParams {
+                                config: config.clone(),
+                                session: session.clone(),
+                                ontology: self.ontology.clone(),
+                                system: system.clone(),
+                                datastore_mutated: datastore_mutated_tx.clone(),
+                                index_mutated: index_mutated_tx.clone(),
+                            },
                         )
                         .await
                         .with_context(|| format!("Failed to initialize data store {config:?}"))?;
@@ -387,6 +404,8 @@ impl Builder {
             resolver_graph,
             data_store,
             system,
+            datastore_mutated_signal: datastore_mutated_rx,
+            index_mutated_signal: index_mutated_rx,
         })
     }
 
@@ -397,6 +416,9 @@ impl Builder {
     ) -> DomainResult<DomainEngine> {
         let system = self.system.expect("No system API provided!");
 
+        let (datastore_mutated_tx, datastore_mutated_rx) = tokio::sync::watch::channel(());
+        let (index_mutated_tx, index_mutated_rx) = tokio::sync::watch::channel(());
+
         let data_store = match self.data_store {
             Some(data_store) => Some(data_store),
             None => {
@@ -406,10 +428,14 @@ impl Builder {
                     let api = factory
                         .new_api_sync(
                             &persisted_set,
-                            config.clone(),
-                            session.clone(),
-                            self.ontology.clone(),
-                            system.clone(),
+                            DataStoreParams {
+                                config: config.clone(),
+                                session: session.clone(),
+                                ontology: self.ontology.clone(),
+                                system: system.clone(),
+                                datastore_mutated: datastore_mutated_tx.clone(),
+                                index_mutated: index_mutated_tx.clone(),
+                            },
                         )
                         .with_context(|| format!("Failed to initialize data store {config:?}"))?;
                     data_store = Some(DataStore::new(persisted_set, api));
@@ -426,6 +452,8 @@ impl Builder {
             resolver_graph,
             data_store,
             system,
+            datastore_mutated_signal: datastore_mutated_rx,
+            index_mutated_signal: index_mutated_rx,
         })
     }
 }

@@ -123,6 +123,7 @@ pub async fn transact(
     store: Arc<PostgresDataStore>,
     mode: TransactionMode,
     messages: BoxStream<'static, DomainResult<ReqMessage>>,
+    datastore_mutated: tokio::sync::watch::Sender<()>,
 ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
     let mut connection = store
         .pool
@@ -252,6 +253,7 @@ pub async fn transact(
 
         if let Some(write_stats) = mut_ctx.write_stats.finish(ctx.system) {
             yield RespMessage::WriteComplete(Box::new(write_stats));
+            let _ = datastore_mutated.send(());
         }
     }
     .boxed())

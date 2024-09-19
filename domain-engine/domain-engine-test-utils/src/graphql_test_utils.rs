@@ -116,7 +116,7 @@ pub fn gql_ctx_mock_data_store(
                 .iter()
                 .map(|src_name| ontol_test.get_domain_index(src_name.as_ref()))
                 .collect(),
-            Box::new(LinearDataStoreAdapter::new(unimock.clone())),
+            Arc::new(LinearDataStoreAdapter::new(unimock.clone())),
         ))
         .system(Box::new(unimock))
         .build_sync(InMemoryDataStoreFactory, Session::default())

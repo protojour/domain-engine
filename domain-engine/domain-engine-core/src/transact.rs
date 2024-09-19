@@ -109,6 +109,22 @@ impl WriteStats {
     pub fn start(&self) -> chrono::DateTime<chrono::Utc> {
         self.start
     }
+
+    pub fn end(&self) -> chrono::DateTime<chrono::Utc> {
+        self.end
+    }
+
+    pub fn mutated(&self) -> impl Iterator<Item = DefId> + '_ {
+        self.mutated.iter().copied()
+    }
+
+    pub fn deleted(&self) -> impl Iterator<Item = VertexAddr> + '_ {
+        self.deleted.iter().cloned()
+    }
+
+    pub fn take_deleted(&mut self) -> impl Iterator<Item = VertexAddr> + '_ {
+        std::mem::take(&mut self.deleted).into_iter()
+    }
 }
 
 pub struct WriteStatsBuilder {
