@@ -45,6 +45,12 @@ pub enum Members<'a> {
     Join(Var),
 }
 
+pub enum MemberPredicate<'a> {
+    Element(&'a CondTerm, &'a CondTerm),
+    // FIXME: finish?
+    Predicate,
+}
+
 pub struct SetMembers<'a>(&'a [Clause<Var, CondTerm>]);
 
 impl<'a> SetMembers<'a> {
@@ -52,9 +58,10 @@ impl<'a> SetMembers<'a> {
         self.iter().count()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&CondTerm, &CondTerm)> {
+    pub fn iter(&self) -> impl Iterator<Item = MemberPredicate<'_>> {
         self.0.iter().filter_map(|clause| match clause {
-            Clause::Member(rel, val) => Some((rel, val)),
+            Clause::Member(rel, val) => Some(MemberPredicate::Element(rel, val)),
+            Clause::SetPredicate(..) => Some(MemberPredicate::Predicate),
             _ => None,
         })
     }

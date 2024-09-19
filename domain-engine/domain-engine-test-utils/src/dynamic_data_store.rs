@@ -45,6 +45,7 @@ impl DynamicDataStoreFactory {
             make_tantivy_layer(
                 TantivyParams {
                     cancel: Default::default(),
+                    vertex_index_queue_size: 64,
                 },
                 params,
                 inner,

@@ -9,7 +9,7 @@ use ontol_runtime::{
 };
 
 use domain_engine_core::{
-    filter::walker::{ConditionWalker, Members},
+    filter::walker::{ConditionWalker, MemberPredicate, Members},
     DomainError, DomainResult,
 };
 use tracing::{error, warn};
@@ -160,7 +160,10 @@ impl InMemoryStore {
                     let def = ctx.ontology.def(type_def_id);
 
                     let Some(data_relationship) = def.data_relationships.get(prop_id) else {
-                        return Err(ProofError::Disproven);
+                        // temporarily return every vertex.
+                        // typically this is for a comparison on "update_time" which does not exist
+                        // for in-memory database yet.
+                        return Ok(Proof::Proven);
                     };
 
                     match &data_relationship.kind {
@@ -280,24 +283,38 @@ impl InMemoryStore {
         // the right operand is the members (rel_term, val_term)
         match (attr, set_op) {
             (FilterAttr::Scalar(val), SetOperator::ElementIn) => {
-                for (_rel_term, val_term) in members.iter() {
-                    // let r = prove(self.eval_filter_term(rel, rel_term, walker, ctx))?;
-                    let v = prove(self.eval_filter_term(val, val_term, walker, ctx))?;
+                for pred in members.iter() {
+                    match pred {
+                        MemberPredicate::Element(_rel_term, val_term) => {
+                            // let r = prove(self.eval_filter_term(rel, rel_term, walker, ctx))?;
+                            let v = prove(self.eval_filter_term(val, val_term, walker, ctx))?;
 
-                    if v {
-                        return Ok(Proof::Proven);
+                            if v {
+                                return Ok(Proof::Proven);
+                            }
+                        }
+                        MemberPredicate::Predicate => {
+                            return Ok(Proof::Proven);
+                        }
                     }
                 }
 
                 Err(ProofError::Disproven)
             }
             (FilterAttr::Tuple(rel, val), SetOperator::ElementIn) => {
-                for (rel_term, val_term) in members.iter() {
-                    let r = prove(self.eval_filter_term(rel, rel_term, walker, ctx))?;
-                    let v = prove(self.eval_filter_term(val, val_term, walker, ctx))?;
+                for pred in members.iter() {
+                    match pred {
+                        MemberPredicate::Element(rel_term, val_term) => {
+                            let r = prove(self.eval_filter_term(rel, rel_term, walker, ctx))?;
+                            let v = prove(self.eval_filter_term(val, val_term, walker, ctx))?;
 
-                    if r && v {
-                        return Ok(Proof::Proven);
+                            if r && v {
+                                return Ok(Proof::Proven);
+                            }
+                        }
+                        MemberPredicate::Predicate => {
+                            return Ok(Proof::Proven);
+                        }
                     }
                 }
 
@@ -309,18 +326,25 @@ impl InMemoryStore {
                 while rows.iter_next(&mut tup) {
                     let mut found = false;
 
-                    for (rel_term, val_term) in members.iter() {
-                        let (r, v) = self.prove_tuple(
-                            tup.elements.as_slice(),
-                            rel_term,
-                            val_term,
-                            walker,
-                            ctx,
-                        )?;
+                    for pred in members.iter() {
+                        match pred {
+                            MemberPredicate::Element(rel_term, val_term) => {
+                                let (r, v) = self.prove_tuple(
+                                    tup.elements.as_slice(),
+                                    rel_term,
+                                    val_term,
+                                    walker,
+                                    ctx,
+                                )?;
 
-                        if r && v {
-                            found = true;
-                            break;
+                                if r && v {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            MemberPredicate::Predicate => {
+                                return Ok(Proof::Proven);
+                            }
                         }
                     }
 
@@ -334,27 +358,34 @@ impl InMemoryStore {
             (FilterAttr::Matrix(mat), SetOperator::SupersetOf) => {
                 let mut tup = Default::default();
 
-                for (rel_term, val_term) in members.iter() {
-                    let mut found = false;
+                for pred in members.iter() {
+                    match pred {
+                        MemberPredicate::Element(rel_term, val_term) => {
+                            let mut found = false;
 
-                    let mut rows = mat.rows();
-                    while rows.iter_next(&mut tup) {
-                        let (r, v) = self.prove_tuple(
-                            tup.elements.as_slice(),
-                            rel_term,
-                            val_term,
-                            walker,
-                            ctx,
-                        )?;
+                            let mut rows = mat.rows();
+                            while rows.iter_next(&mut tup) {
+                                let (r, v) = self.prove_tuple(
+                                    tup.elements.as_slice(),
+                                    rel_term,
+                                    val_term,
+                                    walker,
+                                    ctx,
+                                )?;
 
-                        if r && v {
-                            found = true;
-                            break;
+                                if r && v {
+                                    found = true;
+                                    break;
+                                }
+                            }
+
+                            if !found {
+                                return Err(ProofError::Disproven);
+                            }
                         }
-                    }
-
-                    if !found {
-                        return Err(ProofError::Disproven);
+                        MemberPredicate::Predicate => {
+                            return Ok(Proof::Proven);
+                        }
                     }
                 }
 
@@ -363,18 +394,25 @@ impl InMemoryStore {
             (FilterAttr::Matrix(mat), SetOperator::SetIntersects) => {
                 let mut tup = Default::default();
 
-                for (rel_term, val_term) in members.iter() {
-                    let mut rows = mat.rows();
-                    while rows.iter_next(&mut tup) {
-                        let (r, v) = self.prove_tuple(
-                            tup.elements.as_slice(),
-                            rel_term,
-                            val_term,
-                            walker,
-                            ctx,
-                        )?;
+                for pred in members.iter() {
+                    match pred {
+                        MemberPredicate::Element(rel_term, val_term) => {
+                            let mut rows = mat.rows();
+                            while rows.iter_next(&mut tup) {
+                                let (r, v) = self.prove_tuple(
+                                    tup.elements.as_slice(),
+                                    rel_term,
+                                    val_term,
+                                    walker,
+                                    ctx,
+                                )?;
 
-                        if r && v {
+                                if r && v {
+                                    return Ok(Proof::Proven);
+                                }
+                            }
+                        }
+                        MemberPredicate::Predicate => {
                             return Ok(Proof::Proven);
                         }
                     }
@@ -390,19 +428,26 @@ impl InMemoryStore {
                 let mut matches: FnvHashMap<usize, usize> = Default::default();
                 let mut tup = Default::default();
 
-                for (index, (rel_term, val_term)) in members.iter().enumerate() {
-                    let mut rows = mat.rows();
-                    while rows.iter_next(&mut tup) {
-                        let (r, v) = self.prove_tuple(
-                            tup.elements.as_slice(),
-                            rel_term,
-                            val_term,
-                            walker,
-                            ctx,
-                        )?;
+                for (index, pred) in members.iter().enumerate() {
+                    match pred {
+                        MemberPredicate::Element(rel_term, val_term) => {
+                            let mut rows = mat.rows();
+                            while rows.iter_next(&mut tup) {
+                                let (r, v) = self.prove_tuple(
+                                    tup.elements.as_slice(),
+                                    rel_term,
+                                    val_term,
+                                    walker,
+                                    ctx,
+                                )?;
 
-                        if r && v {
-                            *matches.entry(index).or_default() += 1;
+                                if r && v {
+                                    *matches.entry(index).or_default() += 1;
+                                }
+                            }
+                        }
+                        MemberPredicate::Predicate => {
+                            return Ok(Proof::Proven);
                         }
                     }
                 }

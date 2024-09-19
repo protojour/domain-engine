@@ -22,6 +22,8 @@ const INDEX_WRITER_MEM_LIMIT: usize = 50_000_000;
 
 #[derive(Clone)]
 pub struct TantivyParams {
+    /// The number of vertices that can fit in the indexing queue
+    pub vertex_index_queue_size: usize,
     pub cancel: CancellationToken,
 }
 
@@ -36,7 +38,7 @@ pub fn make_tantivy_layer(
         data_store,
         ontology,
         index_mutated,
-        tantivy_params.cancel.clone(),
+        tantivy_params,
     )?))
 }
 
@@ -117,13 +119,13 @@ impl TantivyDataStoreLayer {
         data_store: Arc<dyn DataStoreAPI + Send + Sync>,
         ontology: Arc<Ontology>,
         index_mutated: tokio::sync::watch::Sender<()>,
-        cancel: CancellationToken,
+        params: TantivyParams,
     ) -> DomainResult<Self> {
         let schema = make_schema();
 
-        let indexer_cancel = cancel.child_token();
+        let indexer_cancel = params.cancel.child_token();
         let (notify_tx, notify_rx) = tokio::sync::watch::channel(());
-        let (vertex_tx, vertex_rx) = tokio::sync::mpsc::channel(100);
+        let (vertex_tx, vertex_rx) = tokio::sync::mpsc::channel(params.vertex_index_queue_size);
         let sync_queue = SyncQueue::new(notify_tx);
 
         let index = Index::create_in_ram(schema.schema.clone());

@@ -1,5 +1,5 @@
 use domain_engine_core::{
-    filter::walker::{ConditionWalker, Members},
+    filter::walker::{ConditionWalker, MemberPredicate, Members},
     DomainError, DomainResult,
 };
 use ontol_runtime::{
@@ -254,9 +254,14 @@ impl<'a> MetaQuery<'a> {
             }
         }
 
-        for (rel_term, val_term) in members.iter() {
-            self.eval_term(filter, rel_term, walker)?;
-            self.eval_term(filter, val_term, walker)?;
+        for member_pred in members.iter() {
+            match member_pred {
+                MemberPredicate::Element(rel_term, val_term) => {
+                    self.eval_term(filter, rel_term, walker)?;
+                    self.eval_term(filter, val_term, walker)?;
+                }
+                MemberPredicate::Predicate => {}
+            }
         }
 
         Ok(())

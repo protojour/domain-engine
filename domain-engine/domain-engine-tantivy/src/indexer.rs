@@ -26,11 +26,13 @@ use tracing::{debug, error};
 
 use crate::document::IndexingContext;
 
+#[derive(Debug)]
 enum SyncMsg {
     Update(UpdateSyncMsg),
     Delete(VertexAddr),
 }
 
+#[derive(Debug)]
 struct UpdateSyncMsg {
     def_id: DefId,
     start: chrono::DateTime<chrono::Utc>,
@@ -63,9 +65,18 @@ pub async fn synchronizer_async_task(
     loop {
         tokio::select! {
             _ = watch.changed() => {
-                let messages = sync_queue.take_current();
-                for msg in messages {
-                    synchronizer.handle_message(msg).await;
+                if true {
+                    // repeatedly pop messages from the queue front,
+                    // keeping the rest in the queue for further merging
+                    while let Some(msg) = sync_queue.take_one() {
+                        synchronizer.handle_message(msg).await;
+                    }
+                } else {
+                    let messages = sync_queue.take_current();
+                    debug!("synchronizer handling {} messages", messages.len());
+                    for msg in messages {
+                        synchronizer.handle_message(msg).await;
+                    }
                 }
             }
             _ = indexer_cancel.cancelled() => {
@@ -85,18 +96,20 @@ pub fn indexer_blocking_task(
     loop {
         match vertex_rx.blocking_recv() {
             Some(VertexMsg::Update(vertex)) => {
+                debug!("index update {:?}", vertex.type_def_id());
                 if let Err(err) = indexing_context.reindex(vertex, &mut index_writer) {
                     error!("document not reindexed: {err:?}");
                 }
             }
             Some(VertexMsg::Delete(vertex_addr)) => {
-                debug!("delete {vertex_addr:?}");
+                debug!("index delete {vertex_addr:?}");
                 index_writer.delete_term(Term::from_field_bytes(
                     indexing_context.schema.vertex_addr,
                     &vertex_addr,
                 ));
             }
             Some(VertexMsg::Cancel) | None => {
+                debug!("indexer task killed");
                 return;
             }
         }
@@ -237,6 +250,11 @@ impl SyncQueue {
         if let Err(err) = self.notify.send(()) {
             error!("could not send change notification to indexing queue: {err}");
         }
+    }
+
+    fn take_one(&self) -> Option<SyncMsg> {
+        let mut queue = self.queue.lock().unwrap();
+        queue.pop_front()
     }
 
     fn take_current(&self) -> VecDeque<SyncMsg> {
