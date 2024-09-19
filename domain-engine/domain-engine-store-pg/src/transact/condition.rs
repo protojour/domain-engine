@@ -168,7 +168,10 @@ impl<'a> TransactCtx<'a> {
 
         match pg.table.find_property_ref(&prop_id) {
             Some(PgPropertyRef::Column(pg_column)) => {
-                debug!("compare column: {:?} in {def_id:?}", path_builder.items);
+                debug!(
+                    "compare column: {prop_id:?} `{}` {:?} in {def_id:?}",
+                    pg_column.col_name, path_builder.items
+                );
 
                 if path_builder.items.is_empty() {
                     if let Some(leaf_condition) = self.column_condition(

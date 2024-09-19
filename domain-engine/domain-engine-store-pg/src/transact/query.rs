@@ -270,7 +270,7 @@ impl<'a> TransactCtx<'a> {
                     );
                 }
 
-                if q.limit.map(|limit| observed_rows < limit).unwrap_or(false) {
+                if q.limit.map(|limit| observed_rows < limit).unwrap_or(true) {
                     let row_value = self.read_vertex_row_value(row_iter, query_select.as_ref(), IncludeJoinedAttrs::Yes, DataOperation::Queried)?;
                     yield QueryFrame::Row(row_value);
 
