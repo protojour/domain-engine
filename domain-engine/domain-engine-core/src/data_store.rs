@@ -25,6 +25,13 @@ pub trait DataStoreAPI {
         messages: BoxStream<'static, DomainResult<ReqMessage>>,
         session: Session,
     ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>>;
+
+    /// Returns whether the data store is currently working on building a search index in the background.
+    ///
+    /// The answer may not be 100% reliable, since the definition of "running" is a little vague.
+    fn background_search_indexer_running(&self) -> bool {
+        false
+    }
 }
 
 pub struct DataStore {

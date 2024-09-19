@@ -1,6 +1,9 @@
 use std::{
     collections::VecDeque,
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
 };
 
 use domain_engine_core::{
@@ -22,7 +25,7 @@ use ontol_runtime::{
 };
 use tantivy::{IndexWriter, Term};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error};
+use tracing::{debug, error, trace};
 
 use crate::document::IndexingContext;
 
@@ -53,30 +56,26 @@ pub struct Synrchonizer {
 
 pub struct SyncQueue {
     queue: Mutex<VecDeque<SyncMsg>>,
-    notify: tokio::sync::watch::Sender<()>,
+    queue_watch: tokio::sync::watch::Sender<()>,
+    indexer_running: Arc<AtomicBool>,
 }
 
+/// The synchronizer's responsibility is to read change stats
+/// from the underlying data store, read the implied vertices out of the store,
+/// and send them over to the indexer task.
 pub async fn synchronizer_async_task(
     synchronizer: Synrchonizer,
     sync_queue: Arc<SyncQueue>,
-    mut watch: tokio::sync::watch::Receiver<()>,
+    mut queue_watch: tokio::sync::watch::Receiver<()>,
     indexer_cancel: CancellationToken,
 ) {
     loop {
         tokio::select! {
-            _ = watch.changed() => {
-                if true {
-                    // repeatedly pop messages from the queue front,
-                    // keeping the rest in the queue for further merging
-                    while let Some(msg) = sync_queue.take_one() {
-                        synchronizer.handle_message(msg).await;
-                    }
-                } else {
-                    let messages = sync_queue.take_current();
-                    debug!("synchronizer handling {} messages", messages.len());
-                    for msg in messages {
-                        synchronizer.handle_message(msg).await;
-                    }
+            _ = queue_watch.changed() => {
+                // repeatedly pop messages from the queue front,
+                // keeping the rest in the queue for potential merging
+                while let Some(msg) = sync_queue.take_one() {
+                    synchronizer.handle_message(msg).await;
                 }
             }
             _ = indexer_cancel.cancelled() => {
@@ -87,28 +86,44 @@ pub async fn synchronizer_async_task(
     }
 }
 
+/// The indexer's responsibility is to receive vertex data,
+/// convert into searchable documents, and commit the new inverted index.
 pub fn indexer_blocking_task(
     indexing_context: IndexingContext,
     mut vertex_rx: tokio::sync::mpsc::Receiver<VertexMsg>,
     index_mutated: tokio::sync::watch::Sender<()>,
     mut index_writer: IndexWriter,
+    indexer_running: Arc<AtomicBool>,
 ) {
+    let mut update_count: usize = 0;
+    let mut delete_count: usize = 0;
+
     loop {
         match vertex_rx.blocking_recv() {
             Some(VertexMsg::Update(vertex)) => {
-                debug!("index update {:?}", vertex.type_def_id());
+                indexer_running.store(true, Ordering::SeqCst);
+
+                trace!("index update {:?}", vertex.type_def_id());
                 if let Err(err) = indexing_context.reindex(vertex, &mut index_writer) {
                     error!("document not reindexed: {err:?}");
                 }
+
+                update_count += 1;
             }
             Some(VertexMsg::Delete(vertex_addr)) => {
-                debug!("index delete {vertex_addr:?}");
+                indexer_running.store(true, Ordering::SeqCst);
+
+                trace!("index delete {vertex_addr:?}");
                 index_writer.delete_term(Term::from_field_bytes(
                     indexing_context.schema.vertex_addr,
                     &vertex_addr,
                 ));
+
+                delete_count += 1;
             }
             Some(VertexMsg::Cancel) | None => {
+                indexer_running.store(false, Ordering::SeqCst);
+
                 debug!("indexer task killed");
                 return;
             }
@@ -117,8 +132,11 @@ pub fn indexer_blocking_task(
         // FIXME: should commit also after a fixed number of iterations, or passed time,
         // or else there is a risk of never committing
         if vertex_rx.is_empty() {
-            debug!("index commit");
+            debug!("committing index, {update_count} updated, {delete_count} deleted");
             index_writer.commit().unwrap();
+            update_count = 0;
+            delete_count = 0;
+            indexer_running.store(false, Ordering::SeqCst);
 
             let _ = index_mutated.send(());
         }
@@ -214,11 +232,17 @@ impl Synrchonizer {
                     .then(|resp_msg| {
                         let vertex_tx = self.vertex_tx.clone();
                         async move {
-                            if let Ok(RespMessage::Element(vertex, _)) = resp_msg {
-                                if let Err(err) = vertex_tx.send(VertexMsg::Update(vertex)).await {
-                                    error!(
-                                        "error passing vertex update into indexing queue: {err:?}"
-                                    );
+                            match resp_msg {
+                                Ok(RespMessage::Element(vertex, _)) => {
+                                    if let Err(err) = vertex_tx.send(VertexMsg::Update(vertex)).await {
+                                        error!(
+                                            "error passing vertex update into indexing queue: {err:?}"
+                                        );
+                                    }
+                                }
+                                Ok(_ignored_message) => {}
+                                Err(error) => {
+                                    error!("query error: {error:?}");
                                 }
                             }
                         }
@@ -234,10 +258,14 @@ impl Synrchonizer {
 }
 
 impl SyncQueue {
-    pub fn new(notify: tokio::sync::watch::Sender<()>) -> Arc<Self> {
+    pub fn new(
+        queue_watch: tokio::sync::watch::Sender<()>,
+        indexer_running: Arc<AtomicBool>,
+    ) -> Arc<Self> {
         Arc::new(SyncQueue {
             queue: Mutex::new(VecDeque::new()),
-            notify,
+            queue_watch,
+            indexer_running,
         })
     }
 
@@ -247,7 +275,10 @@ impl SyncQueue {
             Self::write_to_queue(stats, &mut queue);
         }
 
-        if let Err(err) = self.notify.send(()) {
+        self.indexer_running.store(true, Ordering::SeqCst);
+
+        // send signal to the synchronizer, so it may start processing messages from the queue
+        if let Err(err) = self.queue_watch.send(()) {
             error!("could not send change notification to indexing queue: {err}");
         }
     }
@@ -255,11 +286,6 @@ impl SyncQueue {
     fn take_one(&self) -> Option<SyncMsg> {
         let mut queue = self.queue.lock().unwrap();
         queue.pop_front()
-    }
-
-    fn take_current(&self) -> VecDeque<SyncMsg> {
-        let mut queue = self.queue.lock().unwrap();
-        std::mem::take(&mut queue)
     }
 
     fn write_to_queue(stats: &WriteStats, queue: &mut VecDeque<SyncMsg>) {

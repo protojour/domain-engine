@@ -65,12 +65,19 @@ async fn test_conduit_search(ds: &str) {
 
     info!("awaiting index change..");
 
-    domain_engine
-        .index_mutated_signal()
-        .clone()
-        .changed()
-        .await
-        .unwrap();
+    while domain_engine
+        .get_data_store()
+        .unwrap()
+        .api()
+        .background_search_indexer_running()
+    {
+        domain_engine
+            .index_mutated_signal()
+            .clone()
+            .changed()
+            .await
+            .unwrap();
+    }
 
     info!("done indexing");
 }

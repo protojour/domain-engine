@@ -1,5 +1,6 @@
-use std::collections::BTreeSet;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::{collections::BTreeSet, sync::atomic::AtomicBool};
 
 use document::IndexingContext;
 use domain_engine_core::{
@@ -85,6 +86,7 @@ impl<F: DataStoreFactorySync> DataStoreFactorySync for TantivyDataStoreFactoryLa
 struct TantivyDataStoreLayer {
     data_store: Arc<dyn DataStoreAPI + Send + Sync>,
     sync_queue: Arc<SyncQueue>,
+    indexer_running: Arc<AtomicBool>,
 
     /// Cancellation token for all indexing tasks.
     /// Cancelling happens automatically upon dropping the layer (Drop impl).
@@ -112,6 +114,10 @@ impl DataStoreAPI for TantivyDataStoreLayer {
             })
             .boxed())
     }
+
+    fn background_search_indexer_running(&self) -> bool {
+        self.indexer_running.load(Ordering::SeqCst)
+    }
 }
 
 impl TantivyDataStoreLayer {
@@ -124,9 +130,10 @@ impl TantivyDataStoreLayer {
         let schema = make_schema();
 
         let indexer_cancel = params.cancel.child_token();
+        let indexer_running = Arc::new(AtomicBool::new(false));
         let (notify_tx, notify_rx) = tokio::sync::watch::channel(());
         let (vertex_tx, vertex_rx) = tokio::sync::mpsc::channel(params.vertex_index_queue_size);
-        let sync_queue = SyncQueue::new(notify_tx);
+        let sync_queue = SyncQueue::new(notify_tx, indexer_running.clone());
 
         let index = Index::create_in_ram(schema.schema.clone());
         let index_writer = index.writer(INDEX_WRITER_MEM_LIMIT).unwrap();
@@ -156,8 +163,17 @@ impl TantivyDataStoreLayer {
         // real indexer task
         std::thread::Builder::new()
             .name("tantivy-indexer".to_string())
-            .spawn(move || {
-                indexer_blocking_task(indexing_context, vertex_rx, index_mutated, index_writer);
+            .spawn({
+                let indexer_running = indexer_running.clone();
+                move || {
+                    indexer_blocking_task(
+                        indexing_context,
+                        vertex_rx,
+                        index_mutated,
+                        index_writer,
+                        indexer_running,
+                    );
+                }
             })
             .unwrap();
 
@@ -165,6 +181,7 @@ impl TantivyDataStoreLayer {
             data_store,
             sync_queue,
             indexer_cancel,
+            indexer_running,
         })
     }
 }
