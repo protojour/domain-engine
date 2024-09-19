@@ -240,31 +240,26 @@ impl PgDomain {
 
 impl PgTable {
     pub fn find_property_ref(&self, prop_id: &PropId) -> Option<PgPropertyRef<'_>> {
-        match self
-            .properties
-            .get(&prop_id.tag())
-            .map(|prop| prop.as_ref())
-        {
-            Some(property) => Some(property),
-            None => {
-                if prop_id == &OntolDefTag::CreateTime.prop_id_0() {
-                    Some(PgPropertyRef::Column(PgColumnRef {
-                        key: -1,
-                        col_name: "_created",
-                        pg_type: PgType::TimestampTz,
-                        standard: true,
-                    }))
-                } else if prop_id == &OntolDefTag::UpdateTime.prop_id_0() {
-                    Some(PgPropertyRef::Column(PgColumnRef {
-                        key: -1,
-                        col_name: "_updated",
-                        pg_type: PgType::TimestampTz,
-                        standard: true,
-                    }))
-                } else {
-                    None
-                }
-            }
+        if prop_id.0.domain_index() != DomainIndex::ontol() {
+            self.properties
+                .get(&prop_id.tag())
+                .map(|prop| prop.as_ref())
+        } else if prop_id == &OntolDefTag::CreateTime.prop_id_0() {
+            Some(PgPropertyRef::Column(PgColumnRef {
+                key: -1,
+                col_name: "_created",
+                pg_type: PgType::TimestampTz,
+                standard: true,
+            }))
+        } else if prop_id == &OntolDefTag::UpdateTime.prop_id_0() {
+            Some(PgPropertyRef::Column(PgColumnRef {
+                key: -1,
+                col_name: "_updated",
+                pg_type: PgType::TimestampTz,
+                standard: true,
+            }))
+        } else {
+            None
         }
     }
 
