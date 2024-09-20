@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -38,6 +39,8 @@ pub struct TantivyConfig {
     /// since indexing is an internal matter.
     pub indexing_datastore: Arc<dyn DataStoreAPI + Send + Sync>,
 
+    pub index_source: TantivyIndexSource,
+
     /// The number of vertices that can fit in the indexing queue
     pub vertex_index_queue_size: usize,
 
@@ -46,6 +49,12 @@ pub struct TantivyConfig {
 
     /// Cancellation token for the indexer task
     pub cancel: CancellationToken,
+}
+
+#[derive(Clone)]
+pub enum TantivyIndexSource {
+    InMemory,
+    MMapDir(PathBuf),
 }
 
 pub fn make_tantivy_layer(
@@ -119,7 +128,22 @@ impl TantivyDataStoreLayer {
         let (vertex_tx, vertex_rx) = tokio::sync::mpsc::channel(config.vertex_index_queue_size);
         let sync_queue = SyncQueue::new(notify_tx, indexer_running.clone());
 
-        let index = Index::create_in_ram(schema.schema.clone());
+        let index = match &config.index_source {
+            TantivyIndexSource::InMemory => Index::create_in_ram(schema.schema.clone()),
+            TantivyIndexSource::MMapDir(path) => if path.exists() {
+                Index::open_in_dir(&path)
+            } else {
+                // TODO: Need to reindex if the schema changed
+                Index::create_in_dir(&path, schema.schema.clone())
+            }
+            .map_err(|err| {
+                DomainErrorKind::Search(format!(
+                    "unable to open index at path {path}: {err:?}",
+                    path = path.display()
+                ))
+            })?,
+        };
+
         let index_writer = index
             .writer(config.index_writer_mem_budget)
             .map_err(|err| DomainErrorKind::Search(format!("writer init error: {err:?}")))?;
