@@ -9,8 +9,9 @@ use ontol_runtime::{
 use tracing::{debug, error};
 
 use crate::{
+    address::deserialize_address,
     pg_error::PgError,
-    pg_model::{EdgeId, PgColumnRef, PgPropertyRef, PgRegKey},
+    pg_model::{EdgeId, PgColumnRef, PgPropertyRef, PgRegKey, PgType},
     sql::{self, WhereExt},
     sql_value::SqlScalar,
     transact::{data::Data, edge_query::edge_join_condition},
@@ -400,7 +401,7 @@ impl<'a> TransactCtx<'a> {
                             let Data::Sql(sql_val) = self.data_from_value(value.clone())? else {
                                 return Err(PgError::Condition("compound condition value").into());
                             };
-                            ctx.sql_params.push(sql_val);
+                            ctx.sql_params.push(self.adapt_param(sql_val, pg_column)?);
                         }
                         Clause::SetPredicate(predicate, CondTerm::Value(value)) => {
                             let param_idx = ctx.sql_params.len();
@@ -417,7 +418,7 @@ impl<'a> TransactCtx<'a> {
                             let Data::Sql(sql_val) = self.data_from_value(value.clone())? else {
                                 return Err(PgError::Condition("compound condition value").into());
                             };
-                            ctx.sql_params.push(sql_val);
+                            ctx.sql_params.push(self.adapt_param(sql_val, pg_column)?);
                         }
                         _ => {
                             return Err(PgError::Condition(
@@ -502,6 +503,16 @@ impl<'a> TransactCtx<'a> {
             AbstractKind::Scalar { .. } => {
                 Err(PgError::Condition("compare scalar set-to-set").into())
             }
+        }
+    }
+
+    fn adapt_param(&self, param: SqlScalar, pg_column: PgColumnRef) -> DomainResult<SqlScalar> {
+        match (param, pg_column.pg_type) {
+            (SqlScalar::Octets(octets), PgType::Bigserial) => {
+                let (_, data_key) = deserialize_address(&octets.0)?;
+                Ok(SqlScalar::I64(data_key))
+            }
+            (param, _) => Ok(param),
         }
     }
 }

@@ -244,6 +244,13 @@ impl PgTable {
             self.properties
                 .get(&prop_id.tag())
                 .map(|prop| prop.as_ref())
+        } else if prop_id == &OntolDefTag::RelationDataStoreAddress.prop_id_0() {
+            Some(PgPropertyRef::Column(PgColumnRef {
+                key: -1,
+                col_name: "_key",
+                pg_type: PgType::Bigserial,
+                standard: true,
+            }))
         } else if prop_id == &OntolDefTag::CreateTime.prop_id_0() {
             Some(PgPropertyRef::Column(PgColumnRef {
                 key: -1,

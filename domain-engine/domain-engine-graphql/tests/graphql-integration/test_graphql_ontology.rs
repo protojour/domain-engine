@@ -5,7 +5,7 @@ use domain_engine_graphql::{
     ontology::{OntologyCtx, OntologySchema},
 };
 use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema, ValueExt};
-use juniper::graphql_value;
+use juniper::{graphql_value, ScalarValue};
 use ontol_examples::stix::stix_bundle;
 use ontol_macros::datastore_test;
 use ontol_test_utils::{expect_eq, TestCompile};
@@ -545,6 +545,75 @@ async fn test_ontology_stix(ds: &str) {
                 }
             }))
         );
+
+        info!("fetch with addresses");
+        let with_address = format!(
+            r#"
+            query vertices($defId: DefId!) {{
+                vertices(
+                    defId: $defId,
+                    first: 100,
+                    withAddress: true,
+                    withDefId: false,
+                    withAttrs: false,
+                ) {{
+                    elements
+                }}
+            }}
+            "#
+        )
+        .exec(
+            OntologyParams {
+                def_id: Some(url.graphql_def_id()),
+            },
+            &ontology_schema,
+            &ontology_ctx,
+        )
+        .await
+        .unwrap();
+
+        let first_address = with_address
+            .field("vertices")
+            .field("elements")
+            .element(0)
+            .field("address")
+            .scalar()
+            .as_string()
+            .unwrap();
+
+        info!("filter by address");
+        let filtered_by_address = format!(
+            r#"
+            query vertices($defId: DefId!) {{
+                vertices(
+                    defId: $defId,
+                    first: 100,
+                    addresses: ["{first_address}"],
+                    withAddress: true,
+                    withDefId: false,
+                    withAttrs: false,
+                ) {{
+                    elements
+                }}
+            }}
+            "#
+        )
+        .exec(
+            OntologyParams {
+                def_id: Some(url.graphql_def_id()),
+            },
+            &ontology_schema,
+            &ontology_ctx,
+        )
+        .await
+        .unwrap();
+
+        let vertices = filtered_by_address
+            .field("vertices")
+            .field("elements")
+            .as_list_value()
+            .unwrap();
+        assert_eq!(vertices.len(), 1);
     }
 
     info!("vertices (url) with updated timestamp");

@@ -40,7 +40,11 @@ pub fn deserialize_ontol_vertex_address(value: Value) -> DomainResult<(PgRegKey,
         return Err(ds_bad_req("bad vertex type"));
     };
 
-    let Ok(address) = bincode::deserialize::<Address>(&seq.0) else {
+    deserialize_address(&seq.0)
+}
+
+pub fn deserialize_address(bincode: &[u8]) -> DomainResult<(PgRegKey, PgDataKey)> {
+    let Ok(address) = bincode::deserialize::<Address>(bincode) else {
         return Err(ds_bad_req("bad vertex encoding"));
     };
 

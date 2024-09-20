@@ -6,7 +6,7 @@ use ontol_runtime::{
     value::Value,
     DefId, OntolDefTag, PropId,
 };
-use tracing::{debug, warn};
+use tracing::debug;
 
 use crate::{
     pg_error::PgModelError,

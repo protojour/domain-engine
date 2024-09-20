@@ -7,6 +7,7 @@ use crate::gql_scalar::GqlScalar;
 use crate::juniper::{self, graphql_object, FieldResult};
 
 use ::juniper::FieldError;
+use base64::Engine;
 use domain_engine_core::domain_select::domain_select_no_edges;
 use domain_engine_core::search::VertexSearchParams;
 use domain_engine_core::transact::AccumulateSequences;
@@ -21,7 +22,7 @@ use ontol_runtime::query::order::Direction;
 use ontol_runtime::query::select::StructOrUnionSelect;
 use ontol_runtime::query::select::StructSelect;
 use ontol_runtime::query::select::{EntitySelect, Select};
-use ontol_runtime::value::Value;
+use ontol_runtime::value::{OctetSequence, Value};
 use ontol_runtime::{OntolDefTag, PropId};
 use serde::de::value::StringDeserializer;
 use serde::Deserialize;
@@ -116,6 +117,7 @@ impl Query {
         with_update_time: Option<bool>,
         with_attrs: Option<bool>,
         updated_after: Option<chrono::DateTime<chrono::Utc>>,
+        addresses: Option<Vec<String>>,
         order: Option<Vec<gql_vertex::VertexOrder>>,
         ctx: &OntologyCtx,
     ) -> FieldResult<gql_vertex::VertexConnection> {
@@ -161,6 +163,34 @@ impl Query {
                         )),
                     ),
                 );
+            }
+
+            if let Some(addresses) = addresses {
+                let set_var = condition.mk_cond_var();
+                condition.add_clause(
+                    root_var,
+                    Clause::MatchProp(
+                        OntolDefTag::RelationDataStoreAddress.prop_id_0(),
+                        SetOperator::ElementIn,
+                        set_var,
+                    ),
+                );
+                for address_base64 in addresses {
+                    let address = base64::engine::general_purpose::STANDARD
+                        .decode(&address_base64)
+                        .map_err(field_error)?;
+
+                    condition.add_clause(
+                        set_var,
+                        Clause::Member(
+                            CondTerm::Wildcard,
+                            CondTerm::Value(Value::OctetSequence(
+                                OctetSequence(address.into_iter().collect()),
+                                OntolDefTag::Vertex.def_id().into(),
+                            )),
+                        ),
+                    );
+                }
             }
         }
 
