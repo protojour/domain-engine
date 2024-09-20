@@ -11,6 +11,7 @@ use tantivy::{
     schema::{Facet, OwnedValue},
     TantivyDocument,
 };
+use tracing::debug;
 
 use crate::schema::SchemaWithMeta;
 
@@ -138,8 +139,12 @@ impl IndexingContext {
                             Attr::Unit(value) => {
                                 self.process_vertex(value, data);
                             }
-                            Attr::Tuple(_) => todo!(),
-                            Attr::Matrix(_) => todo!(),
+                            Attr::Tuple(_) => {
+                                debug!("TODO: tuple");
+                            }
+                            Attr::Matrix(_) => {
+                                debug!("TODO: matrix");
+                            }
                         },
                         DataRelationshipKind::Edge(_) => {}
                     }
