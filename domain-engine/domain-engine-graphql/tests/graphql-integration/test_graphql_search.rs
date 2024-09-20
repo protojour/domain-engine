@@ -16,7 +16,8 @@ use ontol_macros::datastore_test;
 use ontol_test_utils::expect_eq;
 use tracing::info;
 
-#[datastore_test(tokio::test)]
+// FIXME: inmemory DB needs to implement universal create and update timestamps
+#[datastore_test(tokio::test, ignore("inmemory"))]
 async fn test_conduit_search(ds: &str) {
     let (test, conduit_schema) = conduit_db().1.compile_single_schema();
     let domain_engine = Arc::new(

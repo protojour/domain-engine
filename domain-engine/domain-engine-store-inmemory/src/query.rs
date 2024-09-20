@@ -18,7 +18,7 @@ use tracing::{debug, debug_span, error};
 use domain_engine_core::{domain_error::DomainErrorKind, DomainError, DomainResult};
 
 use crate::{
-    core::{find_data_relationship, DbContext, DynamicKey, EdgeData, EdgeVectorData},
+    core::{DbContext, DynamicKey, EdgeData, EdgeVectorData},
     filter::FilterVal,
     sort::sort_props_vec,
 };
@@ -199,25 +199,27 @@ impl InMemoryStore {
                 continue;
             }
 
-            let data_relationship = find_data_relationship(def, prop_id)?;
+            if let Some(rel_info) = def.data_relationships.get(prop_id) {
+                let DataRelationshipKind::Edge(projection) = rel_info.kind else {
+                    continue;
+                };
 
-            let DataRelationshipKind::Edge(projection) = data_relationship.kind else {
-                continue;
-            };
-
-            match data_relationship.cardinality.1 {
-                ValueCardinality::Unit => {
-                    let matrix =
-                        self.sub_query_edge(projection, subselect, vertex_key, false, ctx)?;
-                    if let Some(row) = matrix.into_rows().next() {
-                        properties.insert(*prop_id, row.into());
+                match rel_info.cardinality.1 {
+                    ValueCardinality::Unit => {
+                        let matrix =
+                            self.sub_query_edge(projection, subselect, vertex_key, false, ctx)?;
+                        if let Some(row) = matrix.into_rows().next() {
+                            properties.insert(*prop_id, row.into());
+                        }
+                    }
+                    ValueCardinality::IndexSet | ValueCardinality::List => {
+                        let matrix =
+                            self.sub_query_edge(projection, subselect, vertex_key, true, ctx)?;
+                        properties.insert(*prop_id, Attr::Matrix(matrix));
                     }
                 }
-                ValueCardinality::IndexSet | ValueCardinality::List => {
-                    let matrix =
-                        self.sub_query_edge(projection, subselect, vertex_key, true, ctx)?;
-                    properties.insert(*prop_id, Attr::Matrix(matrix));
-                }
+            } else {
+                // TODO: need to match built-in properties like address and timestamps
             }
         }
 

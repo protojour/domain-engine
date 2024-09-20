@@ -25,7 +25,7 @@ use ontol_runtime::{
 };
 use tantivy::{IndexReader, IndexWriter, Term};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, trace};
+use tracing::{debug, error, info, trace};
 
 use crate::document::IndexingContext;
 
@@ -137,7 +137,7 @@ pub fn indexer_blocking_task(
         // FIXME: should commit also after a fixed number of iterations, or passed time,
         // or else there is a risk of never committing
         if vertex_rx.is_empty() {
-            debug!("committing index, {update_count} updated, {delete_count} deleted");
+            info!("committing index, {update_count} updated, {delete_count} deleted");
             index_writer.commit().unwrap();
             update_count = 0;
             delete_count = 0;

@@ -547,21 +547,19 @@ async fn test_ontology_stix(ds: &str) {
         );
 
         info!("fetch with addresses");
-        let with_address = format!(
-            r#"
-            query vertices($defId: DefId!) {{
+        let with_address = r#"
+            query vertices($defId: DefId!) {
                 vertices(
                     defId: $defId,
                     first: 100,
                     withAddress: true,
                     withDefId: false,
                     withAttrs: false,
-                ) {{
+                ) {
                     elements
-                }}
-            }}
+                }
+            }
             "#
-        )
         .exec(
             OntologyParams {
                 def_id: Some(url.graphql_def_id()),

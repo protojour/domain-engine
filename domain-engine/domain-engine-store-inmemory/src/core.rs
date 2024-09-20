@@ -239,10 +239,15 @@ pub(crate) fn find_data_relationship<'a>(
             keys = def.data_relationships.keys()
         );
 
-        DomainError::data_store_bad_request(format!(
+        panic!(
             "data relationship {def_id:?} -> {prop_id} does not exist",
             def_id = def.id
-        ))
+        );
+
+        // DomainError::data_store_bad_request(format!(
+        //     "data relationship {def_id:?} -> {prop_id} does not exist",
+        //     def_id = def.id
+        // ))
     })
 }
 
