@@ -7,7 +7,8 @@ use ontol_runtime::{
 };
 
 use crate::{
-    domain_error::DomainResult,
+    domain_error::{DomainErrorKind, DomainResult},
+    search::{VertexSearchParams, VertexSearchResults},
     system::ArcSystemApi,
     transact::{ReqMessage, RespMessage, TransactionMode},
     Session,
@@ -25,6 +26,12 @@ pub trait DataStoreAPI {
         messages: BoxStream<'static, DomainResult<ReqMessage>>,
         session: Session,
     ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>>;
+
+    /// Perform a vertex search.
+    #[allow(unused)]
+    async fn vertex_search(&self, params: VertexSearchParams) -> DomainResult<VertexSearchResults> {
+        Err(DomainErrorKind::NotImplemented("vertex search".to_string()).into_error())
+    }
 
     /// Returns whether the data store is currently working on building a search index in the background.
     ///

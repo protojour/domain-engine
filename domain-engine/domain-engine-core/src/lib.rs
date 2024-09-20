@@ -6,6 +6,7 @@ pub mod domain_select;
 pub mod entity_id_utils;
 pub mod filter;
 pub mod object_generator;
+pub mod search;
 pub mod system;
 pub mod transact;
 

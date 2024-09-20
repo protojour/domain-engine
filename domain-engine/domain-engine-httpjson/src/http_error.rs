@@ -109,9 +109,9 @@ pub fn domain_error_to_response(error: DomainError) -> http::Response<Body> {
             )),
         )
             .into_response(),
-        DomainErrorKind::NotImplemented => (
+        DomainErrorKind::NotImplemented(msg) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            json_error("not implemented"),
+            json_error(format!("not implemented: {msg}")),
         )
             .into_response(),
         DomainErrorKind::ImpureMapping => (
@@ -125,6 +125,9 @@ pub fn domain_error_to_response(error: DomainError) -> http::Response<Body> {
         )
             .into_response(),
         DomainErrorKind::DataStoreBadRequest(err) => {
+            (StatusCode::BAD_REQUEST, json_error(format!("{err:?}"))).into_response()
+        }
+        DomainErrorKind::Search(err) => {
             (StatusCode::BAD_REQUEST, json_error(format!("{err:?}"))).into_response()
         }
         DomainErrorKind::OntolVm(_) => {

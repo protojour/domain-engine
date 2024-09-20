@@ -130,13 +130,15 @@ pub enum DomainErrorKind {
     /// unresolved foreign keys, including: {0}
     UnresolvedForeignKeys(String),
     /// not implemented
-    NotImplemented,
+    NotImplemented(String),
     /// impure mapping where a pure mapping was expected
     ImpureMapping,
     /// datastore error: {0}
     DataStore(String),
     /// datastore bad request: {0}
     DataStoreBadRequest(String),
+    /// search error: {0}
+    Search(String),
     /// ontol data error: {0}
     OntolVm(VmError),
     /// serialization failed

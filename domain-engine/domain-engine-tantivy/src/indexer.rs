@@ -23,7 +23,7 @@ use ontol_runtime::{
     value::Value,
     DefId, OntolDefTag,
 };
-use tantivy::{IndexWriter, Term};
+use tantivy::{IndexReader, IndexWriter, Term};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, trace};
 
@@ -93,6 +93,7 @@ pub fn indexer_blocking_task(
     mut vertex_rx: tokio::sync::mpsc::Receiver<VertexMsg>,
     index_mutated: tokio::sync::watch::Sender<()>,
     mut index_writer: IndexWriter,
+    index_reader: IndexReader,
     indexer_running: Arc<AtomicBool>,
 ) {
     let mut update_count: usize = 0;
@@ -137,6 +138,10 @@ pub fn indexer_blocking_task(
             update_count = 0;
             delete_count = 0;
             indexer_running.store(false, Ordering::SeqCst);
+
+            if let Err(err) = index_reader.reload() {
+                error!("could not reload index reader: {err:?}");
+            }
 
             let _ = index_mutated.send(());
         }
