@@ -22,6 +22,8 @@ pub struct IndexingContext {
 
 pub struct Doc {
     pub vertex_addr: VertexAddr,
+    pub create_time: chrono::DateTime<chrono::Utc>,
+    pub update_time: chrono::DateTime<chrono::Utc>,
     pub doc: TantivyDocument,
 }
 
@@ -33,6 +35,8 @@ pub enum DocError {
     InvalidVertex,
     /// no address
     NoAddress,
+    /// no create time
+    NoCreateTime,
     /// no update time
     NoUpdateTime,
     /// update-time out of range
@@ -66,19 +70,24 @@ impl IndexingContext {
             OwnedValue::Bytes(vertex_addr.0.iter().copied().collect()),
         );
 
-        if let Some(Attr::Unit(Value::ChronoDateTime(timestamp, _))) =
+        let Some(Attr::Unit(Value::ChronoDateTime(create_time, _))) =
+            attrs.get(&OntolDefTag::CreateTime.prop_id_0())
+        else {
+            return Err(DocError::NoCreateTime);
+        };
+        let Some(Attr::Unit(Value::ChronoDateTime(update_time, _))) =
             attrs.get(&OntolDefTag::UpdateTime.prop_id_0())
-        {
-            if let Some(nanoseconds) = timestamp.timestamp_nanos_opt() {
-                doc.add_date(
-                    self.schema.update_time,
-                    tantivy::DateTime::from_timestamp_nanos(nanoseconds),
-                );
-            } else {
-                return Err(DocError::UpdateTimeOutOfRange);
-            }
-        } else {
+        else {
             return Err(DocError::NoUpdateTime);
+        };
+
+        if let Some(nanoseconds) = update_time.timestamp_nanos_opt() {
+            doc.add_date(
+                self.schema.update_time,
+                tantivy::DateTime::from_timestamp_nanos(nanoseconds),
+            );
+        } else {
+            return Err(DocError::UpdateTimeOutOfRange);
         }
 
         doc.add_field_value(
@@ -98,8 +107,10 @@ impl IndexingContext {
         doc.add_field_value(self.schema.text, OwnedValue::Str(data.text_concat));
 
         Ok(Doc {
-            doc,
             vertex_addr: vertex_addr.0.iter().copied().collect(),
+            create_time: *create_time,
+            update_time: *update_time,
+            doc,
         })
     }
 

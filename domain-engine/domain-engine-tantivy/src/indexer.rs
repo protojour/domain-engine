@@ -132,7 +132,7 @@ pub fn indexer_blocking_task(
         let work_tokens = match vertex_rx.blocking_recv() {
             Some(VertexMsg::Update(vertex, work_tokens)) => {
                 trace!("index update {:?}", vertex.type_def_id());
-                if let Err(err) = indexing_context.reindex(vertex, &mut index_writer) {
+                if let Err(err) = indexing_context.index(vertex, &mut index_writer) {
                     error!("document not reindexed: {err:?}");
                 }
 
@@ -183,14 +183,17 @@ pub fn indexer_blocking_task(
 }
 
 impl IndexingContext {
-    fn reindex(&self, vertex: Value, index_writer: &mut IndexWriter) -> anyhow::Result<()> {
+    fn index(&self, vertex: Value, index_writer: &mut IndexWriter) -> anyhow::Result<()> {
         let doc = self.make_vertex_doc(&vertex)?;
 
-        // update consists of deleting first
-        index_writer.delete_term(Term::from_field_bytes(
-            self.schema.vertex_addr,
-            &doc.vertex_addr,
-        ));
+        if doc.update_time > doc.create_time {
+            // an update must delete the previous document
+            index_writer.delete_term(Term::from_field_bytes(
+                self.schema.vertex_addr,
+                &doc.vertex_addr,
+            ));
+        }
+
         index_writer.add_document(doc.doc)?;
 
         Ok(())
@@ -229,6 +232,9 @@ impl Synrchonizer {
             OntolDefTag::RelationDataStoreAddress.prop_id_0(),
             Select::Unit,
         );
+        struct_select
+            .properties
+            .insert(OntolDefTag::CreateTime.prop_id_0(), Select::Unit);
         struct_select
             .properties
             .insert(OntolDefTag::UpdateTime.prop_id_0(), Select::Unit);
