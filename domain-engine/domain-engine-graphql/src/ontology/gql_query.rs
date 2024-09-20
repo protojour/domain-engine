@@ -268,10 +268,13 @@ impl Query {
 
         let results = data_store
             .api()
-            .vertex_search(VertexSearchParams {
-                query,
-                limit: limit.try_into().map_err(field_error)?,
-            })
+            .vertex_search(
+                VertexSearchParams {
+                    query,
+                    limit: limit.try_into().map_err(field_error)?,
+                },
+                ctx.session().clone(),
+            )
             .await
             .map_err(field_error)?;
 

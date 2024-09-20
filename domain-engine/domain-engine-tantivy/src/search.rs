@@ -3,7 +3,7 @@ use std::future::IntoFuture;
 use domain_engine_core::{
     domain_error::DomainErrorKind,
     search::{VertexSearchParams, VertexSearchResults},
-    DomainError, DomainResult, VertexAddr,
+    DomainError, DomainResult, Session, VertexAddr,
 };
 use ontol_runtime::DefId;
 use tantivy::{
@@ -66,6 +66,7 @@ impl TantivyDataStoreLayer {
     pub async fn vertex_search(
         &self,
         params: VertexSearchParams,
+        session: Session,
     ) -> DomainResult<VertexSearchResults> {
         let zelf = self.clone();
         let vertex_hits = tokio::task::spawn_blocking(move || zelf.blocking_vertex_search(params))
@@ -73,7 +74,7 @@ impl TantivyDataStoreLayer {
             .await
             .map_err(SearchError::Join)??;
 
-        self.fetch_vertex_results(vertex_hits).await
+        self.fetch_vertex_results(vertex_hits, session).await
     }
 
     fn blocking_vertex_search(&self, params: VertexSearchParams) -> DomainResult<Vec<VertexHit>> {

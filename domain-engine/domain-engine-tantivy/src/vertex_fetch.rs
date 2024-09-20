@@ -40,6 +40,7 @@ impl TantivyDataStoreLayer {
     pub async fn fetch_vertex_results(
         &self,
         vertex_hits: Vec<VertexHit>,
+        session: Session,
     ) -> DomainResult<VertexSearchResults> {
         let mut ordinal_by_addr: HashMap<VertexAddr, usize> =
             HashMap::with_capacity(vertex_hits.len());
@@ -59,7 +60,7 @@ impl TantivyDataStoreLayer {
             score: -1.0,
         });
 
-        for vertex in self.fetch_vertices_union(addr_by_def_id).await? {
+        for vertex in self.fetch_vertices_union(addr_by_def_id, session).await? {
             let Some(Attr::Unit(Value::OctetSequence(vertex_addr, _))) =
                 vertex.get_attribute(OntolDefTag::RelationDataStoreAddress.prop_id_0())
             else {
@@ -85,10 +86,11 @@ impl TantivyDataStoreLayer {
     async fn fetch_vertices_union(
         &self,
         addr_by_def_id: BTreeMap<DefId, Vec<VertexAddr>>,
+        session: Session,
     ) -> DomainResult<Vec<Value>> {
         let ds_futures: FuturesUnordered<_> = addr_by_def_id
             .into_iter()
-            .map(|(def_id, addresses)| self.fetch_vertices(def_id, addresses))
+            .map(|(def_id, addresses)| self.fetch_vertices(def_id, addresses, session.clone()))
             .collect();
 
         let vec_of_vecs: Vec<_> = ds_futures.try_collect().await?;
@@ -107,6 +109,7 @@ impl TantivyDataStoreLayer {
         &self,
         def_id: DefId,
         addresses: Vec<VertexAddr>,
+        session: Session,
     ) -> DomainResult<ThinVec<Value>> {
         let filter = {
             let mut filter = Filter::default_for_datastore();
@@ -166,7 +169,7 @@ impl TantivyDataStoreLayer {
             .transact(
                 TransactionMode::ReadOnly,
                 futures_util::stream::iter(messages).boxed(),
-                Session::default(),
+                session,
             )
             .await?
             .accumulate_sequences()

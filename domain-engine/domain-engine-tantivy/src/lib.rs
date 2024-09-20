@@ -86,8 +86,12 @@ impl DataStoreAPI for TantivyDataStoreLayer {
             .boxed())
     }
 
-    async fn vertex_search(&self, params: VertexSearchParams) -> DomainResult<VertexSearchResults> {
-        self.clone().vertex_search(params).await
+    async fn vertex_search(
+        &self,
+        params: VertexSearchParams,
+        session: Session,
+    ) -> DomainResult<VertexSearchResults> {
+        self.clone().vertex_search(params, session).await
     }
 
     fn background_search_indexer_running(&self) -> bool {

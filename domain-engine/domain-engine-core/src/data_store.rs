@@ -29,7 +29,11 @@ pub trait DataStoreAPI {
 
     /// Perform a vertex search.
     #[allow(unused)]
-    async fn vertex_search(&self, params: VertexSearchParams) -> DomainResult<VertexSearchResults> {
+    async fn vertex_search(
+        &self,
+        params: VertexSearchParams,
+        session: Session,
+    ) -> DomainResult<VertexSearchResults> {
         Err(DomainErrorKind::NotImplemented("vertex search".to_string()).into_error())
     }
 
