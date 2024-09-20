@@ -6,7 +6,7 @@ use ontol_runtime::{
     value::Value,
     DefId, OntolDefTag, PropId,
 };
-use tracing::warn;
+use tracing::{debug, warn};
 
 use crate::{
     pg_error::PgModelError,
@@ -134,7 +134,7 @@ impl<'a> TransactCtx<'a> {
             PgRepr::Unit => match self.ontology.try_produce_constant(target_def_id) {
                 Some(value) => Ok(Some(value)),
                 None => {
-                    warn!("can't produce a representation of constant unit {target_def_id:?}");
+                    debug!("can't produce a representation of constant unit {target_def_id:?}");
                     Ok(None)
                 }
             },
