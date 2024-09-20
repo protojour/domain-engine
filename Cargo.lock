@@ -1147,6 +1147,7 @@ dependencies = [
  "ontol-runtime",
  "ontol-test-utils",
  "pretty_assertions",
+ "smallvec 2.0.0-alpha.7",
  "tantivy",
  "thin-vec",
  "tokio",

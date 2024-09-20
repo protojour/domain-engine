@@ -62,8 +62,8 @@ impl DomainEngine {
         &self.datastore_mutated_signal
     }
 
-    pub fn index_mutated_signal(&self) -> &tokio::sync::watch::Receiver<()> {
-        &self.index_mutated_signal
+    pub fn index_mutated_signal(&self) -> tokio::sync::watch::Receiver<()> {
+        self.index_mutated_signal.clone()
     }
 
     pub fn get_data_store(&self) -> DomainResult<&DataStore> {

@@ -13,6 +13,7 @@ ontol-runtime.path = "../../ontol/ontol-runtime"
 domain-engine-core.path = "../domain-engine-core"
 tracing.workspace = true
 thin-vec.workspace = true
+smallvec.workspace = true
 async-trait = "0.1"
 anyhow = "1"
 chrono = "0.4"

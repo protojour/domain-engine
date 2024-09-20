@@ -148,6 +148,19 @@ impl domain_engine_core::FindEntitySelect for TestFindQuery {
     }
 }
 
+pub async fn await_search_indexer_queue_empty(domain_engine: &DomainEngine) {
+    while domain_engine
+        .get_data_store()
+        .unwrap()
+        .api()
+        .background_search_indexer_running()
+    {
+        let mut signal = domain_engine.index_mutated_signal();
+        signal.mark_unchanged();
+        signal.changed().await.unwrap();
+    }
+}
+
 pub mod system {
     use std::sync::{Arc, Mutex};
 

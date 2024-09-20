@@ -1,6 +1,4 @@
 use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use document::IndexingContext;
@@ -12,6 +10,7 @@ use domain_engine_core::{
     DomainResult, Session,
 };
 use futures_util::{stream::BoxStream, StreamExt};
+use indexer::WorkTracker;
 use indexer::{indexer_blocking_task, synchronizer_async_task, SyncQueue, Synrchonizer};
 use ontol_runtime::ontology::Ontology;
 use schema::{make_schema, SchemaWithMeta};
@@ -70,7 +69,7 @@ struct TantivyDataStoreLayer {
     schema: SchemaWithMeta,
     index: Index,
     index_reader: IndexReader,
-    indexer_running: Arc<AtomicBool>,
+    indexer_work_tracker: Arc<WorkTracker>,
 
     #[expect(unused)]
     /// Cancellation token for all indexing tasks.
@@ -113,7 +112,9 @@ impl DataStoreAPI for TantivyDataStoreLayer {
     }
 
     fn background_search_indexer_running(&self) -> bool {
-        self.indexer_running.load(Ordering::SeqCst)
+        let pending_work = self.indexer_work_tracker.count_ongoing_work();
+        debug!("client pending work: {pending_work}");
+        pending_work > 0
     }
 }
 
@@ -123,18 +124,18 @@ impl TantivyDataStoreLayer {
         let schema = make_schema();
 
         let indexer_cancel = config.cancel.child_token();
-        let indexer_running = Arc::new(AtomicBool::new(false));
+        let indexer_work_tracker = Arc::new(WorkTracker::default());
         let (notify_tx, notify_rx) = tokio::sync::watch::channel(());
         let (vertex_tx, vertex_rx) = tokio::sync::mpsc::channel(config.vertex_index_queue_size);
-        let sync_queue = SyncQueue::new(notify_tx, indexer_running.clone());
+        let sync_queue = SyncQueue::new(notify_tx, indexer_work_tracker.clone());
 
         let index = match &config.index_source {
             TantivyIndexSource::InMemory => Index::create_in_ram(schema.schema.clone()),
             TantivyIndexSource::MMapDir(path) => if path.exists() {
-                Index::open_in_dir(&path)
+                Index::open_in_dir(path)
             } else {
                 // TODO: Need to reindex if the schema changed
-                Index::create_in_dir(&path, schema.schema.clone())
+                Index::create_in_dir(path, schema.schema.clone())
             }
             .map_err(|err| {
                 DomainErrorKind::Search(format!(
@@ -184,8 +185,8 @@ impl TantivyDataStoreLayer {
         std::thread::Builder::new()
             .name("tantivy-indexer".to_string())
             .spawn({
-                let indexer_running = indexer_running.clone();
                 let index_reader = index_reader.clone();
+                let indexer_work_tracker = indexer_work_tracker.clone();
                 move || {
                     indexer_blocking_task(
                         indexing_context,
@@ -193,7 +194,7 @@ impl TantivyDataStoreLayer {
                         index_mutated,
                         index_writer,
                         index_reader,
-                        indexer_running,
+                        indexer_work_tracker,
                     );
                 }
             })
@@ -206,7 +207,7 @@ impl TantivyDataStoreLayer {
             index,
             index_reader,
             indexer_cancel_dropguard: Arc::new(indexer_cancel.drop_guard()),
-            indexer_running,
+            indexer_work_tracker,
         })
     }
 

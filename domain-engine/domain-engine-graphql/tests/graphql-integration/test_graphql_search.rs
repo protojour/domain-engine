@@ -6,6 +6,7 @@ use domain_engine_graphql::{
     ontology::{OntologyCtx, OntologySchema},
 };
 use domain_engine_test_utils::{
+    await_search_indexer_queue_empty,
     dynamic_data_store::DynamicDataStoreFactory,
     graphql_test_utils::{Exec, TestCompileSingletonSchema},
     system::mock_current_time_monotonic,
@@ -89,21 +90,7 @@ async fn test_conduit_search(ds: &str) {
     .unwrap();
 
     info!("awaiting index change..");
-
-    while domain_engine
-        .get_data_store()
-        .unwrap()
-        .api()
-        .background_search_indexer_running()
-    {
-        domain_engine
-            .index_mutated_signal()
-            .clone()
-            .changed()
-            .await
-            .unwrap();
-    }
-
+    await_search_indexer_queue_empty(&domain_engine).await;
     info!("done indexing");
 
     expect_eq!(
