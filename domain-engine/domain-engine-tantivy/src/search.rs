@@ -163,7 +163,7 @@ impl TantivyDataStoreLayer {
             let domain_ulid = path_iter.next().ok_or(SearchError::DocInvalidDomainDefId)?;
             let def_tag = path_iter.next().ok_or(SearchError::DocInvalidDomainDefId)?;
 
-            let Some(domain) = self.ontology.domain_by_id(
+            let Some(domain) = self.ontology().domain_by_id(
                 domain_ulid
                     .parse()
                     .map_err(|_| SearchError::DocInvalidDomainDefId)?,

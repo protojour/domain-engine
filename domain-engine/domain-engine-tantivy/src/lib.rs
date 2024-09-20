@@ -1,18 +1,18 @@
+use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::{collections::BTreeSet, sync::atomic::AtomicBool};
 
 use document::IndexingContext;
 use domain_engine_core::domain_error::DomainErrorKind;
 use domain_engine_core::search::{VertexSearchParams, VertexSearchResults};
 use domain_engine_core::{
-    data_store::{DataStoreAPI, DataStoreFactory, DataStoreFactorySync, DataStoreParams},
+    data_store::{DataStoreAPI, DataStoreParams},
     transact::{ReqMessage, RespMessage, TransactionMode},
     DomainResult, Session,
 };
 use futures_util::{stream::BoxStream, StreamExt};
 use indexer::{indexer_blocking_task, synchronizer_async_task, SyncQueue, Synrchonizer};
-use ontol_runtime::{ontology::Ontology, DomainIndex};
+use ontol_runtime::ontology::Ontology;
 use schema::{make_schema, SchemaWithMeta};
 use tantivy::{Index, IndexReader, ReloadPolicy};
 use tokio_util::sync::{CancellationToken, DropGuard};
@@ -24,34 +24,39 @@ mod schema;
 mod search;
 mod vertex_fetch;
 
-const INDEX_WRITER_MEM_LIMIT: usize = 50_000_000;
-
 #[derive(Clone)]
-pub struct TantivyParams {
+pub struct TantivyConfig {
+    /// Original datastore params from DomainEngine
+    pub data_store_params: DataStoreParams,
+
+    /// The wrapped datastore facade used for forwarding user-originating transactions
+    pub datastore: Arc<dyn DataStoreAPI + Send + Sync>,
+
+    /// Datastore facade used for indexing requests
+    ///
+    /// the reason this is a separate facade is that it can circumvent sequrity checks,
+    /// since indexing is an internal matter.
+    pub indexing_datastore: Arc<dyn DataStoreAPI + Send + Sync>,
+
     /// The number of vertices that can fit in the indexing queue
     pub vertex_index_queue_size: usize,
+
+    /// Max amount of memory used by the indexer
+    pub index_writer_mem_budget: usize,
+
+    /// Cancellation token for the indexer task
     pub cancel: CancellationToken,
 }
 
 pub fn make_tantivy_layer(
-    tantivy_params: TantivyParams,
-    data_store_params: DataStoreParams,
-    data_store: Arc<dyn DataStoreAPI + Send + Sync>,
+    config: TantivyConfig,
 ) -> DomainResult<Arc<dyn DataStoreAPI + Send + Sync>> {
-    let ontology = data_store_params.ontology.clone();
-    let index_mutated = data_store_params.index_mutated.clone();
-    Ok(Arc::new(TantivyDataStoreLayer::new(
-        data_store,
-        ontology,
-        index_mutated,
-        tantivy_params,
-    )?))
+    Ok(Arc::new(TantivyDataStoreLayer::new(config)?))
 }
 
 #[derive(Clone)]
 struct TantivyDataStoreLayer {
-    data_store: Arc<dyn DataStoreAPI + Send + Sync>,
-    ontology: Arc<Ontology>,
+    config: TantivyConfig,
     sync_queue: Arc<SyncQueue>,
     schema: SchemaWithMeta,
     index: Index,
@@ -72,7 +77,11 @@ impl DataStoreAPI for TantivyDataStoreLayer {
         messages: BoxStream<'static, DomainResult<ReqMessage>>,
         session: Session,
     ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
-        let resp_messages = self.data_store.transact(mode, messages, session).await?;
+        let resp_messages = self
+            .config
+            .datastore
+            .transact(mode, messages, session)
+            .await?;
         let sync_queue = self.sync_queue.clone();
 
         Ok(resp_messages
@@ -100,24 +109,19 @@ impl DataStoreAPI for TantivyDataStoreLayer {
 }
 
 impl TantivyDataStoreLayer {
-    fn new(
-        data_store: Arc<dyn DataStoreAPI + Send + Sync>,
-        ontology: Arc<Ontology>,
-        index_mutated: tokio::sync::watch::Sender<()>,
-        params: TantivyParams,
-    ) -> DomainResult<Self> {
+    fn new(config: TantivyConfig) -> DomainResult<Self> {
         debug!("TantivyDataStoreLayer::new");
         let schema = make_schema();
 
-        let indexer_cancel = params.cancel.child_token();
+        let indexer_cancel = config.cancel.child_token();
         let indexer_running = Arc::new(AtomicBool::new(false));
         let (notify_tx, notify_rx) = tokio::sync::watch::channel(());
-        let (vertex_tx, vertex_rx) = tokio::sync::mpsc::channel(params.vertex_index_queue_size);
+        let (vertex_tx, vertex_rx) = tokio::sync::mpsc::channel(config.vertex_index_queue_size);
         let sync_queue = SyncQueue::new(notify_tx, indexer_running.clone());
 
         let index = Index::create_in_ram(schema.schema.clone());
         let index_writer = index
-            .writer(INDEX_WRITER_MEM_LIMIT)
+            .writer(config.index_writer_mem_budget)
             .map_err(|err| DomainErrorKind::Search(format!("writer init error: {err:?}")))?;
         let index_reader = index
             .reader_builder()
@@ -130,8 +134,8 @@ impl TantivyDataStoreLayer {
             let indexer_queue = sync_queue.clone();
             let indexer_cancel = indexer_cancel.clone();
             let synchronizer = Synrchonizer {
-                ontology: ontology.clone(),
-                data_store: data_store.clone(),
+                ontology: config.data_store_params.ontology.clone(),
+                data_store: config.indexing_datastore.clone(),
                 vertex_tx,
             };
             async move {
@@ -146,9 +150,11 @@ impl TantivyDataStoreLayer {
         });
 
         let indexing_context = IndexingContext {
-            ontology: ontology.clone(),
+            ontology: config.data_store_params.ontology.clone(),
             schema: schema.clone(),
         };
+
+        let index_mutated = config.data_store_params.index_mutated.clone();
 
         // real indexer task
         std::thread::Builder::new()
@@ -170,8 +176,7 @@ impl TantivyDataStoreLayer {
             .unwrap();
 
         Ok(Self {
-            data_store,
-            ontology,
+            config,
             sync_queue,
             schema,
             index,
@@ -180,44 +185,8 @@ impl TantivyDataStoreLayer {
             indexer_running,
         })
     }
-}
 
-pub struct TantivyDataStoreFactoryLayer<F> {
-    inner: F,
-    params: TantivyParams,
-}
-
-impl<F> TantivyDataStoreFactoryLayer<F> {
-    pub fn new(inner: F, params: TantivyParams) -> Self {
-        Self { inner, params }
-    }
-}
-
-#[async_trait::async_trait]
-impl<F: DataStoreFactory + Send + Sync> DataStoreFactory for TantivyDataStoreFactoryLayer<F> {
-    async fn new_api(
-        &self,
-        persisted: &BTreeSet<DomainIndex>,
-        params: DataStoreParams,
-    ) -> DomainResult<Arc<dyn DataStoreAPI + Send + Sync>> {
-        make_tantivy_layer(
-            self.params.clone(),
-            params.clone(),
-            self.inner.new_api(persisted, params).await?,
-        )
-    }
-}
-
-impl<F: DataStoreFactorySync> DataStoreFactorySync for TantivyDataStoreFactoryLayer<F> {
-    fn new_api_sync(
-        &self,
-        persisted: &BTreeSet<DomainIndex>,
-        params: DataStoreParams,
-    ) -> DomainResult<Arc<dyn DataStoreAPI + Send + Sync>> {
-        make_tantivy_layer(
-            self.params.clone(),
-            params.clone(),
-            self.inner.new_api_sync(persisted, params)?,
-        )
+    pub fn ontology(&self) -> &Ontology {
+        &self.config.data_store_params.ontology
     }
 }

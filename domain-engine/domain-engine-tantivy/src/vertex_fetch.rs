@@ -140,7 +140,7 @@ impl TantivyDataStoreLayer {
             filter
         };
 
-        let Select::Struct(mut struct_select) = domain_select_no_edges(def_id, &self.ontology)
+        let Select::Struct(mut struct_select) = domain_select_no_edges(def_id, self.ontology())
         else {
             panic!("domain select of vertex must be Struct");
         };
@@ -165,7 +165,8 @@ impl TantivyDataStoreLayer {
         ))];
 
         let sequences: Vec<_> = self
-            .data_store
+            .config
+            .datastore
             .transact(
                 TransactionMode::ReadOnly,
                 futures_util::stream::iter(messages).boxed(),

@@ -6,7 +6,7 @@ use domain_engine_core::{
     DomainResult,
 };
 use domain_engine_store_inmemory::InMemoryDataStoreFactory;
-use domain_engine_tantivy::{make_tantivy_layer, TantivyParams};
+use domain_engine_tantivy::{make_tantivy_layer, TantivyConfig};
 use ontol_runtime::DomainIndex;
 use tracing::error;
 
@@ -42,14 +42,14 @@ impl DynamicDataStoreFactory {
         params: DataStoreParams,
     ) -> DomainResult<Arc<dyn DataStoreAPI + Send + Sync>> {
         if self.tantivy_index {
-            make_tantivy_layer(
-                TantivyParams {
-                    cancel: Default::default(),
-                    vertex_index_queue_size: 64,
-                },
-                params,
-                inner,
-            )
+            make_tantivy_layer(TantivyConfig {
+                data_store_params: params,
+                datastore: inner.clone(),
+                indexing_datastore: inner.clone(),
+                vertex_index_queue_size: 64,
+                index_writer_mem_budget: 50_000_000,
+                cancel: Default::default(),
+            })
         } else {
             Ok(inner)
         }
