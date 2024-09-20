@@ -1148,6 +1148,7 @@ dependencies = [
  "ontol-test-utils",
  "pretty_assertions",
  "tantivy",
+ "thin-vec",
  "tokio",
  "tokio-util",
  "tracing",

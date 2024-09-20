@@ -21,6 +21,7 @@ mod document;
 mod indexer;
 mod schema;
 mod search;
+mod vertex_fetch;
 
 const INDEX_WRITER_MEM_LIMIT: usize = 50_000_000;
 
