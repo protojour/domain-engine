@@ -60,7 +60,6 @@ impl DataStore {
     }
 }
 
-#[non_exhaustive]
 #[derive(Clone)]
 pub struct DataStoreParams {
     pub config: DataStoreConfig,
