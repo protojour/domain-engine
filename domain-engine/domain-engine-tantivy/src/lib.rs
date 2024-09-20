@@ -15,7 +15,8 @@ use indexer::{indexer_blocking_task, synchronizer_async_task, SyncQueue, Synrcho
 use ontol_runtime::{ontology::Ontology, DomainIndex};
 use schema::{make_schema, SchemaWithMeta};
 use tantivy::{Index, IndexReader, ReloadPolicy};
-use tokio_util::sync::CancellationToken;
+use tokio_util::sync::{CancellationToken, DropGuard};
+use tracing::debug;
 
 mod document;
 mod indexer;
@@ -57,9 +58,10 @@ struct TantivyDataStoreLayer {
     index_reader: IndexReader,
     indexer_running: Arc<AtomicBool>,
 
+    #[expect(unused)]
     /// Cancellation token for all indexing tasks.
     /// Cancelling happens automatically upon dropping the layer (Drop impl).
-    indexer_cancel: CancellationToken,
+    indexer_cancel_dropguard: Arc<DropGuard>,
 }
 
 #[async_trait::async_trait]
@@ -100,6 +102,7 @@ impl TantivyDataStoreLayer {
         index_mutated: tokio::sync::watch::Sender<()>,
         params: TantivyParams,
     ) -> DomainResult<Self> {
+        debug!("TantivyDataStoreLayer::new");
         let schema = make_schema();
 
         let indexer_cancel = params.cancel.child_token();
@@ -169,15 +172,9 @@ impl TantivyDataStoreLayer {
             schema,
             index,
             index_reader,
-            indexer_cancel,
+            indexer_cancel_dropguard: Arc::new(indexer_cancel.drop_guard()),
             indexer_running,
         })
-    }
-}
-
-impl Drop for TantivyDataStoreLayer {
-    fn drop(&mut self) {
-        self.indexer_cancel.cancel();
     }
 }
 

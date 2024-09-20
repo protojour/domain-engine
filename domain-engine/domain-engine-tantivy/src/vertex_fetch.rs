@@ -32,7 +32,7 @@ enum FetchError {
 impl From<FetchError> for DomainError {
     fn from(value: FetchError) -> Self {
         warn!("fetch error: {value}");
-        DomainErrorKind::Search(format!("fetch error")).into_error()
+        DomainErrorKind::Search("fetch error".to_string()).into_error()
     }
 }
 
@@ -54,10 +54,14 @@ impl TantivyDataStoreLayer {
         }
 
         let mut search_results: Vec<VertexSearchResult> = Vec::with_capacity(vertex_hits.len());
+        search_results.resize_with(vertex_hits.len(), || VertexSearchResult {
+            vertex: Value::unit(),
+            score: -1.0,
+        });
 
         for vertex in self.fetch_vertices_union(addr_by_def_id).await? {
             let Some(Attr::Unit(Value::OctetSequence(vertex_addr, _))) =
-                vertex.get_attribute(OntolDefTag::Vertex.prop_id_0())
+                vertex.get_attribute(OntolDefTag::RelationDataStoreAddress.prop_id_0())
             else {
                 return Err(FetchError::NoVertexAddress.into());
             };
@@ -67,10 +71,6 @@ impl TantivyDataStoreLayer {
                 continue;
             };
 
-            search_results.resize_with(ordinal + 1, || VertexSearchResult {
-                vertex: Value::unit(),
-                score: -1.0,
-            });
             search_results[*ordinal] = VertexSearchResult {
                 vertex,
                 score: vertex_hits[*ordinal].score,
@@ -95,8 +95,8 @@ impl TantivyDataStoreLayer {
 
         let mut ret = vec![];
         for vec in vec_of_vecs {
-            for value in vec {
-                ret.push(value);
+            for vertex in vec {
+                ret.push(vertex);
             }
         }
 
@@ -142,9 +142,10 @@ impl TantivyDataStoreLayer {
             panic!("domain select of vertex must be Struct");
         };
 
-        struct_select
-            .properties
-            .insert(OntolDefTag::Vertex.prop_id_0(), Select::Unit);
+        struct_select.properties.insert(
+            OntolDefTag::RelationDataStoreAddress.prop_id_0(),
+            Select::Unit,
+        );
         struct_select
             .properties
             .insert(OntolDefTag::UpdateTime.prop_id_0(), Select::Unit);

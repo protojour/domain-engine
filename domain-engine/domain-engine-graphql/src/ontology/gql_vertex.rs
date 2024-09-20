@@ -16,6 +16,20 @@ pub struct VertexConnection {
 }
 
 #[derive(GraphQLObject)]
+#[graphql(context = OntologyCtx, scalar = GqlScalar)]
+pub struct VertexSearchConnection {
+    pub results: Vec<VertexSearchResult>,
+    pub page_info: Option<PageInfo>,
+}
+
+#[derive(GraphQLObject)]
+#[graphql(context = OntologyCtx, scalar = GqlScalar)]
+pub struct VertexSearchResult {
+    pub vertex: gql_value::OntolValue,
+    pub score: f64,
+}
+
+#[derive(GraphQLObject)]
 #[graphql(context = OntologyCtx)]
 pub struct PageInfo {
     pub has_next_page: bool,

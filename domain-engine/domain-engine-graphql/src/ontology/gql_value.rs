@@ -19,6 +19,7 @@ pub struct ValueScalarCfg {
     pub with_def_id: bool,
     pub with_create_time: bool,
     pub with_update_time: bool,
+    pub with_attrs: bool,
 }
 
 #[derive(juniper::GraphQLScalar)]
@@ -240,13 +241,15 @@ pub fn write_ontol_scalar(
                         .collect();
                     sorted.sort_by_key(|(prop_id, _)| *prop_id);
 
-                    let mut gattrs = Vec::with_capacity(sorted.len());
+                    if cfg.with_attrs {
+                        let mut gattrs = Vec::with_capacity(sorted.len());
 
-                    for (prop_id, attr) in sorted {
-                        gattrs.push(ontol_attr_to_scalar(prop_id, attr, cfg, ctx)?);
+                        for (prop_id, attr) in sorted {
+                            gattrs.push(ontol_attr_to_scalar(prop_id, attr, cfg, ctx)?);
+                        }
+
+                        gobj.add_field("attrs", juniper::Value::list(gattrs));
                     }
-
-                    gobj.add_field("attrs", juniper::Value::list(gattrs));
                 }
             }
         }

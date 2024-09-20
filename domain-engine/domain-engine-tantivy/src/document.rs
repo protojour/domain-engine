@@ -32,6 +32,8 @@ pub enum DocError {
     InvalidVertex,
     /// no address
     NoAddress,
+    /// no update time
+    NoUpdateTime,
     /// update-time out of range
     UpdateTimeOutOfRange,
 }
@@ -74,6 +76,8 @@ impl IndexingContext {
             } else {
                 return Err(DocError::UpdateTimeOutOfRange);
             }
+        } else {
+            return Err(DocError::NoUpdateTime);
         }
 
         doc.add_field_value(

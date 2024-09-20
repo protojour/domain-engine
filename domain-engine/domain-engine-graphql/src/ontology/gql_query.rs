@@ -6,7 +6,9 @@ use crate::field_error;
 use crate::gql_scalar::GqlScalar;
 use crate::juniper::{self, graphql_object, FieldResult};
 
+use ::juniper::FieldError;
 use domain_engine_core::domain_select::domain_select_no_edges;
+use domain_engine_core::search::VertexSearchParams;
 use domain_engine_core::transact::AccumulateSequences;
 use domain_engine_core::transact::ReqMessage;
 use domain_engine_core::transact::TransactionMode;
@@ -28,7 +30,7 @@ use ulid::Ulid;
 use super::gql_dictionary;
 use super::gql_dictionary::DefDictionaryEntry;
 use super::gql_domain;
-use super::gql_value::ValueScalarCfg;
+use super::gql_value::{write_ontol_scalar, OntolValue, ValueScalarCfg};
 use super::gql_vertex::{self, VertexOrderDirection};
 use super::OntologyCtx;
 use super::{gql_def, gql_id};
@@ -112,6 +114,7 @@ impl Query {
         with_def_id: Option<bool>,
         with_create_time: Option<bool>,
         with_update_time: Option<bool>,
+        with_attrs: Option<bool>,
         updated_after: Option<chrono::DateTime<chrono::Utc>>,
         order: Option<Vec<gql_vertex::VertexOrder>>,
         ctx: &OntologyCtx,
@@ -127,6 +130,7 @@ impl Query {
             with_def_id: with_def_id.unwrap_or(true),
             with_create_time: with_create_time.unwrap_or(false),
             with_update_time: with_update_time.unwrap_or(false),
+            with_attrs: with_attrs.unwrap_or(true),
         };
 
         let mut filter = Filter::default_for_datastore();
@@ -250,5 +254,52 @@ impl Query {
             .ok_or_else(|| field_error("nothing returned"))?;
 
         gql_vertex::VertexConnection::from_sequence(sequence, cfg, ctx)
+    }
+
+    async fn vertex_search(
+        query: Option<String>,
+        limit: i32,
+        with_address: Option<bool>,
+        with_def_id: Option<bool>,
+        with_attrs: Option<bool>,
+        ctx: &OntologyCtx,
+    ) -> FieldResult<gql_vertex::VertexSearchConnection> {
+        let data_store = ctx.data_store().map_err(field_error)?;
+
+        let results = data_store
+            .api()
+            .vertex_search(VertexSearchParams {
+                query,
+                limit: limit.try_into().map_err(field_error)?,
+            })
+            .await
+            .map_err(field_error)?;
+
+        let value_scalar_cfg = ValueScalarCfg {
+            with_address: with_address.unwrap_or(true),
+            with_def_id: with_def_id.unwrap_or(true),
+            with_create_time: true,
+            with_update_time: true,
+            with_attrs: with_attrs.unwrap_or(true),
+        };
+
+        Ok(gql_vertex::VertexSearchConnection {
+            results: results
+                .results
+                .into_iter()
+                .map(|result| {
+                    let mut gobj = juniper::Object::with_capacity(3);
+                    let vertex =
+                        write_ontol_scalar(&mut gobj, result.vertex, value_scalar_cfg, ctx)
+                            .map(|()| OntolValue(juniper::Value::Object(gobj)))?;
+
+                    Ok::<_, FieldError>(gql_vertex::VertexSearchResult {
+                        vertex,
+                        score: result.score.into(),
+                    })
+                })
+                .collect::<Result<_, _>>()?,
+            page_info: None,
+        })
     }
 }

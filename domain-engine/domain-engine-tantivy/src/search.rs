@@ -9,20 +9,18 @@ use ontol_runtime::DefId;
 use tantivy::{
     collector::TopDocs,
     query::{AllQuery, QueryParser, QueryParserError},
-    schema::OwnedValue,
-    DateTime, DocAddress, Order, Searcher, TantivyDocument, TantivyError,
+    DateTime, DocAddress, Order, Searcher, TantivyError,
 };
 use tokio::task::JoinError;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 use crate::TantivyDataStoreLayer;
 
+#[derive(Debug)]
 pub struct VertexHit {
     pub ordinal: usize,
     pub vertex_addr: VertexAddr,
     pub def_id: DefId,
-    #[expect(unused)]
-    pub update_time: tantivy::DateTime,
     pub score: f32,
 }
 
@@ -38,16 +36,16 @@ enum SearchError {
     Join(JoinError),
     /// search: {0}
     Search(TantivyError),
-    /// document fetch: {0}
-    DocumentFetch(TantivyError),
+    /// fast field failed
+    FastFieldFailed,
+    /// fast field not present
+    FastFieldNotPresent,
     /// doc is missing vertex address
     DocMissingVertexAddress,
     /// doc is missing domain def id
     DocMissingDomainDefId,
     /// doc has invalid domain def id
     DocInvalidDomainDefId,
-    /// doc has invalid update time
-    DocInvalidUpdateTime,
 }
 
 impl From<SearchInputError> for DomainError {
@@ -84,7 +82,7 @@ impl TantivyDataStoreLayer {
         if let Some(query) = params.query.as_deref() {
             let query_parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
             let query = query_parser
-                .parse_query(&query)
+                .parse_query(query)
                 .map_err(SearchInputError::Parse)?;
 
             let hits = searcher
@@ -110,16 +108,17 @@ impl TantivyDataStoreLayer {
         hits: Vec<(S, DocAddress)>,
         searcher: &Searcher,
     ) -> DomainResult<Vec<VertexHit>> {
+        debug!("got {} hits", hits.len());
+
         let mut vertex_hits = Vec::with_capacity(hits.len());
 
         for (score_source, doc_address) in hits {
-            let doc = searcher
-                .doc::<TantivyDocument>(doc_address)
-                .map_err(SearchError::DocumentFetch)?;
-
-            if let Some(vertex_hit) =
-                self.parse_vertex_hit(&doc, score_source.to_score(), vertex_hits.len())?
-            {
+            if let Some(vertex_hit) = self.parse_vertex_hit(
+                doc_address,
+                score_source.to_score(),
+                vertex_hits.len(),
+                searcher,
+            )? {
                 vertex_hits.push(vertex_hit);
             }
         }
@@ -129,26 +128,36 @@ impl TantivyDataStoreLayer {
 
     fn parse_vertex_hit(
         &self,
-        doc: &TantivyDocument,
+        doc_address: DocAddress,
         score: f32,
         ordinal: usize,
+        searcher: &Searcher,
     ) -> DomainResult<Option<VertexHit>> {
-        let OwnedValue::Bytes(vertex_address) = doc
-            .get_first(self.schema.vertex_addr)
-            .ok_or(SearchError::DocMissingVertexAddress)?
-        else {
-            panic!("vertex address must be bytes");
-        };
+        let segment_reader = searcher.segment_reader(doc_address.segment_ord);
+
+        let vertex_addr_ff = segment_reader
+            .fast_fields()
+            .bytes("vertex_addr")
+            .map_err(|_| SearchError::FastFieldFailed)?
+            .ok_or(SearchError::FastFieldNotPresent)?;
+        let domain_def_id_ff = segment_reader
+            .fast_fields()
+            .str("domain_def_id")
+            .map_err(|_| SearchError::FastFieldFailed)?
+            .ok_or(SearchError::FastFieldNotPresent)?;
+
+        let mut vertex_addr = Vec::with_capacity(VertexAddr::inline_size());
+        vertex_addr_ff
+            .ord_to_bytes(doc_address.doc_id.into(), &mut vertex_addr)
+            .map_err(|_| SearchError::DocMissingVertexAddress)?;
 
         let def_id = {
-            let OwnedValue::Facet(domain_def_id_facet) =
-                doc.get_first(self.schema.domain_def_id)
-                    .ok_or(SearchError::DocMissingDomainDefId)?
-            else {
-                panic!("domain def id must be a facet");
-            };
+            let mut domain_def_id = String::new();
+            domain_def_id_ff
+                .ord_to_str(doc_address.doc_id.into(), &mut domain_def_id)
+                .map_err(|_| SearchError::DocMissingDomainDefId)?;
 
-            let mut path_iter = domain_def_id_facet.to_path().into_iter();
+            let mut path_iter = domain_def_id.split('\0');
 
             let domain_ulid = path_iter.next().ok_or(SearchError::DocInvalidDomainDefId)?;
             let def_tag = path_iter.next().ok_or(SearchError::DocInvalidDomainDefId)?;
@@ -170,18 +179,10 @@ impl TantivyDataStoreLayer {
             DefId(domain.def_id().domain_index(), def_tag)
         };
 
-        let OwnedValue::Date(update_time) = doc
-            .get_first(self.schema.update_time)
-            .ok_or(SearchError::DocInvalidUpdateTime)?
-        else {
-            panic!("update time must be date");
-        };
-
         Ok(Some(VertexHit {
             ordinal,
-            vertex_addr: vertex_address.iter().copied().collect(),
+            vertex_addr: vertex_addr.into_iter().collect(),
             def_id,
-            update_time: update_time.clone(),
             score,
         }))
     }

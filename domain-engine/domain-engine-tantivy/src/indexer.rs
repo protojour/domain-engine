@@ -122,10 +122,14 @@ pub fn indexer_blocking_task(
 
                 delete_count += 1;
             }
-            Some(VertexMsg::Cancel) | None => {
+            Some(VertexMsg::Cancel) => {
                 indexer_running.store(false, Ordering::SeqCst);
-
-                debug!("indexer task killed");
+                debug!("indexer task cancelled");
+                return;
+            }
+            None => {
+                indexer_running.store(false, Ordering::SeqCst);
+                debug!("indexer task killed: message queue closed");
                 return;
             }
         }
@@ -180,10 +184,19 @@ impl Synrchonizer {
     }
 
     async fn sync_updates(&self, update: &UpdateSyncMsg) {
-        let Select::Struct(struct_select) = domain_select_no_edges(update.def_id, &self.ontology)
+        let Select::Struct(mut struct_select) =
+            domain_select_no_edges(update.def_id, &self.ontology)
         else {
             return;
         };
+
+        struct_select.properties.insert(
+            OntolDefTag::RelationDataStoreAddress.prop_id_0(),
+            Select::Unit,
+        );
+        struct_select
+            .properties
+            .insert(OntolDefTag::UpdateTime.prop_id_0(), Select::Unit);
 
         let filter = {
             let mut filter = Filter::default_for_datastore();
