@@ -77,7 +77,7 @@ impl TantivyDataStoreLayer {
         }
 
         Ok(VertexSearchResults {
-            results: search_results.into_iter().filter_map(|opt| opt).collect(),
+            results: search_results.into_iter().flatten().collect(),
         })
     }
 
