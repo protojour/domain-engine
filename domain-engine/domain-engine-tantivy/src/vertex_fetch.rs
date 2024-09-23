@@ -7,7 +7,7 @@ use domain_engine_core::{
     transact::{AccumulateSequences, ReqMessage, TransactionMode},
     DomainError, DomainResult, Session, VertexAddr,
 };
-use futures_util::{stream::FuturesUnordered, StreamExt, TryStreamExt};
+use futures_util::{stream::FuturesUnordered, StreamExt};
 use ontol_runtime::{
     attr::Attr,
     query::{
@@ -54,11 +54,9 @@ impl TantivyDataStoreLayer {
                 .push(hit.vertex_addr.clone());
         }
 
-        let mut search_results: Vec<VertexSearchResult> = Vec::with_capacity(vertex_hits.len());
-        search_results.resize_with(vertex_hits.len(), || VertexSearchResult {
-            vertex: Value::unit(),
-            score: -1.0,
-        });
+        let mut search_results: Vec<Option<VertexSearchResult>> =
+            Vec::with_capacity(vertex_hits.len());
+        search_results.resize_with(vertex_hits.len(), || None);
 
         for vertex in self.fetch_vertices_union(addr_by_def_id, session).await? {
             let Some(Attr::Unit(Value::OctetSequence(vertex_addr, _))) =
@@ -72,14 +70,14 @@ impl TantivyDataStoreLayer {
                 continue;
             };
 
-            search_results[*ordinal] = VertexSearchResult {
+            search_results[*ordinal] = Some(VertexSearchResult {
                 vertex,
                 score: vertex_hits[*ordinal].score,
-            };
+            });
         }
 
         Ok(VertexSearchResults {
-            results: search_results,
+            results: search_results.into_iter().filter_map(|opt| opt).collect(),
         })
     }
 
@@ -88,17 +86,30 @@ impl TantivyDataStoreLayer {
         addr_by_def_id: BTreeMap<DefId, Vec<VertexAddr>>,
         session: Session,
     ) -> DomainResult<Vec<Value>> {
-        let ds_futures: FuturesUnordered<_> = addr_by_def_id
+        let mut ds_futures: FuturesUnordered<_> = addr_by_def_id
             .into_iter()
             .map(|(def_id, addresses)| self.fetch_vertices(def_id, addresses, session.clone()))
             .collect();
 
-        let vec_of_vecs: Vec<_> = ds_futures.try_collect().await?;
-
         let mut ret = vec![];
-        for vec in vec_of_vecs {
-            for vertex in vec {
-                ret.push(vertex);
+
+        while let Some(result) = ds_futures.next().await {
+            match result {
+                Ok(vec) => {
+                    for vertex in vec {
+                        ret.push(vertex);
+                    }
+                }
+                Err(err) => {
+                    match err.kind() {
+                        DomainErrorKind::Unauthorized => {
+                            // silently filtered out
+                        }
+                        _ => {
+                            return Err(err);
+                        }
+                    }
+                }
             }
         }
 
