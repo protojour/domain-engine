@@ -14,6 +14,7 @@ use indexer::WorkTracker;
 use indexer::{indexer_blocking_task, synchronizer_async_task, SyncQueue, Synrchonizer};
 use ontol_runtime::ontology::Ontology;
 use schema::{make_schema, SchemaWithMeta};
+use tantivy::directory::MmapDirectory;
 use tantivy::tokenizer::{Language, LowerCaser, SimpleTokenizer, Stemmer, TextAnalyzer};
 use tantivy::{Index, IndexReader, ReloadPolicy};
 use tokio_util::sync::{CancellationToken, DropGuard};
@@ -139,18 +140,16 @@ impl TantivyDataStoreLayer {
 
         let index = match &config.index_source {
             TantivyIndexSource::InMemory => Index::create_in_ram(schema.schema.clone()),
-            TantivyIndexSource::MMapDir(path) => if path.exists() {
-                Index::open_in_dir(path)
-            } else {
-                // TODO: Need to reindex if the schema changed
-                Index::create_in_dir(path, schema.schema.clone())
+            TantivyIndexSource::MMapDir(path) => {
+                let mmap_dir = MmapDirectory::open(path)
+                    .map_err(|_| DomainErrorKind::Search(format!("could not open dir {path:?}")))?;
+                Index::open_or_create(mmap_dir, schema.schema.clone()).map_err(|err| {
+                    DomainErrorKind::Search(format!(
+                        "unable to open index at path {path}: {err:?}",
+                        path = path.display()
+                    ))
+                })?
             }
-            .map_err(|err| {
-                DomainErrorKind::Search(format!(
-                    "unable to open index at path {path}: {err:?}",
-                    path = path.display()
-                ))
-            })?,
         };
 
         index.tokenizers().register(TOKENIZER_NAME, tokenizer);
