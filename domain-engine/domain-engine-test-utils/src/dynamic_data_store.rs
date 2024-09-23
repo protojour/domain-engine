@@ -164,6 +164,7 @@ mod pg {
     use domain_engine_store_pg::{connect_and_migrate, recreate_database, PostgresHandle};
     use domain_engine_store_pg::{deadpool_postgres, tokio_postgres, PostgresDataStore};
     use futures_util::stream::BoxStream;
+    use ontol_runtime::PropId;
     use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
     /// Make sure not to overwhelm the test postgres instance.
@@ -208,6 +209,10 @@ mod pg {
             session: Session,
         ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
             self.handle.transact(mode, messages, session).await
+        }
+
+        fn stable_property_index(&self, prop_id: PropId) -> Option<u32> {
+            self.handle.stable_property_index(prop_id)
         }
     }
 

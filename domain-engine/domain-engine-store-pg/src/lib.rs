@@ -10,7 +10,7 @@ use domain_engine_core::{
     DomainResult, Session,
 };
 use futures_util::stream::BoxStream;
-use ontol_runtime::{ontology::Ontology, DomainIndex};
+use ontol_runtime::{ontology::Ontology, DomainIndex, PropId};
 use tokio_postgres::NoTls;
 
 pub use pg_model::PgModel;
@@ -110,6 +110,10 @@ impl DataStoreAPI for PostgresHandle {
             self.store.datastore_mutated.clone(),
         )
         .await
+    }
+
+    fn stable_property_index(&self, prop_id: PropId) -> Option<u32> {
+        self.store.pg_model.stable_property_index(prop_id)
     }
 }
 

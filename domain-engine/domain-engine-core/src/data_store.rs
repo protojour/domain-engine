@@ -3,7 +3,7 @@ use std::{collections::BTreeSet, sync::Arc};
 use futures_util::stream::BoxStream;
 use ontol_runtime::{
     ontology::{config::DataStoreConfig, Ontology},
-    DomainIndex,
+    DomainIndex, PropId,
 };
 
 use crate::{
@@ -28,7 +28,7 @@ pub trait DataStoreAPI {
     ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>>;
 
     /// Perform a vertex search.
-    #[allow(unused)]
+    #[expect(unused)]
     async fn vertex_search(
         &self,
         params: VertexSearchParams,
@@ -42,6 +42,11 @@ pub trait DataStoreAPI {
     /// The answer may not be 100% reliable, since the definition of "running" is a little vague.
     fn background_search_indexer_running(&self) -> bool {
         false
+    }
+
+    #[expect(unused)]
+    fn stable_property_index(&self, prop_id: PropId) -> Option<u32> {
+        None
     }
 }
 

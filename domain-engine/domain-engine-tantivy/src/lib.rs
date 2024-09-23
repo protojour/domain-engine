@@ -14,6 +14,7 @@ use indexer::WorkTracker;
 use indexer::{indexer_blocking_task, synchronizer_async_task, SyncQueue, Synrchonizer};
 use ontol_runtime::ontology::Ontology;
 use schema::{make_schema, SchemaWithMeta};
+use tantivy::tokenizer::{Language, LowerCaser, SimpleTokenizer, Stemmer, TextAnalyzer};
 use tantivy::{Index, IndexReader, ReloadPolicy};
 use tokio_util::sync::{CancellationToken, DropGuard};
 use tracing::debug;
@@ -23,6 +24,8 @@ mod indexer;
 mod schema;
 mod search;
 mod vertex_fetch;
+
+const TOKENIZER_NAME: &str = "default";
 
 #[derive(Clone)]
 pub struct TantivyConfig {
@@ -129,6 +132,11 @@ impl TantivyDataStoreLayer {
         let (vertex_tx, vertex_rx) = tokio::sync::mpsc::channel(config.vertex_index_queue_size);
         let sync_queue = SyncQueue::new(notify_tx, indexer_work_tracker.clone());
 
+        let tokenizer = TextAnalyzer::builder(SimpleTokenizer::default())
+            .filter(LowerCaser)
+            .filter(Stemmer::new(Language::English))
+            .build();
+
         let index = match &config.index_source {
             TantivyIndexSource::InMemory => Index::create_in_ram(schema.schema.clone()),
             TantivyIndexSource::MMapDir(path) => if path.exists() {
@@ -144,6 +152,8 @@ impl TantivyDataStoreLayer {
                 ))
             })?,
         };
+
+        index.tokenizers().register(TOKENIZER_NAME, tokenizer);
 
         let index_writer = index
             .writer(config.index_writer_mem_budget)
@@ -177,6 +187,7 @@ impl TantivyDataStoreLayer {
         let indexing_context = IndexingContext {
             ontology: config.data_store_params.ontology.clone(),
             schema: schema.clone(),
+            indexing_datastore: config.indexing_datastore.clone(),
         };
 
         let index_mutated = config.data_store_params.index_mutated.clone();

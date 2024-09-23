@@ -184,7 +184,7 @@ pub fn indexer_blocking_task(
 
 impl IndexingContext {
     fn index(&self, vertex: Value, index_writer: &mut IndexWriter) -> anyhow::Result<()> {
-        let doc = self.make_vertex_doc(&vertex)?;
+        let doc = self.make_vertex_doc(vertex)?;
 
         if doc.update_time > doc.create_time {
             // an update must delete the previous document

@@ -86,6 +86,8 @@ impl TantivyDataStoreLayer {
                 .parse_query(query)
                 .map_err(SearchInputError::Parse)?;
 
+            debug!("search query {query:?}");
+
             let hits = searcher
                 .search(&query, &TopDocs::with_limit(params.limit))
                 .map_err(SearchError::Search)?;

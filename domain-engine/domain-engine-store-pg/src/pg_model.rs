@@ -57,7 +57,7 @@ pub struct PgModel {
 }
 
 impl PgModel {
-    pub(crate) fn new(
+    pub fn new(
         domains: FnvHashMap<DomainIndex, PgDomain>,
         entity_id_to_entity: FnvHashMap<DefId, DefId>,
     ) -> Self {
@@ -82,14 +82,26 @@ impl PgModel {
         }
     }
 
-    pub(crate) fn pg_domain(&self, domain_index: DomainIndex) -> DomainResult<&PgDomain> {
+    pub fn stable_property_index(&self, prop_id: PropId) -> Option<u32> {
+        let def_id = prop_id.0;
+        let pg_domain = self.domains.get(&def_id.0)?;
+        let pg_table = pg_domain.datatables.get(&def_id)?;
+        let pg_property = pg_table.properties.get(&prop_id.1)?;
+
+        match pg_property {
+            PgProperty::Column(pg_column) => pg_column.key.try_into().ok(),
+            PgProperty::Abstract(_) => None,
+        }
+    }
+
+    pub fn pg_domain(&self, domain_index: DomainIndex) -> DomainResult<&PgDomain> {
         Ok(self
             .domains
             .get(&domain_index)
             .ok_or(PgModelError::DomainNotFound(domain_index))?)
     }
 
-    pub(crate) fn pg_domain_datatable(
+    pub fn pg_domain_datatable(
         &self,
         domain_index: DomainIndex,
         def_id: DefId,
@@ -102,7 +114,7 @@ impl PgModel {
         })
     }
 
-    pub(crate) fn pg_domain_edgetable(&self, edge_id: &EdgeId) -> DomainResult<PgDomainTable> {
+    pub fn pg_domain_edgetable(&self, edge_id: &EdgeId) -> DomainResult<PgDomainTable> {
         let domain = self.pg_domain(edge_id.domain_index())?;
         let datatable = self.edgetable(edge_id)?;
         Ok(PgDomainTable {
@@ -111,39 +123,31 @@ impl PgModel {
         })
     }
 
-    pub(crate) fn find_datatable(
-        &self,
-        domain_index: DomainIndex,
-        def_id: DefId,
-    ) -> Option<&PgTable> {
+    pub fn find_datatable(&self, domain_index: DomainIndex, def_id: DefId) -> Option<&PgTable> {
         self.domains
             .get(&domain_index)
             .and_then(|pg_domain| pg_domain.datatables.get(&def_id))
     }
 
-    pub(crate) fn datatable(
-        &self,
-        domain_index: DomainIndex,
-        def_id: DefId,
-    ) -> DomainResult<&PgTable> {
+    pub fn datatable(&self, domain_index: DomainIndex, def_id: DefId) -> DomainResult<&PgTable> {
         Ok(self
             .find_datatable(domain_index, def_id)
             .ok_or(PgModelError::CollectionNotFound(domain_index, def_id))?)
     }
 
-    pub(crate) fn find_edgetable(&self, edge_id: &EdgeId) -> Option<&PgTable> {
+    pub fn find_edgetable(&self, edge_id: &EdgeId) -> Option<&PgTable> {
         self.domains
             .get(&edge_id.domain_index())
             .and_then(|pg_domain| pg_domain.edgetables.get(&edge_id.def_id().1))
     }
 
-    pub(crate) fn edgetable(&self, edge_id: &EdgeId) -> DomainResult<&PgTable> {
+    pub fn edgetable(&self, edge_id: &EdgeId) -> DomainResult<&PgTable> {
         Ok(self
             .find_edgetable(edge_id)
             .ok_or(PgModelError::EdgeNotFound(*edge_id))?)
     }
 
-    pub(crate) fn datatable_key_by_def_key(
+    pub fn datatable_key_by_def_key(
         &self,
         def_key: PgRegKey,
     ) -> DomainResult<(DomainIndex, DefId)> {
@@ -401,9 +405,7 @@ pub struct PgColumnRef<'a> {
 
 #[derive(Clone, Debug)]
 pub struct PgEdgeCardinal {
-    #[expect(unused)]
     pub key: PgRegKey,
-    #[expect(unused)]
     pub ident: Box<str>,
     pub kind: PgEdgeCardinalKind,
     pub index_type: Option<PgIndexType>,

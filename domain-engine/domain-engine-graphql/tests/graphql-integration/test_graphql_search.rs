@@ -91,8 +91,8 @@ async fn test_conduit_search(ds: &str) {
 
     info!("awaiting index change..");
     await_search_indexer_queue_empty(&domain_engine).await;
-    info!("done indexing");
 
+    info!("search without query");
     expect_eq!(
         actual = r"{
             vertexSearch(
@@ -140,6 +140,39 @@ async fn test_conduit_search(ds: &str) {
                         },
                         "score": 1.0
                     }
+                ]
+            }
+        }))
+    );
+
+    info!("search with query");
+    expect_eq!(
+        actual = r#"{
+            vertexSearch(
+                query: "DISASTERS"
+                limit: 10
+                withAddress: false
+                withDefId: false
+                withAttrs: false
+            ) {
+                results {
+                    vertex
+                    score
+                }
+            }
+        }"#
+        .exec([], &ontology_schema, &ontology_ctx)
+        .await,
+        expected = Ok(graphql_value!({
+            "vertexSearch": {
+                "results": [
+                    {
+                        "vertex": {
+                            "type": "struct",
+                            "update_time": "1976-01-01T00:00:00Z"
+                        },
+                        "score": 1.1138169765472412
+                    },
                 ]
             }
         }))

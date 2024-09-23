@@ -193,9 +193,7 @@ pub enum Expr<'a> {
     Row(Vec<Expr<'a>>),
     Any(Box<Expr<'a>>),
     Array(Box<Expr<'a>>),
-    #[expect(unused)]
     ArrayAgg(Box<Expr<'a>>),
-    #[expect(unused)]
     AsIndex(Box<Expr<'a>>, Alias),
     /// count(*) over ()
     CountStarOver,

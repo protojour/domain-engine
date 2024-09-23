@@ -1,15 +1,16 @@
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
-use domain_engine_core::VertexAddr;
+use domain_engine_core::{data_store::DataStoreAPI, VertexAddr};
 use ontol_runtime::{
     attr::Attr,
     ontology::{domain::DataRelationshipKind, Ontology},
+    tuple::EndoTuple,
     value::Value,
     OntolDefTag,
 };
 use tantivy::{
     schema::{Facet, OwnedValue},
-    TantivyDocument,
+    DateTime, TantivyDocument,
 };
 use tracing::debug;
 
@@ -18,6 +19,7 @@ use crate::schema::SchemaWithMeta;
 pub struct IndexingContext {
     pub ontology: Arc<Ontology>,
     pub schema: SchemaWithMeta,
+    pub indexing_datastore: Arc<dyn DataStoreAPI + Send + Sync>,
 }
 
 pub struct Doc {
@@ -46,7 +48,7 @@ pub enum DocError {
 impl std::error::Error for DocError {}
 
 impl IndexingContext {
-    pub fn make_vertex_doc(&self, vertex: &Value) -> Result<Doc, DocError> {
+    pub fn make_vertex_doc(&self, vertex: Value) -> Result<Doc, DocError> {
         let def_id = vertex.type_def_id();
         let domain = self.ontology.domain_by_index(def_id.0).unwrap();
 
@@ -54,31 +56,42 @@ impl IndexingContext {
             return Err(DocError::UnstableDomain);
         }
 
-        let Value::Struct(attrs, _tag) = vertex else {
+        let Value::Struct(attrs, _tag) = &vertex else {
             return Err(DocError::InvalidVertex);
         };
 
         let mut doc = TantivyDocument::new();
 
-        let Some(Attr::Unit(Value::OctetSequence(vertex_addr, _))) =
-            attrs.get(&OntolDefTag::RelationDataStoreAddress.prop_id_0())
-        else {
-            return Err(DocError::NoAddress);
+        let vertex_addr: VertexAddr = {
+            let Some(Attr::Unit(Value::OctetSequence(vertex_addr, _))) =
+                attrs.get(&OntolDefTag::RelationDataStoreAddress.prop_id_0())
+            else {
+                return Err(DocError::NoAddress);
+            };
+            vertex_addr.0.iter().copied().collect()
         };
+
         doc.add_field_value(
             self.schema.vertex_addr,
-            OwnedValue::Bytes(vertex_addr.0.iter().copied().collect()),
+            OwnedValue::Bytes(vertex_addr.iter().copied().collect()),
         );
 
-        let Some(Attr::Unit(Value::ChronoDateTime(create_time, _))) =
-            attrs.get(&OntolDefTag::CreateTime.prop_id_0())
-        else {
-            return Err(DocError::NoCreateTime);
+        let create_time = {
+            let Some(Attr::Unit(Value::ChronoDateTime(create_time, _))) =
+                attrs.get(&OntolDefTag::CreateTime.prop_id_0())
+            else {
+                return Err(DocError::NoCreateTime);
+            };
+            *create_time
         };
-        let Some(Attr::Unit(Value::ChronoDateTime(update_time, _))) =
-            attrs.get(&OntolDefTag::UpdateTime.prop_id_0())
-        else {
-            return Err(DocError::NoUpdateTime);
+
+        let update_time = {
+            let Some(Attr::Unit(Value::ChronoDateTime(update_time, _))) =
+                attrs.get(&OntolDefTag::UpdateTime.prop_id_0())
+            else {
+                return Err(DocError::NoUpdateTime);
+            };
+            *update_time
         };
 
         if let Some(nanoseconds) = update_time.timestamp_nanos_opt() {
@@ -98,41 +111,124 @@ impl IndexingContext {
             ])),
         );
 
-        let mut data = VertexData {
-            text_concat: String::new(),
-        };
+        if true {
+            let mut concat = String::new();
+            self.concat_vertex(&vertex, &mut concat);
 
-        self.process_vertex(vertex, &mut data);
+            doc.add_field_value(self.schema.text, OwnedValue::Str(concat));
+        }
 
-        doc.add_field_value(self.schema.text, OwnedValue::Str(data.text_concat));
+        if let Some(tantivy_value) = self.value_to_tantivy(vertex) {
+            debug!("data: {tantivy_value:#?}");
+            doc.add_field_value(self.schema.data, tantivy_value);
+        }
+
+        // doc.add_object(field, object)
 
         Ok(Doc {
-            vertex_addr: vertex_addr.0.iter().copied().collect(),
-            create_time: *create_time,
-            update_time: *update_time,
+            vertex_addr,
+            create_time,
+            update_time,
             doc,
         })
     }
 
-    fn process_vertex(&self, value: &Value, data: &mut VertexData) {
+    fn value_to_tantivy(&self, value: Value) -> Option<OwnedValue> {
+        match value {
+            Value::Unit(_) | Value::Void(_) => None,
+            Value::I64(int, _) => Some(OwnedValue::I64(int)),
+            Value::F64(float, _) => Some(OwnedValue::F64(float)),
+            Value::Serial(serial, _) => Some(OwnedValue::U64(serial.0)),
+            Value::Rational(_, _) => None,
+            Value::Text(text, _) => Some(OwnedValue::Str(text.into())),
+            Value::OctetSequence(_seq, _) => {
+                // FIXME: Must convert this into textual representation
+                None
+            }
+            Value::ChronoDateTime(dt, _) => dt
+                .timestamp_nanos_opt()
+                // BUG: nanosecond precision + i64 limits historical dates to ~584 years before 1970.
+                // so likely a different (text based) datetime solution is needed
+                .map(|nanos| OwnedValue::Date(DateTime::from_timestamp_nanos(nanos))),
+            Value::ChronoDate(_, _) => {
+                debug!("TODO: date");
+                None
+            }
+            Value::ChronoTime(_, _) => {
+                debug!("TODO: time");
+                None
+            }
+            Value::Struct(attrs, _) => {
+                let mut tantivy_map: BTreeMap<String, OwnedValue> = BTreeMap::new();
+
+                for (prop_id, attr) in attrs.into_iter() {
+                    let Some(stable_index) = self.indexing_datastore.stable_property_index(prop_id)
+                    else {
+                        debug!("stable index for {prop_id:?} was None");
+                        continue;
+                    };
+
+                    let Some(tantivy_value) = self.attr_to_tantivy(attr) else {
+                        continue;
+                    };
+
+                    tantivy_map.insert(stable_index.to_string(), tantivy_value);
+                }
+
+                Some(OwnedValue::Object(tantivy_map))
+            }
+            Value::Dict(_dict, _) => None,
+            Value::Sequence(_, _) => None,
+            Value::DeleteRelationship(_) => None,
+            Value::Filter(_, _) => None,
+        }
+    }
+
+    fn attr_to_tantivy(&self, attr: Attr) -> Option<OwnedValue> {
+        match attr {
+            Attr::Unit(value) => self.value_to_tantivy(value),
+            Attr::Tuple(tuple) => Some(OwnedValue::Array(
+                tuple
+                    .elements
+                    .into_iter()
+                    .filter_map(|value| self.value_to_tantivy(value))
+                    .collect(),
+            )),
+            Attr::Matrix(matrix) => Some(OwnedValue::Array(
+                matrix
+                    .into_rows()
+                    .map(|row| {
+                        OwnedValue::Array(
+                            row.elements
+                                .into_iter()
+                                .filter_map(|value| self.value_to_tantivy(value))
+                                .collect(),
+                        )
+                    })
+                    .collect(),
+            )),
+        }
+    }
+
+    fn concat_vertex(&self, value: &Value, concat: &mut String) {
         use std::fmt::Write;
 
         match value {
             Value::Unit(_) => {}
             Value::Void(_) => {}
             Value::I64(int, _) => {
-                prepend_ws(&mut data.text_concat);
-                write!(&mut data.text_concat, "{int}").unwrap();
+                prepend_ws(concat);
+                write!(concat, "{int}").unwrap();
             }
             Value::F64(_, _) => {}
             Value::Serial(serial, _) => {
-                prepend_ws(&mut data.text_concat);
-                write!(&mut data.text_concat, "{}", serial.0).unwrap();
+                prepend_ws(concat);
+                write!(concat, "{}", serial.0).unwrap();
             }
             Value::Rational(_, _) => {}
             Value::Text(text, _) => {
-                prepend_ws(&mut data.text_concat);
-                data.text_concat.push_str(text);
+                prepend_ws(concat);
+                concat.push_str(text);
             }
             Value::OctetSequence(_, _) => {}
             Value::ChronoDateTime(_, _) => {}
@@ -148,13 +244,22 @@ impl IndexingContext {
                     match &rel_info.kind {
                         DataRelationshipKind::Id | DataRelationshipKind::Tree => match attr {
                             Attr::Unit(value) => {
-                                self.process_vertex(value, data);
+                                self.concat_vertex(value, concat);
                             }
-                            Attr::Tuple(_) => {
-                                debug!("TODO: tuple");
+                            Attr::Tuple(tup) => {
+                                for element in &tup.elements {
+                                    self.concat_vertex(element, concat);
+                                }
                             }
-                            Attr::Matrix(_) => {
-                                debug!("TODO: matrix");
+                            Attr::Matrix(matrix) => {
+                                let mut rows = matrix.rows();
+                                let mut tup = EndoTuple::default();
+
+                                while rows.iter_next(&mut tup) {
+                                    for element in &tup.elements {
+                                        self.concat_vertex(element, concat);
+                                    }
+                                }
                             }
                         },
                         DataRelationshipKind::Edge(_) => {}
@@ -167,10 +272,6 @@ impl IndexingContext {
             Value::Filter(_, _) => {}
         }
     }
-}
-
-struct VertexData {
-    text_concat: String,
 }
 
 fn prepend_ws(string: &mut String) {
