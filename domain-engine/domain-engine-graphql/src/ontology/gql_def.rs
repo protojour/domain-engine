@@ -68,6 +68,13 @@ impl Def {
         self.id.1.into()
     }
 
+    /// The domain of this Def
+    fn domain(&self) -> gql_domain::Domain {
+        gql_domain::Domain {
+            domain_index: self.id.domain_index(),
+        }
+    }
+
     /// The ONTOL identifier of this def
     fn ident(&self, ctx: &OntologyCtx) -> Option<String> {
         ctx.def(self.id).ident().map(|name| ctx[name].into())
@@ -150,12 +157,6 @@ impl Def {
                 meta: meta.clone(),
             })
             .collect()
-    }
-
-    fn domain(&self) -> gql_domain::Domain {
-        gql_domain::Domain {
-            domain_index: self.id.domain_index(),
-        }
     }
 }
 

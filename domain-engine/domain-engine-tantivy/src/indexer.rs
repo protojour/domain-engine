@@ -132,7 +132,7 @@ pub fn indexer_blocking_task(
         let work_tokens = match vertex_rx.blocking_recv() {
             Some(VertexMsg::Update(vertex, work_tokens)) => {
                 trace!("index update {:?}", vertex.type_def_id());
-                if let Err(err) = indexing_context.index(vertex, &mut index_writer) {
+                if let Err(err) = indexing_context.index(vertex, true, &mut index_writer) {
                     error!("document not reindexed: {err:?}");
                 }
 
@@ -183,10 +183,15 @@ pub fn indexer_blocking_task(
 }
 
 impl IndexingContext {
-    fn index(&self, vertex: Value, index_writer: &mut IndexWriter) -> anyhow::Result<()> {
+    fn index(
+        &self,
+        vertex: Value,
+        force_update: bool,
+        index_writer: &mut IndexWriter,
+    ) -> anyhow::Result<()> {
         let doc = self.make_vertex_doc(vertex)?;
 
-        if doc.update_time > doc.create_time {
+        if force_update || doc.update_time > doc.create_time {
             // an update must delete the previous document
             index_writer.delete_term(Term::from_field_bytes(
                 self.schema.vertex_addr,

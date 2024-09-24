@@ -9,6 +9,7 @@ use ontol_runtime::DefId;
 use tantivy::{
     collector::TopDocs,
     query::{AllQuery, QueryParser, QueryParserError},
+    schema::Facet,
     DateTime, DocAddress, Order, Searcher, TantivyError,
 };
 use tokio::task::JoinError;
@@ -42,6 +43,8 @@ enum SearchError {
     FastFieldNotPresent,
     /// doc is missing vertex address
     DocMissingVertexAddress,
+    /// doc has invalid vertex address
+    DocInvalidVertexAddress,
     /// doc is missing domain def id
     DocMissingDomainDefId,
     /// doc has invalid domain def id
@@ -116,6 +119,8 @@ impl TantivyDataStoreLayer {
         let mut vertex_hits = Vec::with_capacity(hits.len());
 
         for (score_source, doc_address) in hits {
+            // let doc: TantivyDocument = searcher.doc(doc_address).unwrap();
+
             if let Some(vertex_hit) = self.parse_vertex_hit(
                 doc_address,
                 score_source.to_score(),
@@ -138,30 +143,40 @@ impl TantivyDataStoreLayer {
     ) -> DomainResult<Option<VertexHit>> {
         let segment_reader = searcher.segment_reader(doc_address.segment_ord);
 
-        let vertex_addr_ff = segment_reader
+        let vertex_addr_reader = segment_reader
             .fast_fields()
             .bytes("vertex_addr")
             .map_err(|_| SearchError::FastFieldFailed)?
             .ok_or(SearchError::FastFieldNotPresent)?;
-        let domain_def_id_ff = segment_reader
-            .fast_fields()
-            .str("domain_def_id")
-            .map_err(|_| SearchError::FastFieldFailed)?
-            .ok_or(SearchError::FastFieldNotPresent)?;
+
+        let domain_def_id_reader = segment_reader
+            .facet_reader("domain_def_id")
+            .map_err(|_| SearchError::FastFieldFailed)?;
 
         let mut vertex_addr = Vec::with_capacity(VertexAddr::inline_size());
-        vertex_addr_ff
-            .ord_to_bytes(doc_address.doc_id.into(), &mut vertex_addr)
-            .map_err(|_| SearchError::DocMissingVertexAddress)?;
+        vertex_addr_reader
+            .ord_to_bytes(
+                vertex_addr_reader
+                    .term_ords(doc_address.doc_id)
+                    .next()
+                    .ok_or(SearchError::DocMissingVertexAddress)?,
+                &mut vertex_addr,
+            )
+            .map_err(|_| SearchError::DocInvalidVertexAddress)?;
 
         let def_id = {
-            let mut domain_def_id = String::new();
-            domain_def_id_ff
-                .ord_to_str(doc_address.doc_id.into(), &mut domain_def_id)
-                .map_err(|_| SearchError::DocMissingDomainDefId)?;
+            let mut facet = Facet::default();
+            domain_def_id_reader
+                .facet_from_ord(
+                    domain_def_id_reader
+                        .facet_ords(doc_address.doc_id)
+                        .next()
+                        .ok_or(SearchError::DocMissingDomainDefId)?,
+                    &mut facet,
+                )
+                .map_err(|_| SearchError::DocInvalidDomainDefId)?;
 
-            let mut path_iter = domain_def_id.split('\0');
-
+            let mut path_iter = facet.encoded_str().split('\0');
             let domain_ulid = path_iter.next().ok_or(SearchError::DocInvalidDomainDefId)?;
             let def_tag = path_iter.next().ok_or(SearchError::DocInvalidDomainDefId)?;
 

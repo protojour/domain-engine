@@ -54,9 +54,17 @@ impl TantivyDataStoreLayer {
                 .push(hit.vertex_addr.clone());
         }
 
-        let mut search_results: Vec<Option<VertexSearchResult>> =
+        if ordinal_by_addr.len() < vertex_hits.len() {
+            warn!(
+                "overlapping addresses ({}/{})",
+                ordinal_by_addr.len(),
+                vertex_hits.len()
+            );
+        }
+
+        let mut vertex_results: Vec<Option<VertexSearchResult>> =
             Vec::with_capacity(vertex_hits.len());
-        search_results.resize_with(vertex_hits.len(), || None);
+        vertex_results.resize_with(vertex_hits.len(), || None);
 
         for vertex in self.fetch_vertices_union(addr_by_def_id, session).await? {
             let Some(Attr::Unit(Value::OctetSequence(vertex_addr, _))) =
@@ -66,18 +74,35 @@ impl TantivyDataStoreLayer {
             };
 
             let Some(ordinal) = ordinal_by_addr.get(vertex_addr.0.as_slice()) else {
-                warn!("{vertex_addr:?} was not in original hit list, ignoring");
+                warn!(
+                    "{vertex_addr:?} ({:?}) was not in original hit list, ignoring",
+                    vertex.type_def_id()
+                );
                 continue;
             };
 
-            search_results[*ordinal] = Some(VertexSearchResult {
+            let old = vertex_results[*ordinal].replace(VertexSearchResult {
                 vertex,
                 score: vertex_hits[*ordinal].score,
             });
+
+            if old.is_some() {
+                warn!("overwrote vertex ordinal {ordinal}");
+            }
+        }
+
+        let vertex_results: Vec<_> = vertex_results.into_iter().flatten().collect();
+
+        if vertex_results.len() < vertex_hits.len() {
+            warn!(
+                "vertex results len={}, hits len={}",
+                vertex_results.len(),
+                vertex_hits.len()
+            );
         }
 
         Ok(VertexSearchResults {
-            results: search_results.into_iter().flatten().collect(),
+            results: vertex_results,
         })
     }
 
@@ -122,6 +147,7 @@ impl TantivyDataStoreLayer {
         addresses: Vec<VertexAddr>,
         session: Session,
     ) -> DomainResult<ThinVec<Value>> {
+        let addresses_len = addresses.len();
         let filter = {
             let mut filter = Filter::default_for_datastore();
             let condition = filter.condition_mut();
@@ -191,7 +217,15 @@ impl TantivyDataStoreLayer {
         let Some(seq_result) = sequences.into_iter().next() else {
             return Ok(thin_vec![]);
         };
+        let elements = seq_result?.into_elements();
 
-        Ok(seq_result?.into_elements())
+        if elements.len() < addresses_len {
+            warn!(
+                "there were {addresses_len} addresses but only {} vertices for {def_id:?}",
+                elements.len()
+            );
+        }
+
+        Ok(elements)
     }
 }

@@ -123,8 +123,6 @@ impl IndexingContext {
             doc.add_field_value(self.schema.data, tantivy_value);
         }
 
-        // doc.add_object(field, object)
-
         Ok(Doc {
             vertex_addr,
             create_time,
