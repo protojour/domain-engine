@@ -24,5 +24,8 @@ test:
         POSTGRES_DB: domainengine
         POSTGRES_USER: domainengine
         POSTGRES_PASSWORD: postgres
+  variables:
+    RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
   script:
+    - apt-get update && apt-get install -y mold
     - cargo test --tests --benches --no-fail-fast
