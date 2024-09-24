@@ -152,7 +152,7 @@ async fn test_conduit_search(ds: &str) {
                 query: "DISASTERS"
                 limit: 10
                 withAddress: false
-                withDefId: false
+                withDefId: true
                 withAttrs: false
             ) {
                 results {
@@ -168,6 +168,7 @@ async fn test_conduit_search(ds: &str) {
                 "results": [
                     {
                         "vertex": {
+                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES:5",
                             "type": "struct",
                             "update_time": "1976-01-01T00:00:00Z"
                         },

@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use ::juniper::FieldResult;
 use ulid::Ulid;
 
@@ -17,6 +19,12 @@ pub struct DefId {
     pub def_tag: u16,
 }
 
+impl Display for DefId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.domain_id, self.def_tag)
+    }
+}
+
 impl DefId {
     pub fn as_runtime_def_id(&self, ctx: &OntologyCtx) -> FieldResult<ontol_runtime::DefId> {
         let domain = ctx
@@ -31,7 +39,7 @@ impl DefId {
     fn to_output(v: &Self) -> juniper::Value<GqlScalar> {
         use std::fmt::Write;
         let mut s = smartstring::alias::String::new();
-        write!(&mut s, "{}:{}", v.domain_id, v.def_tag).unwrap();
+        write!(&mut s, "{v}").unwrap();
         juniper::Value::Scalar(GqlScalar::String(s))
     }
 

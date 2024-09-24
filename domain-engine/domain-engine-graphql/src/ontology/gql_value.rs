@@ -11,7 +11,7 @@ use ontol_runtime::{
 
 use crate::{field_error, gql_scalar::GqlScalar};
 
-use super::OntologyCtx;
+use super::{gql_id, OntologyCtx};
 
 #[derive(Clone, Copy)]
 pub struct ValueScalarCfg {
@@ -94,7 +94,14 @@ pub fn write_ontol_scalar(
 ) -> juniper::FieldResult<()> {
     let def_id = value.type_def_id();
     if cfg.with_def_id {
-        put_string(gobj, DEF_ID, format!("{:?}", def_id));
+        if let Some(domain) = ctx.domain_by_index(def_id.0) {
+            let gql_def_id = gql_id::DefId {
+                domain_id: domain.domain_id().ulid,
+                def_tag: def_id.1,
+            };
+
+            put_string(gobj, DEF_ID, format!("{gql_def_id}"));
+        }
     }
 
     match value {
