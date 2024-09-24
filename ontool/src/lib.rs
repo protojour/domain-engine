@@ -10,10 +10,6 @@ use axum::{
     routing::get,
 };
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use crossterm::{
-    cursor, queue,
-    terminal::{Clear, ClearType},
-};
 use domain_engine_core::{DomainEngine, Session};
 use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use notify_debouncer_full::{
@@ -42,7 +38,7 @@ use std::{
     collections::HashMap,
     fmt::Display,
     fs::{self, read_dir, File},
-    io::{stdout, Stdout, Write},
+    io::{stdout, Stdout},
     net::SocketAddr,
     path::PathBuf,
     rc::Rc,
@@ -483,10 +479,20 @@ enum ChannelMessage {
     Reload,
 }
 
-fn clear_term(stdout: &mut Stdout) {
-    queue!(stdout, Clear(ClearType::All), cursor::MoveTo(0, 0))
-        .expect("Terminal should be able to be cleared");
-    stdout.flush().unwrap();
+#[allow(unused)]
+fn clear_term_if_supported(stdout: &mut Stdout) {
+    #[cfg(feature = "crossterm")]
+    {
+        use crossterm::{
+            cursor, queue,
+            terminal::{Clear, ClearType},
+        };
+        use std::io::Write;
+
+        queue!(stdout, Clear(ClearType::All), cursor::MoveTo(0, 0))
+            .expect("Terminal should be able to be cleared");
+        stdout.flush().unwrap();
+    }
 }
 
 async fn serve(root_dir: PathBuf, domains: Vec<String>, port: u16) -> Result<(), OntoolError> {
@@ -494,7 +500,7 @@ async fn serve(root_dir: PathBuf, domains: Vec<String>, port: u16) -> Result<(),
     let (tx, rx) = std::sync::mpsc::channel();
     let (reload_tx, _reload_rx) = broadcast::channel::<ChannelMessage>(16);
     let mut debouncer = new_debouncer(Duration::from_secs(1), None, tx).unwrap();
-    clear_term(&mut stdout);
+    clear_term_if_supported(&mut stdout);
 
     debouncer
         .watcher()
@@ -554,7 +560,7 @@ async fn serve(root_dir: PathBuf, domains: Vec<String>, port: u16) -> Result<(),
                     {
                         cancellation_token.cancel();
                         cancellation_token = CancellationToken::new();
-                        clear_term(&mut stdout);
+                        clear_term_if_supported(&mut stdout);
 
                         let ontology_result =
                             compile(root_dir.clone(), domains.clone(), backend.clone());

@@ -8,6 +8,9 @@ edition = "2021"
 [lib]
 doctest = false
 
+[features]
+validate-jsonschema = ["dep:jsonschema"]
+
 [dependencies]
 ontol-compiler.path = "../ontol-compiler"
 ontol-parser.path = "../ontol-parser"
@@ -19,6 +22,6 @@ serde.workspace = true
 serde_json.workspace = true
 fnv.workspace = true
 unimock.workspace = true
-jsonschema = { version = "0.18", default-features = false, features = ["draft202012"] }
+jsonschema = { version = "0.20", optional = true, default-features = false, features = ["draft202012"] }
 serde-value = "0.7"
 url = "2"

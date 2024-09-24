@@ -9,9 +9,8 @@ use ontol_runtime::{
     DefId, PropId,
 };
 use serde::de::DeserializeSeed;
-use tracing::error;
 
-use crate::def_binding::{DefBinding, TEST_JSON_SCHEMA_VALIDATION};
+use crate::def_binding::DefBinding;
 
 /// A trait used in JSON tests.
 /// using this trait one can pass a serde_json::Value or a static JSON str.
@@ -128,6 +127,7 @@ impl<'b, 'on, 'p> SerdeHelper<'b, 'on, 'p> {
             .with_profile(&self.profile)
             .deserialize(&mut serde_json::Deserializer::from_str(&json_string));
 
+        #[cfg(feature = "validate-jsonschema")]
         match self.binding.json_schema() {
             Some(json_schema) if TEST_JSON_SCHEMA_VALIDATION => {
                 let json_schema_result =
@@ -154,6 +154,9 @@ impl<'b, 'on, 'p> SerdeHelper<'b, 'on, 'p> {
             }
             _ => attribute_result,
         }
+
+        #[cfg(not(feature = "validate-jsonschema"))]
+        attribute_result
     }
 
     pub fn as_json(&self, attr: AttrRef) -> serde_json::Value {

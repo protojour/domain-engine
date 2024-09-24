@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use jsonschema::JSONSchema;
 use ontol_faker::new_constant_fake;
 use ontol_runtime::{
     attr::Attr,
@@ -20,18 +19,15 @@ use ontol_runtime::{
     DefId, DomainIndex, PropId,
 };
 use serde::de::DeserializeSeed;
-use tracing::{debug, trace, warn};
+use tracing::{trace, warn};
 
 use crate::{serde_helper::serde_create, OntolTest};
 
-/// This test asserts that JSON schemas accept the same things that
-/// ONTOL's own deserializer does.
-pub(crate) const TEST_JSON_SCHEMA_VALIDATION: bool = true;
-
 pub struct DefBinding<'on> {
     pub def: &'on Def,
-    json_schema: Option<JSONSchema>,
     ontology: &'on Ontology,
+    #[cfg(feature = "validate-jsonschema")]
+    json_schema: Option<jsonschema::Validator>,
 }
 
 impl<'on> DefBinding<'on> {
@@ -67,22 +63,22 @@ impl<'on> DefBinding<'on> {
                 .map(|id| ontology.new_serde_processor(id, ProcessorMode::Create))
         );
 
-        let json_schema = if ontol_test.compile_json_schema {
-            Some(compile_json_schema(ontology, def))
-        } else {
-            None
-        };
-
         Self {
             def,
-            json_schema,
             ontology,
+            #[cfg(feature = "validate-jsonschema")]
+            json_schema: if ontol_test.compile_json_schema {
+                Some(compile_json_schema(ontology, def))
+            } else {
+                None
+            },
         }
     }
 
     pub fn from_def_id(def_id: DefId, ontology: &'on Ontology) -> Self {
         Self {
             def: ontology.def(def_id),
+            #[cfg(feature = "validate-jsonschema")]
             json_schema: None,
             ontology,
         }
@@ -160,7 +156,8 @@ impl<'on> DefBinding<'on> {
             .find_property(prop)
     }
 
-    pub fn json_schema(&self) -> Option<&JSONSchema> {
+    #[cfg(feature = "validate-jsonschema")]
+    pub fn json_schema(&self) -> Option<&jsonschema::Validator> {
         self.json_schema.as_ref()
     }
 
@@ -170,17 +167,18 @@ impl<'on> DefBinding<'on> {
     }
 }
 
-fn compile_json_schema(ontology: &Ontology, def: &Def) -> JSONSchema {
+#[cfg(feature = "validate-jsonschema")]
+fn compile_json_schema(ontology: &Ontology, def: &Def) -> jsonschema::Validator {
     let standalone_schema = build_standalone_schema(ontology, def, ProcessorMode::Create).unwrap();
 
-    debug!(
+    tracing::debug!(
         "outputted json schema: {}",
         serde_json::to_string_pretty(&standalone_schema).unwrap()
     );
 
-    JSONSchema::options()
+    jsonschema::Validator::options()
         .with_draft(jsonschema::Draft::Draft202012)
-        .compile(&serde_json::to_value(&standalone_schema).unwrap())
+        .build(&serde_json::to_value(&standalone_schema).unwrap())
         .unwrap()
 }
 

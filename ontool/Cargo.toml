@@ -3,6 +3,9 @@ name = "ontool"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+crossterm = ["dep:crossterm"]
+
 [dependencies]
 domain-engine-graphql.path = "../domain-engine/domain-engine-graphql"
 domain-engine-httpjson.path = "../domain-engine/domain-engine-httpjson"
@@ -35,7 +38,7 @@ anyhow = "1"
 tower-http = { version = "0.5", features = ["trace", "cors"] }
 tikv-jemallocator = "0.6"
 tower-service = "0.3.2"
-crossterm = { version = "0.28", default-features = false }
+crossterm = { version = "0.28", optional = true, default-features = false }
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "brotli",
