@@ -9,7 +9,7 @@ use crate::juniper::{self, graphql_object, FieldResult};
 use ::juniper::FieldError;
 use base64::Engine;
 use domain_engine_core::domain_select::domain_select_no_edges;
-use domain_engine_core::search::VertexSearchParams;
+use domain_engine_core::search::{SearchDomainOrDefFilter, SearchFilters, VertexSearchParams};
 use domain_engine_core::transact::AccumulateSequences;
 use domain_engine_core::transact::ReqMessage;
 use domain_engine_core::transact::TransactionMode;
@@ -286,9 +286,12 @@ impl Query {
         gql_vertex::VertexConnection::from_sequence(sequence, cfg, ctx)
     }
 
+    #[expect(clippy::too_many_arguments)]
     async fn vertex_search(
         query: Option<String>,
         limit: i32,
+        domain_filters: Option<Vec<String>>,
+        def_filters: Option<Vec<gql_id::DefId>>,
         with_address: Option<bool>,
         with_def_id: Option<bool>,
         with_attrs: Option<bool>,
@@ -296,11 +299,38 @@ impl Query {
     ) -> FieldResult<gql_vertex::VertexSearchConnection> {
         let data_store = ctx.data_store().map_err(field_error)?;
 
+        let mut domain_or_def_filters = vec![];
+
+        if let Some(domain_filters) = domain_filters {
+            for domain_filter in domain_filters {
+                domain_or_def_filters.push(SearchDomainOrDefFilter {
+                    domain_id: domain_filter.parse()?,
+                    def_tag: None,
+                });
+            }
+        }
+
+        if let Some(def_filters) = def_filters {
+            for def_filter in def_filters {
+                domain_or_def_filters.push(SearchDomainOrDefFilter {
+                    domain_id: def_filter.domain_id,
+                    def_tag: Some(def_filter.def_tag),
+                });
+            }
+        }
+
         let results = data_store
             .api()
             .vertex_search(
                 VertexSearchParams {
                     query,
+                    filters: SearchFilters {
+                        domains_or_defs: if domain_or_def_filters.is_empty() {
+                            None
+                        } else {
+                            Some(domain_or_def_filters)
+                        },
+                    },
                     limit: limit.try_into().map_err(field_error)?,
                 },
                 ctx.session().clone(),

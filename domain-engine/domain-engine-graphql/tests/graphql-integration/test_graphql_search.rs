@@ -98,7 +98,7 @@ async fn test_conduit_search(ds: &str) {
             vertexSearch(
                 limit: 10
                 withAddress: false
-                withDefId: false
+                withDefId: true
                 withAttrs: false
             ) {
                 results {
@@ -114,6 +114,7 @@ async fn test_conduit_search(ds: &str) {
                 "results": [
                     {
                         "vertex": {
+                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES:5",
                             "type": "struct",
                             "update_time": "1976-01-01T00:00:00Z"
                         },
@@ -121,6 +122,7 @@ async fn test_conduit_search(ds: &str) {
                     },
                     {
                         "vertex": {
+                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES:5",
                             "type": "struct",
                             "update_time": "1975-01-01T00:00:00Z"
                         },
@@ -128,6 +130,7 @@ async fn test_conduit_search(ds: &str) {
                     },
                     {
                         "vertex": {
+                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES:4",
                             "type": "struct",
                             "update_time": "1972-01-01T00:00:00Z"
                         },
@@ -135,11 +138,54 @@ async fn test_conduit_search(ds: &str) {
                     },
                     {
                         "vertex": {
+                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES:4",
                             "type": "struct",
                             "update_time": "1971-01-01T00:00:00Z"
                         },
                         "score": 1.0
                     }
+                ]
+            }
+        }))
+    );
+
+    info!("search without query, with filter");
+    expect_eq!(
+        actual = r#"{
+            vertexSearch(
+                limit: 10
+                defFilters: ["01GZQ1ZRW0WJR72GHM6VWRMFES:5"]
+                withAddress: false
+                withDefId: true
+                withAttrs: false
+            ) {
+                results {
+                    vertex
+                    score
+                }
+            }
+        }"#
+        .exec([], &ontology_schema, &ontology_ctx)
+        .await,
+        expected = Ok(graphql_value!({
+            "vertexSearch": {
+                "results": [
+                    {
+                        "vertex": {
+                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES:5",
+                            "type": "struct",
+                            "update_time": "1976-01-01T00:00:00Z"
+                        },
+                        "score": 1.0
+                    },
+                    {
+                        "vertex": {
+                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES:5",
+                            "type": "struct",
+                            "update_time": "1975-01-01T00:00:00Z"
+                        },
+                        "score": 1.0
+                    },
                 ]
             }
         }))
@@ -175,6 +221,32 @@ async fn test_conduit_search(ds: &str) {
                         "score": 1.1138169765472412
                     },
                 ]
+            }
+        }))
+    );
+
+    info!("search with query and filter");
+    expect_eq!(
+        actual = r#"{
+            vertexSearch(
+                query: "DISASTERS"
+                limit: 10
+                defFilters: ["01GZQ1ZRW0WJR72GHM6VWRMFES:4"]
+                withAddress: false
+                withDefId: true
+                withAttrs: false
+            ) {
+                results {
+                    vertex
+                    score
+                }
+            }
+        }"#
+        .exec([], &ontology_schema, &ontology_ctx)
+        .await,
+        expected = Ok(graphql_value!({
+            "vertexSearch": {
+                "results": []
             }
         }))
     );

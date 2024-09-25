@@ -2,15 +2,15 @@ use std::future::IntoFuture;
 
 use domain_engine_core::{
     domain_error::DomainErrorKind,
-    search::{VertexSearchParams, VertexSearchResults},
+    search::{SearchFilters, VertexSearchParams, VertexSearchResults},
     DomainError, DomainResult, Session, VertexAddr,
 };
 use ontol_runtime::DefId;
 use tantivy::{
     collector::TopDocs,
-    query::{AllQuery, QueryParser, QueryParserError},
-    schema::Facet,
-    DateTime, DocAddress, Order, Searcher, TantivyError,
+    query::{AllQuery, BooleanQuery, Occur, Query, QueryParser, QueryParserError, TermQuery},
+    schema::{Facet, IndexRecordOption},
+    DateTime, DocAddress, Order, Searcher, TantivyError, Term,
 };
 use tokio::task::JoinError;
 use tracing::{debug, error, info};
@@ -89,7 +89,9 @@ impl TantivyDataStoreLayer {
                 .parse_query(query)
                 .map_err(SearchInputError::Parse)?;
 
-            debug!("search query {query:?}");
+            let query = self.apply_search_filters(Box::new(query), params.filters);
+
+            info!("search query {query:?}");
 
             let hits = searcher
                 .search(&query, &TopDocs::with_limit(params.limit))
@@ -100,13 +102,48 @@ impl TantivyDataStoreLayer {
 
             let hits = searcher
                 .search(
-                    &AllQuery,
+                    &self.apply_search_filters(Box::new(AllQuery), params.filters),
                     &TopDocs::with_limit(params.limit)
                         .order_by_fast_field::<DateTime>("update_time", Order::Desc),
                 )
                 .map_err(SearchError::Search)?;
             self.read_vertex_hits(hits, &searcher)
         }
+    }
+
+    fn apply_search_filters(
+        &self,
+        base_query: Box<dyn Query>,
+        filters: SearchFilters,
+    ) -> Box<dyn Query> {
+        let Some(filters) = filters.filter_is_empty() else {
+            return base_query;
+        };
+
+        let mut subqueries: Vec<(Occur, Box<dyn Query>)> = vec![];
+        subqueries.push((Occur::Must, base_query));
+
+        if let Some(domain_or_def_filters) = filters.domains_or_defs {
+            for domain_or_def_filter in domain_or_def_filters {
+                let mut facet_path: Vec<String> = vec![];
+
+                facet_path.push(format!("{}", domain_or_def_filter.domain_id));
+
+                if let Some(def_tag) = domain_or_def_filter.def_tag {
+                    facet_path.push(format!("{def_tag}"));
+                }
+
+                subqueries.push((
+                    Occur::Must,
+                    Box::new(TermQuery::new(
+                        Term::from_facet(self.schema.domain_def_id, &Facet::from_path(facet_path)),
+                        IndexRecordOption::Basic,
+                    )),
+                ));
+            }
+        }
+
+        Box::new(BooleanQuery::new(subqueries))
     }
 
     fn read_vertex_hits<S: ScoreSource>(

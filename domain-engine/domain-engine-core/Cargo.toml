@@ -21,6 +21,7 @@ chrono.workspace = true
 unimock.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+ulid.workspace = true
 futures-util = "0.3"
 tokio.workspace = true
 async-stream = "0.3"
