@@ -104,11 +104,17 @@ impl IndexingContext {
         }
 
         doc.add_field_value(
-            self.schema.domain_def_id,
-            OwnedValue::Facet(Facet::from_path([
-                domain.domain_id().ulid.to_string(),
-                def_id.1.to_string(),
-            ])),
+            self.schema.facet,
+            OwnedValue::Facet(
+                Facet::from_text(&format!("/def/{}:{}", domain.domain_id().ulid, def_id.1))
+                    .unwrap(),
+            ),
+        );
+        doc.add_field_value(
+            self.schema.facet,
+            OwnedValue::Facet(
+                Facet::from_text(&format!("/domain/{}", domain.domain_id().ulid)).unwrap(),
+            ),
         );
 
         if true {

@@ -21,7 +21,7 @@ use ontol_runtime::{
 use thin_vec::{thin_vec, ThinVec};
 use tracing::warn;
 
-use crate::{search::VertexHit, TantivyDataStoreLayer};
+use crate::{search::RawSearchResults, TantivyDataStoreLayer};
 
 #[derive(displaydoc::Display, Debug)]
 enum FetchError {
@@ -39,9 +39,10 @@ impl From<FetchError> for DomainError {
 impl TantivyDataStoreLayer {
     pub async fn fetch_vertex_results(
         &self,
-        vertex_hits: Vec<VertexHit>,
+        raw_results: RawSearchResults,
         session: Session,
     ) -> DomainResult<VertexSearchResults> {
+        let vertex_hits = raw_results.raw_hits;
         let mut ordinal_by_addr: HashMap<VertexAddr, usize> =
             HashMap::with_capacity(vertex_hits.len());
         let mut addr_by_def_id: BTreeMap<DefId, Vec<VertexAddr>> = Default::default();
@@ -103,6 +104,7 @@ impl TantivyDataStoreLayer {
 
         Ok(VertexSearchResults {
             results: vertex_results,
+            facets: raw_results.facets,
         })
     }
 

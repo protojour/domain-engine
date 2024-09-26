@@ -11,7 +11,7 @@ pub struct VertexSearchParams {
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct SearchFilters {
-    pub domains_or_defs: Option<Vec<SearchDomainOrDefFilter>>,
+    pub domains_or_defs: Option<Vec<SearchDomainOrDef>>,
 }
 
 impl SearchFilters {
@@ -25,7 +25,7 @@ impl SearchFilters {
 }
 
 #[derive(Default, Serialize, Deserialize)]
-pub struct SearchDomainOrDefFilter {
+pub struct SearchDomainOrDef {
     pub domain_id: Ulid,
     pub def_tag: Option<u16>,
 }
@@ -33,10 +33,23 @@ pub struct SearchDomainOrDefFilter {
 #[derive(Serialize, Deserialize)]
 pub struct VertexSearchResults {
     pub results: Vec<VertexSearchResult>,
+    pub facets: VertexSearchFacets,
+}
+
+#[derive(Default, Serialize, Deserialize)]
+pub struct VertexSearchFacets {
+    pub domains: Vec<FacetCount<SearchDomainOrDef>>,
+    pub defs: Vec<FacetCount<SearchDomainOrDef>>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct VertexSearchResult {
     pub vertex: Value,
     pub score: f32,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct FacetCount<F> {
+    pub facet: F,
+    pub count: u64,
 }

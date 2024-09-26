@@ -9,7 +9,7 @@ use crate::juniper::{self, graphql_object, FieldResult};
 use ::juniper::FieldError;
 use base64::Engine;
 use domain_engine_core::domain_select::domain_select_no_edges;
-use domain_engine_core::search::{SearchDomainOrDefFilter, SearchFilters, VertexSearchParams};
+use domain_engine_core::search::{SearchDomainOrDef, SearchFilters, VertexSearchParams};
 use domain_engine_core::transact::AccumulateSequences;
 use domain_engine_core::transact::ReqMessage;
 use domain_engine_core::transact::TransactionMode;
@@ -303,7 +303,7 @@ impl Query {
 
         if let Some(domain_filters) = domain_filters {
             for domain_filter in domain_filters {
-                domain_or_def_filters.push(SearchDomainOrDefFilter {
+                domain_or_def_filters.push(SearchDomainOrDef {
                     domain_id: domain_filter.parse()?,
                     def_tag: None,
                 });
@@ -312,7 +312,7 @@ impl Query {
 
         if let Some(def_filters) = def_filters {
             for def_filter in def_filters {
-                domain_or_def_filters.push(SearchDomainOrDefFilter {
+                domain_or_def_filters.push(SearchDomainOrDef {
                     domain_id: def_filter.domain_id,
                     def_tag: Some(def_filter.def_tag),
                 });

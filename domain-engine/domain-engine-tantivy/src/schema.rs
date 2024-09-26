@@ -3,13 +3,21 @@ use tantivy::schema::{
     TextOptions, FAST,
 };
 
+pub mod fieldname {
+    pub const VERTEX_ADDR: &str = "vertex_addr";
+    pub const FACET: &str = "facet";
+    pub const UPDATE_TIME: &str = "update_time";
+    pub const TEXT: &str = "text";
+    pub const DATA: &str = "data";
+}
+
 use crate::TOKENIZER_NAME;
 
 #[derive(Clone)]
 pub struct SchemaWithMeta {
     pub schema: Schema,
     pub vertex_addr: Field,
-    pub domain_def_id: Field,
+    pub facet: Field,
     pub update_time: Field,
     pub text: Field,
     pub data: Field,
@@ -22,22 +30,22 @@ pub fn make_schema() -> SchemaWithMeta {
         .set_tokenizer(TOKENIZER_NAME)
         .set_index_option(IndexRecordOption::WithFreqsAndPositions);
 
-    let vertex_addr = builder.add_bytes_field("vertex_addr", FAST);
-    let domain_def_id = builder.add_facet_field("domain_def_id", FacetOptions::default());
-    let update_time = builder.add_date_field("update_time", FAST);
+    let vertex_addr = builder.add_bytes_field(fieldname::VERTEX_ADDR, FAST);
+    let facet = builder.add_facet_field(fieldname::FACET, FacetOptions::default());
+    let update_time = builder.add_date_field(fieldname::UPDATE_TIME, FAST);
     let text = builder.add_text_field(
-        "text",
+        fieldname::TEXT,
         TextOptions::default().set_indexing_options(text_field_indexing.clone()),
     );
     let data = builder.add_json_field(
-        "data",
+        fieldname::DATA,
         JsonObjectOptions::default().set_indexing_options(text_field_indexing),
     );
 
     SchemaWithMeta {
         schema: builder.build(),
         vertex_addr,
-        domain_def_id,
+        facet,
         update_time,
         text,
         data,

@@ -2,12 +2,16 @@ use std::future::IntoFuture;
 
 use domain_engine_core::{
     domain_error::DomainErrorKind,
-    search::{SearchFilters, VertexSearchParams, VertexSearchResults},
+    search::{
+        FacetCount, SearchDomainOrDef, SearchFilters, VertexSearchFacets, VertexSearchParams,
+        VertexSearchResults,
+    },
     DomainError, DomainResult, Session, VertexAddr,
 };
 use ontol_runtime::DefId;
 use tantivy::{
-    collector::TopDocs,
+    collector::{FacetCollector, FacetCounts, TopDocs},
+    fastfield::FacetReader,
     query::{AllQuery, BooleanQuery, Occur, Query, QueryParser, QueryParserError, TermQuery},
     schema::{Facet, IndexRecordOption},
     DateTime, DocAddress, Order, Searcher, TantivyError, Term,
@@ -15,10 +19,16 @@ use tantivy::{
 use tokio::task::JoinError;
 use tracing::{debug, error, info};
 
-use crate::TantivyDataStoreLayer;
+use crate::{schema::fieldname, TantivyDataStoreLayer};
+
+/// Raw output from tantivy search
+pub struct RawSearchResults {
+    pub raw_hits: Vec<RawVertexHit>,
+    pub facets: VertexSearchFacets,
+}
 
 #[derive(Debug)]
-pub struct VertexHit {
+pub struct RawVertexHit {
     pub ordinal: usize,
     pub vertex_addr: VertexAddr,
     pub def_id: DefId,
@@ -72,15 +82,15 @@ impl TantivyDataStoreLayer {
         session: Session,
     ) -> DomainResult<VertexSearchResults> {
         let zelf = self.clone();
-        let vertex_hits = tokio::task::spawn_blocking(move || zelf.blocking_vertex_search(params))
+        let raw_results = tokio::task::spawn_blocking(move || zelf.blocking_vertex_search(params))
             .into_future()
             .await
             .map_err(SearchError::Join)??;
 
-        self.fetch_vertex_results(vertex_hits, session).await
+        self.fetch_vertex_results(raw_results, session).await
     }
 
-    fn blocking_vertex_search(&self, params: VertexSearchParams) -> DomainResult<Vec<VertexHit>> {
+    fn blocking_vertex_search(&self, params: VertexSearchParams) -> DomainResult<RawSearchResults> {
         let searcher = self.index_reader.searcher();
 
         if let Some(query) = params.query.as_deref() {
@@ -93,21 +103,30 @@ impl TantivyDataStoreLayer {
 
             info!("search query {query:?}");
 
-            let hits = searcher
-                .search(&query, &TopDocs::with_limit(params.limit))
-                .map_err(SearchError::Search)?;
-            self.read_vertex_hits(hits, &searcher)
-        } else {
-            // a query matching everything ordered by update_time decreasing
+            let mut facet_collector = FacetCollector::for_field(fieldname::FACET);
+            facet_collector.add_facet("/def");
+            facet_collector.add_facet("/domain");
 
-            let hits = searcher
+            let (document_hits, facet_counts) = searcher
+                .search(
+                    &query,
+                    &(TopDocs::with_limit(params.limit), facet_collector),
+                )
+                .map_err(SearchError::Search)?;
+            self.read_raw_results(document_hits, facet_counts, &searcher)
+        } else {
+            // a query matching everything ordered by update_time decreasing.
+            // Facet counts are not collected for this, because that makes less sense
+            // when ordering by UPDATE_TIME.
+
+            let document_hits = searcher
                 .search(
                     &self.apply_search_filters(Box::new(AllQuery), params.filters),
                     &TopDocs::with_limit(params.limit)
-                        .order_by_fast_field::<DateTime>("update_time", Order::Desc),
+                        .order_by_fast_field::<DateTime>(fieldname::UPDATE_TIME, Order::Desc),
                 )
                 .map_err(SearchError::Search)?;
-            self.read_vertex_hits(hits, &searcher)
+            self.read_raw_results(document_hits, FacetCounts::default(), &searcher)
         }
     }
 
@@ -127,16 +146,18 @@ impl TantivyDataStoreLayer {
             for domain_or_def_filter in domain_or_def_filters {
                 let mut facet_path: Vec<String> = vec![];
 
-                facet_path.push(format!("{}", domain_or_def_filter.domain_id));
-
                 if let Some(def_tag) = domain_or_def_filter.def_tag {
-                    facet_path.push(format!("{def_tag}"));
+                    facet_path.push("def".to_string());
+                    facet_path.push(format!("{}:{def_tag}", domain_or_def_filter.domain_id));
+                } else {
+                    facet_path.push("domain".to_string());
+                    facet_path.push(format!("{}", domain_or_def_filter.domain_id));
                 }
 
                 subqueries.push((
                     Occur::Must,
                     Box::new(TermQuery::new(
-                        Term::from_facet(self.schema.domain_def_id, &Facet::from_path(facet_path)),
+                        Term::from_facet(self.schema.facet, &Facet::from_path(facet_path)),
                         IndexRecordOption::Basic,
                     )),
                 ));
@@ -146,48 +167,104 @@ impl TantivyDataStoreLayer {
         Box::new(BooleanQuery::new(subqueries))
     }
 
-    fn read_vertex_hits<S: ScoreSource>(
+    fn read_raw_results<S: ScoreSource>(
         &self,
-        hits: Vec<(S, DocAddress)>,
+        document_hits: Vec<(S, DocAddress)>,
+        facet_counts: FacetCounts,
         searcher: &Searcher,
-    ) -> DomainResult<Vec<VertexHit>> {
-        debug!("got {} hits", hits.len());
+    ) -> DomainResult<RawSearchResults> {
+        debug!("got {} hits", document_hits.len());
 
-        let mut vertex_hits = Vec::with_capacity(hits.len());
+        let mut raw_hits = Vec::with_capacity(document_hits.len());
 
-        for (score_source, doc_address) in hits {
-            // let doc: TantivyDocument = searcher.doc(doc_address).unwrap();
-
-            if let Some(vertex_hit) = self.parse_vertex_hit(
+        for (score_source, doc_address) in document_hits {
+            if let Some(raw_hit) = self.read_raw_vertex_hit(
                 doc_address,
                 score_source.to_score(),
-                vertex_hits.len(),
+                raw_hits.len(),
                 searcher,
             )? {
-                vertex_hits.push(vertex_hit);
+                raw_hits.push(raw_hit);
             }
         }
 
-        Ok(vertex_hits)
+        let mut facets = VertexSearchFacets::default();
+
+        for (facet, count) in facet_counts.get("/") {
+            let mut path = facet.encoded_str().split('0');
+
+            let Some(prefix) = path.next() else {
+                continue;
+            };
+
+            match prefix {
+                "def" => {
+                    let Some(str) = path.next() else {
+                        continue;
+                    };
+
+                    let mut split = str.split(':');
+                    let Some(domain_id) = split.next() else {
+                        continue;
+                    };
+                    let Ok(domain_id) = domain_id.parse() else {
+                        continue;
+                    };
+                    let Some(def_tag) = split.next() else {
+                        continue;
+                    };
+                    let Ok(def_tag) = def_tag.parse() else {
+                        continue;
+                    };
+
+                    facets.domains.push(FacetCount {
+                        facet: SearchDomainOrDef {
+                            domain_id,
+                            def_tag: Some(def_tag),
+                        },
+                        count,
+                    });
+                }
+                "domain" => {
+                    let Some(str) = path.next() else {
+                        continue;
+                    };
+                    let Ok(domain_id) = str.parse() else {
+                        continue;
+                    };
+
+                    facets.domains.push(FacetCount {
+                        facet: SearchDomainOrDef {
+                            domain_id,
+                            def_tag: None,
+                        },
+                        count,
+                    });
+                }
+                _ => {}
+            }
+        }
+
+        Ok(RawSearchResults { raw_hits, facets })
     }
 
-    fn parse_vertex_hit(
+    fn read_raw_vertex_hit(
         &self,
         doc_address: DocAddress,
         score: f32,
         ordinal: usize,
         searcher: &Searcher,
-    ) -> DomainResult<Option<VertexHit>> {
+    ) -> DomainResult<Option<RawVertexHit>> {
         let segment_reader = searcher.segment_reader(doc_address.segment_ord);
 
         let vertex_addr_reader = segment_reader
             .fast_fields()
-            .bytes("vertex_addr")
+            .bytes(fieldname::VERTEX_ADDR)
             .map_err(|_| SearchError::FastFieldFailed)?
             .ok_or(SearchError::FastFieldNotPresent)?;
 
-        let domain_def_id_reader = segment_reader
-            .facet_reader("domain_def_id")
+        let facet_reader = segment_reader
+            .facet_reader(fieldname::FACET)
             .map_err(|_| SearchError::FastFieldFailed)?;
 
         let mut vertex_addr = Vec::with_capacity(VertexAddr::inline_size());
@@ -201,21 +278,37 @@ impl TantivyDataStoreLayer {
             )
             .map_err(|_| SearchError::DocInvalidVertexAddress)?;
 
-        let def_id = {
-            let mut facet = Facet::default();
-            domain_def_id_reader
-                .facet_from_ord(
-                    domain_def_id_reader
-                        .facet_ords(doc_address.doc_id)
-                        .next()
-                        .ok_or(SearchError::DocMissingDomainDefId)?,
-                    &mut facet,
-                )
+        let Some(def_id) = self.read_def_id(doc_address.doc_id, &facet_reader)? else {
+            return Ok(None);
+        };
+
+        Ok(Some(RawVertexHit {
+            ordinal,
+            vertex_addr: vertex_addr.into_iter().collect(),
+            def_id,
+            score,
+        }))
+    }
+
+    fn read_def_id(&self, doc_id: u32, facet_reader: &FacetReader) -> DomainResult<Option<DefId>> {
+        let mut facet = Facet::default();
+
+        for facet_ord in facet_reader.facet_ords(doc_id) {
+            facet_reader
+                .facet_from_ord(facet_ord, &mut facet)
                 .map_err(|_| SearchError::DocInvalidDomainDefId)?;
 
             let mut path_iter = facet.encoded_str().split('\0');
-            let domain_ulid = path_iter.next().ok_or(SearchError::DocInvalidDomainDefId)?;
-            let def_tag = path_iter.next().ok_or(SearchError::DocInvalidDomainDefId)?;
+
+            if path_iter.next().ok_or(SearchError::DocInvalidDomainDefId)? != "def" {
+                continue;
+            }
+
+            let def_str = path_iter.next().ok_or(SearchError::DocInvalidDomainDefId)?;
+            let mut split = def_str.split(':');
+
+            let domain_ulid = split.next().ok_or(SearchError::DocInvalidDomainDefId)?;
+            let def_tag = split.next().ok_or(SearchError::DocInvalidDomainDefId)?;
 
             let Some(domain) = self.ontology().domain_by_id(
                 domain_ulid
@@ -231,15 +324,10 @@ impl TantivyDataStoreLayer {
                 .parse()
                 .map_err(|_| SearchError::DocInvalidDomainDefId)?;
 
-            DefId(domain.def_id().domain_index(), def_tag)
-        };
+            return Ok(Some(DefId(domain.def_id().domain_index(), def_tag)));
+        }
 
-        Ok(Some(VertexHit {
-            ordinal,
-            vertex_addr: vertex_addr.into_iter().collect(),
-            def_id,
-            score,
-        }))
+        Err(SearchError::DocMissingDomainDefId.into())
     }
 }
 
