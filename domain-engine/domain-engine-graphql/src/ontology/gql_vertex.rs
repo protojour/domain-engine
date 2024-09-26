@@ -4,6 +4,7 @@ use ontol_runtime::{sequence::Sequence, value::Value};
 use crate::{cursor_util::serialize_cursor, gql_scalar::GqlScalar, juniper};
 
 use super::{
+    gql_id,
     gql_value::{self, write_ontol_scalar, OntolValue, ValueScalarCfg},
     OntologyCtx,
 };
@@ -19,7 +20,29 @@ pub struct VertexConnection {
 #[graphql(context = OntologyCtx, scalar = GqlScalar)]
 pub struct VertexSearchConnection {
     pub results: Vec<VertexSearchResult>,
+    pub facets: VertexSearchFacets,
     pub page_info: Option<PageInfo>,
+}
+
+#[derive(GraphQLObject)]
+#[graphql(context = OntologyCtx, scalar = GqlScalar)]
+pub struct VertexSearchFacets {
+    pub domains: Vec<VertexSearchDomainFacetCount>,
+    pub defs: Vec<VertexSearchDefFacetCount>,
+}
+
+#[derive(GraphQLObject)]
+#[graphql(context = OntologyCtx, scalar = GqlScalar)]
+pub struct VertexSearchDomainFacetCount {
+    pub domain_id: juniper::ID,
+    pub count: i32,
+}
+
+#[derive(GraphQLObject)]
+#[graphql(context = OntologyCtx, scalar = GqlScalar)]
+pub struct VertexSearchDefFacetCount {
+    pub def_id: gql_id::DefId,
+    pub count: i32,
 }
 
 #[derive(GraphQLObject)]

@@ -205,6 +205,10 @@ async fn test_conduit_search(ds: &str) {
                     vertex
                     score
                 }
+                facets {
+                    domains { domainId count }
+                    defs { defId count }
+                }
             }
         }"#
         .exec([], &ontology_schema, &ontology_ctx)
@@ -220,7 +224,15 @@ async fn test_conduit_search(ds: &str) {
                         },
                         "score": 1.1138169765472412
                     },
-                ]
+                ],
+                "facets": {
+                    "domains": [
+                        { "domainId": "01GZQ1ZRW0WJR72GHM6VWRMFES", "count": 1 }
+                    ],
+                    "defs": [
+                        { "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES:5", "count": 1 }
+                    ]
+                },
             }
         }))
     );

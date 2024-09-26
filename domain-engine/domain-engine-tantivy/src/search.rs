@@ -18,6 +18,7 @@ use tantivy::{
 };
 use tokio::task::JoinError;
 use tracing::{debug, error, info};
+use ulid::Ulid;
 
 use crate::{schema::fieldname, TantivyDataStoreLayer};
 
@@ -33,6 +34,11 @@ pub struct RawVertexHit {
     pub vertex_addr: VertexAddr,
     pub def_id: DefId,
     pub score: f32,
+}
+
+enum ParsedFacet {
+    Domain(Ulid),
+    Def(Ulid, u16),
 }
 
 #[derive(displaydoc::Display, Debug)]
@@ -191,33 +197,9 @@ impl TantivyDataStoreLayer {
         let mut facets = VertexSearchFacets::default();
 
         for (facet, count) in facet_counts.get("/") {
-            let mut path = facet.encoded_str().split('0');
-
-            let Some(prefix) = path.next() else {
-                continue;
-            };
-
-            match prefix {
-                "def" => {
-                    let Some(str) = path.next() else {
-                        continue;
-                    };
-
-                    let mut split = str.split(':');
-                    let Some(domain_id) = split.next() else {
-                        continue;
-                    };
-                    let Ok(domain_id) = domain_id.parse() else {
-                        continue;
-                    };
-                    let Some(def_tag) = split.next() else {
-                        continue;
-                    };
-                    let Ok(def_tag) = def_tag.parse() else {
-                        continue;
-                    };
-
-                    facets.domains.push(FacetCount {
+            match parse_facet(facet) {
+                Ok(ParsedFacet::Def(domain_id, def_tag)) => {
+                    facets.defs.push(FacetCount {
                         facet: SearchDomainOrDef {
                             domain_id,
                             def_tag: Some(def_tag),
@@ -225,14 +207,7 @@ impl TantivyDataStoreLayer {
                         count,
                     });
                 }
-                "domain" => {
-                    let Some(str) = path.next() else {
-                        continue;
-                    };
-                    let Ok(domain_id) = str.parse() else {
-                        continue;
-                    };
-
+                Ok(ParsedFacet::Domain(domain_id)) => {
                     facets.domains.push(FacetCount {
                         facet: SearchDomainOrDef {
                             domain_id,
@@ -241,7 +216,9 @@ impl TantivyDataStoreLayer {
                         count,
                     });
                 }
-                _ => {}
+                Err(err) => {
+                    error!("unable to parse facet: {err}");
+                }
             }
         }
 
@@ -328,6 +305,38 @@ impl TantivyDataStoreLayer {
         }
 
         Err(SearchError::DocMissingDomainDefId.into())
+    }
+}
+
+fn parse_facet(facet: &Facet) -> Result<ParsedFacet, &'static str> {
+    let mut path = facet.encoded_str().split('\0');
+
+    match path.next().ok_or("missing prefix")? {
+        "def" => {
+            let mut split = path.next().ok_or("missing def str")?.split(':');
+            let domain_id = split
+                .next()
+                .ok_or("missing domain prefix")?
+                .parse()
+                .map_err(|_| "invalid domain id")?;
+            let def_tag = split
+                .next()
+                .ok_or("missing def tag")?
+                .parse()
+                .map_err(|_| "invalid def tag")?;
+
+            Ok(ParsedFacet::Def(domain_id, def_tag))
+        }
+        "domain" => {
+            let domain_id = path
+                .next()
+                .ok_or("missing domain id")?
+                .parse()
+                .map_err(|_| "invalid domain id")?;
+
+            Ok(ParsedFacet::Domain(domain_id))
+        }
+        _prefix => Err("invalid facet prefix"),
     }
 }
 

@@ -362,6 +362,29 @@ impl Query {
                     })
                 })
                 .collect::<Result<_, _>>()?,
+            facets: gql_vertex::VertexSearchFacets {
+                domains: results
+                    .facets
+                    .domains
+                    .into_iter()
+                    .map(|f| gql_vertex::VertexSearchDomainFacetCount {
+                        domain_id: f.facet.domain_id.to_string().into(),
+                        count: f.count.try_into().unwrap_or(i32::MAX),
+                    })
+                    .collect(),
+                defs: results
+                    .facets
+                    .defs
+                    .into_iter()
+                    .map(|f| gql_vertex::VertexSearchDefFacetCount {
+                        def_id: gql_id::DefId {
+                            domain_id: f.facet.domain_id,
+                            def_tag: f.facet.def_tag.unwrap(),
+                        },
+                        count: f.count.try_into().unwrap_or(i32::MAX),
+                    })
+                    .collect(),
+            },
             page_info: None,
         })
     }
