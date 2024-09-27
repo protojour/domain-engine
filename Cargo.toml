@@ -52,7 +52,7 @@ regex-automata = "0.4"
 arcstr = { version = "1", features = ["serde"] }
 ordered-float = { version = "4", features = ["serde"] }
 unimock = "0.6"
-rstest = { version = "0.21", default-features = false }
+rstest = { version = "0.22", default-features = false }
 
 [workspace.dependencies.juniper]
 git = "https://github.com/protojour/juniper"

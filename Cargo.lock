@@ -213,9 +213,9 @@ dependencies = [
 
 [[package]]
 name = "async-trait"
-version = "0.1.82"
+version = "0.1.83"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a27b8a3a6e1a44fa4c8baf1f653e4172e81486d4941f2237e20dc2d0cf4ddff1"
+checksum = "721cae7de5c34fbb2acd27e21e6d2cf7b886dce0c27388d46c4e6c47ea4318dd"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -253,9 +253,9 @@ dependencies = [
 
 [[package]]
 name = "autocfg"
-version = "1.3.0"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c4b4d0bd25bd0b74681c0ad21497610ce1b7c91b1022cd21c80c6fbdd9476b0"
+checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "axum"
@@ -513,9 +513,9 @@ checksum = "37b2a672a2cb129a2e41c10b1224bb368f9f37a2b16b612598138befd7b37eb5"
 
 [[package]]
 name = "cc"
-version = "1.1.21"
+version = "1.1.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07b1695e2c7e8fc85310cde85aeaab7e3097f593c91d209d3f9df76c928100f0"
+checksum = "9540e661f81799159abee814118cc139a2004b3a3aa3ea37724a1b66530b90e0"
 dependencies = [
  "jobserver",
  "libc",
@@ -1114,7 +1114,7 @@ dependencies = [
  "ontol-macros",
  "ontol-runtime",
  "ontol-test-utils",
- "ordered-float 4.2.2",
+ "ordered-float 4.3.0",
  "pin-utils",
  "postgres-protocol 0.6.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "postgres-types",
@@ -1177,7 +1177,7 @@ dependencies = [
  "juniper",
  "ontol-runtime",
  "ontol-test-utils",
- "ordered-float 4.2.2",
+ "ordered-float 4.3.0",
  "reqwest",
  "reqwest-middleware",
  "serde",
@@ -1259,9 +1259,9 @@ dependencies = [
 
 [[package]]
 name = "fake"
-version = "2.9.2"
+version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c25829bde82205da46e1823b2259db6273379f626fc211f126f65654a2669be"
+checksum = "2d391ba4af7f1d93f01fcf7b2f29e2bc9348e109dfdbf4dcbdc51dfa38dab0b6"
 dependencies = [
  "chrono",
  "deunicode",
@@ -1320,9 +1320,9 @@ dependencies = [
 
 [[package]]
 name = "flate2"
-version = "1.0.33"
+version = "1.0.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "324a1be68054ef05ad64b861cc9eaf1d623d2d8cb25b4bf2cb9cdd902b4bf253"
+checksum = "a1b589b4dc103969ad3cf85c950899926ec64300a1a46d76c03a6072957036f0"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
@@ -1706,9 +1706,9 @@ dependencies = [
 
 [[package]]
 name = "hyper-util"
-version = "0.1.8"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da62f120a8a37763efb0cf8fdf264b884c7b8b9ac8660b900c8661030c00e6ba"
+checksum = "41296eb09f183ac68eec06e03cdbea2e759633d4067b2f6552fc2e009bcad08b"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -1719,7 +1719,6 @@ dependencies = [
  "pin-project-lite",
  "socket2",
  "tokio",
- "tower 0.4.13",
  "tower-service",
  "tracing",
 ]
@@ -2014,9 +2013,9 @@ checksum = "0c2cdeb66e45e9f36bfad5bbdb4d2384e70936afbee843c6f6543f0c551ebb25"
 
 [[package]]
 name = "libc"
-version = "0.2.158"
+version = "0.2.159"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8adc4bb1803a324070e64a98ae98f38934d91957a99cfb3a43dcbc01bc56439"
+checksum = "561d97a539a36e26a9a5fad1ea11a3039a67714694aaa379433e580854bc3dc5"
 
 [[package]]
 name = "libdbus-sys"
@@ -2502,7 +2501,7 @@ dependencies = [
  "ontol-parser",
  "ontol-runtime",
  "ontol-test-utils",
- "ordered-float 4.2.2",
+ "ordered-float 4.3.0",
  "patricia_tree",
  "phf_generator",
  "phf_shared",
@@ -2631,7 +2630,7 @@ dependencies = [
  "num",
  "num_enum",
  "ontol-macros",
- "ordered-float 4.2.2",
+ "ordered-float 4.3.0",
  "phf_shared",
  "pretty_assertions",
  "regex-automata 0.4.7",
@@ -2752,9 +2751,9 @@ dependencies = [
 
 [[package]]
 name = "ordered-float"
-version = "4.2.2"
+version = "4.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a91171844676f8c7990ce64959210cd2eaef32c2612c50f9fae9f8aaa6065a6"
+checksum = "44d501f1a72f71d3c063a6bbc8f7271fa73aa09fe5d6283b6571e2ed176a2537"
 dependencies = [
  "num-traits",
  "rand",
@@ -2943,8 +2942,8 @@ dependencies = [
 
 [[package]]
 name = "postgres-derive"
-version = "0.4.5"
-source = "git+https://github.com/audunhalland/rust-postgres.git?branch=pub_col_buffer#b68bb07cc96a5382aa1dbc35d88051f749e623e6"
+version = "0.4.6"
+source = "git+https://github.com/audunhalland/rust-postgres.git?branch=pub_col_buffer#fa2e4045bc7147581b013bccf11d16dc46453ad3"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
@@ -2973,7 +2972,7 @@ dependencies = [
 [[package]]
 name = "postgres-protocol"
 version = "0.6.7"
-source = "git+https://github.com/audunhalland/rust-postgres.git?branch=pub_col_buffer#b68bb07cc96a5382aa1dbc35d88051f749e623e6"
+source = "git+https://github.com/audunhalland/rust-postgres.git?branch=pub_col_buffer#fa2e4045bc7147581b013bccf11d16dc46453ad3"
 dependencies = [
  "base64 0.22.1",
  "byteorder",
@@ -2989,8 +2988,8 @@ dependencies = [
 
 [[package]]
 name = "postgres-types"
-version = "0.2.7"
-source = "git+https://github.com/audunhalland/rust-postgres.git?branch=pub_col_buffer#b68bb07cc96a5382aa1dbc35d88051f749e623e6"
+version = "0.2.8"
+source = "git+https://github.com/audunhalland/rust-postgres.git?branch=pub_col_buffer#fa2e4045bc7147581b013bccf11d16dc46453ad3"
 dependencies = [
  "bytes",
  "chrono",
@@ -3197,9 +3196,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.5.4"
+version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0884ad60e090bf1345b93da0a5de8923c93884cd03f40dfcfddd3b4bee661853"
+checksum = "355ae415ccd3a04315d3f8246e86d67689ea74d88d915576e1589a351062a13b"
 dependencies = [
  "bitflags 2.6.0",
 ]
@@ -3398,9 +3397,9 @@ dependencies = [
 
 [[package]]
 name = "rstest"
-version = "0.21.0"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9afd55a67069d6e434a95161415f5beeada95a01c7b815508a82dcb0e1593682"
+checksum = "7b423f0e62bdd61734b67cd21ff50871dfaeb9cc74f869dcd6af974fbcb19936"
 dependencies = [
  "rstest_macros",
  "rustc_version",
@@ -3408,9 +3407,9 @@ dependencies = [
 
 [[package]]
 name = "rstest_macros"
-version = "0.21.0"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4165dfae59a39dd41d8dec720d3cbfbc71f69744efb480a3920f5d4e0cc6798d"
+checksum = "c5e1711e7d14f74b12a58411c542185ef7fb7f2e7f8ee6e2940a883628522b42"
 dependencies = [
  "cfg-if",
  "glob",
@@ -3499,9 +3498,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-pki-types"
-version = "1.8.0"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc0a2ce646f8655401bb81e7927b812614bd5d91dbc968696be50603510fcaf0"
+checksum = "0e696e35370c65c9c541198af4543ccd580cf17fc25d8e05c5a242b202488c55"
 
 [[package]]
 name = "rustls-webpki"
@@ -3787,9 +3786,9 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "syn"
-version = "2.0.77"
+version = "2.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f35bcdf61fd8e7be6caf75f429fdca8beb3ed76584befb503b1569faee373ed"
+checksum = "89132cd0bf050864e1d38dc3bbc07a0eb8e7530af26344d3d2bbbef83499f590"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4127,8 +4126,8 @@ dependencies = [
 
 [[package]]
 name = "tokio-postgres"
-version = "0.7.11"
-source = "git+https://github.com/audunhalland/rust-postgres.git?branch=pub_col_buffer#b68bb07cc96a5382aa1dbc35d88051f749e623e6"
+version = "0.7.12"
+source = "git+https://github.com/audunhalland/rust-postgres.git?branch=pub_col_buffer#fa2e4045bc7147581b013bccf11d16dc46453ad3"
 dependencies = [
  "async-trait",
  "byteorder",
@@ -4222,7 +4221,6 @@ dependencies = [
  "futures-util",
  "pin-project",
  "pin-project-lite",
- "tokio",
  "tower-layer",
  "tower-service",
 ]
