@@ -264,7 +264,7 @@ impl<'a> TransactCtx<'a> {
                 let input_param = sql_params.get(param_idx).unwrap();
 
                 let unit_val =
-                    self.deserialize_sql(rel_info.target.def_id(), input_param.clone().into())?;
+                    self.deserialize_sql(rel_info.target.def_id(), input_param.clone())?;
                 attrs.insert(*prop_id, Attr::Unit(unit_val));
                 param_idx += 1;
             } else if let Some(ValueGenerator::CreatedAtTime | ValueGenerator::UpdatedAtTime) =
@@ -273,7 +273,7 @@ impl<'a> TransactCtx<'a> {
                 let input_param = sql_params.first().unwrap();
 
                 let unit_val =
-                    self.deserialize_sql(rel_info.target.def_id(), input_param.clone().into())?;
+                    self.deserialize_sql(rel_info.target.def_id(), input_param.clone())?;
                 attrs.insert(*prop_id, Attr::Unit(unit_val));
             }
         }

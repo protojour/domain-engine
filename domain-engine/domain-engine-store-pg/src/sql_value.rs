@@ -28,7 +28,7 @@ impl From<CodecError> for DomainError {
 
 pub type CodecResult<T> = Result<T, CodecError>;
 
-/// Something put into PG
+/// Dynamic data type convertible to/from SQL cells
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SqlScalar {
     Null,
@@ -44,24 +44,10 @@ pub enum SqlScalar {
     Time(chrono::NaiveTime),
 }
 
-pub type PgTimestamp = chrono::DateTime<chrono::Utc>;
-
-/// Something read out of PG
-#[derive(Debug)]
-pub enum SqlOutput {
-    Scalar(SqlScalar),
-}
-
-impl<'b> From<SqlScalar> for SqlOutput {
-    fn from(value: SqlScalar) -> Self {
-        Self::Scalar(value)
-    }
-}
-
-impl SqlOutput {
+impl SqlScalar {
     pub fn null_filter(self) -> Option<Self> {
         match self {
-            Self::Scalar(SqlScalar::Null) => None,
+            Self::Null => None,
             other => Some(other),
         }
     }
@@ -69,11 +55,13 @@ impl SqlOutput {
     #[expect(unused)]
     pub fn non_null(self) -> DomainResult<Self> {
         match self {
-            Self::Scalar(SqlScalar::Null) => Err(PgError::InvalidType("null").into()),
+            Self::Null => Err(PgError::InvalidType("null").into()),
             other => Ok(other),
         }
     }
 }
+
+pub type PgTimestamp = chrono::DateTime<chrono::Utc>;
 
 impl ToSql for SqlScalar {
     fn to_sql(

@@ -13,7 +13,7 @@ use crate::{
     pg_model::{PgDataKey, PgDomainTable, PgRepr, PgTable, PgType},
     sql,
     sql_iter::SqlIterator,
-    sql_value::{PgTimestamp, SqlOutput, SqlScalar},
+    sql_value::{PgTimestamp, SqlScalar},
 };
 
 use super::{query_select::VertexSelect, TransactCtx};
@@ -144,7 +144,7 @@ impl<'a> TransactCtx<'a> {
                 };
                 Ok(Some(self.deserialize_sql(
                     target_def_id,
-                    SqlOutput::Scalar(SqlScalar::Timestamp(standard_fields.created_at)),
+                    SqlScalar::Timestamp(standard_fields.created_at),
                 )?))
             }
             PgRepr::UpdatedAtColumn => {
@@ -153,7 +153,7 @@ impl<'a> TransactCtx<'a> {
                 };
                 Ok(Some(self.deserialize_sql(
                     target_def_id,
-                    SqlOutput::Scalar(SqlScalar::Timestamp(standard_fields.updated_at)),
+                    SqlScalar::Timestamp(standard_fields.updated_at),
                 )?))
             }
             PgRepr::Abstract => Ok(None),

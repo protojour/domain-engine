@@ -931,7 +931,7 @@ impl<'a> TransactCtx<'a> {
 
         'outer: for ((_, def_id), scalars) in &mut_ctx.tentative_foreign_keys {
             for scalar in scalars.keys() {
-                values.push(self.deserialize_sql(*def_id, scalar.clone().into())?);
+                values.push(self.deserialize_sql(*def_id, scalar.clone())?);
 
                 if values.len() >= MAX_REPORTED {
                     break 'outer;
@@ -959,7 +959,7 @@ impl<'a> TransactCtx<'a> {
     }
 
     pub fn unresolved_foreign_error(&self, def_id: DefId, id: SqlScalar) -> DomainError {
-        match self.deserialize_sql(def_id, id.into()) {
+        match self.deserialize_sql(def_id, id) {
             Ok(value) => DomainErrorKind::UnresolvedForeignKey(self.ontology.format_value(&value))
                 .into_error(),
             Err(error) => error,

@@ -14,7 +14,7 @@ use ontol_runtime::{
 use crate::{
     pg_error::{ds_bad_req, ds_err},
     pg_model::{PgDataKey, PgRegKey},
-    sql_value::{PgTimestamp, SqlOutput, SqlScalar},
+    sql_value::{PgTimestamp, SqlScalar},
 };
 
 use super::TransactCtx;
@@ -55,7 +55,7 @@ pub enum Compound {
 }
 
 impl<'a> TransactCtx<'a> {
-    pub fn deserialize_sql(&self, def_id: DefId, sql_val: SqlOutput) -> DomainResult<Value> {
+    pub fn deserialize_sql(&self, def_id: DefId, sql_val: SqlScalar) -> DomainResult<Value> {
         let tag = ValueTag::from(def_id);
 
         match &self.ontology.def(def_id).kind {
@@ -76,28 +76,20 @@ impl<'a> TransactCtx<'a> {
                 (_sql_val, DefRepr::FmtStruct(None)) => {
                     unreachable!("tried to deserialize an empty FmtStruct (has no data)")
                 }
-                (SqlOutput::Scalar(SqlScalar::Unit | SqlScalar::Null), _) => Ok(Value::Unit(tag)),
-                (SqlOutput::Scalar(SqlScalar::Bool(b)), _) => {
-                    Ok(Value::I64(if b { 1 } else { 0 }, tag))
-                }
-                (SqlOutput::Scalar(SqlScalar::I32(i)), _) => Ok(Value::I64(i as i64, tag)),
-                (SqlOutput::Scalar(SqlScalar::I64(i)), DefRepr::Serial) => Ok(Value::Serial(
+                (SqlScalar::Unit | SqlScalar::Null, _) => Ok(Value::Unit(tag)),
+                (SqlScalar::Bool(b), _) => Ok(Value::I64(if b { 1 } else { 0 }, tag)),
+                (SqlScalar::I32(i), _) => Ok(Value::I64(i as i64, tag)),
+                (SqlScalar::I64(i), DefRepr::Serial) => Ok(Value::Serial(
                     Serial(i.try_into().map_err(|_| ds_err("serial underflow"))?),
                     tag,
                 )),
-                (SqlOutput::Scalar(SqlScalar::I64(i)), _) => Ok(Value::I64(i, tag)),
-                (SqlOutput::Scalar(SqlScalar::F64(f)), _) => Ok(Value::F64(f.into(), tag)),
-                (SqlOutput::Scalar(SqlScalar::Text(string)), _) => {
-                    Ok(Value::Text(string.into(), tag))
-                }
-                (SqlOutput::Scalar(SqlScalar::Octets(seq)), _) => {
-                    Ok(Value::OctetSequence(seq, tag))
-                }
-                (SqlOutput::Scalar(SqlScalar::Timestamp(dt)), _) => {
-                    Ok(Value::ChronoDateTime(dt, tag))
-                }
-                (SqlOutput::Scalar(SqlScalar::Date(d)), _) => Ok(Value::ChronoDate(d, tag)),
-                (SqlOutput::Scalar(SqlScalar::Time(t)), _) => Ok(Value::ChronoTime(t, tag)),
+                (SqlScalar::I64(i), _) => Ok(Value::I64(i, tag)),
+                (SqlScalar::F64(f), _) => Ok(Value::F64(f.into(), tag)),
+                (SqlScalar::Text(string), _) => Ok(Value::Text(string.into(), tag)),
+                (SqlScalar::Octets(seq), _) => Ok(Value::OctetSequence(seq, tag)),
+                (SqlScalar::Timestamp(dt), _) => Ok(Value::ChronoDateTime(dt, tag)),
+                (SqlScalar::Date(d), _) => Ok(Value::ChronoDate(d, tag)),
+                (SqlScalar::Time(t), _) => Ok(Value::ChronoTime(t, tag)),
             },
             _ => Err(ds_err("unrecognized DefKind for PG scalar deserialization")),
         }
