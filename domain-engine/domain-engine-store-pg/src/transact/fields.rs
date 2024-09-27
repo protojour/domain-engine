@@ -13,7 +13,7 @@ use crate::{
     pg_model::{PgDataKey, PgDomainTable, PgRepr, PgTable, PgType},
     sql,
     sql_record::SqlRecordIterator,
-    sql_value::{Layout, PgTimestamp, SqlOutput, SqlScalar},
+    sql_value::{PgTimestamp, SqlOutput, SqlScalar},
 };
 
 use super::{query_select::VertexSelect, TransactCtx};
@@ -123,7 +123,7 @@ impl<'a> TransactCtx<'a> {
 
         match pg_repr {
             PgRepr::Scalar(pg_type, _) => {
-                let sql_val = record_iter.next_field(&Layout::Scalar(pg_type))?;
+                let sql_val = record_iter.next_field_dyn(pg_type)?;
 
                 Ok(if let Some(sql_val) = sql_val.null_filter() {
                     Some(self.deserialize_sql(target_def_id, sql_val)?)

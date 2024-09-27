@@ -60,10 +60,6 @@ branch = "protojour-mods"
 default-features = false
 features = ["schema-language", "chrono"]
 
-[patch.crates-io]
-tokio-postgres = { git = "https://github.com/audunhalland/rust-postgres.git", branch = "pub_col_buffer" }
-postgres-types = { git = "https://github.com/audunhalland/rust-postgres.git", branch = "pub_col_buffer" }
-
 [profile.release]
 strip = true
 opt-level = "z"

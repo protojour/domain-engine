@@ -25,11 +25,11 @@ use tracing::{debug, trace, warn};
 use crate::{
     pg_error::{map_row_error, PgError, PgInputError},
     pg_model::{
-        EdgeId, InDomain, PgColumnRef, PgDataKey, PgDomainTable, PgDomainTableType, PgRepr, PgType,
+        EdgeId, InDomain, PgColumnRef, PgDataKey, PgDomainTable, PgDomainTableType, PgRepr,
     },
     sql::{self},
     sql_record::{SqlColumnStream, SqlRecordIterator},
-    sql_value::{Layout, PgTimestamp, SqlScalar},
+    sql_value::{PgTimestamp, SqlScalar},
     statement::{Prepare, PreparedStatement, ToArcStr},
     transact::query::IncludeJoinedAttrs,
 };
@@ -838,9 +838,7 @@ impl<'a> TransactCtx<'a> {
         let mut column_stream = SqlColumnStream::new(&row);
 
         // read the initial `xmax = 0` column
-        let inserted = column_stream
-            .next_field(&Layout::Scalar(PgType::Boolean))?
-            .into_bool()?;
+        let inserted = column_stream.next_field::<bool>()?;
 
         self.read_vertex_row_value(
             column_stream,

@@ -32,7 +32,7 @@ use crate::{
     },
     sql::{self, FromItem, WhereExt},
     sql_record::{SqlColumnStream, SqlRecord, SqlRecordIterator},
-    sql_value::{Layout, SqlScalar},
+    sql_value::{Layout, SqlArray, SqlScalar},
     transact::query_select::QuerySelectRef,
 };
 
@@ -266,7 +266,7 @@ impl<'a> TransactCtx<'a> {
                     // must read this for every row if include_total_len was true
                     total_len = Some(
                         row_iter
-                            .next_field(&Layout::Scalar(PgType::BigInt))?.into_i64()? as usize
+                            .next_field::<i64>()? as usize
                     );
                 }
 
@@ -628,19 +628,11 @@ impl<'a> TransactCtx<'a> {
         include_joined_attrs: IncludeJoinedAttrs,
         op: DataOperation,
     ) -> DomainResult<RowValue> {
-        let def_key = iterator
-            .next_field(&Layout::Scalar(PgType::Integer))?
-            .into_i32()?;
+        let def_key = iterator.next_field::<PgRegKey>()?;
 
-        let data_key = iterator
-            .next_field(&Layout::Scalar(PgType::BigInt))?
-            .into_i64()?;
-        let created_at = iterator
-            .next_field(&Layout::Scalar(PgType::TimestampTz))?
-            .into_timestamp()?;
-        let updated_at = iterator
-            .next_field(&Layout::Scalar(PgType::TimestampTz))?
-            .into_timestamp()?;
+        let data_key = iterator.next_field::<PgDataKey>()?;
+        let created_at = iterator.next_field::<chrono::DateTime<chrono::Utc>>()?;
+        let updated_at = iterator.next_field::<chrono::DateTime<chrono::Utc>>()?;
 
         let standard_attrs = StandardAttrs {
             data_key,
@@ -761,8 +753,7 @@ impl<'a> TransactCtx<'a> {
                     &rel_info.cardinality.1,
                 ) {
                     (AbstractKind::VertexUnion(_), ValueCardinality::Unit) => {
-                        if let Some(sql_val) = iterator.next_field(&Layout::Record)?.null_filter() {
-                            let sql_record = sql_val.into_record()?;
+                        if let Some(sql_record) = iterator.next_field::<Option<SqlRecord>>()? {
                             let row_value = self.read_vertex_row_value(
                                 sql_record.fields(),
                                 abstract_select.as_ref(),
@@ -779,7 +770,7 @@ impl<'a> TransactCtx<'a> {
                         AbstractKind::VertexUnion(_),
                         ValueCardinality::IndexSet | ValueCardinality::List,
                     ) => {
-                        let sql_array = iterator.next_field(&Layout::Array)?.into_array()?;
+                        let sql_array = iterator.next_field::<SqlArray>()?;
                         let mut matrix = AttrMatrix::default();
                         matrix.columns.push(Default::default());
 
@@ -810,7 +801,7 @@ impl<'a> TransactCtx<'a> {
                         },
                         _,
                     ) => {
-                        let sql_array = iterator.next_field(&Layout::Array)?.into_array()?;
+                        let sql_array = iterator.next_field::<SqlArray>()?;
 
                         let mut matrix = AttrMatrix::default();
                         matrix.columns.push(Default::default());
@@ -865,10 +856,7 @@ impl<'a> TransactCtx<'a> {
 
             match rel_info.cardinality.1 {
                 ValueCardinality::Unit => {
-                    if let Some(sql_edge_tuple) =
-                        record_iter.next_field(&Layout::Record)?.null_filter()
-                    {
-                        let sql_edge_tuple = sql_edge_tuple.into_record()?;
+                    if let Some(sql_edge_tuple) = record_iter.next_field::<Option<SqlRecord>>()? {
                         let attr = self.read_edge_tuple_as_attr(
                             sql_edge_tuple,
                             cardinal_selects,
@@ -878,7 +866,7 @@ impl<'a> TransactCtx<'a> {
                     }
                 }
                 ValueCardinality::IndexSet | ValueCardinality::List => {
-                    let sql_array = record_iter.next_field(&Layout::Array)?.into_array()?;
+                    let sql_array = record_iter.next_field::<SqlArray>()?;
 
                     let mut matrix = AttrMatrix::default();
                     matrix.columns.push(Default::default());
@@ -934,7 +922,7 @@ impl<'a> TransactCtx<'a> {
         debug!("read edge tuple {cardinal_selects:#?}");
 
         for cardinal_select in cardinal_selects {
-            let sql_record = tuple_fields.next_field(&Layout::Record)?.into_record()?;
+            let sql_record = tuple_fields.next_field::<SqlRecord>()?;
             let Some(pg_cardinal) = pg_edge.edge_cardinals.get(&cardinal_select.cardinal_idx)
             else {
                 continue;
@@ -993,18 +981,16 @@ impl<'a> TransactCtx<'a> {
 
                 let pg_id = pg_def.pg.table.column(&entity.id_prop)?;
                 let mut fields = sql_record.fields();
-                fields.next_field(&Layout::Scalar(PgType::Integer))?;
-                let sql_field = fields.next_field(&Layout::Scalar(pg_id.pg_type))?;
+                fields.next_field::<PgRegKey>()?;
+                let sql_output = fields.next_field_dyn(pg_id.pg_type)?;
 
-                self.deserialize_sql(entity.id_value_def_id, sql_field)
+                self.deserialize_sql(entity.id_value_def_id, sql_output)
             }
             QuerySelectRef::VertexAddress => {
                 let mut fields = sql_record.fields();
 
-                let _ = fields.next_field(&Layout::Scalar(PgType::Integer))?;
-                let data_key = fields
-                    .next_field(&Layout::Scalar(PgType::BigInt))?
-                    .into_i64()?;
+                fields.next_field::<PgRegKey>()?;
+                let data_key = fields.next_field()?;
 
                 Ok(make_ontol_vertex_address(def_key, data_key))
             }

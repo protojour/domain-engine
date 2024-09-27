@@ -55,7 +55,6 @@ pub type PgTimestamp = chrono::DateTime<chrono::Utc>;
 #[derive(Debug)]
 pub enum SqlOutput<'b> {
     Scalar(SqlScalar),
-    Array(SqlArray<'b>),
     Record(SqlRecord<'b>),
 }
 
@@ -69,7 +68,6 @@ impl<'b> From<SqlScalar> for SqlOutput<'b> {
 #[derive(Debug)]
 pub enum Layout {
     Scalar(PgType),
-    Array,
     Record,
 }
 
@@ -86,41 +84,6 @@ impl<'b> SqlOutput<'b> {
         match self {
             Self::Scalar(SqlScalar::Null) => Err(PgError::InvalidType("null").into()),
             other => Ok(other),
-        }
-    }
-
-    pub fn into_bool(self) -> DomainResult<bool> {
-        match self {
-            Self::Scalar(SqlScalar::Bool(b)) => Ok(b),
-            _ => Err(PgError::ExpectedType("boolean").into()),
-        }
-    }
-
-    pub fn into_i32(self) -> DomainResult<i32> {
-        match self {
-            Self::Scalar(SqlScalar::I32(int)) => Ok(int),
-            _ => Err(PgError::ExpectedType("i32").into()),
-        }
-    }
-
-    pub fn into_i64(self) -> DomainResult<i64> {
-        match self {
-            Self::Scalar(SqlScalar::I64(int)) => Ok(int),
-            _ => Err(PgError::ExpectedType("i64").into()),
-        }
-    }
-
-    pub fn into_timestamp(self) -> DomainResult<PgTimestamp> {
-        match self {
-            Self::Scalar(SqlScalar::Timestamp(ts)) => Ok(ts),
-            _ => Err(PgError::ExpectedType("timestamp").into()),
-        }
-    }
-
-    pub fn into_array(self) -> DomainResult<SqlArray<'b>> {
-        match self {
-            Self::Array(array) => Ok(array),
-            _ => Err(PgError::ExpectedType("array").into()),
         }
     }
 
@@ -162,14 +125,6 @@ impl<'b> SqlOutput<'b> {
                 raw,
             )?)
             .into()),
-            Layout::Array => {
-                let array = postgres_protocol::types::array_from_sql(raw)?;
-                if array.dimensions().count()? > 1 {
-                    return Err(CodecError("array contains too many dimensions".into()));
-                }
-
-                Ok(Self::Array(SqlArray { inner: array }))
-            }
             Layout::Record => Ok(Self::Record(SqlRecord::from_sql(raw)?)),
         }
     }
@@ -241,6 +196,24 @@ impl<'b> SqlArray<'b> {
             .values()
             .iterator()
             .map(move |buf_result| SqlOutput::decode(buf_result?, element_layout))
+    }
+}
+
+impl<'b> FromSql<'b> for SqlArray<'b> {
+    fn from_sql(
+        _ty: &Type,
+        raw: &'b [u8],
+    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        let array = postgres_protocol::types::array_from_sql(raw)?;
+        if array.dimensions().count()? > 1 {
+            return Err("array contains too many dimensions".into());
+        }
+
+        Ok(SqlArray { inner: array })
+    }
+
+    fn accepts(_ty: &Type) -> bool {
+        true
     }
 }
 
