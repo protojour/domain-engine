@@ -35,7 +35,7 @@ axum = { version = "0.7", features = ["ws"] }
 http-body = "1"
 bytes = "1"
 anyhow = "1"
-tower-http = { version = "0.5", features = ["trace", "cors"] }
+tower-http = { version = "0.6", features = ["trace", "cors"] }
 tikv-jemallocator = "0.6"
 tower-service = "0.3.2"
 crossterm = { version = "0.28", optional = true, default-features = false }
