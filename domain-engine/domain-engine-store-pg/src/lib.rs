@@ -20,6 +20,8 @@ mod migrate;
 mod pg_error;
 mod pg_model;
 mod sql;
+mod sql_array;
+mod sql_iter;
 mod sql_record;
 mod sql_value;
 mod statement;

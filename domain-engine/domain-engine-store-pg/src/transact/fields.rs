@@ -12,7 +12,7 @@ use crate::{
     pg_error::PgModelError,
     pg_model::{PgDataKey, PgDomainTable, PgRepr, PgTable, PgType},
     sql,
-    sql_record::SqlRecordIterator,
+    sql_iter::SqlIterator,
     sql_value::{PgTimestamp, SqlOutput, SqlScalar},
 };
 
@@ -73,7 +73,7 @@ impl<'a> TransactCtx<'a> {
     /// Read the columns in the order of the VertexSelect.
     pub fn read_inherent_vertex_fields<'b>(
         &self,
-        record_iter: &mut impl SqlRecordIterator<'b>,
+        record_iter: &mut impl SqlIterator<'b>,
         def: &Def,
         vertex_select: &VertexSelect,
         attrs: &mut FnvHashMap<PropId, Attr>,
@@ -111,7 +111,7 @@ impl<'a> TransactCtx<'a> {
     pub fn read_field<'b>(
         &self,
         rel_info: &DataRelationshipInfo,
-        record_iter: &mut impl SqlRecordIterator<'b>,
+        record_iter: &mut impl SqlIterator<'b>,
         standard_fields: Option<&StandardAttrs>,
     ) -> DomainResult<Option<Value>> {
         let target_def_id = rel_info.target.def_id();
@@ -123,7 +123,7 @@ impl<'a> TransactCtx<'a> {
 
         match pg_repr {
             PgRepr::Scalar(pg_type, _) => {
-                let sql_val = record_iter.next_field_dyn(pg_type)?;
+                let sql_val = record_iter.next_dyn(pg_type)?;
 
                 Ok(if let Some(sql_val) = sql_val.null_filter() {
                     Some(self.deserialize_sql(target_def_id, sql_val)?)

@@ -28,11 +28,13 @@ use crate::{
     address::make_ontol_vertex_address,
     pg_error::{PgError, PgInputError, PgModelError},
     pg_model::{
-        EdgeId, PgDataKey, PgDomainTable, PgEdgeCardinalKind, PgRegKey, PgTable, PgTableKey, PgType,
+        EdgeId, PgDataKey, PgDomainTable, PgEdgeCardinalKind, PgRegKey, PgTable, PgTableKey,
     },
     sql::{self, FromItem, WhereExt},
-    sql_record::{SqlColumnStream, SqlRecord, SqlRecordIterator},
-    sql_value::{Layout, SqlArray, SqlScalar},
+    sql_array::SqlArray,
+    sql_iter::SqlIterator,
+    sql_record::{SqlColumnStream, SqlRecord},
+    sql_value::SqlScalar,
     transact::query_select::QuerySelectRef,
 };
 
@@ -148,7 +150,6 @@ impl<'a> TransactCtx<'a> {
             .pg_model
             .pg_domain_datatable(def_id.domain_index(), def_id)?;
 
-        let mut row_layout: Vec<Layout> = vec![];
         let mut query_ctx = QueryBuildCtx::default();
         let mut sql_params: Vec<SqlScalar> = vec![];
 
@@ -160,7 +161,6 @@ impl<'a> TransactCtx<'a> {
 
             if q.include_total_len {
                 expressions.items.push(sql::Expr::CountStarOver);
-                row_layout.push(Layout::Scalar(PgType::BigInt));
             }
 
             let (from, alias, tail_expressions) = {
@@ -266,7 +266,7 @@ impl<'a> TransactCtx<'a> {
                     // must read this for every row if include_total_len was true
                     total_len = Some(
                         row_iter
-                            .next_field::<i64>()? as usize
+                            .next::<i64>()? as usize
                     );
                 }
 
@@ -623,16 +623,16 @@ impl<'a> TransactCtx<'a> {
 
     pub fn read_vertex_row_value<'b>(
         &self,
-        mut iterator: impl SqlRecordIterator<'b>,
+        mut iterator: impl SqlIterator<'b>,
         query_select: QuerySelectRef,
         include_joined_attrs: IncludeJoinedAttrs,
         op: DataOperation,
     ) -> DomainResult<RowValue> {
-        let def_key = iterator.next_field::<PgRegKey>()?;
+        let def_key = iterator.next::<PgRegKey>()?;
 
-        let data_key = iterator.next_field::<PgDataKey>()?;
-        let created_at = iterator.next_field::<chrono::DateTime<chrono::Utc>>()?;
-        let updated_at = iterator.next_field::<chrono::DateTime<chrono::Utc>>()?;
+        let data_key = iterator.next::<PgDataKey>()?;
+        let created_at = iterator.next::<chrono::DateTime<chrono::Utc>>()?;
+        let updated_at = iterator.next::<chrono::DateTime<chrono::Utc>>()?;
 
         let standard_attrs = StandardAttrs {
             data_key,
@@ -709,7 +709,7 @@ impl<'a> TransactCtx<'a> {
 
     pub fn read_row_value_with_vertex_select<'b>(
         &self,
-        mut iterator: impl SqlRecordIterator<'b>,
+        mut iterator: impl SqlIterator<'b>,
         (def_key, domain_index, def_id): (PgRegKey, DomainIndex, DefId),
         standard_attrs: StandardAttrs,
         vertex_select: &VertexSelect,
@@ -753,7 +753,7 @@ impl<'a> TransactCtx<'a> {
                     &rel_info.cardinality.1,
                 ) {
                     (AbstractKind::VertexUnion(_), ValueCardinality::Unit) => {
-                        if let Some(sql_record) = iterator.next_field::<Option<SqlRecord>>()? {
+                        if let Some(sql_record) = iterator.next::<Option<SqlRecord>>()? {
                             let row_value = self.read_vertex_row_value(
                                 sql_record.fields(),
                                 abstract_select.as_ref(),
@@ -770,12 +770,12 @@ impl<'a> TransactCtx<'a> {
                         AbstractKind::VertexUnion(_),
                         ValueCardinality::IndexSet | ValueCardinality::List,
                     ) => {
-                        let sql_array = iterator.next_field::<SqlArray>()?;
+                        let mut sql_array_iter = iterator.next::<SqlArray>()?.sql_iterator()?;
                         let mut matrix = AttrMatrix::default();
                         matrix.columns.push(Default::default());
 
-                        for result in sql_array.elements(&Layout::Record) {
-                            let sql_record = result?.into_record()?;
+                        while sql_array_iter.has_next() {
+                            let sql_record = sql_array_iter.next::<SqlRecord>()?;
 
                             let row_value = self.read_vertex_row_value(
                                 sql_record.fields(),
@@ -801,13 +801,13 @@ impl<'a> TransactCtx<'a> {
                         },
                         _,
                     ) => {
-                        let sql_array = iterator.next_field::<SqlArray>()?;
+                        let mut sql_array_iter = iterator.next::<SqlArray>()?.sql_iterator()?;
 
                         let mut matrix = AttrMatrix::default();
                         matrix.columns.push(Default::default());
 
-                        for result in sql_array.elements(&Layout::Scalar(pg_type)) {
-                            let sql_val = result?;
+                        while sql_array_iter.has_next() {
+                            let sql_val = sql_array_iter.next_dyn(pg_type)?;
 
                             let value = self.deserialize_sql(target_def_id, sql_val)?;
 
@@ -839,7 +839,7 @@ impl<'a> TransactCtx<'a> {
 
     pub fn read_edge_attributes<'b>(
         &self,
-        record_iter: &mut impl SqlRecordIterator<'b>,
+        record_iter: &mut impl SqlIterator<'b>,
         def: &Def,
         vertex_select: &VertexSelect,
         attrs: &mut FnvHashMap<PropId, Attr>,
@@ -856,7 +856,7 @@ impl<'a> TransactCtx<'a> {
 
             match rel_info.cardinality.1 {
                 ValueCardinality::Unit => {
-                    if let Some(sql_edge_tuple) = record_iter.next_field::<Option<SqlRecord>>()? {
+                    if let Some(sql_edge_tuple) = record_iter.next::<Option<SqlRecord>>()? {
                         let attr = self.read_edge_tuple_as_attr(
                             sql_edge_tuple,
                             cardinal_selects,
@@ -866,13 +866,13 @@ impl<'a> TransactCtx<'a> {
                     }
                 }
                 ValueCardinality::IndexSet | ValueCardinality::List => {
-                    let sql_array = record_iter.next_field::<SqlArray>()?;
+                    let mut sql_array_iter = record_iter.next::<SqlArray>()?.sql_iterator()?;
 
                     let mut matrix = AttrMatrix::default();
                     matrix.columns.push(Default::default());
 
-                    for result in sql_array.elements(&Layout::Record) {
-                        let sql_edge_tuple = result?.into_record()?;
+                    while sql_array_iter.has_next() {
+                        let sql_edge_tuple = sql_array_iter.next::<SqlRecord>()?;
 
                         match self.read_edge_tuple_as_attr(
                             sql_edge_tuple,
@@ -922,7 +922,7 @@ impl<'a> TransactCtx<'a> {
         debug!("read edge tuple {cardinal_selects:#?}");
 
         for cardinal_select in cardinal_selects {
-            let sql_record = tuple_fields.next_field::<SqlRecord>()?;
+            let sql_record = tuple_fields.next::<SqlRecord>()?;
             let Some(pg_cardinal) = pg_edge.edge_cardinals.get(&cardinal_select.cardinal_idx)
             else {
                 continue;
@@ -981,16 +981,16 @@ impl<'a> TransactCtx<'a> {
 
                 let pg_id = pg_def.pg.table.column(&entity.id_prop)?;
                 let mut fields = sql_record.fields();
-                fields.next_field::<PgRegKey>()?;
-                let sql_output = fields.next_field_dyn(pg_id.pg_type)?;
+                fields.next::<PgRegKey>()?;
+                let sql_output = fields.next_dyn(pg_id.pg_type)?;
 
                 self.deserialize_sql(entity.id_value_def_id, sql_output)
             }
             QuerySelectRef::VertexAddress => {
                 let mut fields = sql_record.fields();
 
-                fields.next_field::<PgRegKey>()?;
-                let data_key = fields.next_field()?;
+                fields.next::<PgRegKey>()?;
+                let data_key = fields.next()?;
 
                 Ok(make_ontol_vertex_address(def_key, data_key))
             }

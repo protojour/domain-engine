@@ -28,7 +28,8 @@ use crate::{
         EdgeId, InDomain, PgColumnRef, PgDataKey, PgDomainTable, PgDomainTableType, PgRepr,
     },
     sql::{self},
-    sql_record::{SqlColumnStream, SqlRecordIterator},
+    sql_iter::SqlIterator,
+    sql_record::SqlColumnStream,
     sql_value::{PgTimestamp, SqlScalar},
     statement::{Prepare, PreparedStatement, ToArcStr},
     transact::query::IncludeJoinedAttrs,
@@ -838,7 +839,7 @@ impl<'a> TransactCtx<'a> {
         let mut column_stream = SqlColumnStream::new(&row);
 
         // read the initial `xmax = 0` column
-        let inserted = column_stream.next_field::<bool>()?;
+        let inserted = column_stream.next::<bool>()?;
 
         self.read_vertex_row_value(
             column_stream,

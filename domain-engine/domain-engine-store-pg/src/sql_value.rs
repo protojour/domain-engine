@@ -2,13 +2,12 @@ use std::fmt::Debug;
 
 use bytes::BytesMut;
 use domain_engine_core::{DomainError, DomainResult};
-use fallible_iterator::FallibleIterator;
 use ontol_runtime::value::OctetSequence;
 use ordered_float::OrderedFloat;
-use postgres_types::{FromSql, ToSql, Type};
+use postgres_types::ToSql;
 use tracing::error;
 
-use crate::{pg_error::PgError, pg_model::PgType, sql_record::SqlRecord};
+use crate::pg_error::PgError;
 
 type BoxError = Box<dyn std::error::Error + Sync + Send>;
 
@@ -28,10 +27,6 @@ impl From<CodecError> for DomainError {
 }
 
 pub type CodecResult<T> = Result<T, CodecError>;
-
-mod wellknown_oid {
-    pub const TIMESTAMPTZ: u32 = 1184;
-}
 
 /// Something put into PG
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -53,25 +48,17 @@ pub type PgTimestamp = chrono::DateTime<chrono::Utc>;
 
 /// Something read out of PG
 #[derive(Debug)]
-pub enum SqlOutput<'b> {
+pub enum SqlOutput {
     Scalar(SqlScalar),
-    Record(SqlRecord<'b>),
 }
 
-impl<'b> From<SqlScalar> for SqlOutput<'b> {
+impl<'b> From<SqlScalar> for SqlOutput {
     fn from(value: SqlScalar) -> Self {
         Self::Scalar(value)
     }
 }
 
-/// Layout of Sql data
-#[derive(Debug)]
-pub enum Layout {
-    Scalar(PgType),
-    Record,
-}
-
-impl<'b> SqlOutput<'b> {
+impl SqlOutput {
     pub fn null_filter(self) -> Option<Self> {
         match self {
             Self::Scalar(SqlScalar::Null) => None,
@@ -84,48 +71,6 @@ impl<'b> SqlOutput<'b> {
         match self {
             Self::Scalar(SqlScalar::Null) => Err(PgError::InvalidType("null").into()),
             other => Ok(other),
-        }
-    }
-
-    pub fn into_record(self) -> DomainResult<SqlRecord<'b>> {
-        match self {
-            Self::Record(record) => Ok(record),
-            _ => Err(PgError::ExpectedType("record").into()),
-        }
-    }
-
-    pub(crate) fn decode(buf: Option<&'b [u8]>, layout: &Layout) -> CodecResult<Self> {
-        let Some(raw) = buf else {
-            return Ok(SqlScalar::Null.into());
-        };
-
-        match layout {
-            Layout::Scalar(PgType::Integer) => {
-                Ok(SqlScalar::I32(postgres_protocol::types::int4_from_sql(raw)?).into())
-            }
-            Layout::Scalar(PgType::BigInt | PgType::Bigserial) => {
-                Ok(SqlScalar::I64(postgres_protocol::types::int8_from_sql(raw)?).into())
-            }
-            Layout::Scalar(PgType::DoublePrecision) => {
-                Ok(SqlScalar::F64(postgres_protocol::types::float8_from_sql(raw)?.into()).into())
-            }
-            Layout::Scalar(PgType::Boolean) => {
-                Ok(SqlScalar::Bool(postgres_protocol::types::bool_from_sql(raw)?).into())
-            }
-            Layout::Scalar(PgType::Text) => Ok(SqlScalar::Text(
-                postgres_protocol::types::text_from_sql(raw)?.to_string(),
-            )
-            .into()),
-            Layout::Scalar(PgType::Bytea) => Ok(SqlScalar::Octets(OctetSequence(
-                postgres_protocol::types::bytea_from_sql(raw).into(),
-            ))
-            .into()),
-            Layout::Scalar(PgType::TimestampTz) => Ok(SqlScalar::Timestamp(FromSql::from_sql(
-                &Type::from_oid(wellknown_oid::TIMESTAMPTZ).unwrap(),
-                raw,
-            )?)
-            .into()),
-            Layout::Record => Ok(Self::Record(SqlRecord::from_sql(raw)?)),
         }
     }
 }
@@ -177,48 +122,5 @@ impl ToSql for SqlScalar {
             Self::Date(d) => d.to_sql_checked(ty, out),
             Self::Time(t) => t.to_sql_checked(ty, out),
         }
-    }
-}
-
-pub struct SqlArray<'b> {
-    inner: postgres_protocol::types::Array<'b>,
-}
-
-impl<'b> SqlArray<'b> {
-    pub fn elements<'l>(
-        &self,
-        element_layout: &'l Layout,
-    ) -> impl Iterator<Item = CodecResult<SqlOutput<'b>>> + 'l
-    where
-        'b: 'l,
-    {
-        self.inner
-            .values()
-            .iterator()
-            .map(move |buf_result| SqlOutput::decode(buf_result?, element_layout))
-    }
-}
-
-impl<'b> FromSql<'b> for SqlArray<'b> {
-    fn from_sql(
-        _ty: &Type,
-        raw: &'b [u8],
-    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
-        let array = postgres_protocol::types::array_from_sql(raw)?;
-        if array.dimensions().count()? > 1 {
-            return Err("array contains too many dimensions".into());
-        }
-
-        Ok(SqlArray { inner: array })
-    }
-
-    fn accepts(_ty: &Type) -> bool {
-        true
-    }
-}
-
-impl<'b> Debug for SqlArray<'b> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SqlArray").finish()
     }
 }

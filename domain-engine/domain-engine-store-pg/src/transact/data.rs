@@ -98,7 +98,6 @@ impl<'a> TransactCtx<'a> {
                 }
                 (SqlOutput::Scalar(SqlScalar::Date(d)), _) => Ok(Value::ChronoDate(d, tag)),
                 (SqlOutput::Scalar(SqlScalar::Time(t)), _) => Ok(Value::ChronoTime(t, tag)),
-                (SqlOutput::Record(_), _) => Err(ds_err("cannot turn a composite into a value")),
             },
             _ => Err(ds_err("unrecognized DefKind for PG scalar deserialization")),
         }
