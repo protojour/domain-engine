@@ -1,4 +1,4 @@
 def foo ()
 def bar ()
-rel {foo} 'a'[]::'aa' bar
-rel {foo} 'b'::'bb' text // ERROR subject must be a domain type
+rel {foo} 'a'[]: bar
+rel text 'bb': foo // ERROR subject must be a domain type// ERROR must identify a type within the domain

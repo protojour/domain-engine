@@ -30,7 +30,7 @@ Ontol
                         ThisSet
                             Star `*`
                 Whitespace
-                RelFwdSet
+                RelationSet
                     Relation
                         TypeQuantUnit
                             Literal
@@ -52,7 +52,7 @@ Ontol
                         ThisSet
                             Star `*`
                 Whitespace
-                RelFwdSet
+                RelationSet
                     Relation
                         TypeQuantUnit
                             Literal

@@ -1,7 +1,10 @@
+// historical ONTOL syntax, does not work anymore:
 rel* 'a'::'b'? {c}
 
 //@ grammar=ontol
 Ontol
+    Comment `// historical ONTOL syntax, does not work anymore:`
+    Whitespace
     RelStatement
         KwRel `rel`
         RelSubject
@@ -9,24 +12,22 @@ Ontol
                 ThisSet
                     Star `*`
         Whitespace
-        RelFwdSet
+        RelationSet
             Relation
                 TypeQuantUnit
                     Literal
                         SingleQuoteText `'a'`
                 PropCardinality
         Colon `:`
-        RelBackwdSet
-            Colon `:`
-            Name
-                SingleQuoteText `'b'`
-            PropCardinality
-                Question `?`
-        Whitespace
         RelObject
-            TypeQuantSet
-                CurlyOpen `{`
-                IdentPath
-                    Symbol `c`
-                CurlyClose `}`
-    Whitespace
+            TypeQuantUnit
+                Error
+                    Colon `:`
+    Error
+        SingleQuoteText `'b'`
+        Question `?`
+        Whitespace
+        CurlyOpen `{`
+        Symbol `c`
+        CurlyClose `}`
+        Whitespace

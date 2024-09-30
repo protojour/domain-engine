@@ -15,7 +15,7 @@ Ontol
                     Dot `.`
                 CurlyClose `}`
         Whitespace
-        RelFwdSet
+        RelationSet
             Relation
                 TypeQuantUnit
                     Literal
@@ -29,7 +29,7 @@ Ontol
                                 ThisSet
                                     Star `*`
                         Whitespace
-                        RelFwdSet
+                        RelationSet
                             Relation
                                 TypeQuantUnit
                                     IdentPath

@@ -30,7 +30,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         mut block: BlockContext,
     ) -> Option<RootDefs> {
         let rel_subject = stmt.subject()?;
-        let fwd_set = stmt.fwd_set()?;
+        let relation_set = stmt.relation_set()?;
         let rel_object = stmt.object()?;
 
         let mut root_defs = RootDefs::default();
@@ -65,19 +65,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             }
         };
 
-        for (index, relation) in fwd_set.relations().enumerate() {
-            if let Some(mut defs) = self.lower_relationship(
-                subject_ty,
-                relation,
-                object_ty,
-                if index == 0 {
-                    stmt.clone().backwd_set()
-                } else {
-                    None
-                },
-                stmt.clone(),
-                &mut block,
-            ) {
+        for relation in relation_set.relations() {
+            if let Some(mut defs) =
+                self.lower_relationship(subject_ty, relation, object_ty, stmt.clone(), &mut block)
+            {
                 root_defs.append(&mut defs);
             }
         }
@@ -115,7 +106,6 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         subject_ty: ResolvedType,
         relation: insp::Relation<V>,
         object_ty: ResolvedType,
-        backward_relation: Option<insp::RelBackwdSet<V>>,
         rel_stmt: insp::RelStatement<V>,
         block: &mut BlockContext,
     ) -> Option<RootDefs> {
@@ -151,7 +141,6 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                                     (def_id, span, edge_id),
                                     relation,
                                     object_ty,
-                                    backward_relation,
                                     rel_stmt,
                                 );
                             } else {
@@ -181,13 +170,11 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             (key, ident_span, index_range_rel_params),
             relation,
             object_ty,
-            backward_relation,
             rel_stmt,
             block,
         )
     }
 
-    #[expect(clippy::too_many_arguments)]
     fn lower_literal_relationship(
         &mut self,
         subject_ty: ResolvedType,
@@ -198,13 +185,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         ),
         relation: insp::Relation<V>,
         object_ty: ResolvedType,
-        backward_relation: Option<insp::RelBackwdSet<V>>,
         rel_stmt: insp::RelStatement<V>,
         block: &mut BlockContext,
     ) -> Option<RootDefs> {
         let mut root_defs = RootDefs::new();
-
-        let has_object_prop = backward_relation.is_some();
 
         // This syntax just defines the relation the first time it's used
         let relation_def_id = self.ctx.define_relation_if_undefined(key);
@@ -283,37 +267,13 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             RelParams::Unit
         };
 
-        let object_prop = backward_relation
-            .clone()
-            .and_then(|rel| rel.name())
-            .and_then(|name| Some((name.clone(), name.text()?)))
-            .and_then(|(name, result)| Some((name, self.ctx.unescape(result)?)))
-            .map(|(name, prop)| (name, self.ctx.compiler.str_ctx.intern(&prop)));
-
         let mut relationship0 = {
             let subject_cardinality = (
                 property_cardinality(relation.prop_cardinality())
                     .unwrap_or(PropertyCardinality::Mandatory),
                 object_ty.cardinality,
             );
-            let object_cardinality = {
-                let default = if has_object_prop {
-                    // i.e. no syntax sugar: The object prop is explicit,
-                    // therefore the object cardinality is explicit.
-                    (PropertyCardinality::Mandatory, ValueCardinality::Unit)
-                } else {
-                    // The syntactic sugar case, which is the default behaviour:
-                    // Many incoming edges to the same object:
-                    (PropertyCardinality::Optional, ValueCardinality::IndexSet)
-                };
-
-                (
-                    backward_relation
-                        .and_then(|rel| property_cardinality(rel.prop_cardinality()))
-                        .unwrap_or(default.0),
-                    subject_ty.cardinality,
-                )
-            };
+            let object_cardinality = (PropertyCardinality::Optional, subject_ty.cardinality);
 
             Relationship {
                 relation_def_id,
@@ -328,30 +288,6 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 modifiers: relation_modifiers,
             }
         };
-
-        if let Some((name, prop)) = object_prop {
-            let relation1_def_id = self.unescaped_text_literal_def_id(prop);
-            let relationship1 = Relationship {
-                relation_def_id: relation1_def_id,
-                edge_projection: None,
-                relation_span: self.ctx.source_span(name.view().span()),
-                subject: relationship0.object,
-                subject_cardinality: relationship0.object_cardinality,
-                object: relationship0.subject,
-                object_cardinality: relationship0.subject_cardinality,
-                rel_params,
-                macro_source: None,
-                modifiers: vec![],
-            };
-
-            let rel_id = self.ctx.compiler.rel_ctx.alloc_rel_id(object_ty.def_id);
-            self.ctx.outcome.predefine_rel(
-                rel_id,
-                relationship1,
-                self.ctx.source_span(rel_stmt.0.span()),
-                None,
-            );
-        }
 
         // HACK(for now): invert id relationship
         if relation_def_id == OntolDefTag::RelationId.def_id() {
@@ -405,7 +341,6 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         (sym_id, ident_span, edge_id): (DefId, U32Span, EdgeId),
         relation: insp::Relation<V>,
         object_ty: ResolvedType,
-        backward_relation: Option<insp::RelBackwdSet<V>>,
         rel_stmt: insp::RelStatement<V>,
     ) -> Option<RootDefs> {
         let edge = self
@@ -424,16 +359,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     .unwrap_or(PropertyCardinality::Mandatory),
                 object_ty.cardinality,
             );
-            let object_cardinality = {
-                let default = (PropertyCardinality::Optional, ValueCardinality::IndexSet);
-
-                (
-                    backward_relation
-                        .and_then(|rel| property_cardinality(rel.prop_cardinality()))
-                        .unwrap_or(default.0),
-                    subject_ty.cardinality,
-                )
-            };
+            let object_cardinality = (PropertyCardinality::Optional, subject_ty.cardinality);
 
             let unique = matches!(subject_cardinality.1, ValueCardinality::Unit);
             let slot = *edge.symbols.get(&sym_id).unwrap();
@@ -490,8 +416,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
         for statement in rp.statements() {
             if let insp::Statement::RelStatement(rel_statement) = statement {
-                if let Some(rel_fwd_set) = rel_statement.fwd_set() {
-                    for relation in rel_fwd_set.relations() {
+                if let Some(set) = rel_statement.relation_set() {
+                    for relation in set.relations() {
                         if let Some(type_quant) = relation.relation_type() {
                             if let Some(resolved_type) = self.resolve_quant_type_reference(
                                 type_quant,

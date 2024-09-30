@@ -163,7 +163,7 @@ mod rel {
         rel_type_reference(p, TypeAccept::all());
         p.end(subject);
 
-        let fwd = p.start(Kind::RelFwdSet);
+        let relation_set = p.start(Kind::RelationSet);
         loop {
             let relation = p.start(Kind::Relation);
             forward_relation(p);
@@ -175,30 +175,9 @@ mod rel {
                 break;
             }
         }
-        p.end(fwd);
+        p.end(relation_set);
 
         p.eat(K![:]);
-
-        if matches!(p.at(), K![:]) {
-            let backwd = p.start(Kind::RelBackwdSet);
-            p.eat(K![:]);
-
-            loop {
-                let ident = p.start(Kind::Name);
-                p.eat_text_literal();
-                p.end(ident);
-
-                prop_cardinality(p);
-
-                if matches!(p.at(), K![|]) {
-                    p.eat(K![|]);
-                } else {
-                    break;
-                }
-            }
-
-            p.end(backwd);
-        }
 
         p.eat_trivia();
 

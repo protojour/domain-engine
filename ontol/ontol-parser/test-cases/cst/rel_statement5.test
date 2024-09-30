@@ -9,7 +9,7 @@ Ontol
                 ThisSet
                     Star `*`
         Whitespace
-        RelFwdSet
+        RelationSet
             Relation
                 TypeQuantUnit
                     IdentPath

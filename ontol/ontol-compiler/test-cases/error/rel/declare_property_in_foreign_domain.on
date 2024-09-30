@@ -1,0 +1,12 @@
+use 'foreign' as foreign
+
+def bar (
+    rel* 'foo': foreign.foo // This is OK
+)
+
+def baz ()
+
+rel foreign.foo 'baz': baz // ERROR definition is sealed and cannot be modified// ERROR must identify a type within the domain
+
+//@ src_name=foreign
+def foo ()

@@ -21,7 +21,7 @@ Ontol
                         ThisUnit
                             Dot `.`
                 Whitespace
-                RelFwdSet
+                RelationSet
                     Relation
                         TypeQuantUnit
                             IdentPath

@@ -14,7 +14,7 @@ Ontol
                     IdentPath
                         Symbol `b`
         Whitespace
-        RelFwdSet
+        RelationSet
             Relation
                 TypeQuantUnit
                     IdentPath

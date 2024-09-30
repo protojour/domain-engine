@@ -113,8 +113,7 @@ nodes!(Node {
     ArcVar,
     ArcTypeParam,
     RelStatement,
-    RelFwdSet,
-    RelBackwdSet,
+    RelationSet,
     Relation,
     RelSubject,
     RelObject,
@@ -302,12 +301,8 @@ impl<V: NodeView> RelStatement<V> {
         self.view().sub_nodes().find_map(RelSubject::from_view)
     }
 
-    pub fn fwd_set(&self) -> Option<RelFwdSet<V>> {
-        self.view().sub_nodes().find_map(RelFwdSet::from_view)
-    }
-
-    pub fn backwd_set(&self) -> Option<RelBackwdSet<V>> {
-        self.view().sub_nodes().find_map(RelBackwdSet::from_view)
+    pub fn relation_set(&self) -> Option<RelationSet<V>> {
+        self.view().sub_nodes().find_map(RelationSet::from_view)
     }
 
     pub fn object(&self) -> Option<RelObject<V>> {
@@ -333,21 +328,9 @@ impl<V: NodeView> RelObject<V> {
     }
 }
 
-impl<V: NodeView> RelFwdSet<V> {
+impl<V: NodeView> RelationSet<V> {
     pub fn relations(&self) -> impl Iterator<Item = Relation<V>> {
         self.view().sub_nodes().filter_map(Relation::from_view)
-    }
-}
-
-/// TODO: In the AST parser, the backward relation set can contain
-/// many things, but it's never used in examples, so it's not implemented here yet
-impl<V: NodeView> RelBackwdSet<V> {
-    pub fn name(&self) -> Option<Name<V>> {
-        self.view().sub_nodes().find_map(Name::from_view)
-    }
-
-    pub fn prop_cardinality(&self) -> Option<PropCardinality<V>> {
-        self.view().sub_nodes().find_map(PropCardinality::from_view)
     }
 }
 
