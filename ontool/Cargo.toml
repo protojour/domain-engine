@@ -5,6 +5,7 @@ edition = "2021"
 
 [features]
 crossterm = ["dep:crossterm"]
+jemalloc = ["dep:tikv-jemallocator"]
 
 [dependencies]
 domain-engine-graphql.path = "../domain-engine/domain-engine-graphql"
@@ -36,7 +37,7 @@ http-body = "1"
 bytes = "1"
 anyhow = "1"
 tower-http = { version = "0.6", features = ["trace", "cors"] }
-tikv-jemallocator = "0.6"
+tikv-jemallocator = { version = "0.6", optional = true }
 tower-service = "0.3.2"
 crossterm = { version = "0.28", optional = true, default-features = false }
 reqwest = { version = "0.12", default-features = false, features = [

@@ -66,9 +66,6 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// This environment variable is used to control logs.
 const LOG_ENV_VAR: &str = "LOG";
 
-#[global_allocator]
-static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-
 /// ontool – ONTOlogy Language tool
 #[derive(Parser)]
 #[command(version, about, arg_required_else_help(true))]
