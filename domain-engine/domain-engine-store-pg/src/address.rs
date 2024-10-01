@@ -19,10 +19,8 @@ struct Address {
 pub fn make_vertex_addr(def_key: PgRegKey, data_key: PgDataKey) -> VertexAddr {
     let address = Address { data_key, def_key };
     let mut vertex_addr = VertexAddr::default();
-    bincode::serialize_into(&mut vertex_addr, &address).unwrap();
+    postcard::to_io(&address, &mut vertex_addr).unwrap();
 
-    // PG vertex addr should fit exactly in VertexAddr inline size
-    assert_eq!(vertex_addr.len(), VertexAddr::inline_size());
     vertex_addr
 }
 
@@ -30,7 +28,7 @@ pub fn make_ontol_vertex_address(def_key: PgRegKey, data_key: PgDataKey) -> Valu
     let address = Address { data_key, def_key };
 
     let mut octet_sequence = OctetSequence(Default::default());
-    bincode::serialize_into(&mut octet_sequence.0, &address).unwrap();
+    postcard::to_io(&address, &mut octet_sequence.0).unwrap();
 
     Value::OctetSequence(octet_sequence, OntolDefTag::Vertex.def_id().into())
 }
@@ -43,8 +41,8 @@ pub fn deserialize_ontol_vertex_address(value: Value) -> DomainResult<(PgRegKey,
     deserialize_address(&seq.0)
 }
 
-pub fn deserialize_address(bincode: &[u8]) -> DomainResult<(PgRegKey, PgDataKey)> {
-    let Ok(address) = bincode::deserialize::<Address>(bincode) else {
+pub fn deserialize_address(postcard: &[u8]) -> DomainResult<(PgRegKey, PgDataKey)> {
+    let Ok(address) = postcard::from_bytes::<Address>(postcard) else {
         return Err(ds_bad_req("bad vertex encoding"));
     };
 

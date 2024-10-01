@@ -364,9 +364,9 @@ impl TestPackages {
         if !self.disable_ontology_serde {
             let mut binary_ontology: Vec<u8> = Vec::new();
             ontology
-                .try_serialize_to_bincode(&mut binary_ontology)
+                .try_serialize_to_postcard(&mut binary_ontology)
                 .unwrap();
-            ontology = Ontology::try_from_bincode(binary_ontology.as_slice()).unwrap();
+            ontology = Ontology::try_from_postcard(binary_ontology.as_slice()).unwrap();
         }
 
         Ok(OntolTest {

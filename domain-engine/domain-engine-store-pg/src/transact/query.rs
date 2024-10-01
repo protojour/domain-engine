@@ -107,7 +107,7 @@ impl<'a> TransactCtx<'a> {
         };
         let after_cursor: Option<Cursor> = match &entity_select.after_cursor {
             Some(bytes) => {
-                Some(bincode::deserialize(bytes).map_err(|e| PgInputError::BadCursor(e.into()))?)
+                Some(postcard::from_bytes(bytes).map_err(|e| PgInputError::BadCursor(e.into()))?)
             }
             None => None,
         };
@@ -287,7 +287,7 @@ impl<'a> TransactCtx<'a> {
                     Some(Cursor::Offset(offset)) => *offset,
                     None => 0,
                 };
-                Some(bincode::serialize(&Cursor::Offset(original_offset + observed_values)).unwrap().into_boxed_slice())
+                Some(postcard::to_allocvec(&Cursor::Offset(original_offset + observed_values)).unwrap().into_boxed_slice())
             } else {
                 None
             };

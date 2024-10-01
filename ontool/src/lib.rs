@@ -199,7 +199,7 @@ pub async fn run_command(command: Command) -> Result<(), OntoolError> {
             let output_file = File::create(args.output)?;
 
             let ontology = compile(args.dir, args.domains, args.backend)?;
-            ontology.try_serialize_to_bincode(output_file).unwrap();
+            ontology.try_serialize_to_postcard(output_file).unwrap();
 
             Ok(())
         }

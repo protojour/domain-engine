@@ -80,14 +80,14 @@ pub fn compile_benchmark(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("serialize_ontology_bincode", |b| {
+    c.bench_function("serialize_ontology_postcard", |b| {
         let test = TestPackages::with_static_sources(black_box([tiny()])).compile();
         b.iter(|| {
             let mut binary_ontology: Vec<u8> = Vec::new();
             test.ontology()
-                .try_serialize_to_bincode(&mut binary_ontology)
+                .try_serialize_to_postcard(&mut binary_ontology)
                 .unwrap();
-            Ontology::try_from_bincode(binary_ontology.as_slice()).unwrap()
+            Ontology::try_from_postcard(binary_ontology.as_slice()).unwrap()
         })
     });
 

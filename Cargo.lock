@@ -369,15 +369,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a8241f3ebb85c056b509d4327ad0358fbbba6ffb340bf388f26350aeda225b1"
 
 [[package]]
-name = "bincode"
-version = "1.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -628,6 +619,12 @@ name = "clap_lex"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1462739cb27611015575c0c11df5df7601141071f07518d56fcc1be504cbec97"
+
+[[package]]
+name = "cobs"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67ba02a97a2bd10f4b59b25c7973101c79642302776489e030cd13cdab09ed15"
 
 [[package]]
 name = "colorchoice"
@@ -1025,7 +1022,6 @@ dependencies = [
  "anyhow",
  "async-stream",
  "async-trait",
- "bincode",
  "deunicode",
  "domain-engine-core",
  "domain-engine-graphql",
@@ -1040,6 +1036,7 @@ dependencies = [
  "ontol-macros",
  "ontol-runtime",
  "ontol-test-utils",
+ "postcard",
  "pretty_assertions",
  "reqwest",
  "reqwest-middleware",
@@ -1062,7 +1059,6 @@ version = "0.1.0"
 dependencies = [
  "async-stream",
  "async-trait",
- "bincode",
  "domain-engine-core",
  "domain-engine-test-utils",
  "fnv",
@@ -1072,6 +1068,7 @@ dependencies = [
  "ontol-macros",
  "ontol-runtime",
  "ontol-test-utils",
+ "postcard",
  "pretty_assertions",
  "serde",
  "serde_json",
@@ -1090,7 +1087,6 @@ dependencies = [
  "arcstr",
  "async-stream",
  "async-trait",
- "bincode",
  "byteorder",
  "bytes",
  "chrono",
@@ -1110,6 +1106,7 @@ dependencies = [
  "ontol-test-utils",
  "ordered-float 4.3.0",
  "pin-utils",
+ "postcard",
  "postgres-protocol",
  "postgres-types",
  "pretty_assertions",
@@ -1192,6 +1189,18 @@ name = "either"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
+
+[[package]]
+name = "embedded-io"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef1a6892d9eef45c8fa6b9e0086428a2cca8491aca8f787c534a3d6d0bcb3ced"
+
+[[package]]
+name = "embedded-io"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
 
 [[package]]
 name = "ena"
@@ -2612,7 +2621,6 @@ dependencies = [
  "ahash",
  "arcstr",
  "base64",
- "bincode",
  "bit-set 0.8.0",
  "bit-vec 0.8.0",
  "bitflags 2.6.0",
@@ -2626,6 +2634,7 @@ dependencies = [
  "ontol-macros",
  "ordered-float 4.3.0",
  "phf_shared",
+ "postcard",
  "pretty_assertions",
  "regex-automata 0.4.7",
  "serde",
@@ -2932,6 +2941,18 @@ checksum = "96d9b0ba45e2c294fcd0795bc51e45c12746758e9954bb1190f97603ec9a3e91"
 dependencies = [
  "higher-kinded-types",
  "never-say-never",
+]
+
+[[package]]
+name = "postcard"
+version = "1.0.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f7f0a8d620d71c457dd1d47df76bb18960378da56af4527aaa10f515eee732e"
+dependencies = [
+ "cobs",
+ "embedded-io 0.4.0",
+ "embedded-io 0.6.1",
+ "serde",
 ]
 
 [[package]]

@@ -231,7 +231,7 @@ impl ArangoDatabase {
         let select_cursor: Option<Cursor> = select
             .after_cursor
             .as_deref()
-            .map(bincode::deserialize)
+            .map(postcard::from_bytes)
             .transpose()
             .map_err(|_| DomainError::data_store("Invalid cursor format"))?;
         let include_total = match select_cursor {
@@ -302,7 +302,7 @@ impl ArangoDatabase {
 
                 Ok(sequence.with_sub(SubSequence {
                     end_cursor: end_cursor
-                        .map(|cursor| bincode::serialize(&cursor).unwrap().into()),
+                        .map(|cursor| postcard::to_allocvec(&cursor).unwrap().into()),
                     has_next,
                     total_len: match select.include_total_len {
                         true => Some(full_count),

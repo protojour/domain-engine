@@ -24,6 +24,7 @@ regex-automata.workspace = true
 arcstr.workspace = true
 ordered-float.workspace = true
 itertools.workspace = true
+postcard.workspace = true
 indexmap = { workspace = true, features = ["serde"] }
 smallvec = { workspace = true, features = ["serde"] }
 smartstring = { version = "1", features = ["serde"] }
@@ -31,7 +32,6 @@ num = { version = "0.4", features = ["serde"] }
 serde-value = "0.7"
 urlencoding = "2"
 bit-vec = { version = "0.8", features = ["serde"] }
-bincode = "1"
 thiserror = "1"
 ahash = "0.8"
 phf_shared = "0.11"

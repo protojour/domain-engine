@@ -20,7 +20,7 @@ tracing.workspace = true
 itertools.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-bincode = "1"
+postcard.workspace = true
 futures-util = "0.3"
 async-stream = "0.3"
 

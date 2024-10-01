@@ -4,7 +4,6 @@ use std::ops::Index;
 
 use ::serde::{Deserialize, Serialize};
 use arcstr::ArcStr;
-use bincode::Options;
 use domain::{DefRepr, EdgeInfo};
 use fnv::FnvHashMap;
 use tracing::debug;
@@ -78,31 +77,25 @@ pub struct Data {
     property_flows: Vec<PropertyFlow>,
 }
 
-fn bincode_config() -> impl bincode::Options {
-    bincode::options()
-        .with_little_endian()
-        .with_varint_encoding()
-        .reject_trailing_bytes()
-}
-
 impl Ontology {
     /// Make a builder for building an Ontology from scratch.
     pub fn builder() -> OntologyBuilder {
         builder::new_builder()
     }
 
-    /// Deserialize an Ontology using the bincode format.
-    pub fn try_from_bincode(reader: impl std::io::Read) -> Result<Self, bincode::Error> {
-        let data: Data = bincode_config().deserialize_from(reader)?;
+    /// Deserialize an Ontology using the postcard format.
+    pub fn try_from_postcard(bytes: &[u8]) -> Result<Self, postcard::Error> {
+        let data: Data = postcard::from_bytes(bytes)?;
         Ok(Self::from(data))
     }
 
-    /// Serialize an ontology to bincode.
-    pub fn try_serialize_to_bincode(
+    /// Serialize an ontology to postcard.
+    pub fn try_serialize_to_postcard(
         &self,
         writer: impl std::io::Write,
-    ) -> Result<(), bincode::Error> {
-        bincode_config().serialize_into(writer, &self.data)
+    ) -> Result<(), postcard::Error> {
+        postcard::to_io(&self.data, writer)?;
+        Ok(())
     }
 
     /// Access the ontology's [Data].

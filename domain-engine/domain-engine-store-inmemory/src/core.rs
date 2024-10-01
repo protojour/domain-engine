@@ -113,7 +113,7 @@ impl InMemoryStore {
                         return Err(DomainError::data_store_bad_request("bad vertex type"));
                     };
 
-                    let vertex_key = bincode::deserialize::<VertexKey<DynamicKey>>(&seq.0)
+                    let vertex_key = postcard::from_bytes::<VertexKey<DynamicKey>>(&seq.0)
                         .map_err(|_| DomainError::data_store_bad_request("bad vertex encoding"))?;
 
                     Ok(EdgeColumnMatch::VertexRef(vertex_key))
@@ -170,7 +170,7 @@ impl InMemoryStore {
 
         for vertex_key in &deleted_set {
             let mut vertex_addr: VertexAddr = Default::default();
-            bincode::serialize_into(&mut vertex_addr, vertex_key).unwrap();
+            postcard::to_io(vertex_key, &mut vertex_addr).unwrap();
             ctx.write_stats.mark_deleted(vertex_addr);
         }
 

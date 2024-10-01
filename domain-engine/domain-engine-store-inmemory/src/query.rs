@@ -46,7 +46,7 @@ impl InMemoryStore {
                 select
                     .after_cursor
                     .as_deref()
-                    .map(bincode::deserialize)
+                    .map(postcard::from_bytes)
                     .transpose()
                     .map_err(|_| DomainError::data_store("Invalid cursor format"))?,
                 IncludeTotalLen(select.include_total_len),
@@ -131,7 +131,7 @@ impl InMemoryStore {
                     Some(limit) => {
                         if limit > 0 {
                             Some(
-                                bincode::serialize(&Cursor {
+                                postcard::to_allocvec(&Cursor {
                                     offset: start_offset + limit - 1,
                                 })
                                 .unwrap()
@@ -139,7 +139,7 @@ impl InMemoryStore {
                             )
                         } else {
                             after_cursor.map(|after_cursor| {
-                                bincode::serialize(&after_cursor).unwrap().into()
+                                postcard::to_allocvec(&after_cursor).unwrap().into()
                             })
                         }
                     }
@@ -189,7 +189,7 @@ impl InMemoryStore {
         properties.insert(
             PropId::data_store_address(),
             Attr::Unit(Value::OctetSequence(
-                OctetSequence(bincode::serialize(&vertex_key).unwrap().into()),
+                OctetSequence(postcard::to_allocvec(&vertex_key).unwrap().into()),
                 DefId::unit().into(),
             )),
         );
@@ -318,7 +318,7 @@ impl InMemoryStore {
 
         match select {
             Select::VertexAddress => {
-                let bytes = bincode::serialize(&vertex_key).unwrap();
+                let bytes = postcard::to_allocvec(&vertex_key).unwrap();
                 Ok(Some(Value::OctetSequence(
                     OctetSequence(bytes.into()),
                     OntolDefTag::Vertex.def_id().into(),

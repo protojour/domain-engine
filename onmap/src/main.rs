@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use std::{fs::File, path::PathBuf, sync::Arc};
+use std::{fs::File, io::Read, path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context};
 use clap::{Parser, ValueEnum};
@@ -131,6 +131,8 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn load_ontology(path: PathBuf) -> anyhow::Result<Ontology> {
-    let ontology_file = File::open(path).context("Ontology file not found")?;
-    Ontology::try_from_bincode(ontology_file).context("Problem reading ontology")
+    let mut ontology_file = File::open(path).context("Ontology file not found")?;
+    let mut buf = vec![];
+    ontology_file.read_to_end(&mut buf).unwrap();
+    Ontology::try_from_postcard(&buf).context("Problem reading ontology")
 }

@@ -123,7 +123,7 @@ impl<'a> MetaQuery<'a> {
                 let cursor: Option<Cursor> = entity_select
                     .after_cursor
                     .as_deref()
-                    .map(bincode::deserialize)
+                    .map(postcard::from_bytes)
                     .transpose()
                     .map_err(|_| DomainError::data_store("invalid cursor format"))?;
 
