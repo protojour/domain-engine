@@ -1,8 +1,7 @@
-use crate::test_util;
 use domain_engine_core::{DomainEngine, Session};
 use domain_engine_test_utils::{
-    dynamic_data_store::DynamicDataStoreFactory, system::mock_current_time_monotonic, unimock,
-    DomainEngineTestExt, TestFindQuery,
+    data_store_util, dynamic_data_store::DynamicDataStoreFactory,
+    system::mock_current_time_monotonic, unimock, DomainEngineTestExt, TestFindQuery,
 };
 use ontol_examples as examples;
 use ontol_runtime::{
@@ -121,7 +120,7 @@ async fn test_db_multiple_persistent_domains(ds: &str) {
     let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds).await;
     let [conduit_user, ai_artist] = test.bind(["conduit_db.User", "artist_and_instrument.artist"]);
 
-    test_util::insert_entity_select_entityid(
+    data_store_util::insert_entity_select_entityid(
         &engine,
         serde_create(&conduit_user)
             .to_value(json!({
@@ -134,7 +133,7 @@ async fn test_db_multiple_persistent_domains(ds: &str) {
     .await
     .unwrap();
 
-    test_util::insert_entity_select_entityid(
+    data_store_util::insert_entity_select_entityid(
         &engine,
         serde_create(&ai_artist)
             .to_value(json!({
@@ -153,7 +152,7 @@ async fn test_conduit_db_id_generation(ds: &str) {
     let [user, article, comment, tag_entity] =
         test.bind(["User", "Article", "Comment", "TagEntity"]);
 
-    test_util::insert_entity_select_entityid(
+    data_store_util::insert_entity_select_entityid(
         &engine,
         serde_create(&user)
             .to_value(json!({
@@ -166,7 +165,7 @@ async fn test_conduit_db_id_generation(ds: &str) {
     .await
     .unwrap();
 
-    let explicit_user_id = test_util::insert_entity_select_entityid(
+    let explicit_user_id = data_store_util::insert_entity_select_entityid(
         &engine,
         // Store with the Read processor which supports specifying ID upfront
         serde_read(&user)
@@ -187,7 +186,7 @@ async fn test_conduit_db_id_generation(ds: &str) {
             "OctetSequence(67e5504410b1426f9247bb680e5fe0c8, tag(def@1:1, Some(TagFlags(0x0))))"
     );
 
-    let article_id: Uuid = test_util::insert_entity_select_entityid(
+    let article_id: Uuid = data_store_util::insert_entity_select_entityid(
         &engine,
         serde_create(&article)
             .to_value(json!({
@@ -205,7 +204,7 @@ async fn test_conduit_db_id_generation(ds: &str) {
     .unwrap()
     .cast_into();
 
-    test_util::insert_entity_select_entityid(
+    data_store_util::insert_entity_select_entityid(
         &engine,
         serde_create(&comment)
             .to_value(json!({
@@ -222,7 +221,7 @@ async fn test_conduit_db_id_generation(ds: &str) {
     .await
     .unwrap();
 
-    test_util::insert_entity_select_entityid(
+    data_store_util::insert_entity_select_entityid(
         &engine,
         serde_create(&tag_entity)
             .to_value(json!({ "tag": "foo" }))
@@ -238,7 +237,7 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
     let engine = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic(), ds).await;
     let [user_def, article_def, comment_def] = test.bind(["User", "Article", "Comment"]);
 
-    let pre_existing_user_id: Uuid = test_util::insert_entity_select_entityid(
+    let pre_existing_user_id: Uuid = data_store_util::insert_entity_select_entityid(
         &engine,
         serde_create(&user_def)
             .to_value(json!({
@@ -252,7 +251,7 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
     .unwrap()
     .cast_into();
 
-    let article_id: Uuid = test_util::insert_entity_select_entityid(
+    let article_id: Uuid = data_store_util::insert_entity_select_entityid(
         &engine,
         serde_create(&article_def)
             .to_value(json!({
@@ -286,7 +285,7 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
     .unwrap()
     .cast_into();
 
-    let users = test_util::query_entities(
+    let users = data_store_util::query_entities(
         &engine,
         user_def
             .struct_select([("user_id", Select::Unit)])
@@ -305,7 +304,7 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
 
     expect_eq!(
         actual = serde_read(&user_def).as_json(AttrRef::Unit(
-            &test_util::query_entities(
+            &data_store_util::query_entities(
                 &engine,
                 user_def
                     .struct_select([
@@ -334,7 +333,7 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
         })
     );
 
-    let comments = test_util::query_entities(
+    let comments = data_store_util::query_entities(
         &engine,
         comment_def
             .struct_select([("id", Select::Unit)])
@@ -360,7 +359,7 @@ async fn test_conduit_db_store_entity_tree(ds: &str) {
                 ..Default::default()
             })
             .as_json(AttrRef::Unit(
-                &test_util::query_entities(
+                &data_store_util::query_entities(
                     &engine,
                     user_def
                         .struct_select([
@@ -437,7 +436,7 @@ async fn test_conduit_db_unresolved_foreign_key(ds: &str) {
     let [article] = test.bind(["Article"]);
 
     assert_error_msg!(
-        test_util::insert_entity_select_entityid(
+        data_store_util::insert_entity_select_entityid(
             &engine,
             serde_create(&article)
                 .to_value(json!({
@@ -466,7 +465,7 @@ async fn test_artist_and_instrument_fmt_id_generation(ds: &str) {
         test.ontology(),
     );
 
-    let generated_id = test_util::insert_entity_select_entityid(
+    let generated_id = data_store_util::insert_entity_select_entityid(
         &engine,
         serde_create(&artist)
             .to_value(json!({"name": "Igor Stravinskij" }))
@@ -478,7 +477,7 @@ async fn test_artist_and_instrument_fmt_id_generation(ds: &str) {
     let generated_id_json = serde_read(&artist_id).as_json(AttrRef::Unit(&generated_id));
     assert!(generated_id_json.as_str().unwrap().starts_with("artist/"));
 
-    let explicit_id = test_util::insert_entity_select_entityid(
+    let explicit_id = data_store_util::insert_entity_select_entityid(
         &engine,
         serde_read(&artist)
             .to_value(json!({
@@ -509,7 +508,7 @@ async fn test_artist_and_instrument_pagination(ds: &str) {
     ];
 
     for json in &entities {
-        test_util::insert_entity_select_entityid(
+        data_store_util::insert_entity_select_entityid(
             &engine,
             serde_create(&artist).to_value(json.clone()).unwrap(),
         )
@@ -550,7 +549,7 @@ async fn test_artist_and_instrument_filter_condition(ds: &str) {
     ];
 
     for json in &entities {
-        test_util::insert_entity_select_entityid(
+        data_store_util::insert_entity_select_entityid(
             &engine,
             serde_create(&artist).to_value(json.clone()).unwrap(),
         )

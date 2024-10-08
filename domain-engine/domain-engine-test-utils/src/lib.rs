@@ -18,6 +18,7 @@ use ontol_runtime::{
 };
 use serde::de::DeserializeSeed;
 
+pub mod data_store_util;
 pub mod dummy_session;
 pub mod dynamic_data_store;
 pub mod graphql_test_utils;

@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "domain-engine/domain-engine-core",
+    "domain-engine/domain-engine-datafusion",
     "domain-engine/domain-engine-graphql",
     "domain-engine/domain-engine-grpc",
     "domain-engine/domain-engine-httpjson",

@@ -1,0 +1,28 @@
+[package]
+name = "domain-engine-datafusion"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+doctest = false
+
+[dependencies]
+ontol-runtime.path = "../../ontol/ontol-runtime"
+domain-engine-core.path = "../domain-engine-core"
+tracing.workspace = true
+async-stream = "0.3"
+async-trait = "0.1"
+datafusion = "42"
+futures-util = "0.3"
+
+[dev-dependencies]
+ontol-test-utils.path = "../../ontol/ontol-test-utils"
+ontol-macros.path = "../../ontol/ontol-macros"
+ontol-examples.path = "../../ontol/ontol-examples"
+domain-engine-test-utils.path = "../domain-engine-test-utils"
+tracing-subscriber.workspace = true
+pretty_assertions = "1"
+tokio.workspace = true
+serde_json.workspace = true
