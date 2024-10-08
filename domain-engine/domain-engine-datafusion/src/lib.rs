@@ -1,5 +1,6 @@
 use std::{any::Any, fmt::Debug, sync::Arc};
 
+use arrow::{mk_arrow_schema, RecordBatchBuilder};
 use datafusion::{
     arrow::datatypes::SchemaRef,
     catalog::{self, CatalogProvider, SchemaProvider, TableProvider},
@@ -18,14 +19,15 @@ use domain_engine_core::{
     transact::{ReqMessage, TransactionMode},
     DomainEngine, DomainError, Session,
 };
+use filter::DatafusionFilter;
 use futures_util::StreamExt;
 use ontol_runtime::{
     ontology::domain::{Def, Domain, Entity},
     DefId, DomainIndex,
 };
-use table::{mk_datafusion_schema, DatafusionFilter, RecordBatchBuilder};
 
-mod table;
+mod arrow;
+mod filter;
 
 type DfResult<T> = Result<T, DataFusionError>;
 
@@ -115,11 +117,11 @@ impl SchemaProvider for DomainSchemaProvider {
             return Ok(None);
         };
 
-        let schema = mk_datafusion_schema(def, self.engine.ontology());
+        let arrow_schema = mk_arrow_schema(def, self.engine.ontology());
 
         Ok(Some(Arc::new(EntityTableProvider {
             engine: self.engine.clone(),
-            schema: Arc::new(schema),
+            arrow_schema: Arc::new(arrow_schema),
             def_id,
         })))
     }
@@ -144,7 +146,7 @@ impl SchemaProvider for DomainSchemaProvider {
 
 struct EntityTableProvider {
     engine: Arc<DomainEngine>,
-    schema: SchemaRef,
+    arrow_schema: SchemaRef,
     def_id: DefId,
 }
 
@@ -155,7 +157,7 @@ impl TableProvider for EntityTableProvider {
     }
 
     fn schema(&self) -> SchemaRef {
-        self.schema.clone()
+        self.arrow_schema.clone()
     }
 
     fn table_type(&self) -> TableType {
@@ -256,7 +258,6 @@ impl TableProvider for EntityTableProvider {
         let df_filter = DatafusionFilter::compile(
             self.def_id,
             (projection, filters, limit),
-            &self.schema,
             self.engine.ontology(),
         );
 
@@ -265,7 +266,7 @@ impl TableProvider for EntityTableProvider {
             df_filter,
             session: Session(session.0.clone()),
             properties: PlanProperties::new(
-                EquivalenceProperties::new(self.schema.clone()),
+                EquivalenceProperties::new(self.arrow_schema.clone()),
                 Partitioning::UnknownPartitioning(1),
                 ExecutionMode::Unbounded,
             ),
@@ -424,8 +425,8 @@ impl ExecutionPlan for EntityScan {
     ) -> DfResult<SendableRecordBatchStream> {
         let engine = self.engine.clone();
         let mut batch_builder = RecordBatchBuilder::new(
-            self.schema(),
             self.df_filter.column_selection(),
+            self.schema(),
             self.engine.ontology_owned(),
         );
         let session = self.session.clone();
@@ -448,7 +449,7 @@ impl ExecutionPlan for EntityScan {
                 }
             }
 
-            if let Some(batch) = batch_builder.produce_batch() {
+            if let Some(batch) = batch_builder.yield_batch() {
                 yield batch;
             }
         }
