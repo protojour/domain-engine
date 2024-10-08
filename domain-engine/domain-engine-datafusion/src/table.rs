@@ -12,8 +12,10 @@ use datafusion::{
 use domain_engine_core::{domain_select, transact::RespMessage};
 use ontol_runtime::{
     attr::Attr,
+    interface::serde::operator::SerdeOperator,
     ontology::{
         domain::{DataRelationshipTarget, Def},
+        ontol::text_pattern::FormatPattern,
         Ontology,
     },
     property::PropertyCardinality,
@@ -24,7 +26,6 @@ use ontol_runtime::{
     value::{FormatValueAsText, Value},
     DefId, PropId,
 };
-use tracing::debug;
 
 pub fn mk_datafusion_schema(def: &Def, ontology: &Ontology) -> Schema {
     let fields = iter_fields(def, ontology)
@@ -208,16 +209,35 @@ impl RecordBatchBuilder {
                         b.append_value(t);
                     }
                     Some(Attr::Unit(v)) => {
-                        let text = format!(
-                            "{}",
-                            FormatValueAsText {
-                                value: &v,
-                                type_def_id: v.type_def_id(),
-                                ontology: &self.ontology,
+                        let text = match self
+                            .ontology
+                            .def(v.type_def_id())
+                            .operator_addr
+                            .map(|addr| &self.ontology[addr])
+                        {
+                            Some(SerdeOperator::CapturingTextPattern(pattern_def_id)) => {
+                                let pattern =
+                                    &self.ontology.get_text_pattern(*pattern_def_id).unwrap();
+                                format!(
+                                    "{}",
+                                    FormatPattern {
+                                        pattern,
+                                        value: &v,
+                                        ontology: &self.ontology
+                                    }
+                                )
                             }
-                        );
-
-                        debug!("format text: (def_id: {:?}) `{text}`", v.type_def_id());
+                            _ => {
+                                format!(
+                                    "{}",
+                                    FormatValueAsText {
+                                        value: &v,
+                                        type_def_id: v.type_def_id(),
+                                        ontology: &self.ontology,
+                                    }
+                                )
+                            }
+                        };
 
                         b.append_value(text);
                     }
