@@ -28,7 +28,6 @@ async fn test_where_text_equals() {
         .sql(r#"SELECT "ID", name FROM ontology.artist_and_instrument.artist WHERE name = 'foo'"#)
         .await
         .unwrap();
-
     dataframe.collect().await.unwrap();
 }
 
@@ -45,7 +44,29 @@ async fn test_where_timestamp_lt() {
         .sql(r#"SELECT slug FROM ontology.conduit_db."Article" WHERE created_at > '1983-01-01T01:30:00'"#)
         .await
         .unwrap();
+    dataframe.collect().await.unwrap();
+}
 
+#[test(tokio::test)]
+async fn test_limit() {
+    let test = TestPackages::with_static_sources([artist_and_instrument()]).compile();
+    let unimock = Unimock::new(
+        LinearTransactMock::transact
+            .next_call(matching!(_))
+            .answers_arc(Arc::new(move |_, _, messages, _| {
+                let Some(Ok(ReqMessage::Query(_, entity_select))) = messages.first() else {
+                    panic!()
+                };
+                assert_eq!(Some(42), entity_select.limit);
+
+                Ok(vec![])
+            })),
+    );
+
+    let dataframe = datafusion_ctx(mock_engine(&unimock, test.ontology_owned()))
+        .sql(r#"SELECT "ID", name FROM ontology.artist_and_instrument.artist LIMIT 42"#)
+        .await
+        .unwrap();
     dataframe.collect().await.unwrap();
 }
 
