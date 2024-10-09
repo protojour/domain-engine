@@ -23,7 +23,7 @@ serde.workspace = true
 serde_json.workspace = true
 ulid.workspace = true
 futures-util = "0.3"
-tokio.workspace = true
+tokio = { workspace = true, features = ["sync"] }
 async-stream = "0.3"
 displaydoc = "0.2"
 smallvec = { version = "2.0.0-alpha.7", features = ["std"] }

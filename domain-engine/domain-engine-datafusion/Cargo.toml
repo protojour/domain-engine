@@ -11,9 +11,10 @@ doctest = false
 [dependencies]
 ontol-runtime.path = "../../ontol/ontol-runtime"
 domain-engine-core.path = "../domain-engine-core"
+domain-engine-arrow.path = "../domain-engine-arrow"
 tracing.workspace = true
 chrono.workspace = true
-arrow = "53"
+arrow = { version = "53", default-features = false }
 async-stream = "0.3"
 async-trait = "0.1"
 datafusion-catalog = "42"

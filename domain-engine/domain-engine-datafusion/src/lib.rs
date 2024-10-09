@@ -1,7 +1,6 @@
 use std::{any::Any, fmt::Debug, sync::Arc};
 
 use arrow::datatypes::SchemaRef;
-use arrow_codec::{mk_arrow_schema, RecordBatchBuilder};
 use datafusion_catalog::{CatalogProvider, SchemaProvider, TableProvider};
 use datafusion_common::DataFusionError;
 use datafusion_execution::{SendableRecordBatchStream, TaskContext};
@@ -11,10 +10,11 @@ use datafusion_physical_plan::{
     stream::RecordBatchStreamAdapter, DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan,
     Partitioning, PlanProperties,
 };
-use domain_engine_core::{
-    transact::{ReqMessage, TransactionMode},
-    DomainEngine, DomainError, Session,
+use domain_engine_arrow::{
+    schema::mk_arrow_schema, ArrowConfig, ArrowQuery, ArrowReqMessage, ArrowRespMessage,
+    ArrowTransactAPI,
 };
+use domain_engine_core::{DomainEngine, DomainError, Session};
 use filter::{ConditionBuilder, DatafusionFilter};
 use futures_util::StreamExt;
 use ontol_runtime::{
@@ -22,7 +22,6 @@ use ontol_runtime::{
     DefId, DomainIndex,
 };
 
-mod arrow_codec;
 mod filter;
 
 #[cfg(test)]
@@ -287,40 +286,26 @@ impl ExecutionPlan for EntityScan {
         _partition: usize,
         context: Arc<TaskContext>,
     ) -> DfResult<SendableRecordBatchStream> {
-        let engine = self.params.engine.clone();
-        let mut batch_builder = RecordBatchBuilder::new(
-            self.params.df_filter.column_selection(),
-            self.schema(),
-            engine.ontology_owned(),
-            context.session_config().batch_size(),
-        );
-        let session = self.params.session.clone();
-        let msg_stream = futures_util::stream::iter([Ok(ReqMessage::Query(
-            0,
-            self.params.df_filter.entity_select(),
-        ))])
-        .boxed();
-
-        let record_batch_stream = async_stream::try_stream! {
-            let datastore_stream = engine.transact(
-                TransactionMode::ReadOnly,
-                msg_stream,
-                session,
+        let record_batch_stream = self
+            .params
+            .engine
+            .arrow_transact(
+                ArrowReqMessage::Query(ArrowQuery {
+                    entity_select: self.params.df_filter.entity_select(),
+                    column_selection: self.params.df_filter.column_selection(),
+                    schema: self.schema(),
+                }),
+                ArrowConfig {
+                    batch_size: context.session_config().batch_size(),
+                },
+                self.params.session.clone(),
             )
-            .await
-            .map_err(domain_error)?;
-
-            for await result in datastore_stream {
-                if let Some(batch) = batch_builder.handle_msg(result.map_err(domain_error)?) {
-                    yield batch;
+            .filter_map(|resp_message| async move {
+                match resp_message {
+                    Ok(ArrowRespMessage::RecordBatch(batch)) => Some(Ok(batch)),
+                    Err(err) => Some(Err(domain_error(err))),
                 }
-            }
-
-            if let Some(batch) = batch_builder.yield_batch() {
-                yield batch;
-            }
-        }
-        .boxed();
+            });
 
         Ok(Box::pin(RecordBatchStreamAdapter::new(
             self.schema(),

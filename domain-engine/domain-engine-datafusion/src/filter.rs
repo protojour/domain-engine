@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use datafusion_common::ScalarValue;
 use datafusion_expr::{BinaryExpr, Expr, Operator};
+use domain_engine_arrow::schema::{iter_arrow_fields, FieldType};
 use domain_engine_core::domain_select;
 use ontol_runtime::{
     ontology::{domain::Def, Ontology},
@@ -15,8 +16,6 @@ use ontol_runtime::{
     DefId, PropId,
 };
 use tracing::trace;
-
-use crate::arrow_codec::{iter_arrow_fields, FieldType};
 
 #[derive(Clone)]
 pub struct DatafusionFilter {

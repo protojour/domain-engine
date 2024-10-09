@@ -349,6 +349,9 @@ name = "arrow-schema"
 version = "53.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fbf0388a18fd7f7f3fe3de01852d30f54ed5182f9004db700fbe3ba843ed2794"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "arrow-select"
@@ -1577,6 +1580,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "domain-engine-arrow"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "arrow-schema",
+ "async-stream",
+ "chrono",
+ "domain-engine-core",
+ "futures-util",
+ "ontol-runtime",
+ "serde",
+ "tracing",
+]
+
+[[package]]
 name = "domain-engine-core"
 version = "0.1.0"
 dependencies = [
@@ -1621,6 +1639,7 @@ dependencies = [
  "datafusion-expr",
  "datafusion-physical-expr",
  "datafusion-physical-plan",
+ "domain-engine-arrow",
  "domain-engine-core",
  "domain-engine-test-utils",
  "futures-util",
