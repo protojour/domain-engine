@@ -1,15 +1,19 @@
 use std::collections::BTreeMap;
 
-use datafusion::prelude::Expr;
+use datafusion::{logical_expr::BinaryExpr, prelude::Expr, scalar::ScalarValue};
 use domain_engine_core::domain_select;
 use ontol_runtime::{
-    ontology::Ontology,
+    ontology::{domain::Def, Ontology},
     query::{
+        condition::{Clause, CondTerm, Condition, SetOperator},
         filter::Filter,
         select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     },
+    value::Value,
+    var::Var,
     DefId, PropId,
 };
+use tracing::trace;
 
 use crate::arrow::{iter_arrow_fields, FieldType};
 
@@ -22,7 +26,7 @@ pub struct DatafusionFilter {
 impl DatafusionFilter {
     pub fn compile(
         def_id: DefId,
-        (projection, _filters, limit): (Option<&Vec<usize>>, &[Expr], Option<usize>),
+        (projection, filters, limit): (Option<&Vec<usize>>, &[Expr], Option<usize>),
         ontology: &Ontology,
     ) -> Self {
         let def = ontology.def(def_id);
@@ -53,13 +57,24 @@ impl DatafusionFilter {
                 .collect();
         }
 
+        let mut ontol_filter = Filter::default_for_domain();
+
+        {
+            let mut condition_builder = ConditionBuilder::new(def, ontology);
+            for expr in filters {
+                let _ = condition_builder.try_add_expr(expr);
+            }
+
+            (*ontol_filter.condition_mut()) = condition_builder.build();
+        }
+
         DatafusionFilter {
             entity_select: EntitySelect {
                 source: StructOrUnionSelect::Struct(StructSelect {
                     def_id,
                     properties: select_properties,
                 }),
-                filter: Filter::default_for_domain(),
+                filter: ontol_filter,
                 limit,
                 after_cursor: None,
                 include_total_len: false,
@@ -74,5 +89,205 @@ impl DatafusionFilter {
 
     pub fn column_selection(&self) -> Vec<(PropId, FieldType)> {
         self.column_selection.clone()
+    }
+}
+
+pub struct ConditionBuilder<'o> {
+    condition: Condition,
+    root_var: Var,
+    has_filters: bool,
+    def: &'o Def,
+    ontology: &'o Ontology,
+}
+
+pub enum ConditionError {
+    Expr,
+    BinaryOperands,
+    Column,
+    Literal,
+    TimeZone,
+}
+
+impl<'o> ConditionBuilder<'o> {
+    pub fn new(def: &'o Def, ontology: &'o Ontology) -> Self {
+        let mut condition = Condition::default();
+        let root_var = condition.mk_cond_var();
+        condition.add_clause(root_var, Clause::Root);
+
+        Self {
+            condition,
+            root_var,
+            has_filters: false,
+            def,
+            ontology,
+        }
+    }
+
+    pub fn build(self) -> Condition {
+        if self.has_filters {
+            self.condition
+        } else {
+            Condition::default()
+        }
+    }
+
+    pub fn try_add_expr(&mut self, expr: &Expr) -> Result<(), ConditionError> {
+        trace!("try add expr: {expr:?}");
+
+        let result = match expr {
+            Expr::BinaryExpr(binary) => self.try_add_binary(binary),
+            _ => Err(ConditionError::Expr),
+        };
+
+        if result.is_ok() {
+            self.has_filters = true;
+        }
+
+        result
+    }
+
+    fn try_add_binary(&mut self, expr: &BinaryExpr) -> Result<(), ConditionError> {
+        let mut operands = [
+            self.classify_as_scalar_expr(&expr.left)?,
+            self.classify_as_scalar_expr(&expr.right)?,
+        ];
+        operands.sort_by_key(|s| s.ordinal());
+
+        if let [ScalarExpr::Property(prop_id), ScalarExpr::Literal(value)] = operands {
+            let set_var = self.condition.mk_cond_var();
+            self.condition.add_clause(
+                self.root_var,
+                Clause::MatchProp(prop_id, SetOperator::ElementIn, set_var),
+            );
+            self.condition.add_clause(
+                set_var,
+                Clause::Member(CondTerm::Wildcard, CondTerm::Value(value)),
+            );
+            Ok(())
+        } else {
+            Err(ConditionError::BinaryOperands)
+        }
+    }
+
+    fn classify_as_scalar_expr(&self, expr: &Expr) -> Result<ScalarExpr, ConditionError> {
+        fn lit<T>(lit: &Option<T>) -> Result<&T, ConditionError> {
+            lit.as_ref().ok_or(ConditionError::Literal)
+        }
+
+        fn no_tz<T>(tz: &Option<T>) -> Result<(), ConditionError> {
+            if tz.is_some() {
+                Err(ConditionError::TimeZone)
+            } else {
+                Ok(())
+            }
+        }
+
+        match expr {
+            Expr::Column(column) => {
+                if let Some((prop_id, _)) = self
+                    .def
+                    .data_relationships
+                    .iter()
+                    .find(|(_, rel_info)| self.ontology[rel_info.name] == column.name)
+                {
+                    Ok(ScalarExpr::Property(*prop_id))
+                } else {
+                    Err(ConditionError::Column)
+                }
+            }
+            Expr::Literal(scalar_value) => match scalar_value {
+                ScalarValue::Boolean(b) => Ok(ScalarExpr::Literal(Value::boolean(*lit(b)?))),
+                ScalarValue::Float16(f) => Ok(ScalarExpr::Literal(Value::f64((*lit(f)?).into()))),
+                ScalarValue::Float32(f) => Ok(ScalarExpr::Literal(Value::f64((*lit(f)?).into()))),
+                ScalarValue::Float64(f) => Ok(ScalarExpr::Literal(Value::f64(*lit(f)?))),
+                ScalarValue::Int8(i) => Ok(ScalarExpr::Literal(Value::i64((*lit(i)?).into()))),
+                ScalarValue::Int16(i) => Ok(ScalarExpr::Literal(Value::i64((*lit(i)?).into()))),
+                ScalarValue::Int32(i) => Ok(ScalarExpr::Literal(Value::i64((*lit(i)?).into()))),
+                ScalarValue::Int64(i) => Ok(ScalarExpr::Literal(Value::i64(*lit(i)?))),
+                ScalarValue::UInt8(i) => Ok(ScalarExpr::Literal(Value::i64((*lit(i)?).into()))),
+                ScalarValue::UInt16(i) => Ok(ScalarExpr::Literal(Value::i64((*lit(i)?).into()))),
+                ScalarValue::UInt32(i) => Ok(ScalarExpr::Literal(Value::i64((*lit(i)?).into()))),
+                ScalarValue::UInt64(i) => Ok(ScalarExpr::Literal(Value::i64(
+                    (*lit(i)?).try_into().map_err(|_| ConditionError::Literal)?,
+                ))),
+                ScalarValue::Utf8(s) => Ok(ScalarExpr::Literal(Value::text(lit(s)?))),
+                ScalarValue::TimestampSecond(s, tz) => {
+                    no_tz(tz)?;
+                    Ok(ScalarExpr::Literal(Value::datetime(
+                        chrono::DateTime::from_timestamp(*lit(s)?, 0)
+                            .ok_or(ConditionError::Literal)?,
+                    )))
+                }
+                ScalarValue::TimestampMillisecond(ms, tz) => {
+                    no_tz(tz)?;
+                    Ok(ScalarExpr::Literal(Value::datetime(
+                        chrono::DateTime::from_timestamp_millis(*lit(ms)?)
+                            .ok_or(ConditionError::Literal)?,
+                    )))
+                }
+                ScalarValue::TimestampMicrosecond(ms, tz) => {
+                    no_tz(tz)?;
+                    Ok(ScalarExpr::Literal(Value::datetime(
+                        chrono::DateTime::from_timestamp_micros(*lit(ms)?)
+                            .ok_or(ConditionError::Literal)?,
+                    )))
+                }
+                ScalarValue::TimestampNanosecond(ns, tz) => {
+                    no_tz(tz)?;
+                    Ok(ScalarExpr::Literal(Value::datetime(
+                        chrono::DateTime::from_timestamp_nanos(*lit(ns)?),
+                    )))
+                }
+                ScalarValue::Binary(b) => {
+                    let bytes = lit(b)?;
+                    Ok(ScalarExpr::Literal(Value::octet_sequence(
+                        bytes.iter().copied().collect(),
+                    )))
+                }
+                ScalarValue::Null => Err(ConditionError::Literal),
+                ScalarValue::Decimal128(_, _, _) => Err(ConditionError::Literal),
+                ScalarValue::Decimal256(_, _, _) => Err(ConditionError::Literal),
+                ScalarValue::Utf8View(_) => Err(ConditionError::Literal),
+                ScalarValue::LargeUtf8(_) => Err(ConditionError::Literal),
+                ScalarValue::BinaryView(_) => Err(ConditionError::Literal),
+                ScalarValue::FixedSizeBinary(_, _) => Err(ConditionError::Literal),
+                ScalarValue::LargeBinary(_) => Err(ConditionError::Literal),
+                ScalarValue::FixedSizeList(_) => Err(ConditionError::Literal),
+                ScalarValue::List(_) => Err(ConditionError::Literal),
+                ScalarValue::LargeList(_) => Err(ConditionError::Literal),
+                ScalarValue::Struct(_) => Err(ConditionError::Literal),
+                ScalarValue::Map(_) => Err(ConditionError::Literal),
+                ScalarValue::Date32(_) => Err(ConditionError::Literal),
+                ScalarValue::Date64(_) => Err(ConditionError::Literal),
+                ScalarValue::Time32Second(_) => Err(ConditionError::Literal),
+                ScalarValue::Time32Millisecond(_) => Err(ConditionError::Literal),
+                ScalarValue::Time64Microsecond(_) => Err(ConditionError::Literal),
+                ScalarValue::Time64Nanosecond(_) => Err(ConditionError::Literal),
+                ScalarValue::IntervalYearMonth(_) => Err(ConditionError::Literal),
+                ScalarValue::IntervalDayTime(_) => Err(ConditionError::Literal),
+                ScalarValue::IntervalMonthDayNano(_) => Err(ConditionError::Literal),
+                ScalarValue::DurationSecond(_) => Err(ConditionError::Literal),
+                ScalarValue::DurationMillisecond(_) => Err(ConditionError::Literal),
+                ScalarValue::DurationMicrosecond(_) => Err(ConditionError::Literal),
+                ScalarValue::DurationNanosecond(_) => Err(ConditionError::Literal),
+                ScalarValue::Union(_, _, _) => Err(ConditionError::Literal),
+                ScalarValue::Dictionary(_, _) => Err(ConditionError::Literal),
+            },
+            _ => Err(ConditionError::Expr),
+        }
+    }
+}
+
+enum ScalarExpr {
+    Property(PropId),
+    Literal(Value),
+}
+
+impl ScalarExpr {
+    fn ordinal(&self) -> u8 {
+        match self {
+            Self::Property(_) => 0,
+            Self::Literal(_) => 1,
+        }
     }
 }

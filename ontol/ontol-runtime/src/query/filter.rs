@@ -42,6 +42,10 @@ impl Filter {
         &self.condition
     }
 
+    pub fn condition_mut(&mut self) -> &mut Condition {
+        &mut self.condition
+    }
+
     /// Symbolic order is the order format expected inside domains
     pub fn symbolic_order(&self) -> Option<&[Value]> {
         match &self.order {
@@ -60,10 +64,6 @@ impl Filter {
 
     pub fn direction(&self) -> Direction {
         self.direction.unwrap_or(Direction::Ascending)
-    }
-
-    pub fn condition_mut(&mut self) -> &mut Condition {
-        &mut self.condition
     }
 
     pub fn set_symbolic_order(&mut self, order: Value) {

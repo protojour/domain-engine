@@ -1714,10 +1714,12 @@ version = "0.1.0"
 dependencies = [
  "async-stream",
  "async-trait",
+ "chrono",
  "datafusion",
  "domain-engine-core",
  "domain-engine-test-utils",
  "futures-util",
+ "indoc",
  "ontol-examples",
  "ontol-macros",
  "ontol-runtime",

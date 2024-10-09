@@ -71,6 +71,26 @@ impl Value {
         )
     }
 
+    pub fn i64(value: i64) -> Self {
+        Self::I64(value, OntolDefTag::I64.def_id().into())
+    }
+
+    pub fn f64(value: f64) -> Self {
+        Self::F64(value, OntolDefTag::F64.def_id().into())
+    }
+
+    pub fn text(value: impl Into<String>) -> Self {
+        Self::Text(value.into(), OntolDefTag::Text.def_id().into())
+    }
+
+    pub fn datetime(value: chrono::DateTime<chrono::Utc>) -> Self {
+        Self::ChronoDateTime(value, OntolDefTag::DateTime.def_id().into())
+    }
+
+    pub fn octet_sequence(value: ThinVec<u8>) -> Self {
+        Self::OctetSequence(OctetSequence(value), OntolDefTag::Octets.def_id().into())
+    }
+
     pub fn sequence_of(values: impl IntoIterator<Item = Value>) -> Self {
         let sequence: Sequence<Value> = values.into_iter().collect();
         let type_def_id = sequence

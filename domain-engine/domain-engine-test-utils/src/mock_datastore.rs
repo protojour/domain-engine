@@ -1,5 +1,7 @@
+use std::{collections::BTreeSet, sync::Arc};
+
 use domain_engine_core::{
-    data_store::DataStoreAPI,
+    data_store::{DataStoreAPI, DataStoreFactorySync, DataStoreParams},
     transact::{DataOperation, ReqMessage, RespMessage, TransactionMode},
     DomainResult, Session,
 };
@@ -11,7 +13,7 @@ use unimock::{matching, MockFn, Unimock};
 #[unimock::unimock(api = LinearTransactMock)]
 #[async_trait::async_trait]
 pub trait LinearTransact {
-    async fn transact<'a>(
+    async fn transact(
         &self,
         mode: TransactionMode,
         messages: Vec<DomainResult<ReqMessage>>,
@@ -61,6 +63,16 @@ pub struct LinearDataStoreAdapter(unimock::Unimock);
 impl LinearDataStoreAdapter {
     pub fn new(unimock: unimock::Unimock) -> Self {
         Self(unimock)
+    }
+}
+
+impl DataStoreFactorySync for LinearDataStoreAdapter {
+    fn new_api_sync(
+        &self,
+        _persisted: &BTreeSet<ontol_runtime::DomainIndex>,
+        _params: DataStoreParams,
+    ) -> DomainResult<Arc<dyn DataStoreAPI + Send + Sync>> {
+        Ok(Arc::new(LinearDataStoreAdapter(self.0.clone())))
     }
 }
 
