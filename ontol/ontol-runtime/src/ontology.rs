@@ -34,10 +34,11 @@ use self::{
 
 pub mod builder;
 pub mod config;
-pub mod data;
 pub mod domain;
 pub mod map;
 pub mod ontol;
+
+mod data;
 
 /// The Ontology is the model of a single ONTOL runtime environment.
 pub struct Ontology {
