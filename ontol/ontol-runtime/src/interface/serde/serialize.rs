@@ -250,6 +250,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         let pattern = &self
             .ontology
             .data
+            .domain
             .text_patterns
             .get(&pattern_def_id)
             .unwrap();
@@ -279,6 +280,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 let pattern = &self
                     .ontology
                     .data
+                    .domain
                     .text_patterns
                     .get(&pattern_def_id)
                     .unwrap();

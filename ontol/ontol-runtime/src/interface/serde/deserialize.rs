@@ -167,7 +167,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
             ),
             (SerdeOperator::TextPattern(def_id), _) => deserializer.deserialize_str(
                 TextPatternMatcher {
-                    pattern: self.ontology.data.text_patterns.get(def_id).unwrap(),
+                    pattern: self.ontology.data.domain.text_patterns.get(def_id).unwrap(),
                     def_id: *def_id,
                     ontology: self.ontology,
                 }
@@ -176,7 +176,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
             (SerdeOperator::CapturingTextPattern(def_id), scalar_format) => deserializer
                 .deserialize_str(
                     CapturingTextPatternMatcher {
-                        pattern: self.ontology.data.text_patterns.get(def_id).unwrap(),
+                        pattern: self.ontology.data.domain.text_patterns.get(def_id).unwrap(),
                         def_id: *def_id,
                         ontology: self.ontology,
                         scalar_format,

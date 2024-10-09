@@ -209,7 +209,7 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                 LeafDiscriminant::MatchesCapturingTextPattern(def_id),
                 serde_value::Value::String(value),
             ) => {
-                let pattern = self.ontology.data.text_patterns.get(def_id).unwrap();
+                let pattern = self.ontology.data.domain.text_patterns.get(def_id).unwrap();
                 pattern.regex.is_match(value)
             }
             _ => false,

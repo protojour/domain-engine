@@ -107,7 +107,7 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
                 }
                 LeafDiscriminant::MatchesCapturingTextPattern(def_id) => {
                     let result_type = variant.deserialize.def_id;
-                    let pattern = self.ontology.data.text_patterns.get(def_id).unwrap();
+                    let pattern = self.ontology.data.domain.text_patterns.get(def_id).unwrap();
 
                     if let Ok(value) = pattern.try_capturing_match(str, result_type, self.ontology)
                     {
