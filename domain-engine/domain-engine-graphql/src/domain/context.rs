@@ -4,6 +4,7 @@
 
 use std::sync::Arc;
 
+use arcstr::ArcStr;
 use domain_engine_core::DomainEngine;
 use ontol_runtime::{
     interface::{
@@ -13,7 +14,7 @@ use ontol_runtime::{
         },
         serde::processor::ProcessorProfileFlags,
     },
-    ontology::{ontol::TextConstant, Ontology},
+    ontology::Ontology,
     value::Value,
     DefId,
 };
@@ -210,12 +211,7 @@ impl SchemaType {
         }
     }
 
-    pub(crate) fn docs(&self) -> Option<TextConstant> {
+    pub(crate) fn docs(&self) -> Option<&ArcStr> {
         self.type_data().docs(self.ontology())
-    }
-
-    pub(crate) fn docs_str(&self) -> Option<&str> {
-        self.docs()
-            .map(|docs_constant| &self.schema_ctx.ontology[docs_constant])
     }
 }

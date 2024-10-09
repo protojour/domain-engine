@@ -11,6 +11,7 @@ doctest = false
 [dependencies]
 ontol-runtime.path = "../../ontol/ontol-runtime"
 domain-engine-core.path = "../domain-engine-core"
+arcstr.workspace = true
 juniper.workspace = true
 tracing.workspace = true
 serde.workspace = true

@@ -1,3 +1,4 @@
+use arcstr::ArcStr;
 use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
 use thin_vec::ThinVec;
@@ -128,7 +129,7 @@ pub struct TypeData {
 }
 
 impl TypeData {
-    pub fn docs(&self, ontology: &Ontology) -> Option<TextConstant> {
+    pub fn docs<'o>(&self, ontology: &'o Ontology) -> Option<&'o ArcStr> {
         match &self.kind {
             TypeKind::Object(ObjectData {
                 kind: ObjectKind::Node(nodedata),

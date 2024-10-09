@@ -69,12 +69,12 @@ impl OntologyBuilder {
         self
     }
 
-    pub fn def_docs(mut self, docs: FnvHashMap<DefId, TextConstant>) -> Self {
+    pub fn def_docs(mut self, docs: FnvHashMap<DefId, ArcStr>) -> Self {
         self.data().def_docs = docs;
         self
     }
 
-    pub fn prop_docs(mut self, docs: FnvHashMap<PropId, TextConstant>) -> Self {
+    pub fn prop_docs(mut self, docs: FnvHashMap<PropId, ArcStr>) -> Self {
         self.data().prop_docs = docs;
         self
     }

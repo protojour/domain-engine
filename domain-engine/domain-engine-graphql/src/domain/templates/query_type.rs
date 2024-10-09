@@ -30,7 +30,7 @@ impl juniper::GraphQLType<GqlScalar> for QueryType {
 
         let mut builder = registry.build_object_type::<Self>(info, &fields);
 
-        if let Some(docs) = info.docs_str() {
+        if let Some(docs) = info.docs() {
             builder = builder.description(docs);
         }
 

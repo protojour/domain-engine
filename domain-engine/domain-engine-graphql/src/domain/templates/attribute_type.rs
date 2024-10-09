@@ -119,7 +119,7 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
                 let fields = reg.get_fields(info.type_addr);
                 if fields.is_empty() {
                     let mut builder = registry.build_scalar_type::<InputType>(info);
-                    if let Some(docs) = info.docs_str() {
+                    if let Some(docs) = info.docs() {
                         builder = builder.description(docs);
                     }
                     builder.into_meta()
@@ -141,7 +141,7 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
                                 .build_object_type::<Self>(info, &fields)
                                 .interfaces(&implements_interfaces);
 
-                            if let Some(docs) = info.docs_str() {
+                            if let Some(docs) = info.docs() {
                                 builder = builder.description(docs);
                             }
                             builder.into_meta()
@@ -163,7 +163,7 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
                             }
 
                             let mut builder = registry.build_interface_type::<Self>(info, &fields);
-                            if let Some(docs) = info.docs_str() {
+                            if let Some(docs) = info.docs() {
                                 builder = builder.description(docs);
                             }
                             builder.into_meta()
@@ -185,14 +185,14 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
                     .collect();
 
                 let mut builder = registry.build_union_type::<Self>(info, &types);
-                if let Some(docs) = info.docs_str() {
+                if let Some(docs) = info.docs() {
                     builder = builder.description(docs);
                 }
                 builder.into_meta()
             }
             TypeKind::CustomScalar(_) => {
                 let mut builder = registry.build_scalar_type::<InputType>(info);
-                if let Some(docs) = info.docs_str() {
+                if let Some(docs) = info.docs() {
                     builder = builder.description(docs);
                 }
                 builder.into_meta()

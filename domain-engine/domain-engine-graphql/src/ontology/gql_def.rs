@@ -82,8 +82,7 @@ impl Def {
 
     /// The documentation of this def
     fn doc(&self, ctx: &OntologyCtx) -> Option<String> {
-        ctx.get_def_docs(self.id)
-            .map(|docs_constant| ctx[docs_constant].into())
+        ctx.get_def_docs(self.id).map(|docs| docs.to_string())
     }
 
     /// The prop-id if this Def is used directly as a property

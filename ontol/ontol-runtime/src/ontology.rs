@@ -2,10 +2,9 @@
 
 use std::ops::Index;
 
-use ::serde::{Deserialize, Serialize};
 use arcstr::ArcStr;
+use data::Data;
 use domain::{DefRepr, EdgeInfo};
-use fnv::FnvHashMap;
 use tracing::debug;
 use ulid::Ulid;
 
@@ -21,12 +20,8 @@ use crate::{
     },
     query::condition::Condition,
     value::Value,
-    vec_map::VecMap,
-    vm::{
-        ontol_vm::OntolVm,
-        proc::{Lib, Procedure},
-    },
-    DefId, DefIdSet, DomainIndex, MapKey, PropId,
+    vm::{ontol_vm::OntolVm, proc::Procedure},
+    DefId, DomainIndex, MapKey, PropId,
 };
 
 use self::{
@@ -39,6 +34,7 @@ use self::{
 
 pub mod builder;
 pub mod config;
+pub mod data;
 pub mod domain;
 pub mod map;
 pub mod ontol;
@@ -46,35 +42,6 @@ pub mod ontol;
 /// The Ontology is the model of a single ONTOL runtime environment.
 pub struct Ontology {
     pub(crate) data: Data,
-}
-
-/// All of the information that makes an Ontology.
-#[derive(Serialize, Deserialize)]
-pub struct Data {
-    pub(crate) const_proc_table: FnvHashMap<DefId, Procedure>,
-    pub(crate) map_meta_table: FnvHashMap<MapKey, MapMeta>,
-    pub(crate) static_conditions: FnvHashMap<MapKey, Condition>,
-    pub(crate) named_downmaps: FnvHashMap<(DomainIndex, TextConstant), MapKey>,
-    pub(crate) text_like_types: FnvHashMap<DefId, TextLikeType>,
-    pub(crate) text_patterns: FnvHashMap<DefId, TextPattern>,
-    pub(crate) extern_table: FnvHashMap<DefId, Extern>,
-    pub(crate) lib: Lib,
-
-    /// The text constants are stored using ArcStr because it's only one word wide,
-    /// (length is stored on the heap) and which makes the vector as dense as possible:
-    text_constants: Vec<ArcStr>,
-
-    domains: VecMap<DomainIndex, Domain>,
-    extended_entity_table: FnvHashMap<DefId, ExtendedEntityInfo>,
-    ontol_domain_meta: OntolDomainMeta,
-    union_variants: FnvHashMap<DefId, DefIdSet>,
-    domain_interfaces: FnvHashMap<DomainIndex, Vec<DomainInterface>>,
-    domain_config_table: FnvHashMap<DomainIndex, DomainConfig>,
-    def_docs: FnvHashMap<DefId, TextConstant>,
-    prop_docs: FnvHashMap<PropId, TextConstant>,
-    serde_operators: Vec<SerdeOperator>,
-    dynamic_sequence_operator_addr: SerdeOperatorAddr,
-    property_flows: Vec<PropertyFlow>,
 }
 
 impl Ontology {
@@ -124,12 +91,12 @@ impl Ontology {
         }
     }
 
-    pub fn get_def_docs(&self, def_id: DefId) -> Option<TextConstant> {
-        self.data.def_docs.get(&def_id).copied()
+    pub fn get_def_docs(&self, def_id: DefId) -> Option<&ArcStr> {
+        self.data.def_docs.get(&def_id)
     }
 
-    pub fn get_prop_docs(&self, prop_id: PropId) -> Option<TextConstant> {
-        self.data.prop_docs.get(&prop_id).copied()
+    pub fn get_prop_docs(&self, prop_id: PropId) -> Option<&ArcStr> {
+        self.data.prop_docs.get(&prop_id)
     }
 
     pub fn get_text_pattern(&self, def_id: DefId) -> Option<&TextPattern> {

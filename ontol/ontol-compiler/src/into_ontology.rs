@@ -335,7 +335,7 @@ impl<'m> Compiler<'m> {
         for (doc_id, docs) in &docs_table {
             match doc_id {
                 DocId::Def(def_id) => {
-                    def_docs.insert(*def_id, str_ctx.intern_constant(docs));
+                    def_docs.insert(*def_id, docs.clone());
                 }
                 DocId::Rel(_rel_id) => {}
             }
@@ -345,7 +345,7 @@ impl<'m> Compiler<'m> {
             if let Some(table) = &properties.table {
                 for (prop_id, property) in table {
                     if let Some(docs) = docs_table.get(&DocId::Rel(property.rel_id)) {
-                        prop_docs.insert(*prop_id, str_ctx.intern_constant(docs));
+                        prop_docs.insert(*prop_id, docs.clone());
                     }
                 }
             }

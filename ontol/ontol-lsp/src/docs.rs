@@ -88,7 +88,7 @@ impl State {
                     match self.ontol_def.get(ident) {
                         Some(def) => {
                             let doc = self.ontology.get_def_docs(def.id)
-                                .map(|docs_constant| &self.ontology[docs_constant])
+                                .map(|doc| doc.as_str())
                                 .unwrap_or_default();
                             let kind = match def.kind {
                                 DefKind::Entity(_) | DefKind::Data(_) => Some("Primitive"),

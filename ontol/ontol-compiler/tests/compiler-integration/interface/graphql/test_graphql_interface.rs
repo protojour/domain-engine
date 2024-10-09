@@ -41,7 +41,7 @@ fn test_domain_docs_as_query_docs() {
             panic!();
         };
 
-        let docs = &ontology[ontology.get_def_docs(*domain_def_id).unwrap()];
+        let docs = ontology.get_def_docs(*domain_def_id).unwrap();
         assert_eq!(docs, "Domain docs");
     });
 }

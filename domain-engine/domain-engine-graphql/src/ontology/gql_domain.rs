@@ -31,8 +31,7 @@ impl Domain {
     }
 
     fn doc(&self, ctx: &OntologyCtx) -> Option<String> {
-        let text_constant = ctx.get_def_docs(self.data(ctx).def_id())?;
-        Some(ctx[text_constant].to_string())
+        Some(ctx.get_def_docs(self.data(ctx).def_id())?.to_string())
     }
 
     fn entities(&self, ctx: &OntologyCtx) -> Vec<gql_def::Entity> {

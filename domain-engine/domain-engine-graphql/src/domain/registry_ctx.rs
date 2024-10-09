@@ -82,7 +82,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 .build_input_object_type::<InputType>(info, arguments)
         };
 
-        if let Some(docs) = info.docs_str() {
+        if let Some(docs) = info.docs() {
             builder = builder.description(docs);
         }
 
@@ -104,7 +104,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                             .schema_ctx
                             .ontology
                             .get_prop_docs(*id)
-                            .map(|docs_constant| self.schema_ctx.ontology[docs_constant].into()),
+                            .map(|d| d.to_string()),
                         _ => None,
                     },
                     arguments: self.get_arguments_to_field(&field_data.kind),
@@ -221,9 +221,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         }
                     };
 
-                    if let Some(docs_constant) = self.schema_ctx.ontology.get_prop_docs(property.id)
-                    {
-                        argument = argument.description(&self.schema_ctx.ontology[docs_constant]);
+                    if let Some(docs) = self.schema_ctx.ontology.get_prop_docs(property.id) {
+                        argument = argument.description(docs);
                     }
 
                     output.push(argument);

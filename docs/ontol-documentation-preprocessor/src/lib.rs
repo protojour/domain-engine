@@ -52,8 +52,7 @@ fn get_ontol_docs_md(ontology: &Ontology, predicate: &dyn Fn(&Def) -> bool) -> S
             let ident = &ontology[ident];
             docs.push((
                 ident.into(),
-                doc.map(|docs_constant| ontology[docs_constant].to_string())
-                    .unwrap_or_default(),
+                doc.map(|doc| doc.as_str()).unwrap_or_default().to_string(),
             ));
         }
     }
