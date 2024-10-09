@@ -170,85 +170,18 @@ impl TableProvider for EntityTableProvider {
         TableType::Base
     }
 
-    /// Create an [`ExecutionPlan`] for scanning the table with optionally
-    /// specified `projection`, `filter` and `limit`, described below.
-    ///
-    /// The `ExecutionPlan` is responsible scanning the datasource's
-    /// partitions in a streaming, parallelized fashion.
-    ///
-    /// # Projection
-    ///
-    /// If specified, only a subset of columns should be returned, in the order
-    /// specified. The projection is a set of indexes of the fields in
-    /// [`Self::schema`].
-    ///
-    /// DataFusion provides the projection to scan only the columns actually
-    /// used in the query to improve performance, an optimization  called
-    /// "Projection Pushdown". Some datasources, such as Parquet, can use this
-    /// information to go significantly faster when only a subset of columns is
-    /// required.
-    ///
-    /// # Filters
-    ///
-    /// A list of boolean filter [`Expr`]s to evaluate *during* the scan, in the
-    /// manner specified by [`Self::supports_filters_pushdown`]. Only rows for
-    /// which *all* of the `Expr`s evaluate to `true` must be returned (aka the
-    /// expressions are `AND`ed together).
-    ///
-    /// To enable filter pushdown you must override
-    /// [`Self::supports_filters_pushdown`] as the default implementation does
-    /// not and `filters` will be empty.
-    ///
-    /// DataFusion pushes filtering into the scans whenever possible
-    /// ("Filter Pushdown"), and depending on the format and the
-    /// implementation of the format, evaluating the predicate during the scan
-    /// can increase performance significantly.
-    ///
-    /// ## Note: Some columns may appear *only* in Filters
-    ///
-    /// In certain cases, a query may only use a certain column in a Filter that
-    /// has been completely pushed down to the scan. In this case, the
-    /// projection will not contain all the columns found in the filter
-    /// expressions.
-    ///
-    /// For example, given the query `SELECT t.a FROM t WHERE t.b > 5`,
-    ///
-    /// ```text
-    /// ┌────────────────────┐
-    /// │  Projection(t.a)   │
-    /// └────────────────────┘
-    ///            ▲
-    ///            │
-    ///            │
-    /// ┌────────────────────┐     Filter     ┌────────────────────┐   Projection    ┌────────────────────┐
-    /// │  Filter(t.b > 5)   │────Pushdown──▶ │  Projection(t.a)   │ ───Pushdown───▶ │  Projection(t.a)   │
-    /// └────────────────────┘                └────────────────────┘                 └────────────────────┘
-    ///            ▲                                     ▲                                      ▲
-    ///            │                                     │                                      │
-    ///            │                                     │                           ┌────────────────────┐
-    /// ┌────────────────────┐                ┌────────────────────┐                 │        Scan        │
-    /// │        Scan        │                │        Scan        │                 │  filter=(t.b > 5)  │
-    /// └────────────────────┘                │  filter=(t.b > 5)  │                 │  projection=(t.a)  │
-    ///                                       └────────────────────┘                 └────────────────────┘
-    ///
-    /// Initial Plan                  If `TableProviderFilterPushDown`           Projection pushdown notes that
-    ///                               returns true, filter pushdown              the scan only needs t.a
-    ///                               pushes the filter into the scan
-    ///                                                                          BUT internally evaluating the
-    ///                                                                          predicate still requires t.b
-    /// ```
-    ///
-    /// # Limit
-    ///
-    /// If `limit` is specified,  must only produce *at least* this many rows,
-    /// (though it may return more).  Like Projection Pushdown and Filter
-    /// Pushdown, DataFusion pushes `LIMIT`s  as far down in the plan as
-    /// possible, called "Limit Pushdown" as some sources can use this
-    /// information to improve their performance. Note that if there are any
-    /// Inexact filters pushed down, the LIMIT cannot be pushed down. This is
-    /// because inexact filters do not guarantee that every filtered row is
-    /// removed, so applying the limit could lead to too few rows being available
-    /// to return as a final result.
+    // FIXME: Need to understand the documentaion on _limit pushdown_:
+    //
+    // from the trait method documentation:
+    // > If `limit` is specified,  must only produce *at least* this many rows,
+    // > (though it may return more).  Like Projection Pushdown and Filter
+    // > Pushdown, DataFusion pushes `LIMIT`s  as far down in the plan as
+    // > possible, called "Limit Pushdown" as some sources can use this
+    // > information to improve their performance. Note that if there are any
+    // > Inexact filters pushed down, the LIMIT cannot be pushed down. This is
+    // > because inexact filters do not guarantee that every filtered row is
+    // > removed, so applying the limit could lead to too few rows being available
+    // > to return as a final result.
     async fn scan(
         &self,
         state: &dyn catalog::Session,
@@ -268,97 +201,20 @@ impl TableProvider for EntityTableProvider {
         );
 
         Ok(Arc::new(EntityScan {
-            engine: self.engine.clone(),
-            df_filter,
-            session: Session(session.0.clone()),
-            properties: PlanProperties::new(
-                EquivalenceProperties::new(self.arrow_schema.clone()),
-                Partitioning::UnknownPartitioning(1),
-                ExecutionMode::Unbounded,
-            ),
+            params: Arc::new(EntityScanParams {
+                engine: self.engine.clone(),
+                df_filter,
+                session: Session(session.0.clone()),
+                properties: PlanProperties::new(
+                    EquivalenceProperties::new(self.arrow_schema.clone()),
+                    Partitioning::UnknownPartitioning(1),
+                    ExecutionMode::Unbounded,
+                ),
+            }),
             children: vec![],
         }))
     }
 
-    /// Specify if DataFusion should provide filter expressions to the
-    /// TableProvider to apply *during* the scan.
-    ///
-    /// Some TableProviders can evaluate filters more efficiently than the
-    /// `Filter` operator in DataFusion, for example by using an index.
-    ///
-    /// # Parameters and Return Value
-    ///
-    /// The return `Vec` must have one element for each element of the `filters`
-    /// argument. The value of each element indicates if the TableProvider can
-    /// apply the corresponding filter during the scan. The position in the return
-    /// value corresponds to the expression in the `filters` parameter.
-    ///
-    /// If the length of the resulting `Vec` does not match the `filters` input
-    /// an error will be thrown.
-    ///
-    /// Each element in the resulting `Vec` is one of the following:
-    /// * [`Exact`] or [`Inexact`]: The TableProvider can apply the filter
-    /// during scan
-    /// * [`Unsupported`]: The TableProvider cannot apply the filter during scan
-    ///
-    /// By default, this function returns [`Unsupported`] for all filters,
-    /// meaning no filters will be provided to [`Self::scan`].
-    ///
-    /// [`Unsupported`]: TableProviderFilterPushDown::Unsupported
-    /// [`Exact`]: TableProviderFilterPushDown::Exact
-    /// [`Inexact`]: TableProviderFilterPushDown::Inexact
-    /// # Example
-    ///
-    /// ```rust
-    /// # use std::any::Any;
-    /// # use std::sync::Arc;
-    /// # use arrow_schema::SchemaRef;
-    /// # use async_trait::async_trait;
-    /// # use datafusion_catalog::{TableProvider, Session};
-    /// # use datafusion_common::Result;
-    /// # use datafusion_expr::{Expr, TableProviderFilterPushDown, TableType};
-    /// # use datafusion_physical_plan::ExecutionPlan;
-    /// // Define a struct that implements the TableProvider trait
-    /// struct TestDataSource {}
-    ///
-    /// #[async_trait]
-    /// impl TableProvider for TestDataSource {
-    /// # fn as_any(&self) -> &dyn Any { todo!() }
-    /// # fn schema(&self) -> SchemaRef { todo!() }
-    /// # fn table_type(&self) -> TableType { todo!() }
-    /// # async fn scan(&self, s: &dyn Session, p: Option<&Vec<usize>>, f: &[Expr], l: Option<usize>) -> Result<Arc<dyn ExecutionPlan>> {
-    ///         todo!()
-    /// # }
-    ///     // Override the supports_filters_pushdown to evaluate which expressions
-    ///     // to accept as pushdown predicates.
-    ///     fn supports_filters_pushdown(&self, filters: &[&Expr]) -> Result<Vec<TableProviderFilterPushDown>> {
-    ///         // Process each filter
-    ///         let support: Vec<_> = filters.iter().map(|expr| {
-    ///           match expr {
-    ///             // This example only supports a between expr with a single column named "c1".
-    ///             Expr::Between(between_expr) => {
-    ///                 between_expr.expr
-    ///                 .try_into_col()
-    ///                 .map(|column| {
-    ///                     if column.name == "c1" {
-    ///                         TableProviderFilterPushDown::Exact
-    ///                     } else {
-    ///                         TableProviderFilterPushDown::Unsupported
-    ///                     }
-    ///                 })
-    ///                 // If there is no column in the expr set the filter to unsupported.
-    ///                 .unwrap_or(TableProviderFilterPushDown::Unsupported)
-    ///             }
-    ///             _ => {
-    ///                 // For all other cases return Unsupported.
-    ///                 TableProviderFilterPushDown::Unsupported
-    ///             }
-    ///         }
-    ///     }).collect();
-    ///     Ok(support)
-    ///     }
-    /// }
-    /// ```
     fn supports_filters_pushdown(
         &self,
         filters: &[&Expr],
@@ -366,7 +222,7 @@ impl TableProvider for EntityTableProvider {
         let def = self.engine.ontology().def(self.def_id);
         let mut condition_builder = ConditionBuilder::new(def, self.engine.ontology());
 
-        let results = filters
+        Ok(filters
             .iter()
             .map(|expr| {
                 if condition_builder.try_add_expr(expr).is_ok() {
@@ -375,18 +231,20 @@ impl TableProvider for EntityTableProvider {
                     TableProviderFilterPushDown::Unsupported
                 }
             })
-            .collect();
-
-        Ok(results)
+            .collect())
     }
 }
 
 struct EntityScan {
+    params: Arc<EntityScanParams>,
+    children: Vec<Arc<dyn ExecutionPlan>>,
+}
+
+struct EntityScanParams {
     engine: Arc<DomainEngine>,
     df_filter: DatafusionFilter,
     session: Session,
     properties: PlanProperties,
-    children: Vec<Arc<dyn ExecutionPlan>>,
 }
 
 impl DisplayAs for EntityScan {
@@ -415,7 +273,7 @@ impl ExecutionPlan for EntityScan {
     }
 
     fn properties(&self) -> &datafusion::physical_plan::PlanProperties {
-        &self.properties
+        &self.params.properties
     }
 
     fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
@@ -427,10 +285,7 @@ impl ExecutionPlan for EntityScan {
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> DfResult<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(Self {
-            engine: self.engine.clone(),
-            df_filter: self.df_filter.clone(),
-            session: self.session.clone(),
-            properties: self.properties.clone(),
+            params: self.params.clone(),
             children,
         }))
     }
@@ -438,18 +293,21 @@ impl ExecutionPlan for EntityScan {
     fn execute(
         &self,
         _partition: usize,
-        _context: Arc<datafusion::execution::TaskContext>,
+        context: Arc<datafusion::execution::TaskContext>,
     ) -> DfResult<SendableRecordBatchStream> {
-        let engine = self.engine.clone();
+        let engine = self.params.engine.clone();
         let mut batch_builder = RecordBatchBuilder::new(
-            self.df_filter.column_selection(),
+            self.params.df_filter.column_selection(),
             self.schema(),
-            self.engine.ontology_owned(),
+            engine.ontology_owned(),
+            context.session_config().batch_size(),
         );
-        let session = self.session.clone();
-        let msg_stream =
-            futures_util::stream::iter([Ok(ReqMessage::Query(0, self.df_filter.entity_select()))])
-                .boxed();
+        let session = self.params.session.clone();
+        let msg_stream = futures_util::stream::iter([Ok(ReqMessage::Query(
+            0,
+            self.params.df_filter.entity_select(),
+        ))])
+        .boxed();
 
         let record_batch_stream = async_stream::try_stream! {
             let datastore_stream = engine.transact(

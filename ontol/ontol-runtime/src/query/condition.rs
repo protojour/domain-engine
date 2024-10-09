@@ -190,6 +190,17 @@ pub enum SetPredicate {
     Gte,
 }
 
+impl Display for SetPredicate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SetPredicate::Lt => write!(f, "<"),
+            SetPredicate::Lte => write!(f, "<="),
+            SetPredicate::Gt => write!(f, ">"),
+            SetPredicate::Gte => write!(f, ">="),
+        }
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub enum CondTerm {
     Wildcard,
@@ -248,8 +259,8 @@ where
             Clause::Member(rel, val) => {
                 write!(f, "(member {var} ({rel} {val}))")
             }
-            Clause::SetPredicate(..) => {
-                write!(f, "(set-predicate {var})")
+            Clause::SetPredicate(pred, term) => {
+                write!(f, "(set-predicate {var} {pred} {term})")
             }
         }
     }

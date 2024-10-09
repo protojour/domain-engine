@@ -1,11 +1,15 @@
 use std::collections::BTreeMap;
 
-use datafusion::{logical_expr::BinaryExpr, prelude::Expr, scalar::ScalarValue};
+use datafusion::{
+    logical_expr::{BinaryExpr, Operator},
+    prelude::Expr,
+    scalar::ScalarValue,
+};
 use domain_engine_core::domain_select;
 use ontol_runtime::{
     ontology::{domain::Def, Ontology},
     query::{
-        condition::{Clause, CondTerm, Condition, SetOperator},
+        condition::{Clause, CondTerm, Condition, SetOperator, SetPredicate},
         filter::Filter,
         select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     },
@@ -103,6 +107,7 @@ pub struct ConditionBuilder<'o> {
 pub enum ConditionError {
     Expr,
     BinaryOperands,
+    BinaryOperator,
     Column,
     Literal,
     TimeZone,
@@ -147,26 +152,56 @@ impl<'o> ConditionBuilder<'o> {
     }
 
     fn try_add_binary(&mut self, expr: &BinaryExpr) -> Result<(), ConditionError> {
+        let mut predicate_op = PredicateOp::try_from(expr.op)?;
         let mut operands = [
             self.classify_as_scalar_expr(&expr.left)?,
             self.classify_as_scalar_expr(&expr.right)?,
         ];
-        operands.sort_by_key(|s| s.ordinal());
 
-        if let [ScalarExpr::Property(prop_id), ScalarExpr::Literal(value)] = operands {
-            let set_var = self.condition.mk_cond_var();
-            self.condition.add_clause(
-                self.root_var,
-                Clause::MatchProp(prop_id, SetOperator::ElementIn, set_var),
-            );
-            self.condition.add_clause(
-                set_var,
-                Clause::Member(CondTerm::Wildcard, CondTerm::Value(value)),
-            );
-            Ok(())
+        // want the property first, then the literal:
+        if operands[0].ordinal() > operands[1].ordinal() {
+            operands.swap(0, 1);
+            predicate_op = predicate_op.invert();
+        }
+
+        if let [ScalarExpr::Property(prop_id), ScalarExpr::Literal(lit)] = operands {
+            match predicate_op {
+                PredicateOp::Eq => {
+                    let set_var = self.condition.mk_cond_var();
+                    self.condition.add_clause(
+                        self.root_var,
+                        Clause::MatchProp(prop_id, SetOperator::ElementIn, set_var),
+                    );
+                    self.condition.add_clause(
+                        set_var,
+                        Clause::Member(CondTerm::Wildcard, CondTerm::Value(lit)),
+                    );
+                    Ok(())
+                }
+                PredicateOp::Lt => self.add_set_predicate(prop_id, lit, SetPredicate::Lt),
+                PredicateOp::LtEq => self.add_set_predicate(prop_id, lit, SetPredicate::Lte),
+                PredicateOp::Gt => self.add_set_predicate(prop_id, lit, SetPredicate::Gt),
+                PredicateOp::GtEq => self.add_set_predicate(prop_id, lit, SetPredicate::Gte),
+            }
         } else {
             Err(ConditionError::BinaryOperands)
         }
+    }
+
+    fn add_set_predicate(
+        &mut self,
+        prop_id: PropId,
+        lit: Value,
+        pred: SetPredicate,
+    ) -> Result<(), ConditionError> {
+        let set_var = self.condition.mk_cond_var();
+        self.condition.add_clause(
+            self.root_var,
+            Clause::MatchProp(prop_id, SetOperator::ElementIn, set_var),
+        );
+        self.condition
+            .add_clause(set_var, Clause::SetPredicate(pred, CondTerm::Value(lit)));
+        Ok(())
     }
 
     fn classify_as_scalar_expr(&self, expr: &Expr) -> Result<ScalarExpr, ConditionError> {
@@ -288,6 +323,42 @@ impl ScalarExpr {
         match self {
             Self::Property(_) => 0,
             Self::Literal(_) => 1,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum PredicateOp {
+    Eq,
+    Lt,
+    LtEq,
+    Gt,
+    GtEq,
+}
+
+impl TryFrom<Operator> for PredicateOp {
+    type Error = ConditionError;
+
+    fn try_from(value: Operator) -> Result<Self, Self::Error> {
+        match value {
+            Operator::Eq => Ok(Self::Eq),
+            Operator::Lt => Ok(Self::Lt),
+            Operator::LtEq => Ok(Self::LtEq),
+            Operator::Gt => Ok(Self::Gt),
+            Operator::GtEq => Ok(Self::GtEq),
+            _ => Err(ConditionError::BinaryOperator),
+        }
+    }
+}
+
+impl PredicateOp {
+    fn invert(self) -> Self {
+        match self {
+            Self::Eq => Self::Eq,
+            Self::Lt => Self::GtEq,
+            Self::LtEq => Self::Gt,
+            Self::Gt => Self::LtEq,
+            Self::GtEq => Self::Lt,
         }
     }
 }

@@ -7,7 +7,7 @@ use domain_engine_test_utils::{
     unimock::{self, matching, MockFn, Unimock},
 };
 use indoc::indoc;
-use ontol_examples::artist_and_instrument;
+use ontol_examples::{artist_and_instrument, conduit};
 use ontol_macros::test;
 use ontol_runtime::ontology::Ontology;
 use ontol_test_utils::{TestCompile, TestPackages};
@@ -26,6 +26,23 @@ async fn test_where_text_equals() {
 
     let dataframe = datafusion_ctx(mock_engine(&unimock, test.ontology_owned()))
         .sql(r#"SELECT "ID", name FROM ontology.artist_and_instrument.artist WHERE name = 'foo'"#)
+        .await
+        .unwrap();
+
+    dataframe.collect().await.unwrap();
+}
+
+#[test(tokio::test)]
+async fn test_where_timestamp_lt() {
+    let test = TestPackages::with_static_sources([conduit::conduit_db()]).compile();
+    let unimock = Unimock::new(verify_transact_filter(indoc! { "
+        (root $a)
+        (match-prop $a p@1:5:5 (element-in $b))
+        (set-predicate $b > datetime(1983-01-01 01:30:00 UTC))
+    "}));
+
+    let dataframe = datafusion_ctx(mock_engine(&unimock, test.ontology_owned()))
+        .sql(r#"SELECT slug FROM ontology.conduit_db."Article" WHERE created_at > '1983-01-01T01:30:00'"#)
         .await
         .unwrap();
 

@@ -41,6 +41,7 @@ pub fn mk_arrow_schema(def: &Def, ontology: &Ontology) -> Schema {
     }
 }
 
+#[derive(Debug)]
 pub struct ArrowFieldInfo<'o> {
     pub prop_id: PropId,
     pub name: &'o str,
@@ -49,7 +50,7 @@ pub struct ArrowFieldInfo<'o> {
 }
 
 /// field type that's the intersection of what ONTOL and Arrow supports
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum FieldType {
     Boolean,
     I64,
@@ -136,6 +137,7 @@ impl RecordBatchBuilder {
         column_selection: Vec<(PropId, FieldType)>,
         arrow_schema: SchemaRef,
         ontology: Arc<Ontology>,
+        max_batch_size: usize,
     ) -> Self {
         let builders = column_selection
             .iter()
@@ -151,7 +153,7 @@ impl RecordBatchBuilder {
 
         Self {
             column_selection,
-            max_batch_size: 128,
+            max_batch_size,
             current_row_count: 0,
             builders,
             arrow_schema,
