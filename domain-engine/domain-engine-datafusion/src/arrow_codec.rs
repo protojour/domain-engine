@@ -1,8 +1,8 @@
-//! ONTOL Arrow encoding
+//! ONTOL <-> Arrow codec, or data mapping
 
 use std::sync::Arc;
 
-use datafusion::arrow::{
+use arrow::{
     array::{
         ArrayRef, BinaryBuilder, BooleanBuilder, Float64Builder, Int64Builder, PrimitiveBuilder,
         RecordBatch, RecordBatchOptions, StringBuilder,

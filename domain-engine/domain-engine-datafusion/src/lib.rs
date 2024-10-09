@@ -1,19 +1,15 @@
 use std::{any::Any, fmt::Debug, sync::Arc};
 
-use arrow::{mk_arrow_schema, RecordBatchBuilder};
-use datafusion::{
-    arrow::datatypes::SchemaRef,
-    catalog::{self, CatalogProvider, SchemaProvider, TableProvider},
-    datasource::TableType,
-    error::DataFusionError,
-    execution::SendableRecordBatchStream,
-    logical_expr::TableProviderFilterPushDown,
-    physical_expr::EquivalenceProperties,
-    physical_plan::{
-        stream::RecordBatchStreamAdapter, DisplayAs, ExecutionMode, ExecutionPlan, Partitioning,
-        PlanProperties,
-    },
-    prelude::Expr,
+use arrow::datatypes::SchemaRef;
+use arrow_codec::{mk_arrow_schema, RecordBatchBuilder};
+use datafusion_catalog::{CatalogProvider, SchemaProvider, TableProvider};
+use datafusion_common::DataFusionError;
+use datafusion_execution::{SendableRecordBatchStream, TaskContext};
+use datafusion_expr::{Expr, TableProviderFilterPushDown, TableType};
+use datafusion_physical_expr::EquivalenceProperties;
+use datafusion_physical_plan::{
+    stream::RecordBatchStreamAdapter, DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan,
+    Partitioning, PlanProperties,
 };
 use domain_engine_core::{
     transact::{ReqMessage, TransactionMode},
@@ -26,7 +22,7 @@ use ontol_runtime::{
     DefId, DomainIndex,
 };
 
-mod arrow;
+mod arrow_codec;
 mod filter;
 
 #[cfg(test)]
@@ -184,7 +180,7 @@ impl TableProvider for EntityTableProvider {
     // > to return as a final result.
     async fn scan(
         &self,
-        state: &dyn catalog::Session,
+        state: &dyn datafusion_catalog::Session,
         projection: Option<&Vec<usize>>,
         filters: &[Expr],
         limit: Option<usize>,
@@ -248,11 +244,7 @@ struct EntityScanParams {
 }
 
 impl DisplayAs for EntityScan {
-    fn fmt_as(
-        &self,
-        _t: datafusion::physical_plan::DisplayFormatType,
-        f: &mut std::fmt::Formatter,
-    ) -> std::fmt::Result {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "EntityScan")
     }
 }
@@ -272,7 +264,7 @@ impl ExecutionPlan for EntityScan {
         self
     }
 
-    fn properties(&self) -> &datafusion::physical_plan::PlanProperties {
+    fn properties(&self) -> &PlanProperties {
         &self.params.properties
     }
 
@@ -293,7 +285,7 @@ impl ExecutionPlan for EntityScan {
     fn execute(
         &self,
         _partition: usize,
-        context: Arc<datafusion::execution::TaskContext>,
+        context: Arc<TaskContext>,
     ) -> DfResult<SendableRecordBatchStream> {
         let engine = self.params.engine.clone();
         let mut batch_builder = RecordBatchBuilder::new(
