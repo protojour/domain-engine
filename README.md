@@ -35,7 +35,7 @@ a high level interface for interacting with the ontology.
 
 The _domain service_ encapsulates the domain engine, turning it into an internet service.
 
-### Workspace crate graph
+### Workspace crate dependency graph
 ```mermaid
 graph TD
    ontol-runtime-->ontol-macros
@@ -57,11 +57,20 @@ graph TD
 
    domain-engine-core-->ontol-runtime
 
+   domain-engine-httpjson-->ontol-runtime
+   domain-engine-httpjson-->domain-engine-core
    domain-engine-graphql-->ontol-runtime
    domain-engine-graphql-->domain-engine-core
+   domain-engine-arrow-->ontol-runtime
+   domain-engine-arrow-->domain-engine-core
+   domain-engine-datafusion-->ontol-runtime
+   domain-engine-datafusion-->domain-engine-arrow
+   domain-engine-datafusion-->domain-engine-core
 
    domain-engine-store-inmemory-->ontol-runtime
    domain-engine-store-inmemory-->domain-engine-core
+   domain-engine-store-pg-->ontol-runtime
+   domain-engine-store-pg-->domain-engine-core
 
    ontool-->ontol-compiler
    ontool-->ontol-runtime
