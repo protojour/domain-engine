@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use domain_engine_core::{domain_error::DomainErrorKind, DomainError, DomainResult};
 use ontol_runtime::{
     attr::Attr,
+    format_utils::format_value,
     ontology::{
         domain::{DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget},
         Ontology,
@@ -364,7 +365,7 @@ pub fn apply_select(attr: AttrMut, select: &Select, db: &ArangoDatabase) -> Doma
                     let address = format!(
                         "{}/{}",
                         collection_ident.raw_str(),
-                        db.ontology.format_value(id)
+                        format_value(id, db.ontology.as_ref()),
                     );
 
                     attr_map.insert(

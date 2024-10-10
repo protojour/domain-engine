@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use anyhow::{anyhow, Context};
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    ontology::{domain::DefKind, Ontology},
+    ontology::{aspects::DefsAspect, domain::DefKind},
     tuple::CardinalIdx,
     DefId, DefPropTag, DomainIndex, OntolDefTag,
 };
@@ -124,7 +124,7 @@ enum MigrationStep {
 
 pub async fn migrate(
     persistent_domains: &BTreeSet<DomainIndex>,
-    ontology: &Ontology,
+    ontology_defs: &DefsAspect,
     db_name: &str,
     pg_client: &mut Client,
 ) -> anyhow::Result<PgModel> {
@@ -164,16 +164,16 @@ pub async fn migrate(
 
     let mut entity_id_to_entity = FnvHashMap::<DefId, DefId>::default();
 
-    read_registry(ontology, &mut ctx, &txn).await?;
+    read_registry(ontology_defs, &mut ctx, &txn).await?;
 
     // collect migration steps for persistent domains
     // this improves separation of concerns while also enabling dry run simulations
     for domain_index in [DomainIndex::ontol()].iter().chain(persistent_domains) {
-        let domain = ontology
+        let domain = ontology_defs
             .domain_by_index(*domain_index)
             .ok_or_else(|| anyhow!("domain does not exist"))?;
 
-        steps::migrate_domain_steps(*domain_index, domain, ontology, &mut ctx)
+        steps::migrate_domain_steps(*domain_index, domain, ontology_defs, &mut ctx)
             .instrument(debug_span!("migrate", id = %domain.domain_id().ulid))
             .await
             .context("domain migration steps")?;

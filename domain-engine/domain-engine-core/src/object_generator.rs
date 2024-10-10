@@ -7,7 +7,11 @@ use ontol_runtime::{
         },
         processor::{ProcessorLevel, ProcessorMode},
     },
-    ontology::{domain::Def, ontol::ValueGenerator, Ontology},
+    ontology::{
+        aspects::{DefsAspect, SerdeAspect},
+        domain::Def,
+        ontol::ValueGenerator,
+    },
     value::{OctetSequence, Value, ValueTag},
     DefId, PropId,
 };
@@ -16,7 +20,8 @@ use crate::system::SystemAPI;
 
 /// Relationship and object generator based on auto-generator information from ONTOL.
 pub struct ObjectGenerator<'e> {
-    ontology: &'e Ontology,
+    defs: &'e DefsAspect,
+    serde: &'e SerdeAspect,
     system: &'e dyn SystemAPI,
     mode: ProcessorMode,
 
@@ -25,9 +30,14 @@ pub struct ObjectGenerator<'e> {
 }
 
 impl<'e> ObjectGenerator<'e> {
-    pub fn new(mode: ProcessorMode, ontology: &'e Ontology, system: &'e dyn SystemAPI) -> Self {
+    pub fn new(
+        mode: ProcessorMode,
+        ontology: &'e (impl AsRef<DefsAspect> + AsRef<SerdeAspect>),
+        system: &'e dyn SystemAPI,
+    ) -> Self {
         Self {
-            ontology,
+            defs: ontology.as_ref(),
+            serde: ontology.as_ref(),
             system,
             mode,
             current_time: Some(system.current_time()),
@@ -36,11 +46,12 @@ impl<'e> ObjectGenerator<'e> {
 
     pub fn without_timestamps(
         mode: ProcessorMode,
-        ontology: &'e Ontology,
+        ontology: &'e (impl AsRef<DefsAspect> + AsRef<SerdeAspect>),
         system: &'e dyn SystemAPI,
     ) -> Self {
         Self {
-            ontology,
+            defs: ontology.as_ref(),
+            serde: ontology.as_ref(),
             system,
             mode,
             current_time: None,
@@ -50,7 +61,7 @@ impl<'e> ObjectGenerator<'e> {
     pub fn generate_objects(&self, value: &mut Value) {
         match value {
             Value::Struct(struct_map, type_def_id) => {
-                let def = self.ontology.def(type_def_id.def_id());
+                let def = self.defs.def(type_def_id.def_id());
                 if let Some(addr) = def.operator_addr {
                     self.generate_struct_relationships(struct_map, def, addr);
                 }
@@ -93,7 +104,7 @@ impl<'e> ObjectGenerator<'e> {
         def: &Def,
         addr: SerdeOperatorAddr,
     ) {
-        let operator = &self.ontology[addr];
+        let operator = &self.serde[addr];
         let id_prop = def.entity().map(|entity| entity.id_prop);
 
         match operator {
@@ -180,7 +191,7 @@ impl<'e> ObjectGenerator<'e> {
     }
 
     fn property_tag(&self, property: &SerdeProperty) -> ValueTag {
-        let operator = &self.ontology[property.value_addr];
+        let operator = &self.serde[property.value_addr];
         self.operator_def_id(operator).into()
     }
 
@@ -208,9 +219,7 @@ impl<'e> ObjectGenerator<'e> {
             SerdeOperator::Alias(alias_op) => alias_op.def.def_id,
             SerdeOperator::Union(union_op) => union_op.union_def().def_id,
             SerdeOperator::Struct(struct_op) => struct_op.def.def_id,
-            SerdeOperator::IdSingletonStruct(.., addr) => {
-                self.operator_def_id(&self.ontology[*addr])
-            }
+            SerdeOperator::IdSingletonStruct(.., addr) => self.operator_def_id(&self.serde[*addr]),
         }
     }
 }

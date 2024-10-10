@@ -30,9 +30,9 @@ pub use serialize_raw::serialize_raw;
 
 #[derive(Clone, Copy)]
 pub(crate) struct OntologyCtx<'on> {
-    serde: &'on SerdeAspect,
-    defs: &'on DefsAspect,
-    execution: &'on ExecutionAspect,
+    pub serde: &'on SerdeAspect,
+    pub defs: &'on DefsAspect,
+    pub execution: &'on ExecutionAspect,
 }
 
 impl<'on> AsRef<SerdeAspect> for OntologyCtx<'on> {

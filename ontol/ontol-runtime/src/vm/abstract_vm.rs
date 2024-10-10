@@ -8,7 +8,7 @@ use super::{
 use crate::{
     debug::OntolDebug,
     ontology::{
-        aspects::{get_aspect, DefsAspect, ExecutionAspect},
+        aspects::{aspect, DefsAspect, ExecutionAspect},
         ontol::TextConstant,
     },
     property::ValueCardinality,
@@ -117,13 +117,13 @@ impl<'on, P: Processor> AbstractVm<'on, P> {
     ) -> Self {
         trace!(
             "AbstractVm::new({:?})",
-            procedure.debug(get_aspect::<DefsAspect>(ontology))
+            procedure.debug(aspect::<DefsAspect>(ontology))
         );
         Self {
             program_counter: procedure.address.0 as usize,
             proc_address: procedure.address.0 as usize,
             call_stack: vec![],
-            lib: &get_aspect::<ExecutionAspect>(ontology).lib,
+            lib: &aspect::<ExecutionAspect>(ontology).lib,
             defs: ontology.as_ref(),
         }
     }

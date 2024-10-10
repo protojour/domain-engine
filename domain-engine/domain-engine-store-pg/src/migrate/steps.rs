@@ -3,10 +3,10 @@ use itertools::Itertools;
 use ontol_runtime::{
     debug::OntolDebug,
     ontology::{
+        aspects::DefsAspect,
         domain::{
             DataRelationshipKind, DataRelationshipTarget, Def, DefRepr, Domain, EdgeCardinalFlags,
         },
-        Ontology,
     },
     property::ValueCardinality,
     tuple::CardinalIdx,
@@ -27,7 +27,7 @@ use super::{MigrationCtx, PgDomainIds, Stage};
 pub async fn migrate_domain_steps<'t>(
     domain_index: DomainIndex,
     domain: &Domain,
-    ontology: &Ontology,
+    ontology_defs: &DefsAspect,
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
     let domain_uid = domain.domain_id().ulid;
@@ -35,7 +35,7 @@ pub async fn migrate_domain_steps<'t>(
         index: domain_index,
         uid: domain_uid,
     };
-    let unique_name = &ontology[domain.unique_name()];
+    let unique_name = &ontology_defs[domain.unique_name()];
     let pg_domain = ctx.domains.get_mut(&domain_index);
 
     let schema_name = {
@@ -79,7 +79,7 @@ pub async fn migrate_domain_steps<'t>(
             Stage::Domain,
             domain_ids,
             [MigrationStep::DeployDomain {
-                name: ontology[domain.unique_name()].into(),
+                name: ontology_defs[domain.unique_name()].into(),
                 schema_name,
             }],
         );
@@ -94,14 +94,14 @@ pub async fn migrate_domain_steps<'t>(
         let Some(ident) = def.ident() else {
             continue;
         };
-        let ident = &ontology[ident];
+        let ident = &ontology_defs[ident];
 
-        migrate_vertex_steps(domain_ids, def.id, def, ident, ontology, ctx)
+        migrate_vertex_steps(domain_ids, def.id, def, ident, ontology_defs, ctx)
             .instrument(trace_span!("vtx", ident))
             .await?;
     }
 
-    migrate_domain_edges_steps(domain_index, domain, domain_ids, ontology, ctx).await?;
+    migrate_domain_edges_steps(domain_index, domain, domain_ids, ontology_defs, ctx).await?;
 
     if let Some(abstract_scalar_tags) = ctx.abstract_scalars.remove(&domain_index) {
         let pg_domain = ctx.domains.get_mut(&domain_index).unwrap();
@@ -117,7 +117,7 @@ pub async fn migrate_domain_steps<'t>(
                 [
                     MigrationStep::DeployVertex {
                         vertex_def_id: tag.def_id(),
-                        table_name: format!("s_{:?}", tag.debug(ontology)).into_boxed_str(),
+                        table_name: format!("s_{:?}", tag.debug(ontology_defs)).into_boxed_str(),
                     },
                     MigrationStep::DeployVertexFKey {
                         vertex_def_id: tag.def_id(),
@@ -143,7 +143,7 @@ async fn migrate_vertex_steps<'t>(
     vertex_def_id: DefId,
     def: &Def,
     ident: &str,
-    ontology: &Ontology,
+    ontology_defs: &DefsAspect,
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
     let table_name = format!("v_{}", ident).into_boxed_str();
@@ -194,7 +194,7 @@ async fn migrate_vertex_steps<'t>(
         domain_ids,
         PgTableIdUnion::Def(vertex_def_id),
         def,
-        ontology,
+        ontology_defs,
         ctx,
     )?;
 
@@ -212,14 +212,14 @@ async fn migrate_domain_edges_steps<'t>(
     domain_index: DomainIndex,
     domain: &Domain,
     domain_ids: PgDomainIds,
-    ontology: &Ontology,
+    ontology_defs: &DefsAspect,
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
     let pg_domain = ctx.domains.get_mut(&domain_index).unwrap();
     let mut param_def_ids: Vec<(EdgeId, DefId)> = vec![];
     for (edge_id, edge_info) in domain.edges() {
         let edge_tag = edge_id.1;
-        let ident = &ontology[edge_info.ident];
+        let ident = &ontology_defs[edge_info.ident];
         let table_name = format!("e_{ident}").into_boxed_str();
 
         if let Some(pg_table) = pg_domain.edgetables.get_mut(&edge_tag) {
@@ -328,8 +328,8 @@ async fn migrate_domain_edges_steps<'t>(
             Stage::Edge,
             domain_ids,
             PgTableIdUnion::Edge(edge_id),
-            ontology.def(data_def_id),
-            ontology,
+            ontology_defs.def(data_def_id),
+            ontology_defs,
             ctx,
         )?;
     }
@@ -342,7 +342,7 @@ fn migrate_datafields_steps(
     domain_ids: PgDomainIds,
     table_id: PgTableIdUnion,
     def: &Def,
-    ontology: &Ontology,
+    ontology_defs: &DefsAspect,
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
     let pg_domain = ctx.domains.get_mut(&domain_ids.index).unwrap();
@@ -363,7 +363,7 @@ fn migrate_datafields_steps(
     for (prop_tag, rel_info) in &tree_relationships {
         // FIXME: should mix columns on the root _and_ child structures,
         // so there needs to be some disambiguation in place
-        let column_name = &ontology[rel_info.name];
+        let column_name = &ontology_defs[rel_info.name];
 
         let target_def_id = match rel_info.target {
             DataRelationshipTarget::Unambiguous(def_id) => def_id,
@@ -374,7 +374,7 @@ fn migrate_datafields_steps(
             pg_domain
                 .get_table(&table_id)
                 .and_then(|datatable| datatable.properties.get(prop_tag)),
-            PgRepr::classify_property(rel_info, target_def_id, ontology),
+            PgRepr::classify_property(rel_info, target_def_id, ontology_defs),
             rel_info.cardinality.1,
         ) {
             (_, PgRepr::Unit, _) => {

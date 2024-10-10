@@ -5,7 +5,7 @@ use ontol_macros::OntolDebug;
 use crate::{
     debug::OntolDebug,
     format_utils::{Backticks, CommaSeparated, DoubleQuote},
-    ontology::aspects::{get_aspect, DefsAspect, ExecutionAspect, SerdeAspect},
+    ontology::aspects::{aspect, DefsAspect, ExecutionAspect, SerdeAspect},
     DefId, PropId,
 };
 
@@ -40,7 +40,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         ontology: &'on (impl AsRef<SerdeAspect> + AsRef<DefsAspect> + AsRef<ExecutionAspect>),
     ) -> Self {
         Self {
-            value_operator: &get_aspect::<SerdeAspect>(ontology).operators[value_addr.0 as usize],
+            value_operator: &aspect::<SerdeAspect>(ontology).operators[value_addr.0 as usize],
             sub_ctx: Default::default(),
             level: ProcessorLevel::new_root(),
             ontology: OntologyCtx {

@@ -10,7 +10,10 @@ use domain_engine_core::{
     DomainResult, Session,
 };
 use futures_util::stream::BoxStream;
-use ontol_runtime::{ontology::Ontology, DomainIndex, PropId};
+use ontol_runtime::{
+    ontology::{aspects::DefsAspect, Ontology},
+    DomainIndex, PropId,
+};
 use tokio_postgres::NoTls;
 
 pub use pg_model::PgModel;
@@ -73,7 +76,7 @@ impl From<PostgresDataStore> for PostgresHandle {
 
 pub async fn connect_and_migrate(
     persistent_domains: &BTreeSet<DomainIndex>,
-    ontology: &Ontology,
+    ontology_defs: &DefsAspect,
     pg_config: &tokio_postgres::Config,
 ) -> anyhow::Result<PgModel> {
     let db_name = pg_config
@@ -89,7 +92,8 @@ pub async fn connect_and_migrate(
         }
     });
 
-    let pg_model = migrate::migrate(persistent_domains, ontology, db_name, &mut client).await?;
+    let pg_model =
+        migrate::migrate(persistent_domains, ontology_defs, db_name, &mut client).await?;
     drop(client);
 
     join_handle.await?;

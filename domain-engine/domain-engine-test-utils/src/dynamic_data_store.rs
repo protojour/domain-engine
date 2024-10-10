@@ -242,10 +242,11 @@ mod pg {
 
         let test_config = test_pg_config(&test_name);
 
-        let pg_model = connect_and_migrate(persisted, params.ontology.as_ref(), &test_config)
-            .await
-            .map_err(DomainError::data_store_from_anyhow)
-            .with_context(|| "connect and migrate")?;
+        let pg_model =
+            connect_and_migrate(persisted, params.ontology.as_ref().as_ref(), &test_config)
+                .await
+                .map_err(DomainError::data_store_from_anyhow)
+                .with_context(|| "connect and migrate")?;
 
         let deadpool_manager = deadpool_postgres::Manager::from_config(
             test_config,

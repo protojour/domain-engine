@@ -13,6 +13,7 @@ use vec_map::VecMapKey;
 
 pub mod attr;
 pub mod cast;
+pub mod constant;
 pub mod debug;
 pub mod format_utils;
 pub mod interface;

@@ -6,8 +6,8 @@ use itertools::Itertools;
 use ontol_runtime::{
     attr::Attr,
     ontology::{
+        aspects::{DefsAspect, SerdeAspect},
         domain::{DataRelationshipInfo, Def},
-        Ontology,
     },
     tuple::CardinalIdx,
     value::{Serial, Value},
@@ -31,10 +31,23 @@ pub(super) struct InMemoryStore {
 }
 
 pub(super) struct DbContext<'a> {
-    pub ontology: &'a Ontology,
+    pub ontology_defs: &'a DefsAspect,
+    pub ontology_serde: &'a SerdeAspect,
     pub system: &'a dyn SystemAPI,
     pub check: ConstraintCheck,
     pub write_stats: WriteStatsBuilder,
+}
+
+impl<'a> AsRef<DefsAspect> for DbContext<'a> {
+    fn as_ref(&self) -> &DefsAspect {
+        self.ontology_defs
+    }
+}
+
+impl<'a> AsRef<SerdeAspect> for DbContext<'a> {
+    fn as_ref(&self) -> &SerdeAspect {
+        self.ontology_serde
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
@@ -124,7 +137,7 @@ impl InMemoryStore {
                         .vertex_union
                         .iter()
                         .find(|vertex_def_id| {
-                            let entity = ctx.ontology.def(**vertex_def_id).entity().unwrap();
+                            let entity = ctx.ontology_defs.def(**vertex_def_id).entity().unwrap();
                             entity.id_value_def_id == value_def_id
                         })
                         .unwrap_or_else(|| {

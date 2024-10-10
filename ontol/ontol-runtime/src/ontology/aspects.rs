@@ -18,13 +18,13 @@ use crate::{
 
 use super::{
     config::DomainConfig,
-    domain::{Def, Domain, ExtendedEntityInfo},
+    domain::{Def, Domain, EdgeInfo, ExtendedEntityInfo},
     map::{Extern, MapMeta, PropertyFlow},
     ontol::{text_pattern::TextPattern, OntolDomainMeta, TextConstant, TextLikeType},
 };
 
-/// get aspect, turbofish style
-pub fn get_aspect<T>(source: &impl AsRef<T>) -> &T {
+/// fetch aspect, turbofish style
+pub fn aspect<T>(source: &impl AsRef<T>) -> &T {
     source.as_ref()
 }
 
@@ -44,6 +44,12 @@ impl DefsAspect {
         self.domains.get(&index)
     }
 
+    pub fn domains(&self) -> impl Iterator<Item = (DomainIndex, &Domain)> {
+        self.domains
+            .iter()
+            .map(|(idx, domain)| (DomainIndex(idx as u16), domain))
+    }
+
     pub fn def(&self, def_id: DefId) -> &Def {
         match self.domain_by_index(def_id.0) {
             Some(domain) => domain.def(def_id),
@@ -58,6 +64,28 @@ impl DefsAspect {
             Some(domain) => domain.def_option(def_id),
             None => None,
         }
+    }
+
+    pub fn find_edge(&self, id: DefId) -> Option<&EdgeInfo> {
+        let domain = self.domain_by_index(id.0)?;
+        domain.find_edge(id)
+    }
+
+    /// Get the members of a given union.
+    /// Returns an empty slice if it's not a union.
+    pub fn union_variants(&self, union_def_id: DefId) -> &[DefId] {
+        self.union_variants
+            .get(&union_def_id)
+            .map(|set| set.as_slice())
+            .unwrap_or(&[])
+    }
+
+    pub fn get_text_pattern(&self, def_id: DefId) -> Option<&TextPattern> {
+        self.text_patterns.get(&def_id)
+    }
+
+    pub fn get_text_like_type(&self, def_id: DefId) -> Option<TextLikeType> {
+        self.text_like_types.get(&def_id).cloned()
     }
 }
 
@@ -113,6 +141,20 @@ pub struct ExecutionAspect {
     pub(crate) extern_table: FnvHashMap<DefId, Extern>,
     pub(crate) lib: Lib,
     pub(crate) property_flows: Vec<PropertyFlow>,
+}
+
+impl ExecutionAspect {
+    pub(crate) fn empty() -> Self {
+        Self {
+            const_proc_table: Default::default(),
+            map_meta_table: Default::default(),
+            static_conditions: Default::default(),
+            lib: Lib::default(),
+            property_flows: Default::default(),
+            named_downmaps: Default::default(),
+            extern_table: Default::default(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]

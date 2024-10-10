@@ -2,11 +2,11 @@ use fnv::FnvHashMap;
 use ontol_runtime::{
     interface::serde::operator::{AliasOperator, SerdeOperator, SerdeOperatorAddr},
     ontology::{
+        aspects::{DefsAspect, SerdeAspect},
         ontol::{
             text_pattern::{TextPattern, TextPatternConstantPart, TextPatternProperty},
             TextLikeType, ValueGenerator,
         },
-        Ontology,
     },
     value::{OctetSequence, Value},
     DefId, PropId,
@@ -16,10 +16,10 @@ use crate::{domain_error::DomainErrorKind, system::SystemAPI, DomainError, Domai
 
 pub fn find_inherent_entity_id(
     entity_val: &Value,
-    ontology: &Ontology,
+    ontology_defs: &DefsAspect,
 ) -> Result<Option<Value>, DomainError> {
     let def_id = entity_val.type_def_id();
-    let def = ontology.def(def_id);
+    let def = ontology_defs.def(def_id);
     let entity = def
         .entity()
         .ok_or(DomainErrorKind::NotAnEntity(def_id).into_error())?;
@@ -60,10 +60,13 @@ impl GeneratedIdContainer {
 pub fn try_generate_entity_id(
     id_operator_addr: SerdeOperatorAddr,
     value_generator: ValueGenerator,
-    ontology: &Ontology,
+    ontology: &(impl AsRef<SerdeAspect> + AsRef<DefsAspect>),
     system: &dyn SystemAPI,
 ) -> DomainResult<(GeneratedId, GeneratedIdContainer)> {
-    match (&ontology[id_operator_addr], value_generator) {
+    let serde: &SerdeAspect = ontology.as_ref();
+    let defs: &DefsAspect = ontology.as_ref();
+
+    match (&serde[id_operator_addr], value_generator) {
         (SerdeOperator::String(def_id), ValueGenerator::Uuid) => Ok((
             GeneratedId::Generated(Value::Text(
                 format!("{}", system.generate_uuid()).into(),
@@ -72,7 +75,7 @@ pub fn try_generate_entity_id(
             GeneratedIdContainer::Raw,
         )),
         (SerdeOperator::TextPattern(def_id), _) => {
-            match (ontology.get_text_like_type(*def_id), value_generator) {
+            match (defs.get_text_like_type(*def_id), value_generator) {
                 (Some(TextLikeType::Uuid), ValueGenerator::Uuid) => Ok((
                     GeneratedId::Generated(Value::OctetSequence(
                         OctetSequence(system.generate_uuid().as_bytes().iter().cloned().collect()),
@@ -84,10 +87,8 @@ pub fn try_generate_entity_id(
             }
         }
         (SerdeOperator::CapturingTextPattern(def_id), _) => {
-            if let Some(property) =
-                analyze_text_pattern(ontology.get_text_pattern(*def_id).unwrap())
-            {
-                let def = ontology.def(property.type_def_id);
+            if let Some(property) = analyze_text_pattern(defs.get_text_pattern(*def_id).unwrap()) {
+                let def = defs.def(property.type_def_id);
                 let (generated_id, _) = try_generate_entity_id(
                     def.operator_addr.unwrap(),
                     value_generator,

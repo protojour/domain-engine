@@ -2,6 +2,7 @@ use domain_engine_core::DomainResult;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     attr::Attr,
+    constant::try_produce_constant,
     ontology::domain::{DataRelationshipInfo, DataRelationshipTarget, Def},
     value::Value,
     DefId, OntolDefTag, PropId,
@@ -119,7 +120,7 @@ impl<'a> TransactCtx<'a> {
         // TODO: Might be able to cache this in some way,
         // e.g. a Vec<PgType> for the property columns in each PgTable.
         // But is the increased memory usage worth it?
-        let pg_repr = PgRepr::classify_property(rel_info, target_def_id, self.ontology);
+        let pg_repr = PgRepr::classify_property(rel_info, target_def_id, self.ontology_defs);
 
         match pg_repr {
             PgRepr::Scalar(pg_type, _) => {
@@ -131,7 +132,7 @@ impl<'a> TransactCtx<'a> {
                     None
                 })
             }
-            PgRepr::Unit => match self.ontology.try_produce_constant(target_def_id) {
+            PgRepr::Unit => match try_produce_constant(target_def_id, self) {
                 Some(value) => Ok(Some(value)),
                 None => {
                     debug!("can't produce a representation of constant unit {target_def_id:?}");
@@ -164,9 +165,9 @@ impl<'a> TransactCtx<'a> {
     pub fn abstract_kind(&self, target: &'a DataRelationshipTarget) -> AbstractKind<'a> {
         match target {
             DataRelationshipTarget::Unambiguous(target_def_id) => {
-                let target_def = self.ontology.def(*target_def_id);
+                let target_def = self.ontology_defs.def(*target_def_id);
                 if let Some(PgRepr::Scalar(pg_type, ontol_def_tag)) =
-                    PgRepr::classify_opt_def_repr(target_def.repr(), self.ontology)
+                    PgRepr::classify_opt_def_repr(target_def.repr(), self.ontology_defs)
                 {
                     AbstractKind::Scalar {
                         pg_type,
@@ -178,7 +179,7 @@ impl<'a> TransactCtx<'a> {
                 }
             }
             DataRelationshipTarget::Union(union_def_id) => {
-                AbstractKind::VertexUnion(self.ontology.union_variants(*union_def_id))
+                AbstractKind::VertexUnion(self.ontology_defs.union_variants(*union_def_id))
             }
         }
     }

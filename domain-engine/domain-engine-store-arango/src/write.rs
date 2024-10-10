@@ -397,7 +397,7 @@ fn generate_id(
     let def = ontology.def(entity.type_def_id());
     let entity_info = def.entity().expect("def should be an entity");
 
-    let inherent_id = find_inherent_entity_id(entity, ontology)?;
+    let inherent_id = find_inherent_entity_id(entity, ontology.as_ref())?;
     let id = match (&inherent_id, entity_info.id_value_generator) {
         (Some(_), _) => inherent_id.clone(),
         (None, Some(value_generator)) => {

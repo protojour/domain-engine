@@ -29,7 +29,7 @@ impl<'a> TransactCtx<'a> {
 
         let mut order_by = sql::OrderBy::default();
 
-        let def = self.ontology.def(def_id);
+        let def = self.ontology_defs.def(def_id);
 
         for item in vertex_order_tuple {
             let direction = item.direction;
@@ -100,7 +100,7 @@ impl<'a> TransactCtx<'a> {
                 Ok(PgRepr::classify_property(
                     rel_info,
                     target_def_id,
-                    self.ontology,
+                    self.ontology_defs,
                 ))
             }
             None => {

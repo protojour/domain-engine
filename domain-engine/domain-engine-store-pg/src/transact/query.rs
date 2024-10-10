@@ -116,7 +116,7 @@ impl<'a> TransactCtx<'a> {
         let pg = self
             .pg_model
             .pg_domain_datatable(def_id.domain_index(), def_id)?;
-        let def = self.ontology.def(def_id);
+        let def = self.ontology_defs.def(def_id);
 
         let vertex_select =
             self.analyze_vertex_select_properties(def, pg.table, &struct_select.properties)?;
@@ -183,7 +183,7 @@ impl<'a> TransactCtx<'a> {
                     ),
                     QuerySelectRef::EntityId => {
                         let mut fields: Vec<_> = self.initial_standard_data_fields(pg).into();
-                        let def = self.ontology.def(def_id);
+                        let def = self.ontology_defs.def(def_id);
                         let Some(entity) = def.entity() else {
                             return Err(DomainErrorKind::NotAnEntity(def_id).into_error());
                         };
@@ -315,7 +315,7 @@ impl<'a> TransactCtx<'a> {
         query_ctx: &mut QueryBuildCtx<'a>,
         mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<(sql::FromItem<'a>, sql::Alias, Vec<sql::Expr<'a>>)> {
-        let def = self.ontology.def(def_id);
+        let def = self.ontology_defs.def(def_id);
 
         // select data properties
         let mut sql_expressions = vec![];
@@ -371,7 +371,7 @@ impl<'a> TransactCtx<'a> {
                     let mut union_operands: Vec<sql::Expr> = vec![];
 
                     for sub_def_id in def_ids.iter().copied() {
-                        let sub_def = self.ontology.def(sub_def_id);
+                        let sub_def = self.ontology_defs.def(sub_def_id);
                         let sub_pg = self
                             .pg_model
                             .pg_domain_datatable(sub_def_id.domain_index(), sub_def_id)?;
@@ -515,7 +515,7 @@ impl<'a> TransactCtx<'a> {
             };
 
             let edge_alias = query_ctx.alias.incr();
-            let edge_info = self.ontology.find_edge(proj.edge_id).unwrap();
+            let edge_info = self.ontology_defs.find_edge(proj.edge_id).unwrap();
             let pg_edge = self.pg_model.pg_domain_edgetable(&EdgeId(proj.edge_id))?;
             let pg_subj_cardinal = pg_edge.table.edge_cardinal(proj.subject)?;
 
@@ -681,7 +681,7 @@ impl<'a> TransactCtx<'a> {
                 else {
                     return Err(PgError::InvalidDynamicDataType(def_key).into());
                 };
-                let def = self.ontology.def(*def_id);
+                let def = self.ontology_defs.def(*def_id);
                 let Some(entity) = def.entity() else {
                     return Err(DomainErrorKind::NotAnEntity(*def_id).into_error());
                 };
@@ -716,7 +716,7 @@ impl<'a> TransactCtx<'a> {
         include_joined_attrs: IncludeJoinedAttrs,
         op: DataOperation,
     ) -> DomainResult<RowValue> {
-        let def = self.ontology.def(def_id);
+        let def = self.ontology_defs.def(def_id);
 
         let mut attrs: FnvHashMap<PropId, Attr> =
             FnvHashMap::with_capacity_and_hasher(def.data_relationships.len(), Default::default());
@@ -930,7 +930,7 @@ impl<'a> TransactCtx<'a> {
 
             let value = match &pg_cardinal.kind {
                 PgEdgeCardinalKind::Parameters(def_id) => {
-                    let def = self.ontology.def(*def_id);
+                    let def = self.ontology_defs.def(*def_id);
                     let mut attrs: FnvHashMap<PropId, Attr> = FnvHashMap::with_capacity_and_hasher(
                         def.data_relationships.len(),
                         Default::default(),

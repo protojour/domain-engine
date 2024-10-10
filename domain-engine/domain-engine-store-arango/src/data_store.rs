@@ -324,7 +324,7 @@ impl ArangoDatabase {
     ) -> DomainResult<(Value, DataOperation)> {
         let seed: PhantomData<serde_json::Value> = PhantomData;
 
-        ObjectGenerator::new(processor_mode, &self.ontology, self.system.as_ref())
+        ObjectGenerator::new(processor_mode, self.ontology.as_ref(), self.system.as_ref())
             .generate_objects(&mut entity);
 
         let pre_query = AqlQuery::prequery_from_entity(&entity, &self.ontology, self)?;

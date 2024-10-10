@@ -122,7 +122,7 @@ impl<'a> TransactCtx<'a> {
             def_id_set.iter().next().copied().unwrap()
         };
 
-        let def = self.ontology.def(def_id);
+        let def = self.ontology_defs.def(def_id);
 
         debug!("traverse condition {cond_var}");
 
@@ -314,7 +314,7 @@ impl<'a> TransactCtx<'a> {
                     proj: *proj,
                     idx: CardinalIdx(0),
                 });
-                let edge = self.ontology.find_edge(proj.edge_id).unwrap();
+                let edge = self.ontology_defs.find_edge(proj.edge_id).unwrap();
 
                 match set_operator {
                     SetOperator::ElementIn => {

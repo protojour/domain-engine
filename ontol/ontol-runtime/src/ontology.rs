@@ -5,12 +5,11 @@ use std::ops::Index;
 use arcstr::ArcStr;
 use aspects::{DefsAspect, ExecutionAspect, SerdeAspect};
 use data::Data;
-use domain::{DefRepr, EdgeInfo};
+use domain::EdgeInfo;
 use tracing::debug;
 use ulid::Ulid;
 
 use crate::{
-    attr::AttrRef,
     debug::{OntolDebug, OntolFormatter},
     interface::{
         serde::{
@@ -20,7 +19,6 @@ use crate::{
         DomainInterface,
     },
     query::condition::Condition,
-    value::Value,
     vm::{ontol_vm::OntolVm, proc::Procedure},
     DefId, DomainIndex, MapKey, PropId,
 };
@@ -98,19 +96,15 @@ impl Ontology {
     }
 
     pub fn get_text_pattern(&self, def_id: DefId) -> Option<&TextPattern> {
-        self.data.defs.text_patterns.get(&def_id)
+        self.data.defs.get_text_pattern(def_id)
     }
 
     pub fn get_text_like_type(&self, def_id: DefId) -> Option<TextLikeType> {
-        self.data.defs.text_like_types.get(&def_id).cloned()
+        self.data.defs.get_text_like_type(def_id)
     }
 
     pub fn domains(&self) -> impl Iterator<Item = (DomainIndex, &Domain)> {
-        self.data
-            .defs
-            .domains
-            .iter()
-            .map(|(idx, domain)| (DomainIndex(idx as u16), domain))
+        self.data.defs.domains()
     }
 
     pub fn ontol_domain_meta(&self) -> &OntolDomainMeta {
@@ -133,17 +127,11 @@ impl Ontology {
     /// Get the members of a given union.
     /// Returns an empty slice if it's not a union.
     pub fn union_variants(&self, union_def_id: DefId) -> &[DefId] {
-        self.data
-            .defs
-            .union_variants
-            .get(&union_def_id)
-            .map(|set| set.as_slice())
-            .unwrap_or(&[])
+        self.data.defs.union_variants(union_def_id)
     }
 
     pub fn find_edge(&self, id: DefId) -> Option<&EdgeInfo> {
-        let domain = self.domain_by_index(id.0)?;
-        domain.find_edge(id)
+        self.data.defs.find_edge(id)
     }
 
     pub fn extended_entity_info(&self, def_id: DefId) -> Option<&ExtendedEntityInfo> {
@@ -250,74 +238,6 @@ impl Ontology {
             .named_downmaps
             .get(&(index, text_constant))
             .cloned()
-    }
-
-    /// best-effort formatting of a value
-    pub fn format_value(&self, value: &Value) -> String {
-        let def = self.def(value.type_def_id());
-        if let Some(operator_addr) = def.operator_addr {
-            // TODO: Easier way to report values in "human readable"/JSON format
-
-            let processor = self.new_serde_processor(operator_addr, ProcessorMode::Read);
-
-            let mut buf: Vec<u8> = vec![];
-            processor
-                .serialize_attr(
-                    AttrRef::Unit(value),
-                    &mut serde_json::Serializer::new(&mut buf),
-                )
-                .unwrap();
-            String::from(std::str::from_utf8(&buf).unwrap())
-        } else {
-            "N/A".to_string()
-        }
-    }
-
-    pub fn try_produce_constant(&self, def_id: DefId) -> Option<Value> {
-        let def = self.def(def_id);
-        match def.repr() {
-            Some(DefRepr::TextConstant(constant)) => {
-                Some(Value::Text(self[*constant].into(), def_id.into()))
-            }
-            _ => {
-                let Some(operator_addr) = def.operator_addr else {
-                    debug!("{def_id:?} has no operator addr, no constant can be produced");
-                    return None;
-                };
-                self.try_produce_constant_from_operator(operator_addr)
-            }
-        }
-    }
-
-    fn try_produce_constant_from_operator(&self, addr: SerdeOperatorAddr) -> Option<Value> {
-        let operator = &self.data.serde.operators[addr.0 as usize];
-        match operator {
-            SerdeOperator::AnyPlaceholder => None,
-            SerdeOperator::Unit => Some(Value::unit()),
-            SerdeOperator::True(_) => Some(Value::boolean(true)),
-            SerdeOperator::False(_) => Some(Value::boolean(false)),
-            SerdeOperator::Boolean(_)
-            | SerdeOperator::I32(..)
-            | SerdeOperator::I64(..)
-            | SerdeOperator::F64(..)
-            | SerdeOperator::Serial(_)
-            | SerdeOperator::Octets(_)
-            | SerdeOperator::String(_) => None,
-            SerdeOperator::StringConstant(text_constant, def_id) => {
-                Some(Value::Text(self[*text_constant].into(), (*def_id).into()))
-            }
-            SerdeOperator::TextPattern(_)
-            | SerdeOperator::CapturingTextPattern(_)
-            | SerdeOperator::DynamicSequence
-            | SerdeOperator::RelationList(_)
-            | SerdeOperator::RelationIndexSet(_)
-            | SerdeOperator::ConstructorSequence(_) => None,
-            SerdeOperator::Alias(alias_op) => {
-                self.try_produce_constant_from_operator(alias_op.inner_addr)
-            }
-            SerdeOperator::Union(_) | SerdeOperator::Struct(_) => None,
-            SerdeOperator::IdSingletonStruct(_, _, _) => None,
-        }
     }
 }
 

@@ -1,7 +1,9 @@
 use anyhow::Context;
 use fnv::FnvHashMap;
 use indoc::indoc;
-use ontol_runtime::{ontology::Ontology, tuple::CardinalIdx, DefId, DefPropTag, DomainIndex};
+use ontol_runtime::{
+    ontology::aspects::DefsAspect, tuple::CardinalIdx, DefId, DefPropTag, DomainIndex,
+};
 use tokio_postgres::Transaction;
 use tracing::info;
 use ulid::Ulid;
@@ -20,11 +22,11 @@ enum TableRef {
 
 /// Read the entire database registry into PgModel
 pub async fn read_registry<'t>(
-    ontology: &Ontology,
+    ontology_defs: &DefsAspect,
     ctx: &mut MigrationCtx,
     txn: &Transaction<'t>,
 ) -> anyhow::Result<()> {
-    let domain_index_by_ulid: FnvHashMap<Ulid, DomainIndex> = ontology
+    let domain_index_by_ulid: FnvHashMap<Ulid, DomainIndex> = ontology_defs
         .domains()
         .map(|(domain_index, domain)| (domain.domain_id().ulid, domain_index))
         .collect();

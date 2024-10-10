@@ -157,7 +157,7 @@ impl InMemoryStore {
                         dynamic_key,
                     },
                 ) => {
-                    let def = ctx.ontology.def(type_def_id);
+                    let def = ctx.ontology_defs.def(type_def_id);
 
                     let Some(data_relationship) = def.data_relationships.get(prop_id) else {
                         // temporarily return every vertex.

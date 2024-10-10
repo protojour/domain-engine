@@ -97,7 +97,7 @@ impl<'a> TransactCtx<'a> {
 
     fn analyze_struct_select(&self, struct_select: &StructSelect) -> DomainResult<VertexSelect> {
         let domain_index = struct_select.def_id.domain_index();
-        let def = self.ontology.def(struct_select.def_id);
+        let def = self.ontology_defs.def(struct_select.def_id);
         let pg_datatable = self
             .pg_model
             .datatable(domain_index, struct_select.def_id)?;
@@ -161,7 +161,7 @@ impl<'a> TransactCtx<'a> {
                                     let mut variant_selects = Vec::with_capacity(variants.len());
 
                                     for variant_def_id in variants {
-                                        let variant_def = self.ontology.def(*variant_def_id);
+                                        let variant_def = self.ontology_defs.def(*variant_def_id);
                                         let pg = self.pg_model.datatable(
                                             variant_def_id.domain_index(),
                                             *variant_def_id,
@@ -189,7 +189,7 @@ impl<'a> TransactCtx<'a> {
                     }
                     DataRelationshipKind::Edge(proj) => {
                         let mut cardinal_selects = smallvec![];
-                        let edge_info = self.ontology.find_edge(proj.edge_id).unwrap();
+                        let edge_info = self.ontology_defs.find_edge(proj.edge_id).unwrap();
                         let pg_edge = self.pg_model.pg_domain_edgetable(&EdgeId(proj.edge_id))?;
 
                         let mut has_vertex_cardinal = false;
@@ -218,7 +218,7 @@ impl<'a> TransactCtx<'a> {
                                     }
                                 }
                                 PgEdgeCardinalKind::Parameters(def_id) => {
-                                    let def = self.ontology.def(*def_id);
+                                    let def = self.ontology_defs.def(*def_id);
                                     let mut inherent_set = BTreeSet::new();
 
                                     // "infer" parameter selection:

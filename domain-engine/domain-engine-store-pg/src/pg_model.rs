@@ -4,9 +4,9 @@ use domain_engine_core::DomainResult;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::{
+        aspects::DefsAspect,
         domain::{DataRelationshipInfo, Def, DefKind, DefRepr, DefReprUnionBound},
         ontol::ValueGenerator,
-        Ontology,
     },
     tuple::CardinalIdx,
     value::Value,
@@ -457,30 +457,33 @@ impl PgRepr {
     pub fn classify_property(
         rel_info: &DataRelationshipInfo,
         def_id: DefId,
-        ontology: &Ontology,
+        ontology_defs: &DefsAspect,
     ) -> Self {
         match rel_info.generator {
             Some(ValueGenerator::CreatedAtTime) => Self::CreatedAtColumn,
             Some(ValueGenerator::UpdatedAtTime) => Self::UpdatedAtColumn,
-            _ => Self::classify_def_id(def_id, ontology),
+            _ => Self::classify_def_id(def_id, ontology_defs),
         }
     }
 
-    pub fn classify_opt_def_repr(def_repr: Option<&DefRepr>, ontology: &Ontology) -> Option<Self> {
-        def_repr.map(|r| Self::classify_def_repr(r, ontology))
+    pub fn classify_opt_def_repr(
+        def_repr: Option<&DefRepr>,
+        ontology_defs: &DefsAspect,
+    ) -> Option<Self> {
+        def_repr.map(|r| Self::classify_def_repr(r, ontology_defs))
     }
 
-    fn classify_def_id(def_id: DefId, ontology: &Ontology) -> Self {
-        let def = ontology.get_def(def_id).unwrap();
+    fn classify_def_id(def_id: DefId, ontology_defs: &DefsAspect) -> Self {
+        let def = ontology_defs.get_def(def_id).unwrap();
         let def_repr = match &def.kind {
             DefKind::Data(basic_def) => &basic_def.repr,
             _ => &DefRepr::Unknown,
         };
 
-        Self::classify_def_repr(def_repr, ontology)
+        Self::classify_def_repr(def_repr, ontology_defs)
     }
 
-    fn classify_def_repr(def_repr: &DefRepr, ontology: &Ontology) -> Self {
+    fn classify_def_repr(def_repr: &DefRepr, ontology_defs: &DefsAspect) -> Self {
         match def_repr {
             DefRepr::Unit => Self::Unit,
             DefRepr::I64 => Self::Scalar(PgType::BigInt, OntolDefTag::I64),
@@ -492,7 +495,7 @@ impl PgRepr {
             DefRepr::Octets => Self::Scalar(PgType::Bytea, OntolDefTag::Octets),
             DefRepr::DateTime => Self::Scalar(PgType::TimestampTz, OntolDefTag::DateTime),
             DefRepr::FmtStruct(Some((_prop_id, def_id))) => {
-                Self::classify_def_id(*def_id, ontology)
+                Self::classify_def_id(*def_id, ontology_defs)
             }
             DefRepr::FmtStruct(None) => Self::Unit,
             DefRepr::Seq => todo!("seq"),
@@ -500,7 +503,7 @@ impl PgRepr {
             DefRepr::Intersection(_) => Self::NotSupported("intersection"),
             DefRepr::Union(_variants, bound) => match bound {
                 DefReprUnionBound::Scalar(scalar_repr) => {
-                    Self::classify_def_repr(scalar_repr, ontology)
+                    Self::classify_def_repr(scalar_repr, ontology_defs)
                 }
                 _ => Self::Abstract,
             },

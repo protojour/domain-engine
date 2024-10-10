@@ -50,9 +50,9 @@ impl InMemoryStore {
         select: &Select,
         ctx: &mut DbContext,
     ) -> DomainResult<(Value, DataOperation)> {
-        let entity_id = find_inherent_entity_id(&value, ctx.ontology)?
+        let entity_id = find_inherent_entity_id(&value, ctx.ontology_defs)?
             .ok_or_else(|| DomainErrorKind::EntityNotFound.into_error())?;
-        let def = ctx.ontology.def(value.type_def_id());
+        let def = ctx.ontology_defs.def(value.type_def_id());
         let dynamic_key = Self::extract_dynamic_key(&entity_id)?;
 
         if self
@@ -93,9 +93,9 @@ impl InMemoryStore {
 
         debug!("update entity: {:#?}", value);
 
-        let entity_id = find_inherent_entity_id(&value, ctx.ontology)?
+        let entity_id = find_inherent_entity_id(&value, ctx.ontology_defs)?
             .ok_or_else(|| DomainErrorKind::EntityNotFound.into_error())?;
-        let def = ctx.ontology.def(value.type_def_id());
+        let def = ctx.ontology_defs.def(value.type_def_id());
         ctx.write_stats.mark_mutated(def.id);
         let vertex_key = VertexKey {
             type_def_id: def.id,
@@ -238,7 +238,7 @@ impl InMemoryStore {
                 )?;
 
                 for value in entity_seq.into_elements() {
-                    let id = find_inherent_entity_id(&value, ctx.ontology)?;
+                    let id = find_inherent_entity_id(&value, ctx.ontology_defs)?;
                     if let Some(id) = id {
                         let dynamic_key = Self::extract_dynamic_key(&id)?;
 
@@ -267,13 +267,13 @@ impl InMemoryStore {
 
         debug!("value: {}", ValueDebug(&vertex));
 
-        let def = ctx.ontology.def(vertex.type_def_id());
+        let def = ctx.ontology_defs.def(vertex.type_def_id());
         ctx.write_stats.mark_mutated(def.id);
         let entity = def
             .entity()
             .ok_or(DomainErrorKind::NotAnEntity(vertex.type_def_id()).into_error())?;
 
-        let (id, id_generated) = match find_inherent_entity_id(&vertex, ctx.ontology)? {
+        let (id, id_generated) = match find_inherent_entity_id(&vertex, ctx.ontology_defs)? {
             Some(id) => (id, false),
             None => {
                 let value_generator = entity.id_value_generator.ok_or_else(|| {
@@ -449,7 +449,7 @@ impl InMemoryStore {
                         EdgeColumnMatch::VertexIdOf(vertex_def_id) => {
                             let vertex_key = self.resolve_foreign_key_for_edge(
                                 vertex_def_id,
-                                ctx.ontology.def(vertex_def_id).entity().unwrap(),
+                                ctx.ontology_defs.def(vertex_def_id).entity().unwrap(),
                                 value,
                                 ctx,
                             )?;
@@ -579,16 +579,16 @@ impl InMemoryStore {
             DataRelationshipTarget::Unambiguous(entity_def_id) => self
                 .resolve_foreign_key_for_edge(
                     *entity_def_id,
-                    ctx.ontology.def(*entity_def_id).entity().unwrap(),
+                    ctx.ontology_defs.def(*entity_def_id).entity().unwrap(),
                     foreign_id,
                     ctx,
                 )?,
             DataRelationshipTarget::Union(union_def_id) => {
-                let variants = ctx.ontology.union_variants(*union_def_id);
+                let variants = ctx.ontology_defs.union_variants(*union_def_id);
                 let (variant_def_id, entity) = variants
                     .iter()
                     .find_map(|variant_def_id| {
-                        let entity = ctx.ontology.def(*variant_def_id).entity().unwrap();
+                        let entity = ctx.ontology_defs.def(*variant_def_id).entity().unwrap();
 
                         if entity.id_value_def_id == foreign_id.type_def_id() {
                             Some((*variant_def_id, entity))
@@ -658,7 +658,8 @@ impl InMemoryStore {
                 foreign_entity_def_id,
                 foreign_key.clone(),
                 id_value,
-                ctx.ontology,
+                ctx.ontology_defs,
+                ctx.ontology_serde,
             )?;
         }
 
@@ -675,7 +676,7 @@ impl InMemoryStore {
         ctx: &DbContext,
     ) -> DomainResult<Value> {
         let (generated_id, container) =
-            try_generate_entity_id(id_operator_addr, value_generator, ctx.ontology, ctx.system)?;
+            try_generate_entity_id(id_operator_addr, value_generator, ctx, ctx.system)?;
 
         Ok(container.wrap(match generated_id {
             GeneratedId::Generated(value) => value,

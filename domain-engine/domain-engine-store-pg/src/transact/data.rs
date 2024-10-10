@@ -58,7 +58,7 @@ impl<'a> TransactCtx<'a> {
     pub fn deserialize_sql(&self, def_id: DefId, sql_val: SqlScalar) -> DomainResult<Value> {
         let tag = ValueTag::from(def_id);
 
-        match &self.ontology.def(def_id).kind {
+        match &self.ontology_defs.def(def_id).kind {
             DefKind::Data(basic) => match (sql_val, &basic.repr) {
                 (sql_val, DefRepr::FmtStruct(Some((attr_prop_id, attr_def_id)))) => {
                     Ok(Value::Struct(
@@ -96,7 +96,7 @@ impl<'a> TransactCtx<'a> {
     }
 
     pub fn data_from_value(&self, value: Value) -> DomainResult<Data> {
-        let def = self.ontology.def(value.type_def_id());
+        let def = self.ontology_defs.def(value.type_def_id());
 
         match (value, &def.kind) {
             (Value::Unit(_) | Value::Void(_), _) => Ok(SqlScalar::Unit.into()),

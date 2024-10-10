@@ -114,7 +114,7 @@ impl<'a> TransactCtx<'a> {
 
         self.preprocess_insert_value(insert_mode, &mut value.value)?;
 
-        let def = self.ontology.def(value.value.type_def_id());
+        let def = self.ontology_defs.def(value.value.type_def_id());
         let (mut analyzed, pg) =
             self.analyze_input(None, def, value, select, timestamp, mut_ctx)?;
         let sql_params = analyzed.sql_params;
@@ -314,10 +314,10 @@ impl<'a> TransactCtx<'a> {
         mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<()> {
         let value_def_id = value.type_def_id();
-        let def = self.ontology.def(value_def_id);
+        let def = self.ontology_defs.def(value_def_id);
 
         if let Some(PgRepr::Scalar(_pg_type, ontol_def_tag)) =
-            PgRepr::classify_opt_def_repr(def.repr(), self.ontology)
+            PgRepr::classify_opt_def_repr(def.repr(), self.ontology_defs)
         {
             let domain_index = parent.prop_id.0.domain_index();
             let def_id = ontol_def_tag.def_id();
@@ -388,7 +388,7 @@ impl<'a> TransactCtx<'a> {
                 prepared
             };
 
-            let def = self.ontology.def(def_id);
+            let def = self.ontology_defs.def(def_id);
             let (analyzed, pg) = self.analyze_input(
                 Some(parent),
                 def,
@@ -437,7 +437,7 @@ impl<'a> TransactCtx<'a> {
 
     fn preprocess_insert_value(&self, mode: InsertMode, value: &mut Value) -> DomainResult<()> {
         let def_id = value.type_def_id();
-        let def = self.ontology.def(def_id);
+        let def = self.ontology_defs.def(def_id);
         let entity = def.entity().ok_or_else(|| {
             warn!("not an entity");
             DomainErrorKind::NotAnEntity(value.type_def_id()).into_error()
@@ -454,7 +454,7 @@ impl<'a> TransactCtx<'a> {
                         let (generated_id, _container) = try_generate_entity_id(
                             entity.id_operator_addr,
                             value_generator,
-                            self.ontology,
+                            self,
                             self.system,
                         )?;
                         if let GeneratedId::Generated(value) = generated_id {
@@ -479,7 +479,7 @@ impl<'a> TransactCtx<'a> {
         select: &'a Select,
         mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<PreparedInsert> {
-        let def = self.ontology.def(def_id);
+        let def = self.ontology_defs.def(def_id);
         let pg = self.pg_model.pg_domain_datatable(domain_index, def_id)?;
 
         let mut query_ctx = QueryBuildCtx::default();
@@ -514,7 +514,7 @@ impl<'a> TransactCtx<'a> {
             param_idx += 2;
         }
 
-        match PgRepr::classify_opt_def_repr(def.repr(), self.ontology) {
+        match PgRepr::classify_opt_def_repr(def.repr(), self.ontology_defs) {
             Some(PgRepr::Scalar(_, _)) => {
                 column_names.push("value");
                 values.push(sql::Expr::param(param_idx));
@@ -770,7 +770,7 @@ impl<'a> TransactCtx<'a> {
                     match &rel_info.target {
                         DataRelationshipTarget::Unambiguous(def_id) => {
                             if matches!(
-                                PgRepr::classify_property(rel_info, *def_id, self.ontology),
+                                PgRepr::classify_property(rel_info, *def_id, self.ontology_defs),
                                 PgRepr::Unit
                             ) {
                                 continue;

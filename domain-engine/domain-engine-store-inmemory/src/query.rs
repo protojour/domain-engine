@@ -73,7 +73,7 @@ impl InMemoryStore {
             .get(&struct_select.def_id)
             .ok_or(DomainErrorKind::InvalidEntityDefId.into_error())?;
 
-        let def = ctx.ontology.def(struct_select.def_id);
+        let def = ctx.ontology_defs.def(struct_select.def_id);
         let _entity = def
             .entity()
             .ok_or(DomainErrorKind::NotAnEntity(struct_select.def_id).into_error())?;
@@ -311,7 +311,7 @@ impl InMemoryStore {
             }
         }
 
-        let def = ctx.ontology.def(vertex_key.type_def_id);
+        let def = ctx.ontology_defs.def(vertex_key.type_def_id);
         let entity = def
             .entity()
             .ok_or(DomainErrorKind::NotAnEntity(vertex_key.type_def_id).into_error())?;

@@ -46,13 +46,13 @@ impl<'a> TransactCtx<'a> {
     ) -> DomainResult<Value> {
         let domain_index = value.domain_index;
         let def_id = value.type_def_id();
-        let def = self.ontology.def(def_id);
+        let def = self.ontology_defs.def(def_id);
         let entity = def.entity().ok_or_else(|| {
             warn!("not an entity");
             DomainErrorKind::NotAnEntity(value.type_def_id()).into_error()
         })?;
 
-        let entity_id = find_inherent_entity_id(&value, self.ontology)?
+        let entity_id = find_inherent_entity_id(&value, self.ontology_defs)?
             .ok_or_else(|| DomainErrorKind::EntityNotFound.into_error())?;
 
         mut_ctx.write_stats.mark_mutated(def_id);
@@ -104,7 +104,7 @@ impl<'a> TransactCtx<'a> {
         mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<PgDataKey> {
         let def_id = value.type_def_id();
-        let def = self.ontology.def(def_id);
+        let def = self.ontology_defs.def(def_id);
 
         let pg = self
             .pg_model

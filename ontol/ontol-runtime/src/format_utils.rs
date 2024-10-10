@@ -1,5 +1,12 @@
 use std::fmt::{Debug, Display};
 
+use crate::{
+    attr::AttrRef,
+    interface::serde::processor::{ProcessorMode, SerdeProcessor},
+    ontology::aspects::{DefsAspect, ExecutionAspect, SerdeAspect},
+    value::Value,
+};
+
 pub struct LogicalConcat<T> {
     pub items: Vec<T>,
     pub logic_op: LogicOp,
@@ -170,6 +177,38 @@ impl<'a> Display for Literal<'a> {
 impl<'a> Debug for Literal<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+/// best-effort formatting of a value
+pub fn format_value(
+    value: &Value,
+    ontology: &(impl AsRef<DefsAspect> + AsRef<SerdeAspect>),
+) -> String {
+    let defs: &DefsAspect = ontology.as_ref();
+
+    let def = defs.def(value.type_def_id());
+    if let Some(operator_addr) = def.operator_addr {
+        // TODO: Easier way to report values in "human readable"/JSON format
+
+        let dummy_execution = ExecutionAspect::empty();
+        let ctx = crate::interface::serde::OntologyCtx {
+            serde: ontology.as_ref(),
+            defs: ontology.as_ref(),
+            execution: &dummy_execution,
+        };
+        let processor = SerdeProcessor::new(operator_addr, ProcessorMode::Read, &ctx);
+
+        let mut buf: Vec<u8> = vec![];
+        processor
+            .serialize_attr(
+                AttrRef::Unit(value),
+                &mut serde_json::Serializer::new(&mut buf),
+            )
+            .unwrap();
+        String::from(std::str::from_utf8(&buf).unwrap())
+    } else {
+        "N/A".to_string()
     }
 }
 

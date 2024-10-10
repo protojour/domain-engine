@@ -20,7 +20,7 @@ impl<'a> TransactCtx<'a> {
         id: Value,
         mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<bool> {
-        let def = self.ontology.def(def_id);
+        let def = self.ontology_defs.def(def_id);
         let entity = def.entity().ok_or_else(|| {
             warn!("not an entity");
             DomainErrorKind::NotAnEntity(def_id).into_error()

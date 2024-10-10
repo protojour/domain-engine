@@ -162,7 +162,8 @@ impl InMemoryDb {
 
         Ok(async_stream::try_stream! {
             let mut ctx = DbContext {
-                ontology: &self.ontology,
+                ontology_defs: self.ontology.as_ref().as_ref(),
+                ontology_serde: self.ontology.as_ref().as_ref(),
                 system: self.system.as_ref(),
                 check: match mode {
                     TransactionMode::ReadOnly | TransactionMode::ReadWrite => ConstraintCheck::Disabled,
@@ -216,7 +217,7 @@ impl InMemoryDb {
                             Some(State::Insert(_, select)) => {
                                 ObjectGenerator::new(
                                     ProcessorMode::Create,
-                                    &self.ontology,
+                                    self.ontology.as_ref(),
                                     self.system.as_ref(),
                                 )
                                 .generate_objects(&mut value);
@@ -232,7 +233,7 @@ impl InMemoryDb {
                             Some(State::Update(_, select)) => {
                                 ObjectGenerator::new(
                                     ProcessorMode::Update,
-                                    &self.ontology,
+                                    self.ontology.as_ref(),
                                     self.system.as_ref(),
                                 )
                                 .generate_objects(&mut value);
@@ -248,7 +249,7 @@ impl InMemoryDb {
                             Some(State::Upsert(_, select)) => {
                                 ObjectGenerator::new(
                                     ProcessorMode::Create,
-                                    &self.ontology,
+                                    self.ontology.as_ref(),
                                     self.system.as_ref(),
                                 )
                                 .generate_objects(&mut value);

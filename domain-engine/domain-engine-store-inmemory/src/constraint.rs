@@ -1,12 +1,37 @@
 use domain_engine_core::{domain_error::DomainErrorKind, DomainResult};
 use indexmap::IndexMap;
-use ontol_runtime::{ontology::Ontology, value::Value, DefId};
+use ontol_runtime::{
+    format_utils::format_value,
+    ontology::{
+        aspects::{DefsAspect, SerdeAspect},
+        Ontology,
+    },
+    value::Value,
+    DefId,
+};
 
 use crate::core::{DynamicKey, InMemoryStore};
 
 pub(super) enum ConstraintCheck {
     Disabled,
     Deferred(DeferredCheck),
+}
+
+struct FormatCtx<'a> {
+    defs: &'a DefsAspect,
+    serde: &'a SerdeAspect,
+}
+
+impl<'a> AsRef<DefsAspect> for FormatCtx<'a> {
+    fn as_ref(&self) -> &DefsAspect {
+        self.defs
+    }
+}
+
+impl<'a> AsRef<SerdeAspect> for FormatCtx<'a> {
+    fn as_ref(&self) -> &SerdeAspect {
+        self.serde
+    }
 }
 
 impl ConstraintCheck {
@@ -22,13 +47,14 @@ impl ConstraintCheck {
         def_id: DefId,
         key: DynamicKey,
         value: Value,
-        ontology: &Ontology,
+        defs: &DefsAspect,
+        serde: &SerdeAspect,
     ) -> DomainResult<()> {
         match self {
-            Self::Disabled => Err(DomainErrorKind::UnresolvedForeignKey(
-                ontology.format_value(&value),
-            )
-            .into_error()),
+            Self::Disabled => {
+                let ctx = FormatCtx { defs, serde };
+                Err(DomainErrorKind::UnresolvedForeignKey(format_value(&value, &ctx)).into_error())
+            }
             Self::Deferred(d) => {
                 d.deferred_foreign_keys.insert((def_id, key), value);
                 Ok(())
@@ -55,7 +81,7 @@ impl DeferredCheck {
         for ((def_id, key), value) in &self.deferred_foreign_keys {
             if store.look_up_vertex(*def_id, key).is_none() {
                 return Err(
-                    DomainErrorKind::UnresolvedForeignKey(ontology.format_value(value))
+                    DomainErrorKind::UnresolvedForeignKey(format_value(value, ontology))
                         .into_error(),
                 );
             }

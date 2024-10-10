@@ -8,7 +8,7 @@ use tracing::{error, trace};
 use crate::{
     attr::Attr,
     interface::serde::processor::{ProcessorMode, SerdeProcessor},
-    ontology::aspects::{get_aspect, DefsAspect, ExecutionAspect, SerdeAspect},
+    ontology::aspects::{aspect, DefsAspect, ExecutionAspect, SerdeAspect},
     value::{FormatValueAsText, Value},
     DefId, DefPropTag, OntolDefTag, PropId,
 };
@@ -94,7 +94,7 @@ impl TextPattern {
                             .map(|span| &haystack[span.start..span.end])
                             .expect("expected property match");
 
-                        let def = get_aspect::<DefsAspect>(ontology).def(property.type_def_id);
+                        let def = aspect::<DefsAspect>(ontology).def(property.type_def_id);
                         let processor = SerdeProcessor::new(
                             def.operator_addr
                                 .expect("No operator addr for pattern constant part"),

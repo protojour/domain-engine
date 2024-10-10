@@ -8,6 +8,7 @@ use domain_engine_core::{domain_error::DomainErrorKind, DomainError, DomainResul
 use futures_util::{TryFutureExt, TryStreamExt};
 use ontol_runtime::{
     attr::Attr,
+    format_utils::format_value,
     ontology::domain::{DataRelationshipKind, DataRelationshipTarget},
     query::select::Select,
     tuple::CardinalIdx,
@@ -237,7 +238,7 @@ impl<'a> TransactCtx<'a> {
                     param_index += 1;
                 }
                 PgEdgeCardinalKind::Parameters(params_def_id) => {
-                    let def = self.ontology.def(*params_def_id);
+                    let def = self.ontology_defs.def(*params_def_id);
                     for (prop_id, rel_info) in &def.data_relationships {
                         if let DataRelationshipKind::Tree = &rel_info.kind {
                             match &rel_info.target {
@@ -344,7 +345,7 @@ impl<'a> TransactCtx<'a> {
                 let pg_foreign = self
                     .pg_model
                     .pg_domain_datatable(vertex_def_id.domain_index(), vertex_def_id)?;
-                let foreign_def = self.ontology.def(vertex_def_id);
+                let foreign_def = self.ontology_defs.def(vertex_def_id);
                 let Some(foreign_entity) = foreign_def.entity() else {
                     return Err(PgInputError::NotAnEntity.into());
                 };
@@ -700,7 +701,7 @@ impl<'a> TransactCtx<'a> {
             .find_datatable(def_id.domain_index(), def_id)
             .is_some()
         {
-            let entity = self.ontology.def(def_id).entity().unwrap();
+            let entity = self.ontology_defs.def(def_id).entity().unwrap();
 
             if entity.is_self_identifying {
                 let Value::Struct(mut map, _) = value else {
@@ -719,7 +720,7 @@ impl<'a> TransactCtx<'a> {
                 (ResolveMode::VertexData, def_id, value)
             }
         } else if let Some(vertex_def_id) = self.pg_model.entity_id_to_entity.get(&def_id) {
-            let entity = self.ontology.def(*vertex_def_id).entity().unwrap();
+            let entity = self.ontology_defs.def(*vertex_def_id).entity().unwrap();
             let id_prop_id = entity.id_prop;
             let id_resolve_mode = if entity.is_self_identifying {
                 IdResolveMode::SelfIdentifying
@@ -943,25 +944,20 @@ impl<'a> TransactCtx<'a> {
             0 => Ok(()),
             1 => {
                 let value = values.into_iter().next().unwrap();
-                Err(
-                    DomainErrorKind::UnresolvedForeignKey(self.ontology.format_value(&value))
-                        .into_error(),
-                )
+                Err(DomainErrorKind::UnresolvedForeignKey(format_value(&value, self)).into_error())
             }
             _ => {
                 let value = values.into_iter().next().unwrap();
-                Err(
-                    DomainErrorKind::UnresolvedForeignKeys(self.ontology.format_value(&value))
-                        .into_error(),
-                )
+                Err(DomainErrorKind::UnresolvedForeignKeys(format_value(&value, self)).into_error())
             }
         }
     }
 
     pub fn unresolved_foreign_error(&self, def_id: DefId, id: SqlScalar) -> DomainError {
         match self.deserialize_sql(def_id, id) {
-            Ok(value) => DomainErrorKind::UnresolvedForeignKey(self.ontology.format_value(&value))
-                .into_error(),
+            Ok(value) => {
+                DomainErrorKind::UnresolvedForeignKey(format_value(&value, self)).into_error()
+            }
             Err(error) => error,
         }
     }

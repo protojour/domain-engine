@@ -9,8 +9,11 @@ use domain_engine_core::{
 use futures_util::{stream::BoxStream, StreamExt};
 use mut_ctx::PgMutCtx;
 use ontol_runtime::{
-    interface::serde::processor::ProcessorMode, ontology::Ontology, query::select::Select,
-    value::Value, DefId,
+    interface::serde::processor::ProcessorMode,
+    ontology::aspects::{DefsAspect, SerdeAspect},
+    query::select::Select,
+    value::Value,
+    DefId,
 };
 use query::QueryFrame;
 use tokio_postgres::IsolationLevel;
@@ -59,9 +62,22 @@ pub enum InsertMode {
 struct TransactCtx<'a> {
     txn_mode: TransactionMode,
     pg_model: &'a PgModel,
-    ontology: &'a Ontology,
+    ontology_defs: &'a DefsAspect,
+    ontology_serde: &'a SerdeAspect,
     system: &'a (dyn SystemAPI + Send + Sync),
     connection_state: ConnectionState<'a>,
+}
+
+impl<'a> AsRef<DefsAspect> for TransactCtx<'a> {
+    fn as_ref(&self) -> &DefsAspect {
+        self.ontology_defs
+    }
+}
+
+impl<'a> AsRef<SerdeAspect> for TransactCtx<'a> {
+    fn as_ref(&self) -> &SerdeAspect {
+        self.ontology_serde
+    }
 }
 
 impl<'a> TransactCtx<'a> {
@@ -74,7 +90,7 @@ impl<'a> TransactCtx<'a> {
 
     /// Look up ontology def and PG data for the given def_id
     pub fn lookup_def(&self, def_id: DefId) -> DomainResult<PgDef<'a>> {
-        let def = self.ontology.def(def_id);
+        let def = self.ontology_defs.def(def_id);
         let pg = self
             .pg_model
             .pg_domain_datatable(def_id.domain_index(), def_id)?;
@@ -153,7 +169,8 @@ pub async fn transact(
         let ctx = TransactCtx {
             txn_mode: mode,
             pg_model: &store.pg_model,
-            ontology: &store.ontology,
+            ontology_defs: store.ontology.as_ref().as_ref(),
+            ontology_serde: store.ontology.as_ref().as_ref(),
             system: store.system.as_ref(),
             connection_state,
         };
@@ -208,7 +225,7 @@ pub async fn transact(
                 ReqMessage::Argument(mut value) => {
                     match state.as_ref() {
                         Some(State::Insert(_, select)) => {
-                            ObjectGenerator::without_timestamps(ProcessorMode::Create, ctx.ontology, ctx.system)
+                            ObjectGenerator::without_timestamps(ProcessorMode::Create, &ctx, ctx.system)
                                 .generate_objects(&mut value);
 
                             let timestamp = ctx.system.current_time();
@@ -216,7 +233,7 @@ pub async fn transact(
                             yield RespMessage::Element(row.value, row.op);
                         }
                         Some(State::Update(_, select)) => {
-                            ObjectGenerator::without_timestamps(ProcessorMode::Update, ctx.ontology, ctx.system)
+                            ObjectGenerator::without_timestamps(ProcessorMode::Update, &ctx, ctx.system)
                                 .generate_objects(&mut value);
 
                             let timestamp = ctx.system.current_time();
@@ -224,7 +241,7 @@ pub async fn transact(
                             yield RespMessage::Element(value, DataOperation::Updated);
                         }
                         Some(State::Upsert(_, select)) => {
-                            ObjectGenerator::without_timestamps(ProcessorMode::Create, ctx.ontology, ctx.system)
+                            ObjectGenerator::without_timestamps(ProcessorMode::Create, &ctx, ctx.system)
                                 .generate_objects(&mut value);
 
                             let timestamp = ctx.system.current_time();
