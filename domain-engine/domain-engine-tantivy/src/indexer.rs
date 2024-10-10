@@ -226,7 +226,7 @@ impl Synrchonizer {
 
     async fn sync_updates(&self, update: UpdateSyncMsg) {
         let Select::Struct(mut struct_select) =
-            domain_select_no_edges(update.def_id, &self.ontology)
+            domain_select_no_edges(update.def_id, self.ontology.as_ref().as_ref())
         else {
             return;
         };

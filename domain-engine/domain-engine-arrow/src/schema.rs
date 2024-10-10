@@ -1,16 +1,16 @@
 use arrow::datatypes::{DataType, Field, Fields, Schema, TimeUnit};
 use ontol_runtime::{
     ontology::{
+        aspects::DefsAspect,
         domain::{DataRelationshipTarget, Def, DefRepr},
-        Ontology,
     },
     property::PropertyCardinality,
     PropId,
 };
 use serde::{Deserialize, Serialize};
 
-pub fn mk_arrow_schema(def: &Def, ontology: &Ontology) -> Schema {
-    let fields = iter_arrow_fields(def, ontology)
+pub fn mk_arrow_schema(def: &Def, ontology_defs: &DefsAspect) -> Schema {
+    let fields = iter_arrow_fields(def, ontology_defs)
         .map(|field_info| {
             Field::new(
                 field_info.name.to_string(),
@@ -60,13 +60,13 @@ impl FieldType {
 
 pub fn iter_arrow_fields<'o>(
     def: &'o Def,
-    ontology: &'o Ontology,
+    ontology_defs: &'o DefsAspect,
 ) -> impl Iterator<Item = ArrowFieldInfo<'o>> {
     def.data_relationships
         .iter()
         .filter_map(|(prop_id, rel_info)| match &rel_info.target {
             DataRelationshipTarget::Unambiguous(def_id) => {
-                let repr = ontology.def(*def_id).repr()?;
+                let repr = ontology_defs.def(*def_id).repr()?;
                 let field_type = match repr {
                     DefRepr::Unit => return None,
                     DefRepr::I64 => FieldType::I64,
@@ -89,7 +89,7 @@ pub fn iter_arrow_fields<'o>(
 
                 Some(ArrowFieldInfo {
                     prop_id: *prop_id,
-                    name: &ontology[rel_info.name],
+                    name: &ontology_defs[rel_info.name],
                     field_type,
                     nullable: matches!(rel_info.cardinality.0, PropertyCardinality::Optional),
                 })

@@ -19,7 +19,7 @@ mod batch_builder;
 /// API for executing queries translated to the Apache Arrow format.
 pub trait ArrowTransactAPI {
     fn arrow_transact(
-        self: &Arc<Self>,
+        &self,
         req: ArrowReqMessage,
         config: ArrowConfig,
         session: Session,
@@ -46,9 +46,9 @@ pub enum ArrowRespMessage {
     RecordBatch(RecordBatch),
 }
 
-impl ArrowTransactAPI for DomainEngine {
+impl ArrowTransactAPI for Arc<DomainEngine> {
     fn arrow_transact(
-        self: &Arc<Self>,
+        &self,
         req: ArrowReqMessage,
         config: ArrowConfig,
         session: Session,

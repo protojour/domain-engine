@@ -13,7 +13,7 @@ use ontol_runtime::ontology::Ontology;
 use ontol_test_utils::{TestCompile, TestPackages};
 use pretty_assertions::assert_eq;
 
-use crate::OntologyCatalogProvider;
+use crate::{DomainEngineAPI, OntologyCatalogProvider};
 
 #[test(tokio::test)]
 async fn test_where_text_equals() {
@@ -99,9 +99,7 @@ fn datafusion_ctx(engine: Arc<DomainEngine>) -> SessionContext {
     let mut config = SessionConfig::new();
     config.set_extension(Arc::new(Session::default()));
     let ctx = SessionContext::new_with_config(config);
-    ctx.register_catalog(
-        "ontology",
-        Arc::new(OntologyCatalogProvider::from(engine.clone())),
-    );
+    let api: Arc<dyn DomainEngineAPI + Send + Sync> = Arc::new(engine.clone());
+    ctx.register_catalog("ontology", Arc::new(OntologyCatalogProvider::from(api)));
     ctx
 }

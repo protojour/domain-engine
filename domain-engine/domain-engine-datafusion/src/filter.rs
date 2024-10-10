@@ -5,7 +5,7 @@ use datafusion_expr::{BinaryExpr, Expr, Operator};
 use domain_engine_arrow::schema::{iter_arrow_fields, FieldType};
 use domain_engine_core::domain_select;
 use ontol_runtime::{
-    ontology::{domain::Def, Ontology},
+    ontology::{aspects::DefsAspect, domain::Def},
     query::{
         condition::{Clause, CondTerm, Condition, SetOperator, SetPredicate},
         filter::Filter,
@@ -27,13 +27,13 @@ impl DatafusionFilter {
     pub fn compile(
         def_id: DefId,
         (projection, filters, limit): (Option<&Vec<usize>>, &[Expr], Option<usize>),
-        ontology: &Ontology,
+        ontology_defs: &DefsAspect,
     ) -> Self {
-        let def = ontology.def(def_id);
+        let def = ontology_defs.def(def_id);
         let mut select_properties: BTreeMap<PropId, Select> = Default::default();
         let mut columns = vec![];
 
-        let fields: Vec<_> = iter_arrow_fields(def, ontology).collect();
+        let fields: Vec<_> = iter_arrow_fields(def, ontology_defs).collect();
 
         if let Some(projection) = projection {
             for field_idx in projection {
@@ -46,7 +46,7 @@ impl DatafusionFilter {
             }
         } else {
             if let Select::Struct(struct_select) =
-                domain_select::domain_select_no_edges(def_id, ontology)
+                domain_select::domain_select_no_edges(def_id, ontology_defs)
             {
                 select_properties = struct_select.properties;
             }
@@ -60,7 +60,7 @@ impl DatafusionFilter {
         let mut ontol_filter = Filter::default_for_domain();
 
         {
-            let mut condition_builder = ConditionBuilder::new(def, ontology);
+            let mut condition_builder = ConditionBuilder::new(def, ontology_defs);
             for expr in filters {
                 let _ = condition_builder.try_add_expr(expr);
             }
@@ -97,7 +97,7 @@ pub struct ConditionBuilder<'o> {
     root_var: Var,
     has_filters: bool,
     def: &'o Def,
-    ontology: &'o Ontology,
+    ontology_defs: &'o DefsAspect,
 }
 
 pub enum ConditionError {
@@ -110,7 +110,7 @@ pub enum ConditionError {
 }
 
 impl<'o> ConditionBuilder<'o> {
-    pub fn new(def: &'o Def, ontology: &'o Ontology) -> Self {
+    pub fn new(def: &'o Def, ontology_defs: &'o DefsAspect) -> Self {
         let mut condition = Condition::default();
         let root_var = condition.mk_cond_var();
         condition.add_clause(root_var, Clause::Root);
@@ -120,7 +120,7 @@ impl<'o> ConditionBuilder<'o> {
             root_var,
             has_filters: false,
             def,
-            ontology,
+            ontology_defs,
         }
     }
 
@@ -219,7 +219,7 @@ impl<'o> ConditionBuilder<'o> {
                     .def
                     .data_relationships
                     .iter()
-                    .find(|(_, rel_info)| self.ontology[rel_info.name] == column.name)
+                    .find(|(_, rel_info)| self.ontology_defs[rel_info.name] == column.name)
                 {
                     Ok(ScalarExpr::Property(*prop_id))
                 } else {

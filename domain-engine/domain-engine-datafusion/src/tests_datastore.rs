@@ -12,7 +12,7 @@ use ontol_runtime::ontology::Ontology;
 use ontol_test_utils::{serde_helper::serde_create, TestCompile, TestPackages};
 use serde_json::json;
 
-use crate::OntologyCatalogProvider;
+use crate::{DomainEngineAPI, OntologyCatalogProvider};
 
 #[datastore_test(tokio::test)]
 async fn datastore_test(ds: &str) {
@@ -23,10 +23,8 @@ async fn datastore_test(ds: &str) {
     let mut config = SessionConfig::new();
     config.set_extension(Arc::new(Session::default()));
     let ctx = SessionContext::new_with_config(config);
-    ctx.register_catalog(
-        "ontology",
-        Arc::new(OntologyCatalogProvider::from(engine.clone())),
-    );
+    let api: Arc<dyn DomainEngineAPI + Send + Sync> = Arc::new(engine.clone());
+    ctx.register_catalog("ontology", Arc::new(OntologyCatalogProvider::from(api)));
 
     data_store_util::insert_entity_select_entityid(
         &engine,

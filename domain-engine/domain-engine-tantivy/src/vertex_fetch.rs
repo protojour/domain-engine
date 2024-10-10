@@ -179,7 +179,8 @@ impl TantivyDataStoreLayer {
             filter
         };
 
-        let Select::Struct(mut struct_select) = domain_select_no_edges(def_id, self.ontology())
+        let Select::Struct(mut struct_select) =
+            domain_select_no_edges(def_id, self.ontology().as_ref())
         else {
             panic!("domain select of vertex must be Struct");
         };

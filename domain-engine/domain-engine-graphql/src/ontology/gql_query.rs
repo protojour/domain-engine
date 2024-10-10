@@ -224,7 +224,7 @@ impl Query {
             filter.set_vertex_order(vertex_order_chain);
         }
 
-        let mut struct_select = match domain_select_no_edges(def_id, ctx) {
+        let mut struct_select = match domain_select_no_edges(def_id, ctx.ontology().as_ref()) {
             Select::Struct(struct_select) => struct_select,
             _ => StructSelect {
                 def_id,

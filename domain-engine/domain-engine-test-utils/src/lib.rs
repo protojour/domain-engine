@@ -134,7 +134,7 @@ impl domain_engine_core::FindEntitySelect for TestFindQuery {
             .root_def_id()
             .expect("Unable to detect an entity being queried");
 
-        let struct_select = match domain_select(def_id, &self.ontology) {
+        let struct_select = match domain_select(def_id, self.ontology.as_ref().as_ref()) {
             Select::Struct(struct_select) => struct_select,
             _ => panic!("must be struct select"),
         };

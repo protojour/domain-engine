@@ -18,7 +18,10 @@ use domain_engine_core::{DomainEngine, DomainError, Session};
 use filter::{ConditionBuilder, DatafusionFilter};
 use futures_util::StreamExt;
 use ontol_runtime::{
-    ontology::domain::{Def, Domain, Entity},
+    ontology::{
+        aspects::DefsAspect,
+        domain::{Def, Domain, Entity},
+    },
     DefId, DomainIndex,
 };
 
@@ -32,12 +35,22 @@ mod tests_filter;
 
 type DfResult<T> = Result<T, DataFusionError>;
 
-pub struct OntologyCatalogProvider {
-    engine: Arc<DomainEngine>,
+pub trait DomainEngineAPI: ArrowTransactAPI {
+    fn ontology_defs(&self) -> &DefsAspect;
 }
 
-impl From<Arc<DomainEngine>> for OntologyCatalogProvider {
-    fn from(value: Arc<DomainEngine>) -> Self {
+impl DomainEngineAPI for Arc<DomainEngine> {
+    fn ontology_defs(&self) -> &DefsAspect {
+        self.ontology().as_ref()
+    }
+}
+
+pub struct OntologyCatalogProvider {
+    engine: Arc<dyn DomainEngineAPI + Send + Sync>,
+}
+
+impl From<Arc<dyn DomainEngineAPI + Send + Sync>> for OntologyCatalogProvider {
+    fn from(value: Arc<dyn DomainEngineAPI + Send + Sync>) -> Self {
         Self { engine: value }
     }
 }
@@ -49,18 +62,18 @@ impl CatalogProvider for OntologyCatalogProvider {
 
     fn schema_names(&self) -> Vec<String> {
         self.engine
-            .ontology()
+            .ontology_defs()
             .domains()
-            .map(|(_, domain)| self.engine.ontology()[domain.unique_name()].to_string())
+            .map(|(_, domain)| self.engine.ontology_defs()[domain.unique_name()].to_string())
             .collect()
     }
 
     fn schema(&self, name: &str) -> Option<Arc<dyn SchemaProvider>> {
         let (domain_index, _domain) = self
             .engine
-            .ontology()
+            .ontology_defs()
             .domains()
-            .find(|(_, domain)| &self.engine.ontology()[domain.unique_name()] == name)?;
+            .find(|(_, domain)| &self.engine.ontology_defs()[domain.unique_name()] == name)?;
 
         Some(Arc::new(DomainSchemaProvider {
             engine: self.engine.clone(),
@@ -70,14 +83,14 @@ impl CatalogProvider for OntologyCatalogProvider {
 }
 
 struct DomainSchemaProvider {
-    engine: Arc<DomainEngine>,
+    engine: Arc<dyn DomainEngineAPI + Send + Sync>,
     domain_index: DomainIndex,
 }
 
 impl DomainSchemaProvider {
     fn domain(&self) -> &Domain {
         self.engine
-            .ontology()
+            .ontology_defs()
             .domain_by_index(self.domain_index)
             .unwrap()
     }
@@ -90,7 +103,7 @@ impl DomainSchemaProvider {
 
     fn entity_by_name(&self, name: &str) -> Option<(DefId, &Def, &Entity)> {
         self.entities()
-            .find(|(.., entity)| &self.engine.ontology()[entity.ident] == name)
+            .find(|(.., entity)| &self.engine.ontology_defs()[entity.ident] == name)
     }
 }
 
@@ -109,7 +122,7 @@ impl SchemaProvider for DomainSchemaProvider {
     /// Retrieves the list of available table names in this schema.
     fn table_names(&self) -> Vec<String> {
         self.entities()
-            .map(|(.., entity)| self.engine.ontology()[entity.ident].to_string())
+            .map(|(.., entity)| self.engine.ontology_defs()[entity.ident].to_string())
             .collect()
     }
 
@@ -118,7 +131,7 @@ impl SchemaProvider for DomainSchemaProvider {
             return Ok(None);
         };
 
-        let arrow_schema = mk_arrow_schema(def, self.engine.ontology());
+        let arrow_schema = mk_arrow_schema(def, self.engine.ontology_defs());
 
         Ok(Some(Arc::new(EntityTableProvider {
             engine: self.engine.clone(),
@@ -146,7 +159,7 @@ impl SchemaProvider for DomainSchemaProvider {
 }
 
 struct EntityTableProvider {
-    engine: Arc<DomainEngine>,
+    engine: Arc<dyn DomainEngineAPI + Send + Sync>,
     arrow_schema: SchemaRef,
     def_id: DefId,
 }
@@ -192,7 +205,7 @@ impl TableProvider for EntityTableProvider {
         let df_filter = DatafusionFilter::compile(
             self.def_id,
             (projection, filters, limit),
-            self.engine.ontology(),
+            self.engine.ontology_defs(),
         );
 
         Ok(Arc::new(EntityScan {
@@ -214,8 +227,8 @@ impl TableProvider for EntityTableProvider {
         &self,
         filters: &[&Expr],
     ) -> DfResult<Vec<TableProviderFilterPushDown>> {
-        let def = self.engine.ontology().def(self.def_id);
-        let mut condition_builder = ConditionBuilder::new(def, self.engine.ontology());
+        let def = self.engine.ontology_defs().def(self.def_id);
+        let mut condition_builder = ConditionBuilder::new(def, self.engine.ontology_defs());
 
         Ok(filters
             .iter()
@@ -236,7 +249,7 @@ struct EntityScan {
 }
 
 struct EntityScanParams {
-    engine: Arc<DomainEngine>,
+    engine: Arc<dyn DomainEngineAPI + Send + Sync>,
     df_filter: DatafusionFilter,
     session: Session,
     properties: PlanProperties,

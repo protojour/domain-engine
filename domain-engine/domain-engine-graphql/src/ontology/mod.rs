@@ -43,6 +43,10 @@ impl OntologyCtx {
     pub(crate) fn data_store(&self) -> DomainResult<&DataStore> {
         self.domain_engine.get_data_store()
     }
+
+    pub(crate) fn ontology(&self) -> &Ontology {
+        self.domain_engine.ontology()
+    }
 }
 
 impl Deref for OntologyCtx {

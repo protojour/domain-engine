@@ -1,30 +1,30 @@
 use ontol_runtime::{
     ontology::{
+        aspects::DefsAspect,
         domain::{DataRelationshipKind, DataRelationshipTarget, Def, DefRepr},
-        Ontology,
     },
     query::select::{Select, StructSelect},
     DefId,
 };
 
 /// Produce a Select matching a domain def
-pub fn domain_select(def_id: DefId, ontology: &Ontology) -> Select {
-    let builder = DomainSelectBuilder { ontology };
+pub fn domain_select(def_id: DefId, ontology_defs: &DefsAspect) -> Select {
+    let builder = DomainSelectBuilder { ontology_defs };
     builder.domain_select(def_id, true)
 }
 
-pub fn domain_select_no_edges(def_id: DefId, ontology: &Ontology) -> Select {
-    let builder = DomainSelectBuilder { ontology };
+pub fn domain_select_no_edges(def_id: DefId, ontology_defs: &DefsAspect) -> Select {
+    let builder = DomainSelectBuilder { ontology_defs };
     builder.domain_select(def_id, false)
 }
 
 struct DomainSelectBuilder<'o> {
-    ontology: &'o Ontology,
+    ontology_defs: &'o DefsAspect,
 }
 
 impl<'o> DomainSelectBuilder<'o> {
     fn domain_select(&self, def_id: DefId, follow_edge: bool) -> Select {
-        let def = self.ontology.def(def_id);
+        let def = self.ontology_defs.def(def_id);
 
         match def.repr() {
             Some(DefRepr::Struct) => Select::Struct(self.domain_struct_select(def, follow_edge)),
@@ -57,9 +57,12 @@ impl<'o> DomainSelectBuilder<'o> {
                         .insert(*prop_id, self.domain_select(*def_id, next_follow_edge));
                 }
                 DataRelationshipTarget::Union(union_def_id) => {
-                    let variants = self.ontology.union_variants(*union_def_id);
+                    let variants = self.ontology_defs.union_variants(*union_def_id);
                     let select = if variants.iter().all(|def_id| {
-                        matches!(self.ontology.def(*def_id).repr(), Some(DefRepr::Struct))
+                        matches!(
+                            self.ontology_defs.def(*def_id).repr(),
+                            Some(DefRepr::Struct)
+                        )
                     }) {
                         Select::StructUnion(
                             *union_def_id,
@@ -67,7 +70,7 @@ impl<'o> DomainSelectBuilder<'o> {
                                 .iter()
                                 .map(|def_id| {
                                     self.domain_struct_select(
-                                        self.ontology.def(*def_id),
+                                        self.ontology_defs.def(*def_id),
                                         next_follow_edge,
                                     )
                                 })
