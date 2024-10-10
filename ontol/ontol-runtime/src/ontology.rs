@@ -4,7 +4,8 @@ use std::{ops::Index, sync::Arc};
 
 use arcstr::ArcStr;
 use aspects::{
-    ConfigAspect, DefsAspect, DocumentationAspect, ExecutionAspect, InterfaceAspect, SerdeAspect,
+    ConfigAspect, DefsAspect, DocumentationAspect, ExecutionAspect, InterfaceAspect,
+    OntologyAspects, SerdeAspect,
 };
 use domain::EdgeInfo;
 use serde::{Deserialize, Serialize};
@@ -46,7 +47,7 @@ pub struct Ontology {
 }
 
 /// All of the information that makes an Ontology.
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub(crate) struct Data {
     pub(crate) defs: Arc<DefsAspect>,
     pub(crate) serde: Arc<SerdeAspect>,
@@ -243,6 +244,35 @@ impl Ontology {
             .named_downmaps
             .get(&(index, text_constant))
             .cloned()
+    }
+
+    /// Create a possibly stripped-down version of the Ontology.
+    ///
+    /// This is useful for serialization over the wire to subsystems
+    /// that only needs certain aspects of the ontology, e.g. data stores,
+    /// modules that only needs to read domain definitions, etc.
+    pub fn aspect_subset(&self, aspects: OntologyAspects) -> Self {
+        let mut data = self.data.clone();
+        if !aspects.contains(OntologyAspects::DEFS) {
+            data.defs = Arc::new(DefsAspect::empty());
+        }
+        if !aspects.contains(OntologyAspects::SERDE) {
+            data.serde = Arc::new(SerdeAspect::empty());
+        }
+        if !aspects.contains(OntologyAspects::DOCUMENTATION) {
+            data.documentation = Arc::new(DocumentationAspect::empty());
+        }
+        if !aspects.contains(OntologyAspects::INTERFACE) {
+            data.interface = Arc::new(InterfaceAspect::empty());
+        }
+        if !aspects.contains(OntologyAspects::EXECTUTION) {
+            data.execution = Arc::new(ExecutionAspect::empty());
+        }
+        if !aspects.contains(OntologyAspects::CONFIG) {
+            data.config = Arc::new(ConfigAspect::empty());
+        }
+
+        Self { data }
     }
 }
 

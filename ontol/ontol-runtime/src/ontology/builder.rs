@@ -164,37 +164,11 @@ impl OntologyBuilder {
 
 pub(super) fn new_builder() -> OntologyBuilder {
     OntologyBuilder {
-        defs: DefsAspect {
-            domains: Default::default(),
-            extended_entity_table: Default::default(),
-            ontol_domain_meta: Default::default(),
-            text_constants: vec![],
-            text_like_types: Default::default(),
-            text_patterns: Default::default(),
-            union_variants: Default::default(),
-        },
-        serde: SerdeAspect {
-            operators: Default::default(),
-            dynamic_sequence_operator_addr: SerdeOperatorAddr(u32::MAX),
-        },
-        documentation: DocumentationAspect {
-            def_docs: Default::default(),
-            prop_docs: Default::default(),
-        },
-        interface: InterfaceAspect {
-            interfaces: Default::default(),
-        },
-        execution: ExecutionAspect {
-            const_proc_table: Default::default(),
-            map_meta_table: Default::default(),
-            static_conditions: Default::default(),
-            lib: Lib::default(),
-            property_flows: Default::default(),
-            named_downmaps: Default::default(),
-            extern_table: Default::default(),
-        },
-        config: ConfigAspect {
-            domain_config_table: Default::default(),
-        },
+        defs: DefsAspect::empty(),
+        serde: SerdeAspect::empty(),
+        documentation: DocumentationAspect::empty(),
+        interface: InterfaceAspect::empty(),
+        execution: ExecutionAspect::empty(),
+        config: ConfigAspect::empty(),
     }
 }

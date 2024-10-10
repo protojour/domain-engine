@@ -7,7 +7,7 @@ use domain_engine_core::{
 };
 use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use domain_engine_tantivy::{make_tantivy_layer, TantivyConfig, TantivyIndexSource};
-use ontol_runtime::DomainIndex;
+use ontol_runtime::{ontology::aspects::OntologyAspects, DomainIndex};
 use tracing::error;
 
 #[derive(Clone)]
@@ -62,8 +62,15 @@ impl DataStoreFactory for DynamicDataStoreFactory {
     async fn new_api(
         &self,
         persisted: &BTreeSet<DomainIndex>,
-        params: DataStoreParams,
+        mut params: DataStoreParams,
     ) -> DomainResult<Arc<dyn DataStoreAPI + Send + Sync>> {
+        // test stripped down ontology
+        params.ontology = Arc::new(
+            params
+                .ontology
+                .aspect_subset(OntologyAspects::DEFS | OntologyAspects::SERDE),
+        );
+
         let api = match self.name.as_str() {
             "arango" => {
                 arango::ArangoTestDatastoreFactory {

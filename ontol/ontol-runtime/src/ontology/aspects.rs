@@ -28,6 +28,18 @@ pub fn aspect<T>(source: &impl AsRef<T>) -> &T {
     source.as_ref()
 }
 
+bitflags::bitflags! {
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Serialize, Deserialize, Debug)]
+    pub struct OntologyAspects: u8 {
+        const DEFS          = 0b00000001;
+        const SERDE         = 0b00000010;
+        const DOCUMENTATION = 0b00000100;
+        const INTERFACE     = 0b00001000;
+        const EXECTUTION    = 0b00010000;
+        const CONFIG        = 0b00100000;
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct DefsAspect {
     pub(crate) domains: VecMap<DomainIndex, Domain>,
@@ -87,6 +99,18 @@ impl DefsAspect {
     pub fn get_text_like_type(&self, def_id: DefId) -> Option<TextLikeType> {
         self.text_like_types.get(&def_id).cloned()
     }
+
+    pub(crate) fn empty() -> Self {
+        Self {
+            domains: Default::default(),
+            extended_entity_table: Default::default(),
+            ontol_domain_meta: Default::default(),
+            text_constants: vec![],
+            text_like_types: Default::default(),
+            text_patterns: Default::default(),
+            union_variants: Default::default(),
+        }
+    }
 }
 
 impl Index<TextConstant> for DefsAspect {
@@ -113,6 +137,15 @@ pub struct SerdeAspect {
     pub(crate) dynamic_sequence_operator_addr: SerdeOperatorAddr,
 }
 
+impl SerdeAspect {
+    pub(crate) fn empty() -> Self {
+        Self {
+            operators: Default::default(),
+            dynamic_sequence_operator_addr: SerdeOperatorAddr(u32::MAX),
+        }
+    }
+}
+
 impl Index<SerdeOperatorAddr> for SerdeAspect {
     type Output = SerdeOperator;
 
@@ -127,9 +160,26 @@ pub struct DocumentationAspect {
     pub(crate) prop_docs: FnvHashMap<PropId, ArcStr>,
 }
 
+impl DocumentationAspect {
+    pub(crate) fn empty() -> Self {
+        Self {
+            def_docs: Default::default(),
+            prop_docs: Default::default(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct InterfaceAspect {
     pub(crate) interfaces: FnvHashMap<DomainIndex, Vec<DomainInterface>>,
+}
+
+impl InterfaceAspect {
+    pub(crate) fn empty() -> Self {
+        Self {
+            interfaces: Default::default(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -160,4 +210,12 @@ impl ExecutionAspect {
 #[derive(Serialize, Deserialize)]
 pub struct ConfigAspect {
     pub(crate) domain_config_table: FnvHashMap<DomainIndex, DomainConfig>,
+}
+
+impl ConfigAspect {
+    pub(crate) fn empty() -> Self {
+        Self {
+            domain_config_table: Default::default(),
+        }
+    }
 }
