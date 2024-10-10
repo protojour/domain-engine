@@ -9,7 +9,7 @@ use crate::{
     attr::Attr,
     interface::serde::processor::{ProcessorMode, SerdeProcessor},
     ontology::aspects::{aspect, DefsAspect, ExecutionAspect, SerdeAspect},
-    value::{FormatValueAsText, Value},
+    value::{ValueFormatRaw, Value},
     DefId, DefPropTag, OntolDefTag, PropId,
 };
 
@@ -187,11 +187,7 @@ impl<'d, 'on> Display for FormatPattern<'d, 'on> {
                         error!("Not a unit");
                         return Err(std::fmt::Error);
                     };
-                    write!(
-                        f,
-                        "{}",
-                        FormatValueAsText::new(value, *type_def_id, self.defs)
-                    )?;
+                    write!(f, "{}", ValueFormatRaw::new(value, *type_def_id, self.defs))?;
                 }
                 (TextPatternConstantPart::Literal(constant), _) => {
                     write!(f, "{string}", string = &self.defs[*constant])?

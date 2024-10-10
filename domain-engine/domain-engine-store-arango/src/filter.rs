@@ -10,7 +10,7 @@ use ontol_runtime::{
         order::Direction as OntolDirection,
         select::{Select, StructSelect},
     },
-    value::{FormatValueAsText, Value},
+    value::{Value, ValueFormatRaw},
     var::Var,
     DefId,
 };
@@ -286,10 +286,10 @@ impl<'a> MetaQuery<'a> {
                     | Value::ChronoDateTime(_, _)
                     | Value::Struct(_, _) => format!(
                         r#""{}""#,
-                        FormatValueAsText::new(value, value.type_def_id(), self.ontology.as_ref())
+                        ValueFormatRaw::new(value, value.type_def_id(), self.ontology.as_ref())
                     ),
                     // unquoted
-                    _ => FormatValueAsText::new(value, value.type_def_id(), self.ontology.as_ref())
+                    _ => ValueFormatRaw::new(value, value.type_def_id(), self.ontology.as_ref())
                         .to_string(),
                 };
 

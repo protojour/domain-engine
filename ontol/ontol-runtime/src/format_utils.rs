@@ -180,7 +180,10 @@ impl<'a> Debug for Literal<'a> {
     }
 }
 
-/// best-effort formatting of a value
+/// best-effort string-formatting of a value, in accordance with domain definition.
+///
+/// If the value has a string-based serialization, that string is returned.
+/// If the value has a complex serialization that's not string, a JSON-as-string representation is returned.
 pub fn format_value(
     value: &Value,
     ontology: &(impl AsRef<DefsAspect> + AsRef<SerdeAspect>),
@@ -199,14 +202,13 @@ pub fn format_value(
         };
         let processor = SerdeProcessor::new(operator_addr, ProcessorMode::Read, &ctx);
 
-        let mut buf: Vec<u8> = vec![];
-        processor
-            .serialize_attr(
-                AttrRef::Unit(value),
-                &mut serde_json::Serializer::new(&mut buf),
-            )
-            .unwrap();
-        String::from(std::str::from_utf8(&buf).unwrap())
+        match processor.serialize_attr(AttrRef::Unit(value), serde_json::value::Serializer) {
+            Ok(serde_json::Value::String(string)) => string,
+            Ok(json_value) => {
+                serde_json::to_string(&json_value).unwrap_or_else(|_| "N/A".to_string())
+            }
+            Err(_) => "N/A".to_string(),
+        }
     } else {
         "N/A".to_string()
     }

@@ -9,11 +9,7 @@ use arrow::{
 };
 use domain_engine_core::transact::RespMessage;
 use ontol_runtime::{
-    attr::Attr,
-    interface::serde::operator::SerdeOperator,
-    ontology::{ontol::text_pattern::FormatPattern, Ontology},
-    value::{FormatValueAsText, Value},
-    PropId,
+    attr::Attr, format_utils::format_value, ontology::Ontology, value::Value, PropId,
 };
 use tracing::error;
 
@@ -83,41 +79,8 @@ impl RecordBatchBuilder {
 
             match builder {
                 DynBuilder::Text(b) => match attr {
-                    Some(Attr::Unit(Value::Text(t, _))) => {
-                        b.append_value(t);
-                    }
-                    Some(Attr::Unit(v)) => {
-                        let text = match self
-                            .ontology
-                            .def(v.type_def_id())
-                            .operator_addr
-                            .map(|addr| &self.ontology[addr])
-                        {
-                            Some(SerdeOperator::CapturingTextPattern(pattern_def_id)) => {
-                                let pattern =
-                                    &self.ontology.get_text_pattern(*pattern_def_id).unwrap();
-                                format!(
-                                    "{}",
-                                    FormatPattern::new(
-                                        &v,
-                                        pattern,
-                                        self.ontology.as_ref().as_ref()
-                                    )
-                                )
-                            }
-                            _ => {
-                                format!(
-                                    "{}",
-                                    FormatValueAsText::new(
-                                        &v,
-                                        v.type_def_id(),
-                                        self.ontology.as_ref().as_ref()
-                                    )
-                                )
-                            }
-                        };
-
-                        b.append_value(text);
+                    Some(Attr::Unit(value)) => {
+                        b.append_value(format_value(&value, self.ontology.as_ref()))
                     }
                     _ => {
                         b.append_null();

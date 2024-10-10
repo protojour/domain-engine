@@ -16,7 +16,7 @@ use crate::{
         processor::{RecursionLimitError, ScalarFormat},
     },
     ontology::ontol::text_pattern::{FormatPattern, TextPatternConstantPart},
-    value::{FormatValueAsText, Value},
+    value::{Value, ValueFormatRaw},
     DefId, PropId,
 };
 
@@ -230,7 +230,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         write!(
             &mut buf,
             "{}",
-            FormatValueAsText::new(value, operator_def_id, self.ontology.defs)
+            ValueFormatRaw::new(value, operator_def_id, self.ontology.defs)
         )
         .map_err(|_| S::Error::custom("conversion to text failed"))?;
 

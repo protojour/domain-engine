@@ -343,7 +343,7 @@ async fn edge_entity_simple_foreign_violation(ds: &str) {
         .exec([], &schema, &ctx)
         .await
         .unwrap_first_exec_error_msg(),
-        expected = "unresolved foreign key: \"bar1\"",
+        expected = "unresolved foreign key: bar1",
     );
 }
 
@@ -459,6 +459,6 @@ async fn edge_entity_union_foreign_violation(ds: &str) {
         .exec([], &schema, &ctx)
         .await
         .unwrap_first_exec_error_msg(),
-        expected = "unresolved foreign key: \"qux/1\""
+        expected = "unresolved foreign key: qux/1"
     );
 }

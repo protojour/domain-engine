@@ -251,13 +251,16 @@ impl Debug for OctetSequence {
     }
 }
 
-pub struct FormatValueAsText<'d, 'on> {
+/// Formatter for values, outputs a "raw" format
+/// that may not be in accordance with domain interfaces for complex values.
+/// For that, the value needs to be serialized instead.
+pub struct ValueFormatRaw<'d, 'on> {
     value: &'d Value,
     type_def_id: DefId,
     defs: &'on DefsAspect,
 }
 
-impl<'d, 'on> FormatValueAsText<'d, 'on> {
+impl<'d, 'on> ValueFormatRaw<'d, 'on> {
     pub fn new(value: &'d Value, type_def_id: DefId, defs: &'on DefsAspect) -> Self {
         Self {
             value,
@@ -267,7 +270,7 @@ impl<'d, 'on> FormatValueAsText<'d, 'on> {
     }
 }
 
-impl<'d, 'o> Display for FormatValueAsText<'d, 'o> {
+impl<'d, 'o> Display for ValueFormatRaw<'d, 'o> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(text_like_type) = self.defs.text_like_types.get(&self.type_def_id) {
             text_like_type.format(self.value, f)
@@ -292,7 +295,7 @@ impl<'d, 'o> Display for FormatValueAsText<'d, 'o> {
                     // concatenate every prop (not sure this is a good idea, since the order is not defined)
                     for attr in props.values() {
                         if let Attr::Unit(value) = attr {
-                            FormatValueAsText {
+                            ValueFormatRaw {
                                 value,
                                 type_def_id: (*tag).into(),
                                 defs: self.defs,
