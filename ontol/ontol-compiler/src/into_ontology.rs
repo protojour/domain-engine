@@ -261,11 +261,9 @@ impl<'m> Compiler<'m> {
                     continue;
                 }
 
-                if let Some(httpjson) = generate_httpjson_interface(
-                    domain_index,
-                    builder.partial_ontology(),
-                    &mut serde_gen,
-                ) {
+                if let Some(httpjson) =
+                    generate_httpjson_interface(domain_index, builder.defs_aspect(), &mut serde_gen)
+                {
                     interfaces
                         .entry(domain_index)
                         .or_default()
@@ -274,7 +272,7 @@ impl<'m> Compiler<'m> {
 
                 if let Some(schema) = generate_graphql_schema(
                     domain_index,
-                    builder.partial_ontology(),
+                    builder.defs_aspect(),
                     map_namespaces.get(&domain_def_id),
                     &self.code_ctx,
                     &self.resolver_graph,

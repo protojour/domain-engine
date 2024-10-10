@@ -274,7 +274,7 @@ impl DomainEngine {
                 let up_path = self
                     .resolver_graph
                     .probe_path(
-                        &self.ontology,
+                        self.ontology.as_ref().as_ref(),
                         struct_select.def_id,
                         ProbeOptions {
                             must_be_entity: true,

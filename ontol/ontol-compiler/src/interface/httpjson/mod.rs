@@ -3,7 +3,7 @@ use ontol_runtime::{
         http_json::{Endpoint, HttpJson, HttpResource},
         serde::{SerdeDef, SerdeModifier},
     },
-    ontology::{domain::DefKind, Ontology},
+    ontology::{aspects::DefsAspect, domain::DefKind},
     DefId, DomainIndex,
 };
 
@@ -13,10 +13,10 @@ use super::serde::{serde_generator::SerdeGenerator, SerdeKey};
 
 pub fn generate_httpjson_interface(
     domain_index: DomainIndex,
-    partial_ontology: &Ontology,
+    partial_defs: &DefsAspect,
     serde_gen: &mut SerdeGenerator,
 ) -> Option<HttpJson> {
-    let domain = partial_ontology.domain_by_index(domain_index).unwrap();
+    let domain = partial_defs.domain_by_index(domain_index).unwrap();
 
     let contains_entities = domain.defs().any(|def| def.entity().is_some());
     if !contains_entities {

@@ -1,5 +1,5 @@
 use crate::{
-    ontology::{domain::DefKind, map::MapLossiness, Ontology},
+    ontology::{aspects::DefsAspect, domain::DefKind, map::MapLossiness, Ontology},
     query::select::{EntitySelect, Select, StructOrUnionSelect},
     DefId, MapDef, MapDefFlags, MapDirection, MapFlags, MapKey,
 };
@@ -122,7 +122,7 @@ impl ResolverGraph {
 
     pub fn probe_path_for_select(
         &self,
-        ontology: &Ontology,
+        ontology_defs: &DefsAspect,
         select: &Select,
         direction: ProbeDirection,
         filter: ProbeFilter,
@@ -135,7 +135,7 @@ impl ResolverGraph {
                 },
                 ..,
             ) => self.probe_path(
-                ontology,
+                ontology_defs,
                 struct_select.def_id,
                 ProbeOptions {
                     must_be_entity: true,
@@ -144,7 +144,7 @@ impl ResolverGraph {
                 },
             ),
             Select::Struct(struct_select) => self.probe_path(
-                ontology,
+                ontology_defs,
                 struct_select.def_id,
                 ProbeOptions {
                     must_be_entity: true,
@@ -172,12 +172,12 @@ impl ResolverGraph {
 
     pub fn probe_path_for_entity_select(
         &self,
-        ontology: &Ontology,
+        ontology_defs: &DefsAspect,
         select: &EntitySelect,
     ) -> Option<ResolvePath> {
         match &select.source {
             StructOrUnionSelect::Struct(struct_query) => self.probe_path(
-                ontology,
+                ontology_defs,
                 struct_query.def_id,
                 ProbeOptions {
                     must_be_entity: true,
@@ -191,14 +191,14 @@ impl ResolverGraph {
 
     pub fn probe_path(
         &self,
-        ontology: &Ontology,
+        ontology_defs: &DefsAspect,
         public_def_id: DefId,
         options: ProbeOptions,
     ) -> Option<ResolvePath> {
         let mut path = vec![];
         let mut visited = Default::default();
         let mut probe = Probe {
-            ontology,
+            ontology_defs,
             graph: match options.direction {
                 ProbeDirection::Down => &self.downgraph,
                 ProbeDirection::Up => &self.upgraph,
@@ -241,7 +241,7 @@ impl ResolverGraph {
 }
 
 struct Probe<'on, 'a> {
-    ontology: &'on Ontology,
+    ontology_defs: &'on DefsAspect,
     graph: &'on FnvHashMap<DefId, FnvHashMap<MapDef, Vec<Flags>>>,
     options: &'on ProbeOptions,
     path: &'a mut Vec<MapKey>,
@@ -264,7 +264,7 @@ impl<'on, 'a> Probe<'on, 'a> {
             Some(edges) => edges,
             None => {
                 if self.options.must_be_entity {
-                    let def = self.ontology.def(def_id);
+                    let def = self.ontology_defs.def(def_id);
                     if !matches!(&def.kind, DefKind::Entity(_)) {
                         return false;
                     }

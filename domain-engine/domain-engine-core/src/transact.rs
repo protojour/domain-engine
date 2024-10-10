@@ -265,7 +265,7 @@ impl DomainEngine {
                 *updating = false;
                 let resolve_path = self
                     .resolver_graph
-                    .probe_path_for_entity_select(self.ontology(), &select)
+                    .probe_path_for_entity_select(self.ontology().as_ref(), &select)
                     .ok_or(DomainErrorKind::NoResolvePathToDataStore.into_error())?;
 
                 for map_key in resolve_path.iter() {
@@ -344,12 +344,17 @@ impl DomainEngine {
         let ontology = self.ontology();
         let down_path = self
             .resolver_graph
-            .probe_path_for_select(ontology, select, ProbeDirection::Down, down_filter)
+            .probe_path_for_select(ontology.as_ref(), select, ProbeDirection::Down, down_filter)
             .ok_or(DomainErrorKind::NoResolvePathToDataStore.into_error())?;
 
         let up_path = self
             .resolver_graph
-            .probe_path_for_select(ontology, select, ProbeDirection::Up, ProbeFilter::Complete)
+            .probe_path_for_select(
+                ontology.as_ref(),
+                select,
+                ProbeDirection::Up,
+                ProbeFilter::Complete,
+            )
             .ok_or(DomainErrorKind::NoResolvePathToDataStore.into_error())?;
 
         for map_key in up_path.iter() {
@@ -379,7 +384,7 @@ impl DomainEngine {
             let up_path = self
                 .resolver_graph
                 .probe_path(
-                    self.ontology(),
+                    self.ontology().as_ref(),
                     *def_id,
                     ProbeOptions {
                         must_be_entity: true,

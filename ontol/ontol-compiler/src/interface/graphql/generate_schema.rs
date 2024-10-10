@@ -8,7 +8,7 @@ use ontol_runtime::{
         },
         schema::GraphqlSchema,
     },
-    ontology::Ontology,
+    ontology::aspects::DefsAspect,
     phf::PhfKey,
     resolve_path::ResolverGraph,
     DefId, DomainIndex, MapKey,
@@ -29,14 +29,14 @@ use super::{
 
 pub fn generate_graphql_schema<'c>(
     domain_index: DomainIndex,
-    partial_ontology: &'c Ontology,
+    ontology_defs: &'c DefsAspect,
     map_namespace: Option<&'c IndexMap<&str, DefId>>,
     code_ctx: &'c CodeCtx,
     resolver_graph: &'c ResolverGraph,
     union_member_cache: &'c UnionMemberCache,
     serde_gen: &mut SerdeGenerator<'c, '_>,
 ) -> Option<GraphqlSchema> {
-    let domain = partial_ontology.domain_by_index(domain_index).unwrap();
+    let domain = ontology_defs.domain_by_index(domain_index).unwrap();
 
     let contains_entities = domain.defs().any(|def| def.entity().is_some());
 
@@ -66,7 +66,7 @@ pub fn generate_graphql_schema<'c>(
     let mut schema = new_schema_with_capacity(domain_index, domain.type_count());
     let mut namespace = GraphqlNamespace::with_domain_disambiguation(DomainDisambiguation {
         root_domain: domain_index,
-        ontology: partial_ontology,
+        ontology_defs,
     });
 
     let mut builder = {
@@ -79,7 +79,7 @@ pub fn generate_graphql_schema<'c>(
             lazy_tasks: vec![],
             schema: &mut schema,
             type_namespace: &mut namespace,
-            partial_ontology,
+            ontology_defs,
             serde_gen,
             rel_ctx,
             misc_ctx,
@@ -95,7 +95,7 @@ pub fn generate_graphql_schema<'c>(
     let mut query_fields: IndexMap<String, FieldData> = Default::default();
     let mut mutation_fields: IndexMap<String, FieldData> = Default::default();
 
-    builder.register_fundamental_types(domain_index, partial_ontology);
+    builder.register_fundamental_types(domain_index, ontology_defs);
     builder.register_standard_queries(&mut query_fields);
 
     for def in domain.defs() {

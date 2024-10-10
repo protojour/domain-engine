@@ -49,7 +49,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         match level {
             QLevel::Node => self.make_node_type(def_id),
             QLevel::Edge { rel_params } => {
-                let def = self.partial_ontology.def(def_id);
+                let def = self.ontology_defs.def(def_id);
                 let node_ref = self.gen_def_type_ref(def_id, QLevel::Node);
                 match node_ref {
                     UnitTypeRef::Addr(node_type_addr) => {
@@ -262,7 +262,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         match repr_kind {
             ReprKind::Unit | ReprKind::Struct | ReprKind::StructIntersection(_) => {
-                let def = self.partial_ontology.def(def_id);
+                let def = self.ontology_defs.def(def_id);
 
                 let operator_addr = self.serde_gen.gen_addr_lazy(gql_serde_key(def_id)).unwrap();
 
@@ -294,7 +294,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 )
             }
             ReprKind::Union(variants, _) => {
-                let def = self.partial_ontology.def(def_id);
+                let def = self.ontology_defs.def(def_id);
 
                 let mut needs_scalar = false;
                 let mut type_variants = thin_vec![];
@@ -512,8 +512,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         // Generate typename variant
         for (_, relation_id, discriminator) in permutations.iter() {
-            let relation_def = self.partial_ontology.def(relation_id.0);
-            let variant_def = self.partial_ontology.def(discriminator.def_id);
+            let relation_def = self.ontology_defs.def(relation_id.0);
+            let variant_def = self.ontology_defs.def(discriminator.def_id);
 
             fn typename_append(output: &mut std::string::String, name: &str) {
                 if name

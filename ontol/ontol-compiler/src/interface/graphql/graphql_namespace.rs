@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::HashMap};
 
 use heck::{AsLowerCamelCase, AsSnakeCase};
 use itertools::Itertools;
-use ontol_runtime::{ontology::Ontology, DefId, DomainIndex};
+use ontol_runtime::{ontology::aspects::DefsAspect, DefId, DomainIndex};
 
 use crate::{
     def::{DefKind, Defs},
@@ -17,7 +17,7 @@ pub struct GraphqlNamespace<'o> {
 
 pub struct DomainDisambiguation<'o> {
     pub root_domain: DomainIndex,
-    pub ontology: &'o Ontology,
+    pub ontology_defs: &'o DefsAspect,
 }
 
 impl<'o> GraphqlNamespace<'o> {
@@ -121,8 +121,9 @@ impl<'o> GraphqlNamespace<'o> {
                 let domain_index = def_id.0;
                 if domain_index != domain_disambiguation.root_domain {
                     output.push('_');
-                    if let Some(domain) =
-                        domain_disambiguation.ontology.domain_by_index(domain_index)
+                    if let Some(domain) = domain_disambiguation
+                        .ontology_defs
+                        .domain_by_index(domain_index)
                     {
                         let domain_name =
                             adapt_graphql_identifier(&ctx.str_ctx[domain.unique_name()])

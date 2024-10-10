@@ -18,9 +18,9 @@ use ontol_runtime::{
         },
     },
     ontology::{
+        aspects::DefsAspect,
         map::{PropertyFlow, PropertyFlowData},
         ontol::TextConstant,
-        Ontology,
     },
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolverGraph},
     var::Var,
@@ -48,7 +48,7 @@ pub(super) struct SchemaBuilder<'a, 's, 'c, 'm> {
     /// Tool to ensure global type names are unique
     pub type_namespace: &'s mut GraphqlNamespace<'a>,
     /// The partial ontology containing TypeInfo (does not yet have SerdeOperators)
-    pub partial_ontology: &'a Ontology,
+    pub ontology_defs: &'a DefsAspect,
     /// Serde generator for generating new serialization operators
     pub serde_gen: &'a mut SerdeGenerator<'c, 'm>,
     /// The compiler's relations
@@ -160,7 +160,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
     pub fn register_fundamental_types(
         &mut self,
         domain_index: DomainIndex,
-        partial_ontology: &'c Ontology,
+        ontology_defs: &'c DefsAspect,
     ) {
         self.schema.query = self.schema.push_type_data(TypeData {
             typename: self.serde_gen.str_ctx.intern_constant("Query"),
@@ -169,7 +169,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             kind: TypeKind::Object(ObjectData {
                 fields: Default::default(),
                 kind: ObjectKind::Query {
-                    domain_def_id: partial_ontology
+                    domain_def_id: ontology_defs
                         .domain_by_index(domain_index)
                         .unwrap()
                         .def_id(),
@@ -453,7 +453,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         entity_data: EntityData,
         fields: &mut IndexMap<std::string::String, FieldData>,
     ) {
-        let def = self.partial_ontology.def(entity_data.node_def_id);
+        let def = self.ontology_defs.def(entity_data.node_def_id);
 
         let mutation_result_ref =
             self.gen_def_type_ref(entity_data.node_def_id, QLevel::MutationResult);
@@ -477,7 +477,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         ]
         .map(|(direction, filter)| {
             self.resolver_graph.probe_path(
-                self.partial_ontology,
+                self.ontology_defs,
                 def.id,
                 ProbeOptions {
                     must_be_entity: true,

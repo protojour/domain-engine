@@ -1,11 +1,13 @@
 //! The ONTOL ontology.
 
-use std::ops::Index;
+use std::{ops::Index, sync::Arc};
 
 use arcstr::ArcStr;
-use aspects::{DefsAspect, ExecutionAspect, SerdeAspect};
-use data::Data;
+use aspects::{
+    ConfigAspect, DefsAspect, DocumentationAspect, ExecutionAspect, InterfaceAspect, SerdeAspect,
+};
 use domain::EdgeInfo;
+use serde::{Deserialize, Serialize};
 use tracing::debug;
 use ulid::Ulid;
 
@@ -38,11 +40,20 @@ pub mod domain;
 pub mod map;
 pub mod ontol;
 
-mod data;
-
 /// The Ontology is the model of a single ONTOL runtime environment.
 pub struct Ontology {
     pub(crate) data: Data,
+}
+
+/// All of the information that makes an Ontology.
+#[derive(Serialize, Deserialize)]
+pub(crate) struct Data {
+    pub(crate) defs: Arc<DefsAspect>,
+    pub(crate) serde: Arc<SerdeAspect>,
+    pub(crate) documentation: Arc<DocumentationAspect>,
+    pub(crate) interface: Arc<InterfaceAspect>,
+    pub(crate) execution: Arc<ExecutionAspect>,
+    pub(crate) config: Arc<ConfigAspect>,
 }
 
 impl Ontology {
@@ -64,12 +75,6 @@ impl Ontology {
     ) -> Result<(), postcard::Error> {
         postcard::to_io(&self.data, writer)?;
         Ok(())
-    }
-
-    /// Access the ontology's [Data].
-    /// The data is a serializable value.
-    pub fn data(&self) -> &Data {
-        &self.data
     }
 
     pub fn new_vm(&self, proc: Procedure) -> OntolVm<'_> {
@@ -242,11 +247,16 @@ impl Ontology {
 }
 
 impl From<Data> for Ontology {
-    fn from(value: Data) -> Self {
-        let mut ontology = Ontology { data: value };
+    fn from(data: Data) -> Self {
+        let mut ontology = Ontology { data };
 
-        let mut serde_operators = std::mem::take(&mut ontology.data.serde.operators);
-        let mut interfaces = std::mem::take(&mut ontology.data.interface.interfaces);
+        let mut serde_operators =
+            std::mem::take(&mut Arc::get_mut(&mut ontology.data.serde).unwrap().operators);
+        let mut interfaces = std::mem::take(
+            &mut Arc::get_mut(&mut ontology.data.interface)
+                .unwrap()
+                .interfaces,
+        );
 
         for operator in serde_operators.iter_mut() {
             operator.ontology_init(&ontology);
@@ -258,8 +268,10 @@ impl From<Data> for Ontology {
             }
         }
 
-        ontology.data.serde.operators = serde_operators;
-        ontology.data.interface.interfaces = interfaces;
+        Arc::get_mut(&mut ontology.data.serde).unwrap().operators = serde_operators;
+        Arc::get_mut(&mut ontology.data.interface)
+            .unwrap()
+            .interfaces = interfaces;
 
         ontology
     }
