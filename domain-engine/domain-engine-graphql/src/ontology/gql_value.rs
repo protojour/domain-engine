@@ -5,7 +5,7 @@ use ontol_runtime::{
     attr::{Attr, AttrRef},
     interface::serde::processor::ProcessorMode,
     ontology::domain::DefRepr,
-    value::{ValueFormatRaw, Value},
+    value::{Value, ValueFormatRaw},
     OntolDefTag, PropId,
 };
 

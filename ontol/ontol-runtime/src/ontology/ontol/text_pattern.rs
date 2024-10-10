@@ -9,7 +9,7 @@ use crate::{
     attr::Attr,
     interface::serde::processor::{ProcessorMode, SerdeProcessor},
     ontology::aspects::{aspect, DefsAspect, ExecutionAspect, SerdeAspect},
-    value::{ValueFormatRaw, Value},
+    value::{Value, ValueFormatRaw},
     DefId, DefPropTag, OntolDefTag, PropId,
 };
 
