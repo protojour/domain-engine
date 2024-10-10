@@ -5,7 +5,7 @@ use chrono::Utc;
 use crate::{DomainResult, Session};
 
 /// Combination of system-specific functionality and configuration for the domain engine.
-#[unimock::unimock(api = SystemApiMock)]
+#[cfg_attr(feature = "unimock", unimock::unimock(api = SystemApiMock))]
 #[async_trait::async_trait]
 pub trait SystemAPI: Sync {
     /// Get the system's current time.

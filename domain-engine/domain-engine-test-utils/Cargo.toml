@@ -9,7 +9,7 @@ doctest = false
 [dependencies]
 ontol-runtime.path = "../../ontol/ontol-runtime"
 ontol-test-utils.path = "../../ontol/ontol-test-utils"
-domain-engine-core.path = "../domain-engine-core"
+domain-engine-core = { path = "../domain-engine-core", features = ["unimock"] }
 domain-engine-graphql.path = "../domain-engine-graphql"
 domain-engine-store-arango.path = "../domain-engine-store-arango"
 domain-engine-store-inmemory.path = "../domain-engine-store-inmemory"

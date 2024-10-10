@@ -8,6 +8,9 @@ edition = "2021"
 [lib]
 doctest = false
 
+[features]
+unimock = ["dep:unimock"]
+
 [dependencies]
 ontol-runtime.path = "../../ontol/ontol-runtime"
 anyhow = "1"
@@ -18,7 +21,7 @@ itertools.workspace = true
 uuid = { workspace = true, features = ["v4", "v7"] }
 async-trait.workspace = true
 chrono.workspace = true
-unimock.workspace = true
+unimock = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
 ulid.workspace = true
