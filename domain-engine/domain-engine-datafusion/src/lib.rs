@@ -12,7 +12,6 @@ use datafusion_physical_plan::{
 };
 use domain_engine_arrow::{
     schema::mk_arrow_schema, ArrowConfig, ArrowQuery, ArrowReqMessage, ArrowRespMessage,
-    ArrowTransactAPI,
 };
 use domain_engine_core::{DomainEngine, DomainError, Session};
 use filter::{ConditionBuilder, DatafusionFilter};
@@ -24,6 +23,9 @@ use ontol_runtime::{
     },
     DefId, DomainIndex,
 };
+
+pub use domain_engine_arrow::ArrowTransactAPI;
+pub use ontol_runtime::ontology::Ontology;
 
 mod filter;
 
