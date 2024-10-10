@@ -92,7 +92,7 @@ async fn test_httpjson_stix_jsonlines_unresolved_foreign_key(ds: &str) {
         fetch_body_assert_status(put_jsonlines_response, StatusCode::UNPROCESSABLE_ENTITY)
             .await
             .unwrap();
-    assert_eq!("{\"message\":\"unresolved foreign key: \\\"marking-definition--fa42a846-8d90-4e51-bc29-71d5b4802168\\\"\"}", message);
+    assert_eq!("{\"message\":\"unresolved foreign key: marking-definition--fa42a846-8d90-4e51-bc29-71d5b4802168\"}", message);
 }
 
 mod testdata {
