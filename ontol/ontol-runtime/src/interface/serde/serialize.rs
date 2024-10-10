@@ -37,14 +37,14 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
     pub fn serialize_attr<S: Serializer>(&self, attr: AttrRef, serializer: S) -> Res<S> {
         trace!(
             "serializing op={:?}",
-            self.value_operator.debug(self.ontology)
+            self.value_operator.debug(self.ontology.defs)
         );
 
         let attr = attr.coerce_to_unit();
 
         match (self.value_operator, self.scalar_format(), attr) {
             (SerdeOperator::AnyPlaceholder, ..) => {
-                warn!("serializatoin of AnyPlaceholder");
+                warn!("serialization of AnyPlaceholder");
                 Err(Error::custom("unknown type"))
             }
             (SerdeOperator::Unit, _, AttrRef::Unit(v)) => {
@@ -163,7 +163,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                             panic!(
                                 "Discriminator not found while serializing union type {:?}: {:#?}",
                                 val.type_def_id(),
-                                possible_variants.debug(self.ontology)
+                                possible_variants.debug(self.ontology.defs)
                             );
                         }
                     }
@@ -178,7 +178,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
                 let mut map = serializer.serialize_map(Some(1))?;
                 map.serialize_entry(
-                    &self.ontology[*name_constant],
+                    &self.ontology.defs[*name_constant],
                     &Proxy {
                         attr: AttrRef::Unit(val),
                         processor: self
@@ -187,7 +187,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     },
                 )?;
                 self.serialize_rel_params::<S>(
-                    &self.ontology.ontol_domain_meta().edge_property,
+                    &self.ontology.defs.ontol_domain_meta.edge_property,
                     rel_params,
                     &mut map,
                 )?;
@@ -230,11 +230,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         write!(
             &mut buf,
             "{}",
-            FormatValueAsText {
-                value,
-                type_def_id: operator_def_id,
-                ontology: self.ontology
-            }
+            FormatValueAsText::new(value, operator_def_id, self.ontology.defs)
         )
         .map_err(|_| S::Error::custom("conversion to text failed"))?;
 
@@ -249,8 +245,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
     ) -> Res<S> {
         let pattern = &self
             .ontology
-            .data
-            .domain
+            .defs
             .text_patterns
             .get(&pattern_def_id)
             .unwrap();
@@ -258,11 +253,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         write!(
             &mut buf,
             "{}",
-            FormatPattern {
-                pattern,
-                value,
-                ontology: self.ontology
-            }
+            FormatPattern::new(value, pattern, self.ontology.defs)
         )
         .map_err(|_| S::Error::custom("Failed to serialize capturing text pattern"))?;
 
@@ -279,8 +270,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             Value::Struct(attrs, _) => {
                 let pattern = &self
                     .ontology
-                    .data
-                    .domain
+                    .defs
                     .text_patterns
                     .get(&pattern_def_id)
                     .unwrap();
@@ -401,7 +391,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
         for value in elements {
             let def_id = value.type_def_id();
-            match self.ontology.def(def_id).operator_addr {
+            match self.ontology.defs.def(def_id).operator_addr {
                 Some(addr) => seq.serialize_element(&Proxy {
                     attr: AttrRef::Unit(value),
                     processor: self.narrow(addr),
@@ -432,6 +422,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         if value.tag().def_id() != struct_op.def.def_id {
             if let Some(entity) = self
                 .ontology
+                .defs
                 .get_def(struct_op.def.def_id)
                 .unwrap()
                 .entity()
@@ -451,7 +442,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
                 let mut map = serializer.serialize_map(Some(1))?;
                 map.serialize_entry(
-                    &self.ontology[key.constant],
+                    &self.ontology.defs[key.constant],
                     &Proxy {
                         attr: AttrRef::Unit(value),
                         processor: self
@@ -460,7 +451,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     },
                 )?;
                 self.serialize_rel_params::<S>(
-                    &self.ontology.ontol_domain_meta().edge_property,
+                    &self.ontology.defs.ontol_domain_meta.edge_property,
                     rel_params,
                     &mut map,
                 )?;
@@ -511,7 +502,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
                     map.serialize_entry(
                         key,
-                        &RawProxy::new_as_child(value, self.ontology, self.level)
+                        &RawProxy::new_as_child(value, self.level)
                             .map_err(RecursionLimitError::to_ser_error)?,
                     )?;
                 }
@@ -530,9 +521,11 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         overridden_id_property_key: Option<&str>,
         map: &mut S::SerializeMap,
     ) -> Result<(), S::Error> {
-        for (phf_key, serde_prop) in
-            struct_op.filter_properties(self.mode, self.ctx.parent_property_id, self.profile.flags)
-        {
+        for (phf_key, serde_prop) in struct_op.filter_properties(
+            self.mode,
+            self.sub_ctx.parent_property_id,
+            self.profile.flags,
+        ) {
             if serde_prop.is_rel_params() {
                 self.serialize_rel_params::<S>(phf_key.arc_str(), rel_params, map)?;
             } else {
@@ -543,21 +536,21 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                         if serde_prop.is_optional_for(self.mode, &self.profile.flags) {
                             continue;
                         } else {
-                            match &self.ontology[serde_prop.value_addr] {
+                            match &self.ontology.serde[serde_prop.value_addr] {
                                 SerdeOperator::Struct(struct_op) => {
                                     if struct_op.is_struct_properties_empty() {
                                         &unit_attr
                                     } else {
                                         panic!(
                                             "While serializing value {:?} with `{}`, the expected value was a non-empty struct, but found unit",
-                                            value, &self.ontology[struct_op.typename]
+                                            value, &self.ontology.defs[struct_op.typename]
                                         )
                                     }
                                 }
                                 _ => {
                                     panic!(
                                         "While serializing value {:?} with `{}`, property `{}` was not found.",
-                                        value, &self.ontology[struct_op.typename], phf_key.arc_str()
+                                        value, &self.ontology.defs[struct_op.typename], phf_key.arc_str()
                                     )
                                 }
                             }
@@ -593,7 +586,8 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                         )?;
                     }
                     SerdePropertyKind::FlatUnionDiscriminator { union_addr } => {
-                        let SerdeOperator::Union(union_op) = &self.ontology[*union_addr] else {
+                        let SerdeOperator::Union(union_op) = &self.ontology.serde[*union_addr]
+                        else {
                             panic!("expected union operator");
                         };
                         let value = attr.as_unit().unwrap();
@@ -622,7 +616,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                             }
                         };
 
-                        match &self.ontology[addr] {
+                        match &self.ontology.serde[addr] {
                             SerdeOperator::Struct(struct_op) => {
                                 self.serialize_struct_properties::<S>(
                                     struct_op,
@@ -654,7 +648,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         rel_params: Option<&Value>,
         map: &mut <S as Serializer>::SerializeMap,
     ) -> Result<(), <S as Serializer>::Error> {
-        match (rel_params, self.ctx.rel_params_addr) {
+        match (rel_params, self.sub_ctx.rel_params_addr) {
             (None, None) => {}
             (Some(rel_params), Some(addr)) => {
                 map.serialize_entry(

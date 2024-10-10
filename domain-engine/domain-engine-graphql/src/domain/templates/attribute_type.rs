@@ -389,7 +389,6 @@ impl<'v> AttributeType<'v> {
                 match attrs.get(&PropId::open_data()) {
                     Some(Attr::Unit(open_data_value)) => Ok(serialize_raw(
                         open_data_value,
-                        &schema_ctx.ontology,
                         ProcessorLevel::new_root_with_recursion_limit(32),
                         JuniperValueSerializer,
                     )?),

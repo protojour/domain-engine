@@ -16,16 +16,16 @@ use crate::{
                 ProcessorLevel, ProcessorMode, ProcessorProfile, ScalarFormat, SpecialProperty,
                 SubProcessorContext,
             },
+            OntologyCtx,
         },
     },
-    ontology::Ontology,
 };
 
 /// A state machine for map matching
 pub struct MapMatcher<'on, 'p> {
     possible_variants: PossibleVariants<'on>,
     match_if_singleton: Option<&'on SerdeUnionVariant>,
-    ontology: &'on Ontology,
+    ontology: OntologyCtx<'on>,
     ctx: SubProcessorContext,
     profile: &'p ProcessorProfile<'p>,
     mode: ProcessorMode,
@@ -47,7 +47,7 @@ enum AttrMatch<'on> {
 impl<'on, 'p> MapMatcher<'on, 'p> {
     pub fn new(
         possible_variants: PossibleVariants<'on>,
-        ontology: &'on Ontology,
+        ontology: OntologyCtx<'on>,
         ctx: SubProcessorContext,
         profile: &'p ProcessorProfile<'p>,
         mode: ProcessorMode,
@@ -142,7 +142,7 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
             if let Discriminant::HasAttribute(_, match_property, scalar_discriminant) =
                 possible_variant.discriminant()
             {
-                if property.as_ref() == &self.ontology[*match_property]
+                if property.as_ref() == &self.ontology.defs[*match_property]
                     && self.match_attribute_value(
                         value,
                         possible_variant.purpose(),
@@ -203,13 +203,13 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
             ) => true,
             (LeafDiscriminant::IsSequence, serde_value::Value::Seq(_)) => true,
             (LeafDiscriminant::IsTextLiteral(constant), serde_value::Value::String(value)) => {
-                value == &self.ontology[*constant]
+                value == &self.ontology.defs[*constant]
             }
             (
                 LeafDiscriminant::MatchesCapturingTextPattern(def_id),
                 serde_value::Value::String(value),
             ) => {
-                let pattern = self.ontology.data.domain.text_patterns.get(def_id).unwrap();
+                let pattern = self.ontology.defs.text_patterns.get(def_id).unwrap();
                 pattern.regex.is_match(value)
             }
             _ => false,
@@ -221,7 +221,7 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
         matched_variant: &'on SerdeUnionVariant,
     ) -> ControlFlow<MatchOk<'on>> {
         match (
-            &self.ontology[matched_variant.deserialize.addr],
+            &self.ontology.serde[matched_variant.deserialize.addr],
             matched_variant.purpose(),
         ) {
             (SerdeOperator::Struct(struct_op), _) => ControlFlow::Break(MatchOk {
@@ -241,7 +241,7 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
             }
             other => panic!(
                 "Matched discriminator is not a map type: {other:?}",
-                other = other.debug(self.ontology)
+                other = other.debug(self.ontology.defs)
             ),
         }
     }

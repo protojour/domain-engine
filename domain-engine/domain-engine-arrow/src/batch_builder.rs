@@ -98,21 +98,21 @@ impl RecordBatchBuilder {
                                     &self.ontology.get_text_pattern(*pattern_def_id).unwrap();
                                 format!(
                                     "{}",
-                                    FormatPattern {
+                                    FormatPattern::new(
+                                        &v,
                                         pattern,
-                                        value: &v,
-                                        ontology: &self.ontology
-                                    }
+                                        self.ontology.as_ref().as_ref()
+                                    )
                                 )
                             }
                             _ => {
                                 format!(
                                     "{}",
-                                    FormatValueAsText {
-                                        value: &v,
-                                        type_def_id: v.type_def_id(),
-                                        ontology: &self.ontology,
-                                    }
+                                    FormatValueAsText::new(
+                                        &v,
+                                        v.type_def_id(),
+                                        self.ontology.as_ref().as_ref()
+                                    )
                                 )
                             }
                         };

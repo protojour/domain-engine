@@ -5,11 +5,14 @@ use ontol_macros::OntolDebug;
 use crate::{
     debug::OntolDebug,
     format_utils::{Backticks, CommaSeparated, DoubleQuote},
-    ontology::Ontology,
+    ontology::aspects::{get_aspect, DefsAspect, ExecutionAspect, SerdeAspect},
     DefId, PropId,
 };
 
-use super::operator::{AppliedVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags};
+use super::{
+    operator::{AppliedVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags},
+    OntologyCtx,
+};
 
 /// SerdeProcessor handles serializing and deserializing domain types in an optimized way.
 /// Each serde-enabled type has its own operator, which is cached
@@ -19,10 +22,10 @@ pub struct SerdeProcessor<'on, 'p> {
     /// The operator used for (de)serializing this value
     pub value_operator: &'on SerdeOperator,
 
-    pub ctx: SubProcessorContext,
+    pub sub_ctx: SubProcessorContext,
 
     /// The ontology, via which new SerdeOperators can be created.
-    pub(crate) ontology: &'on Ontology,
+    pub(crate) ontology: OntologyCtx<'on>,
 
     pub(crate) profile: &'p ProcessorProfile<'p>,
 
@@ -31,8 +34,27 @@ pub struct SerdeProcessor<'on, 'p> {
 }
 
 impl<'on, 'p> SerdeProcessor<'on, 'p> {
-    pub fn ontology(&self) -> &Ontology {
-        self.ontology
+    pub(crate) fn new(
+        value_addr: SerdeOperatorAddr,
+        mode: ProcessorMode,
+        ontology: &'on (impl AsRef<SerdeAspect> + AsRef<DefsAspect> + AsRef<ExecutionAspect>),
+    ) -> Self {
+        Self {
+            value_operator: &get_aspect::<SerdeAspect>(ontology).operators[value_addr.0 as usize],
+            sub_ctx: Default::default(),
+            level: ProcessorLevel::new_root(),
+            ontology: OntologyCtx {
+                serde: ontology.as_ref(),
+                defs: ontology.as_ref(),
+                execution: ontology.as_ref(),
+            },
+            profile: &DOMAIN_PROFILE,
+            mode,
+        }
+    }
+
+    pub fn defs_aspect(&self) -> &DefsAspect {
+        self.ontology.defs
     }
 
     /// Get the current processor level
@@ -53,30 +75,34 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
     /// Return a processor that helps to _narrow the value_ that this processor represents.
     pub fn narrow(&self, addr: SerdeOperatorAddr) -> Self {
         Self {
-            value_operator: &self.ontology[addr],
+            value_operator: &self.ontology.serde[addr],
             ..*self
         }
     }
 
     /// Return a processor that helps to _narrow the value_ that this processor represents.
-    pub fn narrow_with_context(&self, addr: SerdeOperatorAddr, ctx: SubProcessorContext) -> Self {
+    pub fn narrow_with_context(
+        &self,
+        addr: SerdeOperatorAddr,
+        sub_ctx: SubProcessorContext,
+    ) -> Self {
         Self {
-            value_operator: &self.ontology[addr],
-            ctx,
+            value_operator: &self.ontology.serde[addr],
+            sub_ctx,
             ..*self
         }
     }
 
     /// Set the sub-processor context explicitly, given that the full context in which the processor operates is known.
-    pub fn with_known_context(&self, ctx: SubProcessorContext) -> Self {
-        Self { ctx, ..*self }
+    pub fn with_known_context(&self, sub_ctx: SubProcessorContext) -> Self {
+        Self { sub_ctx, ..*self }
     }
 
     /// Return a processor that processes a new value that is a child value (i.e. increases the recursion level) of this processor.
     pub fn new_child(&self, addr: SerdeOperatorAddr) -> Result<Self, RecursionLimitError> {
         Ok(Self {
-            value_operator: &self.ontology[addr],
-            ctx: Default::default(),
+            value_operator: &self.ontology.serde[addr],
+            sub_ctx: Default::default(),
             level: self.level.child()?,
             ..*self
         })
@@ -88,9 +114,9 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         addr: SerdeOperatorAddr,
     ) -> Result<Self, RecursionLimitError> {
         Ok(Self {
-            value_operator: &self.ontology[addr],
-            ctx: SubProcessorContext {
-                is_update: self.ctx.is_update,
+            value_operator: &self.ontology.serde[addr],
+            sub_ctx: SubProcessorContext {
+                is_update: self.sub_ctx.is_update,
                 ..Default::default()
             },
             level: self.level.child()?,
@@ -101,11 +127,11 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
     pub fn new_child_with_context(
         &self,
         addr: SerdeOperatorAddr,
-        ctx: SubProcessorContext,
+        sub_ctx: SubProcessorContext,
     ) -> Result<Self, RecursionLimitError> {
         Ok(Self {
-            value_operator: &self.ontology[addr],
-            ctx,
+            value_operator: &self.ontology.serde[addr],
+            sub_ctx,
             level: self.level.child()?,
             ..*self
         })
@@ -113,7 +139,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
     pub fn scalar_format(&self) -> ScalarFormat {
         if self
-            .ctx
+            .sub_ctx
             .parent_property_flags
             .contains(SerdePropertyFlags::ENTITY_ID)
         {
@@ -366,8 +392,8 @@ impl<'on, 'p> Debug for SerdeProcessor<'on, 'p> {
         // This structure might contain cycles (through operator addr),
         // so just print the topmost level.
         f.debug_struct("SerdeProcessor")
-            .field("operator", &self.value_operator.debug(self.ontology))
-            .field("rel_params_addr", &self.ctx.rel_params_addr)
+            .field("operator", &self.value_operator.debug(self.ontology.defs))
+            .field("rel_params_addr", &self.sub_ctx.rel_params_addr)
             .finish()
     }
 }
@@ -414,7 +440,7 @@ impl<'on, 'p> Display for SerdeProcessor<'on, 'p> {
             SerdeOperator::Octets(_) => write!(f, "`octets`"),
             SerdeOperator::String(_) => write!(f, "`string`"),
             SerdeOperator::StringConstant(constant, _) => {
-                DoubleQuote(&self.ontology[*constant]).fmt(f)
+                DoubleQuote(&self.ontology.defs[*constant]).fmt(f)
             }
             SerdeOperator::TextPattern(_) | SerdeOperator::CapturingTextPattern(_) => {
                 write!(f, "`text_pattern`")
@@ -451,11 +477,13 @@ impl<'on, 'p> Display for SerdeProcessor<'on, 'p> {
                     processors = CommaSeparated(&processors)
                 )
             }
-            SerdeOperator::Alias(alias_op) => Backticks(&self.ontology[alias_op.typename]).fmt(f),
+            SerdeOperator::Alias(alias_op) => {
+                Backticks(&self.ontology.defs[alias_op.typename]).fmt(f)
+            }
             SerdeOperator::Union(_) => write!(f, "union"),
             SerdeOperator::IdSingletonStruct(..) => write!(f, "id"),
             SerdeOperator::Struct(struct_op) => {
-                Backticks(&self.ontology[struct_op.typename]).fmt(f)
+                Backticks(&self.ontology.defs[struct_op.typename]).fmt(f)
             }
         }
     }

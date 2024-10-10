@@ -8,10 +8,14 @@ use crate::{
         discriminator::{Discriminant, LeafDiscriminant},
         serde::{
             operator::{PossibleVariants, SerdeOperator},
-            processor::{ProcessorLevel, ProcessorMode, ProcessorProfile, SubProcessorContext},
+            processor::{
+                ProcessorLevel, ProcessorMode, ProcessorProfile, SerdeProcessor,
+                SubProcessorContext,
+            },
+            OntologyCtx,
         },
     },
-    ontology::{ontol::TextConstant, Ontology},
+    ontology::ontol::TextConstant,
     value::Value,
     DefId,
 };
@@ -28,7 +32,7 @@ pub struct UnionMatcher<'on, 'p> {
     pub typename: TextConstant,
     pub possible_variants: PossibleVariants<'on>,
     pub ctx: SubProcessorContext,
-    pub ontology: &'on Ontology,
+    pub ontology: OntologyCtx<'on>,
     pub profile: &'p ProcessorProfile<'p>,
     pub mode: ProcessorMode,
     pub level: ProcessorLevel,
@@ -40,15 +44,17 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
         write!(
             f,
             "{} ({})",
-            Backticks(&self.ontology[self.typename]),
+            Backticks(&self.ontology.defs[self.typename]),
             LogicalConcat {
                 items: self
                     .possible_variants
                     .into_iter()
                     .dedup_by(|a, b| { a.deserialize.def_id == b.deserialize.def_id })
-                    .map(|variant| self
-                        .ontology
-                        .new_serde_processor(variant.deserialize.addr, self.mode))
+                    .map(|variant| SerdeProcessor::new(
+                        variant.deserialize.addr,
+                        self.mode,
+                        &self.ontology
+                    ))
                     .collect(),
                 logic_op: LogicOp::Or,
             }
@@ -89,27 +95,27 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
             match scalar_discriminant {
                 LeafDiscriminant::IsText => {
                     return try_deserialize_custom_string(
-                        self.ontology,
-                        variant.deserialize.def_id,
                         str,
+                        variant.deserialize.def_id,
+                        self.ontology,
                     )
                     .map_err(|_| ())
                 }
                 LeafDiscriminant::IsTextLiteral(constant) => {
-                    if str == &self.ontology[*constant] {
+                    if str == &self.ontology.defs[*constant] {
                         return try_deserialize_custom_string(
-                            self.ontology,
-                            variant.deserialize.def_id,
                             str,
+                            variant.deserialize.def_id,
+                            self.ontology,
                         )
                         .map_err(|_| ());
                     }
                 }
                 LeafDiscriminant::MatchesCapturingTextPattern(def_id) => {
                     let result_type = variant.deserialize.def_id;
-                    let pattern = self.ontology.data.domain.text_patterns.get(def_id).unwrap();
+                    let pattern = self.ontology.defs.text_patterns.get(def_id).unwrap();
 
-                    if let Ok(value) = pattern.try_capturing_match(str, result_type, self.ontology)
+                    if let Ok(value) = pattern.try_capturing_match(str, result_type, &self.ontology)
                     {
                         return Ok(value);
                     }
@@ -128,7 +134,7 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
             };
 
             if leaf_discriminant == &LeafDiscriminant::IsSequence {
-                match &self.ontology[variant.deserialize.addr] {
+                match &self.ontology.serde[variant.deserialize.addr] {
                     SerdeOperator::RelationList(seq_op) => {
                         return Ok(SequenceRangesMatcher::new(
                             slice::from_ref(&seq_op.range),

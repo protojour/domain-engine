@@ -12,7 +12,10 @@ use crate::{
     attr::{Attr, AttrMatrix},
     cast::Cast,
     debug::OntolDebug,
-    ontology::{ontol::TextConstant, Ontology},
+    ontology::{
+        aspects::{DefsAspect, ExecutionAspect},
+        ontol::TextConstant,
+    },
     property::ValueCardinality,
     query::{
         condition::{Clause, ClausePair, CondTerm},
@@ -36,18 +39,21 @@ use super::{
 };
 
 /// Virtual machine for executing ONTOL procedures
-pub struct OntolVm<'o> {
-    abstract_vm: AbstractVm<'o, OntolProcessor<'o>>,
-    processor: OntolProcessor<'o>,
+pub struct OntolVm<'on> {
+    abstract_vm: AbstractVm<'on, OntolProcessor<'on>>,
+    processor: OntolProcessor<'on>,
 }
 
-impl<'o> OntolVm<'o> {
-    pub fn new(ontology: &'o Ontology, proc: Procedure) -> Self {
+impl<'on> OntolVm<'on> {
+    pub fn new(
+        proc: Procedure,
+        ontology: &'on (impl AsRef<ExecutionAspect> + AsRef<DefsAspect>),
+    ) -> Self {
         Self {
-            abstract_vm: AbstractVm::new(ontology, proc),
+            abstract_vm: AbstractVm::new(proc, ontology),
             processor: OntolProcessor {
                 stack: Default::default(),
-                ontology,
+                defs: ontology.as_ref(),
             },
         }
     }
@@ -59,9 +65,9 @@ impl<'o> OntolVm<'o> {
         self.processor.stack.extend(params);
 
         let result = if tracing::enabled!(Level::TRACE) {
-            let ontology = self.processor.ontology;
+            let defs = self.processor.defs;
             self.abstract_vm
-                .run(&mut self.processor, &mut Tracer { ontology })?
+                .run(&mut self.processor, &mut Tracer { defs })?
         } else {
             self.abstract_vm.run(&mut self.processor, &mut ())?
         };
@@ -76,12 +82,12 @@ impl<'o> OntolVm<'o> {
     }
 }
 
-pub struct OntolProcessor<'o> {
+pub struct OntolProcessor<'on> {
     stack: Vec<Value>,
-    ontology: &'o Ontology,
+    defs: &'on DefsAspect,
 }
 
-impl<'o> Processor for OntolProcessor<'o> {
+impl<'on> Processor for OntolProcessor<'on> {
     type Value = Value;
     type Yield = Yield;
 
@@ -300,7 +306,7 @@ impl<'o> Processor for OntolProcessor<'o> {
 
     #[inline(always)]
     fn push_string(&mut self, k: TextConstant, result_type: DefId) -> VmResult<()> {
-        let str = &self.ontology[k];
+        let str = &self.defs[k];
         self.stack.push(Value::Text(str.into(), result_type.into()));
         Ok(())
     }
@@ -379,7 +385,7 @@ impl<'o> Processor for OntolProcessor<'o> {
             return Err(VmError::InvalidType(local));
         };
 
-        let text_pattern = self.ontology.get_text_pattern(pattern_id).unwrap();
+        let text_pattern = self.defs.text_patterns.get(&pattern_id).unwrap();
 
         let mut captures = text_pattern.regex.create_captures();
         text_pattern.regex.captures(haystack, &mut captures);
@@ -410,7 +416,7 @@ impl<'o> Processor for OntolProcessor<'o> {
             return Err(VmError::InvalidType(local));
         };
 
-        let text_pattern = self.ontology.get_text_pattern(pattern_id).unwrap();
+        let text_pattern = self.defs.text_patterns.get(&pattern_id).unwrap();
 
         let mut values: ThinVec<Value> = ThinVec::new();
         let text_tag: ValueTag = OntolDefTag::Text.def_id().into();
@@ -632,7 +638,7 @@ impl<'o> OntolProcessor<'o> {
 }
 
 struct Tracer<'on> {
-    ontology: &'on Ontology,
+    defs: &'on DefsAspect,
 }
 
 impl<'on> VmDebug<OntolProcessor<'on>> for Tracer<'on> {
@@ -642,7 +648,7 @@ impl<'on> VmDebug<OntolProcessor<'on>> for Tracer<'on> {
                 trace!("    L{index}: {}", ValueDebug(value));
             }
         }
-        trace!("{:?}", &vm.pending_opcode().debug(self.ontology));
+        trace!("{:?}", &vm.pending_opcode().debug(self.defs));
     }
 }
 
@@ -698,7 +704,7 @@ mod tests {
         );
 
         let ontology = Ontology::builder().lib(lib).build();
-        let output = OntolVm::new(&ontology, proc)
+        let output = OntolVm::new(proc, &ontology)
             .run([Value::new_struct(
                 [
                     (
@@ -766,7 +772,7 @@ mod tests {
         );
 
         let ontology = Ontology::builder().lib(lib).build();
-        let output = OntolVm::new(&ontology, mapping_proc)
+        let output = OntolVm::new(mapping_proc, &ontology)
             .run([Value::new_struct(
                 [
                     (
@@ -833,7 +839,7 @@ mod tests {
         );
 
         let ontology = Ontology::builder().lib(lib).build();
-        let output = OntolVm::new(&ontology, proc)
+        let output = OntolVm::new(proc, &ontology)
             .run([Value::sequence_of([
                 Value::I64(1, ValueTag::unit()),
                 Value::I64(2, ValueTag::unit()),
@@ -889,7 +895,7 @@ mod tests {
         );
 
         let ontology = Ontology::builder().lib(lib).build();
-        let output = OntolVm::new(&ontology, proc)
+        let output = OntolVm::new(proc, &ontology)
             .run([Value::new_struct(
                 [
                     (prop_a, Value::Text("a".into(), ValueTag::unit()).into()),
@@ -949,7 +955,7 @@ mod tests {
             format!(
                 "{}",
                 ValueDebug(
-                    &OntolVm::new(&ontology, proc)
+                    &OntolVm::new(proc, &ontology)
                         .run([Value::new_struct([], ValueTag::unit())])
                         .unwrap()
                         .unwrap()
@@ -962,7 +968,7 @@ mod tests {
             format!(
                 "{}",
                 ValueDebug(
-                    &OntolVm::new(&ontology, proc)
+                    &OntolVm::new(proc, &ontology)
                         .run([Value::new_struct(
                             [(prop, Value::unit().into())],
                             ValueTag::unit()
@@ -978,7 +984,7 @@ mod tests {
             format!(
                 "{}",
                 ValueDebug(
-                    &OntolVm::new(&ontology, proc)
+                    &OntolVm::new(proc, &ontology)
                         .run([Value::new_struct(
                             [(prop, Value::Text("a".into(), inner_tag).into())],
                             ValueTag::unit()

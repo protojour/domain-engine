@@ -16,7 +16,10 @@ use crate::{
     ontology::{domain::DefKind, ontol::ValueGenerator},
     phf::PhfIndexMap,
     value::{Value, ValueTag},
-    vm::proc::{NParams, Procedure},
+    vm::{
+        ontol_vm::OntolVm,
+        proc::{NParams, Procedure},
+    },
     DefId, PropId,
 };
 
@@ -106,7 +109,7 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
         write!(
             f,
             "type `{}`",
-            &self.processor.ontology[self.struct_op.typename]
+            &self.processor.ontology.defs[self.struct_op.typename]
         )
     }
 
@@ -121,7 +124,7 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
         )
         .with_required_props_bitset(self.struct_op.required_props_bitset(
             self.processor.mode,
-            self.processor.ctx.parent_property_id,
+            self.processor.sub_ctx.parent_property_id,
             self.processor.profile.flags,
         ))
         .with_rel_params_addr(self.ctx.rel_params_addr);
@@ -199,7 +202,9 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         trace!(
             "deserialize properties {:?} {:#?}",
             self.processor.mode.debug(&()),
-            self.properties.raw_map().debug(self.processor.ontology)
+            self.properties
+                .raw_map()
+                .debug(self.processor.ontology.defs)
         );
 
         self.consume(buf_reader, prop_visitor, &mut output)?;
@@ -274,7 +279,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             .map_err(serde::de::Error::custom)?;
 
         let mut tag = ValueTag::from(self.type_def_id);
-        if self.processor.ctx.is_update {
+        if self.processor.sub_ctx.is_update {
             tag.set_is_update();
         }
 
@@ -380,13 +385,13 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                     }
                 }
                 PropKind::FlatUnionDiscriminator(prop_idx, key, serde_property, union_addr) => {
-                    let SerdeOperator::Union(union_op) = &self.processor.ontology[union_addr]
+                    let SerdeOperator::Union(union_op) = &self.processor.ontology.serde[union_addr]
                     else {
                         panic!("expected a union operator");
                     };
                     let union_matcher = UnionMatcher {
                         typename: union_op.typename(),
-                        ctx: self.processor.ctx,
+                        ctx: self.processor.sub_ctx,
                         possible_variants: PossibleVariants::new(
                             union_op.unfiltered_variants(),
                             self.processor.mode,
@@ -433,7 +438,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                     output.open_dict.insert(
                         key,
                         map.next_value_seed(
-                            RawVisitor::new(self.processor.ontology, self.processor.level)
+                            RawVisitor::new(self.processor.level)
                                 .map_err(RecursionLimitError::to_de_error)?,
                         )?,
                     );
@@ -452,7 +457,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         output: &mut Struct,
     ) -> Result<(), E> {
         for (rel_id, addr) in std::mem::take(&mut output.flattened_union_ops) {
-            let SerdeOperator::Struct(struct_op) = &self.processor.ontology[addr] else {
+            let SerdeOperator::Struct(struct_op) = &self.processor.ontology.serde[addr] else {
                 return Err(E::custom("BUG: flattened union must use a struct operator"));
             };
 
@@ -465,7 +470,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             )
             .with_required_props_bitset(struct_op.required_props_bitset(
                 self.processor.mode,
-                self.processor.ctx.parent_property_id,
+                self.processor.sub_ctx.parent_property_id,
                 self.processor.profile.flags,
             ));
 
@@ -490,7 +495,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             for (key, serde_value) in std::mem::take(&mut output.flattened_union_tmp_data) {
                 output.open_dict.insert(
                     key.into(),
-                    RawVisitor::new(self.processor.ontology, self.processor.level)
+                    RawVisitor::new(self.processor.level)
                         .map_err(RecursionLimitError::to_de_error)?
                         .deserialize(serde_value::ValueDeserializer::new(serde_value))?,
                 );
@@ -507,7 +512,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         }
 
         let (prop_id, _) = output.attributes.iter().next().unwrap();
-        let def = self.processor.ontology.def(self.type_def_id);
+        let def = self.processor.ontology.defs.def(self.type_def_id);
 
         let DefKind::Entity(entity) = &def.kind else {
             return Ok(IdOrStruct::Struct(output));
@@ -556,10 +561,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                         address,
                         n_params: NParams(0),
                     };
-                    let value = self
-                        .processor
-                        .ontology
-                        .new_vm(procedure)
+                    let value = OntolVm::new(procedure, &self.processor.ontology)
                         .run([])
                         .map_err(|vm_error| format!("{vm_error}"))?
                         .unwrap();
@@ -589,7 +591,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             self.processor.mode.debug(&()),
             output.rel_params.is_unit(),
             self.rel_params_addr.is_none(),
-            self.processor.ctx.parent_property_id,
+            self.processor.sub_ctx.parent_property_id,
             output.observed_props_bitset,
             self.required_props_bitset
         );
@@ -605,7 +607,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                 prop.flags,
                 prop.filter(
                     self.processor.mode,
-                    self.processor.ctx.parent_property_id,
+                    self.processor.sub_ctx.parent_property_id,
                     self.processor.profile.flags
                 )
                 .is_some(),
@@ -621,7 +623,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                     && property
                         .filter(
                             self.processor.mode,
-                            self.processor.ctx.parent_property_id,
+                            self.processor.sub_ctx.parent_property_id,
                             self.processor.profile.flags,
                         )
                         .is_some()
@@ -649,7 +651,8 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             items.push(DoubleQuote(
                 self.processor
                     .ontology
-                    .ontol_domain_meta()
+                    .defs
+                    .ontol_domain_meta
                     .edge_property
                     .clone(),
             ));

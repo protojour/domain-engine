@@ -140,11 +140,7 @@ pub fn write_ontol_scalar(
             put_string(
                 gobj,
                 VALUE,
-                &FormatValueAsText {
-                    value: &value,
-                    type_def_id: value.type_def_id(),
-                    ontology: ctx,
-                },
+                FormatValueAsText::new(&value, value.type_def_id(), ctx.as_ref()),
             );
         }
         value @ Value::ChronoDate(..) => {
@@ -152,11 +148,7 @@ pub fn write_ontol_scalar(
             put_string(
                 gobj,
                 VALUE,
-                &FormatValueAsText {
-                    value: &value,
-                    type_def_id: value.type_def_id(),
-                    ontology: ctx,
-                },
+                FormatValueAsText::new(&value, value.type_def_id(), ctx.as_ref()),
             );
         }
         value @ Value::ChronoTime(..) => {
@@ -164,11 +156,7 @@ pub fn write_ontol_scalar(
             put_string(
                 gobj,
                 VALUE,
-                &FormatValueAsText {
-                    value: &value,
-                    type_def_id: value.type_def_id(),
-                    ontology: ctx,
-                },
+                FormatValueAsText::new(&value, value.type_def_id(), ctx.as_ref()),
             );
         }
         Value::Struct(attrs, tag) => {
@@ -216,11 +204,7 @@ pub fn write_ontol_scalar(
                             put_string(
                                 gobj,
                                 CREATE_TIME,
-                                &FormatValueAsText {
-                                    value,
-                                    type_def_id: value.type_def_id(),
-                                    ontology: ctx,
-                                },
+                                FormatValueAsText::new(value, value.type_def_id(), ctx.as_ref()),
                             );
                         }
                     }
@@ -233,11 +217,7 @@ pub fn write_ontol_scalar(
                             put_string(
                                 gobj,
                                 UPDATE_TIME,
-                                &FormatValueAsText {
-                                    value,
-                                    type_def_id: value.type_def_id(),
-                                    ontology: ctx,
-                                },
+                                FormatValueAsText::new(value, value.type_def_id(), ctx.as_ref()),
                             );
                         }
                     }

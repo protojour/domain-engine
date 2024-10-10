@@ -286,19 +286,11 @@ impl<'a> MetaQuery<'a> {
                     | Value::ChronoDateTime(_, _)
                     | Value::Struct(_, _) => format!(
                         r#""{}""#,
-                        FormatValueAsText {
-                            value,
-                            type_def_id: value.type_def_id(),
-                            ontology: self.ontology,
-                        }
+                        FormatValueAsText::new(value, value.type_def_id(), self.ontology.as_ref())
                     ),
                     // unquoted
-                    _ => FormatValueAsText {
-                        value,
-                        type_def_id: value.type_def_id(),
-                        ontology: self.ontology,
-                    }
-                    .to_string(),
+                    _ => FormatValueAsText::new(value, value.type_def_id(), self.ontology.as_ref())
+                        .to_string(),
                 };
 
                 filter.values.push(val);

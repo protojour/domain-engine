@@ -70,7 +70,7 @@ impl<'a, 'de> Visitor<'de> for PropertyMapVisitor<'a> {
         if serde_property
             .filter(
                 self.deserializer.processor.mode,
-                self.deserializer.processor.ctx.parent_property_id,
+                self.deserializer.processor.sub_ctx.parent_property_id,
                 self.deserializer.processor.profile.flags,
             )
             .is_some()
@@ -133,7 +133,8 @@ impl<'a, 'de> Visitor<'de> for IdSingletonPropVisitor<'a> {
                 .deserializer
                 .processor
                 .ontology
-                .ontol_domain_meta()
+                .defs
+                .ontol_domain_meta
                 .edge_property
         {
             if let Some(addr) = self.deserializer.rel_params_addr {
@@ -161,6 +162,7 @@ fn fallback<'a, E: Error>(
             let def = deserializer
                 .processor
                 .ontology
+                .defs
                 .def(deserializer.type_def_id);
             let DefKind::Entity(entity) = &def.kind else {
                 return Err(E::custom("not an entity"));

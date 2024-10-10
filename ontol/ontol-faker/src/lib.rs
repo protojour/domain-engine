@@ -259,7 +259,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
             }
             SerdeOperator::Struct(struct_op) => {
                 let mut attrs = HashMap::default();
-                let def = processor.ontology().def(struct_op.def.def_id);
+                let def = processor.defs_aspect().def(struct_op.def.def_id);
 
                 for (_, property) in struct_op.properties.iter() {
                     if let Some(data_relationship) = def.data_relationships.get(&property.id) {
@@ -284,7 +284,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
             }
         };
 
-        let attr = if let Some(rel_params_addr) = processor.ctx.rel_params_addr {
+        let attr = if let Some(rel_params_addr) = processor.sub_ctx.rel_params_addr {
             let rel = self
                 .fake_attribute(processor.new_child(rel_params_addr)?)?
                 .into_unit()

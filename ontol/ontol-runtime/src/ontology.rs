@@ -3,6 +3,7 @@
 use std::ops::Index;
 
 use arcstr::ArcStr;
+use aspects::{DefsAspect, ExecutionAspect, SerdeAspect};
 use data::Data;
 use domain::{DefRepr, EdgeInfo};
 use tracing::debug;
@@ -14,7 +15,7 @@ use crate::{
     interface::{
         serde::{
             operator::{SerdeOperator, SerdeOperatorAddr},
-            processor::{ProcessorLevel, ProcessorMode, SerdeProcessor, DOMAIN_PROFILE},
+            processor::{ProcessorMode, SerdeProcessor},
         },
         DomainInterface,
     },
@@ -74,16 +75,11 @@ impl Ontology {
     }
 
     pub fn new_vm(&self, proc: Procedure) -> OntolVm<'_> {
-        OntolVm::new(self, proc)
+        OntolVm::new(proc, self)
     }
 
     pub fn def(&self, def_id: DefId) -> &Def {
-        match self.domain_by_index(def_id.0) {
-            Some(domain) => domain.def(def_id),
-            None => {
-                panic!("No domain for {:?}", def_id.0)
-            }
-        }
+        self.data.defs.def(def_id)
     }
 
     pub fn get_def(&self, def_id: DefId) -> Option<&Def> {
@@ -102,32 +98,32 @@ impl Ontology {
     }
 
     pub fn get_text_pattern(&self, def_id: DefId) -> Option<&TextPattern> {
-        self.data.domain.text_patterns.get(&def_id)
+        self.data.defs.text_patterns.get(&def_id)
     }
 
     pub fn get_text_like_type(&self, def_id: DefId) -> Option<TextLikeType> {
-        self.data.domain.text_like_types.get(&def_id).cloned()
+        self.data.defs.text_like_types.get(&def_id).cloned()
     }
 
     pub fn domains(&self) -> impl Iterator<Item = (DomainIndex, &Domain)> {
         self.data
-            .domain
+            .defs
             .domains
             .iter()
             .map(|(idx, domain)| (DomainIndex(idx as u16), domain))
     }
 
     pub fn ontol_domain_meta(&self) -> &OntolDomainMeta {
-        &self.data.domain.ontol_domain_meta
+        &self.data.defs.ontol_domain_meta
     }
 
     pub fn domain_by_index(&self, index: DomainIndex) -> Option<&Domain> {
-        self.data.domain.domains.get(&index)
+        self.data.defs.domain_by_index(index)
     }
 
     pub fn domain_by_id(&self, domain_id: Ulid) -> Option<&Domain> {
         self.data
-            .domain
+            .defs
             .domains
             .iter()
             .find(|(_, domain)| domain.domain_id().ulid == domain_id)
@@ -138,7 +134,7 @@ impl Ontology {
     /// Returns an empty slice if it's not a union.
     pub fn union_variants(&self, union_def_id: DefId) -> &[DefId] {
         self.data
-            .domain
+            .defs
             .union_variants
             .get(&union_def_id)
             .map(|set| set.as_slice())
@@ -151,7 +147,7 @@ impl Ontology {
     }
 
     pub fn extended_entity_info(&self, def_id: DefId) -> Option<&ExtendedEntityInfo> {
-        self.data.domain.extended_entity_table.get(&def_id)
+        self.data.defs.extended_entity_table.get(&def_id)
     }
 
     pub fn get_domain_config(&self, index: DomainIndex) -> Option<&DomainConfig> {
@@ -168,12 +164,12 @@ impl Ontology {
     }
 
     pub fn get_const_proc(&self, const_id: DefId) -> Option<Procedure> {
-        self.data.mapping.const_proc_table.get(&const_id).cloned()
+        self.data.execution.const_proc_table.get(&const_id).cloned()
     }
 
     pub fn iter_map_meta(&self) -> impl Iterator<Item = (MapKey, &MapMeta)> + '_ {
         self.data
-            .mapping
+            .execution
             .map_meta_table
             .iter()
             .map(|(key, proc)| (*key, proc))
@@ -183,27 +179,27 @@ impl Ontology {
         &self,
     ) -> impl Iterator<Item = (DomainIndex, TextConstant, MapKey)> + '_ {
         self.data
-            .mapping
+            .execution
             .named_downmaps
             .iter()
             .map(|((index, text_constant), value)| (*index, *text_constant, *value))
     }
 
     pub fn get_map_meta(&self, key: &MapKey) -> Option<&MapMeta> {
-        self.data.mapping.map_meta_table.get(key)
+        self.data.execution.map_meta_table.get(key)
     }
 
     pub fn get_prop_flow_slice(&self, map_meta: &MapMeta) -> Option<&[PropertyFlow]> {
         let range = map_meta.propflow_range.as_ref()?;
-        Some(&self.data.mapping.property_flows[range.start as usize..range.end as usize])
+        Some(&self.data.execution.property_flows[range.start as usize..range.end as usize])
     }
 
     pub fn get_static_condition(&self, key: &MapKey) -> Option<&Condition> {
-        self.data.mapping.static_conditions.get(key)
+        self.data.execution.static_conditions.get(key)
     }
 
     pub fn get_mapper_proc(&self, key: &MapKey) -> Option<Procedure> {
-        self.data.mapping.map_meta_table.get(key).map(|map_info| {
+        self.data.execution.map_meta_table.get(key).map(|map_info| {
             debug!(
                 "get_mapper_proc ({:?}) => {:?}",
                 key.def_ids(),
@@ -218,14 +214,7 @@ impl Ontology {
         value_addr: SerdeOperatorAddr,
         mode: ProcessorMode,
     ) -> SerdeProcessor {
-        SerdeProcessor {
-            value_operator: &self.data.serde.operators[value_addr.0 as usize],
-            ctx: Default::default(),
-            level: ProcessorLevel::new_root(),
-            ontology: self,
-            profile: &DOMAIN_PROFILE,
-            mode,
-        }
+        SerdeProcessor::new(value_addr, mode, self)
     }
 
     pub fn dynamic_sequence_operator_addr(&self) -> SerdeOperatorAddr {
@@ -233,11 +222,11 @@ impl Ontology {
     }
 
     pub fn get_extern(&self, def_id: DefId) -> Option<&Extern> {
-        self.data.mapping.extern_table.get(&def_id)
+        self.data.execution.extern_table.get(&def_id)
     }
 
     pub fn get_text_constant(&self, constant: TextConstant) -> &ArcStr {
-        &self.data.domain.text_constants[constant.0 as usize]
+        &self.data.defs.text_constants[constant.0 as usize]
     }
 
     /// Find a text constant given its string representation.
@@ -245,7 +234,7 @@ impl Ontology {
     /// It's only use case should be testing.
     pub fn find_text_constant(&self, str: &str) -> Option<TextConstant> {
         self.data
-            .domain
+            .defs
             .text_constants
             .iter()
             .enumerate()
@@ -257,7 +246,7 @@ impl Ontology {
     pub fn find_named_downmap_meta(&self, index: DomainIndex, name: &str) -> Option<MapKey> {
         let text_constant = self.find_text_constant(name)?;
         self.data
-            .mapping
+            .execution
             .named_downmaps
             .get(&(index, text_constant))
             .cloned()
@@ -356,6 +345,24 @@ impl From<Data> for Ontology {
     }
 }
 
+impl AsRef<DefsAspect> for Ontology {
+    fn as_ref(&self) -> &DefsAspect {
+        &self.data.defs
+    }
+}
+
+impl AsRef<SerdeAspect> for Ontology {
+    fn as_ref(&self) -> &SerdeAspect {
+        &self.data.serde
+    }
+}
+
+impl AsRef<ExecutionAspect> for Ontology {
+    fn as_ref(&self) -> &ExecutionAspect {
+        &self.data.execution
+    }
+}
+
 /// Things that must be done after deserialization before the ontology can be used
 pub trait OntologyInit {
     fn ontology_init(&mut self, ontology: &Ontology);
@@ -365,7 +372,7 @@ impl Index<TextConstant> for Ontology {
     type Output = str;
 
     fn index(&self, index: TextConstant) -> &Self::Output {
-        &self.data.domain.text_constants[index.0 as usize]
+        &self.data.defs.text_constants[index.0 as usize]
     }
 }
 

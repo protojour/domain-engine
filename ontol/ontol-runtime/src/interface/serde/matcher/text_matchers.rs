@@ -4,13 +4,13 @@ use tracing::error;
 
 use crate::{
     attr::Attr,
-    interface::serde::processor::{ProcessorMode, ScalarFormat},
-    ontology::{
-        ontol::{
-            text_pattern::{TextPattern, TextPatternConstantPart},
-            ParseError,
-        },
-        Ontology,
+    interface::serde::{
+        processor::{ProcessorMode, ScalarFormat, SerdeProcessor},
+        OntologyCtx,
+    },
+    ontology::ontol::{
+        text_pattern::{TextPattern, TextPatternConstantPart},
+        ParseError,
     },
     value::{Value, ValueTag},
     DefId, DefPropTag, OntolDefTag, PropId,
@@ -57,7 +57,7 @@ impl<'on> ValueMatcher for ConstantStringMatcher<'on> {
 pub struct TextPatternMatcher<'on> {
     pub pattern: &'on TextPattern,
     pub def_id: DefId,
-    pub ontology: &'on Ontology,
+    pub ontology: OntologyCtx<'on>,
 }
 
 impl<'on> ValueMatcher for TextPatternMatcher<'on> {
@@ -68,7 +68,7 @@ impl<'on> ValueMatcher for TextPatternMatcher<'on> {
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
         if self.pattern.regex.is_match(str) {
-            try_deserialize_custom_string(self.ontology, self.def_id, str).map_err(|_| ())
+            try_deserialize_custom_string(str, self.def_id, self.ontology).map_err(|_| ())
         } else {
             Err(())
         }
@@ -81,7 +81,7 @@ impl<'on> ValueMatcher for TextPatternMatcher<'on> {
 pub struct CapturingTextPatternMatcher<'on> {
     pub pattern: &'on TextPattern,
     pub def_id: DefId,
-    pub ontology: &'on Ontology,
+    pub ontology: OntologyCtx<'on>,
     pub scalar_format: ScalarFormat,
 }
 
@@ -94,7 +94,7 @@ impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
         match self.scalar_format {
             ScalarFormat::DomainTransparent => Ok(self
                 .pattern
-                .try_capturing_match(str, self.def_id, self.ontology)
+                .try_capturing_match(str, self.def_id, &self.ontology)
                 .map_err(|_| ())?),
 
             ScalarFormat::RawText => {
@@ -108,13 +108,13 @@ impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
                                 return Err(());
                             }
 
-                            let def = self.ontology.def(property.type_def_id);
-                            let processor = self.ontology.new_serde_processor(
+                            let def = self.ontology.defs.def(property.type_def_id);
+                            let processor = SerdeProcessor::new(
                                 def.operator_addr
                                     .expect("No operator addr for pattern constant part"),
                                 ProcessorMode::Create,
+                                &self.ontology,
                             );
-
                             let attribute = processor
                                 .deserialize(StrDeserializer::<serde_json::Error>::new(str))
                                 .map_err(|_| ())?;
@@ -138,24 +138,23 @@ impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
 }
 
 pub fn try_deserialize_custom_string(
-    ontology: &Ontology,
-    def_id: DefId,
     str: &str,
+    def_id: DefId,
+    ontology: OntologyCtx,
 ) -> Result<Value, ParseError> {
-    match ontology.data.domain.text_like_types.get(&def_id) {
+    match ontology.defs.text_like_types.get(&def_id) {
         Some(custom_string_deserializer) => custom_string_deserializer.try_deserialize(def_id, str),
         None => Ok(Value::Text(str.into(), def_id.into())),
     }
 }
 
 fn expecting_custom_string(
-    ontology: &Ontology,
+    ontology: OntologyCtx,
     def_id: DefId,
     f: &mut std::fmt::Formatter,
 ) -> Option<std::fmt::Result> {
     ontology
-        .data
-        .domain
+        .defs
         .text_like_types
         .get(&def_id)
         .map(|custom_string_deserializer| write!(f, "`{}`", custom_string_deserializer.type_name()))

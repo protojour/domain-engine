@@ -13,7 +13,7 @@ use crate::{
 
 use super::{
     aspects::{
-        ConfigAspect, DocumentationAspect, DomainAspect, InterfaceAspect, MappingAspect,
+        ConfigAspect, DefsAspect, DocumentationAspect, ExecutionAspect, InterfaceAspect,
         SerdeAspect,
     },
     config::DomainConfig,
@@ -34,11 +34,11 @@ impl OntologyBuilder {
     }
 
     pub fn add_domain(&mut self, index: DomainIndex, domain: Domain) {
-        self.ontology.data.domain.domains.insert(index, domain);
+        self.ontology.data.defs.domains.insert(index, domain);
     }
 
     pub fn domain_mut(&mut self, index: DomainIndex) -> &mut Domain {
-        self.ontology.data.domain.domains.get_mut(&index).unwrap()
+        self.ontology.data.defs.domains.get_mut(&index).unwrap()
     }
 
     pub fn add_domain_config(&mut self, index: DomainIndex, config: DomainConfig) {
@@ -50,32 +50,32 @@ impl OntologyBuilder {
     }
 
     pub fn union_variants(mut self, table: FnvHashMap<DefId, DefIdSet>) -> Self {
-        self.data().domain.union_variants = table;
+        self.data().defs.union_variants = table;
         self
     }
 
     pub fn extended_entity_info(mut self, table: FnvHashMap<DefId, ExtendedEntityInfo>) -> Self {
-        self.data().domain.extended_entity_table = table;
+        self.data().defs.extended_entity_table = table;
         self
     }
 
     pub fn text_constants(mut self, text_constants: Vec<ArcStr>) -> Self {
-        self.data().domain.text_constants = text_constants;
+        self.data().defs.text_constants = text_constants;
         self
     }
 
     pub fn ontol_domain_meta(mut self, meta: OntolDomainMeta) -> Self {
-        self.data().domain.ontol_domain_meta = meta;
+        self.data().defs.ontol_domain_meta = meta;
         self
     }
 
     pub fn text_like_types(mut self, types: FnvHashMap<DefId, TextLikeType>) -> Self {
-        self.data().domain.text_like_types = types;
+        self.data().defs.text_like_types = types;
         self
     }
 
     pub fn text_patterns(mut self, patterns: FnvHashMap<DefId, TextPattern>) -> Self {
-        self.data().domain.text_patterns = patterns;
+        self.data().defs.text_patterns = patterns;
         self
     }
 
@@ -108,22 +108,22 @@ impl OntologyBuilder {
     }
 
     pub fn lib(mut self, lib: Lib) -> Self {
-        self.data().mapping.lib = lib;
+        self.data().execution.lib = lib;
         self
     }
 
     pub fn const_procs(mut self, const_procs: FnvHashMap<DefId, Procedure>) -> Self {
-        self.data().mapping.const_proc_table = const_procs;
+        self.data().execution.const_proc_table = const_procs;
         self
     }
 
     pub fn map_meta_table(mut self, map_meta_table: FnvHashMap<MapKey, MapMeta>) -> Self {
-        self.data().mapping.map_meta_table = map_meta_table;
+        self.data().execution.map_meta_table = map_meta_table;
         self
     }
 
     pub fn static_conditions(mut self, static_conditions: FnvHashMap<MapKey, Condition>) -> Self {
-        self.data().mapping.static_conditions = static_conditions;
+        self.data().execution.static_conditions = static_conditions;
         self
     }
 
@@ -131,17 +131,17 @@ impl OntologyBuilder {
         mut self,
         named_forward_maps: FnvHashMap<(DomainIndex, TextConstant), MapKey>,
     ) -> Self {
-        self.data().mapping.named_downmaps = named_forward_maps;
+        self.data().execution.named_downmaps = named_forward_maps;
         self
     }
 
     pub fn property_flows(mut self, flows: Vec<PropertyFlow>) -> Self {
-        self.data().mapping.property_flows = flows;
+        self.data().execution.property_flows = flows;
         self
     }
 
     pub fn externs(mut self, externs: FnvHashMap<DefId, Extern>) -> Self {
-        self.data().mapping.extern_table = externs;
+        self.data().execution.extern_table = externs;
         self
     }
 
@@ -158,7 +158,7 @@ pub(super) fn new_builder() -> OntologyBuilder {
     OntologyBuilder {
         ontology: Ontology {
             data: Data {
-                domain: DomainAspect {
+                defs: DefsAspect {
                     domains: Default::default(),
                     extended_entity_table: Default::default(),
                     ontol_domain_meta: Default::default(),
@@ -178,7 +178,7 @@ pub(super) fn new_builder() -> OntologyBuilder {
                 interface: InterfaceAspect {
                     interfaces: Default::default(),
                 },
-                mapping: MappingAspect {
+                execution: ExecutionAspect {
                     const_proc_table: Default::default(),
                     map_meta_table: Default::default(),
                     static_conditions: Default::default(),

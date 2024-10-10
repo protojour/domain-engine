@@ -4,7 +4,7 @@ use serde::{
 };
 use tracing::error;
 
-use crate::{ontology::Ontology, value::Value, OntolDefTag};
+use crate::{value::Value, OntolDefTag};
 
 use super::processor::{ProcessorLevel, RecursionLimitError};
 
@@ -15,12 +15,7 @@ type Res<S> = Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Err
 /// This is essentially domainless serialization.
 ///
 /// It does _not_ support structs, so use with care.
-pub fn serialize_raw<S: Serializer>(
-    value: &Value,
-    ontology: &Ontology,
-    level: ProcessorLevel,
-    serializer: S,
-) -> Res<S> {
+pub fn serialize_raw<S: Serializer>(value: &Value, level: ProcessorLevel, serializer: S) -> Res<S> {
     match value {
         Value::Unit(_) => serializer.serialize_unit(),
         Value::I64(int, tag) => {
@@ -42,7 +37,7 @@ pub fn serialize_raw<S: Serializer>(
             for (key, value) in dict.iter() {
                 map_access.serialize_entry(
                     key,
-                    &RawProxy::new_as_child(value, ontology, level)
+                    &RawProxy::new_as_child(value, level)
                         .map_err(RecursionLimitError::to_ser_error)?,
                 )?;
             }
@@ -54,7 +49,7 @@ pub fn serialize_raw<S: Serializer>(
 
             for element in &seq.elements {
                 seq_access.serialize_element(
-                    &RawProxy::new_as_child(element, ontology, level)
+                    &RawProxy::new_as_child(element, level)
                         .map_err(RecursionLimitError::to_ser_error)?,
                 )?;
             }
@@ -68,31 +63,28 @@ pub fn serialize_raw<S: Serializer>(
     }
 }
 
-pub(crate) struct RawProxy<'v, 'on> {
+pub(crate) struct RawProxy<'v> {
     value: &'v Value,
-    ontology: &'on Ontology,
     level: ProcessorLevel,
 }
 
-impl<'v, 'on> RawProxy<'v, 'on> {
+impl<'v> RawProxy<'v> {
     pub fn new_as_child(
         value: &'v Value,
-        ontology: &'on Ontology,
         level: ProcessorLevel,
     ) -> Result<Self, RecursionLimitError> {
         Ok(Self {
             value,
-            ontology,
             level: level.child()?,
         })
     }
 }
 
-impl<'v, 'on> serde::Serialize for RawProxy<'v, 'on> {
+impl<'v> serde::Serialize for RawProxy<'v> {
     fn serialize<S>(&self, serializer: S) -> Res<S>
     where
         S: serde::Serializer,
     {
-        serialize_raw(self.value, self.ontology, self.level, serializer)
+        serialize_raw(self.value, self.level, serializer)
     }
 }

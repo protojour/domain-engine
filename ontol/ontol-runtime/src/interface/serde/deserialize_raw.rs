@@ -6,7 +6,6 @@ use serde::{
 };
 
 use crate::{
-    ontology::Ontology,
     sequence::Sequence,
     value::{Value, ValueTag},
     OntolDefTag,
@@ -15,33 +14,30 @@ use crate::{
 use super::processor::{ProcessorLevel, RecursionLimitError};
 
 pub fn deserialize_raw<'de, D: Deserializer<'de>>(
-    ontology: &Ontology,
     level: ProcessorLevel,
     deserializer: D,
 ) -> Result<Value, D::Error> {
-    RawVisitor { ontology, level }.deserialize(deserializer)
+    RawVisitor { level }.deserialize(deserializer)
 }
 
 #[derive(Clone, Copy)]
-pub(crate) struct RawVisitor<'o> {
-    ontology: &'o Ontology,
+pub(crate) struct RawVisitor {
     level: ProcessorLevel,
 }
 
-impl<'o> RawVisitor<'o> {
-    pub fn new(ontology: &'o Ontology, level: ProcessorLevel) -> Result<Self, RecursionLimitError> {
+impl RawVisitor {
+    pub fn new(level: ProcessorLevel) -> Result<Self, RecursionLimitError> {
         Ok(Self {
-            ontology,
             level: level.child()?,
         })
     }
 
     fn child(self) -> Result<Self, RecursionLimitError> {
-        Self::new(self.ontology, self.level)
+        Self::new(self.level)
     }
 }
 
-impl<'o, 'de> DeserializeSeed<'de> for RawVisitor<'o> {
+impl<'de> DeserializeSeed<'de> for RawVisitor {
     type Value = Value;
 
     fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
@@ -49,7 +45,7 @@ impl<'o, 'de> DeserializeSeed<'de> for RawVisitor<'o> {
     }
 }
 
-impl<'o, 'de> Visitor<'de> for RawVisitor<'o> {
+impl<'de> Visitor<'de> for RawVisitor {
     type Value = Value;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

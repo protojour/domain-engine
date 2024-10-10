@@ -258,7 +258,6 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
 
     pub fn with_open_data(self, json: serde_json::Value) -> Self {
         let value = deserialize_raw(
-            self.binding.ontology,
             ProcessorLevel::new_root(),
             &mut serde_json::Deserializer::from_str(&serde_json::to_string(&json).unwrap()),
         )

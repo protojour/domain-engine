@@ -13,7 +13,7 @@ use thin_vec::ThinVec;
 use crate::{
     attr::{Attr, AttrMatrix},
     cast::Cast,
-    ontology::Ontology,
+    ontology::aspects::DefsAspect,
     query::filter::Filter,
     sequence::Sequence,
     tuple::EndoTupleElements,
@@ -251,15 +251,25 @@ impl Debug for OctetSequence {
     }
 }
 
-pub struct FormatValueAsText<'d, 'o> {
-    pub value: &'d Value,
-    pub type_def_id: DefId,
-    pub ontology: &'o Ontology,
+pub struct FormatValueAsText<'d, 'on> {
+    value: &'d Value,
+    type_def_id: DefId,
+    defs: &'on DefsAspect,
+}
+
+impl<'d, 'on> FormatValueAsText<'d, 'on> {
+    pub fn new(value: &'d Value, type_def_id: DefId, defs: &'on DefsAspect) -> Self {
+        Self {
+            value,
+            type_def_id,
+            defs,
+        }
+    }
 }
 
 impl<'d, 'o> Display for FormatValueAsText<'d, 'o> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(text_like_type) = self.ontology.get_text_like_type(self.type_def_id) {
+        if let Some(text_like_type) = self.defs.text_like_types.get(&self.type_def_id) {
             text_like_type.format(self.value, f)
         } else {
             match &self.value {
@@ -285,7 +295,7 @@ impl<'d, 'o> Display for FormatValueAsText<'d, 'o> {
                             FormatValueAsText {
                                 value,
                                 type_def_id: (*tag).into(),
-                                ontology: self.ontology,
+                                defs: self.defs,
                             }
                             .fmt(f)?;
                         }

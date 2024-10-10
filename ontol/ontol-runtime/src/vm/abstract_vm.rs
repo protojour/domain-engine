@@ -2,12 +2,15 @@ use bit_vec::BitVec;
 use tracing::trace;
 
 use super::{
-    proc::{GetAttrFlags, OpCodeCondTerm},
+    proc::{GetAttrFlags, Lib, OpCodeCondTerm},
     VmResult,
 };
 use crate::{
     debug::OntolDebug,
-    ontology::{ontol::TextConstant, Ontology},
+    ontology::{
+        aspects::{get_aspect, DefsAspect, ExecutionAspect},
+        ontol::TextConstant,
+    },
     property::ValueCardinality,
     query::condition::ClausePair,
     var::Var,
@@ -20,7 +23,7 @@ use crate::{
 /// The stack of the stack machine is abstracted away.
 ///
 /// The abstract machine is in charge of the program counter and the call stack.
-pub struct AbstractVm<'o, P: Processor> {
+pub struct AbstractVm<'on, P: Processor> {
     /// The position of the pending program opcode
     program_counter: usize,
     /// The address where the current frame started executing
@@ -29,7 +32,8 @@ pub struct AbstractVm<'o, P: Processor> {
     /// When a `Return` opcode is executed and this stack is empty, the VM evaluation session ends.
     call_stack: Vec<CallStackFrame<P>>,
 
-    pub(crate) ontology: &'o Ontology,
+    pub(crate) lib: &'on Lib,
+    pub(crate) defs: &'on DefsAspect,
 }
 
 /// A stack frame indicating a procedure called another procedure.
@@ -106,19 +110,26 @@ pub trait Processor {
     ) -> VmResult<Self::Yield>;
 }
 
-impl<'o, P: Processor> AbstractVm<'o, P> {
-    pub fn new(ontology: &'o Ontology, procedure: Procedure) -> Self {
-        trace!("AbstractVm::new({:?})", procedure.debug(ontology));
+impl<'on, P: Processor> AbstractVm<'on, P> {
+    pub fn new(
+        procedure: Procedure,
+        ontology: &'on (impl AsRef<ExecutionAspect> + AsRef<DefsAspect>),
+    ) -> Self {
+        trace!(
+            "AbstractVm::new({:?})",
+            procedure.debug(get_aspect::<DefsAspect>(ontology))
+        );
         Self {
             program_counter: procedure.address.0 as usize,
             proc_address: procedure.address.0 as usize,
-            ontology,
             call_stack: vec![],
+            lib: &get_aspect::<ExecutionAspect>(ontology).lib,
+            defs: ontology.as_ref(),
         }
     }
 
     pub fn pending_opcode(&self) -> &OpCode {
-        &self.ontology.data.mapping.lib.opcodes[self.program_counter]
+        &self.lib.opcodes[self.program_counter]
     }
 
     pub fn run(
@@ -126,7 +137,7 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
         processor: &mut P,
         debug: &mut dyn VmDebug<P>,
     ) -> VmResult<Option<P::Yield>> {
-        let opcodes = self.ontology.data.mapping.lib.opcodes.as_slice();
+        let opcodes = self.lib.opcodes.as_slice();
 
         loop {
             debug.tick(self, processor);
@@ -292,7 +303,7 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                     return Ok(Some(processor.yield_match_condition(*var, *cardinality)?));
                 }
                 OpCode::Panic(msg_constant) => {
-                    let msg = &self.ontology[*msg_constant];
+                    let msg = &self.defs[*msg_constant];
                     panic!("{msg}");
                 }
             }
@@ -300,7 +311,7 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
     }
 
     fn read_regex_capture_indexes(&mut self) -> &BitVec {
-        let opcodes = self.ontology.data.mapping.lib.opcodes.as_slice();
+        let opcodes = self.lib.opcodes.as_slice();
         self.program_counter += 1;
         let OpCode::RegexCaptureIndexes(index_filter) = &opcodes[self.program_counter] else {
             panic!("Expected capture indexes");

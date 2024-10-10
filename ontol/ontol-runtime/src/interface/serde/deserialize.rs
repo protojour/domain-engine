@@ -43,9 +43,9 @@ pub(super) struct MatcherVisitor<'on, 'p, M> {
 impl<'on, 'p> SerdeProcessor<'on, 'p> {
     fn assert_no_rel_params(&self) {
         assert!(
-            self.ctx.rel_params_addr.is_none(),
+            self.sub_ctx.rel_params_addr.is_none(),
             "rel_params_addr should be None for {:?}",
-            self.value_operator.debug(self.ontology)
+            self.value_operator.debug(self.ontology.defs)
         );
     }
 }
@@ -155,7 +155,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 .deserialize_str(StringMatcher { def_id: *def_id }.into_visitor_no_params(self)),
             (SerdeOperator::StringConstant(constant, def_id), _) => deserializer.deserialize_str(
                 ConstantStringMatcher {
-                    constant: &self.ontology[*constant],
+                    constant: &self.ontology.defs[*constant],
                     def_id: *def_id,
                 }
                 .into_visitor_no_params(self),
@@ -167,7 +167,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
             ),
             (SerdeOperator::TextPattern(def_id), _) => deserializer.deserialize_str(
                 TextPatternMatcher {
-                    pattern: self.ontology.data.domain.text_patterns.get(def_id).unwrap(),
+                    pattern: self.ontology.defs.text_patterns.get(def_id).unwrap(),
                     def_id: *def_id,
                     ontology: self.ontology,
                 }
@@ -176,7 +176,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
             (SerdeOperator::CapturingTextPattern(def_id), scalar_format) => deserializer
                 .deserialize_str(
                     CapturingTextPatternMatcher {
-                        pattern: self.ontology.data.domain.text_patterns.get(def_id).unwrap(),
+                        pattern: self.ontology.defs.text_patterns.get(def_id).unwrap(),
                         def_id: *def_id,
                         ontology: self.ontology,
                         scalar_format,
@@ -199,7 +199,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                         slice::from_ref(&seq_op.range),
                         SequenceKind::AttrMatrixList,
                         seq_op.def.def_id,
-                        self.ctx,
+                        self.sub_ctx,
                     )
                     .into_visitor(self),
                 ),
@@ -217,7 +217,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                         slice::from_ref(&seq_op.range),
                         SequenceKind::AttrMatrixIndexSet,
                         seq_op.def.def_id,
-                        self.ctx,
+                        self.sub_ctx,
                     )
                     .into_visitor(self),
                 ),
@@ -227,7 +227,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                     &seq_op.ranges,
                     SequenceKind::ValueList,
                     seq_op.def.def_id,
-                    self.ctx,
+                    self.sub_ctx,
                 )
                 .into_visitor(self),
             ),
@@ -251,14 +251,14 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                         self.narrow(addr).deserialize(deserializer)
                     }
                     AppliedVariants::OneOf(possible_variants) => {
-                        trace!("  OneOf {:?}", possible_variants.debug(self.ontology));
+                        trace!("  OneOf {:?}", possible_variants.debug(self.ontology.defs));
 
                         deserializer.deserialize_any(
                             UnionMatcher {
                                 typename: union_op.typename(),
                                 possible_variants,
                                 ontology: self.ontology,
-                                ctx: self.ctx,
+                                ctx: self.sub_ctx,
                                 profile: self.profile,
                                 mode: self.mode,
                                 level: self.level,
@@ -271,14 +271,14 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
             (SerdeOperator::IdSingletonStruct(_, name, inner_addr), _) => deserializer
                 .deserialize_map(IdSingletonStructVisitor {
                     processor: self,
-                    property_name: &self.ontology[*name],
+                    property_name: &self.ontology.defs[*name],
                     inner_addr: *inner_addr,
                 }),
             (SerdeOperator::Struct(struct_op), _) => deserializer.deserialize_map(StructVisitor {
                 processor: self,
                 buffered_attrs: Default::default(),
                 struct_op,
-                ctx: self.ctx,
+                ctx: self.sub_ctx,
             }),
         }
     }
@@ -426,7 +426,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
 
         trace!(
             "matched map: {m:?} buffered attrs: {buffered_attrs:?}",
-            m = match_ok.debug(self.processor.ontology)
+            m = match_ok.debug(self.processor.ontology.defs)
         );
 
         let MatchOk {
@@ -444,7 +444,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
         )
         .with_required_props_bitset(struct_op.required_props_bitset(
             self.processor.mode,
-            self.processor.ctx.parent_property_id,
+            self.processor.sub_ctx.parent_property_id,
             self.processor.profile.flags,
         ))
         .with_rel_params_addr(match_ok.ctx.rel_params_addr)

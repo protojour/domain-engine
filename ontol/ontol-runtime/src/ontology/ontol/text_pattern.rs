@@ -7,8 +7,8 @@ use tracing::{error, trace};
 
 use crate::{
     attr::Attr,
-    interface::serde::processor::ProcessorMode,
-    ontology::Ontology,
+    interface::serde::processor::{ProcessorMode, SerdeProcessor},
+    ontology::aspects::{get_aspect, DefsAspect, ExecutionAspect, SerdeAspect},
     value::{FormatValueAsText, Value},
     DefId, DefPropTag, OntolDefTag, PropId,
 };
@@ -48,7 +48,7 @@ impl TextPattern {
         &self,
         haystack: &str,
         type_def_id: DefId,
-        ontology: &Ontology,
+        ontology: &(impl AsRef<SerdeAspect> + AsRef<DefsAspect> + AsRef<ExecutionAspect>),
     ) -> Result<Value, ParseError> {
         if self.constant_parts.is_empty() {
             if let Some(match_) = self.regex.find(haystack) {
@@ -94,11 +94,12 @@ impl TextPattern {
                             .map(|span| &haystack[span.start..span.end])
                             .expect("expected property match");
 
-                        let def = ontology.def(property.type_def_id);
-                        let processor = ontology.new_serde_processor(
+                        let def = get_aspect::<DefsAspect>(ontology).def(property.type_def_id);
+                        let processor = SerdeProcessor::new(
                             def.operator_addr
                                 .expect("No operator addr for pattern constant part"),
                             ProcessorMode::Create,
+                            ontology,
                         );
 
                         let attribute = processor
@@ -133,13 +134,23 @@ pub struct TextPatternProperty {
     pub capture_group: usize,
 }
 
-pub struct FormatPattern<'d, 'o> {
-    pub pattern: &'d TextPattern,
-    pub value: &'d Value,
-    pub ontology: &'o Ontology,
+pub struct FormatPattern<'d, 'on> {
+    value: &'d Value,
+    pattern: &'d TextPattern,
+    defs: &'on DefsAspect,
 }
 
-impl<'d, 'o> Display for FormatPattern<'d, 'o> {
+impl<'d, 'on> FormatPattern<'d, 'on> {
+    pub fn new(value: &'d Value, pattern: &'d TextPattern, defs: &'on DefsAspect) -> Self {
+        Self {
+            value,
+            pattern,
+            defs,
+        }
+    }
+}
+
+impl<'d, 'on> Display for FormatPattern<'d, 'on> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for constant_part in &self.pattern.constant_parts {
             match (constant_part, self.value) {
@@ -179,15 +190,11 @@ impl<'d, 'o> Display for FormatPattern<'d, 'o> {
                     write!(
                         f,
                         "{}",
-                        FormatValueAsText {
-                            value,
-                            type_def_id: *type_def_id,
-                            ontology: self.ontology
-                        }
+                        FormatValueAsText::new(value, *type_def_id, self.defs)
                     )?;
                 }
                 (TextPatternConstantPart::Literal(constant), _) => {
-                    write!(f, "{string}", string = &self.ontology[*constant])?
+                    write!(f, "{string}", string = &self.defs[*constant])?
                 }
                 (part, data) => {
                     panic!("unable to format pattern - mismatch between {part:?} and {data:?}")

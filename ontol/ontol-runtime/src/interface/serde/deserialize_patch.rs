@@ -41,7 +41,7 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
                     );
 
                     if matches!(operation, Operation::Update) {
-                        sub_processor.ctx.is_update = true;
+                        sub_processor.sub_ctx.is_update = true;
                     }
 
                     let attr = map.next_value_seed(sub_processor)?;

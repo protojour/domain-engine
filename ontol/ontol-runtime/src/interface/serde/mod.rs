@@ -2,7 +2,11 @@ use std::fmt::Debug;
 
 use ::serde::{Deserialize, Serialize};
 
-use crate::{impl_ontol_debug, DefId};
+use crate::{
+    impl_ontol_debug,
+    ontology::aspects::{DefsAspect, ExecutionAspect, SerdeAspect},
+    DefId,
+};
 
 use self::operator::StructOperator;
 
@@ -23,6 +27,31 @@ pub mod processor;
 
 pub use deserialize_raw::deserialize_raw;
 pub use serialize_raw::serialize_raw;
+
+#[derive(Clone, Copy)]
+pub(crate) struct OntologyCtx<'on> {
+    serde: &'on SerdeAspect,
+    defs: &'on DefsAspect,
+    execution: &'on ExecutionAspect,
+}
+
+impl<'on> AsRef<SerdeAspect> for OntologyCtx<'on> {
+    fn as_ref(&self) -> &SerdeAspect {
+        self.serde
+    }
+}
+
+impl<'on> AsRef<DefsAspect> for OntologyCtx<'on> {
+    fn as_ref(&self) -> &DefsAspect {
+        self.defs
+    }
+}
+
+impl<'on> AsRef<ExecutionAspect> for OntologyCtx<'on> {
+    fn as_ref(&self) -> &ExecutionAspect {
+        self.execution
+    }
+}
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct SerdeDef {
