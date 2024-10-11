@@ -202,7 +202,7 @@ impl TableProvider for EntityTableProvider {
         let session = state
             .config()
             .get_extension::<Session>()
-            .ok_or_else(|| exec_error("domain-engine Session is missing"))?;
+            .unwrap_or_else(|| Arc::new(Session::default()));
 
         let df_filter = DatafusionFilter::compile(
             self.def_id,
