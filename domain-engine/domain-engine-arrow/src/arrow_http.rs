@@ -5,6 +5,7 @@ use arrow_ipc::{reader::StreamReader, writer::StreamWriter};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use domain_engine_core::{DomainError, DomainResult};
 use futures_util::Stream;
+use tracing::info;
 
 use crate::ArrowRespMessage;
 
@@ -32,7 +33,10 @@ pub fn resp_msg_to_http_stream(
         for await result in resp_stream {
             match result? {
                 ArrowRespMessage::RecordBatch(batch) => {
-                    yield encoder.encode_next_batch(batch)?;
+                    let bytes = encoder.encode_next_batch(batch)?;
+
+                    info!("sending arrow batch of len={}", bytes.len());
+                    yield bytes;
                 }
             }
         }
