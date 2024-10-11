@@ -14,7 +14,7 @@ domain-engine-core.path = "../domain-engine-core"
 chrono.workspace = true
 serde.workspace = true
 tracing.workspace = true
-arrow = { version = "53", default-features = false }
+arrow-array = "53"
 arrow-schema = { version = "53", features = ["serde"] }
 async-stream = "0.3"
 futures-util = "0.3"

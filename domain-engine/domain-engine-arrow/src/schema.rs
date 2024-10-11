@@ -1,4 +1,4 @@
-use arrow::datatypes::{DataType, Field, Fields, Schema, TimeUnit};
+use arrow_schema::{DataType, Field, Fields, Schema, TimeUnit};
 use ontol_runtime::{
     ontology::{
         aspects::DefsAspect,

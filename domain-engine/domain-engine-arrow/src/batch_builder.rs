@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
-use arrow::{
-    array::{
-        ArrayRef, BinaryBuilder, BooleanBuilder, Float64Builder, Int64Builder, PrimitiveBuilder,
-        RecordBatch, RecordBatchOptions, StringBuilder,
+use arrow_array::{
+    builder::{
+        BinaryBuilder, BooleanBuilder, Float64Builder, Int64Builder, PrimitiveBuilder,
+        StringBuilder,
     },
-    datatypes::{SchemaRef, TimestampMicrosecondType},
+    types::TimestampMicrosecondType,
+    ArrayRef, RecordBatch, RecordBatchOptions,
 };
+use arrow_schema::SchemaRef;
 use domain_engine_core::transact::RespMessage;
 use ontol_runtime::{
     attr::Attr, format_utils::format_value, ontology::Ontology, value::Value, PropId,

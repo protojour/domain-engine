@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use ::arrow_schema::SchemaRef;
-use arrow::array::RecordBatch;
+use arrow_array::RecordBatch;
+use arrow_schema::SchemaRef;
 use batch_builder::RecordBatchBuilder;
 use domain_engine_core::{
     transact::{ReqMessage, TransactionMode},

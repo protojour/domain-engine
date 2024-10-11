@@ -1583,7 +1583,7 @@ dependencies = [
 name = "domain-engine-arrow"
 version = "0.1.0"
 dependencies = [
- "arrow",
+ "arrow-array",
  "arrow-schema",
  "async-stream",
  "chrono",
