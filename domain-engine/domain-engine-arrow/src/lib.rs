@@ -5,7 +5,7 @@ use arrow_schema::SchemaRef;
 use batch_builder::RecordBatchBuilder;
 use domain_engine_core::{
     transact::{ReqMessage, TransactionMode},
-    DomainEngine, DomainResult, Session,
+    DomainEngine, DomainError, DomainResult, Session,
 };
 use futures_util::{stream::BoxStream, StreamExt};
 use ontol_runtime::{query::select::EntitySelect, PropId};
@@ -57,18 +57,28 @@ impl ArrowTransactAPI for Arc<DomainEngine> {
         match req {
             ArrowReqMessage::Query(query) => {
                 let domain_engine = self.clone();
-                let msg_stream =
+                let ontology = domain_engine.ontology_owned();
+
+                async_stream::try_stream! {
+                    let mut schema = query.schema.clone();
+                    if let Some(projection) = query.projection.as_ref() {
+                        schema = Arc::new(
+                            schema.project(&projection)
+                                .map_err(|err| DomainError::protocol(format!("{err:?}")))?
+                        );
+                    }
+
+                    let msg_stream =
                     futures_util::stream::iter([Ok(ReqMessage::Query(0, query.entity_select))])
                         .boxed();
 
-                let mut batch_builder = RecordBatchBuilder::new(
-                    query.column_selection,
-                    query.schema,
-                    self.ontology_owned(),
-                    config.batch_size,
-                );
+                    let mut batch_builder = RecordBatchBuilder::new(
+                        query.column_selection,
+                        schema,
+                        ontology,
+                        config.batch_size,
+                    );
 
-                async_stream::try_stream! {
                     let datastore_stream = domain_engine.transact(
                         TransactionMode::ReadOnly,
                         msg_stream,
