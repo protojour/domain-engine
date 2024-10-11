@@ -39,6 +39,7 @@ pub enum ArrowReqMessage {
 pub struct ArrowQuery {
     pub entity_select: EntitySelect,
     pub column_selection: Vec<(PropId, FieldType)>,
+    pub projection: Option<Vec<usize>>,
     pub schema: SchemaRef,
 }
 

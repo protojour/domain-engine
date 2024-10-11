@@ -308,6 +308,7 @@ impl ExecutionPlan for EntityScan {
                 ArrowReqMessage::Query(ArrowQuery {
                     entity_select: self.params.df_filter.entity_select(),
                     column_selection: self.params.df_filter.column_selection(),
+                    projection: self.params.df_filter.projection(),
                     schema: self.schema(),
                 }),
                 ArrowConfig {

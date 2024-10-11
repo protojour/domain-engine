@@ -21,6 +21,7 @@ use tracing::trace;
 pub struct DatafusionFilter {
     entity_select: EntitySelect,
     column_selection: Vec<(PropId, FieldType)>,
+    projection: Option<Vec<usize>>,
 }
 
 impl DatafusionFilter {
@@ -80,6 +81,7 @@ impl DatafusionFilter {
                 include_total_len: false,
             },
             column_selection: columns,
+            projection: projection.cloned(),
         }
     }
 
@@ -89,6 +91,10 @@ impl DatafusionFilter {
 
     pub fn column_selection(&self) -> Vec<(PropId, FieldType)> {
         self.column_selection.clone()
+    }
+
+    pub fn projection(&self) -> Option<Vec<usize>> {
+        self.projection.clone()
     }
 }
 
