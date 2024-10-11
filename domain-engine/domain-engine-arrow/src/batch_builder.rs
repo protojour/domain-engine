@@ -142,7 +142,7 @@ impl RecordBatchBuilder {
             return None;
         }
 
-        let columns = self
+        let columns: Vec<_> = self
             .builders
             .iter_mut()
             .map(|dyn_builder| -> ArrayRef {

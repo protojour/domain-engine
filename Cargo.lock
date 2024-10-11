@@ -1584,8 +1584,10 @@ name = "domain-engine-arrow"
 version = "0.1.0"
 dependencies = [
  "arrow-array",
+ "arrow-ipc",
  "arrow-schema",
  "async-stream",
+ "bytes",
  "chrono",
  "domain-engine-core",
  "futures-util",

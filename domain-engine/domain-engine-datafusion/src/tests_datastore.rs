@@ -1,16 +1,24 @@
 use std::sync::Arc;
 
+use arrow::{array::RecordBatch, util::pretty::pretty_format_batches};
 use datafusion::prelude::{SessionConfig, SessionContext};
-use domain_engine_core::{DomainEngine, Session};
+use domain_engine_arrow::{
+    arrow_http::{http_stream_to_resp_msg_stream, resp_msg_to_http_stream},
+    ArrowConfig, ArrowReqMessage, ArrowRespMessage, ArrowTransactAPI,
+};
+use domain_engine_core::{DomainEngine, DomainResult, Session};
 use domain_engine_test_utils::{
     data_store_util, dynamic_data_store::DynamicDataStoreFactory,
     system::mock_current_time_monotonic, unimock,
 };
+use futures_util::{stream::BoxStream, StreamExt};
+use indoc::indoc;
 use ontol_examples::artist_and_instrument;
 use ontol_macros::datastore_test;
 use ontol_runtime::ontology::Ontology;
 use ontol_test_utils::{serde_helper::serde_create, TestCompile, TestPackages};
 use serde_json::json;
+use tracing::info;
 
 use crate::{DomainEngineAPI, OntologyCatalogProvider};
 
@@ -23,7 +31,12 @@ async fn datastore_test(ds: &str) {
     let mut config = SessionConfig::new();
     config.set_extension(Arc::new(Session::default()));
     let ctx = SessionContext::new_with_config(config);
-    let api: Arc<dyn DomainEngineAPI + Send + Sync> = Arc::new(engine.clone());
+
+    // testing with the HTTP stream
+    let api: Arc<dyn DomainEngineAPI + Send + Sync> = Arc::new(IPCStreamer {
+        domain_engine: engine.clone(),
+    });
+
     ctx.register_catalog("ontology", Arc::new(OntologyCatalogProvider::from(api)));
 
     data_store_util::insert_entity_select_entityid(
@@ -43,21 +56,56 @@ async fn datastore_test(ds: &str) {
         .await
         .unwrap();
 
-    let results = dataframe.collect().await.unwrap();
+    assert_eq!(
+        prettify(&dataframe.collect().await.unwrap()),
+        indoc! { "
+            +---------------------------------------------+------------+
+            | ID                                          | name       |
+            +---------------------------------------------+------------+
+            | artist/88832e20-8c6e-46b4-af79-27b19b889a58 | Beach Boys |
+            +---------------------------------------------+------------+
+        "}
+    );
 
-    let pretty_results = datafusion::arrow::util::pretty::pretty_format_batches(&results)
-        .unwrap()
-        .to_string();
+    info!("column subset");
 
-    let expected = vec![
-        "+---------------------------------------------+------------+",
-        "| ID                                          | name       |",
-        "+---------------------------------------------+------------+",
-        "| artist/88832e20-8c6e-46b4-af79-27b19b889a58 | Beach Boys |",
-        "+---------------------------------------------+------------+",
-    ];
+    let dataframe = ctx
+        .sql("SELECT \"ID\" FROM ontology.artist_and_instrument.artist")
+        .await
+        .unwrap();
 
-    assert_eq!(pretty_results.trim().lines().collect::<Vec<_>>(), expected);
+    assert_eq!(
+        prettify(&dataframe.collect().await.unwrap()),
+        indoc! { "
+            +---------------------------------------------+
+            | ID                                          |
+            +---------------------------------------------+
+            | artist/88832e20-8c6e-46b4-af79-27b19b889a58 |
+            +---------------------------------------------+
+        "}
+    );
+
+    let dataframe = ctx
+        .sql("SELECT name FROM ontology.artist_and_instrument.artist")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        prettify(&dataframe.collect().await.unwrap()),
+        indoc! { "
+            +------------+
+            | name       |
+            +------------+
+            | Beach Boys |
+            +------------+
+        "}
+    );
+}
+
+fn prettify(results: &[RecordBatch]) -> String {
+    let mut pretty = pretty_format_batches(results).unwrap().to_string();
+    pretty.push('\n');
+    pretty
 }
 
 async fn make_domain_engine(ontology: Arc<Ontology>, datastore: &str) -> Arc<DomainEngine> {
@@ -70,4 +118,27 @@ async fn make_domain_engine(ontology: Arc<Ontology>, datastore: &str) -> Arc<Dom
             .await
             .unwrap(),
     )
+}
+
+struct IPCStreamer {
+    domain_engine: Arc<DomainEngine>,
+}
+
+impl ArrowTransactAPI for IPCStreamer {
+    fn arrow_transact(
+        &self,
+        req: ArrowReqMessage,
+        config: ArrowConfig,
+        session: Session,
+    ) -> BoxStream<'static, DomainResult<ArrowRespMessage>> {
+        let source_stream = self.domain_engine.arrow_transact(req, config, session);
+        let http_stream = resp_msg_to_http_stream(source_stream);
+        http_stream_to_resp_msg_stream(http_stream).boxed()
+    }
+}
+
+impl DomainEngineAPI for IPCStreamer {
+    fn ontology_defs(&self) -> &ontol_runtime::ontology::aspects::DefsAspect {
+        self.domain_engine.ontology_defs()
+    }
 }

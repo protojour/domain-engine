@@ -204,6 +204,12 @@ impl TableProvider for EntityTableProvider {
             .get_extension::<Session>()
             .unwrap_or_else(|| Arc::new(Session::default()));
 
+        let mut arrow_schema = self.arrow_schema.clone();
+
+        if let Some(indices) = &projection {
+            arrow_schema = Arc::new(arrow_schema.project(indices)?);
+        }
+
         let df_filter = DatafusionFilter::compile(
             self.def_id,
             (projection, filters, limit),
@@ -216,7 +222,7 @@ impl TableProvider for EntityTableProvider {
                 df_filter,
                 session: Session(session.0.clone()),
                 properties: PlanProperties::new(
-                    EquivalenceProperties::new(self.arrow_schema.clone()),
+                    EquivalenceProperties::new(arrow_schema),
                     Partitioning::UnknownPartitioning(1),
                     ExecutionMode::Unbounded,
                 ),
