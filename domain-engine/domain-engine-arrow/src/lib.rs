@@ -63,7 +63,7 @@ impl ArrowTransactAPI for Arc<DomainEngine> {
                     let mut schema = query.schema.clone();
                     if let Some(projection) = query.projection.as_ref() {
                         schema = Arc::new(
-                            schema.project(&projection)
+                            schema.project(projection)
                                 .map_err(|err| DomainError::protocol(format!("{err:?}")))?
                         );
                     }
