@@ -1590,6 +1590,7 @@ dependencies = [
  "bytes",
  "chrono",
  "domain-engine-core",
+ "flatbuffers",
  "futures-util",
  "ontol-runtime",
  "serde",
