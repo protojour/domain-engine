@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use arrow::{array::RecordBatch, util::pretty::pretty_format_batches};
+use bytes::Bytes;
 use datafusion::prelude::{SessionConfig, SessionContext};
 use domain_engine_arrow::{
     arrow_http::{http_stream_to_resp_msg_stream, resp_msg_to_http_stream},
@@ -35,6 +36,7 @@ async fn datastore_test(ds: &str) {
     // testing with the HTTP stream
     let api: Arc<dyn DomainEngineAPI + Send + Sync> = Arc::new(IPCStreamer {
         domain_engine: engine.clone(),
+        rechunk_size: 100,
     });
 
     ctx.register_catalog("ontology", Arc::new(OntologyCatalogProvider::from(api)));
@@ -122,6 +124,7 @@ async fn make_domain_engine(ontology: Arc<Ontology>, datastore: &str) -> Arc<Dom
 
 struct IPCStreamer {
     domain_engine: Arc<DomainEngine>,
+    rechunk_size: usize,
 }
 
 impl ArrowTransactAPI for IPCStreamer {
@@ -133,7 +136,27 @@ impl ArrowTransactAPI for IPCStreamer {
     ) -> BoxStream<'static, DomainResult<ArrowRespMessage>> {
         let source_stream = self.domain_engine.arrow_transact(req, config, session);
         let http_stream = resp_msg_to_http_stream(source_stream);
-        http_stream_to_resp_msg_stream(http_stream).boxed()
+        let rechunk_size = self.rechunk_size;
+
+        // this is all for testing purposes, simulating re-chunking in HTTP
+        fn rechunk_bytes(bytes: Bytes, rechunk_size: usize) -> Vec<Bytes> {
+            let mut vec = vec![];
+            for chunk in bytes.chunks(rechunk_size) {
+                vec.push(Bytes::copy_from_slice(chunk))
+            }
+
+            vec
+        }
+
+        let rechunked_stream = async_stream::try_stream! {
+            for await result in http_stream {
+                let bytes = result?;
+                for bytes in rechunk_bytes(bytes, rechunk_size) {
+                    yield bytes;
+                }
+            }
+        };
+        http_stream_to_resp_msg_stream(rechunked_stream).boxed()
     }
 }
 

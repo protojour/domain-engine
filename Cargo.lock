@@ -1634,6 +1634,7 @@ dependencies = [
  "arrow",
  "async-stream",
  "async-trait",
+ "bytes",
  "chrono",
  "datafusion",
  "datafusion-catalog",

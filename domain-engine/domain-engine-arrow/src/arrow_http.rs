@@ -9,7 +9,7 @@ use bytes_deque::BytesDeque;
 use domain_engine_core::{DomainError, DomainResult};
 use flatbuffers::InvalidFlatbuffer;
 use futures_util::Stream;
-use tracing::info;
+use tracing::{info, trace};
 
 use crate::ArrowRespMessage;
 
@@ -29,7 +29,7 @@ pub fn resp_msg_to_http_stream(
                 ArrowRespMessage::RecordBatch(batch) => {
                     let bytes = encoder.encode_next_batch(batch)?;
 
-                    info!("sending arrow batch of len={}", bytes.len());
+                    trace!("sending arrow batch of len={}", bytes.len());
                     yield bytes;
                 }
             }
@@ -240,9 +240,11 @@ impl StreamDecoder {
             return Ok(ReadAttempt::Incomplete);
         }
 
-        let meta_len = i32::from_le_bytes(meta_size_buf);
+        let Ok(meta_size) = usize::try_from(i32::from_le_bytes(meta_size_buf)) else {
+            return Err(DomainError::protocol("arrow invalid meta len"));
+        };
 
-        if meta_len == 0 {
+        if meta_size == 0 {
             return Ok(ReadAttempt::EndOfStream);
         }
 
@@ -250,7 +252,7 @@ impl StreamDecoder {
         // repeatedly read chunks into this buffer until a msg_type can be read
         let mut header_buf: Vec<u8> = vec![];
 
-        let msg_type = loop {
+        let (msg_type, body_size) = loop {
             let prev_len = header_buf.len();
             header_buf.extend([0; HEADER_CHUNK_SIZE]);
 
@@ -258,10 +260,10 @@ impl StreamDecoder {
                 .read(&mut header_buf[prev_len..prev_len + HEADER_CHUNK_SIZE])
                 .map_err(|_| DomainError::protocol("could not read message header"))?;
 
-            match flatbuffers::root::<msg_type_reader::MsgTypeReader>(
+            match flatbuffers::root::<msg_header_reader::MsgHeaderReader>(
                 &header_buf[0..prev_len + chunk_len],
             ) {
-                Ok(reader) => break reader.header_type(),
+                Ok(reader) => break (reader.header_type(), reader.body_length()),
                 Err(InvalidFlatbuffer::RangeOutOfBounds { .. }) => {
                     if chunk_len < HEADER_CHUNK_SIZE {
                         // not enough data to read the message header
@@ -278,7 +280,19 @@ impl StreamDecoder {
             }
         };
 
-        if !reader.has_unread_capacity((meta_len - (header_buf.len() as i32)) as usize) {
+        let Ok(body_size) = usize::try_from(body_size) else {
+            return Err(DomainError::protocol("arrow invalid body length"));
+        };
+
+        let additional_bytes_needed = meta_size + body_size - header_buf.len();
+
+        // trace!(
+        //     "    try_read meta_len={meta_size}, header_buf_len={hbl}, reader_total_size={rtl}, additional_bytes_needed={additional_bytes_needed}",
+        //     rtl = reader.size(),
+        //     hbl = header_buf.len()
+        // );
+
+        if !reader.contains_minimum(additional_bytes_needed) {
             return Ok(ReadAttempt::Incomplete);
         }
 
@@ -286,16 +300,16 @@ impl StreamDecoder {
     }
 }
 
-mod msg_type_reader {
+mod msg_header_reader {
     use arrow_ipc::{Message, MessageHeader};
 
-    /// a `flatbuffers` reader for arrow IPC messages that allows just reading the VT_HEADER_TYPE field,
+    /// a `flatbuffers` reader for arrow IPC messages that allows just reading the headers, not the body,
     /// so that it can work with an incomplete buffer.
-    pub struct MsgTypeReader<'a> {
+    pub struct MsgHeaderReader<'a> {
         _tab: flatbuffers::Table<'a>,
     }
 
-    impl<'a> MsgTypeReader<'a> {
+    impl<'a> MsgHeaderReader<'a> {
         pub fn header_type(&self) -> MessageHeader {
             // Safety:
             // Created from valid Table for this object
@@ -306,9 +320,21 @@ mod msg_type_reader {
                     .unwrap()
             }
         }
+
+        #[inline]
+        pub fn body_length(&self) -> i64 {
+            // Safety:
+            // Created from valid Table for this object
+            // which contains a valid value in this slot
+            unsafe {
+                self._tab
+                    .get::<i64>(Message::VT_BODYLENGTH, Some(0))
+                    .unwrap()
+            }
+        }
     }
 
-    impl flatbuffers::Verifiable for MsgTypeReader<'_> {
+    impl flatbuffers::Verifiable for MsgHeaderReader<'_> {
         #[inline]
         fn run_verifier(
             v: &mut flatbuffers::Verifier,
@@ -316,13 +342,14 @@ mod msg_type_reader {
         ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
             v.visit_table(pos)?
                 .visit_field::<MessageHeader>("header_type", Message::VT_HEADER_TYPE, true)?
+                .visit_field::<i64>("bodyLength", Message::VT_BODYLENGTH, false)?
                 .finish();
             Ok(())
         }
     }
 
-    impl<'a> flatbuffers::Follow<'a> for MsgTypeReader<'a> {
-        type Inner = MsgTypeReader<'a>;
+    impl<'a> flatbuffers::Follow<'a> for MsgHeaderReader<'a> {
+        type Inner = MsgHeaderReader<'a>;
         #[inline]
         unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
             Self {
@@ -339,7 +366,7 @@ mod msg_type_reader {
             0, 16, 0, 0, 0, 15, 0, 4, 0,
         ];
 
-        let reader = flatbuffers::root::<MsgTypeReader>(&buf).unwrap();
+        let reader = flatbuffers::root::<MsgHeaderReader>(&buf).unwrap();
         assert_eq!(reader.header_type(), MessageHeader::Schema);
     }
 
@@ -351,7 +378,7 @@ mod msg_type_reader {
             0, 0, 36, 0, 0, 0, 12, 0, 0, 0,
         ];
 
-        let reader = flatbuffers::root::<MsgTypeReader>(&buf).unwrap();
+        let reader = flatbuffers::root::<MsgHeaderReader>(&buf).unwrap();
         assert_eq!(reader.header_type(), MessageHeader::RecordBatch);
     }
 }
@@ -372,8 +399,17 @@ mod bytes_deque {
             self.deque.push_back(bytes);
         }
 
+        #[allow(unused)]
+        pub fn size(&self) -> usize {
+            let mut len = 0;
+            for bytes in &self.deque {
+                len += bytes.len();
+            }
+            len
+        }
+
         /// check whether this deque contains at least `capacity` unread bytes
-        pub fn has_unread_capacity(&self, capacity: usize) -> bool {
+        pub fn contains_minimum(&self, capacity: usize) -> bool {
             let mut cap = 0;
 
             for bytes in &self.deque {

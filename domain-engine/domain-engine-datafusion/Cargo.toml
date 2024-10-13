@@ -36,3 +36,4 @@ tracing-subscriber.workspace = true
 datafusion = { version = "42", default-features = false }
 indoc = "2"
 pretty_assertions = "1"
+bytes = "1"
