@@ -89,8 +89,6 @@ pub fn http_stream_to_resp_msg_stream(
 
         for await bytes_result in http_stream {
             let bytes = bytes_result?;
-            println!("received batch len={}", bytes.len());
-
             if !decoder.push_bytes(bytes)? {
                 // end of stream
                 break;
