@@ -11,7 +11,6 @@ pub mod serde_generator;
 
 mod sequence_range_builder;
 mod serde_generator_lazy;
-// mod union_builder;
 
 pub const EDGE_PROPERTY: &str = "_edge";
 
@@ -32,7 +31,7 @@ impl<'m> Compiler<'m> {
         &'c self,
         str_ctx: &'c mut StringCtx<'m>,
         union_member_cache: &'c UnionMemberCache,
-    ) -> SerdeGenerator<'_, 'm> {
+    ) -> SerdeGenerator<'c, 'm> {
         let operators_by_addr: Vec<SerdeOperator> = vec![SerdeOperator::AnyPlaceholder];
 
         SerdeGenerator {

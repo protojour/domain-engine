@@ -392,7 +392,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             SerdeOperator::False(_) | SerdeOperator::True(_) | SerdeOperator::Boolean(_) => {
                 self.modified_arg::<bool>(name, modifier, &())
             }
-            SerdeOperator::I32(_, _) => return self.modified_arg::<i32>(name, modifier, &()),
+            SerdeOperator::I32(_, _) => self.modified_arg::<i32>(name, modifier, &()),
             SerdeOperator::I64(_, _) => {
                 let i64_schema_type = self.schema_ctx.get_schema_type(
                     self.schema_ctx.schema.i64_custom_scalar.unwrap(),

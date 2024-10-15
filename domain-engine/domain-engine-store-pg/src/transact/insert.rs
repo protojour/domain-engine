@@ -79,7 +79,7 @@ impl<'a> TransactCtx<'a> {
         select: &'a Select,
         timestamp: PgTimestamp,
         mut_ctx: &'s mut PgMutCtx,
-    ) -> BoxFuture<'_, DomainResult<RowValue>> {
+    ) -> BoxFuture<'s, DomainResult<RowValue>> {
         Box::pin(async move {
             self.insert_vertex_impl(value, insert_mode, select, timestamp, mut_ctx)
                 // .instrument(debug_span!("ins", id = ?def_id))
@@ -302,7 +302,7 @@ impl<'a> TransactCtx<'a> {
         value: Value,
         timestamp: PgTimestamp,
         mut_ctx: &'s mut PgMutCtx,
-    ) -> BoxFuture<'_, DomainResult<()>> {
+    ) -> BoxFuture<'s, DomainResult<()>> {
         Box::pin(self.insert_abstract_sub_value_impl(parent, value, timestamp, mut_ctx))
     }
 

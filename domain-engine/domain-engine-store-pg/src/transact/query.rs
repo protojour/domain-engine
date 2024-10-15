@@ -100,7 +100,7 @@ impl<'a> TransactCtx<'a> {
         &'s self,
         entity_select: &'s EntitySelect,
         mut_ctx: &mut PgMutCtx,
-    ) -> DomainResult<impl Stream<Item = DomainResult<QueryFrame>> + '_> {
+    ) -> DomainResult<impl Stream<Item = DomainResult<QueryFrame>> + 's> {
         let struct_select = match &entity_select.source {
             StructOrUnionSelect::Struct(struct_select) => struct_select,
             StructOrUnionSelect::Union(..) => return Err(PgInputError::UnionTopLevelQuery.into()),
