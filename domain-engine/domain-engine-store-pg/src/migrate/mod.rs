@@ -47,9 +47,16 @@ struct MigrationCtx {
     current_version: RegVersion,
     deployed_version: RegVersion,
     domains: FnvHashMap<DomainIndex, PgDomain>,
+    stats: Stats,
     steps: Steps,
     abstract_scalars: FnvHashMap<DomainIndex, BTreeMap<OntolDefTag, PgType>>,
     next_schema_disambiguator: i32,
+}
+
+#[derive(Default)]
+struct Stats {
+    new_domains_deployed: usize,
+    domains_already_deployed: usize,
 }
 
 #[derive(Default)]
@@ -144,6 +151,7 @@ pub async fn migrate(
             current_version,
             deployed_version: current_version,
             domains: Default::default(),
+            stats: Default::default(),
             steps: Default::default(),
             abstract_scalars: Default::default(),
             next_schema_disambiguator: 0,
@@ -217,6 +225,12 @@ pub async fn migrate(
     }
 
     txn.commit().await?;
+
+    info!(
+        "{new} new domain(s) deployed, {existing} domain(s) were already deployed",
+        new = ctx.stats.new_domains_deployed,
+        existing = ctx.stats.domains_already_deployed
+    );
 
     Ok(PgModel::new(ctx.domains, entity_id_to_entity))
 }

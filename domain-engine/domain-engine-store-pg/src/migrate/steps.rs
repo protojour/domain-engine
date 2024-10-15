@@ -12,7 +12,7 @@ use ontol_runtime::{
     tuple::CardinalIdx,
     DefId, DefPropTag, DomainIndex,
 };
-use tracing::{error, info, trace_span, Instrument};
+use tracing::{error, trace_span, Instrument};
 
 use crate::{
     migrate::{MigrationStep, PgDomain},
@@ -52,7 +52,7 @@ pub async fn migrate_domain_steps<'t>(
     };
 
     if let Some(pg_domain) = pg_domain {
-        info!("domain already deployed");
+        ctx.stats.domains_already_deployed += 1;
 
         if pg_domain.schema_name != schema_name {
             ctx.steps.extend(
@@ -65,6 +65,7 @@ pub async fn migrate_domain_steps<'t>(
             );
         }
     } else {
+        ctx.stats.new_domains_deployed += 1;
         ctx.domains.insert(
             domain_index,
             PgDomain {
