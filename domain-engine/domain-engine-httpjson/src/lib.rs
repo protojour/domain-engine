@@ -36,8 +36,9 @@ use ontol_runtime::{
 use serde::{de::DeserializeSeed, Deserializer};
 use tracing::{debug, error};
 
+pub mod http_error;
+
 mod content_type;
-mod http_error;
 
 #[derive(Clone)]
 struct Endpoint {
