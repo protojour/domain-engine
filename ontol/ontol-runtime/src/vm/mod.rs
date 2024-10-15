@@ -24,7 +24,7 @@ impl<C, Y> VmState<C, Y> {
     }
 }
 
-#[derive(Debug, Error, Serialize, Deserialize)]
+#[derive(Clone, Error, Serialize, Deserialize, Debug)]
 pub enum VmError {
     #[error("invalid type at {0:?}")]
     InvalidType(Local),

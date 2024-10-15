@@ -119,6 +119,11 @@ pub fn domain_error_to_response(error: DomainError) -> http::Response<Body> {
             json_error("impure mapping"),
         )
             .into_response(),
+        DomainErrorKind::Interface(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json_error(format!("interface: {err:?}")),
+        )
+            .into_response(),
         DomainErrorKind::DataStore(err) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             json_error(format!("data store: {err:?}")),

@@ -13,7 +13,7 @@ use datafusion_physical_plan::{
 use domain_engine_arrow::{
     schema::mk_arrow_schema, ArrowConfig, ArrowQuery, ArrowReqMessage, ArrowRespMessage,
 };
-use domain_engine_core::{DomainEngine, DomainError, Session};
+use domain_engine_core::{DomainEngine, Session};
 use filter::{ConditionBuilder, DatafusionFilter};
 use futures_util::StreamExt;
 use ontol_runtime::{
@@ -147,11 +147,11 @@ impl SchemaProvider for DomainSchemaProvider {
         _name: String,
         _table: Arc<dyn TableProvider>,
     ) -> DfResult<Option<Arc<dyn TableProvider>>> {
-        Err(exec_error("ontology tables are static"))
+        Err(error::exec("ontology tables are static"))
     }
 
     fn deregister_table(&self, _name: &str) -> DfResult<Option<Arc<dyn TableProvider>>> {
-        Err(exec_error("ontology tables are static"))
+        Err(error::exec("ontology tables are static"))
     }
 
     /// Returns true if table exist in the schema provider, false otherwise.
@@ -325,7 +325,7 @@ impl ExecutionPlan for EntityScan {
             .filter_map(|resp_message| async move {
                 match resp_message {
                     Ok(ArrowRespMessage::RecordBatch(batch)) => Some(Ok(batch)),
-                    Err(err) => Some(Err(domain_error(err))),
+                    Err(err) => Some(Err(error::domain_to_datafusion(err))),
                 }
             });
 
@@ -336,10 +336,28 @@ impl ExecutionPlan for EntityScan {
     }
 }
 
-fn exec_error(msg: impl Into<String>) -> DataFusionError {
-    DataFusionError::Execution(msg.into())
-}
+pub mod error {
+    use datafusion_common::DataFusionError;
+    use domain_engine_core::{domain_error::DomainErrorKind, DomainError};
 
-fn domain_error(err: DomainError) -> DataFusionError {
-    DataFusionError::Execution(err.to_string())
+    pub fn domain_to_datafusion(err: DomainError) -> DataFusionError {
+        DataFusionError::External(Box::new(err))
+    }
+
+    pub fn datafusion_to_domain(err: DataFusionError) -> DomainError {
+        match &err {
+            error @ DataFusionError::External(generic_err) => {
+                if let Some(domain_error) = generic_err.downcast_ref::<DomainError>() {
+                    domain_error.clone()
+                } else {
+                    DomainErrorKind::Interface(format!("{error:?}")).into_error()
+                }
+            }
+            other => DomainErrorKind::Interface(format!("{other:?}")).into_error(),
+        }
+    }
+
+    pub fn exec(msg: impl Into<String>) -> DataFusionError {
+        DataFusionError::Execution(msg.into())
+    }
 }

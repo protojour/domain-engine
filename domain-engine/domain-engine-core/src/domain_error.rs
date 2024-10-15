@@ -3,7 +3,7 @@ use std::fmt::Display;
 use ontol_runtime::{vm::VmError, DefId};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct DomainError {
     kind: DomainErrorKind,
     stack: Vec<String>,
@@ -87,7 +87,7 @@ impl From<DomainErrorKind> for DomainError {
     }
 }
 
-#[derive(displaydoc::Display, Debug, Serialize, Deserialize)]
+#[derive(Clone, displaydoc::Display, Serialize, Deserialize, Debug)]
 pub enum DomainErrorKind {
     /// not authenticated
     Unauthenticated,
@@ -133,6 +133,8 @@ pub enum DomainErrorKind {
     NotImplemented(String),
     /// impure mapping where a pure mapping was expected
     ImpureMapping,
+    /// interface error: {0}
+    Interface(String),
     /// datastore error: {0}
     DataStore(String),
     /// datastore bad request: {0}
