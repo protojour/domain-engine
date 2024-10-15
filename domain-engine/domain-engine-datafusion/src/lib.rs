@@ -345,14 +345,15 @@ pub mod error {
     }
 
     pub fn datafusion_to_domain(err: DataFusionError) -> DomainError {
-        match &err {
-            error @ DataFusionError::External(generic_err) => {
-                if let Some(domain_error) = generic_err.downcast_ref::<DomainError>() {
-                    domain_error.clone()
-                } else {
-                    DomainErrorKind::Interface(format!("{error:?}")).into_error()
-                }
+        match err {
+            DataFusionError::Plan(msg) => DomainErrorKind::BadInputFormat(msg).into_error(),
+            DataFusionError::SQL(parser_error, _) => {
+                DomainErrorKind::BadInputFormat(format!("{parser_error}")).into_error()
             }
+            DataFusionError::External(generic_err) => match generic_err.downcast::<DomainError>() {
+                Ok(domain_error) => *domain_error,
+                Err(err) => DomainErrorKind::Interface(format!("{err:?}")).into_error(),
+            },
             other => DomainErrorKind::Interface(format!("{other:?}")).into_error(),
         }
     }

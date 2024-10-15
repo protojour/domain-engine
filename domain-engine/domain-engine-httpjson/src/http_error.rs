@@ -89,13 +89,13 @@ pub fn domain_error_to_response(error: DomainError) -> http::Response<Body> {
             json_error("type cannot be used for id generation"),
         )
             .into_response(),
-        DomainErrorKind::BadInputFormat(err) => (
+        DomainErrorKind::BadInputFormat(msg) => (
             StatusCode::BAD_REQUEST,
-            json_error(format!("bad input format: {err:?}")),
+            json_error(format!("bad input format: {msg:?}")),
         )
             .into_response(),
-        DomainErrorKind::BadInputData(err) => {
-            (StatusCode::UNPROCESSABLE_ENTITY, json_error(err)).into_response()
+        DomainErrorKind::BadInputData(msg) => {
+            (StatusCode::UNPROCESSABLE_ENTITY, json_error(msg)).into_response()
         }
         DomainErrorKind::UnresolvedForeignKey(key) => (
             StatusCode::UNPROCESSABLE_ENTITY,
@@ -119,14 +119,14 @@ pub fn domain_error_to_response(error: DomainError) -> http::Response<Body> {
             json_error("impure mapping"),
         )
             .into_response(),
-        DomainErrorKind::Interface(err) => (
+        DomainErrorKind::Interface(msg) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            json_error(format!("interface: {err:?}")),
+            json_error(format!("interface: {msg:?}")),
         )
             .into_response(),
-        DomainErrorKind::DataStore(err) => (
+        DomainErrorKind::DataStore(msg) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            json_error(format!("data store: {err:?}")),
+            json_error(format!("data store: {msg:?}")),
         )
             .into_response(),
         DomainErrorKind::DataStoreBadRequest(err) => {
