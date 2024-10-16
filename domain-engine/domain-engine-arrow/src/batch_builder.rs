@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use arrow_array::{
     builder::{
-        ArrayBuilder, BinaryBuilder, BooleanBuilder, Float64Builder, Int64Builder,
+        ArrayBuilder, BinaryBuilder, BooleanBuilder, Float64Builder, Int64Builder, ListBuilder,
         PrimitiveBuilder, StringBuilder, StructBuilder,
     },
     types::TimestampMicrosecondType,
@@ -19,7 +19,7 @@ use ontol_runtime::{
 };
 use tracing::error;
 
-use crate::schema::{iter_arrow_fields, FieldType, StructFieldType};
+use crate::schema::{iter_arrow_fields, ArrowSchemaBuilder, FieldType, StructFieldType};
 
 const INITIAL_CAPACITY: usize = 128;
 
@@ -69,7 +69,7 @@ impl RecordBatchBuilder {
         {
             let attr = attrs.remove(prop_id);
 
-            match push_attr(attr, SingleDowncast(builder), field_type, &self.ontology) {
+            match push_attr(attr, IdentityDowncast(builder), field_type, &self.ontology) {
                 Some(()) => {}
                 None => error!("failed to encode arrow value"),
             }
@@ -121,13 +121,17 @@ fn mk_column_builder(field_type: &FieldType, ontology_defs: &DefsAspect) -> Box<
         FieldType::Binary => Box::new(BinaryBuilder::default()),
         FieldType::Timestamp => Box::new(PrimitiveBuilder::<TimestampMicrosecondType>::default()),
         FieldType::Struct(ft) => Box::new(StructBuilder::from_fields(
-            ft.arrow_fields(ontology_defs),
+            ArrowSchemaBuilder::new(ontology_defs).mk_field_list(ontology_defs.def(ft.0)),
             INITIAL_CAPACITY,
         )),
         FieldType::EmptyStruct => Box::new(StructBuilder::from_fields(
             Fields::empty(),
             INITIAL_CAPACITY,
         )),
+        FieldType::List(item_type) => {
+            let item_builder = mk_column_builder(item_type, ontology_defs);
+            Box::new(ListBuilder::new(item_builder))
+        }
     }
 }
 
@@ -135,9 +139,9 @@ trait DowncastArrayBuilder {
     fn downcast_builder<T: ArrayBuilder>(&mut self) -> Option<&mut T>;
 }
 
-struct SingleDowncast<'a>(&'a mut dyn ArrayBuilder);
+struct IdentityDowncast<'a>(&'a mut dyn ArrayBuilder);
 
-impl<'a> DowncastArrayBuilder for SingleDowncast<'a> {
+impl<'a> DowncastArrayBuilder for IdentityDowncast<'a> {
     fn downcast_builder<T: ArrayBuilder>(&mut self) -> Option<&mut T> {
         self.0.as_any_mut().downcast_mut::<T>()
     }
@@ -245,6 +249,34 @@ fn push_attr(
         FieldType::EmptyStruct => {
             let b = builder.downcast_builder::<StructBuilder>()?;
             b.append(true);
+        }
+        FieldType::List(item_type) => {
+            let b = builder.downcast_builder::<ListBuilder<Box<dyn ArrayBuilder>>>()?;
+
+            if let Some(Attr::Matrix(matrix)) = attr {
+                if let Some(first_column) = matrix.columns.into_iter().next() {
+                    let mut valid = true;
+
+                    for value in first_column.into_elements() {
+                        if push_attr(
+                            Some(Attr::Unit(value)),
+                            IdentityDowncast(b.values()),
+                            item_type,
+                            ontology,
+                        )
+                        .is_none()
+                        {
+                            valid = false;
+                        }
+                    }
+
+                    b.append(valid);
+                } else {
+                    b.append(false);
+                }
+            } else {
+                b.append(false);
+            }
         }
     }
 

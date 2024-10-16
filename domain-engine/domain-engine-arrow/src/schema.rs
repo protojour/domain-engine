@@ -6,10 +6,37 @@ use ontol_runtime::{
         aspects::DefsAspect,
         domain::{DataRelationshipTarget, Def, DefRepr},
     },
-    property::PropertyCardinality,
+    property::{PropertyCardinality, ValueCardinality},
     DefId, PropId,
 };
 use serde::{Deserialize, Serialize};
+
+#[derive(Debug)]
+pub struct ArrowFieldInfo<'o> {
+    pub prop_id: PropId,
+    pub name: &'o str,
+    pub field_def_id: DefId,
+    pub field_type: FieldType,
+    pub nullable: bool,
+}
+
+/// field type that's the intersection of what ONTOL and Arrow supports
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum FieldType {
+    Boolean,
+    I64,
+    F64,
+    Text,
+    Binary,
+    Timestamp,
+    Struct(StructFieldType),
+    /// Empty struct is needed for self-recursive ontol structures
+    EmptyStruct,
+    List(Box<FieldType>),
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+pub struct StructFieldType(pub DefId);
 
 pub struct ArrowSchemaBuilder<'o> {
     ontology_defs: &'o DefsAspect,
@@ -31,7 +58,7 @@ impl<'o> ArrowSchemaBuilder<'o> {
         }
     }
 
-    fn mk_field_list(&mut self, def: &Def) -> Vec<Field> {
+    pub fn mk_field_list(&mut self, def: &Def) -> Vec<Field> {
         let def_stack = self.def_stack.clone();
 
         iter_arrow_fields(def, self.ontology_defs, def_stack)
@@ -68,69 +95,16 @@ impl<'o> ArrowSchemaBuilder<'o> {
                 DataType::Struct(Fields::from_iter(fields))
             }
             FieldType::EmptyStruct => DataType::Struct(Fields::empty()),
+            FieldType::List(item_type) => {
+                let item_data_type = self.mk_data_type(item_type);
+
+                // setting nullable to true regardless, if not the builder will complain,
+                // maybe due to bugs
+                let nullable = true;
+
+                DataType::List(Arc::new(Field::new("item", item_data_type, nullable)))
+            }
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct ArrowFieldInfo<'o> {
-    pub prop_id: PropId,
-    pub name: &'o str,
-    pub field_def_id: DefId,
-    pub field_type: FieldType,
-    pub nullable: bool,
-}
-
-impl<'o> ArrowFieldInfo<'o> {
-    fn to_arrow_field(&self, ontology_defs: &DefsAspect) -> Field {
-        Field::new(
-            self.name.to_string(),
-            self.field_type.as_arrow(ontology_defs),
-            self.nullable,
-        )
-    }
-}
-
-/// field type that's the intersection of what ONTOL and Arrow supports
-#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
-pub enum FieldType {
-    Boolean,
-    I64,
-    F64,
-    Text,
-    Binary,
-    Timestamp,
-    Struct(StructFieldType),
-    /// Empty struct is needed for self-recursive ontol structures
-    EmptyStruct,
-}
-
-#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
-pub struct StructFieldType(pub DefId);
-
-impl FieldType {
-    fn as_arrow(&self, ontology_defs: &DefsAspect) -> DataType {
-        match self {
-            FieldType::Boolean => DataType::Boolean,
-            FieldType::I64 => DataType::Int64,
-            FieldType::F64 => DataType::Float64,
-            FieldType::Text => DataType::Utf8,
-            FieldType::Binary => DataType::Binary,
-            FieldType::Timestamp => DataType::Timestamp(TimeUnit::Microsecond, None),
-            FieldType::Struct(ft) => DataType::Struct(ft.arrow_fields(ontology_defs)),
-            FieldType::EmptyStruct => DataType::Struct(Fields::empty()),
-        }
-    }
-}
-
-impl StructFieldType {
-    pub fn arrow_fields(&self, ontology_defs: &DefsAspect) -> Fields {
-        let def = ontology_defs.def(self.0);
-        let fields = iter_arrow_fields(def, ontology_defs, vec![])
-            .map(|info| Arc::new(info.to_arrow_field(ontology_defs)))
-            .collect::<Vec<_>>();
-
-        Fields::from_iter(fields)
     }
 }
 
@@ -144,7 +118,7 @@ pub fn iter_arrow_fields<'o>(
         .filter_map(move |(prop_id, rel_info)| match &rel_info.target {
             DataRelationshipTarget::Unambiguous(def_id) => {
                 let repr = ontology_defs.def(*def_id).repr()?;
-                let field_type = match repr {
+                let mut field_type = match repr {
                     DefRepr::Unit => return None,
                     DefRepr::I64 => FieldType::I64,
                     DefRepr::F64 => FieldType::F64,
@@ -169,6 +143,13 @@ pub fn iter_arrow_fields<'o>(
                     DefRepr::Vertex => return None,
                     DefRepr::Unknown => return None,
                 };
+
+                if matches!(
+                    rel_info.cardinality.1,
+                    ValueCardinality::IndexSet | ValueCardinality::List
+                ) {
+                    field_type = FieldType::List(Box::new(field_type));
+                }
 
                 Some(ArrowFieldInfo {
                     prop_id: *prop_id,

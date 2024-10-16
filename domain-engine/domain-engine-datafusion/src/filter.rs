@@ -46,7 +46,7 @@ impl DatafusionFilter {
                     field_info.prop_id,
                     domain_select::domain_select_no_edges(field_info.field_def_id, ontology_defs),
                 );
-                columns.push((field_info.prop_id, field_info.field_type));
+                columns.push((field_info.prop_id, field_info.field_type.clone()));
             }
         } else {
             if let Select::Struct(struct_select) =

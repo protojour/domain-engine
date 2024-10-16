@@ -18,6 +18,7 @@ use ontol_examples::artist_and_instrument;
 use ontol_macros::datastore_test;
 use ontol_runtime::ontology::Ontology;
 use ontol_test_utils::{file_url, serde_helper::serde_create, TestCompile, TestPackages};
+use pretty_assertions::assert_eq;
 use serde_json::json;
 use tracing::info;
 
@@ -113,10 +114,14 @@ async fn datastore_test_arrow_encoding(ds: &str) {
 
         def entity (
             rel. 'id': (rel* is: text)
+            rel* 'names': [text]
             rel* 'const_str': 'CONST'
             rel* 'int': i64
+            rel* 'ints': {i64}
             rel* 'float': f64
+            rel* 'floats': {f64}
             rel* 'sub': sub_struct
+            rel* 'subs': {sub_struct}
         )
 
         def sub_struct (
@@ -147,13 +152,22 @@ async fn datastore_test_arrow_encoding(ds: &str) {
         serde_create(&entity)
             .to_value(json!({
                 "id": "test",
+                "names": ["a", "b"],
                 "const_str": "CONST",
                 "int": 42,
+                "ints": [666],
                 "float": 1.23456,
+                "floats": [6.54321],
                 "sub": {
                     "a": "A",
                     "b": "B",
-                }
+                },
+                "subs": [
+                    {
+                        "a": "alpha",
+                        "b": "beta",
+                    }
+                ]
             }))
             .unwrap(),
     )
@@ -165,11 +179,11 @@ async fn datastore_test_arrow_encoding(ds: &str) {
     assert_eq!(
         prettify(&dataframe.collect().await.unwrap()),
         indoc! { "
-            +------+-----------+-----+---------+--------------+
-            | id   | const_str | int | float   | sub          |
-            +------+-----------+-----+---------+--------------+
-            | test | CONST     | 42  | 1.23456 | {a: A, b: B} |
-            +------+-----------+-----+---------+--------------+
+            +------+--------+-----------+-----+-------+---------+-----------+--------------+-----------------------+
+            | id   | names  | const_str | int | ints  | float   | floats    | sub          | subs                  |
+            +------+--------+-----------+-----+-------+---------+-----------+--------------+-----------------------+
+            | test | [a, b] | CONST     | 42  | [666] | 1.23456 | [6.54321] | {a: A, b: B} | [{a: alpha, b: beta}] |
+            +------+--------+-----------+-----+-------+---------+-----------+--------------+-----------------------+
         "}
     );
 }
