@@ -34,7 +34,7 @@ impl DatafusionFilter {
         let mut select_properties: BTreeMap<PropId, Select> = Default::default();
         let mut columns = vec![];
 
-        let fields: Vec<_> = iter_arrow_fields(def, ontology_defs).collect();
+        let fields: Vec<_> = iter_arrow_fields(def, ontology_defs, vec![]).collect();
 
         if let Some(projection) = projection {
             for field_idx in projection {
@@ -42,8 +42,11 @@ impl DatafusionFilter {
                     continue;
                 };
 
-                select_properties.insert(field_info.prop_id, Select::Unit);
-                columns.push((field_info.prop_id, field_info.field_type.clone()));
+                select_properties.insert(
+                    field_info.prop_id,
+                    domain_select::domain_select_no_edges(field_info.field_def_id, ontology_defs),
+                );
+                columns.push((field_info.prop_id, field_info.field_type));
             }
         } else {
             if let Select::Struct(struct_select) =
@@ -53,8 +56,8 @@ impl DatafusionFilter {
             }
 
             columns = fields
-                .iter()
-                .map(|field_info| (field_info.prop_id, field_info.field_type.clone()))
+                .into_iter()
+                .map(|field_info| (field_info.prop_id, field_info.field_type))
                 .collect();
         }
 

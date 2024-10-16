@@ -11,14 +11,64 @@ use ontol_runtime::{
 };
 use serde::{Deserialize, Serialize};
 
-pub fn mk_arrow_schema(def: &Def, ontology_defs: &DefsAspect) -> Schema {
-    let fields = iter_arrow_fields(def, ontology_defs)
-        .map(|info| info.to_arrow_field(ontology_defs))
-        .collect::<Vec<_>>();
+pub struct ArrowSchemaBuilder<'o> {
+    ontology_defs: &'o DefsAspect,
+    def_stack: Vec<DefId>,
+}
 
-    Schema {
-        fields: Fields::from_iter(fields),
-        metadata: Default::default(),
+impl<'o> ArrowSchemaBuilder<'o> {
+    pub fn new(ontology_defs: &'o DefsAspect) -> Self {
+        Self {
+            ontology_defs,
+            def_stack: vec![],
+        }
+    }
+
+    pub fn mk_schema(&mut self, def: &Def) -> Schema {
+        Schema {
+            fields: Fields::from_iter(self.mk_field_list(def)),
+            metadata: Default::default(),
+        }
+    }
+
+    fn mk_field_list(&mut self, def: &Def) -> Vec<Field> {
+        let def_stack = self.def_stack.clone();
+
+        iter_arrow_fields(def, self.ontology_defs, def_stack)
+            .map(|field_info| {
+                self.def_stack.push(def.id);
+                let field = self.mk_field(&field_info);
+                self.def_stack.pop();
+                field
+            })
+            .collect::<Vec<_>>()
+    }
+
+    fn mk_field(&mut self, field_info: &ArrowFieldInfo) -> Field {
+        Field::new(
+            field_info.name.to_string(),
+            self.mk_data_type(&field_info.field_type),
+            field_info.nullable,
+        )
+    }
+
+    fn mk_data_type(&mut self, field_type: &FieldType) -> DataType {
+        match field_type {
+            FieldType::Boolean => DataType::Boolean,
+            FieldType::I64 => DataType::Int64,
+            FieldType::F64 => DataType::Float64,
+            FieldType::Text => DataType::Utf8,
+            FieldType::Binary => DataType::Binary,
+            FieldType::Timestamp => DataType::Timestamp(TimeUnit::Microsecond, None),
+            FieldType::Struct(ft) => {
+                let def_id = ft.0;
+                let def = self.ontology_defs.def(def_id);
+                let fields = self.mk_field_list(def);
+
+                DataType::Struct(Fields::from_iter(fields))
+            }
+            FieldType::EmptyStruct => DataType::Struct(Fields::empty()),
+        }
     }
 }
 
@@ -26,6 +76,7 @@ pub fn mk_arrow_schema(def: &Def, ontology_defs: &DefsAspect) -> Schema {
 pub struct ArrowFieldInfo<'o> {
     pub prop_id: PropId,
     pub name: &'o str,
+    pub field_def_id: DefId,
     pub field_type: FieldType,
     pub nullable: bool,
 }
@@ -50,10 +101,12 @@ pub enum FieldType {
     Binary,
     Timestamp,
     Struct(StructFieldType),
+    /// Empty struct is needed for self-recursive ontol structures
+    EmptyStruct,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
-pub struct StructFieldType(DefId);
+pub struct StructFieldType(pub DefId);
 
 impl FieldType {
     fn as_arrow(&self, ontology_defs: &DefsAspect) -> DataType {
@@ -65,6 +118,7 @@ impl FieldType {
             FieldType::Binary => DataType::Binary,
             FieldType::Timestamp => DataType::Timestamp(TimeUnit::Microsecond, None),
             FieldType::Struct(ft) => DataType::Struct(ft.arrow_fields(ontology_defs)),
+            FieldType::EmptyStruct => DataType::Struct(Fields::empty()),
         }
     }
 }
@@ -72,7 +126,7 @@ impl FieldType {
 impl StructFieldType {
     pub fn arrow_fields(&self, ontology_defs: &DefsAspect) -> Fields {
         let def = ontology_defs.def(self.0);
-        let fields = iter_arrow_fields(def, ontology_defs)
+        let fields = iter_arrow_fields(def, ontology_defs, vec![])
             .map(|info| Arc::new(info.to_arrow_field(ontology_defs)))
             .collect::<Vec<_>>();
 
@@ -83,10 +137,11 @@ impl StructFieldType {
 pub fn iter_arrow_fields<'o>(
     def: &'o Def,
     ontology_defs: &'o DefsAspect,
+    def_stack: Vec<DefId>,
 ) -> impl Iterator<Item = ArrowFieldInfo<'o>> {
     def.data_relationships
         .iter()
-        .filter_map(|(prop_id, rel_info)| match &rel_info.target {
+        .filter_map(move |(prop_id, rel_info)| match &rel_info.target {
             DataRelationshipTarget::Unambiguous(def_id) => {
                 let repr = ontology_defs.def(*def_id).repr()?;
                 let field_type = match repr {
@@ -101,8 +156,11 @@ pub fn iter_arrow_fields<'o>(
                     DefRepr::DateTime => FieldType::Timestamp,
                     DefRepr::Seq => return None,
                     DefRepr::Struct => {
-                        // FieldType::Struct(StructFieldType(*def_id))
-                        return None;
+                        if def_stack.contains(def_id) {
+                            FieldType::EmptyStruct
+                        } else {
+                            FieldType::Struct(StructFieldType(*def_id))
+                        }
                     }
                     DefRepr::Intersection(_) => return None,
                     DefRepr::Union(_, _) => return None,
@@ -115,6 +173,7 @@ pub fn iter_arrow_fields<'o>(
                 Some(ArrowFieldInfo {
                     prop_id: *prop_id,
                     name: &ontology_defs[rel_info.name],
+                    field_def_id: *def_id,
                     field_type,
                     nullable: matches!(rel_info.cardinality.0, PropertyCardinality::Optional),
                 })

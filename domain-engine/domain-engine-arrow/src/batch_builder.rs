@@ -8,7 +8,7 @@ use arrow_array::{
     types::TimestampMicrosecondType,
     RecordBatch, RecordBatchOptions,
 };
-use arrow_schema::SchemaRef;
+use arrow_schema::{Fields, SchemaRef};
 use domain_engine_core::transact::RespMessage;
 use ontol_runtime::{
     attr::Attr,
@@ -19,7 +19,7 @@ use ontol_runtime::{
 };
 use tracing::error;
 
-use crate::schema::FieldType;
+use crate::schema::{iter_arrow_fields, FieldType, StructFieldType};
 
 const INITIAL_CAPACITY: usize = 128;
 
@@ -69,7 +69,7 @@ impl RecordBatchBuilder {
         {
             let attr = attrs.remove(prop_id);
 
-            match push_attr(attr, builder, field_type, &self.ontology) {
+            match push_attr(attr, SingleDowncast(builder), field_type, &self.ontology) {
                 Some(()) => {}
                 None => error!("failed to encode arrow value"),
             }
@@ -124,20 +124,45 @@ fn mk_column_builder(field_type: &FieldType, ontology_defs: &DefsAspect) -> Box<
             ft.arrow_fields(ontology_defs),
             INITIAL_CAPACITY,
         )),
+        FieldType::EmptyStruct => Box::new(StructBuilder::from_fields(
+            Fields::empty(),
+            INITIAL_CAPACITY,
+        )),
+    }
+}
+
+trait DowncastArrayBuilder {
+    fn downcast_builder<T: ArrayBuilder>(&mut self) -> Option<&mut T>;
+}
+
+struct SingleDowncast<'a>(&'a mut dyn ArrayBuilder);
+
+impl<'a> DowncastArrayBuilder for SingleDowncast<'a> {
+    fn downcast_builder<T: ArrayBuilder>(&mut self) -> Option<&mut T> {
+        self.0.as_any_mut().downcast_mut::<T>()
+    }
+}
+
+struct StructFieldDowncast<'a> {
+    struct_builder: &'a mut StructBuilder,
+    index: usize,
+}
+
+impl<'a> DowncastArrayBuilder for StructFieldDowncast<'a> {
+    fn downcast_builder<T: ArrayBuilder>(&mut self) -> Option<&mut T> {
+        self.struct_builder.field_builder::<T>(self.index)
     }
 }
 
 fn push_attr(
     attr: Option<Attr>,
-    builder: &mut dyn ArrayBuilder,
+    mut builder: impl DowncastArrayBuilder,
     field_type: &FieldType,
     ontology: &Ontology,
 ) -> Option<()> {
-    let builder = builder.as_any_mut();
-
     match field_type {
         FieldType::Boolean => {
-            let b = builder.downcast_mut::<BooleanBuilder>()?;
+            let b = builder.downcast_builder::<BooleanBuilder>()?;
             if let Some(Attr::Unit(Value::I64(i, _))) = attr {
                 b.append_value(i != 0);
             } else {
@@ -145,7 +170,7 @@ fn push_attr(
             }
         }
         FieldType::I64 => {
-            let b = builder.downcast_mut::<Int64Builder>()?;
+            let b = builder.downcast_builder::<Int64Builder>()?;
             if let Some(Attr::Unit(Value::I64(i, _))) = attr {
                 b.append_value(i);
             } else {
@@ -153,7 +178,7 @@ fn push_attr(
             }
         }
         FieldType::F64 => {
-            let b = builder.downcast_mut::<Float64Builder>()?;
+            let b = builder.downcast_builder::<Float64Builder>()?;
             if let Some(Attr::Unit(Value::F64(f, _))) = attr {
                 b.append_value(f);
             } else {
@@ -161,7 +186,7 @@ fn push_attr(
             }
         }
         FieldType::Text => {
-            let b = builder.downcast_mut::<StringBuilder>()?;
+            let b = builder.downcast_builder::<StringBuilder>()?;
             match attr {
                 Some(Attr::Unit(value)) => b.append_value(format_value(&value, ontology)),
                 _ => {
@@ -170,7 +195,7 @@ fn push_attr(
             }
         }
         FieldType::Binary => {
-            let b = builder.downcast_mut::<BinaryBuilder>()?;
+            let b = builder.downcast_builder::<BinaryBuilder>()?;
             if let Some(Attr::Unit(Value::OctetSequence(o, _))) = attr {
                 b.append_value(&o.0);
             } else {
@@ -178,16 +203,48 @@ fn push_attr(
             }
         }
         FieldType::Timestamp => {
-            let b = builder.downcast_mut::<PrimitiveBuilder<TimestampMicrosecondType>>()?;
+            let b = builder.downcast_builder::<PrimitiveBuilder<TimestampMicrosecondType>>()?;
             if let Some(Attr::Unit(Value::ChronoDateTime(dt, _))) = attr {
                 b.append_value(dt.timestamp_micros());
             } else {
                 b.append_null();
             }
         }
-        FieldType::Struct(_) => {
-            // let b = builder.downcast_mut::<StructBuilder>()?;
-            todo!()
+        FieldType::Struct(StructFieldType(def_id)) => {
+            let b = builder.downcast_builder::<StructBuilder>()?;
+            let def = ontology.def(*def_id);
+
+            if let Some(Attr::Unit(Value::Struct(mut st, _))) = attr {
+                let mut valid = true;
+
+                for (index, field_info) in
+                    iter_arrow_fields(def, ontology.as_ref(), vec![]).enumerate()
+                {
+                    let attr = st.remove(&field_info.prop_id);
+
+                    if push_attr(
+                        attr,
+                        StructFieldDowncast {
+                            struct_builder: b,
+                            index,
+                        },
+                        &field_info.field_type,
+                        ontology,
+                    )
+                    .is_none()
+                    {
+                        valid = false;
+                    }
+                }
+
+                b.append(valid);
+            } else {
+                b.append(false);
+            }
+        }
+        FieldType::EmptyStruct => {
+            let b = builder.downcast_builder::<StructBuilder>()?;
+            b.append(true);
         }
     }
 

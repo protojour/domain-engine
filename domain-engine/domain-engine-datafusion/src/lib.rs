@@ -11,7 +11,7 @@ use datafusion_physical_plan::{
     Partitioning, PlanProperties,
 };
 use domain_engine_arrow::{
-    schema::mk_arrow_schema, ArrowConfig, ArrowQuery, ArrowReqMessage, ArrowRespMessage,
+    schema::ArrowSchemaBuilder, ArrowConfig, ArrowQuery, ArrowReqMessage, ArrowRespMessage,
 };
 use domain_engine_core::{DomainEngine, Session};
 use filter::{ConditionBuilder, DatafusionFilter};
@@ -133,7 +133,7 @@ impl SchemaProvider for DomainSchemaProvider {
             return Ok(None);
         };
 
-        let arrow_schema = mk_arrow_schema(def, self.engine.ontology_defs());
+        let arrow_schema = ArrowSchemaBuilder::new(self.engine.ontology_defs()).mk_schema(def);
 
         Ok(Some(Arc::new(EntityTableProvider {
             engine: self.engine.clone(),
