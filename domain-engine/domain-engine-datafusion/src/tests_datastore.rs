@@ -113,7 +113,15 @@ async fn datastore_test_arrow_encoding(ds: &str) {
 
         def entity (
             rel. 'id': (rel* is: text)
-            rel* 'const': 'CONST'
+            rel* 'const_str': 'CONST'
+            rel* 'int': i64
+            rel* 'float': f64
+            rel* 'sub': sub_struct
+        )
+
+        def sub_struct (
+            rel* 'a': text
+            rel* 'b': text
         )
         ",
     );
@@ -139,7 +147,13 @@ async fn datastore_test_arrow_encoding(ds: &str) {
         serde_create(&entity)
             .to_value(json!({
                 "id": "test",
-                "const": "CONST",
+                "const_str": "CONST",
+                "int": 42,
+                "float": 1.23456,
+                "sub": {
+                    "a": "A",
+                    "b": "B",
+                }
             }))
             .unwrap(),
     )
@@ -151,11 +165,11 @@ async fn datastore_test_arrow_encoding(ds: &str) {
     assert_eq!(
         prettify(&dataframe.collect().await.unwrap()),
         indoc! { "
-            +------+-------+
-            | id   | const |
-            +------+-------+
-            | test | CONST |
-            +------+-------+
+            +------+-----------+-----+---------+
+            | id   | const_str | int | float   |
+            +------+-----------+-----+---------+
+            | test | CONST     | 42  | 1.23456 |
+            +------+-----------+-----+---------+
         "}
     );
 }

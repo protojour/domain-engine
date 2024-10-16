@@ -43,7 +43,7 @@ impl DatafusionFilter {
                 };
 
                 select_properties.insert(field_info.prop_id, Select::Unit);
-                columns.push((field_info.prop_id, field_info.field_type));
+                columns.push((field_info.prop_id, field_info.field_type.clone()));
             }
         } else {
             if let Select::Struct(struct_select) =
@@ -54,7 +54,7 @@ impl DatafusionFilter {
 
             columns = fields
                 .iter()
-                .map(|field_info| (field_info.prop_id, field_info.field_type))
+                .map(|field_info| (field_info.prop_id, field_info.field_type.clone()))
                 .collect();
         }
 

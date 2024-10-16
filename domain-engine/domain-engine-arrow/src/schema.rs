@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use arrow_schema::{DataType, Field, Fields, Schema, TimeUnit};
 use ontol_runtime::{
     ontology::{
@@ -5,19 +7,13 @@ use ontol_runtime::{
         domain::{DataRelationshipTarget, Def, DefRepr},
     },
     property::PropertyCardinality,
-    PropId,
+    DefId, PropId,
 };
 use serde::{Deserialize, Serialize};
 
 pub fn mk_arrow_schema(def: &Def, ontology_defs: &DefsAspect) -> Schema {
     let fields = iter_arrow_fields(def, ontology_defs)
-        .map(|field_info| {
-            Field::new(
-                field_info.name.to_string(),
-                field_info.field_type.as_arrow(),
-                field_info.nullable,
-            )
-        })
+        .map(|info| info.to_arrow_field(ontology_defs))
         .collect::<Vec<_>>();
 
     Schema {
@@ -34,6 +30,16 @@ pub struct ArrowFieldInfo<'o> {
     pub nullable: bool,
 }
 
+impl<'o> ArrowFieldInfo<'o> {
+    fn to_arrow_field(&self, ontology_defs: &DefsAspect) -> Field {
+        Field::new(
+            self.name.to_string(),
+            self.field_type.as_arrow(ontology_defs),
+            self.nullable,
+        )
+    }
+}
+
 /// field type that's the intersection of what ONTOL and Arrow supports
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub enum FieldType {
@@ -43,10 +49,14 @@ pub enum FieldType {
     Text,
     Binary,
     Timestamp,
+    Struct(StructFieldType),
 }
 
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+pub struct StructFieldType(DefId);
+
 impl FieldType {
-    fn as_arrow(&self) -> DataType {
+    fn as_arrow(&self, ontology_defs: &DefsAspect) -> DataType {
         match self {
             FieldType::Boolean => DataType::Boolean,
             FieldType::I64 => DataType::Int64,
@@ -54,7 +64,19 @@ impl FieldType {
             FieldType::Text => DataType::Utf8,
             FieldType::Binary => DataType::Binary,
             FieldType::Timestamp => DataType::Timestamp(TimeUnit::Microsecond, None),
+            FieldType::Struct(ft) => DataType::Struct(ft.arrow_fields(ontology_defs)),
         }
+    }
+}
+
+impl StructFieldType {
+    pub fn arrow_fields(&self, ontology_defs: &DefsAspect) -> Fields {
+        let def = ontology_defs.def(self.0);
+        let fields = iter_arrow_fields(def, ontology_defs)
+            .map(|info| Arc::new(info.to_arrow_field(ontology_defs)))
+            .collect::<Vec<_>>();
+
+        Fields::from_iter(fields)
     }
 }
 
@@ -78,7 +100,10 @@ pub fn iter_arrow_fields<'o>(
                     DefRepr::Octets => FieldType::Binary,
                     DefRepr::DateTime => FieldType::Timestamp,
                     DefRepr::Seq => return None,
-                    DefRepr::Struct => return None,
+                    DefRepr::Struct => {
+                        // FieldType::Struct(StructFieldType(*def_id))
+                        return None;
+                    }
                     DefRepr::Intersection(_) => return None,
                     DefRepr::Union(_, _) => return None,
                     DefRepr::FmtStruct(_) => FieldType::Text,
