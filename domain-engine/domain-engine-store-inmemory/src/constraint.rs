@@ -53,7 +53,10 @@ impl ConstraintCheck {
         match self {
             Self::Disabled => {
                 let ctx = FormatCtx { defs, serde };
-                Err(DomainErrorKind::UnresolvedForeignKey(format_value(&value, &ctx)).into_error())
+                Err(
+                    DomainErrorKind::UnresolvedForeignKey(format_value(&value, &ctx).to_string())
+                        .into_error(),
+                )
             }
             Self::Deferred(d) => {
                 d.deferred_foreign_keys.insert((def_id, key), value);
@@ -80,10 +83,10 @@ impl DeferredCheck {
     fn check_deferred(&self, store: &InMemoryStore, ontology: &Ontology) -> DomainResult<()> {
         for ((def_id, key), value) in &self.deferred_foreign_keys {
             if store.look_up_vertex(*def_id, key).is_none() {
-                return Err(
-                    DomainErrorKind::UnresolvedForeignKey(format_value(value, ontology))
-                        .into_error(),
-                );
+                return Err(DomainErrorKind::UnresolvedForeignKey(
+                    format_value(value, ontology).to_string(),
+                )
+                .into_error());
             }
         }
 

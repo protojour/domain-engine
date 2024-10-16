@@ -17,14 +17,14 @@ use indoc::indoc;
 use ontol_examples::artist_and_instrument;
 use ontol_macros::datastore_test;
 use ontol_runtime::ontology::Ontology;
-use ontol_test_utils::{serde_helper::serde_create, TestCompile, TestPackages};
+use ontol_test_utils::{file_url, serde_helper::serde_create, TestCompile, TestPackages};
 use serde_json::json;
 use tracing::info;
 
 use crate::{DomainEngineAPI, OntologyCatalogProvider};
 
 #[datastore_test(tokio::test)]
-async fn datastore_test(ds: &str) {
+async fn datastore_test_artist_with_chunking(ds: &str) {
     let test = TestPackages::with_static_sources([artist_and_instrument()]).compile();
     let [artist] = test.bind(["artist"]);
     let engine = make_domain_engine(test.ontology_owned(), ds).await;
@@ -100,6 +100,62 @@ async fn datastore_test(ds: &str) {
             +------------+
             | Beach Boys |
             +------------+
+        "}
+    );
+}
+
+#[datastore_test(tokio::test)]
+async fn datastore_test_arrow_encoding(ds: &str) {
+    let ontol_source = (
+        file_url("test"),
+        "
+        domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
+
+        def entity (
+            rel. 'id': (rel* is: text)
+            rel* 'const': 'CONST'
+        )
+        ",
+    );
+
+    let test = TestPackages::with_static_sources([ontol_source]).compile();
+    let [entity] = test.bind(["entity"]);
+    let engine = make_domain_engine(test.ontology_owned(), ds).await;
+
+    let mut config = SessionConfig::new();
+    config.set_extension(Arc::new(Session::default()));
+    let ctx = SessionContext::new_with_config(config);
+
+    // testing with the HTTP stream
+    let api: Arc<dyn DomainEngineAPI + Send + Sync> = Arc::new(IPCStreamer {
+        domain_engine: engine.clone(),
+        rechunk_size: 100,
+    });
+
+    ctx.register_catalog("ontology", Arc::new(OntologyCatalogProvider::from(api)));
+
+    data_store_util::insert_entity_select_entityid(
+        &engine,
+        serde_create(&entity)
+            .to_value(json!({
+                "id": "test",
+                "const": "CONST",
+            }))
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+
+    let dataframe = ctx.sql("SELECT * FROM ontology.test.entity").await.unwrap();
+
+    assert_eq!(
+        prettify(&dataframe.collect().await.unwrap()),
+        indoc! { "
+            +------+-------+
+            | id   | const |
+            +------+-------+
+            | test | CONST |
+            +------+-------+
         "}
     );
 }

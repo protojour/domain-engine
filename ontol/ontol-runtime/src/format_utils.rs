@@ -1,10 +1,13 @@
-use std::fmt::{Debug, Display};
+use std::{
+    borrow::Cow,
+    fmt::{Debug, Display},
+};
 
 use crate::{
     attr::AttrRef,
     interface::serde::processor::{ProcessorMode, SerdeProcessor},
     ontology::aspects::{DefsAspect, ExecutionAspect, SerdeAspect},
-    value::Value,
+    value::{Value, ValueFormatRaw},
 };
 
 pub struct LogicalConcat<T> {
@@ -184,10 +187,10 @@ impl<'a> Debug for Literal<'a> {
 ///
 /// If the value has a string-based serialization, that string is returned.
 /// If the value has a complex serialization that's not string, a JSON-as-string representation is returned.
-pub fn format_value(
-    value: &Value,
+pub fn format_value<'v>(
+    value: &'v Value,
     ontology: &(impl AsRef<DefsAspect> + AsRef<SerdeAspect>),
-) -> String {
+) -> Cow<'v, str> {
     let defs: &DefsAspect = ontology.as_ref();
 
     let def = defs.def(value.type_def_id());
@@ -203,14 +206,20 @@ pub fn format_value(
         let processor = SerdeProcessor::new(operator_addr, ProcessorMode::Read, &ctx);
 
         match processor.serialize_attr(AttrRef::Unit(value), serde_json::value::Serializer) {
-            Ok(serde_json::Value::String(string)) => string,
+            Ok(serde_json::Value::String(string)) => Cow::Owned(string),
             Ok(json_value) => {
-                serde_json::to_string(&json_value).unwrap_or_else(|_| "N/A".to_string())
+                Cow::Owned(serde_json::to_string(&json_value).unwrap_or_else(|_| "N/A".to_string()))
             }
-            Err(_) => "N/A".to_string(),
+            Err(_) => Cow::Borrowed("N/A"),
         }
     } else {
-        "N/A".to_string()
+        match value {
+            Value::Text(text, _) => Cow::Borrowed(text),
+            _ => Cow::Owned(format!(
+                "{}",
+                ValueFormatRaw::new(value, value.type_def_id(), ontology.as_ref()),
+            )),
+        }
     }
 }
 

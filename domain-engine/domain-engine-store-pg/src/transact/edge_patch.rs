@@ -944,11 +944,17 @@ impl<'a> TransactCtx<'a> {
             0 => Ok(()),
             1 => {
                 let value = values.into_iter().next().unwrap();
-                Err(DomainErrorKind::UnresolvedForeignKey(format_value(&value, self)).into_error())
+                Err(
+                    DomainErrorKind::UnresolvedForeignKey(format_value(&value, self).to_string())
+                        .into_error(),
+                )
             }
             _ => {
                 let value = values.into_iter().next().unwrap();
-                Err(DomainErrorKind::UnresolvedForeignKeys(format_value(&value, self)).into_error())
+                Err(
+                    DomainErrorKind::UnresolvedForeignKeys(format_value(&value, self).to_string())
+                        .into_error(),
+                )
             }
         }
     }
@@ -956,7 +962,8 @@ impl<'a> TransactCtx<'a> {
     pub fn unresolved_foreign_error(&self, def_id: DefId, id: SqlScalar) -> DomainError {
         match self.deserialize_sql(def_id, id) {
             Ok(value) => {
-                DomainErrorKind::UnresolvedForeignKey(format_value(&value, self)).into_error()
+                DomainErrorKind::UnresolvedForeignKey(format_value(&value, self).to_string())
+                    .into_error()
             }
             Err(error) => error,
         }
