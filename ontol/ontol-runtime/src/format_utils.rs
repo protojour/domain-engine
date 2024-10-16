@@ -191,34 +191,34 @@ pub fn format_value<'v>(
     value: &'v Value,
     ontology: &(impl AsRef<DefsAspect> + AsRef<SerdeAspect>),
 ) -> Cow<'v, str> {
-    let defs: &DefsAspect = ontology.as_ref();
-
-    let def = defs.def(value.type_def_id());
-    if let Some(operator_addr) = def.operator_addr {
-        // TODO: Easier way to report values in "human readable"/JSON format
-
-        let dummy_execution = ExecutionAspect::empty();
-        let ctx = crate::interface::serde::OntologyCtx {
-            serde: ontology.as_ref(),
-            defs: ontology.as_ref(),
-            execution: &dummy_execution,
-        };
-        let processor = SerdeProcessor::new(operator_addr, ProcessorMode::Read, &ctx);
-
-        match processor.serialize_attr(AttrRef::Unit(value), serde_json::value::Serializer) {
-            Ok(serde_json::Value::String(string)) => Cow::Owned(string),
-            Ok(json_value) => {
-                Cow::Owned(serde_json::to_string(&json_value).unwrap_or_else(|_| "N/A".to_string()))
-            }
-            Err(_) => Cow::Borrowed("N/A"),
-        }
+    if let Value::Text(text, _) = value {
+        // ASSUMPTION: text values always have a transparent representation:
+        return Cow::Borrowed(text);
     } else {
-        match value {
-            Value::Text(text, _) => Cow::Borrowed(text),
-            _ => Cow::Owned(format!(
+        let defs: &DefsAspect = ontology.as_ref();
+        let def = defs.def(value.type_def_id());
+
+        if let Some(operator_addr) = def.operator_addr {
+            let dummy_execution = ExecutionAspect::empty();
+            let ctx = crate::interface::serde::OntologyCtx {
+                serde: ontology.as_ref(),
+                defs: ontology.as_ref(),
+                execution: &dummy_execution,
+            };
+            let processor = SerdeProcessor::new(operator_addr, ProcessorMode::Read, &ctx);
+
+            match processor.serialize_attr(AttrRef::Unit(value), serde_json::value::Serializer) {
+                Ok(serde_json::Value::String(string)) => Cow::Owned(string),
+                Ok(json_value) => Cow::Owned(
+                    serde_json::to_string(&json_value).unwrap_or_else(|_| "N/A".to_string()),
+                ),
+                Err(_) => Cow::Borrowed("N/A"),
+            }
+        } else {
+            Cow::Owned(format!(
                 "{}",
                 ValueFormatRaw::new(value, value.type_def_id(), ontology.as_ref()),
-            )),
+            ))
         }
     }
 }
