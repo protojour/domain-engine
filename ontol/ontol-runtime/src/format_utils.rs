@@ -212,7 +212,12 @@ pub fn format_value<'v>(
                 Ok(json_value) => Cow::Owned(
                     serde_json::to_string(&json_value).unwrap_or_else(|_| "N/A".to_string()),
                 ),
-                Err(_) => Cow::Borrowed("N/A"),
+                Err(err) => {
+                    tracing::error!(
+                        "failed to format_value {value:?} via serde: {err:?}, formatting as `N/A`"
+                    );
+                    Cow::Borrowed("N/A")
+                }
             }
         } else {
             Cow::Owned(format!(
