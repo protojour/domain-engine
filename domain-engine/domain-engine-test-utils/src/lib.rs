@@ -166,36 +166,66 @@ pub mod system {
     use std::sync::{Arc, Mutex};
 
     use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
-    use domain_engine_core::system::SystemApiMock;
+    use domain_engine_core::{
+        system::{SystemAPI, SystemApiMock},
+        DomainResult, Session,
+    };
     use tracing::trace;
     use unimock::*;
 
     /// Mock [domain_engine_core::system::SystemApi::current_time] in a way that increases the year with every call.
     /// Starts at 1970 (January 1st, 00:00).
     pub fn mock_current_time_monotonic() -> impl unimock::Clause {
-        let year_counter: Mutex<i32> = Mutex::new(1970);
+        let monotonic = MonotonicClockSystemApi::default();
 
         SystemApiMock::current_time
             .each_call(matching!())
-            .answers_arc(Arc::new(move |_| {
-                let year = {
-                    let mut lock = year_counter.lock().unwrap();
-                    let year = *lock;
-                    *lock += 1;
-                    year
-                };
+            .answers_arc(Arc::new(move |_| monotonic.current_time()))
+    }
 
-                let dt = DateTime::<Utc>::from_naive_utc_and_offset(
-                    NaiveDateTime::new(
-                        NaiveDate::from_ymd_opt(year, 1, 1).unwrap(),
-                        NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
-                    ),
-                    Utc,
-                );
+    #[derive(Clone)]
+    pub struct MonotonicClockSystemApi {
+        year_counter: Arc<Mutex<i32>>,
+    }
 
-                trace!("mock current time: {dt}");
+    impl Default for MonotonicClockSystemApi {
+        fn default() -> Self {
+            Self {
+                year_counter: Arc::new(Mutex::new(1970)),
+            }
+        }
+    }
 
-                dt
-            }))
+    #[async_trait::async_trait]
+    impl SystemAPI for MonotonicClockSystemApi {
+        fn current_time(&self) -> chrono::DateTime<chrono::Utc> {
+            let year = {
+                let mut lock = self.year_counter.lock().unwrap();
+                let year = *lock;
+                *lock += 1;
+                year
+            };
+
+            let dt = DateTime::<Utc>::from_naive_utc_and_offset(
+                NaiveDateTime::new(
+                    NaiveDate::from_ymd_opt(year, 1, 1).unwrap(),
+                    NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
+                ),
+                Utc,
+            );
+
+            trace!("monotonic year current time: {dt}");
+
+            dt
+        }
+
+        async fn call_http_json_hook(
+            &self,
+            _url: &str,
+            _session: Session,
+            _input: Vec<u8>,
+        ) -> DomainResult<Vec<u8>> {
+            unimplemented!()
+        }
     }
 }

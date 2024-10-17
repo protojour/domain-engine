@@ -9,7 +9,7 @@ use domain_engine_test_utils::{
     await_search_indexer_queue_empty,
     dynamic_data_store::DynamicDataStoreFactory,
     graphql_test_utils::{Exec, TestCompileSingletonSchema},
-    system::mock_current_time_monotonic,
+    system::MonotonicClockSystemApi,
 };
 use juniper::graphql_value;
 use ontol_examples::conduit::conduit_db;
@@ -23,9 +23,7 @@ async fn test_conduit_search(ds: &str) {
     let (test, conduit_schema) = conduit_db().1.compile_single_schema();
     let domain_engine = Arc::new(
         DomainEngine::builder(test.ontology_owned())
-            .system(Box::new(unimock::Unimock::new(
-                mock_current_time_monotonic(),
-            )))
+            .system(Box::new(MonotonicClockSystemApi::default()))
             .build(
                 DynamicDataStoreFactory::new(ds).tantivy_index(),
                 Session::default(),
