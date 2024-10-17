@@ -114,15 +114,15 @@ impl WriteStats {
         self.end
     }
 
-    pub fn mutated(&self) -> impl Iterator<Item = DefId> + '_ {
+    pub fn mutated(&self) -> impl Iterator<Item = DefId> + use<'_> {
         self.mutated.iter().copied()
     }
 
-    pub fn deleted(&self) -> impl Iterator<Item = VertexAddr> + '_ {
+    pub fn deleted(&self) -> impl Iterator<Item = VertexAddr> + use<'_> {
         self.deleted.iter().cloned()
     }
 
-    pub fn take_deleted(&mut self) -> impl Iterator<Item = VertexAddr> + '_ {
+    pub fn take_deleted(&mut self) -> impl Iterator<Item = VertexAddr> + use<'_> {
         std::mem::take(&mut self.deleted).into_iter()
     }
 }

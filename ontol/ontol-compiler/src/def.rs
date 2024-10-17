@@ -304,7 +304,7 @@ impl<'m> Defs<'m> {
         DefId(domain_index, idx)
     }
 
-    pub fn iter_domain_indices(&self) -> impl Iterator<Item = DomainIndex> + '_ {
+    pub fn iter_domain_indices(&self) -> impl Iterator<Item = DomainIndex> + use<'_> {
         self.def_id_allocators.keys().copied()
     }
 

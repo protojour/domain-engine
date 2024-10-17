@@ -161,7 +161,7 @@ impl Ontology {
         self.data.execution.const_proc_table.get(&const_id).cloned()
     }
 
-    pub fn iter_map_meta(&self) -> impl Iterator<Item = (MapKey, &MapMeta)> + '_ {
+    pub fn iter_map_meta(&self) -> impl Iterator<Item = (MapKey, &MapMeta)> + use<'_> {
         self.data
             .execution
             .map_meta_table
@@ -171,7 +171,7 @@ impl Ontology {
 
     pub fn iter_named_downmaps(
         &self,
-    ) -> impl Iterator<Item = (DomainIndex, TextConstant, MapKey)> + '_ {
+    ) -> impl Iterator<Item = (DomainIndex, TextConstant, MapKey)> + use<'_> {
         self.data
             .execution
             .named_downmaps

@@ -24,7 +24,7 @@ pub struct Sequence {
 }
 
 impl Sequence {
-    pub fn elements(&self) -> impl Iterator<Item = (u16, Option<RelId>)> + '_ {
+    pub fn elements(&self) -> impl Iterator<Item = (u16, Option<RelId>)> + use<'_> {
         let mut next_index: u16 = 0;
         let mut iterator = self.elements.iter().peekable();
 

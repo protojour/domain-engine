@@ -16,11 +16,11 @@ impl ResolvePath {
         self.path.is_empty()
     }
 
-    pub fn iter(&self) -> impl DoubleEndedIterator<Item = MapKey> + '_ {
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = MapKey> + use<'_> {
         self.path.iter().cloned()
     }
 
-    pub fn reverse(&self) -> impl DoubleEndedIterator<Item = MapKey> + '_ {
+    pub fn reverse(&self) -> impl DoubleEndedIterator<Item = MapKey> + use<'_> {
         self.path.iter().cloned().rev().map(|key| MapKey {
             input: key.output,
             output: key.input,

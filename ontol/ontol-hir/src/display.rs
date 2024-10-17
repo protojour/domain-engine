@@ -53,10 +53,10 @@ impl<'h, 'a, L: Lang> Printer<'h, 'a, L> {
         self.arena.kind_of(node)
     }
 
-    fn kinds<'n>(&self, nodes: &'n [Node]) -> impl Iterator<Item = &'h Kind<'a, L>> + 'n
-    where
-        'h: 'n,
-    {
+    fn kinds<'n>(
+        &self,
+        nodes: &'n [Node],
+    ) -> impl Iterator<Item = &'h Kind<'a, L>> + use<'n, 'h, 'a, L> {
         nodes.iter().map(|node| self.arena.kind_of(*node))
     }
 }
