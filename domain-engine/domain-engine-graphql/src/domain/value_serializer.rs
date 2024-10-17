@@ -1,3 +1,4 @@
+use compact_str::CompactString;
 use serde::ser;
 use std::fmt::Display;
 
@@ -243,7 +244,7 @@ impl ser::SerializeSeq for JuniperListSerializer {
 }
 
 pub struct JuniperObjectSerializer {
-    pending_key: Option<smartstring::alias::String>,
+    pending_key: Option<CompactString>,
     object: juniper::Object<GqlScalar>,
 }
 

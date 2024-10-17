@@ -1,10 +1,10 @@
 use std::array;
 
 use bit_vec::BitVec;
+use compact_str::CompactString;
 use fnv::FnvHashMap;
 use regex_automata::{util::captures::Captures, Input};
 use smallvec::SmallVec;
-use smartstring::alias::String;
 use thin_vec::ThinVec;
 use tracing::{error, trace, Level};
 
@@ -327,7 +327,7 @@ impl<'on> Processor for OntolProcessor<'on> {
 
     #[inline(always)]
     fn append_string(&mut self, to: Local) -> VmResult<()> {
-        let [appendee]: [String; 1] = self.pop_n();
+        let [appendee]: [CompactString; 1] = self.pop_n();
         let to = self.string_local_mut(to)?;
         to.push_str(&appendee);
         Ok(())
@@ -538,8 +538,8 @@ impl<'o> OntolProcessor<'o> {
                 Value::F64(a / b, tag)
             }
             BuiltinProc::Append => {
-                let [b, a]: [String; 2] = self.pop_n();
-                Value::Text(a + b, tag)
+                let [b, a]: [CompactString; 2] = self.pop_n();
+                Value::Text(a + &b, tag)
             }
             BuiltinProc::NewStruct => Value::Struct(Default::default(), tag),
             BuiltinProc::NewSeq => Value::Sequence(Default::default(), tag),
@@ -581,7 +581,7 @@ impl<'o> OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn string_local_mut(&mut self, local: Local) -> VmResult<&mut String> {
+    fn string_local_mut(&mut self, local: Local) -> VmResult<&mut CompactString> {
         match self.local_mut(local) {
             Value::Text(string, _) => Ok(string),
             _ => Err(VmError::InvalidType(local)),

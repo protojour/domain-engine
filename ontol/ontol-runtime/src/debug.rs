@@ -3,6 +3,7 @@ use std::{
     ops::{Range, RangeInclusive},
 };
 
+use compact_str::CompactString;
 use thin_vec::ThinVec;
 
 use crate::ontology::ontol::TextConstant;
@@ -77,7 +78,7 @@ impl_ontol_debug!(f32);
 impl_ontol_debug!(f64);
 impl_ontol_debug!(usize);
 impl_ontol_debug!(std::string::String);
-impl_ontol_debug!(smartstring::alias::String);
+impl_ontol_debug!(CompactString);
 impl_ontol_debug!(arcstr::ArcStr);
 impl_ontol_debug!(bit_vec::BitVec);
 

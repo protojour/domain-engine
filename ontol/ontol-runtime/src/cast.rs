@@ -1,4 +1,4 @@
-use smartstring::alias::String;
+use compact_str::CompactString;
 use uuid::Uuid;
 
 use crate::value::{Serial, Value};
@@ -66,10 +66,10 @@ impl Cast<bool> for Value {
     }
 }
 
-impl Cast<String> for Value {
+impl Cast<CompactString> for Value {
     type Ref = str;
 
-    fn cast_into(self) -> String {
+    fn cast_into(self) -> CompactString {
         match self {
             Value::Text(s, _) => s,
             _ => panic!("not a string"),

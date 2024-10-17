@@ -727,6 +727,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37b2a672a2cb129a2e41c10b1224bb368f9f37a2b16b612598138befd7b37eb5"
 
 [[package]]
+name = "castaway"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0abae9be0aaf9ea96a3b1b8b1b55c602ca751eba1b1500220cea4ecbafe7c0d5"
+dependencies = [
+ "rustversion",
+]
+
+[[package]]
 name = "cc"
 version = "1.1.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -905,6 +914,21 @@ dependencies = [
  "strum",
  "strum_macros",
  "unicode-width",
+]
+
+[[package]]
+name = "compact_str"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6050c3a16ddab2e412160b31f2c871015704239bca62f72f6e5f0be631d3f644"
+dependencies = [
+ "castaway",
+ "cfg-if",
+ "itoa",
+ "rustversion",
+ "ryu",
+ "serde",
+ "static_assertions",
 ]
 
 [[package]]
@@ -1667,6 +1691,7 @@ dependencies = [
  "async-trait",
  "base64",
  "chrono",
+ "compact_str",
  "domain-engine-core",
  "domain-engine-store-inmemory",
  "domain-engine-test-utils",
@@ -1681,7 +1706,6 @@ dependencies = [
  "pretty_assertions",
  "serde",
  "serde_json",
- "smartstring",
  "thiserror",
  "tokio",
  "tracing",
@@ -1811,6 +1835,7 @@ dependencies = [
  "byteorder",
  "bytes",
  "chrono",
+ "compact_str",
  "deadpool",
  "deadpool-postgres",
  "displaydoc",
@@ -1835,7 +1860,6 @@ dependencies = [
  "serde",
  "serde_json",
  "smallvec 2.0.0-alpha.7",
- "smartstring",
  "thin-vec",
  "tokio",
  "tokio-postgres",
@@ -3451,6 +3475,7 @@ dependencies = [
  "bit-vec 0.8.0",
  "bitflags 2.6.0",
  "chrono",
+ "compact_str",
  "fnv",
  "hex",
  "indexmap",
@@ -3467,7 +3492,6 @@ dependencies = [
  "serde-value",
  "serde_json",
  "smallvec 2.0.0-alpha.7",
- "smartstring",
  "thin-vec",
  "thiserror",
  "tracing",
@@ -4580,7 +4604,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fb72c633efbaa2dd666986505016c32c3044395ceaf881518399d2f4127ee29"
 dependencies = [
  "autocfg",
- "serde",
  "static_assertions",
  "version_check",
 ]

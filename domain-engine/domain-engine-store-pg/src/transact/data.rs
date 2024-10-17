@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use compact_str::CompactString;
 use domain_engine_core::{transact::DataOperation, DomainResult};
 use fnv::FnvHashMap;
 use ontol_runtime::{
@@ -48,7 +49,7 @@ impl From<Compound> for Data {
 #[expect(unused)]
 pub enum Compound {
     Struct(Box<FnvHashMap<PropId, Attr>>, ValueTag),
-    Dict(BTreeMap<smartstring::alias::String, Value>, ValueTag),
+    Dict(BTreeMap<CompactString, Value>, ValueTag),
     Sequence(Sequence<Value>, ValueTag),
     DeleteRelationship(ValueTag),
     Filter(Box<Filter>, ValueTag),

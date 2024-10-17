@@ -1,3 +1,4 @@
+use compact_str::CompactString;
 use serde::{
     de::{DeserializeSeed, Error, Visitor},
     Deserializer,
@@ -23,7 +24,7 @@ pub enum PropKind<'on> {
     OverriddenId(PropId, SerdeOperatorAddr),
     FlatUnionDiscriminator(usize, Box<str>, &'on SerdeProperty, SerdeOperatorAddr),
     FlatUnionData(Box<str>),
-    Open(smartstring::alias::String),
+    Open(CompactString),
     Ignored,
 }
 

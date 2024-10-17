@@ -35,7 +35,7 @@ refinery = { version = "0.8", default-features = false, features = ["tokio-postg
 ulid = { version = "1", features = ["postgres"] }
 indoc = "2"
 bytes = "1"
-smartstring = "1"
+compact_str = "0.8"
 thin-vec.workspace = true
 chrono.workspace = true
 pin-utils = "0.1"

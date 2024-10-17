@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
+use compact_str::CompactString;
 use juniper::ScalarValue;
 use serde::{de, ser};
-use smartstring::alias::String;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum GqlScalar {
@@ -12,7 +12,7 @@ pub enum GqlScalar {
     I64(i64),
     F64(f64),
     Boolean(bool),
-    String(String),
+    String(CompactString),
 }
 
 impl From<i32> for GqlScalar {
@@ -39,8 +39,8 @@ impl From<std::string::String> for GqlScalar {
     }
 }
 
-impl From<smartstring::alias::String> for GqlScalar {
-    fn from(value: smartstring::alias::String) -> Self {
+impl From<CompactString> for GqlScalar {
+    fn from(value: CompactString) -> Self {
         Self::String(value)
     }
 }

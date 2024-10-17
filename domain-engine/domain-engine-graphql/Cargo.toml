@@ -18,7 +18,7 @@ serde.workspace = true
 serde_json.workspace = true
 fnv.workspace = true
 thiserror.workspace = true
-smartstring = { version = "1", features = ["serde"] }
+compact_str = { version = "0.8", features = ["serde"] }
 base64 = "0.22"
 futures-util = "0.3"
 ulid = "1"

@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use ::juniper::FieldResult;
+use compact_str::CompactString;
 use ulid::Ulid;
 
 use crate::{gql_scalar::GqlScalar, juniper};
@@ -38,7 +39,7 @@ impl DefId {
 
     fn to_output(v: &Self) -> juniper::Value<GqlScalar> {
         use std::fmt::Write;
-        let mut s = smartstring::alias::String::new();
+        let mut s = CompactString::default();
         write!(&mut s, "{v}").unwrap();
         juniper::Value::Scalar(GqlScalar::String(s))
     }

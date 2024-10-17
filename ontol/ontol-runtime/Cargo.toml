@@ -37,7 +37,7 @@ num_enum = { version = "0.7", default-features = false }
 phf_shared = "0.11"
 serde-value = "0.7"
 smallvec = { workspace = true, features = ["serde"] }
-smartstring = { version = "1", features = ["serde"] }
+compact_str = { version = "0.8", features = ["serde"] }
 thiserror = "1"
 urlencoding = "2"
 

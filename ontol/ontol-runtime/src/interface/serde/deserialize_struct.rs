@@ -4,6 +4,7 @@ use std::{
 };
 
 use bit_set::BitSet;
+use compact_str::CompactString;
 use fnv::FnvHashMap;
 use serde::de::{DeserializeSeed, MapAccess, Visitor};
 use tracing::{debug, trace, trace_span};
@@ -55,7 +56,7 @@ pub struct Struct {
     /// serde properties that may later be deserialized by the flattened unions above
     flattened_union_tmp_data: HashMap<Box<str>, serde_value::Value>,
 
-    open_dict: BTreeMap<smartstring::alias::String, Value>,
+    open_dict: BTreeMap<CompactString, Value>,
 }
 
 /// A serde visitor for maps (i.e. JSON objects) that uses the [StructDeserializer] internally.

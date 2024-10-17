@@ -5,9 +5,9 @@ use std::{
 };
 
 use ::serde::{Deserialize, Serialize};
+use compact_str::CompactString;
 use fnv::FnvHashMap;
 use itertools::{Itertools, Position};
-use smartstring::alias::String;
 use thin_vec::ThinVec;
 
 use crate::{
@@ -30,7 +30,7 @@ pub enum Value {
     F64(f64, ValueTag),
     Serial(Serial, ValueTag),
     Rational(Box<num::rational::BigRational>, ValueTag),
-    Text(String, ValueTag),
+    Text(CompactString, ValueTag),
     OctetSequence(OctetSequence, ValueTag),
     ChronoDateTime(chrono::DateTime<chrono::Utc>, ValueTag),
     ChronoDate(chrono::NaiveDate, ValueTag),
@@ -40,7 +40,7 @@ pub enum Value {
     Struct(Box<FnvHashMap<PropId, Attr>>, ValueTag),
 
     /// A collection of arbitrary values keyed by strings.
-    Dict(Box<BTreeMap<String, Value>>, ValueTag),
+    Dict(Box<BTreeMap<CompactString, Value>>, ValueTag),
 
     /// A sequence of values.
     ///
@@ -79,7 +79,7 @@ impl Value {
         Self::F64(value, OntolDefTag::F64.def_id().into())
     }
 
-    pub fn text(value: impl Into<String>) -> Self {
+    pub fn text(value: impl Into<CompactString>) -> Self {
         Self::Text(value.into(), OntolDefTag::Text.def_id().into())
     }
 
