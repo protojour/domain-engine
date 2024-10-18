@@ -27,11 +27,11 @@ pub fn map_row_error(
                 PgDomainTableType::Edge => DomainErrorKind::EdgeAlreadyExists,
             }
         } else {
-            info!("row fetch DB error: {db_error:?}");
+            info!(?db_error, "row fetch");
             DomainErrorKind::DataStore("could not fetch row".to_string())
         }
     } else {
-        error!("row fetch PG error: {pg_err:?}");
+        error!(?pg_err, "row fetch");
         DomainErrorKind::DataStore("could not fetch row".to_string())
     }
 }
@@ -136,9 +136,9 @@ pub enum PgInputError {
 }
 
 impl From<PgInputError> for DomainError {
-    fn from(value: PgInputError) -> Self {
-        info!("pg input error: {value:?}");
-        DomainErrorKind::DataStoreBadRequest(format!("{value}")).into_error()
+    fn from(err: PgInputError) -> Self {
+        info!(?err, "pg input error");
+        DomainErrorKind::DataStoreBadRequest(format!("{err}")).into_error()
     }
 }
 
@@ -174,9 +174,9 @@ pub enum PgModelError {
 }
 
 impl From<PgModelError> for DomainError {
-    fn from(value: PgModelError) -> Self {
-        error!("pg model error: {value:?}");
-        DomainErrorKind::DataStore(format!("{value}")).into_error()
+    fn from(err: PgModelError) -> Self {
+        error!(?err, "pg model error");
+        DomainErrorKind::DataStore(format!("{err}")).into_error()
     }
 }
 

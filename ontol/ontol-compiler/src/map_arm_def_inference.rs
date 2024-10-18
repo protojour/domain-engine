@@ -145,7 +145,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                     self.find_source_var_relationship(source_vars, *var, &pattern.span)
                 {
                     if flags != var_relationship.flags {
-                        debug!("flags: {flags:?} var_rel: {:?}", var_relationship.flags);
+                        debug!(flags = ?flags, var_rel = ?var_relationship.flags, "cardinality mismatch");
                         CompileError::InferenceCardinalityMismatch
                             .span(pattern.span)
                             .report(self);
@@ -177,7 +177,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                         modifiers: vec![],
                     };
 
-                    debug!("new rel for {parent_def_id:?}");
+                    debug!(?parent_def_id, "new rel");
 
                     let rel_id = self.rel_ctx.alloc_rel_id(parent_def_id);
                     self.rel_ctx.commit_rel(rel_id, relationship, pattern.span);

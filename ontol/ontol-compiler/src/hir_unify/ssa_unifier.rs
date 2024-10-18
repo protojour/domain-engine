@@ -175,7 +175,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
     ) -> UnifierResult<Nodes> {
         let node_ref = self.expr_arena.node_ref(expr_node);
 
-        // debug!("write expr {node_ref}");
+        // debug!(node_ref, "write expr");
 
         match node_ref.kind() {
             Kind::Map(argument) => {
@@ -577,7 +577,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 let let_cond_var = self.mk_let_cond_var(set_cond_var, match_var, meta.span);
                 let free_vars = self.scan_immediate_free_vars(self.expr_arena, &[*node]);
 
-                debug!("prop predicate free vars: {free_vars:?}");
+                debug!(?free_vars, "prop predicate");
 
                 self.maybe_apply_catch_block(free_vars, meta.span, &|zelf| {
                     let mut body = smallvec![let_cond_var];
@@ -615,9 +615,9 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
         for MatrixRow(label, elements) in rows {
             debug!(
-                "matrix arity={}, in_scope: {:?}",
-                elements.len(),
-                self.scope_tracker.in_scope,
+                arity = elements.len(),
+                in_scope = ?self.scope_tracker.in_scope,
+                "matrix",
             );
 
             if let Some(label) = label {
@@ -631,7 +631,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 };
                 let free_vars = self.scan_immediate_free_vars(self.expr_arena, elements);
 
-                debug!("matrix free vars: {free_vars:?}");
+                debug!(?free_vars, "matrix");
 
                 let for_each = self.prealloc_node();
                 let (bindings, for_each_body) =
@@ -650,7 +650,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             bindings.push(binding);
                         }
 
-                        debug!("in scope in loop: {:?}", zelf.scope_tracker.in_scope);
+                        debug!(in_scope = ?zelf.scope_tracker.in_scope, "in loop");
 
                         let insertions: Vec<_> = elements
                             .iter()
@@ -713,7 +713,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         let mut seq_body: Nodes = smallvec![];
 
         for MatrixRow(label, elements) in rows {
-            debug!("in_scope: {:?}", self.scope_tracker.in_scope);
+            debug!(in_scope = ?self.scope_tracker.in_scope, "matrix body");
 
             if let Some(label) = label {
                 let label = *label.hir();
@@ -724,7 +724,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 };
                 let free_vars = self.scan_immediate_free_vars(self.expr_arena, elements);
 
-                debug!("matrix(match) free vars: {free_vars:?}");
+                debug!(?free_vars, "matrix(match)");
 
                 let for_each = self.prealloc_node();
                 let (bindings, for_each_body) =
@@ -754,7 +754,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             clause_nodes.extend(nodes);
                         }
 
-                        debug!("in match scope in loop: {:?}", zelf.scope_tracker.in_scope);
+                        debug!(in_scope = ?zelf.scope_tracker.in_scope, "in match scope in loop");
 
                         body.push(zelf.mk_node(
                             Kind::PushCondClauses(
@@ -1169,7 +1169,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         match_var: Var,
         span: SourceSpan,
     ) -> Node {
-        // debug!("mk let cond var {cond_var:?}");
+        // debug!(?cond_var, "mk let cond var");
         self.scope_tracker.in_scope.insert(cond_var);
         self.mk_node(
             Kind::LetCondVar(cond_var, match_var),

@@ -56,7 +56,7 @@ pub async fn read_registry<'t>(
             ctx.domains.insert(*domain_index, pg_domain.clone());
             domain_index_by_key.insert(key, *domain_index);
         } else {
-            info!("domain id={uid} is persisted but no longer in the ontology, ignoring");
+            info!(domain_id = %uid, "domain persisted but no longer in the ontology, ignoring");
         }
     }
 

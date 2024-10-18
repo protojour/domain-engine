@@ -498,8 +498,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
             if let Some(addr) = addr {
                 debug!(
-                    "  made sub-operator: {:?} ",
-                    self.get_operator(addr).debug(self.str_ctx)
+                    op = ?self.get_operator(addr).debug(self.str_ctx),
+                    "  made sub-operator",
                 );
 
                 let variant = SerdeUnionVariant {
@@ -509,8 +509,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 };
 
                 debug!(
-                    "add union serde variant: {:#?}",
-                    variant.debug(self.str_ctx)
+                    variant = ?variant.debug(self.str_ctx),
+                    "add union serde variant",
                 );
                 serde_variants.push(variant);
 

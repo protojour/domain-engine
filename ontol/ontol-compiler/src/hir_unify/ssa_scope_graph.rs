@@ -132,9 +132,10 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     0 => {}
                     1 => {
                         debug!(
-                            "single variable producer. dependency={dependency:?} produces={produces:?} unique={unique_produces:?}",
-                            dependency = complex.dependency,
-                            produces = complex.produces
+                            dependency = ?complex.dependency,
+                            produces = ?complex.produces,
+                            ?unique_produces,
+                            "single variable producer",
                         );
 
                         let produces_var = unique_produces.iter().next().unwrap();
@@ -160,7 +161,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                         }
                     }
                     _ => {
-                        debug!("still ambiguous: {unique_produces:?}");
+                        debug!(unique = ?unique_produces, "still ambiguous");
                         complex_list.push((complex, span));
                     }
                 }
@@ -190,7 +191,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         out_binder: &mut Option<TypedHirData<'m, Binder>>,
     ) -> UnifierResult<Node> {
         let node_ref = self.scope_arena.node_ref(node);
-        debug!("invert {node_ref}");
+        debug!(node = %node_ref, "invert");
         match node_ref.kind() {
             ontol_hir::Kind::Var(var) => {
                 assert_eq!(*var, respect_to);

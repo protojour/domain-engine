@@ -13,7 +13,7 @@ use tracing::debug;
 use ulid::Ulid;
 
 use crate::{
-    debug::{OntolDebug, OntolFormatter},
+    debug::OntolFormatter,
     interface::{
         serde::{
             operator::{SerdeOperator, SerdeOperatorAddr},
@@ -195,9 +195,10 @@ impl Ontology {
     pub fn get_mapper_proc(&self, key: &MapKey) -> Option<Procedure> {
         self.data.execution.map_meta_table.get(key).map(|map_info| {
             debug!(
-                "get_mapper_proc ({:?}) => {:?}",
-                key.def_ids(),
-                map_info.procedure.debug(self)
+                i = ?key.input.def_id,
+                o = ?key.output.def_id,
+                addr = ?map_info.procedure.address,
+                "get_mapper_proc",
             );
             map_info.procedure
         })

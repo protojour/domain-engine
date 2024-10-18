@@ -98,7 +98,7 @@ impl<'a> SelectAnalyzer<'a> {
             .into_unit()
             .expect("not a unit");
 
-        debug!("field map queries: {map_queries:?}");
+        debug!(?map_queries, "analyze map field");
 
         let mut output_selects: FnvHashMap<Var, EntitySelect> = Default::default();
 

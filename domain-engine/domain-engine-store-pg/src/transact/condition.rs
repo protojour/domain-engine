@@ -124,7 +124,7 @@ impl<'a> TransactCtx<'a> {
 
         let def = self.ontology_defs.def(def_id);
 
-        debug!("traverse condition {cond_var}");
+        debug!(?cond_var, "traverse condition");
 
         for clause in walker.clauses(cond_var) {
             match clause {

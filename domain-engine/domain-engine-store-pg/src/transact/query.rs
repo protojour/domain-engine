@@ -144,7 +144,7 @@ impl<'a> TransactCtx<'a> {
         query_select: QuerySelect,
         mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<impl Stream<Item = DomainResult<QueryFrame>> + 's> {
-        debug!("query {def_id:?} after cursor: {:?}", q.after_cursor);
+        debug!(?def_id, after_cursor = ?q.after_cursor, "query");
 
         let pg = self
             .pg_model
@@ -919,7 +919,7 @@ impl<'a> TransactCtx<'a> {
         let len = cardinal_selects.len();
         let mut tup_elements: SmallVec<Value, 1> = Default::default();
 
-        debug!("read edge tuple {cardinal_selects:#?}");
+        debug!(?cardinal_selects, "read edge tuple");
 
         for cardinal_select in cardinal_selects {
             let sql_record = tuple_fields.next::<SqlRecord>()?;

@@ -34,7 +34,7 @@ impl<'a> TransactCtx<'a> {
         for item in vertex_order_tuple {
             let direction = item.direction;
 
-            debug!("{direction:?}");
+            debug!(?direction, "order item");
 
             for field_path in item.tuple.as_ref() {
                 if let Some(expr) = self.order_expr_for_field_path(pg, def, field_path)? {
@@ -57,13 +57,13 @@ impl<'a> TransactCtx<'a> {
         }
 
         if let Some(prop_id) = (&path.0).into_iter().next() {
-            debug!("order by property {prop_id:?}");
+            debug!(?prop_id, "order by property");
             match pg.table.properties.get(&prop_id.tag()) {
                 Some(PgProperty::Column(pg_column)) => {
                     return Ok(Some(sql::Expr::path1(pg_column.col_name.as_ref())));
                 }
                 Some(PgProperty::Abstract(_)) => {
-                    error!("order by abstract property {prop_id:?}");
+                    error!(?prop_id, "order by abstract property");
                     return Ok(None);
                 }
                 None => match self.order_fallback(def, prop_id)? {
@@ -77,7 +77,7 @@ impl<'a> TransactCtx<'a> {
                     | PgRepr::Scalar(..)
                     | PgRepr::Abstract
                     | PgRepr::NotSupported(_) => {
-                        error!("order by non-existent property {prop_id:?}");
+                        error!(?prop_id, "order by non-existent property");
                         return Ok(None);
                     }
                 },

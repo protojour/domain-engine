@@ -425,12 +425,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             None => &UNIT_TYPE,
         };
 
-        debug!("rel_params_ty: {rel_params_ty:?}");
+        debug!(?rel_params_ty, "property node");
 
         let node = match kind {
             CompoundPatternAttrKind::Value { rel, val } => {
                 let value_ty = self.check_def(match_attribute.value_def);
-                debug!("value_ty: {value_ty:?}");
+                debug!(?value_ty, "property node");
 
                 let prop_variant = match match_attribute.cardinality.1 {
                     ValueCardinality::Unit => {
@@ -821,12 +821,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         if !self.check_can_construct_default_inner(def_id) {
-            debug!("cannot make default: {ty:?}");
+            debug!(?ty, "cannot make default");
             CompileError::TODO("optional binding required, as a default value cannot be created")
                 .span(span)
                 .report(self);
         } else {
-            info!("CAN MAKE DEFAULT: {ty:?}");
+            info!(?ty, "CAN MAKE DEFAULT");
         }
     }
 

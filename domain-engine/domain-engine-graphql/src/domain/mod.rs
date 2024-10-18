@@ -93,9 +93,9 @@ pub fn create_graphql_schema(
     juniper_schema.argument_validation_disabled = true;
 
     if should_debug {
-        debug!("Created schema \n{}", juniper_schema.as_sdl());
+        debug!(schema = %juniper_schema.as_sdl(), "created schema");
     } else {
-        debug!("Created schema too large to debug");
+        debug!("created schema too large to debug");
     }
 
     Ok(juniper_schema)

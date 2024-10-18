@@ -621,7 +621,7 @@ fn generate_map_proc<'m>(
         }
     }
 
-    debug!("body type: {:?}", func.body.data().ty());
+    debug!(ty = ?func.body.data().ty(), "body");
 
     let key = map_codegen(proc_table, &func, map_flags, direction, compiler);
 

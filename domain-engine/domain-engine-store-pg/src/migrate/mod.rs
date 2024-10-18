@@ -135,7 +135,7 @@ pub async fn migrate(
     db_name: &str,
     pg_client: &mut Client,
 ) -> anyhow::Result<PgModel> {
-    info!("migrating database `{db_name}`");
+    info!(%db_name, "migrating database");
 
     // Migrate the registry
     let mut ctx = {

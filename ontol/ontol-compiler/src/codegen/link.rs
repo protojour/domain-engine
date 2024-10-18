@@ -4,7 +4,7 @@ use ontol_runtime::{
     vm::proc::{Address, Lib, OpCode, Procedure},
     DefId, MapDef, MapKey,
 };
-use tracing::debug;
+use tracing::{debug, debug_span};
 
 use crate::{error::CompileError, types::FormatType, Compiler, SourceSpan};
 
@@ -34,7 +34,9 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
     }
 
     for (key, proc_builder) in std::mem::take(&mut proc_table.map_procedures) {
-        debug!("{:?} -> {:?}", key.input, key.output);
+        let _entered = debug_span!("link", i = ?key.input.def_id, o = ?key.output.def_id).entered();
+
+        debug!(i = ?key.input.flags, o = ?key.output.flags, "link");
 
         let n_params = proc_builder.n_params;
         let opcodes = proc_builder.build();

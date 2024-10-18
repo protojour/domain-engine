@@ -834,7 +834,7 @@ impl<'a> TransactCtx<'a> {
         sql_params: &[SqlScalar],
         query_select: QuerySelectRef<'a>,
     ) -> DomainResult<RowValue> {
-        debug!("{}", stmt);
+        debug!("{stmt}");
         let row = self.query_one_raw(stmt.deref(), sql_params).await?;
         let mut column_stream = SqlColumnStream::new(&row);
 

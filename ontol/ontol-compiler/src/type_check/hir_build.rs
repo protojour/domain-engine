@@ -74,7 +74,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Type::Error | Type::Infer(_) => {}
             _ => {
                 let type_var = ctx.inference.new_type_variable(pat_id);
-                debug!("Check pat(2) root type result: {:?}", node_meta.ty);
+                debug!(ty = ?node_meta.ty, "Check pat(2) root type result");
                 ctx.inference
                     .eq_relations
                     .unify_var_value(
@@ -120,7 +120,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             self.type_ctx,
                         );
 
-                        debug!("sig: {sig:?}");
+                        debug!(?sig, "call");
 
                         if params.len() != sig.args.len() {
                             return self.error_node(
@@ -251,7 +251,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ctx,
                 );
 
-                debug!("built unpacker node! expected_ty: {expected_ty:?}");
+                debug!(?expected_ty, "built unpacker node");
 
                 let meta = *ctx.hir_arena[node].meta();
                 match expected_ty {
@@ -383,7 +383,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     ctx.inference.new_type_variable(val_pat_id),
                                 ));
 
-                                debug!("Infer seq val type: {val_ty:?}");
+                                debug!(?val_ty, "infer seq val type");
                                 val_ty
                             });
 
@@ -432,7 +432,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 )
             }
             (PatternKind::ConstInt(int), Some(expected_ty)) => {
-                debug!("ConstInt expected: {expected_ty:?}");
+                debug!(?expected_ty, "ConstInt");
                 match expected_ty {
                     (Type::Primitive(PrimitiveKind::I64, _), _strengt) => ctx.mk_node(
                         ontol_hir::Kind::I64(*int),
@@ -526,7 +526,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             },
                         );
 
-                        debug!("Unifying type inference for variable {var}: {expected_ty:?}");
+                        debug!(
+                            %var,
+                            ?expected_ty,
+                            "Unifying type inference for variable"
+                        );
 
                         match ctx
                             .inference
@@ -590,9 +594,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let hir_data = &ctx.hir_arena[node];
 
         debug!(
-            "expected/meta: {:?} {:?}",
-            node_info.expected_ty,
-            hir_data.ty()
+            expected = ?node_info.expected_ty,
+            ty = ?hir_data.ty(),
+            "built node"
         );
 
         match (node_info.expected_ty, hir_data.ty()) {

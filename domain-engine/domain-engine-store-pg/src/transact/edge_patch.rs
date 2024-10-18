@@ -127,7 +127,7 @@ impl<'a> TransactCtx<'a> {
         timestamp: PgTimestamp,
         mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<()> {
-        // debug!("patch edges: {patches:#?}");
+        // debug!(?patches, "patch edges");
 
         for (edge_id, patch) in patches.patches {
             self.patch_edge(
