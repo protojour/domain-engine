@@ -22,14 +22,19 @@
     "package": "vsce package --out ontol.vsix"
   },
   "keywords": [
+    "ontol",
     "language-server",
+    "dsl",
     "domain",
-    "ontology",
-    "knowledge-graph"
+    "domain-modelling",
+    "data-modelling",
+    "ontology"
   ],
   "categories": [
     "Programming Languages",
-    "Language Packs"
+    "Language Packs",
+    "Linters",
+    "Snippets"
   ],
   "contributes": {
     "languages": [
