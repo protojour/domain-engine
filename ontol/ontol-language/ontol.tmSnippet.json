@@ -6,6 +6,13 @@
         ],
         "description": "Import domain alias"
     },
+    "domain identifier": {
+        "prefix": "def identifier",
+        "body": [
+            "def ${1:ulid} ()"
+        ],
+        "description": "Domain identifier"
+    },
     "def block": {
         "prefix": "def block",
         "body": [
@@ -23,6 +30,22 @@
             ")"
         ],
         "description": "Modified type definition block"
+    },
+    "sym block": {
+        "prefix": "sym block",
+        "body": [
+            "sym { ${1:name} }"
+        ],
+        "description": "Symbol definition block"
+    },
+    "arc block": {
+        "prefix": "arc block",
+        "body": [
+            "arc ${1:name} {",
+            "\t$2",
+            "}"
+        ],
+        "description": "Arc definition block"
     },
     "rel local": {
         "prefix": "rel* ",

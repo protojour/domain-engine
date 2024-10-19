@@ -6,6 +6,10 @@ fileTypes: ['on']
 uuid: 4fc14b00-3ee2-4804-9036-e70090594121
 
 patterns:
+  - comment: domain declaration
+    name: keyword.domain.ontol
+    match: ^(domain)\s
+
   - comment: use declaration
     name: keyword.import.ontol
     match: ^(use)\s
@@ -18,8 +22,16 @@ patterns:
     match: \b(def)\b
     name: keyword.declaration.def.ontol
 
-  - comment: subject/self dot rel
-    match: \b(rel)\s*?(\.)
+  - comment: sym declaration
+    match: \b(sym)\b
+    name: keyword.declaration.sym.ontol
+
+  - comment: arc declaration
+    match: \b(arc)\b
+    name: keyword.declaration.arc.ontol
+
+  - comment: subject/self dot + asterisk rel
+    match: \b(rel)\s*?([\.\*])
     captures:
       '1': {name: keyword.declaration.rel.ontol}
       '2': {name: variable.language.ontol}
@@ -62,6 +74,10 @@ patterns:
   - comment: ontol generator types
     name: entity.name.function.ontol
     match: \b(auto|create_time|update_time)\b
+
+  - comment: domain id literal
+    name: constant.numeric.ulid.ontol
+    match: \b([0-9ABCDEFGHJKMNPQRSTVWXYZ]{26})\b
 
   - comment: numeric literal
     name: constant.numeric.ontol
