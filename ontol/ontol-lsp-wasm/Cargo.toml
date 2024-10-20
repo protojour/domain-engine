@@ -1,0 +1,9 @@
+[package]
+name = "ontol-lsp-wasm"
+version = "0.4.0"
+edition = "2021"
+
+[dependencies]
+ontol-lsp = { path = "../ontol-lsp", features = ["wasm"] }
+tokio = { workspace = true, features = ["fs", "io-std", "io-util", "rt-multi-thread", "macros"]}
+tower-lsp = "0.20"

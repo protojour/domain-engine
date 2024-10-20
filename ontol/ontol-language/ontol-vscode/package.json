@@ -18,6 +18,7 @@
   "scripts": {
     "check": "tsc --noEmit",
     "tidy": "prettier --write src/**/*.ts",
+    "test": "node test/test.js | wasmtime --wasm threads --wasi threads wasm/ontol-lsp.wasm",
     "build": "esbuild src/extension.ts --bundle --minify --outdir=dist --external:vscode --format=cjs --platform=node",
     "package": "vsce package --out ontol.vsix"
   },
@@ -68,8 +69,15 @@
       }
     ]
   },
+  "extensionDependencies": [
+    "ms-vscode.wasm-wasi-core"
+  ],
   "dependencies": {
-    "vscode-languageclient": "^9"
+    "@vscode/wasm-wasi": "^1.0.1",
+    "@vscode/wasm-wasi-lsp": "^0.1.0-pre.8",
+    "date-fns": "^4.1.0",
+    "vscode-jsonrpc": "^9.0.0-next.5",
+    "vscode-languageclient": "^10.0.0-next.12"
   },
   "devDependencies": {
     "@types/node": "^20",

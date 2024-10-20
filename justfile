@@ -18,13 +18,19 @@ ontool:
 
 lsp:
     #!/usr/bin/env bash
-    cargo build --manifest-path ontool/Cargo.toml --release
+    export RUSTFLAGS=" \
+        --cfg tokio_unstable \
+        -Clink-arg=--initial-memory=1966080 \
+        -Clink-arg=--max-memory=7864320"
+    cargo build --package ontol-lsp-wasm \
+                --target wasm32-wasip1-threads \
+                --release
+    cp target/wasm32-wasip1-threads/release/ontol-lsp-wasm.wasm \
+       ontol/ontol-language/ontol-vscode/wasm/ontol-lsp.wasm
     cd ontol/ontol-language
-    for dest in ontol-sublime/bin/ ontol-vscode/bin/; do
-        mkdir -p "$dest"  && cp ../../target/release/ontool "$dest"; done
     npx js-yaml ontol.tmLanguage.yaml > ontol.tmLanguage.json
-    cp ontol.tmLanguage.yaml ontol-sublime/
-    cp ontol.tmLanguage.json ontol.tmSnippet.json ontol-vscode/
+    cp ontol.tmLanguage.json ontol.tmSnippet.json \
+       ontol-vscode/
     cd ontol-vscode
     npm run build && \
     npm run package

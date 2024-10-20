@@ -1,43 +1,69 @@
-import * as path from "path"
-import { ExtensionContext } from "vscode"
-import {
-  LanguageClient,
-  LanguageClientOptions,
-  ServerOptions,
-} from "vscode-languageclient/node"
+import { ExtensionContext, Uri, window, workspace } from "vscode"
+import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-languageclient/node"
+import { Wasm, WasmProcess, ProcessOptions } from "@vscode/wasm-wasi/v1"
+import { createStdioOptions, createUriConverters, startServer } from "@vscode/wasm-wasi-lsp"
+import { format } from "date-fns"
 
 let client: LanguageClient
+let process: WasmProcess
 
-export function activate(context: ExtensionContext) {
-  let serverOptions: ServerOptions = {
-    command: path.join(context.extensionPath, "bin", "ontool"),
-    args: ["lsp"],
-    options: {
-      detached: true,
-      shell: true,
+export async function activate(context: ExtensionContext) {
+  const channel = window.createOutputChannel("ONTOL language server")
+
+  const serverOptions: ServerOptions = async () => {
+    const wasm: Wasm = await Wasm.load()
+    const file = Uri.joinPath(context.extensionUri, "wasm", "ontol-lsp.wasm")
+    const bits = await workspace.fs.readFile(file)
+    const module = await WebAssembly.compile(bits)
+
+    const options: ProcessOptions = {
+      stdio: createStdioOptions(),
+      mountPoints: [{ kind: "workspaceFolder" }]
     }
+
+    process = await wasm.createProcess(
+      "ontol-lsp",
+      module,
+      { initial: 30, maximum: 120, shared: true },
+      options
+    )
+
+    // const decoder = new TextDecoder("utf-8")
+    // process.stderr!.onData(data => {
+    //   channel.append(
+    //     format(Date.now(), "[Error HH:mm.SSS] ") +
+    //     decoder.decode(data)
+    //       .replace(/^Content-Length: \d+?\r\n\r\n/, "") +
+    //       "\n\n"
+    //   )
+    // })
+
+    return startServer(process)
   }
 
-  let clientOptions: LanguageClientOptions = {
-    documentSelector: [
-      {
-        scheme: "file",
-        language: "ontol",
-      },
-    ],
+  const clientOptions: LanguageClientOptions = {
+    documentSelector: [{ scheme: "file", language: "ontol" }],
+    outputChannel: channel,
+    uriConverters: createUriConverters()
   }
 
   client = new LanguageClient(
-    "ontol-language-server",
-    "ONTOL language server",
+    "ontol-language-client",
+    "ONTOL language client",
     serverOptions,
     clientOptions,
+    // true
   )
 
-  client.start()
+  try {
+    await client.start()
+  } catch (error) {
+    client.error("Language service failed", error, "force")
+  }
 }
 
-export function deactivate(): Thenable<void> | undefined {
-  if (!client) return undefined
-  return client.stop()
+export async function deactivate() {
+  if (!client) return
+  await process.terminate()
+  await client.stop()
 }

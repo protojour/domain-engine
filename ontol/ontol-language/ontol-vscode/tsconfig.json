@@ -1,18 +1,27 @@
 {
   "compilerOptions": {
     "composite": true,
+    "declaration": true,
+    "declarationMap": true,
     "esModuleInterop": true,
     "isolatedModules": true,
-    "lib": ["ES2019"],
-    "module": "commonjs",
-    "outDir": "dist",
     "resolveJsonModule": true,
-    "rootDir": ".",
     "sourceMap": true,
-    "target": "es2019"
+    "stripInternal": true,
+    "lib": [
+      "es2022",
+      "webworker"
+    ],
+    "types": [
+      "vscode"
+    ],
+    "target": "es2022",
+    "module": "node16",
+    "moduleResolution": "node16",
+    "rootDir": ".",
+    "outDir": "dist"
   },
   "exclude": [
-    "./node_modules", 
     "./dist"
-  ],
+  ]
 }
