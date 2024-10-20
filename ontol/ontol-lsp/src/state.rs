@@ -1,5 +1,4 @@
 use crate::docs::get_core_completions;
-use lsp_types::{CompletionItem, Location, MarkedString, Position, Range, Url};
 use ontol_compiler::ontol_syntax::OntolTreeSyntax;
 use ontol_compiler::topology::DomainUrl;
 use ontol_compiler::{
@@ -23,6 +22,7 @@ use std::{
     panic,
     sync::Arc,
 };
+use tower_lsp::lsp_types::{CompletionItem, Location, MarkedString, Position, Range, Url};
 
 type UsizeRange = std::ops::Range<usize>;
 
@@ -346,8 +346,11 @@ impl State {
         let (path, token) = locate_token(cursor, root_node.view(&doc.lex, &doc.text))?;
 
         match token.kind() {
+            Kind::KwDomain => return self.get_ontol_docs("domain"),
             Kind::KwUse => return self.get_ontol_docs("use"),
             Kind::KwDef => return self.get_ontol_docs("def"),
+            Kind::KwSym => return self.get_ontol_docs("sym"),
+            Kind::KwArc => return self.get_ontol_docs("arc"),
             Kind::KwRel => return self.get_ontol_docs("rel"),
             Kind::KwFmt => return self.get_ontol_docs("fmt"),
             Kind::KwMap => return self.get_ontol_docs("map"),

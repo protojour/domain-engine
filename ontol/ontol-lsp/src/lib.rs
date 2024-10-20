@@ -186,6 +186,7 @@ impl LanguageServer for Backend {
         self.client
             .log_message(MessageType::LOG, "Shutting down language server")
             .await;
+
         Ok(())
     }
 

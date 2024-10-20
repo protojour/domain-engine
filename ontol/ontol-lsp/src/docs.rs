@@ -1,5 +1,5 @@
-use lsp_types::{CompletionItem, CompletionItemKind};
 use ontol_runtime::ontology::domain::DefKind;
+use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind};
 
 use crate::state::{HoverDoc, State};
 
@@ -12,13 +12,25 @@ impl State {
     /// Get a HoverDoc for ONTOL core keywords, values and types
     pub fn get_ontol_docs(&self, ident: &str) -> Option<HoverDoc> {
         match ident {
+                "domain" => Some(HoverDoc::from(
+                    ident,
+                    "#### Domain statement\nIdentifies a domain by a global ulid. Doc comments and rel properties serve as documentation and metadata.",
+                )),
                 "use" => Some(HoverDoc::from(
                     ident,
                     "#### Use statement\nImports a domain by name, and defines a local namespace alias.",
                 )),
                 "def" => Some(HoverDoc::from(
                     ident,
-                    "#### Def statement\nDefines a a concept, type or data structure.",
+                    "#### Def statement\nDefines a concept, type or data structure.",
+                )),
+                "sym" => Some(HoverDoc::from(
+                    ident,
+                    "#### Sym statement\nDefines a symbol, a label representing the symbol name itself."
+                )),
+                "arc" => Some(HoverDoc::from(
+                    ident,
+                    "#### Arc statement\nDefines a relationship map, or a set of hypergraph relations."
                 )),
                 "rel" => Some(HoverDoc::from(
                     ident,
@@ -51,10 +63,6 @@ impl State {
                 "@open" => Some(HoverDoc::from(
                     ident,
                     "#### Def modifier\nThe definition and its immediate non-entity relationships are _open_. Arbitrary data can be associated with it."
-                )),
-                "@symbol" => Some(HoverDoc::from(
-                    ident,
-                    "#### Def modifier\nThe definition is a _symbol_, an otherwise empty definition representing the symbol name itself."
                 )),
                 "@extern" => Some(HoverDoc::from(
                     ident,
@@ -109,11 +117,13 @@ impl State {
 }
 
 /// A list of Completions and their Kind
-pub const COMPLETIONS: [(&str, CompletionItemKind); 40] = [
-    ("ontol", CompletionItemKind::MODULE),
+pub const COMPLETIONS: [(&str, CompletionItemKind); 47] = [
+    ("domain", CompletionItemKind::KEYWORD),
     ("def", CompletionItemKind::KEYWORD),
+    ("sym", CompletionItemKind::KEYWORD),
     ("fmt", CompletionItemKind::KEYWORD),
     ("map", CompletionItemKind::KEYWORD),
+    ("arc", CompletionItemKind::KEYWORD),
     ("rel", CompletionItemKind::KEYWORD),
     ("use", CompletionItemKind::KEYWORD),
     ("as", CompletionItemKind::KEYWORD),
@@ -127,9 +137,11 @@ pub const COMPLETIONS: [(&str, CompletionItemKind); 40] = [
     ("auto", CompletionItemKind::FUNCTION),
     ("create_time", CompletionItemKind::FUNCTION),
     ("update_time", CompletionItemKind::FUNCTION),
+    ("ontol", CompletionItemKind::MODULE),
     ("boolean", CompletionItemKind::UNIT),
     ("number", CompletionItemKind::UNIT),
     ("integer", CompletionItemKind::UNIT),
+    ("octets", CompletionItemKind::UNIT),
     ("i64", CompletionItemKind::UNIT),
     ("float", CompletionItemKind::UNIT),
     ("f32", CompletionItemKind::UNIT),
@@ -137,12 +149,15 @@ pub const COMPLETIONS: [(&str, CompletionItemKind); 40] = [
     ("serial", CompletionItemKind::UNIT),
     ("text", CompletionItemKind::UNIT),
     ("uuid", CompletionItemKind::UNIT),
+    ("ulid", CompletionItemKind::UNIT),
     ("datetime", CompletionItemKind::UNIT),
+    ("format", CompletionItemKind::FUNCTION),
+    ("hex", CompletionItemKind::UNIT),
+    ("base64", CompletionItemKind::UNIT),
     ("true", CompletionItemKind::CONSTANT),
     ("false", CompletionItemKind::CONSTANT),
     ("@private", CompletionItemKind::TYPE_PARAMETER),
     ("@open", CompletionItemKind::TYPE_PARAMETER),
-    ("@symbol", CompletionItemKind::TYPE_PARAMETER),
     ("@extern", CompletionItemKind::TYPE_PARAMETER),
     ("@match", CompletionItemKind::TYPE_PARAMETER),
     ("@in", CompletionItemKind::TYPE_PARAMETER),
