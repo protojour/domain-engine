@@ -83,10 +83,14 @@ pub enum Coinage {
     Used,
 }
 
-pub struct Open(pub Option<U32Span>);
-pub struct Private(pub Option<U32Span>);
-pub struct Extern(pub Option<U32Span>);
-pub struct Macro(pub Option<U32Span>);
+#[derive(Clone, Copy, Default)]
+pub struct DefModifiers {
+    pub open: Option<U32Span>,
+    pub private: Option<U32Span>,
+    pub r#extern: Option<U32Span>,
+    pub r#macro: Option<U32Span>,
+    pub crdt: Option<U32Span>,
+}
 
 #[derive(Clone, Copy)]
 pub enum RelationKey {
@@ -244,28 +248,25 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
         &mut self,
         ident: &str,
         ident_span: U32Span,
-        private: Private,
-        open: Open,
-        extern_: Extern,
-        macro_: Macro,
+        modifiers: DefModifiers,
     ) -> Result<DefId, LoweringError> {
         let (def_id, coinage, ident) =
             self.named_def_id(self.domain_def_id, Space::Def, ident, ident_span)?;
         if matches!(coinage, Coinage::New) {
             debug!("{def_id:?}: `{}`", ident);
 
-            let kind = if macro_.0.is_some() {
+            let kind = if modifiers.r#macro.is_some() {
                 DefKind::Macro(ident)
-            } else if extern_.0.is_some() {
+            } else if modifiers.r#extern.is_some() {
                 DefKind::Extern(ident)
             } else {
                 let mut flags = TypeDefFlags::CONCRETE | TypeDefFlags::PUBLIC;
 
-                if private.0.is_some() {
+                if modifiers.private.is_some() {
                     flags.remove(TypeDefFlags::PUBLIC);
                 }
 
-                if open.0.is_some() {
+                if modifiers.open.is_some() {
                     flags.insert(TypeDefFlags::OPEN);
                 }
 
