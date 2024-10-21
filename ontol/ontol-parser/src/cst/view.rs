@@ -50,6 +50,32 @@ pub trait NodeViewExt: NodeView {
     fn display(self) -> NodeDisplay<Self> {
         NodeDisplay(self)
     }
+
+    fn non_trivia_span(&self) -> U32Span {
+        let mut span = self.span();
+
+        for child in self.children() {
+            match child {
+                Item::Token(_) => {
+                    continue;
+                }
+                Item::Node(node)
+                    if matches!(
+                        node.kind(),
+                        Kind::Whitespace | Kind::Comment | Kind::DocComment
+                    ) =>
+                {
+                    continue;
+                }
+                Item::Node(node) => {
+                    span.start = node.span_start();
+                    return span;
+                }
+            }
+        }
+
+        span
+    }
 }
 
 impl<T> NodeViewExt for T where T: NodeView {}

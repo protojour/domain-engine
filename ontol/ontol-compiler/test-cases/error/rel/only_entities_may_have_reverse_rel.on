@@ -1,4 +1,6 @@
 def foo ()
 def bar ()
 rel {foo} 'a'[]: bar
+
+/// trivia (for span testing)
 rel text 'bb': foo // ERROR subject must be a domain type// ERROR must identify a type within the domain

@@ -1,7 +1,10 @@
 use std::ops::Range;
 
 use ontol_parser::{
-    cst::{inspect as insp, view::NodeView},
+    cst::{
+        inspect as insp,
+        view::{NodeView, NodeViewExt},
+    },
     U32Span,
 };
 use ontol_runtime::{
@@ -79,7 +82,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             let identifies_relationship = Relationship {
                 relation_def_id: OntolDefTag::RelationIdentifies.def_id(),
                 edge_projection: None,
-                relation_span: self.ctx.source_span(stmt.view().span()),
+                relation_span: self.ctx.source_span(stmt.view().non_trivia_span()),
                 subject: (object_ty.def_id, self.ctx.source_span(object_ty.span)),
                 subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),
                 object: (subject_ty.def_id, self.ctx.source_span(subject_ty.span)),
@@ -93,7 +96,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             self.ctx.outcome.predefine_rel(
                 rel_id,
                 identifies_relationship,
-                self.ctx.source_span(stmt.view().span()),
+                self.ctx.source_span(stmt.view().non_trivia_span()),
                 None,
             );
         }
@@ -315,7 +318,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 self.ctx.outcome.predefine_rel(
                     rel_id,
                     relationship0,
-                    self.ctx.source_span(rel_stmt.0.span()),
+                    self.ctx.source_span(rel_stmt.0.non_trivia_span()),
                     docs,
                 );
             }
