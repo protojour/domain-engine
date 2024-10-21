@@ -143,6 +143,18 @@ impl<'e> ObjectGenerator<'e> {
                                 .into(),
                             );
                         }
+                        Some(ValueGenerator::Ulid) => {
+                            struct_map.insert(
+                                property.id,
+                                Value::OctetSequence(
+                                    OctetSequence(
+                                        ulid::Ulid::new().to_bytes().into_iter().collect(),
+                                    ),
+                                    self.property_tag(property),
+                                )
+                                .into(),
+                            );
+                        }
                         Some(ValueGenerator::Autoincrement) => {
                             panic!("Cannot auto increment value here");
                         }

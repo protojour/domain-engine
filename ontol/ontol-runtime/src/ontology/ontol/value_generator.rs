@@ -6,6 +6,7 @@ use crate::{impl_ontol_debug, vm::proc::Address};
 pub enum ValueGenerator {
     DefaultProc(Address),
     Uuid,
+    Ulid,
     Autoincrement,
     CreatedAtTime,
     UpdatedAtTime,

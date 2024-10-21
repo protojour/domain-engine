@@ -262,6 +262,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                     Some(Type::Primitive(PrimitiveKind::Text, _)) => Ok(ValueGenerator::Uuid),
                     Some(Type::TextLike(_, TextLikeType::Uuid)) => Ok(ValueGenerator::Uuid),
+                    Some(Type::TextLike(_, TextLikeType::Ulid)) => Ok(ValueGenerator::Ulid),
                     _ => match properties.map(|p| &p.constructor) {
                         Some(Constructor::TextFmt(segment)) => {
                             self.auto_generator_for_text_pattern_segment(segment)
