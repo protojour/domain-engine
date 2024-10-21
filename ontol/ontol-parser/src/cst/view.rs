@@ -55,22 +55,16 @@ pub trait NodeViewExt: NodeView {
         let mut span = self.span();
 
         for child in self.children() {
-            match child {
-                Item::Token(_) => {
-                    continue;
-                }
-                Item::Node(node)
-                    if matches!(
-                        node.kind(),
-                        Kind::Whitespace | Kind::Comment | Kind::DocComment
-                    ) =>
-                {
-                    continue;
-                }
-                Item::Node(node) => {
-                    span.start = node.span_start();
-                    return span;
-                }
+            let (kind, span_start) = match child {
+                Item::Token(token) => (token.kind(), token.span().start),
+                Item::Node(node) => (node.kind(), node.span_start()),
+            };
+
+            if matches!(kind, Kind::Whitespace | Kind::Comment | Kind::DocComment) {
+                continue;
+            } else {
+                span.start = span_start;
+                return span;
             }
         }
 
