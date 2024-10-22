@@ -52,6 +52,7 @@ pub fn generate_httpjson_interface(
                     name: entity.ident,
                     operator_addr: addr,
                     put: Some(Endpoint {}),
+                    post: Some(Endpoint {}),
                     keyed,
                 });
             }
@@ -72,6 +73,7 @@ pub fn generate_httpjson_interface(
                         name: ident,
                         operator_addr: addr,
                         put: Some(Endpoint {}),
+                        post: None,
                         keyed: vec![],
                     });
                 }

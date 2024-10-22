@@ -4,7 +4,7 @@ use std::{convert::Infallible, sync::Arc};
 
 use axum::{
     body::Body,
-    extract::{FromRequest, FromRequestParts},
+    extract::{FromRequest, FromRequestParts, OriginalUri},
     http::StatusCode,
     response::IntoResponse,
     routing::{MethodFilter, MethodRouter},
@@ -17,7 +17,7 @@ use domain_engine_core::{
     domain_error::DomainErrorKind,
     domain_select::domain_select_no_edges,
     transact::{AccumulateSequences, ReqMessage, TransactionMode},
-    DomainEngine, DomainError, DomainResult, Session,
+    DomainEngine, DomainError, Session,
 };
 use futures_util::{stream::StreamExt, TryStreamExt};
 use http::{header, HeaderValue};
@@ -31,6 +31,7 @@ use ontol_runtime::{
         },
         DomainInterface,
     },
+    ontology::ontol::TextConstant,
     query::{
         condition::{Clause, CondTerm, SetOperator},
         filter::Filter,
@@ -54,6 +55,7 @@ mod content_type;
 struct UnkeyedEndpoint {
     engine: Arc<DomainEngine>,
     operator_addr: SerdeOperatorAddr,
+    keyed_name: Option<TextConstant>,
 }
 
 #[derive(Clone)]
@@ -89,6 +91,11 @@ where
     for resource in &httpjson.resources {
         let mut method_router: MethodRouter<State, Infallible> = MethodRouter::default();
 
+        if resource.post.is_some() {
+            method_router =
+                method_router.on(MethodFilter::POST, post_resource_unkeyed::<State, Auth>);
+        }
+
         if resource.put.is_some() {
             method_router =
                 method_router.on(MethodFilter::PUT, put_resource_unkeyed::<State, Auth>);
@@ -102,6 +109,7 @@ where
             method_router.layer(Extension(UnkeyedEndpoint {
                 engine: engine.clone(),
                 operator_addr: resource.operator_addr,
+                keyed_name: resource.keyed.iter().map(|keyed| keyed.key_name).next(),
             })),
         );
 
@@ -137,8 +145,72 @@ where
     Some(domain_router)
 }
 
+/// POST /resource
+async fn post_resource_unkeyed<State, Auth>(
+    endpoint: Extension<UnkeyedEndpoint>,
+    auth: Auth,
+    OriginalUri(original_uri): OriginalUri,
+    req: axum::http::Request<Body>,
+) -> Result<axum::response::Response, HttpJsonError>
+where
+    State: Send + Sync + Clone + 'static,
+    Auth: FromRequestParts<State> + Into<Session> + 'static,
+{
+    let json_content_type = match JsonContentType::parse(&req) {
+        Ok(ct) => ct,
+        Err(err) => return Ok(err.into_response()),
+    };
+    let ontology = endpoint.engine.ontology_owned();
+    let keyed_name = endpoint.keyed_name;
+
+    let sequence = create::create_common(
+        ProcessorMode::Create,
+        json_content_type,
+        endpoint,
+        auth,
+        req,
+    )
+    .await?;
+
+    match json_content_type {
+        JsonContentType::Json => {
+            // one element, set Location header
+            let Some(value) = sequence.into_elements().into_iter().next() else {
+                error!("expected one element");
+                return Ok(StatusCode::CREATED.into_response());
+            };
+
+            let Some(keyed_name) = keyed_name else {
+                return Ok(StatusCode::CREATED.into_response());
+            };
+
+            debug!("value: {value:?}");
+
+            let original_parts = original_uri.into_parts();
+            let path = original_parts.path_and_query.as_ref().unwrap().path();
+
+            let location_path = format!(
+                "{path}/{key_name}/{key}",
+                key_name = &ontology[keyed_name],
+                key = ontol_runtime::format_utils::format_value(&value, ontology.as_ref())
+            );
+
+            Ok((
+                [(
+                    header::LOCATION,
+                    HeaderValue::from_str(&location_path).unwrap(),
+                )],
+                StatusCode::CREATED,
+            )
+                .into_response())
+        }
+        JsonContentType::JsonLines => Ok(StatusCode::OK.into_response()),
+    }
+}
+
+/// PUT /resource
 async fn put_resource_unkeyed<State, Auth>(
-    Extension(endpoint): Extension<UnkeyedEndpoint>,
+    endpoint: Extension<UnkeyedEndpoint>,
     auth: Auth,
     req: axum::http::Request<Body>,
 ) -> Result<axum::response::Response, HttpJsonError>
@@ -146,73 +218,23 @@ where
     State: Send + Sync + Clone + 'static,
     Auth: FromRequestParts<State> + Into<Session> + 'static,
 {
-    let session = auth.into();
-
     let json_content_type = match JsonContentType::parse(&req) {
         Ok(ct) => ct,
         Err(err) => return Ok(err.into_response()),
     };
-
-    let transaction_msg_stream = match json_content_type {
-        JsonContentType::Json => {
-            let bytes = match Bytes::from_request(req, &()).await {
-                Ok(bytes) => bytes,
-                Err(err) => return Ok(err.into_response()),
-            };
-
-            let ontol_value = deserialize_ontol_value(
-                &endpoint
-                    .engine
-                    .ontology()
-                    .new_serde_processor(endpoint.operator_addr, ProcessorMode::Update),
-                &mut serde_json::Deserializer::from_slice(&bytes),
-            )?;
-
-            futures_util::stream::iter([
-                Ok(ReqMessage::Upsert(0, Select::EntityId)),
-                Ok(ReqMessage::Argument(ontol_value)),
-            ])
-            .boxed()
-        }
-        JsonContentType::JsonLines => {
-            let lines = match JsonLines::<serde_json::Value>::from_request(req, &()).await {
-                Ok(lines) => lines,
-                Err(err) => return Ok(err.into_response()),
-            };
-            let endpoint = endpoint.clone();
-
-            async_stream::try_stream! {
-                yield ReqMessage::Upsert(0, Select::EntityId);
-
-                for await json_result in lines {
-                    let json = json_result.map_err(|e| DomainErrorKind::BadInputFormat(format!("{e}")).into_error())?;
-                    let ontol_value = deserialize_ontol_value(&endpoint
-                        .engine
-                        .ontology()
-                        .new_serde_processor(endpoint.operator_addr, ProcessorMode::Update), json)?;
-
-                    yield ReqMessage::Argument(ontol_value);
-                }
-            }
-            .boxed()
-        }
-    };
-
-    let stream = endpoint
-        .engine
-        .transact(
-            TransactionMode::ReadWriteAtomic,
-            transaction_msg_stream,
-            session.clone(),
-        )
-        .await?;
-
-    let collected: DomainResult<Vec<_>> = stream.try_collect().await;
-    let _ = collected?;
+    create::create_common(
+        ProcessorMode::Update,
+        json_content_type,
+        endpoint,
+        auth,
+        req,
+    )
+    .await?;
 
     Ok(StatusCode::OK.into_response())
 }
 
+/// GET /resource/{key_name}/:{key}
 async fn get_resource_keyed<State, Auth>(
     Extension(endpoint): Extension<KeyedEndpoint>,
     auth: Auth,
@@ -316,6 +338,89 @@ where
         json_bytes.into_inner().freeze(),
     )
         .into_response())
+}
+
+mod create {
+    use super::*;
+
+    pub async fn create_common<State, Auth>(
+        mode: ProcessorMode,
+        json_content_type: JsonContentType,
+        Extension(endpoint): Extension<UnkeyedEndpoint>,
+        auth: Auth,
+        req: axum::http::Request<Body>,
+    ) -> Result<Sequence<Value>, HttpJsonError>
+    where
+        State: Send + Sync + Clone + 'static,
+        Auth: FromRequestParts<State> + Into<Session> + 'static,
+    {
+        let session = auth.into();
+        let select = Select::EntityId;
+        let req_message = match mode {
+            ProcessorMode::Create => ReqMessage::Insert(0, select),
+            ProcessorMode::Update => ReqMessage::Upsert(0, select),
+            _ => return Err(HttpJsonError::status(StatusCode::INTERNAL_SERVER_ERROR)),
+        };
+
+        let transaction_msg_stream = match json_content_type {
+            JsonContentType::Json => {
+                let bytes = Bytes::from_request(req, &())
+                    .await
+                    .map_err(|err| HttpJsonError::Response(err.into_response()))?;
+
+                let ontol_value = deserialize_ontol_value(
+                    &endpoint
+                        .engine
+                        .ontology()
+                        .new_serde_processor(endpoint.operator_addr, mode),
+                    &mut serde_json::Deserializer::from_slice(&bytes),
+                )?;
+
+                futures_util::stream::iter([Ok(req_message), Ok(ReqMessage::Argument(ontol_value))])
+                    .boxed()
+            }
+            JsonContentType::JsonLines => {
+                let lines = JsonLines::<serde_json::Value>::from_request(req, &())
+                    .await
+                    .map_err(|err| HttpJsonError::Response(err.into_response()))?;
+                let endpoint = endpoint.clone();
+
+                async_stream::try_stream! {
+                    yield req_message;
+
+                    for await json_result in lines {
+                        let json = json_result.map_err(|e| DomainErrorKind::BadInputFormat(format!("{e}")).into_error())?;
+                        let ontol_value = deserialize_ontol_value(&endpoint
+                            .engine
+                            .ontology()
+                            .new_serde_processor(endpoint.operator_addr, mode), json)?;
+
+                        yield ReqMessage::Argument(ontol_value);
+                    }
+                }
+                .boxed()
+            }
+        };
+
+        let collected: Vec<Sequence<Value>> = endpoint
+            .engine
+            .transact(
+                TransactionMode::ReadWriteAtomic,
+                transaction_msg_stream,
+                session.clone(),
+            )
+            .await?
+            .accumulate_sequences()
+            .try_collect()
+            .await?;
+
+        let sequence = collected
+            .into_iter()
+            .next()
+            .expect("There should be one sequence");
+
+        Ok(sequence)
+    }
 }
 
 fn deserialize_ontol_value<'d>(

@@ -4,17 +4,29 @@ use http::StatusCode;
 use serde::Serialize;
 use tracing::info;
 
-pub struct HttpJsonError(DomainError);
+pub enum HttpJsonError {
+    Domain(DomainError),
+    Response(axum::response::Response),
+}
+
+impl HttpJsonError {
+    pub fn status(code: StatusCode) -> Self {
+        Self::Response(code.into_response())
+    }
+}
 
 impl From<DomainError> for HttpJsonError {
     fn from(value: DomainError) -> Self {
-        Self(value)
+        Self::Domain(value)
     }
 }
 
 impl IntoResponse for HttpJsonError {
     fn into_response(self) -> axum::response::Response {
-        domain_error_to_response(self.0)
+        match self {
+            Self::Domain(domain_error) => domain_error_to_response(domain_error),
+            Self::Response(response) => response,
+        }
     }
 }
 

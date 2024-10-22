@@ -16,6 +16,7 @@ pub struct HttpResource {
     pub def_id: DefId,
     pub operator_addr: SerdeOperatorAddr,
     pub put: Option<Endpoint>,
+    pub post: Option<Endpoint>,
     pub keyed: Vec<HttpKeyedResource>,
 }
 
