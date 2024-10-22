@@ -182,7 +182,7 @@ pub async fn migrate(
             .ok_or_else(|| anyhow!("domain does not exist"))?;
 
         steps::migrate_domain_steps(*domain_index, domain, ontology_defs, &mut ctx)
-            .instrument(debug_span!("migrate", id = %domain.domain_id().ulid))
+            .instrument(debug_span!("migrate", uid = %domain.domain_id().ulid))
             .await
             .context("domain migration steps")?;
 
