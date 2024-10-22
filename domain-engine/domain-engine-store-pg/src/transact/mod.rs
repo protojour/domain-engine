@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use domain_engine_core::{
-    object_generator::ObjectGenerator,
+    make_storable::MakeStorable,
     system::SystemAPI,
     transact::{DataOperation, OpSequence, ReqMessage, RespMessage, TransactionMode},
     DomainError, DomainResult,
@@ -225,24 +225,24 @@ pub async fn transact(
                 ReqMessage::Argument(mut value) => {
                     match state.as_ref() {
                         Some(State::Insert(_, select)) => {
-                            ObjectGenerator::without_timestamps(ProcessorMode::Create, &ctx, ctx.system)
-                                .generate_objects(&mut value);
+                            MakeStorable::without_timestamps(ProcessorMode::Create, &ctx, ctx.system)
+                                .make_storable(&mut value);
 
                             let timestamp = ctx.system.current_time();
                             let row = ctx.insert_vertex(value.into(), InsertMode::Insert, select, timestamp, &mut mut_ctx).await?;
                             yield RespMessage::Element(row.value, row.op);
                         }
                         Some(State::Update(_, select)) => {
-                            ObjectGenerator::without_timestamps(ProcessorMode::Update, &ctx, ctx.system)
-                                .generate_objects(&mut value);
+                            MakeStorable::without_timestamps(ProcessorMode::Update, &ctx, ctx.system)
+                                .make_storable(&mut value);
 
                             let timestamp = ctx.system.current_time();
                             let value = ctx.update_vertex_with_select(value.into(), select, timestamp, &mut mut_ctx).await?;
                             yield RespMessage::Element(value, DataOperation::Updated);
                         }
                         Some(State::Upsert(_, select)) => {
-                            ObjectGenerator::without_timestamps(ProcessorMode::Create, &ctx, ctx.system)
-                                .generate_objects(&mut value);
+                            MakeStorable::without_timestamps(ProcessorMode::Create, &ctx, ctx.system)
+                                .make_storable(&mut value);
 
                             let timestamp = ctx.system.current_time();
                             let row = ctx.insert_vertex(value.into(), InsertMode::Upsert, select, timestamp, &mut mut_ctx).await?;

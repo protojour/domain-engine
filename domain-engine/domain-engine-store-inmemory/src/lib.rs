@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use domain_engine_core::data_store::{DataStoreFactory, DataStoreFactorySync, DataStoreParams};
-use domain_engine_core::object_generator::ObjectGenerator;
+use domain_engine_core::make_storable::MakeStorable;
 use domain_engine_core::system::ArcSystemApi;
 use domain_engine_core::transact::{
     DataOperation, OpSequence, ReqMessage, RespMessage, TransactionMode, WriteStats,
@@ -215,12 +215,12 @@ impl InMemoryDb {
 
                         match state.as_ref() {
                             Some(State::Insert(_, select)) => {
-                                ObjectGenerator::new(
+                                MakeStorable::new(
                                     ProcessorMode::Create,
                                     self.ontology.as_ref(),
                                     self.system.as_ref(),
                                 )
-                                .generate_objects(&mut value);
+                                .make_storable(&mut value);
 
                                 let value = store.write_new_entity(
                                     value,
@@ -231,12 +231,12 @@ impl InMemoryDb {
                                 yield RespMessage::Element(value, DataOperation::Inserted);
                             }
                             Some(State::Update(_, select)) => {
-                                ObjectGenerator::new(
+                                MakeStorable::new(
                                     ProcessorMode::Update,
                                     self.ontology.as_ref(),
                                     self.system.as_ref(),
                                 )
-                                .generate_objects(&mut value);
+                                .make_storable(&mut value);
 
                                 let value = store.update_entity(
                                     value,
@@ -247,12 +247,12 @@ impl InMemoryDb {
                                 yield RespMessage::Element(value, DataOperation::Updated);
                             }
                             Some(State::Upsert(_, select)) => {
-                                ObjectGenerator::new(
+                                MakeStorable::new(
                                     ProcessorMode::Create,
                                     self.ontology.as_ref(),
                                     self.system.as_ref(),
                                 )
-                                .generate_objects(&mut value);
+                                .make_storable(&mut value);
 
                                 let (value, reason) = store.upsert_entity(
                                     value,

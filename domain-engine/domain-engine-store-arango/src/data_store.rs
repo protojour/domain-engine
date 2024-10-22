@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
 use domain_engine_core::{
     data_store::DataStoreAPI,
     domain_error::DomainErrorKind,
-    object_generator::ObjectGenerator,
+    make_storable::MakeStorable,
     transact::{DataOperation, OpSequence, ReqMessage, RespMessage, TransactionMode},
     DomainError, DomainResult, Session,
 };
@@ -324,8 +324,8 @@ impl ArangoDatabase {
     ) -> DomainResult<(Value, DataOperation)> {
         let seed: PhantomData<serde_json::Value> = PhantomData;
 
-        ObjectGenerator::new(processor_mode, self.ontology.as_ref(), self.system.as_ref())
-            .generate_objects(&mut entity);
+        MakeStorable::new(processor_mode, self.ontology.as_ref(), self.system.as_ref())
+            .make_storable(&mut entity);
 
         let pre_query = AqlQuery::prequery_from_entity(&entity, &self.ontology, self)?;
 
