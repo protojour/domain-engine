@@ -474,7 +474,7 @@ impl PgRepr {
     }
 
     fn classify_def_id(def_id: DefId, ontology_defs: &DefsAspect) -> Self {
-        let def = ontology_defs.get_def(def_id).unwrap();
+        let def = ontology_defs.def(def_id);
         let def_repr = match &def.kind {
             DefKind::Data(basic_def) => &basic_def.repr,
             _ => &DefRepr::Unknown,

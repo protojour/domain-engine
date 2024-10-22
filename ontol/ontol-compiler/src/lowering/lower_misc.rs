@@ -135,11 +135,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     }
                     Kind::Regex => {
                         let regex_literal = unescape_regex(token.slice());
-                        match self.ctx.compiler.defs.def_regex(
-                            &regex_literal,
-                            token.span(),
-                            &mut self.ctx.compiler.str_ctx,
-                        ) {
+                        match self.ctx.compiler.def_regex(&regex_literal, token.span()) {
                             Ok(def_id) => Some(def_id),
                             Err((compile_error, span)) => {
                                 CompileError::InvalidRegex(compile_error)

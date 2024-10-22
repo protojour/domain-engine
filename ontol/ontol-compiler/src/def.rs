@@ -345,26 +345,6 @@ impl<'m> Defs<'m> {
         }
     }
 
-    pub fn def_regex(
-        &mut self,
-        lit: &str,
-        span: U32Span,
-        strings: &mut StringCtx<'m>,
-    ) -> Result<DefId, (String, U32Span)> {
-        match self.regex_strings.get(&lit) {
-            Some(def_id) => Ok(*def_id),
-            None => {
-                let lit = strings.intern(lit);
-                let hir = parse_literal_regex(lit, span)?;
-                let def_id = self.add_def(DefKind::Regex(lit), DomainIndex::ontol(), NO_SPAN);
-                self.regex_strings.insert(lit, def_id);
-                self.literal_regex_meta_table.insert(def_id, hir);
-
-                Ok(def_id)
-            }
-        }
-    }
-
     pub fn get_string_representation(&self, def_id: DefId) -> &str {
         match self.def_kind(def_id) {
             DefKind::TextLiteral(lit) => lit,
@@ -465,5 +445,28 @@ impl<'m> Compiler<'m> {
         namespace.insert("ontol", OntolDefTag::Ontol.def_id());
 
         domain_def_id
+    }
+
+    pub fn def_regex(&mut self, lit: &str, span: U32Span) -> Result<DefId, (String, U32Span)> {
+        match self.defs.regex_strings.get(&lit) {
+            Some(def_id) => Ok(*def_id),
+            None => {
+                let lit = self.str_ctx.intern(lit);
+                let hir = parse_literal_regex(lit, span)?;
+                let def_id = self
+                    .defs
+                    .add_def(DefKind::Regex(lit), DomainIndex::ontol(), NO_SPAN);
+                self.defs.regex_strings.insert(lit, def_id);
+                self.defs.literal_regex_meta_table.insert(def_id, hir);
+
+                self.namespaces
+                    .add_anonymous(OntolDefTag::Ontol.def_id(), def_id);
+
+                let ty = self.ty_ctx.intern(Type::Regex(def_id));
+                self.def_ty_ctx.def_table.insert(def_id, ty);
+
+                Ok(def_id)
+            }
+        }
     }
 }

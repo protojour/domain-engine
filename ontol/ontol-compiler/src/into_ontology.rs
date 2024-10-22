@@ -134,7 +134,7 @@ impl<'m> Compiler<'m> {
             .collect();
 
         // For now, create serde operators for every domain
-        for domain_index in domain_indices.iter().cloned() {
+        for domain_index in domain_indices.iter().copied() {
             let domain_def_id = self.domain_def_ids.get(&domain_index).cloned().unwrap();
             let domain_name = *unique_domain_names
                 .get(&domain_index)

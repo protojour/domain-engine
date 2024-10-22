@@ -4,6 +4,7 @@ use ontol_runtime::{
     ontology::domain::{DefRepr, DefReprUnionBound},
 };
 use ontol_test_utils::{file_url, TestCompile, TestPackages};
+use tracing::info;
 
 #[test]
 fn test_repr_valid_mesh1() {
@@ -118,5 +119,24 @@ fn test_text_constant_union_repr() {
         let DefRepr::Text = inner.as_ref() else {
             panic!("not text: {:?}", inner.debug(test.ontology()));
         };
+    });
+}
+
+#[test]
+fn test_regex_def() {
+    "
+    def foo (
+        rel* 'prop': /[a-z]/
+    )
+    "
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        let (_prop_id, rel_info) = foo
+            .def
+            .data_relationship_by_name("prop", test.ontology())
+            .unwrap();
+
+        let regex_def = test.ontology().def(rel_info.target.def_id());
+        info!("regex def: {:?}", regex_def.id);
     });
 }
