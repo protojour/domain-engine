@@ -20,7 +20,7 @@ use domain_engine_core::{
     DomainEngine, DomainError, Session,
 };
 use futures_util::{stream::StreamExt, TryStreamExt};
-use http::{header, HeaderValue};
+use http::{header, HeaderValue, Uri};
 use http_error::{json_error, HttpJsonError};
 use ontol_runtime::{
     attr::{Attr, AttrRef},
@@ -184,21 +184,24 @@ where
                 return Ok(StatusCode::CREATED.into_response());
             };
 
-            debug!("value: {value:?}");
+            let location_uri = {
+                let mut parts = original_uri.into_parts();
+                let path = parts.path_and_query.as_ref().unwrap().path();
 
-            let original_parts = original_uri.into_parts();
-            let path = original_parts.path_and_query.as_ref().unwrap().path();
+                let location_path = format!(
+                    "{path}/{key_name}/{key}",
+                    key_name = &ontology[keyed_name],
+                    key = ontol_runtime::format_utils::format_value(&value, ontology.as_ref())
+                );
 
-            let location_path = format!(
-                "{path}/{key_name}/{key}",
-                key_name = &ontology[keyed_name],
-                key = ontol_runtime::format_utils::format_value(&value, ontology.as_ref())
-            );
+                parts.path_and_query = Some(location_path.parse().unwrap());
+                Uri::from_parts(parts).unwrap()
+            };
 
             Ok((
                 [(
                     header::LOCATION,
-                    HeaderValue::from_str(&location_path).unwrap(),
+                    HeaderValue::from_str(&location_uri.to_string()).unwrap(),
                 )],
                 StatusCode::CREATED,
             )
