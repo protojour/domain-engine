@@ -15,9 +15,17 @@ use ontol_runtime::{
 };
 
 use crate::{
-    mem::Intern, namespace::Space, pattern::PatId, primitive::PrimitiveKind,
-    regex_util::parse_literal_regex, relation::RelId, source::SourceSpan, strings::StringCtx,
-    types::Type, Compiler, SpannedBorrow, NO_SPAN,
+    mem::Intern,
+    namespace::Space,
+    pattern::PatId,
+    primitive::PrimitiveKind,
+    regex_util::parse_literal_regex,
+    relation::RelId,
+    repr::repr_model::{Repr, ReprKind, ReprScalarKind},
+    source::SourceSpan,
+    strings::StringCtx,
+    types::Type,
+    Compiler, SpannedBorrow, NO_SPAN,
 };
 use ontol_parser::U32Span;
 
@@ -464,6 +472,13 @@ impl<'m> Compiler<'m> {
 
                 let ty = self.ty_ctx.intern(Type::Regex(def_id));
                 self.def_ty_ctx.def_table.insert(def_id, ty);
+                self.repr_ctx.repr_table.insert(
+                    def_id,
+                    Repr {
+                        kind: ReprKind::Scalar(def_id, ReprScalarKind::Text, NO_SPAN),
+                        type_params: Default::default(),
+                    },
+                );
 
                 Ok(def_id)
             }
