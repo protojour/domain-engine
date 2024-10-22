@@ -11,6 +11,7 @@ use ontol_runtime::{
     value::{OctetSequence, Value},
     DefId, PropId,
 };
+use ulid::Ulid;
 
 use crate::{domain_error::DomainErrorKind, system::SystemAPI, DomainError, DomainResult};
 
@@ -78,7 +79,14 @@ pub fn try_generate_entity_id(
             match (defs.get_text_like_type(*def_id), value_generator) {
                 (Some(TextLikeType::Uuid), ValueGenerator::Uuid) => Ok((
                     GeneratedId::Generated(Value::OctetSequence(
-                        OctetSequence(system.generate_uuid().as_bytes().iter().cloned().collect()),
+                        OctetSequence(system.generate_uuid().as_bytes().iter().copied().collect()),
+                        (*def_id).into(),
+                    )),
+                    GeneratedIdContainer::Raw,
+                )),
+                (Some(TextLikeType::Ulid), ValueGenerator::Ulid) => Ok((
+                    GeneratedId::Generated(Value::OctetSequence(
+                        OctetSequence(Ulid::new().to_bytes().into_iter().collect()),
                         (*def_id).into(),
                     )),
                     GeneratedIdContainer::Raw,
