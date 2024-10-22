@@ -23,6 +23,7 @@ mod registry {
     refinery::embed_migrations!("./m6mreg_migrations");
 }
 
+mod domain_schemas;
 mod execute;
 mod read_registry;
 mod steps;
@@ -118,6 +119,9 @@ enum MigrationStep {
         kind: PgEdgeCardinalKind,
         index_type: Option<PgIndexType>,
     },
+    DeployCrdt {
+        domain_index: DomainIndex,
+    },
     RenameDomainSchema {
         old: Box<str>,
         new: Box<str>,
@@ -143,7 +147,7 @@ pub async fn migrate(
         runner.set_migration_table_name(MIGRATIONS_TABLE_NAME);
         let current_version =
             RegVersion::try_from(runner.get_migrations().last().unwrap().version() as i32)
-                .map_err(|_| anyhow!("applied version not representable"))?;
+                .map_err(|ver| anyhow!("applied version not representable: {ver}"))?;
 
         runner.run_async(pg_client).await?;
 
@@ -192,6 +196,8 @@ pub async fn migrate(
             }
         }
     }
+
+    domain_schemas::migrate_domain_schemas(&txn, &mut ctx).await?;
 
     execute::execute_domain_migration(&txn, &mut ctx)
         .await

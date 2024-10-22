@@ -2,14 +2,14 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use domain_engine_core::DomainResult;
 use ontol_runtime::{
-    ontology::domain::{DataRelationshipKind, Def},
+    ontology::domain::{DataRelationshipKind, DataTreeRepr, Def},
     query::select::{Select, StructOrUnionSelect, StructSelect},
     tuple::CardinalIdx,
     DefId, OntolDefTag, PropId,
 };
 use smallvec::{smallvec, SmallVec};
 
-use crate::pg_model::{EdgeId, PgEdgeCardinalKind, PgTable};
+use crate::pg_model::{EdgeId, PgEdgeCardinalKind, PgRegKey, PgTable};
 
 use super::{fields::AbstractKind, TransactCtx};
 
@@ -50,6 +50,19 @@ pub struct VertexSelect {
     pub inherent_set: BTreeSet<PropId>,
     pub abstract_set: BTreeMap<PropId, QuerySelect>,
     pub edge_set: BTreeMap<PropId, SmallVec<CardinalSelect, 2>>,
+    pub crdt_set: BTreeMap<PropId, PgRegKey>,
+}
+
+impl VertexSelect {
+    pub fn new(def_id: DefId) -> Self {
+        Self {
+            def_id,
+            inherent_set: Default::default(),
+            abstract_set: Default::default(),
+            edge_set: Default::default(),
+            crdt_set: Default::default(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -119,12 +132,7 @@ impl<'a> TransactCtx<'a> {
                 self.analyze_vertex_select_properties(def, pg_datatable, &struct_select.properties)
             }
             Select::Unit | Select::EntityId => {
-                let mut output = VertexSelect {
-                    def_id: def.id,
-                    inherent_set: Default::default(),
-                    abstract_set: Default::default(),
-                    edge_set: Default::default(),
-                };
+                let mut output = VertexSelect::new(def.id);
 
                 let Some(entity) = def.entity() else {
                     return Ok(output);
@@ -144,17 +152,12 @@ impl<'a> TransactCtx<'a> {
         pg_datatable: &'a PgTable,
         properties: &BTreeMap<PropId, Select>,
     ) -> DomainResult<VertexSelect> {
-        let mut output = VertexSelect {
-            def_id: def.id,
-            inherent_set: Default::default(),
-            abstract_set: Default::default(),
-            edge_set: Default::default(),
-        };
+        let mut output = VertexSelect::new(def.id);
 
         for (prop_id, sub_sel) in properties {
             if let Some(rel_info) = def.data_relationships.get(prop_id) {
                 match &rel_info.kind {
-                    DataRelationshipKind::Id | DataRelationshipKind::Tree => {
+                    DataRelationshipKind::Id | DataRelationshipKind::Tree(DataTreeRepr::Plain) => {
                         if pg_datatable.find_abstract_property(prop_id).is_some() {
                             match self.abstract_kind(&rel_info.target) {
                                 AbstractKind::VertexUnion(variants) => {
@@ -186,6 +189,10 @@ impl<'a> TransactCtx<'a> {
                         } else {
                             output.inherent_set.insert(*prop_id);
                         }
+                    }
+                    DataRelationshipKind::Tree(DataTreeRepr::Crdt) => {
+                        let prop_key = pg_datatable.abstract_property(prop_id)?;
+                        output.crdt_set.insert(*prop_id, prop_key);
                     }
                     DataRelationshipKind::Edge(proj) => {
                         let mut cardinal_selects = smallvec![];
@@ -226,14 +233,12 @@ impl<'a> TransactCtx<'a> {
                                         inherent_set.insert(*prop_id);
                                     }
 
+                                    let mut vertex_select = VertexSelect::new(*def_id);
+                                    vertex_select.inherent_set = inherent_set;
+
                                     cardinal_selects.push(CardinalSelect {
                                         cardinal_idx,
-                                        select: QuerySelect::Vertex(VertexSelect {
-                                            def_id: *def_id,
-                                            inherent_set,
-                                            abstract_set: Default::default(),
-                                            edge_set: Default::default(),
-                                        }),
+                                        select: QuerySelect::Vertex(vertex_select),
                                     });
                                 }
                             }

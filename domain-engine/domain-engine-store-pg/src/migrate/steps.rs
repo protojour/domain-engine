@@ -5,7 +5,8 @@ use ontol_runtime::{
     ontology::{
         aspects::DefsAspect,
         domain::{
-            DataRelationshipKind, DataRelationshipTarget, Def, DefRepr, Domain, EdgeCardinalFlags,
+            DataRelationshipKind, DataRelationshipTarget, DataTreeRepr, Def, DefRepr, Domain,
+            EdgeCardinalFlags,
         },
     },
     property::ValueCardinality,
@@ -73,6 +74,7 @@ pub async fn migrate_domain_steps<'t>(
                 schema_name: schema_name.clone(),
                 datatables: Default::default(),
                 edgetables: Default::default(),
+                has_crdt: false,
             },
         );
 
@@ -148,6 +150,7 @@ async fn migrate_vertex_steps<'t>(
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
     let table_name = format!("v_{}", ident).into_boxed_str();
+
     let pg_domain = ctx.domains.get_mut(&domain_ids.index).unwrap();
 
     let exists = if let Some(datatable) = pg_domain.datatables.get_mut(&vertex_def_id) {
@@ -351,7 +354,7 @@ fn migrate_datafields_steps(
         .data_relationships
         .iter()
         .filter_map(|(prop_id, rel_info)| match &rel_info.kind {
-            DataRelationshipKind::Id | DataRelationshipKind::Tree => {
+            DataRelationshipKind::Id | DataRelationshipKind::Tree(_) => {
                 Some((prop_id.tag(), rel_info))
             }
             DataRelationshipKind::Edge(_) => None,
@@ -396,16 +399,25 @@ fn migrate_datafields_steps(
                     "TODO: change data field pg_type",
                 );
             }
-            (Some(PgProperty::Abstract(_)), PgRepr::Abstract, _) => {
+            (Some(PgProperty::AbstractStruct(_)), PgRepr::Abstract(DataTreeRepr::Plain), _) => {
                 // OK
             }
-            (Some(PgProperty::Abstract(_)), PgRepr::Scalar(..), _) => {
+            (Some(PgProperty::AbstractStruct(_)), PgRepr::Scalar(..), _) => {
+                // OK
+            }
+            (Some(PgProperty::AbstractCrdt(_)), PgRepr::Abstract(DataTreeRepr::Crdt), _) => {
                 // OK
             }
             (Some(PgProperty::Column(_)), PgRepr::Scalar(..), _) => {
                 // OK
             }
-            (Some(PgProperty::Column(_)), PgRepr::Abstract, _) => {
+            (Some(PgProperty::AbstractCrdt(_)), _, _) => {
+                todo!("move out of CRDT")
+            }
+            (Some(PgProperty::AbstractStruct(_)), PgRepr::Abstract(DataTreeRepr::Crdt), _) => {
+                todo!("convert to CRDT")
+            }
+            (Some(PgProperty::Column(_)), PgRepr::Abstract(_proto), _) => {
                 todo!("migrate from column to abstract")
             }
             (
@@ -419,7 +431,7 @@ fn migrate_datafields_steps(
                     [MigrationStep::DeployProperty {
                         table_id,
                         prop_tag: *prop_tag,
-                        data: PgPropertyData::Abstract,
+                        data: PgPropertyData::AbstractStruct,
                     }],
                 );
                 ctx.abstract_scalars
@@ -444,16 +456,37 @@ fn migrate_datafields_steps(
             (_, PgRepr::CreatedAtColumn | PgRepr::UpdatedAtColumn, _) => {
                 // has standard columns ("_created", "_updated")
             }
-            (None, PgRepr::Abstract, _) => {
+            (None, PgRepr::Abstract(DataTreeRepr::Plain), _) => {
                 ctx.steps.extend(
                     stage,
                     domain_ids,
                     [MigrationStep::DeployProperty {
                         table_id,
                         prop_tag: *prop_tag,
-                        data: PgPropertyData::Abstract,
+                        data: PgPropertyData::AbstractStruct,
                     }],
                 );
+            }
+            (None, PgRepr::Abstract(DataTreeRepr::Crdt), _) => {
+                ctx.steps.extend(
+                    stage,
+                    domain_ids,
+                    [MigrationStep::DeployProperty {
+                        table_id,
+                        prop_tag: *prop_tag,
+                        data: PgPropertyData::AbstractCrdt,
+                    }],
+                );
+                if !pg_domain.has_crdt {
+                    ctx.steps.extend(
+                        stage,
+                        domain_ids,
+                        [MigrationStep::DeployCrdt {
+                            domain_index: domain_ids.index,
+                        }],
+                    );
+                    pg_domain.has_crdt = true;
+                }
             }
             (_, PgRepr::NotSupported(msg), _) => {
                 error!("pg repr error for {table_id:?}:`{column_name}`: `{msg:?}`");

@@ -167,7 +167,7 @@ impl InMemoryStore {
                     };
 
                     match &data_relationship.kind {
-                        DataRelationshipKind::Id | DataRelationshipKind::Tree => {
+                        DataRelationshipKind::Id | DataRelationshipKind::Tree(_) => {
                             let attr = prop_tree.get(prop_id).ok_or(ProofError::Disproven)?;
                             proof.merge(self.eval_match_attr(
                                 FilterAttr::from_attr(attr),

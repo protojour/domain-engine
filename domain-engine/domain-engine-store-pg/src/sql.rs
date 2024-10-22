@@ -167,6 +167,8 @@ pub enum Expr<'a> {
     Param(Param),
     Default,
     LiteralInt(i32),
+    LiteralStr(&'a str),
+    LiteralBytea(&'a [u8]),
     /// (a, b, ..)
     Tuple(Vec<Expr<'a>>),
     /// (a)
@@ -194,6 +196,8 @@ pub enum Expr<'a> {
     Any(Box<Expr<'a>>),
     Array(Box<Expr<'a>>),
     ArrayAgg(Box<Expr<'a>>),
+    /// value, separator
+    StringAgg(Box<Expr<'a>>, Box<Expr<'a>>),
     AsIndex(Box<Expr<'a>>, Alias),
     /// count(*) over ()
     CountStarOver,
@@ -216,6 +220,10 @@ impl<'a> Expr<'a> {
 
     pub fn paren(expr: impl Into<Self>) -> Self {
         Self::Paren(Box::new(expr.into()))
+    }
+
+    pub fn select(select: Select<'a>) -> Self {
+        Self::Select(Box::new(select))
     }
 
     pub fn array(expr: impl Into<Self>) -> Self {
@@ -288,6 +296,7 @@ pub enum FromItem<'a> {
     TableNameAs(TableName<'a>, Name),
     Alias(Alias),
     Join(Box<Join<'a>>),
+    Select(Box<Select<'a>>),
 }
 
 #[derive(Clone)]
@@ -548,9 +557,11 @@ impl<'a> Display for Expr<'a> {
             Self::Param(param) => write!(f, "{param}"),
             Self::Default => write!(f, "DEFAULT"),
             Self::LiteralInt(i) => write!(f, "{i}"),
+            Self::LiteralStr(s) => write!(f, "'{s}'"),
+            Self::LiteralBytea(b) => write!(f, "'\\x{}'", HexSlice(b)),
             Self::Tuple(t) => write!(f, "({})", t.iter().format(",")),
             Self::Paren(expr) => write!(f, "({expr})"),
-            Self::Select(select) => write!(f, "{select}"),
+            Self::Select(select) => write!(f, "({select})"),
             Self::Union(union) => write!(f, "{union}"),
             Self::And(clauses) => write!(f, "{}", clauses.iter().format(" AND ")),
             Self::Or(clauses) => write!(f, "{}", clauses.iter().format(" OR ")),
@@ -565,6 +576,7 @@ impl<'a> Display for Expr<'a> {
             Self::Any(expr) => write!(f, "ANY({expr})"),
             Self::Array(expr) => write!(f, "ARRAY({expr})"),
             Self::ArrayAgg(expr) => write!(f, "ARRAY_AGG({expr})"),
+            Self::StringAgg(expr, sep) => write!(f, "STRING_AGG({expr}, {sep})"),
             Self::AsIndex(expr, index) => write!(f, "{expr} AS {index}"),
             Self::CountStarOver => write!(f, "COUNT(*) OVER()"),
             Self::Limit(expr, limit) => write!(f, "{expr}{limit}"),
@@ -597,6 +609,7 @@ impl<'a> Display for FromItem<'a> {
             Self::TableNameAs(tn, alias) => write!(f, "{tn} AS {alias}"),
             Self::Alias(alias) => write!(f, "{alias}"),
             Self::Join(join) => write!(f, "{join}"),
+            Self::Select(select) => write!(f, "({select})"),
         }
     }
 }
@@ -704,6 +717,17 @@ pub struct Param(pub usize);
 impl Display for Param {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "${}", self.0 + 1)
+    }
+}
+
+struct HexSlice<'a>(&'a [u8]);
+
+impl Display for HexSlice<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for byte in self.0 {
+            write!(f, "{:X} ", byte)?;
+        }
+        Ok(())
     }
 }
 

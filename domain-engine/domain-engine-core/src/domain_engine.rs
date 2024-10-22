@@ -160,7 +160,8 @@ impl DomainEngine {
 
                                 for (prop_id, rel_info) in &def.data_relationships {
                                     match &rel_info.kind {
-                                        DataRelationshipKind::Id | DataRelationshipKind::Tree => {
+                                        DataRelationshipKind::Id
+                                        | DataRelationshipKind::Tree(_) => {
                                             struct_select.properties.insert(*prop_id, Select::Unit);
                                         }
                                         DataRelationshipKind::Edge(_) => {}

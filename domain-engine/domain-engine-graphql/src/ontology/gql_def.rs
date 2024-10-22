@@ -1,7 +1,11 @@
 //! GraphQL types related to a single ONTOL domain definition
 
 use ontol_runtime::{
-    ontology::{domain, map::MapMeta, ontol::TextConstant},
+    ontology::{
+        domain::{self, DataRelationshipKind},
+        map::MapMeta,
+        ontol::TextConstant,
+    },
     DefId, DefPropTag, MapKey, PropId,
 };
 
@@ -119,13 +123,9 @@ impl Def {
             .iter()
             .map(|(prop_id, dri)| {
                 let (kind, edge_projection) = match dri.kind {
-                    ontol_runtime::ontology::domain::DataRelationshipKind::Id => {
-                        (gql_rel::RelationshipKind::Id, None)
-                    }
-                    ontol_runtime::ontology::domain::DataRelationshipKind::Tree => {
-                        (gql_rel::RelationshipKind::Tree, None)
-                    }
-                    ontol_runtime::ontology::domain::DataRelationshipKind::Edge(cardinal_id) => {
+                    DataRelationshipKind::Id => (gql_rel::RelationshipKind::Id, None),
+                    DataRelationshipKind::Tree(_) => (gql_rel::RelationshipKind::Tree, None),
+                    DataRelationshipKind::Edge(cardinal_id) => {
                         (gql_rel::RelationshipKind::Edge, Some(cardinal_id))
                     }
                 };

@@ -220,7 +220,7 @@ impl InMemoryDb {
                                     self.ontology.as_ref(),
                                     self.system.as_ref(),
                                 )
-                                .make_storable(&mut value);
+                                .make_storable(&mut value)?;
 
                                 let value = store.write_new_entity(
                                     value,
@@ -236,7 +236,7 @@ impl InMemoryDb {
                                     self.ontology.as_ref(),
                                     self.system.as_ref(),
                                 )
-                                .make_storable(&mut value);
+                                .make_storable(&mut value)?;
 
                                 let value = store.update_entity(
                                     value,
@@ -252,7 +252,7 @@ impl InMemoryDb {
                                     self.ontology.as_ref(),
                                     self.system.as_ref(),
                                 )
-                                .make_storable(&mut value);
+                                .make_storable(&mut value)?;
 
                                 let (value, reason) = store.upsert_entity(
                                     value,

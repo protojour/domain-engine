@@ -93,7 +93,10 @@ fn expected_defs() -> juniper::Value<GqlScalar> {
     b.add("create_time", "GENERATOR");
     b.add("update_time", "GENERATOR");
     b.add("format", "DATA");
-    b.skip(8);
+    b.skip(2);
+    b.add("repr", "RELATION");
+    b.add("crdt", "GENERATOR");
+    b.skip(6);
     b.add("+", "FUNCTION");
     b.add("-", "FUNCTION");
     b.add("*", "FUNCTION");

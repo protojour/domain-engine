@@ -2,21 +2,25 @@ use fnv::FnvHashMap;
 use ontol_runtime::{
     attr::Attr,
     interface::serde::processor::ProcessorMode,
-    ontology::{aspects::DefsAspect, domain::Def, ontol::ValueGenerator},
+    ontology::{
+        aspects::DefsAspect,
+        domain::{DataRelationshipKind, DataTreeRepr, Def},
+        ontol::ValueGenerator,
+    },
     value::{OctetSequence, Value, ValueTag},
     PropId,
 };
 
-use crate::system::SystemAPI;
+use crate::{system::SystemAPI, DomainResult};
 
 /// A converter/finalizer for ONTOL values that processeses the values before stored to a data store.
 pub struct MakeStorable<'e> {
-    defs: &'e DefsAspect,
-    system: &'e dyn SystemAPI,
-    mode: ProcessorMode,
+    pub(crate) defs: &'e DefsAspect,
+    pub(crate) system: &'e dyn SystemAPI,
+    pub(crate) mode: ProcessorMode,
 
     /// All generated times get the same value
-    current_time: Option<chrono::DateTime<chrono::Utc>>,
+    pub(crate) current_time: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl<'e> MakeStorable<'e> {
@@ -46,42 +50,62 @@ impl<'e> MakeStorable<'e> {
         }
     }
 
-    pub fn make_storable(&self, value: &mut Value) {
+    pub fn make_storable(&self, value: &mut Value) -> DomainResult<()> {
         match value {
             Value::Struct(struct_map, type_def_id) => {
                 let def = self.defs.def(type_def_id.def_id());
+
                 self.process_struct(struct_map, def);
 
                 // recurse into sub-properties
-                for attr in struct_map.values_mut() {
-                    self.recurse_attr(attr);
+                for (prop_id, attr) in struct_map.iter_mut() {
+                    let rel_kind = def
+                        .data_relationships
+                        .get(prop_id)
+                        .map(|rel_info| &rel_info.kind);
+
+                    match (rel_kind, attr) {
+                        (
+                            Some(DataRelationshipKind::Tree(DataTreeRepr::Crdt)),
+                            Attr::Unit(Value::CrdtStruct(..)),
+                        ) => {
+                            // already CRDT
+                        }
+                        (
+                            Some(DataRelationshipKind::Tree(DataTreeRepr::Crdt)),
+                            Attr::Unit(value),
+                        ) => {
+                            let automerge_value =
+                                self.ontol_to_automerge(std::mem::replace(value, Value::unit()))?;
+                            *value = automerge_value;
+                        }
+                        (_, Attr::Unit(unit)) => {
+                            self.make_storable(unit)?;
+                        }
+                        (_, Attr::Tuple(tuple)) => {
+                            for value in tuple.elements.iter_mut() {
+                                self.make_storable(value)?;
+                            }
+                        }
+                        (_, Attr::Matrix(matrix)) => {
+                            for column in matrix.columns.iter_mut() {
+                                for value in column.elements_mut() {
+                                    self.make_storable(value)?;
+                                }
+                            }
+                        }
+                    }
                 }
             }
             Value::Sequence(seq, _) => {
                 for value in seq.elements_mut() {
-                    self.make_storable(value);
+                    self.make_storable(value)?;
                 }
             }
             _ => {}
         }
-    }
 
-    fn recurse_attr(&self, attr: &mut Attr) {
-        match attr {
-            Attr::Unit(unit) => self.make_storable(unit),
-            Attr::Tuple(tuple) => {
-                for value in tuple.elements.iter_mut() {
-                    self.make_storable(value);
-                }
-            }
-            Attr::Matrix(matrix) => {
-                for column in matrix.columns.iter_mut() {
-                    for value in column.elements_mut() {
-                        self.make_storable(value);
-                    }
-                }
-            }
-        }
+        Ok(())
     }
 
     fn process_struct(&self, struct_map: &mut FnvHashMap<PropId, Attr>, def: &Def) {

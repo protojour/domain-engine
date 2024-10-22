@@ -7,7 +7,7 @@ use ontol_runtime::{
     interface::serde::operator::SerdeOperatorAddr,
     ontology::{
         domain::{
-            DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget,
+            DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget, DataTreeRepr,
             EdgeCardinalProjection, Entity,
         },
         ontol::ValueGenerator,
@@ -135,7 +135,7 @@ impl InMemoryStore {
                 (DataRelationshipKind::Id, ..) => {
                     debug!("Skipping ID for update");
                 }
-                (DataRelationshipKind::Tree, attr, _) => {
+                (DataRelationshipKind::Tree(DataTreeRepr::Plain), attr, _) => {
                     raw_props_update.insert(prop_id, attr);
                 }
                 (
@@ -317,8 +317,15 @@ impl InMemoryStore {
                 attr,
                 data_relationship.cardinality.1,
             ) {
-                (DataRelationshipKind::Tree | DataRelationshipKind::Id, attr, _) => {
+                (
+                    DataRelationshipKind::Tree(DataTreeRepr::Plain) | DataRelationshipKind::Id,
+                    attr,
+                    _,
+                ) => {
                     raw_props.insert(prop_id, attr);
+                }
+                (DataRelationshipKind::Tree(DataTreeRepr::Crdt), ..) => {
+                    todo!("crdt")
                 }
                 (
                     DataRelationshipKind::Edge(projection),

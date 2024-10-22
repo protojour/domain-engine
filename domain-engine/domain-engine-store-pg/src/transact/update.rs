@@ -152,7 +152,7 @@ impl<'a> TransactCtx<'a> {
                 DataRelationshipKind::Id => {
                     trace!("skipping ID for update");
                 }
-                DataRelationshipKind::Tree => {
+                DataRelationshipKind::Tree(_) => {
                     let pg_column = pg.table.column(&prop_id)?;
                     let param_index = update_params.len();
 

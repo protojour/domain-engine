@@ -11,6 +11,8 @@ pub trait SystemAPI: Sync {
     /// Get the system's current time.
     fn current_time(&self) -> chrono::DateTime<chrono::Utc>;
 
+    fn automerge_system_actor(&self) -> Vec<u8>;
+
     /// Generate a new [uuid::Uuid].
     ///
     /// The default implementation uses UUID V7 (SortRand),

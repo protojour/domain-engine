@@ -1,3 +1,5 @@
+//! ontology migration
+
 use anyhow::{anyhow, Context};
 use indoc::{formatdoc, indoc};
 use itertools::Itertools;
@@ -49,21 +51,24 @@ async fn execute_migration_step<'t>(
                 .await
                 .context("create schema")?;
 
+            let pg_domain = ctx.domains.get_mut(&domain_index).unwrap();
+
             let row = txn
                 .query_one(
                     indoc! {"
                         INSERT INTO m6mreg.domain (
                             uid,
                             name,
-                            schema_name
-                        ) VALUES($1, $2, $3)
+                            schema_name,
+                            has_crdt
+                        ) VALUES($1, $2, $3, $4)
                         RETURNING key
                     "},
-                    &[&domain_uid, &name, &schema_name],
+                    &[&domain_uid, &name, &schema_name, &pg_domain.has_crdt],
                 )
                 .await?;
 
-            ctx.domains.get_mut(&domain_index).unwrap().key = Some(row.get(0));
+            pg_domain.key = Some(row.get(0));
         }
         MigrationStep::DeployVertex {
             vertex_def_id,
@@ -234,7 +239,8 @@ async fn execute_migration_step<'t>(
 
             let (pg_type, column_name) = match &data {
                 PgPropertyData::Scalar { col_name, pg_type } => (Some(pg_type), Some(col_name)),
-                PgPropertyData::Abstract => (None, None),
+                PgPropertyData::AbstractStruct => (None, None),
+                PgPropertyData::AbstractCrdt => (None, None),
             };
 
             let key = txn
@@ -262,7 +268,8 @@ async fn execute_migration_step<'t>(
                         col_name,
                         pg_type,
                     }),
-                    PgPropertyData::Abstract => PgProperty::Abstract(key),
+                    PgPropertyData::AbstractStruct => PgProperty::AbstractStruct(key),
+                    PgPropertyData::AbstractCrdt => PgProperty::AbstractCrdt(key),
                 },
             );
 
@@ -558,6 +565,34 @@ async fn execute_migration_step<'t>(
                     index_type,
                 },
             );
+        }
+        MigrationStep::DeployCrdt { domain_index } => {
+            let pg_domain = ctx.domains.get(&domain_index).unwrap();
+            txn.execute(
+                &format!(
+                    "CREATE TABLE {schema}.crdt (
+                        _fprop int NOT NULL,
+                        _fkey bigint NOT NULL,
+                        chunk_id bigserial NOT NULL,
+                        chunk_type m6m_crdt_chunk_type NOT NULL,
+                        chunk bytea NOT NULL
+                    )",
+                    schema = sql::Ident(&pg_domain.schema_name),
+                ),
+                &[],
+            )
+            .await
+            .context("create crdt table")?;
+
+            txn.execute(
+                &format!(
+                    "CREATE INDEX ON {schema}.crdt (_fprop, _fkey, chunk_id)",
+                    schema = sql::Ident(&pg_domain.schema_name),
+                ),
+                &[],
+            )
+            .await
+            .context("create crdt index")?;
         }
         MigrationStep::RenameDomainSchema { old, new } => {
             let pg_domain = ctx.domains.get_mut(&domain_index).unwrap();

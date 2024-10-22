@@ -12,7 +12,7 @@ use tantivy::{
     schema::{Facet, OwnedValue},
     DateTime, TantivyDocument,
 };
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::schema::SchemaWithMeta;
 
@@ -181,6 +181,7 @@ impl IndexingContext {
 
                 Some(OwnedValue::Object(tantivy_map))
             }
+            Value::CrdtStruct(..) => None,
             Value::Dict(_dict, _) => None,
             Value::Sequence(_, _) => None,
             Value::DeleteRelationship(_) => None,
@@ -246,7 +247,7 @@ impl IndexingContext {
                     };
 
                     match &rel_info.kind {
-                        DataRelationshipKind::Id | DataRelationshipKind::Tree => match attr {
+                        DataRelationshipKind::Id | DataRelationshipKind::Tree(_) => match attr {
                             Attr::Unit(value) => {
                                 self.concat_vertex(value, concat);
                             }
@@ -270,8 +271,20 @@ impl IndexingContext {
                     }
                 }
             }
-            Value::Dict(_dict, _) => todo!(),
-            Value::Sequence(_, _) => todo!(),
+            Value::CrdtStruct(..) => {}
+            Value::Dict(dict, _) => {
+                for (key, item) in dict.as_ref() {
+                    prepend_ws(concat);
+                    write!(concat, "{key}").unwrap();
+                    self.concat_vertex(item, concat);
+                }
+                warn!("TODO: concatenate dict");
+            }
+            Value::Sequence(seq, _) => {
+                for item in seq.elements() {
+                    self.concat_vertex(item, concat);
+                }
+            }
             Value::DeleteRelationship(_) => {}
             Value::Filter(_, _) => {}
         }

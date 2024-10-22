@@ -185,6 +185,10 @@ impl OntolHash for Value {
                 tag.def_id().hash(h);
                 property_map_ontol_hash(v, h, builder);
             }
+            Value::CrdtStruct(crdt, tag) => {
+                tag.def_id().hash(h);
+                crdt.ontol_hash(h, builder);
+            }
             Value::Dict(v, tag) => {
                 tag.def_id().hash(h);
                 v.len().hash(h);

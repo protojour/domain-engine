@@ -274,6 +274,12 @@ fn register_ontol_def_tag(tag: OntolDefTag, defs: &mut Defs) {
         OntolDefTag::FormatBase64 => {
             defs.add_primitive(tag, PrimitiveKind::Format, &["format", "base64"]);
         }
+        OntolDefTag::RelationRepr => {
+            defs.add_builtin_relation(tag, BuiltinRelationKind::Repr, &["repr"]);
+        }
+        OntolDefTag::Crdt => {
+            defs.add_ontol(OntolDefTag::Crdt, DefKind::EmptySequence);
+        }
         OntolDefTag::_LastEntry => {}
     }
 }

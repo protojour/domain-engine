@@ -151,7 +151,7 @@ impl<'a> MetaQuery<'a> {
                     // debug!("{filter:#?}");
 
                     match rel_info.kind {
-                        DataRelationshipKind::Id | DataRelationshipKind::Tree => {
+                        DataRelationshipKind::Id | DataRelationshipKind::Tree(_) => {
                             self.ops.push(Operation::Filter(Filter {
                                 var: Expr::complex(format!("{}.{}", self.var, filter.prop)),
                                 comp: filter.comp.clone(),

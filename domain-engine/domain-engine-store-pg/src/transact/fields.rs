@@ -157,7 +157,7 @@ impl<'a> TransactCtx<'a> {
                     SqlScalar::Timestamp(standard_fields.updated_at),
                 )?))
             }
-            PgRepr::Abstract => Ok(None),
+            PgRepr::Abstract(_) => Ok(None),
             PgRepr::NotSupported(msg) => Err(PgModelError::DataTypeNotSupported(msg).into()),
         }
     }

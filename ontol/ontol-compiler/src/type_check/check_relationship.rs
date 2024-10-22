@@ -367,6 +367,38 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .insert(rel_id, (*value_generator_def_id, *span));
                 object_ty
             }
+            BuiltinRelationKind::Repr => {
+                let Some(parent_relationship) = parent_relationship else {
+                    return &ERROR_TYPE;
+                };
+
+                let _subject_ty = self.check_def(subject.0);
+                let object_ty = self.check_def(object.0);
+
+                let Type::ObjectRepr(repr_def_id) = object_ty else {
+                    return CompileError::TODO("Not a valid object repr")
+                        .span(object.1)
+                        .report_ty(self);
+                };
+
+                let Relationship {
+                    object: outer_object,
+                    ..
+                } = parent_relationship;
+                let Some(_) = self.def_ty_ctx.def_table.get(&outer_object.0) else {
+                    return CompileError::TODO(
+                        "the type of the repr relation has not been checked",
+                    )
+                    .span(*span)
+                    .report_ty(self);
+                };
+
+                self.misc_ctx
+                    .relationship_repr
+                    .insert(rel_id, (*repr_def_id, *span));
+
+                object_ty
+            }
             BuiltinRelationKind::Min | BuiltinRelationKind::Max | BuiltinRelationKind::Example => {
                 let subject_ty = self.check_def(subject.0);
                 let _ = self.check_def(object.0);

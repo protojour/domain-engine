@@ -325,7 +325,7 @@ impl ArangoDatabase {
         let seed: PhantomData<serde_json::Value> = PhantomData;
 
         MakeStorable::new(processor_mode, self.ontology.as_ref(), self.system.as_ref())
-            .make_storable(&mut entity);
+            .make_storable(&mut entity)?;
 
         let pre_query = AqlQuery::prequery_from_entity(&entity, &self.ontology, self)?;
 

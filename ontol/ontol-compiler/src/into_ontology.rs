@@ -9,8 +9,8 @@ use ontol_runtime::{
     ontology::{
         domain::{
             self, BasicDef, DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource,
-            DataRelationshipTarget, Def, DefRepr, DefReprUnionBound, Domain, EdgeCardinal,
-            EdgeCardinalFlags, EdgeCardinalProjection, EdgeInfo, Entity,
+            DataRelationshipTarget, DataTreeRepr, Def, DefRepr, DefReprUnionBound, Domain,
+            EdgeCardinal, EdgeCardinalFlags, EdgeCardinalProjection, EdgeInfo, Entity,
         },
         map::MapMeta,
         ontol::{OntolDomainMeta, TextConstant, TextLikeType},
@@ -497,7 +497,7 @@ impl<'m> Compiler<'m> {
                         (DataRelationshipKind::Edge(edge_projection), target)
                     } else {
                         (
-                            DataRelationshipKind::Tree,
+                            DataRelationshipKind::Tree(DataTreeRepr::Plain),
                             DataRelationshipTarget::Union(target_def_id),
                         )
                     }
@@ -547,6 +547,18 @@ impl<'m> Compiler<'m> {
         target_def_id: DefId,
     ) -> (DataRelationshipKind, DataRelationshipTarget) {
         let target_properties = self.prop_ctx.properties_by_def_id(target_def_id);
+        let tree_repr = self
+            .misc_ctx
+            .relationship_repr
+            .get(&rel_id)
+            .map(|(repr_def_id, _)| {
+                if *repr_def_id == OntolDefTag::Crdt.def_id() {
+                    DataTreeRepr::Crdt
+                } else {
+                    DataTreeRepr::Plain
+                }
+            })
+            .unwrap_or(DataTreeRepr::Plain);
 
         if let Some(identifies) = target_properties.and_then(|p| p.identifies) {
             let meta = rel_def_meta(identifies, &self.rel_ctx, &self.defs);
@@ -566,12 +578,12 @@ impl<'m> Compiler<'m> {
                 (
                     edge_projection
                         .map(DataRelationshipKind::Edge)
-                        .unwrap_or(DataRelationshipKind::Tree),
+                        .unwrap_or(DataRelationshipKind::Tree(tree_repr)),
                     DataRelationshipTarget::Unambiguous(target_def_id),
                 )
             } else {
                 (
-                    DataRelationshipKind::Tree,
+                    DataRelationshipKind::Tree(tree_repr),
                     DataRelationshipTarget::Unambiguous(target_def_id),
                 )
             }
@@ -579,7 +591,7 @@ impl<'m> Compiler<'m> {
             (
                 edge_projection
                     .map(DataRelationshipKind::Edge)
-                    .unwrap_or(DataRelationshipKind::Tree),
+                    .unwrap_or(DataRelationshipKind::Tree(tree_repr)),
                 DataRelationshipTarget::Unambiguous(target_def_id),
             )
         } else {
@@ -595,7 +607,7 @@ impl<'m> Compiler<'m> {
                     if is_entity_id {
                         DataRelationshipKind::Id
                     } else {
-                        DataRelationshipKind::Tree
+                        DataRelationshipKind::Tree(tree_repr)
                     }
                 }
             };
@@ -682,7 +694,7 @@ impl<'m> Compiler<'m> {
                 for data_relationship in data_relationships.values() {
                     if matches!(
                         data_relationship.kind,
-                        DataRelationshipKind::Tree | DataRelationshipKind::Id
+                        DataRelationshipKind::Tree(_) | DataRelationshipKind::Id
                     ) {
                         inherent_property_count += 1;
                     }

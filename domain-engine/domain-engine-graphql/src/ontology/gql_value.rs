@@ -240,8 +240,15 @@ pub fn write_ontol_scalar(
                 }
             }
         }
-        Value::Dict(_, _) => todo!(),
-        Value::Sequence(_, _) => todo!(),
+        Value::Dict(_, _) => {
+            put_string(gobj, TYPE, "dict");
+        }
+        Value::CrdtStruct(..) => {
+            put_string(gobj, TYPE, "crdt_struct");
+        }
+        Value::Sequence(_, _) => {
+            put_string(gobj, TYPE, "sequence");
+        }
         Value::DeleteRelationship(..) | Value::Filter(..) => {
             put_string(gobj, TYPE, "error");
         }

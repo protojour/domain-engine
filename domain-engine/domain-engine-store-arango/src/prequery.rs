@@ -33,7 +33,7 @@ impl AqlQuery {
                 for (prop_id, attr) in struct_map.iter() {
                     if let Some(rel_info) = def.data_relationships.get(prop_id) {
                         match rel_info.kind {
-                            DataRelationshipKind::Tree | DataRelationshipKind::Id => {}
+                            DataRelationshipKind::Tree(_) | DataRelationshipKind::Id => {}
                             DataRelationshipKind::Edge(_) => {
                                 meta.prequery_relation(attr.as_ref(), rel_info)?;
                             }

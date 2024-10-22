@@ -8,10 +8,12 @@ use fnv::FnvHashMap;
 use futures_util::Stream;
 use ontol_runtime::{
     attr::{Attr, AttrMatrix},
+    crdt::{Automerge, CrdtStruct},
     ontology::domain::{DataRelationshipKind, Def},
     property::{PropertyCardinality, ValueCardinality},
     query::{
         filter::Filter,
+        order::Direction,
         select::{EntitySelect, StructOrUnionSelect},
     },
     sequence::SubSequence,
@@ -494,6 +496,46 @@ impl<'a> TransactCtx<'a> {
             }
         }
 
+        for prop_key in vertex_select.crdt_set.values() {
+            output.push(sql::Expr::select(sql::Select {
+                with: None,
+                expressions: sql::Expressions {
+                    items: vec![sql::Expr::StringAgg(
+                        Box::new(sql::Expr::path1("chunk")),
+                        Box::new(sql::Expr::LiteralBytea(&[])),
+                    )],
+                    multiline: false,
+                },
+                from: vec![sql::FromItem::Select(Box::new(sql::Select {
+                    with: None,
+                    expressions: sql::Expressions {
+                        items: vec![sql::Expr::path1("chunk")],
+                        multiline: false,
+                    },
+                    from: vec![sql::TableName(&pg.domain.schema_name, "crdt").into()],
+                    where_: Some(sql::Expr::eq(
+                        sql::Expr::Tuple(vec![
+                            sql::Expr::path1("_fprop"),
+                            sql::Expr::path1("_fkey"),
+                        ]),
+                        sql::Expr::Tuple(vec![
+                            sql::Expr::LiteralInt(*prop_key),
+                            sql::Expr::path2(parent_alias, "_key"),
+                        ]),
+                    )),
+                    order_by: sql::OrderBy {
+                        expressions: vec![sql::OrderByExpr(
+                            sql::Expr::path1("chunk_id"),
+                            Direction::Ascending,
+                        )],
+                    },
+                    ..Default::default()
+                }))],
+
+                ..Default::default()
+            }));
+        }
+
         Ok(())
     }
 
@@ -821,6 +863,24 @@ impl<'a> TransactCtx<'a> {
                         }
                     }
                 }
+            }
+
+            for prop_id in vertex_select.crdt_set.keys() {
+                let concatenated_chunks = iterator.next::<&[u8]>()?;
+
+                let Some(rel_info) = def.data_relationships.get(prop_id) else {
+                    continue;
+                };
+
+                attrs.insert(
+                    *prop_id,
+                    Attr::Unit(Value::CrdtStruct(
+                        CrdtStruct(Box::new(Automerge::load(concatenated_chunks).map_err(
+                            |err| DomainErrorKind::DataStore(format!("corrupted CRDT: {err:?}")),
+                        )?)),
+                        rel_info.target.def_id().into(),
+                    )),
+                );
             }
 
             self.read_edge_attributes(&mut iterator, def, vertex_select, &mut attrs)?;

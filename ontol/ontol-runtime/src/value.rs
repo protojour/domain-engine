@@ -13,6 +13,7 @@ use thin_vec::ThinVec;
 use crate::{
     attr::{Attr, AttrMatrix},
     cast::Cast,
+    crdt::CrdtStruct,
     ontology::aspects::DefsAspect,
     query::filter::Filter,
     sequence::Sequence,
@@ -38,6 +39,9 @@ pub enum Value {
 
     /// A collection of attributes keyed by property.
     Struct(Box<FnvHashMap<PropId, Attr>>, ValueTag),
+
+    /// A conflict-free collection of attributes keyed by property, will full editing history
+    CrdtStruct(CrdtStruct, ValueTag),
 
     /// A collection of arbitrary values keyed by strings.
     Dict(Box<BTreeMap<CompactString, Value>>, ValueTag),
@@ -120,6 +124,7 @@ impl Value {
             Value::ChronoDate(_, tag) => *tag,
             Value::ChronoTime(_, tag) => *tag,
             Value::Struct(_, tag) => *tag,
+            Value::CrdtStruct(_, tag) => *tag,
             Value::Dict(_, tag) => *tag,
             Value::Sequence(_, tag) => *tag,
             Value::DeleteRelationship(tag) => *tag,
@@ -145,6 +150,7 @@ impl Value {
             Value::ChronoDate(_, tag) => tag,
             Value::ChronoTime(_, tag) => tag,
             Value::Struct(_, tag) => tag,
+            Value::CrdtStruct(_, tag) => tag,
             Value::Dict(_, tag) => tag,
             Value::Sequence(_, tag) => tag,
             Value::DeleteRelationship(tag) => tag,
@@ -426,6 +432,9 @@ impl<'v> Display for ValueDebug<'v, Value> {
                     }
                 }
                 write!(f, "}}")
+            }
+            Value::CrdtStruct(..) => {
+                write!(f, "CRDT")
             }
             Value::Dict(..) => {
                 write!(f, "dict")

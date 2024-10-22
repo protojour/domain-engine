@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use domain_engine_core::{
+    make_interfacable::MakeInterfacable,
     make_storable::MakeStorable,
     system::SystemAPI,
     transact::{DataOperation, OpSequence, ReqMessage, RespMessage, TransactionMode},
@@ -26,6 +27,7 @@ use crate::{
 };
 
 mod condition;
+mod crdt;
 mod data;
 mod delete;
 mod edge_patch;
@@ -189,7 +191,8 @@ pub async fn transact(
 
                     for await result in stream {
                         match result? {
-                            QueryFrame::Row(row) => {
+                            QueryFrame::Row(mut row) => {
+                                MakeInterfacable::new(&ctx).make_interfacable(&mut row.value)?;
                                 yield RespMessage::Element(row.value, DataOperation::Queried);
                             }
                             QueryFrame::Footer(sub_sequence) => {
@@ -226,7 +229,7 @@ pub async fn transact(
                     match state.as_ref() {
                         Some(State::Insert(_, select)) => {
                             MakeStorable::without_timestamps(ProcessorMode::Create, &ctx, ctx.system)
-                                .make_storable(&mut value);
+                                .make_storable(&mut value)?;
 
                             let timestamp = ctx.system.current_time();
                             let row = ctx.insert_vertex(value.into(), InsertMode::Insert, select, timestamp, &mut mut_ctx).await?;
@@ -234,7 +237,7 @@ pub async fn transact(
                         }
                         Some(State::Update(_, select)) => {
                             MakeStorable::without_timestamps(ProcessorMode::Update, &ctx, ctx.system)
-                                .make_storable(&mut value);
+                                .make_storable(&mut value)?;
 
                             let timestamp = ctx.system.current_time();
                             let value = ctx.update_vertex_with_select(value.into(), select, timestamp, &mut mut_ctx).await?;
@@ -242,7 +245,7 @@ pub async fn transact(
                         }
                         Some(State::Upsert(_, select)) => {
                             MakeStorable::without_timestamps(ProcessorMode::Create, &ctx, ctx.system)
-                                .make_storable(&mut value);
+                                .make_storable(&mut value)?;
 
                             let timestamp = ctx.system.current_time();
                             let row = ctx.insert_vertex(value.into(), InsertMode::Upsert, select, timestamp, &mut mut_ctx).await?;

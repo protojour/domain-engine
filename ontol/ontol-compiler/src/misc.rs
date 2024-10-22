@@ -31,6 +31,8 @@ pub struct MiscCtx {
     pub order_relationships: FnvHashMap<DefId, Vec<RelId>>,
     /// `direction` relations
     pub direction_relationships: FnvHashMap<DefId, (RelId, DefId)>,
+    /// `repr` for relationships
+    pub relationship_repr: FnvHashMap<RelId, (DefId, SourceSpan)>,
 
     /// `rel type` parameters (instantiated) for various types
     pub type_params: FnvHashMap<DefId, IndexMap<DefId, TypeParam>>,

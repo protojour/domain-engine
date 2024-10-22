@@ -16,6 +16,7 @@ use tracing::debug;
 
 mod test_httpjson_error;
 mod test_httpjson_stix;
+mod test_httpjson_workspace;
 
 trait MakeTestRouter {
     fn make_test_router(&self, domain_engine: Arc<DomainEngine>, short_name: &str) -> axum::Router;

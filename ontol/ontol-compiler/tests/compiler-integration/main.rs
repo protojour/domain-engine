@@ -18,6 +18,7 @@ mod test_multi_package;
 mod test_repr;
 mod test_stix_lite;
 mod test_text_patterns;
+mod test_workspaces;
 mod unify;
 
 fn main() {}

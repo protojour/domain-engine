@@ -240,7 +240,7 @@ impl<'a> TransactCtx<'a> {
                 PgEdgeCardinalKind::Parameters(params_def_id) => {
                     let def = self.ontology_defs.def(*params_def_id);
                     for (prop_id, rel_info) in &def.data_relationships {
-                        if let DataRelationshipKind::Tree = &rel_info.kind {
+                        if let DataRelationshipKind::Tree(_) = &rel_info.kind {
                             match &rel_info.target {
                                 DataRelationshipTarget::Unambiguous(def_id) => {
                                     let pg_column = pg_edge.table.column(prop_id)?;
@@ -387,7 +387,7 @@ impl<'a> TransactCtx<'a> {
 
                 sql_delete.where_and(sql::Expr::in_(
                     sql::Expr::path1(key_col_name.as_ref()),
-                    sql::Expr::paren(sql::Expr::Select(Box::new(sql::Select {
+                    sql::Expr::Select(Box::new(sql::Select {
                         expressions: vec![sql::Expr::path1("_key")].into(),
                         from: vec![pg_foreign.table_name().into()],
                         where_: Some(sql::Expr::eq(
@@ -395,7 +395,7 @@ impl<'a> TransactCtx<'a> {
                             sql::Expr::Any(Box::new(sql::Expr::param(0))),
                         )),
                         ..Default::default()
-                    }))),
+                    })),
                 ));
 
                 let sql = sql_delete.to_string();

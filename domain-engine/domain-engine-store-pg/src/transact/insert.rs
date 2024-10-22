@@ -10,8 +10,9 @@ use fnv::FnvHashMap;
 use futures_util::{future::BoxFuture, TryStreamExt};
 use ontol_runtime::{
     attr::Attr,
+    crdt::Automerge,
     ontology::{
-        domain::{DataRelationshipKind, DataRelationshipTarget, Def},
+        domain::{DataRelationshipKind, DataRelationshipTarget, DataTreeRepr, Def},
         ontol::ValueGenerator,
     },
     query::select::Select,
@@ -36,7 +37,7 @@ use crate::{
 };
 
 use super::{
-    data::{Data, RowValue},
+    data::{Data, ParentProp, RowValue},
     edge_patch::{EdgeEndoTuplePatch, EdgePatches},
     mut_ctx::PgMutCtx,
     query::{DefAliasKey, QueryBuildCtx},
@@ -55,6 +56,7 @@ struct AnalyzedInput {
     query_kind: InsertQueryKind,
     edges: EdgePatches,
     abstract_values: Vec<(PropId, Value)>,
+    crdt_structs: Vec<(PropId, Automerge)>,
     query_select: QuerySelect,
     timestamp: PgTimestamp,
 }
@@ -63,11 +65,6 @@ enum InsertQueryKind {
     Insert,
     // Upsert,
     UpdateTentative(PgDataKey),
-}
-
-struct ParentProp {
-    prop_id: PropId,
-    key: PgDataKey,
 }
 
 impl<'a> TransactCtx<'a> {
@@ -173,6 +170,18 @@ impl<'a> TransactCtx<'a> {
                 },
                 value,
                 row_value.updated_at,
+                mut_ctx,
+            )
+            .await?;
+        }
+
+        for (prop_id, automerge) in analyzed.crdt_structs {
+            self.insert_initial_automerge_crdt(
+                ParentProp {
+                    prop_id,
+                    key: row_value.data_key,
+                },
+                automerge,
                 mut_ctx,
             )
             .await?;
@@ -528,7 +537,7 @@ impl<'a> TransactCtx<'a> {
                         DataRelationshipKind::Id => {
                             primary_id_column = pg_column;
                         }
-                        DataRelationshipKind::Tree => {}
+                        DataRelationshipKind::Tree(_) => {}
                         DataRelationshipKind::Edge(_) => continue,
                     }
 
@@ -558,7 +567,7 @@ impl<'a> TransactCtx<'a> {
                             param_idx += 1;
                         }
                     }
-                    DataRelationshipKind::Tree => {
+                    DataRelationshipKind::Tree(_) => {
                         // TODO: Make sure not to write "write-once" columns like Created time
                         if let Some(pg_column) = pg.table.find_column(prop_id) {
                             update_columns.push(sql::UpdateColumn(
@@ -672,6 +681,7 @@ impl<'a> TransactCtx<'a> {
         let mut update_tentative: Option<PgDataKey> = None;
         let mut edge_patches = EdgePatches::default();
         let mut abstract_values: Vec<(PropId, Value)> = vec![];
+        let mut crdt_structs: Vec<(PropId, Automerge)> = vec![];
 
         if pg_table.has_fkey {
             let Some(parent) = parent else {
@@ -766,6 +776,15 @@ impl<'a> TransactCtx<'a> {
                         }
                     }
                 }
+                (DataRelationshipKind::Tree(DataTreeRepr::Crdt), None) => {
+                    let Some(attr) = attr else {
+                        continue;
+                    };
+                    let Attr::Unit(Value::CrdtStruct(crdt_struct, _)) = attr else {
+                        return Err(DomainErrorKind::EntityMustBeStruct.into_error());
+                    };
+                    crdt_structs.push((*prop_id, *crdt_struct.0));
+                }
                 _ => {
                     match &rel_info.target {
                         DataRelationshipTarget::Unambiguous(def_id) => {
@@ -821,6 +840,7 @@ impl<'a> TransactCtx<'a> {
                 },
                 edges: edge_patches,
                 abstract_values,
+                crdt_structs,
                 query_select,
                 timestamp,
             },

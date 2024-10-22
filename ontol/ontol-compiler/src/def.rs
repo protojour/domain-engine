@@ -177,6 +177,9 @@ pub enum BuiltinRelationKind {
     /// rel* 'id'[rel* gen: auto]|id: (rel* is: uuid)
     /// ```
     Gen,
+    /// Used as an `rel` annotation to instruct ONTOL to use a specific data representation
+    /// for the object of that relation.
+    Repr,
     /// A relation between an entity and an [ordering](interfaces.md#ordering).
     /// ```ontol
     /// order: 'some_field'
@@ -211,6 +214,7 @@ impl BuiltinRelationKind {
             Self::Max => RelationContext::Def,
             Self::Default => RelationContext::Rel,
             Self::Gen => RelationContext::Rel,
+            Self::Repr => RelationContext::Rel,
             Self::Order => RelationContext::Def,
             Self::Direction => RelationContext::Def,
             Self::Example => RelationContext::Def,

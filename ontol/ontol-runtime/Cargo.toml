@@ -28,6 +28,7 @@ ulid = { workspace = true, features = ["serde"] }
 uuid.workspace = true
 
 ahash = "0.8"
+automerge = "0.5"
 bit-vec = { version = "0.8", features = ["serde"] }
 base64 = "0.22"
 hex = "0.4"

@@ -214,9 +214,13 @@ pub mod system {
                 Utc,
             );
 
-            trace!("monotonic year current time: {dt}");
+            trace!(%dt, "monotonic year current time");
 
             dt
+        }
+
+        fn automerge_system_actor(&self) -> Vec<u8> {
+            b"domainengine".to_vec()
         }
 
         async fn call_http_json_hook(

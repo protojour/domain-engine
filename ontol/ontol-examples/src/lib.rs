@@ -169,6 +169,13 @@ pub fn si() -> Example {
     (file_url("SI"), include_str!("../../../examples/SI.on"))
 }
 
+pub fn workspaces() -> Example {
+    (
+        file_url("workspaces"),
+        include_str!("../../../examples/workspaces.on"),
+    )
+}
+
 pub fn wgs() -> Example {
     (file_url("wgs"), include_str!("../../../examples/wgs.on"))
 }

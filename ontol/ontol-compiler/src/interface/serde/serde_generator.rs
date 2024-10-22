@@ -514,6 +514,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             | Type::Domain
             | Type::BuiltinRelation
             | Type::ValueGenerator(_)
+            | Type::ObjectRepr(_)
             | Type::Extern(_)
             | Type::Tautology => None,
             Type::Infer(_) | Type::Error => {

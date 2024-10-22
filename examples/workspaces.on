@@ -1,0 +1,28 @@
+domain 01JAP41VG1STK1VZPWXV26SPNM ()
+
+def Workspace (
+    /// The ULID of this workspace
+    rel. 'id'[rel* gen: auto]: (rel* is: ulid)
+
+    /// The conflict-free replicated representation of the workspace data
+    rel* 'data'[rel* repr: crdt]: WorkspaceData
+)
+
+/// The data making up a workspace.
+def WorkspaceData (
+    /// The title of the workspace
+    rel* 'title': text
+
+    /// The files that workspace contains
+    rel* 'files': {File}
+)
+
+/// A file in a workspace.
+def File (
+    /// The path of the file.
+    /// To simulate directories, use forward slashes to introduce hierarchies.
+    rel* 'path': /^[\w\.]+(\/[\w\.]+)*$/
+
+    /// the contents of the file
+    rel* 'contents': text
+)

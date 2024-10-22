@@ -36,13 +36,17 @@ pub async fn read_registry<'t>(
 
     // domains
     for row in txn
-        .query("SELECT key, uid, schema_name FROM m6mreg.domain", &[])
+        .query(
+            "SELECT key, uid, schema_name, has_crdt FROM m6mreg.domain",
+            &[],
+        )
         .await
         .context("read domains")?
     {
         let key: PgRegKey = row.get(0);
         let uid: Ulid = row.get(1);
         let schema_name = row.get(2);
+        let has_crdt = row.get(3);
 
         next_schema_disambiguator = i32::max(next_schema_disambiguator, key);
 
@@ -52,6 +56,7 @@ pub async fn read_registry<'t>(
                 schema_name,
                 datatables: Default::default(),
                 edgetables: Default::default(),
+                has_crdt,
             };
             ctx.domains.insert(*domain_index, pg_domain.clone());
             domain_index_by_key.insert(key, *domain_index);
@@ -149,7 +154,7 @@ pub async fn read_registry<'t>(
                 col_name,
                 pg_type,
             }),
-            (None, None) => PgProperty::Abstract(key),
+            (None, None) => PgProperty::AbstractStruct(key),
             _ => unreachable!(),
         };
 

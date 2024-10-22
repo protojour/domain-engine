@@ -111,6 +111,10 @@ impl domain_engine_core::system::SystemAPI for System {
         domain_engine_core::system::current_time()
     }
 
+    fn automerge_system_actor(&self) -> Vec<u8> {
+        b"domainengine".to_vec()
+    }
+
     async fn call_http_json_hook(
         &self,
         url: &str,

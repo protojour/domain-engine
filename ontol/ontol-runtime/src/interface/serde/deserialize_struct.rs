@@ -382,7 +382,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                             .attributes
                             .insert(serde_property.id, map.next_value_seed(property_processor)?);
 
-                        trace!("observe required prop {prop_idx} {:?}", serde_property.id);
+                        trace!(%prop_idx, id = ?serde_property.id, "observe required prop");
                     }
                 }
                 PropKind::FlatUnionDiscriminator(prop_idx, key, serde_property, union_addr) => {

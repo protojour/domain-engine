@@ -62,7 +62,7 @@ impl<'a> TransactCtx<'a> {
                 Some(PgProperty::Column(pg_column)) => {
                     return Ok(Some(sql::Expr::path1(pg_column.col_name.as_ref())));
                 }
-                Some(PgProperty::Abstract(_)) => {
+                Some(PgProperty::AbstractStruct(_) | PgProperty::AbstractCrdt(_)) => {
                     error!(?prop_id, "order by abstract property");
                     return Ok(None);
                 }
@@ -75,7 +75,7 @@ impl<'a> TransactCtx<'a> {
                     }
                     PgRepr::Unit
                     | PgRepr::Scalar(..)
-                    | PgRepr::Abstract
+                    | PgRepr::Abstract(_)
                     | PgRepr::NotSupported(_) => {
                         error!(?prop_id, "order by non-existent property");
                         return Ok(None);

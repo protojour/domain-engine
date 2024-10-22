@@ -3,9 +3,13 @@ use std::{collections::BTreeMap, ops::Deref};
 use domain_engine_core::DomainResult;
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    debug::OntolDebug,
     ontology::{
         aspects::DefsAspect,
-        domain::{DataRelationshipInfo, Def, DefKind, DefRepr, DefReprUnionBound},
+        domain::{
+            DataRelationshipInfo, DataRelationshipKind, DataTreeRepr, Def, DefKind, DefRepr,
+            DefReprUnionBound,
+        },
         ontol::ValueGenerator,
     },
     tuple::CardinalIdx,
@@ -14,7 +18,7 @@ use ontol_runtime::{
 };
 use postgres_types::ToSql;
 use tokio_postgres::types::FromSql;
-use tracing::debug;
+use tracing::{debug, trace};
 
 use crate::{pg_error::PgModelError, sql};
 
@@ -90,7 +94,8 @@ impl PgModel {
 
         match pg_property {
             PgProperty::Column(pg_column) => pg_column.key.try_into().ok(),
-            PgProperty::Abstract(_) => None,
+            PgProperty::AbstractStruct(_) => None,
+            PgProperty::AbstractCrdt(_) => None,
         }
     }
 
@@ -190,21 +195,23 @@ impl From<Value> for InDomain<Value> {
 #[repr(i32)]
 pub enum RegVersion {
     Init = 1,
+    Crdt = 2,
 }
 
 impl RegVersion {
     pub const fn current() -> Self {
-        Self::Init
+        Self::Crdt
     }
 }
 
 impl TryFrom<i32> for RegVersion {
-    type Error = ();
+    type Error = i32;
 
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         match value {
             1 => Ok(Self::Init),
-            _ => Err(()),
+            2 => Ok(Self::Crdt),
+            other => Err(other),
         }
     }
 }
@@ -215,6 +222,7 @@ pub struct PgDomain {
     pub schema_name: Box<str>,
     pub datatables: FnvHashMap<DefId, PgTable>,
     pub edgetables: FnvHashMap<u16, PgTable>,
+    pub has_crdt: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -281,7 +289,8 @@ impl PgTable {
 
     pub fn find_abstract_property(&self, prop_id: &PropId) -> Option<PgRegKey> {
         match self.properties.get(&prop_id.tag()) {
-            Some(PgProperty::Abstract(reg_key)) => Some(*reg_key),
+            Some(PgProperty::AbstractStruct(reg_key)) => Some(*reg_key),
+            Some(PgProperty::AbstractCrdt(reg_key)) => Some(*reg_key),
             Some(PgProperty::Column(_)) | None => None,
         }
     }
@@ -350,7 +359,8 @@ impl<'a> PgDomainTable<'a> {
 #[derive(Clone, Debug)]
 pub enum PgProperty {
     Column(PgColumn),
-    Abstract(PgRegKey),
+    AbstractStruct(PgRegKey),
+    AbstractCrdt(PgRegKey),
 }
 
 #[derive(Clone, Copy)]
@@ -362,7 +372,8 @@ pub enum PgPropertyRef<'a> {
 #[derive(Debug)]
 pub enum PgPropertyData {
     Scalar { col_name: Box<str>, pg_type: PgType },
-    Abstract,
+    AbstractStruct,
+    AbstractCrdt,
 }
 
 impl PgProperty {
@@ -374,7 +385,8 @@ impl PgProperty {
                 pg_type: column.pg_type,
                 standard: false,
             }),
-            Self::Abstract(reg_key) => PgPropertyRef::Abstract(*reg_key),
+            Self::AbstractStruct(reg_key) => PgPropertyRef::Abstract(*reg_key),
+            Self::AbstractCrdt(reg_key) => PgPropertyRef::Abstract(*reg_key),
         }
     }
 }
@@ -448,7 +460,7 @@ pub enum PgRepr {
     CreatedAtColumn,
     UpdatedAtColumn,
     /// Something that will be stored in an abstracted manner in "child table"
-    Abstract,
+    Abstract(DataTreeRepr),
     /// PG can't represent it (yet?)
     NotSupported(&'static str),
 }
@@ -459,10 +471,18 @@ impl PgRepr {
         def_id: DefId,
         ontology_defs: &DefsAspect,
     ) -> Self {
+        trace!(rel_info = ?rel_info.debug(ontology_defs), "classify property");
+
         match rel_info.generator {
             Some(ValueGenerator::CreatedAtTime) => Self::CreatedAtColumn,
             Some(ValueGenerator::UpdatedAtTime) => Self::UpdatedAtColumn,
-            _ => Self::classify_def_id(def_id, ontology_defs),
+            _ => match Self::classify_def_id(def_id, ontology_defs) {
+                Self::Abstract(protocol) => match rel_info.kind {
+                    DataRelationshipKind::Tree(tree_repr) => Self::Abstract(tree_repr),
+                    _ => Self::Abstract(protocol),
+                },
+                other => other,
+            },
         }
     }
 
@@ -499,13 +519,13 @@ impl PgRepr {
             }
             DefRepr::FmtStruct(None) => Self::Unit,
             DefRepr::Seq => todo!("seq"),
-            DefRepr::Struct => Self::Abstract,
+            DefRepr::Struct => Self::Abstract(DataTreeRepr::Plain),
             DefRepr::Intersection(_) => Self::NotSupported("intersection"),
             DefRepr::Union(_variants, bound) => match bound {
                 DefReprUnionBound::Scalar(scalar_repr) => {
                     Self::classify_def_repr(scalar_repr, ontology_defs)
                 }
-                _ => Self::Abstract,
+                _ => Self::Abstract(DataTreeRepr::Plain),
             },
             DefRepr::Macro => Self::Unit,
             DefRepr::Vertex => Self::NotSupported("vertex"),

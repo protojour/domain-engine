@@ -187,6 +187,12 @@ impl<'m> Compiler<'m> {
                 .0,
         ));
 
+        root_path_node.insert(DefPath(
+            &["crdt"],
+            self.register_def_type(OntolDefTag::Crdt.def_id(), Type::ObjectRepr)
+                .0,
+        ));
+
         // union setup
         {
             for sym_tag in [OntolDefTag::SymAscending, OntolDefTag::SymDescending] {

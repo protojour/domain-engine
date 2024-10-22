@@ -47,7 +47,7 @@ impl<'o> DomainSelectBuilder<'o> {
                         continue;
                     }
                 }
-                DataRelationshipKind::Id | DataRelationshipKind::Tree => follow_edge,
+                DataRelationshipKind::Id | DataRelationshipKind::Tree(_) => follow_edge,
             };
 
             match &rel_info.target {

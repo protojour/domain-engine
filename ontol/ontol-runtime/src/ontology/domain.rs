@@ -280,10 +280,16 @@ pub enum DataRelationshipKind {
     Id,
     /// A Tree data relationship that can never be circular.
     /// It expresses a simple composition of a composite (the parent) and the component (the child).
-    Tree,
+    Tree(DataTreeRepr),
     /// Graph data relationships can be circular and involves entities.
     /// The Graph relationship kind must go from one entity to another entity.
     Edge(EdgeCardinalProjection),
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, OntolDebug, Debug)]
+pub enum DataTreeRepr {
+    Plain,
+    Crdt,
 }
 
 #[derive(Clone, Serialize, Deserialize, OntolDebug)]

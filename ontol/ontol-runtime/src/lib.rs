@@ -14,6 +14,7 @@ use vec_map::VecMapKey;
 pub mod attr;
 pub mod cast;
 pub mod constant;
+pub mod crdt;
 pub mod debug;
 pub mod format_utils;
 pub mod interface;
@@ -190,8 +191,12 @@ pub enum OntolDefTag {
     Format = 42,
     FormatHex = 43,
     FormatBase64 = 44,
+
+    RelationRepr = 45,
+    /// The `crdt` symbol
+    Crdt = 46,
     /// This must be the last entry. Update the value accordingly.
-    _LastEntry = 45,
+    _LastEntry = 47,
 }
 
 impl_ontol_debug!(OntolDefTag);

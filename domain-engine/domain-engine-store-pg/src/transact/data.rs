@@ -5,6 +5,7 @@ use domain_engine_core::{transact::DataOperation, DomainResult};
 use fnv::FnvHashMap;
 use ontol_runtime::{
     attr::Attr,
+    crdt::CrdtStruct,
     ontology::domain::{DefKind, DefRepr},
     query::filter::Filter,
     sequence::Sequence,
@@ -49,10 +50,16 @@ impl From<Compound> for Data {
 #[expect(unused)]
 pub enum Compound {
     Struct(Box<FnvHashMap<PropId, Attr>>, ValueTag),
+    CrdtStruct(CrdtStruct, ValueTag),
     Dict(BTreeMap<CompactString, Value>, ValueTag),
     Sequence(Sequence<Value>, ValueTag),
     DeleteRelationship(ValueTag),
     Filter(Box<Filter>, ValueTag),
+}
+
+pub struct ParentProp {
+    pub prop_id: PropId,
+    pub key: PgDataKey,
 }
 
 impl<'a> TransactCtx<'a> {
@@ -133,6 +140,7 @@ impl<'a> TransactCtx<'a> {
                 _ => Ok(Compound::Struct(map, tag).into()),
             },
             (Value::Struct(map, tag), _) => Ok(Compound::Struct(map, tag).into()),
+            (Value::CrdtStruct(crdt, tag), _) => Ok(Compound::CrdtStruct(crdt, tag).into()),
             (Value::Dict(map, tag), _) => Ok(Compound::Dict(*map, tag).into()),
             (Value::Sequence(seq, tag), _) => Ok(Compound::Sequence(seq, tag).into()),
             (Value::DeleteRelationship(tag), _) => Ok(Compound::DeleteRelationship(tag).into()),
