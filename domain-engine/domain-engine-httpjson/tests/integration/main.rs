@@ -5,8 +5,7 @@ use bytes::Bytes;
 use domain_engine_core::{DomainEngine, Session};
 use domain_engine_httpjson::create_httpjson_router;
 use domain_engine_test_utils::{
-    dummy_session::DummySession, dynamic_data_store::DynamicDataStoreFactory,
-    system::mock_current_time_monotonic, unimock,
+    dummy_session::DummySession, dynamic_data_store::DynamicDataStoreFactory, unimock,
 };
 use futures_util::{Stream, StreamExt};
 use http::StatusCode;
@@ -62,35 +61,47 @@ fn streaming_axum_body(
     ))
 }
 
-async fn fetch_body_assert_status(
+trait FromBytes {
+    fn from_bytes(bytes: Bytes) -> Self;
+}
+
+impl FromBytes for serde_json::Value {
+    fn from_bytes(bytes: Bytes) -> Self {
+        serde_json::from_slice(&bytes).unwrap()
+    }
+}
+
+impl FromBytes for String {
+    fn from_bytes(bytes: Bytes) -> Self {
+        std::str::from_utf8(&bytes).unwrap().to_string()
+    }
+}
+
+async fn fetch_body_assert_status<B: FromBytes>(
     response: http::Response<Body>,
     expected: StatusCode,
-) -> Result<String, String> {
+) -> Result<B, String> {
     let status = response.status();
 
     use http_body_util::BodyExt;
-    let binary_body = response
-        .into_body()
-        .collect()
-        .await
-        .unwrap()
-        .to_bytes()
-        .to_vec();
-    let string_body = std::str::from_utf8(&binary_body).unwrap().to_string();
+    let binary_body = response.into_body().collect().await.unwrap().to_bytes();
 
     if status != expected {
-        return Err(format!("expected {expected}, was {status}: {string_body}"));
+        let string_body = std::str::from_utf8(&binary_body).unwrap().to_string();
+        Err(format!("expected {expected}, was {status}: {string_body}"))
+    } else {
+        Ok(B::from_bytes(binary_body))
     }
-
-    Ok(string_body)
 }
 
-async fn make_domain_engine(ontology: Arc<Ontology>, datastore: &str) -> Arc<DomainEngine> {
+async fn make_domain_engine(
+    ontology: Arc<Ontology>,
+    datastore: &str,
+    mock_clause: impl unimock::Clause,
+) -> Arc<DomainEngine> {
     Arc::new(
         DomainEngine::builder(ontology)
-            .system(Box::new(unimock::Unimock::new(
-                mock_current_time_monotonic(),
-            )))
+            .system(Box::new(unimock::Unimock::new(mock_clause)))
             .build(DynamicDataStoreFactory::new(datastore), Session::default())
             .await
             .unwrap(),

@@ -1,3 +1,4 @@
+use domain_engine_test_utils::system::mock_current_time_monotonic;
 use http::{header::CONTENT_TYPE, StatusCode};
 use ontol_macros::datastore_test;
 use ontol_test_utils::{default_short_name, TestCompile};
@@ -9,7 +10,7 @@ use crate::{jsonlines_stream, make_domain_engine, MakeTestRouter};
 #[datastore_test(tokio::test)]
 async fn test_httpjson_put_stream_transaction_error(ds: &str) {
     let test = ontol_examples::artist_and_instrument().1.compile();
-    let engine = make_domain_engine(test.ontology_owned(), ds).await;
+    let engine = make_domain_engine(test.ontology_owned(), ds, mock_current_time_monotonic()).await;
     let router = test.make_test_router(engine, default_short_name());
 
     let mut artist_docs = vec![

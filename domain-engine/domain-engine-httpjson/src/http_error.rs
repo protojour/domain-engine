@@ -4,6 +4,20 @@ use http::StatusCode;
 use serde::Serialize;
 use tracing::info;
 
+pub struct HttpJsonError(DomainError);
+
+impl From<DomainError> for HttpJsonError {
+    fn from(value: DomainError) -> Self {
+        Self(value)
+    }
+}
+
+impl IntoResponse for HttpJsonError {
+    fn into_response(self) -> axum::response::Response {
+        domain_error_to_response(self.0)
+    }
+}
+
 #[derive(Serialize)]
 pub struct ErrorJson {
     pub message: String,

@@ -1,6 +1,6 @@
 use ontol_runtime::{
     interface::{
-        http_json::{Endpoint, HttpJson, HttpResource},
+        http_json::{Endpoint, HttpJson, HttpKeyedResource, HttpResource},
         serde::{SerdeDef, SerdeModifier},
     },
     ontology::{aspects::DefsAspect, domain::DefKind},
@@ -35,10 +35,24 @@ pub fn generate_httpjson_interface(
                     continue;
                 };
 
+                let mut keyed: Vec<HttpKeyedResource> = vec![];
+
+                if let Some(id_rel_info) = def.data_relationships.get(&entity.id_prop) {
+                    keyed.push(HttpKeyedResource {
+                        key_name: id_rel_info.name,
+                        key_operator_addr: entity.id_operator_addr,
+                        key_prop_id: entity.id_prop,
+                        get: Some(Endpoint {}),
+                        put: None,
+                    });
+                }
+
                 http_json.resources.push(HttpResource {
+                    def_id: def.id,
                     name: entity.ident,
                     operator_addr: addr,
                     put: Some(Endpoint {}),
+                    keyed,
                 });
             }
             DefKind::Data(_) => {
@@ -54,9 +68,11 @@ pub fn generate_httpjson_interface(
                     };
 
                     http_json.resources.push(HttpResource {
+                        def_id: def.id,
                         name: ident,
                         operator_addr: addr,
                         put: Some(Endpoint {}),
+                        keyed: vec![],
                     });
                 }
             }
