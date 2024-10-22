@@ -3428,7 +3428,6 @@ dependencies = [
 name = "ontol-lsp"
 version = "0.4.0"
 dependencies = [
- "logos",
  "ontol-compiler",
  "ontol-parser",
  "ontol-runtime",

@@ -2,7 +2,7 @@ use ontol_lsp::Backend;
 use tower_lsp::{LspService, Server};
 
 #[tokio::main]
-async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
+async fn main() -> tokio::io::Result<()> {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
 

@@ -2,41 +2,35 @@ import { ExtensionContext, Uri, window, workspace } from "vscode"
 import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-languageclient/node"
 import { Wasm, WasmProcess, ProcessOptions } from "@vscode/wasm-wasi/v1"
 import { createStdioOptions, createUriConverters, startServer } from "@vscode/wasm-wasi-lsp"
-import { format } from "date-fns"
 
 let client: LanguageClient
 let process: WasmProcess
 
 export async function activate(context: ExtensionContext) {
-  const channel = window.createOutputChannel("ONTOL language server")
+  const channel = window.createOutputChannel("ONTOL language server", { log: true })
 
   const serverOptions: ServerOptions = async () => {
-    const wasm: Wasm = await Wasm.load()
+    const wasm = await Wasm.load()
     const file = Uri.joinPath(context.extensionUri, "wasm", "ontol-lsp.wasm")
     const bits = await workspace.fs.readFile(file)
     const module = await WebAssembly.compile(bits)
 
     const options: ProcessOptions = {
       stdio: createStdioOptions(),
-      mountPoints: [{ kind: "workspaceFolder" }]
+      mountPoints: [{ kind: "workspaceFolder" }],
     }
 
     process = await wasm.createProcess(
       "ontol-lsp",
       module,
       { initial: 30, maximum: 120, shared: true },
-      options
+      options,
     )
 
-    // const decoder = new TextDecoder("utf-8")
-    // process.stderr!.onData(data => {
-    //   channel.append(
-    //     format(Date.now(), "[Error HH:mm.SSS] ") +
-    //     decoder.decode(data)
-    //       .replace(/^Content-Length: \d+?\r\n\r\n/, "") +
-    //       "\n\n"
-    //   )
-    // })
+    const decoder = new TextDecoder("utf-8")
+    process.stderr!.onData((data) => {
+      channel.append(decoder.decode(data) + "\n\n")
+    })
 
     return startServer(process)
   }
@@ -44,7 +38,7 @@ export async function activate(context: ExtensionContext) {
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: "file", language: "ontol" }],
     outputChannel: channel,
-    uriConverters: createUriConverters()
+    uriConverters: createUriConverters(),
   }
 
   client = new LanguageClient(
@@ -52,7 +46,7 @@ export async function activate(context: ExtensionContext) {
     "ONTOL language client",
     serverOptions,
     clientOptions,
-    // true
+    true,
   )
 
   try {

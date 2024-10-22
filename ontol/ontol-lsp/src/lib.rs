@@ -177,15 +177,15 @@ impl LanguageServer for Backend {
     }
 
     async fn initialized(&self, _: InitializedParams) {
-        self.client
-            .log_message(MessageType::LOG, "Client and server initialized")
-            .await;
+        // self.client
+        //     .log_message(MessageType::LOG, "Client and server initialized")
+        //     .await;
     }
 
     async fn shutdown(&self) -> Result<()> {
-        self.client
-            .log_message(MessageType::LOG, "Shutting down language server")
-            .await;
+        // self.client
+        //     .log_message(MessageType::LOG, "Shutting down language server")
+        //     .await;
 
         Ok(())
     }
