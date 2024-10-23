@@ -13,7 +13,6 @@ use ontol_runtime::{
     property::{PropertyCardinality, ValueCardinality},
     query::{
         filter::Filter,
-        order::Direction,
         select::{EntitySelect, StructOrUnionSelect},
     },
     sequence::SubSequence,
@@ -508,10 +507,7 @@ impl<'a> TransactCtx<'a> {
                 },
                 from: vec![sql::FromItem::Select(Box::new(sql::Select {
                     with: None,
-                    expressions: sql::Expressions {
-                        items: vec![sql::Expr::path1("chunk")],
-                        multiline: false,
-                    },
+                    expressions: vec![sql::Expr::path1("chunk")].into(),
                     from: vec![sql::TableName(&pg.domain.schema_name, "crdt").into()],
                     where_: Some(sql::Expr::eq(
                         sql::Expr::Tuple(vec![
@@ -524,10 +520,7 @@ impl<'a> TransactCtx<'a> {
                         ]),
                     )),
                     order_by: sql::OrderBy {
-                        expressions: vec![sql::OrderByExpr(
-                            sql::Expr::path1("chunk_id"),
-                            Direction::Ascending,
-                        )],
+                        expressions: vec![sql::Expr::path1("chunk_id").into()],
                     },
                     ..Default::default()
                 }))],

@@ -1,6 +1,6 @@
-use std::{collections::BTreeSet, sync::Arc};
+use std::{collections::BTreeSet, future::Future, sync::Arc};
 
-use futures_util::{stream::BoxStream, Stream, StreamExt};
+use futures_util::{stream::BoxStream, Stream, StreamExt, TryStreamExt};
 use ontol_runtime::{
     query::{
         filter::Filter,
@@ -9,7 +9,7 @@ use ontol_runtime::{
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolvePath},
     sequence::{Sequence, SubSequence},
     value::Value,
-    DefId,
+    DefId, PropId,
 };
 use serde::{Deserialize, Serialize};
 use tracing::trace;
@@ -63,7 +63,12 @@ pub enum ReqMessage {
     Delete(OpSequence, DefId),
     /// Argument to the previous mutation message
     Argument(Value),
+    /// Return
+    CrdtGet(VertexAddr, PropId),
+    CrdtSaveIncremental(VertexAddr, PropId, Vec<CrdtChangeHash>, Vec<u8>),
 }
+
+pub type CrdtChangeHash = Vec<u8>;
 
 #[derive(Serialize, Deserialize)]
 pub enum RespMessage {
@@ -159,6 +164,22 @@ impl WriteStatsBuilder {
 
 pub trait AccumulateSequences<'a> {
     fn accumulate_sequences(self) -> impl Stream<Item = DomainResult<Sequence<Value>>> + 'a;
+
+    /// Expects one sequence to be present
+    fn accumulate_one_sequence(self) -> impl Future<Output = DomainResult<Sequence<Value>>> + 'a
+    where
+        Self: Sized + 'a,
+    {
+        async move {
+            Ok(self
+                .accumulate_sequences()
+                .try_collect::<Vec<_>>()
+                .await?
+                .into_iter()
+                .next()
+                .unwrap())
+        }
+    }
 }
 
 impl<'a> AccumulateSequences<'a> for BoxStream<'a, DomainResult<RespMessage>> {
@@ -330,6 +351,10 @@ impl DomainEngine {
 
                 Ok(ReqMessage::Argument(value))
             }
+            ReqMessage::CrdtGet(addr, prop_id) => Ok(ReqMessage::CrdtGet(addr, prop_id)),
+            ReqMessage::CrdtSaveIncremental(addr, prop_id, hashes, payload) => Ok(
+                ReqMessage::CrdtSaveIncremental(addr, prop_id, hashes, payload),
+            ),
         }
     }
 

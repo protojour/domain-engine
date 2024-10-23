@@ -261,6 +261,19 @@ pub async fn transact(
                         }
                     }
                 }
+                ReqMessage::CrdtGet(vertex_addr, prop_id) => {
+                    let octets = ctx.crdt_get(vertex_addr, prop_id).await?;
+
+                    yield RespMessage::SequenceStart(0);
+                    if let Some(octets) = octets {
+                        yield RespMessage::Element(Value::octet_sequence(octets), DataOperation::Queried);
+                    }
+                    yield RespMessage::SequenceEnd(0, None);
+
+                },
+                ReqMessage::CrdtSaveIncremental(vertex_addr, prop_id, change_hashes, payload) => {
+                    ctx.save_crdt_incremental(vertex_addr, prop_id, change_hashes, payload).await?;
+                },
             }
         }
 

@@ -30,6 +30,7 @@ ontol-examples.path = "../../ontol/ontol-examples"
 domain-engine-test-utils.path = "../domain-engine-test-utils"
 tracing-subscriber.workspace = true
 tokio.workspace = true
+automerge = "0.5"
 pretty_assertions = "1"
 tower = { version = "0.5", default-features = false, features = ["util"] }
 http-body = "1"

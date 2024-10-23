@@ -68,6 +68,10 @@ impl<T> Sequence<T> {
         self.elements
     }
 
+    pub fn into_first(self) -> Option<T> {
+        self.elements.into_iter().next()
+    }
+
     pub fn sub(&self) -> Option<&SubSequence> {
         self.sub_seq.as_deref()
     }

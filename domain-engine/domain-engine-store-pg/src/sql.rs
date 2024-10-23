@@ -153,6 +153,12 @@ pub struct OrderBy<'a> {
 #[derive(Clone)]
 pub struct OrderByExpr<'a>(pub Expr<'a>, pub Direction);
 
+impl<'a> From<Expr<'a>> for OrderByExpr<'a> {
+    fn from(value: Expr<'a>) -> Self {
+        OrderByExpr(value, Direction::Ascending)
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct Limit {
     pub limit: Option<usize>,

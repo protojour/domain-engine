@@ -214,6 +214,8 @@ impl ArangoDatabase {
                             }
                         }
                     }
+                    ReqMessage::CrdtGet(..) => todo!(),
+                    ReqMessage::CrdtSaveIncremental(..) => todo!(),
                 }
             }
         }

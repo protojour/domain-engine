@@ -275,6 +275,8 @@ impl InMemoryDb {
                             }
                         }
                     }
+                    ReqMessage::CrdtGet(..) => todo!(),
+                    ReqMessage::CrdtSaveIncremental(..) => todo!(),
                 }
             }
 

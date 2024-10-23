@@ -1767,6 +1767,7 @@ name = "domain-engine-httpjson"
 version = "0.1.0"
 dependencies = [
  "async-stream",
+ "automerge",
  "axum",
  "axum-extra",
  "bytes",
