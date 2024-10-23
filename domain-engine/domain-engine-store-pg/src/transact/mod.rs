@@ -269,10 +269,11 @@ pub async fn transact(
                         yield RespMessage::Element(Value::octet_sequence(octets), DataOperation::Queried);
                     }
                     yield RespMessage::SequenceEnd(0, None);
-
                 },
                 ReqMessage::CrdtSaveIncremental(vertex_addr, prop_id, change_hashes, payload) => {
                     ctx.save_crdt_incremental(vertex_addr, prop_id, change_hashes, payload).await?;
+                    yield RespMessage::SequenceStart(0);
+                    yield RespMessage::SequenceEnd(0, None);
                 },
             }
         }

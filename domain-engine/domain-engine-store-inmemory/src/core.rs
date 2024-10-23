@@ -5,6 +5,7 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use ontol_runtime::{
     attr::Attr,
+    crdt::CrdtStruct,
     ontology::{
         aspects::{DefsAspect, SerdeAspect},
         domain::{DataRelationshipInfo, Def},
@@ -15,6 +16,7 @@ use ontol_runtime::{
 };
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
+use thin_vec::ThinVec;
 use tracing::{debug, warn};
 
 use domain_engine_core::{
@@ -239,6 +241,67 @@ impl InMemoryStore {
         dynamic_key: &DynamicKey,
     ) -> Option<&FnvHashMap<PropId, Attr>> {
         self.vertices.get(&def_id)?.get(dynamic_key)
+    }
+
+    pub fn look_up_vertex_mut(
+        &mut self,
+        def_id: DefId,
+        dynamic_key: &DynamicKey,
+    ) -> Option<&mut FnvHashMap<PropId, Attr>> {
+        self.vertices.get_mut(&def_id)?.get_mut(dynamic_key)
+    }
+
+    pub fn crdt_to_bytes(
+        &mut self,
+        vertex_addr: VertexAddr,
+        prop_id: PropId,
+    ) -> DomainResult<Option<ThinVec<u8>>> {
+        let Some(crdt_struct) = self.get_crdt_mut(vertex_addr, prop_id)? else {
+            return Ok(None);
+        };
+
+        let bytes = crdt_struct.0.save();
+        Ok(Some(ThinVec::from(bytes)))
+    }
+
+    pub fn crdt_save_incremental(
+        &mut self,
+        vertex_addr: VertexAddr,
+        prop_id: PropId,
+        payload: Vec<u8>,
+    ) -> DomainResult<()> {
+        let Some(crdt_struct) = self.get_crdt_mut(vertex_addr, prop_id)? else {
+            return Err(DomainError::data_store("crdt does not exist"));
+        };
+
+        crdt_struct
+            .0
+            .load_incremental(&payload)
+            .map_err(|_| DomainError::data_store("could not save incremental update to CRDT"))?;
+
+        Ok(())
+    }
+
+    fn get_crdt_mut(
+        &mut self,
+        vertex_addr: VertexAddr,
+        prop_id: PropId,
+    ) -> DomainResult<Option<&mut CrdtStruct>> {
+        let vertex_key = postcard::from_bytes::<VertexKey<DynamicKey>>(&vertex_addr)
+            .map_err(|_| DomainErrorKind::BadInputData("invalid vertex addr".to_string()))?;
+
+        let Some(vertex) = self.look_up_vertex_mut(vertex_key.type_def_id, &vertex_key.dynamic_key)
+        else {
+            return Ok(None);
+        };
+        let Some(Attr::Unit(Value::CrdtStruct(crdt_struct, _))) = vertex.get_mut(&prop_id) else {
+            return Err(DomainErrorKind::BadInputData(
+                "no such property, or is not a CRDT".to_string(),
+            )
+            .into_error());
+        };
+
+        Ok(Some(crdt_struct))
     }
 }
 

@@ -250,7 +250,10 @@ async fn fetch_vertex_addr(def_id: DefId, engine: &DomainEngine) -> OctetSequenc
                 EntitySelect {
                     source: StructOrUnionSelect::Struct(StructSelect {
                         def_id,
-                        properties: From::from([(OntolDefTag::Vertex.prop_id_0(), Select::Unit)]),
+                        properties: From::from([(
+                            OntolDefTag::RelationDataStoreAddress.prop_id_0(),
+                            Select::Unit,
+                        )]),
                     }),
                     filter: Filter::default_for_datastore(),
                     limit: None,

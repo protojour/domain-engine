@@ -1851,6 +1851,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smallvec 2.0.0-alpha.7",
+ "thin-vec",
  "tokio",
  "tracing",
  "tracing-subscriber",
