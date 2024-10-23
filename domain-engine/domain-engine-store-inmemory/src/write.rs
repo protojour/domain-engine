@@ -324,8 +324,8 @@ impl InMemoryStore {
                 ) => {
                     raw_props.insert(prop_id, attr);
                 }
-                (DataRelationshipKind::Tree(DataTreeRepr::Crdt), ..) => {
-                    todo!("crdt")
+                (DataRelationshipKind::Tree(DataTreeRepr::Crdt), attr, _) => {
+                    raw_props.insert(prop_id, attr);
                 }
                 (
                     DataRelationshipKind::Edge(projection),

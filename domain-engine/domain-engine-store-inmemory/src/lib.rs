@@ -4,13 +4,14 @@ use core::{DbContext, EdgeColumn, EdgeVectorData};
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use domain_engine_core::data_store::{DataStoreFactory, DataStoreFactorySync, DataStoreParams};
-use domain_engine_core::make_storable::MakeStorable;
-use domain_engine_core::system::ArcSystemApi;
-use domain_engine_core::transact::{
-    DataOperation, OpSequence, ReqMessage, RespMessage, TransactionMode, WriteStats,
+use domain_engine_core::{
+    data_store::{DataStoreFactory, DataStoreFactorySync, DataStoreParams},
+    make_interfacable::MakeInterfacable,
+    make_storable::MakeStorable,
+    system::ArcSystemApi,
+    transact::{DataOperation, OpSequence, ReqMessage, RespMessage, TransactionMode, WriteStats},
+    DomainError, Session,
 };
-use domain_engine_core::{DomainError, Session};
 use fnv::{FnvHashMap, FnvHashSet};
 use futures_util::stream::BoxStream;
 use futures_util::StreamExt;
@@ -183,7 +184,8 @@ impl InMemoryDb {
 
                         yield RespMessage::SequenceStart(op_seq);
 
-                        for item in elements {
+                        for mut item in elements {
+                            MakeInterfacable::new(self.ontology.as_ref()).make_interfacable(&mut item)?;
                             yield RespMessage::Element(item, DataOperation::Queried);
                         }
 
