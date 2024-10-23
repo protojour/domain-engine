@@ -45,8 +45,11 @@ enum Stage {
 }
 
 struct MigrationCtx {
+    /// The version of the registry
     current_version: RegVersion,
-    deployed_version: RegVersion,
+    /// The version of the domain schema model, stored in m6mreg.domain_migration.
+    /// All changes to domain schemas have to be done through a migration in [domain_schemas].
+    deployed_domain_schema_version: RegVersion,
     domains: FnvHashMap<DomainIndex, PgDomain>,
     stats: Stats,
     steps: Steps,
@@ -141,27 +144,19 @@ pub async fn migrate(
 ) -> anyhow::Result<PgModel> {
     info!(%db_name, "migrating database");
 
-    // Migrate the registry
-    let mut ctx = {
-        let mut runner = registry::migrations::runner();
-        runner.set_migration_table_name(MIGRATIONS_TABLE_NAME);
-        let current_version =
-            RegVersion::try_from(runner.get_migrations().last().unwrap().version() as i32)
-                .map_err(|ver| anyhow!("applied version not representable: {ver}"))?;
+    // migrate the registry itself
+    let current_version = migrate_registry(pg_client).await?;
+    assert_eq!(RegVersion::current(), current_version);
 
-        runner.run_async(pg_client).await?;
-
-        let ctx = MigrationCtx {
-            current_version,
-            deployed_version: current_version,
-            domains: Default::default(),
-            stats: Default::default(),
-            steps: Default::default(),
-            abstract_scalars: Default::default(),
-            next_schema_disambiguator: 0,
-        };
-        assert_eq!(RegVersion::current(), ctx.current_version);
-        ctx
+    // initialize domain migration context
+    let mut ctx = MigrationCtx {
+        current_version,
+        deployed_domain_schema_version: RegVersion::Init,
+        domains: Default::default(),
+        stats: Default::default(),
+        steps: Default::default(),
+        abstract_scalars: Default::default(),
+        next_schema_disambiguator: 0,
     };
 
     // Migrate all the domains in a single transaction
@@ -172,11 +167,15 @@ pub async fn migrate(
         .start()
         .await?;
 
-    ctx.deployed_version = query_domain_migration_version(&txn).await?;
+    ctx.deployed_domain_schema_version = query_domain_migration_version(&txn).await?;
 
     let mut entity_id_to_entity = FnvHashMap::<DefId, DefId>::default();
 
+    // read current state from registry (registry is already migrated)
     read_registry(ontology_defs, &mut ctx, &txn).await?;
+
+    // apply PG changes to the domain schemas if needed
+    domain_schemas::migrate_domain_schemas(&txn, &mut ctx).await?;
 
     // collect migration steps for persistent domains
     // this improves separation of concerns while also enabling dry run simulations
@@ -197,15 +196,14 @@ pub async fn migrate(
         }
     }
 
-    domain_schemas::migrate_domain_schemas(&txn, &mut ctx).await?;
-
+    // do actual migration based on changes to ontology
     execute::execute_domain_migration(&txn, &mut ctx)
         .await
         .context("perform migration")?;
 
     // sanity checks
     {
-        assert_eq!(ctx.current_version, ctx.deployed_version);
+        assert_eq!(ctx.current_version, ctx.deployed_domain_schema_version);
         assert_eq!(
             ctx.current_version,
             query_domain_migration_version(&txn).await?
@@ -241,11 +239,29 @@ pub async fn migrate(
     Ok(PgModel::new(ctx.domains, entity_id_to_entity))
 }
 
+async fn migrate_registry(pg_client: &mut Client) -> anyhow::Result<RegVersion> {
+    let mut runner = registry::migrations::runner();
+    runner.set_migration_table_name(MIGRATIONS_TABLE_NAME);
+
+    let mut migrations = runner
+        .get_migrations()
+        .iter()
+        .filter(|mig| format!("{}", mig.prefix()) == "V")
+        .collect::<Vec<_>>();
+    migrations.sort();
+
+    runner.run_async(pg_client).await?;
+
+    RegVersion::try_from(migrations.last().unwrap().version())
+        .map_err(|ver| anyhow!("applied version not representable: {ver}"))
+}
+
 async fn query_domain_migration_version<'t>(txn: &Transaction<'t>) -> anyhow::Result<RegVersion> {
-    RegVersion::try_from(
-        txn.query_one("SELECT version FROM m6mreg.domain_migration", &[])
-            .await?
-            .get::<_, i32>(0),
-    )
-    .map_err(|_| anyhow!("deployed version not representable"))
+    let version = txn
+        .query_one("SELECT version FROM m6mreg.domain_migration", &[])
+        .await?
+        .get::<_, i32>(0);
+
+    RegVersion::try_from(u32::try_from(version)?)
+        .map_err(|_| anyhow!("deployed version not representable"))
 }

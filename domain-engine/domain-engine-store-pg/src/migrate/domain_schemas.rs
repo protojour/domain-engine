@@ -12,8 +12,8 @@ pub async fn migrate_domain_schemas<'t>(
     txn: &Transaction<'t>,
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
-    while ctx.deployed_version != ctx.current_version {
-        let next_int = ctx.deployed_version as i32 + 1;
+    while ctx.deployed_domain_schema_version != ctx.current_version {
+        let next_int = ctx.deployed_domain_schema_version as u32 + 1;
         let next = RegVersion::try_from(next_int).unwrap();
 
         info!("migrating domain schemas to V{next_int}: {next:?}");
@@ -26,7 +26,7 @@ pub async fn migrate_domain_schemas<'t>(
         )
         .await
         .context("write next version")?;
-        ctx.deployed_version = next;
+        ctx.deployed_domain_schema_version = next;
     }
 
     Ok(())

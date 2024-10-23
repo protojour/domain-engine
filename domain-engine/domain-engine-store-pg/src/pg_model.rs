@@ -192,7 +192,7 @@ impl From<Value> for InDomain<Value> {
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
-#[repr(i32)]
+#[repr(u32)]
 pub enum RegVersion {
     Init = 1,
     Crdt = 2,
@@ -204,10 +204,10 @@ impl RegVersion {
     }
 }
 
-impl TryFrom<i32> for RegVersion {
-    type Error = i32;
+impl TryFrom<u32> for RegVersion {
+    type Error = u32;
 
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
         match value {
             1 => Ok(Self::Init),
             2 => Ok(Self::Crdt),
