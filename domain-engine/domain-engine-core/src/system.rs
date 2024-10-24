@@ -11,6 +11,10 @@ pub trait SystemAPI: Sync {
     /// Get the system's current time.
     fn current_time(&self) -> chrono::DateTime<chrono::Utc>;
 
+    /// Get a user id from the session.
+    /// The user id should be suitable for persistent storage.
+    fn get_user_id(&self, session: Session) -> DomainResult<String>;
+
     /// Verify that a user id belongs to the session
     fn verify_session_user_id(&self, user_id: &str, session: Session) -> DomainResult<()>;
 

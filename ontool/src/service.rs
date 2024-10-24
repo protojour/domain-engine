@@ -112,6 +112,11 @@ impl domain_engine_core::system::SystemAPI for System {
     }
 
     #[expect(unused)]
+    fn get_user_id(&self, session: Session) -> DomainResult<String> {
+        Ok("ontooluser".to_string())
+    }
+
+    #[expect(unused)]
     fn verify_session_user_id(&self, user_id: &str, session: Session) -> DomainResult<()> {
         Ok(())
     }

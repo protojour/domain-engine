@@ -7,7 +7,7 @@ use axum::{
     extract::{FromRequest, FromRequestParts, OriginalUri},
     http::StatusCode,
     response::IntoResponse,
-    routing::{MethodFilter, MethodRouter},
+    routing::{post, MethodFilter, MethodRouter},
     Extension,
 };
 use axum_extra::extract::JsonLines;
@@ -53,6 +53,7 @@ use serde::{
 };
 use tokio::sync::Mutex;
 use tracing::{debug, error};
+use uuid::Uuid;
 
 pub mod crdt;
 pub mod http_error;
@@ -133,6 +134,9 @@ where
         );
 
         for keyed in &resource.keyed {
+            let resource_name = &ontology[resource.name];
+            let key_name = &ontology[keyed.key_name];
+
             let mut method_router: MethodRouter<State, Infallible> = MethodRouter::default();
 
             if keyed.get.is_some() {
@@ -140,11 +144,7 @@ where
                     method_router.on(MethodFilter::GET, get_resource_keyed::<State, Auth>);
             }
 
-            let route_name = format!(
-                "/{resource}/{key}/:{key}",
-                resource = &ontology[resource.name],
-                key = &ontology[keyed.key_name]
-            );
+            let route_name = format!("/{resource_name}/{key_name}/:{key_name}");
 
             debug!("add route `{route_name}`");
 
@@ -160,21 +160,28 @@ where
             );
 
             for (crdt_prop_id, prop_name) in &keyed.crdts {
-                let method_router: MethodRouter<State, Infallible> = MethodRouter::default()
-                    .on(MethodFilter::POST, post_crdt_broker_ws::<State, Auth>);
+                let prop_name = &ontology[*prop_name];
 
-                let route_name = format!(
-                    "/{resource}/{key}/:{key}/{prop}",
-                    resource = &ontology[resource.name],
-                    key = &ontology[keyed.key_name],
-                    prop = &ontology[*prop_name]
+                let sync_route_name =
+                    format!("/{resource_name}/{key_name}/:{key_name}/{prop_name}");
+                debug!("add route `{sync_route_name}`");
+                domain_router = domain_router.route(
+                    &sync_route_name,
+                    post(post_crdt_broker_ws::<State, Auth>).layer(Extension(CrdtBrokerEndpoint {
+                        doc_repository: DocRepository::from(engine.clone()),
+                        broker_manager: broker_manager.clone(),
+                        resource_def_id: resource.def_id,
+                        key_operator_addr: keyed.key_operator_addr,
+                        crdt_prop_id: *crdt_prop_id,
+                    })),
                 );
 
-                debug!("add route `{route_name}`");
-
+                let actor_route_name =
+                    format!("/{resource_name}/{key_name}/:{key_name}/{prop_name}/actor");
+                debug!("add route `{actor_route_name}`");
                 domain_router = domain_router.route(
-                    &route_name,
-                    method_router.layer(Extension(CrdtBrokerEndpoint {
+                    &actor_route_name,
+                    post(post_crdt_actor::<State, Auth>).layer(Extension(CrdtBrokerEndpoint {
                         doc_repository: DocRepository::from(engine.clone()),
                         broker_manager: broker_manager.clone(),
                         resource_def_id: resource.def_id,
@@ -189,7 +196,9 @@ where
     Some(domain_router)
 }
 
+///
 /// POST /resource
+///
 async fn post_resource_unkeyed<State, Auth>(
     endpoint: Extension<UnkeyedEndpoint>,
     auth: Auth,
@@ -255,7 +264,9 @@ where
     }
 }
 
+///
 /// PUT /resource
+///
 async fn put_resource_unkeyed<State, Auth>(
     endpoint: Extension<UnkeyedEndpoint>,
     auth: Auth,
@@ -281,7 +292,9 @@ where
     Ok(StatusCode::OK.into_response())
 }
 
+///
 /// GET /resource/{key_name}/:{key}
+///
 async fn get_resource_keyed<State, Auth>(
     Extension(endpoint): Extension<KeyedEndpoint>,
     auth: Auth,
@@ -379,6 +392,11 @@ struct CrdtBrokerParams {
     actor: String,
 }
 
+///
+/// POST /resource/{key_name}/:{key}/{crdt_prop}
+///
+/// This is the WebSocket sync for the CRDT.
+///
 async fn post_crdt_broker_ws<State, Auth>(
     Extension(endpoint): Extension<CrdtBrokerEndpoint>,
     auth: Auth,
@@ -396,8 +414,12 @@ where
         Ok(key) => key,
         Err(response) => return Ok(response),
     };
-    let crdt_actor = CrdtActor::deserialize_from_hex(&params.actor)
-        .map_err(|_| DomainErrorKind::BadInputFormat("bad actor".to_string()).into_error())?;
+    let crdt_actor = CrdtActor::deserialize_from_hex(&params.actor).ok_or_else(|| {
+        DomainErrorKind::BadInputFormat(
+            "bad actor, allocate a new actor by calling the /actor endpoint".to_string(),
+        )
+        .into_error()
+    })?;
 
     // verify crdt actor
     endpoint
@@ -408,6 +430,7 @@ where
 
     let actor_id = crdt_actor.to_automerge_actor_id();
 
+    // find the vertex that owns the CRDT
     let vertex_addr = endpoint
         .doc_repository
         .fetch_vertex_addr(endpoint.resource_def_id, key, session.clone())
@@ -416,6 +439,7 @@ where
 
     let doc_addr = DocAddr(vertex_addr, endpoint.crdt_prop_id);
 
+    // load or create a broker for that document
     let broker_handle = match load_broker(
         doc_addr.clone(),
         actor_id.clone(),
@@ -440,6 +464,34 @@ where
         };
         let _ = session.run().await;
     }))
+}
+
+///
+/// POST /resource/{key_name}/:{key}/{crdt_prop}/actor
+///
+/// Allocates an actor ID for use with CRDT
+///
+async fn post_crdt_actor<State, Auth>(
+    Extension(endpoint): Extension<CrdtBrokerEndpoint>,
+    auth: Auth,
+) -> Result<axum::Json<String>, HttpJsonError>
+where
+    State: Send + Sync + Clone + 'static,
+    Auth: FromRequestParts<State> + Into<Session> + 'static,
+{
+    let session: Session = auth.into();
+    let user_id = endpoint
+        .doc_repository
+        .domain_engine()
+        .system()
+        .get_user_id(session)?;
+
+    let actor = CrdtActor {
+        actor_id: Uuid::new_v4(),
+        user_id,
+    };
+
+    Ok(axum::Json(actor.serialize_to_hex()))
 }
 
 mod create {

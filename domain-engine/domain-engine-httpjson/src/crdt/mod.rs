@@ -20,9 +20,9 @@ pub struct CrdtActor {
 }
 
 impl CrdtActor {
-    pub fn deserialize_from_hex(hex: &str) -> Result<Self, ()> {
-        let buf = hex::decode(hex).map_err(|_| ())?;
-        postcard::from_bytes(&buf).map_err(|_| ())
+    pub fn deserialize_from_hex(hex: &str) -> Option<Self> {
+        let buf = hex::decode(hex).ok()?;
+        postcard::from_bytes(&buf).ok()
     }
 
     pub fn serialize_to_hex(&self) -> String {
