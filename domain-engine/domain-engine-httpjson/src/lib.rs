@@ -51,7 +51,7 @@ use serde::{
     de::{value::StringDeserializer, DeserializeSeed},
     Deserialize, Deserializer,
 };
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 pub mod crdt;
@@ -416,7 +416,9 @@ where
     Auth: FromRequestParts<State> + Into<Session> + 'static,
 {
     let session = auth.into();
-    let ontology = endpoint.doc_repository.domain_engine().ontology();
+    let domain_engine = endpoint.doc_repository.domain_engine();
+    let ontology = domain_engine.ontology();
+
     let key = match key::deserialize_key(key.0, endpoint.key_operator_addr, ontology) {
         Ok(key) => key,
         Err(response) => return Ok(response),
@@ -429,11 +431,10 @@ where
     })?;
 
     // verify crdt actor
-    endpoint
-        .doc_repository
-        .domain_engine()
-        .system()
-        .verify_session_user_id(&crdt_actor.user_id, session.clone())?;
+    if crdt_actor.user_id != domain_engine.system().get_user_id(session.clone())? {
+        info!("CrdtActor user_id does not match the session user id");
+        return Err(DomainErrorKind::Unauthorized.into_error().into());
+    }
 
     let actor_id: automerge::ActorId = crdt_actor.clone().into();
 

@@ -127,11 +127,6 @@ impl domain_engine_core::system::SystemAPI for System {
         Ok("ontooluser".to_string())
     }
 
-    #[expect(unused)]
-    fn verify_session_user_id(&self, user_id: &str, session: Session) -> DomainResult<()> {
-        Ok(())
-    }
-
     async fn call_http_json_hook(
         &self,
         url: &str,

@@ -15,9 +15,6 @@ pub trait SystemAPI: Sync {
     /// The user id should be suitable for persistent storage.
     fn get_user_id(&self, session: Session) -> DomainResult<String>;
 
-    /// Verify that a user id belongs to the session
-    fn verify_session_user_id(&self, user_id: &str, session: Session) -> DomainResult<()>;
-
     /// Generate a new [uuid::Uuid].
     ///
     /// The default implementation uses UUID V7 (SortRand),

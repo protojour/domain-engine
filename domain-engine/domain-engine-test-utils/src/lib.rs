@@ -224,11 +224,6 @@ pub mod system {
             Ok("testuser".to_string())
         }
 
-        #[expect(unused)]
-        fn verify_session_user_id(&self, user_id: &str, session: Session) -> DomainResult<()> {
-            Ok(())
-        }
-
         async fn call_http_json_hook(
             &self,
             _url: &str,
