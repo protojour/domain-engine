@@ -18,6 +18,7 @@ use domain_engine_graphql::{
     juniper,
     ontology::{OntologyCtx, OntologySchema},
 };
+use domain_engine_httpjson::DomainRouterBuilder;
 use juniper_axum::extract::JuniperRequest;
 use ontol_runtime::DomainIndex;
 use reqwest::header::HeaderName;
@@ -27,6 +28,8 @@ use tracing::info;
 pub async fn domains_router(domain_engine: Arc<DomainEngine>, base_url: &str) -> axum::Router {
     let mut router: axum::Router = axum::Router::new();
     let ontology = domain_engine.ontology();
+
+    let router_builder = DomainRouterBuilder::default();
 
     for (domain_index, domain) in ontology
         .domains()
@@ -38,7 +41,13 @@ pub async fn domains_router(domain_engine: Arc<DomainEngine>, base_url: &str) ->
         );
         router = router.nest(
             &domain_path,
-            domain_router(domain_engine.clone(), &domain_path, domain_index).unwrap(),
+            domain_router(
+                domain_engine.clone(),
+                &domain_path,
+                domain_index,
+                &router_builder,
+            )
+            .unwrap(),
         );
 
         info!("Domain {domain_index:?} served under {base_url}{domain_path}/graphql");
@@ -178,6 +187,7 @@ fn domain_router(
     engine: Arc<DomainEngine>,
     _domain_path: &str,
     domain_index: DomainIndex,
+    router_builder: &DomainRouterBuilder,
 ) -> anyhow::Result<axum::Router> {
     let mut router: axum::Router = axum::Router::new();
 
@@ -202,7 +212,7 @@ fn domain_router(
     };
 
     if let Some(httpjson_router) =
-        domain_engine_httpjson::create_httpjson_router::<(), DummyAuth>(engine, domain_index)
+        router_builder.create_httpjson_router::<(), DummyAuth>(engine, domain_index)
     {
         router = router.nest("/api", httpjson_router);
     }

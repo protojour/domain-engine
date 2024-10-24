@@ -444,6 +444,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-tungstenite"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90e661b6cb0a6eb34d02c520b052daa3aa9ac0cc02495c9d066bbce13ead132b"
+dependencies = [
+ "futures-io",
+ "futures-util",
+ "log",
+ "pin-project-lite",
+ "tungstenite",
+]
+
+[[package]]
 name = "atoi"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1788,9 +1801,11 @@ dependencies = [
  "postcard",
  "pretty_assertions",
  "reqwest",
+ "reqwest-websocket",
  "serde",
  "serde_json",
  "tokio",
+ "tokio-util",
  "tower 0.5.1",
  "tracing",
  "tracing-subscriber",
@@ -4358,6 +4373,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "reqwest-websocket"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a147e80c12e380d0c92de2f862f6b455ca4be33c16e454f1f0a8946a9ec6c817"
+dependencies = [
+ "async-tungstenite",
+ "futures-util",
+ "reqwest",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tungstenite",
+ "web-sys",
+]
+
+[[package]]
 name = "ring"
 version = "0.17.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5272,7 +5304,10 @@ checksum = "61e7c3654c13bcd040d4a03abee2c75b1d14a37b423cf5a813ceae1cc903ec6a"
 dependencies = [
  "bytes",
  "futures-core",
+ "futures-io",
  "futures-sink",
+ "futures-util",
+ "hashbrown",
  "pin-project-lite",
  "tokio",
 ]

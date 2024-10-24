@@ -35,9 +35,11 @@ ontol-examples.path = "../../ontol/ontol-examples"
 domain-engine-test-utils.path = "../domain-engine-test-utils"
 tracing-subscriber.workspace = true
 tokio.workspace = true
+tokio-util = { version = "0.7", default-features = false, features = ["rt"] }
 pretty_assertions = "1"
 tower = { version = "0.5", default-features = false, features = ["util"] }
 http-body = "1"
 http-body-util = "0.1"
 reqwest = { version = "0.12", default-features = false, features = ["http2"] }
+reqwest-websocket = "0.4"
 ulid = "1"

@@ -7,11 +7,16 @@ use automerge::{
     sync::{Message as AmMessage, State, SyncDoc},
     ActorId, Automerge,
 };
-use domain_engine_core::{DomainError, DomainResult, Session};
+use domain_engine_core::{domain_error::DomainErrorKind, DomainError, DomainResult, Session};
 use tokio::sync::{Mutex, MutexGuard};
 use tracing::info;
 
 use super::{doc_repository::DocRepository, DocAddr};
+
+#[derive(Clone, Default)]
+pub struct BrokerManagerHandle {
+    pub(super) manager: Arc<Mutex<BrokerManager>>,
+}
 
 #[derive(Default)]
 pub struct BrokerManager {
@@ -20,14 +25,14 @@ pub struct BrokerManager {
 
 /// A handle to a document broker represents a connected actor
 pub struct BrokerHandle {
-    doc_addr: DocAddr,
     actor: ActorId,
     broker: Arc<Mutex<Broker>>,
-    manager: Option<Arc<Mutex<BrokerManager>>>,
+    manager: Option<BrokerManagerHandle>,
 }
 
 /// An automerge sync for one document broker with a set of clients
 pub struct Broker {
+    doc_addr: DocAddr,
     automerge: Automerge,
     clients: BTreeMap<ActorId, BrokerClient>,
 }
@@ -59,33 +64,42 @@ pub struct MessageBroadcast {
 pub async fn load_broker(
     doc_addr: DocAddr,
     actor: ActorId,
-    manager: Arc<Mutex<BrokerManager>>,
+    manager: BrokerManagerHandle,
     doc_repository: DocRepository,
     session: Session,
 ) -> DomainResult<Option<BrokerHandle>> {
     let broker = {
-        let mut manager = manager.lock().await;
+        let mut manager = manager.manager.lock().await;
         match manager.brokers.entry(doc_addr.clone()) {
             Entry::Vacant(vacant) => {
-                info!(?doc_addr, %actor, "first actor connected, loading document and broker");
+                info!(?doc_addr, %actor, "broker: first actor connected, loading document and broker");
 
                 let Some(automerge) = doc_repository.load(doc_addr.clone(), session).await? else {
                     return Ok(None);
                 };
 
                 vacant
-                    .insert(Arc::new(Mutex::new(Broker::new(automerge))))
+                    .insert(Arc::new(Mutex::new(Broker::new(doc_addr, automerge))))
                     .clone()
             }
             Entry::Occupied(occupied) => {
-                info!(?doc_addr, %actor, "another actor connected, reusing broker");
+                info!(?doc_addr, %actor, "broker: another actor connected, reusing broker");
                 occupied.get().clone()
             }
         }
     };
 
+    {
+        let broker = broker.lock().await;
+        if broker.clients.contains_key(&actor) {
+            return Err(DomainErrorKind::BadInputData(format!(
+                "actor {actor} was already registered"
+            ))
+            .into_error());
+        }
+    }
+
     Ok(Some(BrokerHandle {
-        doc_addr,
         actor,
         broker,
         manager: Some(manager),
@@ -100,25 +114,25 @@ impl BrokerHandle {
 
 impl Drop for BrokerHandle {
     fn drop(&mut self) {
-        let doc_addr = self.doc_addr.clone();
         let actor = std::mem::replace(&mut self.actor, b"".into());
         let manager = self.manager.take().unwrap();
         let broker = self.broker.clone();
         tokio::spawn(async move {
             let mut broker = broker.lock().await;
-            let mut manager = manager.lock().await;
+            let mut manager = manager.manager.lock().await;
 
             if broker.remove_client(&actor) == 0 {
-                info!(?doc_addr, %actor, "last actor disconnected, freeing up broker");
-                manager.brokers.remove(&doc_addr);
+                info!(doc_addr = ?broker.doc_addr, "broker: last actor disconnected, freeing up broker");
+                manager.brokers.remove(&broker.doc_addr);
             }
         });
     }
 }
 
 impl Broker {
-    pub fn new(automerge: Automerge) -> Self {
+    pub fn new(doc_addr: DocAddr, automerge: Automerge) -> Self {
         Self {
+            doc_addr,
             automerge,
             clients: Default::default(),
         }
@@ -130,6 +144,8 @@ impl Broker {
         actor: ActorId,
         sync_tx: tokio::sync::mpsc::Sender<AmMessage>,
     ) -> DomainResult<Option<AmMessage>> {
+        info!(doc_addr = ?self.doc_addr, ?actor, "broker: add client");
+
         let mut client = BrokerClient {
             actor,
             state: State::new(),
@@ -144,6 +160,7 @@ impl Broker {
 
     /// Returns the number of remaining clients
     pub fn remove_client(&mut self, actor: &ActorId) -> usize {
+        info!(doc_addr = ?self.doc_addr, ?actor, "broker: remove client");
         self.clients.remove(actor);
         self.clients.len()
     }

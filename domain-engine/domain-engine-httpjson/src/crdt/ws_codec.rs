@@ -8,6 +8,7 @@ pub enum Message {
     Sync(Vec<u8>),
 }
 
+#[derive(Debug)]
 pub enum DecodeError {
     MissingType,
     MissingLen,
@@ -89,7 +90,6 @@ impl Message {
                 encoder.str("").unwrap();
 
                 encoder.str("message").unwrap();
-                encoder.tag(minicbor::data::Tag::new(64)).unwrap();
                 encoder
                     .tag(minicbor::data::IanaTag::TypedArrayU8.tag())
                     .unwrap();

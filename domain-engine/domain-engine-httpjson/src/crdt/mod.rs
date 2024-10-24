@@ -4,8 +4,7 @@ use ontol_runtime::PropId;
 pub mod broker;
 pub mod doc_repository;
 pub mod sync_session;
-
-mod ws_codec;
+pub mod ws_codec;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct DocAddr(pub VertexAddr, pub PropId);

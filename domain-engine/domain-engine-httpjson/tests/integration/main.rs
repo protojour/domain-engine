@@ -2,10 +2,10 @@ use std::{convert::Infallible, sync::Arc, time::Duration};
 
 use axum::body::Body;
 use bytes::Bytes;
-use domain_engine_core::{DomainEngine, Session};
-use domain_engine_httpjson::create_httpjson_router;
+use domain_engine_core::{system::SystemAPI, DomainEngine, Session};
+use domain_engine_httpjson::DomainRouterBuilder;
 use domain_engine_test_utils::{
-    dummy_session::DummySession, dynamic_data_store::DynamicDataStoreFactory, unimock,
+    dummy_session::DummySession, dynamic_data_store::DynamicDataStoreFactory,
 };
 use futures_util::{Stream, StreamExt};
 use http::StatusCode;
@@ -24,12 +24,13 @@ trait MakeTestRouter {
 
 impl MakeTestRouter for OntolTest {
     fn make_test_router(&self, domain_engine: Arc<DomainEngine>, short_name: &str) -> axum::Router {
-        create_httpjson_router::<(), DummySession>(
-            domain_engine.clone(),
-            self.get_domain_index(short_name),
-        )
-        .unwrap()
-        .with_state(())
+        DomainRouterBuilder::default()
+            .create_httpjson_router::<(), DummySession>(
+                domain_engine.clone(),
+                self.get_domain_index(short_name),
+            )
+            .unwrap()
+            .with_state(())
     }
 }
 
@@ -98,11 +99,11 @@ async fn fetch_body_assert_status<B: FromBytes>(
 async fn make_domain_engine(
     ontology: Arc<Ontology>,
     datastore: &str,
-    mock_clause: impl unimock::Clause,
+    system: Box<dyn SystemAPI + Send + Sync>,
 ) -> Arc<DomainEngine> {
     Arc::new(
         DomainEngine::builder(ontology)
-            .system(Box::new(unimock::Unimock::new(mock_clause)))
+            .system(system)
             .build(DynamicDataStoreFactory::new(datastore), Session::default())
             .await
             .unwrap(),

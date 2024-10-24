@@ -1,7 +1,7 @@
 use automerge::{sync::Message as AmMessage, ActorId};
 use axum::extract::ws::{Message as WsMessage, WebSocket};
 use domain_engine_core::{DomainError, DomainResult, Session};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use super::broker::BrokerHandle;
 use super::doc_repository::DocRepository;
@@ -35,11 +35,14 @@ impl SyncSession {
 
                     match message {
                         Message::Join => {
+                            debug!("session: client join");
+
                             let outgoing = self.broker_handle.broker()
                                 .await
                                 .add_client(self.actor.clone(), sync_tx.clone())?;
 
                             if let Some(outgoing) = outgoing {
+                                debug!("session(join): will send sync message");
                                 let ws_response = Message::Sync(outgoing.encode()).encode_cbor();
 
                                 self.socket.send(WsMessage::Binary(ws_response)).await
@@ -121,7 +124,6 @@ impl SyncSession {
 
 fn try_decode_ws_message(ws_messsage: WsMessage) -> Option<Message> {
     let WsMessage::Binary(buf) = ws_messsage else {
-        info!("invalid ws message type, ignoring");
         return None;
     };
 
