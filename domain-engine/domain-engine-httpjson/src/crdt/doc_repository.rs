@@ -3,7 +3,7 @@ use std::sync::Arc;
 use automerge::Automerge;
 use domain_engine_core::{
     domain_error::DomainErrorKind,
-    transact::{AccumulateSequences, ReqMessage, TransactionMode},
+    transact::{ReqMessage, RespMessage, TransactionMode},
     DomainEngine, DomainError, DomainResult, Session, VertexAddr,
 };
 use futures_util::{StreamExt, TryStreamExt};
@@ -43,10 +43,10 @@ impl DocRepository {
     /// Load one full CRDT/automerge document from data store
     pub async fn load(
         &self,
-        doc_addr: &DocAddr,
+        doc_addr: DocAddr,
         session: Session,
     ) -> DomainResult<Option<Automerge>> {
-        let opt_value = self
+        let mut messages = self
             .domain_engine
             .get_data_store()?
             .api()
@@ -60,12 +60,19 @@ impl DocRepository {
                 session,
             )
             .await?
-            .accumulate_one_sequence()
+            .try_collect::<Vec<_>>()
             .await?
-            .into_first();
+            .into_iter();
 
-        match opt_value {
-            Some(Value::OctetSequence(payload, _)) => {
+        let Some(RespMessage::SequenceStart(_)) = messages.next() else {
+            return Ok(None);
+        };
+        let Some(RespMessage::Element(value, _)) = messages.next() else {
+            return Ok(None);
+        };
+
+        match value {
+            Value::OctetSequence(payload, _) => {
                 let automerge = Automerge::load(&payload.0).map_err(|err| {
                     error!("automerge load: {err:?}");
                     DomainError::data_store("corrupted CRDT")
@@ -75,15 +82,14 @@ impl DocRepository {
                     self.domain_engine.system().automerge_system_actor().into(),
                 )))
             }
-            Some(_value) => Err(DomainError::data_store("incorrect CRDT return value")),
-            None => Ok(None),
+            _value => Err(DomainError::data_store("incorrect CRDT return value")),
         }
     }
 
     /// Save an incremental diff
     pub async fn save_incremental(
         &self,
-        doc_addr: &DocAddr,
+        doc_addr: DocAddr,
         payload: Vec<u8>,
         session: Session,
     ) -> DomainResult<()> {
@@ -135,7 +141,7 @@ impl DocRepository {
             );
         }
 
-        let opt_vertex = self
+        let response_messages: Vec<_> = self
             .domain_engine
             .get_data_store()?
             .api()
@@ -164,11 +170,15 @@ impl DocRepository {
                 session,
             )
             .await?
-            .accumulate_one_sequence()
-            .await?
-            .into_first();
+            .try_collect()
+            .await?;
 
-        let Some(vertex) = opt_vertex else {
+        let mut msg_iter = response_messages.into_iter();
+
+        let Some(RespMessage::SequenceStart(_)) = msg_iter.next() else {
+            return Ok(None);
+        };
+        let Some(RespMessage::Element(vertex, _)) = msg_iter.next() else {
             return Ok(None);
         };
 

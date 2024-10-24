@@ -28,6 +28,7 @@ pub struct HttpKeyedResource {
     pub key_prop_id: PropId,
     pub get: Option<Endpoint>,
     pub put: Option<Endpoint>,
+    pub crdts: Vec<(PropId, TextConstant)>,
 }
 
 #[derive(Serialize, Deserialize)]

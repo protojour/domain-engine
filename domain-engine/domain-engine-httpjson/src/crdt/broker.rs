@@ -13,6 +13,7 @@ use tracing::info;
 
 use super::{doc_repository::DocRepository, DocAddr};
 
+#[derive(Default)]
 pub struct BrokerManager {
     pub(super) brokers: BTreeMap<DocAddr, Arc<Mutex<Broker>>>,
 }
@@ -59,7 +60,7 @@ pub async fn load_broker(
     doc_addr: DocAddr,
     actor: ActorId,
     manager: Arc<Mutex<BrokerManager>>,
-    doc_repository: &DocRepository,
+    doc_repository: DocRepository,
     session: Session,
 ) -> DomainResult<Option<BrokerHandle>> {
     let broker = {
@@ -68,7 +69,7 @@ pub async fn load_broker(
             Entry::Vacant(vacant) => {
                 info!(?doc_addr, %actor, "first actor connected, loading document and broker");
 
-                let Some(automerge) = doc_repository.load(&doc_addr, session).await? else {
+                let Some(automerge) = doc_repository.load(doc_addr.clone(), session).await? else {
                     return Ok(None);
                 };
 

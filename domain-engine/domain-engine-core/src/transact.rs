@@ -162,8 +162,8 @@ impl WriteStatsBuilder {
     }
 }
 
-pub trait AccumulateSequences<'a> {
-    fn accumulate_sequences(self) -> impl Stream<Item = DomainResult<Sequence<Value>>> + 'a;
+pub trait AccumulateSequences<'a>: Send {
+    fn accumulate_sequences(self) -> impl Stream<Item = DomainResult<Sequence<Value>>> + Send + 'a;
 
     /// Expects one sequence to be present
     fn accumulate_one_sequence(self) -> impl Future<Output = DomainResult<Sequence<Value>>> + 'a

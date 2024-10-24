@@ -105,7 +105,7 @@ impl SyncSession {
         let save_result = self
             .doc_repository
             .save_incremental(
-                &self.doc_addr,
+                self.doc_addr.clone(),
                 dispatch.incremental_changes,
                 self.session.clone(),
             )

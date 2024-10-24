@@ -3,8 +3,12 @@ use ontol_runtime::{
         http_json::{Endpoint, HttpJson, HttpKeyedResource, HttpResource},
         serde::{SerdeDef, SerdeModifier},
     },
-    ontology::{aspects::DefsAspect, domain::DefKind},
-    DefId, DomainIndex,
+    ontology::{
+        aspects::DefsAspect,
+        domain::{DataRelationshipKind, DataTreeRepr, DefKind},
+        ontol::TextConstant,
+    },
+    DefId, DomainIndex, PropId,
 };
 
 use crate::repr::repr_model::ReprKind;
@@ -38,12 +42,21 @@ pub fn generate_httpjson_interface(
                 let mut keyed: Vec<HttpKeyedResource> = vec![];
 
                 if let Some(id_rel_info) = def.data_relationships.get(&entity.id_prop) {
+                    let mut crdts: Vec<(PropId, TextConstant)> = vec![];
+
+                    for (prop_id, rel_info) in &def.data_relationships {
+                        if let DataRelationshipKind::Tree(DataTreeRepr::Crdt) = &rel_info.kind {
+                            crdts.push((*prop_id, rel_info.name));
+                        }
+                    }
+
                     keyed.push(HttpKeyedResource {
                         key_name: id_rel_info.name,
                         key_operator_addr: entity.id_operator_addr,
                         key_prop_id: entity.id_prop,
                         get: Some(Endpoint {}),
                         put: None,
+                        crdts,
                     });
                 }
 

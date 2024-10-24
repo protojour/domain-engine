@@ -81,8 +81,6 @@ struct CrdtBrokerEndpoint {
     broker_manager: Arc<Mutex<BrokerManager>>,
     resource_def_id: DefId,
     key_operator_addr: SerdeOperatorAddr,
-    key_prop_id: PropId,
-    operator_addr: SerdeOperatorAddr,
     crdt_prop_id: PropId,
 }
 
@@ -106,6 +104,8 @@ where
 
     let mut domain_router: axum::Router<State> = axum::Router::new();
     let ontology = engine.ontology();
+
+    let broker_manager = Arc::new(Mutex::new(BrokerManager::default()));
 
     for resource in &httpjson.resources {
         let mut method_router: MethodRouter<State, Infallible> = MethodRouter::default();
@@ -158,6 +158,31 @@ where
                     operator_addr: resource.operator_addr,
                 })),
             );
+
+            for (crdt_prop_id, prop_name) in &keyed.crdts {
+                let method_router: MethodRouter<State, Infallible> = MethodRouter::default()
+                    .on(MethodFilter::POST, post_crdt_broker_ws::<State, Auth>);
+
+                let route_name = format!(
+                    "/{resource}/{key}/:{key}/{prop}",
+                    resource = &ontology[resource.name],
+                    key = &ontology[keyed.key_name],
+                    prop = &ontology[*prop_name]
+                );
+
+                debug!("add route `{route_name}`");
+
+                domain_router = domain_router.route(
+                    &route_name,
+                    method_router.layer(Extension(CrdtBrokerEndpoint {
+                        doc_repository: DocRepository::from(engine.clone()),
+                        broker_manager: broker_manager.clone(),
+                        resource_def_id: resource.def_id,
+                        key_operator_addr: keyed.key_operator_addr,
+                        crdt_prop_id: *crdt_prop_id,
+                    })),
+                );
+            }
         }
     }
 
@@ -395,7 +420,7 @@ where
         doc_addr.clone(),
         actor_id.clone(),
         endpoint.broker_manager.clone(),
-        &endpoint.doc_repository,
+        endpoint.doc_repository.clone(),
         session.clone(),
     )
     .await?
