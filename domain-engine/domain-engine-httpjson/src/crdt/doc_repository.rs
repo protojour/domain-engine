@@ -43,6 +43,7 @@ impl DocRepository {
     /// Load one full CRDT/automerge document from data store
     pub async fn load(
         &self,
+        resource_def_id: DefId,
         doc_addr: DocAddr,
         session: Session,
     ) -> DomainResult<Option<Automerge>> {
@@ -53,6 +54,7 @@ impl DocRepository {
             .transact(
                 TransactionMode::ReadOnly,
                 futures_util::stream::iter([Ok(ReqMessage::CrdtGet(
+                    resource_def_id,
                     doc_addr.0.iter().copied().collect(),
                     doc_addr.1,
                 ))])
@@ -89,6 +91,7 @@ impl DocRepository {
     /// Save an incremental diff
     pub async fn save_incremental(
         &self,
+        resource_def_id: DefId,
         doc_addr: DocAddr,
         payload: Vec<u8>,
         session: Session,
@@ -99,9 +102,9 @@ impl DocRepository {
             .transact(
                 TransactionMode::ReadWrite,
                 futures_util::stream::iter([Ok(ReqMessage::CrdtSaveIncremental(
+                    resource_def_id,
                     doc_addr.0.iter().copied().collect(),
                     doc_addr.1,
-                    vec![],
                     payload,
                 ))])
                 .boxed(),

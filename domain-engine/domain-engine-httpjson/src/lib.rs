@@ -418,6 +418,7 @@ where
     let session = auth.into();
     let domain_engine = endpoint.doc_repository.domain_engine();
     let ontology = domain_engine.ontology();
+    let resource_def_id = endpoint.resource_def_id;
 
     let key = match key::deserialize_key(key.0, endpoint.key_operator_addr, ontology) {
         Ok(key) => key,
@@ -449,6 +450,7 @@ where
 
     // load or create a broker for that document
     let broker_handle = match load_broker(
+        endpoint.resource_def_id,
         doc_addr.clone(),
         actor_id.clone(),
         endpoint.broker_manager.clone(),
@@ -461,8 +463,9 @@ where
         None => return Err(DomainErrorKind::EntityNotFound.into_error().into()),
     };
 
-    Ok(ws_upgrade.on_upgrade(|socket| async move {
+    Ok(ws_upgrade.on_upgrade(move |socket| async move {
         let session = SyncSession {
+            resource_def_id,
             actor: actor_id,
             doc_addr,
             socket,

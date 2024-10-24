@@ -261,7 +261,7 @@ pub async fn transact(
                         }
                     }
                 }
-                ReqMessage::CrdtGet(vertex_addr, prop_id) => {
+                ReqMessage::CrdtGet(_def_id, vertex_addr, prop_id) => {
                     let octets = ctx.crdt_get(vertex_addr, prop_id).await?;
 
                     yield RespMessage::SequenceStart(0);
@@ -270,8 +270,8 @@ pub async fn transact(
                     }
                     yield RespMessage::SequenceEnd(0, None);
                 },
-                ReqMessage::CrdtSaveIncremental(vertex_addr, prop_id, change_hashes, payload) => {
-                    ctx.save_crdt_incremental(vertex_addr, prop_id, change_hashes, payload).await?;
+                ReqMessage::CrdtSaveIncremental(_def_id, vertex_addr, prop_id, payload) => {
+                    ctx.save_crdt_incremental(vertex_addr, prop_id,  payload).await?;
                     yield RespMessage::SequenceStart(0);
                     yield RespMessage::SequenceEnd(0, None);
                 },

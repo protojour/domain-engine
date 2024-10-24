@@ -1,4 +1,4 @@
-use domain_engine_core::{transact::CrdtChangeHash, DomainResult, VertexAddr};
+use domain_engine_core::{DomainResult, VertexAddr};
 use ontol_runtime::{crdt::Automerge, PropId};
 use thin_vec::ThinVec;
 use tracing::debug;
@@ -43,7 +43,6 @@ impl<'a> TransactCtx<'a> {
         &self,
         vertex_addr: VertexAddr,
         prop_id: PropId,
-        _change_hashes: Vec<CrdtChangeHash>,
         payload: Vec<u8>,
     ) -> DomainResult<()> {
         let (pg_domain, prop_key, data_key) = self.crdt_meta(vertex_addr, prop_id)?;

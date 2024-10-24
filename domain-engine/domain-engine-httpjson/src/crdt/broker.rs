@@ -8,6 +8,7 @@ use automerge::{
     ActorId, Automerge,
 };
 use domain_engine_core::{domain_error::DomainErrorKind, DomainError, DomainResult, Session};
+use ontol_runtime::DefId;
 use tokio::sync::{Mutex, MutexGuard};
 use tracing::info;
 
@@ -62,6 +63,7 @@ pub struct MessageBroadcast {
 ///
 /// A live BrokerHandle keeps the associated broker live in memory, with the associated Automerge CRDT document.
 pub async fn load_broker(
+    resource_def_id: DefId,
     doc_addr: DocAddr,
     actor: ActorId,
     manager: BrokerManagerHandle,
@@ -74,7 +76,10 @@ pub async fn load_broker(
             Entry::Vacant(vacant) => {
                 info!(?doc_addr, %actor, "broker: first actor connected, loading document and broker");
 
-                let Some(automerge) = doc_repository.load(doc_addr.clone(), session).await? else {
+                let Some(automerge) = doc_repository
+                    .load(resource_def_id, doc_addr.clone(), session)
+                    .await?
+                else {
                     return Ok(None);
                 };
 

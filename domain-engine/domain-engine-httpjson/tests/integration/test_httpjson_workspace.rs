@@ -98,7 +98,7 @@ async fn test_workspaces_rest_api_with_edit(ds: &str) {
     let doc_addr = DocAddr(workspace_vertex_addr.clone(), workspace_data_prop_id);
 
     let mut workspace_data = doc_repository
-        .load(doc_addr.clone(), Session::default())
+        .load(workspace.def_id(), doc_addr.clone(), Session::default())
         .await
         .unwrap()
         .unwrap()
@@ -129,6 +129,7 @@ async fn test_workspaces_rest_api_with_edit(ds: &str) {
 
     doc_repository
         .save_incremental(
+            workspace.def_id(),
             doc_addr,
             workspace_data.save_after(&original_heads),
             Session::default(),

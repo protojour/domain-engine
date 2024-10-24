@@ -275,7 +275,7 @@ impl InMemoryDb {
                             }
                         }
                     }
-                    ReqMessage::CrdtGet(vertex_addr, prop_id) => {
+                    ReqMessage::CrdtGet(_def_id, vertex_addr, prop_id) => {
                         let octets = self.store.write().await.crdt_to_bytes(vertex_addr, prop_id)?;
                         yield RespMessage::SequenceStart(0);
                         if let Some(octets) = octets {
@@ -283,7 +283,7 @@ impl InMemoryDb {
                         }
                         yield RespMessage::SequenceEnd(0, None);
                     },
-                    ReqMessage::CrdtSaveIncremental(vertex_addr, prop_id, _heads, payload) => {
+                    ReqMessage::CrdtSaveIncremental(_def_id, vertex_addr, prop_id, payload) => {
                         self.store.write().await.crdt_save_incremental(vertex_addr, prop_id, payload)?;
                         yield RespMessage::SequenceStart(0);
                         yield RespMessage::SequenceEnd(0, None);

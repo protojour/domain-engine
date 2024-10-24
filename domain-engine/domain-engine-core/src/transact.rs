@@ -64,8 +64,8 @@ pub enum ReqMessage {
     /// Argument to the previous mutation message
     Argument(Value),
     /// Return
-    CrdtGet(VertexAddr, PropId),
-    CrdtSaveIncremental(VertexAddr, PropId, Vec<CrdtChangeHash>, Vec<u8>),
+    CrdtGet(DefId, VertexAddr, PropId),
+    CrdtSaveIncremental(DefId, VertexAddr, PropId, Vec<u8>),
 }
 
 pub type CrdtChangeHash = Vec<u8>;
@@ -351,9 +351,11 @@ impl DomainEngine {
 
                 Ok(ReqMessage::Argument(value))
             }
-            ReqMessage::CrdtGet(addr, prop_id) => Ok(ReqMessage::CrdtGet(addr, prop_id)),
-            ReqMessage::CrdtSaveIncremental(addr, prop_id, hashes, payload) => Ok(
-                ReqMessage::CrdtSaveIncremental(addr, prop_id, hashes, payload),
+            ReqMessage::CrdtGet(def_id, addr, prop_id) => {
+                Ok(ReqMessage::CrdtGet(def_id, addr, prop_id))
+            }
+            ReqMessage::CrdtSaveIncremental(def_id, addr, prop_id, payload) => Ok(
+                ReqMessage::CrdtSaveIncremental(def_id, addr, prop_id, payload),
             ),
         }
     }

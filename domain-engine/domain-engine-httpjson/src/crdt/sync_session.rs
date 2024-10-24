@@ -1,6 +1,7 @@
 use automerge::{sync::Message as AmMessage, ActorId};
 use axum::extract::ws::{Message as WsMessage, WebSocket};
 use domain_engine_core::{DomainError, DomainResult, Session};
+use ontol_runtime::DefId;
 use tracing::{debug, error, info, warn};
 
 use super::broker::BrokerHandle;
@@ -9,8 +10,9 @@ use super::ws_codec::Message;
 use super::DocAddr;
 
 pub struct SyncSession {
-    pub actor: ActorId,
+    pub resource_def_id: DefId,
     pub doc_addr: DocAddr,
+    pub actor: ActorId,
     pub socket: WebSocket,
     pub broker_handle: BrokerHandle,
     pub doc_repository: DocRepository,
@@ -108,6 +110,7 @@ impl SyncSession {
         let save_result = self
             .doc_repository
             .save_incremental(
+                self.resource_def_id,
                 self.doc_addr.clone(),
                 dispatch.incremental_changes,
                 self.session.clone(),
