@@ -17,13 +17,13 @@ use crdt::{
     broker::{load_broker, BrokerManager},
     doc_repository::DocRepository,
     sync_session::SyncSession,
-    CrdtActor, DocAddr,
+    ActorExt, DocAddr,
 };
 use domain_engine_core::{
     domain_error::DomainErrorKind,
     domain_select::domain_select_no_edges,
     transact::{AccumulateSequences, ReqMessage, TransactionMode},
-    DomainEngine, DomainError, Session,
+    CrdtActor, DomainEngine, DomainError, Session,
 };
 use futures_util::{stream::StreamExt, TryStreamExt};
 use http::{header, HeaderValue, Uri};
@@ -428,7 +428,7 @@ where
         .system()
         .verify_session_user_id(&crdt_actor.user_id, session.clone())?;
 
-    let actor_id = crdt_actor.to_automerge_actor_id();
+    let actor_id: automerge::ActorId = crdt_actor.clone().into();
 
     // find the vertex that owns the CRDT
     let vertex_addr = endpoint

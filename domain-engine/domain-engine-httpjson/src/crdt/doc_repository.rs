@@ -79,7 +79,7 @@ impl DocRepository {
                 })?;
 
                 Ok(Some(automerge.with_actor(
-                    self.domain_engine.system().automerge_system_actor().into(),
+                    self.domain_engine.system().crdt_system_actor().into(),
                 )))
             }
             _value => Err(DomainError::data_store("incorrect CRDT return value")),

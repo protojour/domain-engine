@@ -1,5 +1,5 @@
 use automerge::{transaction::Transactable, ReadDoc};
-use domain_engine_core::{system::SystemApiMock, Session};
+use domain_engine_core::{system::SystemApiMock, CrdtActor, Session};
 use domain_engine_httpjson::crdt::{doc_repository::DocRepository, DocAddr};
 use domain_engine_test_utils::system::mock_current_time_monotonic;
 use domain_engine_test_utils::unimock::*;
@@ -29,9 +29,12 @@ async fn test_workspaces(ds: &str) {
         ds,
         (
             mock_current_time_monotonic(),
-            SystemApiMock::automerge_system_actor
+            SystemApiMock::crdt_system_actor
                 .each_call(matching!())
-                .returns(b"test-actor".to_vec()),
+                .returns(CrdtActor {
+                    user_id: "testuser".to_string(),
+                    actor_id: Default::default(),
+                }),
         ),
     )
     .await;

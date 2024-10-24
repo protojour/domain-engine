@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use chrono::Utc;
 
-use crate::{DomainResult, Session};
+use crate::{CrdtActor, DomainResult, Session};
 
 /// Combination of system-specific functionality and configuration for the domain engine.
 #[cfg_attr(feature = "unimock", unimock::unimock(api = SystemApiMock))]
@@ -40,7 +40,7 @@ pub trait SystemAPI: Sync {
         input: Vec<u8>,
     ) -> DomainResult<Vec<u8>>;
 
-    fn automerge_system_actor(&self) -> Vec<u8>;
+    fn crdt_system_actor(&self) -> CrdtActor;
 }
 
 /// A [SystemAPI] in an [Arc].

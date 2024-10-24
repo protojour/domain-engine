@@ -9,7 +9,9 @@ use std::{
 use crate::graphql::{domain_graphql_handler, graphiql_handler, GraphqlService};
 
 use axum::{extract::FromRequestParts, routing::post, Extension};
-use domain_engine_core::{domain_error::DomainErrorKind, DomainEngine, DomainResult, Session};
+use domain_engine_core::{
+    domain_error::DomainErrorKind, CrdtActor, DomainEngine, DomainResult, Session,
+};
 use domain_engine_graphql::{
     domain::CreateSchemaError,
     gql_scalar::GqlScalar,
@@ -164,8 +166,11 @@ impl domain_engine_core::system::SystemAPI for System {
         Ok(output_bytes.into())
     }
 
-    fn automerge_system_actor(&self) -> Vec<u8> {
-        b"ontool".to_vec()
+    fn crdt_system_actor(&self) -> CrdtActor {
+        CrdtActor {
+            user_id: "ontool".to_string(),
+            actor_id: Default::default(),
+        }
     }
 }
 

@@ -1,8 +1,5 @@
-use automerge::ActorId;
-use domain_engine_core::VertexAddr;
+use domain_engine_core::{CrdtActor, VertexAddr};
 use ontol_runtime::PropId;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 pub mod broker;
 pub mod doc_repository;
@@ -13,24 +10,19 @@ mod ws_codec;
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct DocAddr(pub VertexAddr, pub PropId);
 
-#[derive(Serialize, Deserialize)]
-pub struct CrdtActor {
-    pub actor_id: Uuid,
-    pub user_id: String,
+pub trait ActorExt: Sized {
+    fn deserialize_from_hex(hex: &str) -> Option<Self>;
+
+    fn serialize_to_hex(&self) -> String;
 }
 
-impl CrdtActor {
-    pub fn deserialize_from_hex(hex: &str) -> Option<Self> {
+impl ActorExt for CrdtActor {
+    fn deserialize_from_hex(hex: &str) -> Option<Self> {
         let buf = hex::decode(hex).ok()?;
         postcard::from_bytes(&buf).ok()
     }
 
-    pub fn serialize_to_hex(&self) -> String {
+    fn serialize_to_hex(&self) -> String {
         hex::encode(postcard::to_allocvec(&self).unwrap())
-    }
-
-    pub fn to_automerge_actor_id(&self) -> ActorId {
-        let buf = postcard::to_allocvec(&self).unwrap();
-        ActorId::from(buf)
     }
 }

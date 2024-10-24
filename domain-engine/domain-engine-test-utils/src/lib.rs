@@ -168,7 +168,7 @@ pub mod system {
     use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
     use domain_engine_core::{
         system::{SystemAPI, SystemApiMock},
-        DomainResult, Session,
+        CrdtActor, DomainResult, Session,
     };
     use tracing::trace;
     use unimock::*;
@@ -238,8 +238,11 @@ pub mod system {
             unimplemented!()
         }
 
-        fn automerge_system_actor(&self) -> Vec<u8> {
-            b"domainengine".to_vec()
+        fn crdt_system_actor(&self) -> CrdtActor {
+            CrdtActor {
+                user_id: "domainengine".to_string(),
+                actor_id: Default::default(),
+            }
         }
     }
 }

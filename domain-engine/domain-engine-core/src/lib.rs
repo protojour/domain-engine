@@ -19,6 +19,7 @@ mod update;
 use std::any::Any;
 use std::{collections::HashMap, hash::BuildHasher, sync::Arc};
 
+use automerge::ActorId;
 pub use domain_engine::DomainEngine;
 pub use domain_error::{DomainError, DomainResult};
 use ontol_runtime::{
@@ -26,7 +27,9 @@ use ontol_runtime::{
     var::Var,
     DefId,
 };
+use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
+use uuid::Uuid;
 
 /// A session that's passed through the DomainEngine APIs into the data store layer.
 #[derive(Clone)]
@@ -63,3 +66,22 @@ impl<A: BuildHasher> FindEntitySelect for HashMap<Var, EntitySelect, A> {
 }
 
 pub type VertexAddr = SmallVec<u8, 12>;
+
+/// An actor used to track changes in CRDT documents
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct CrdtActor {
+    /// An ID that identifies the system user of this actor.
+    ///
+    /// This way the system should be able to look up user information.
+    pub user_id: String,
+
+    /// An actor id the distinguishes different actors belonging to the same user
+    pub actor_id: Uuid,
+}
+
+impl From<CrdtActor> for automerge::ActorId {
+    fn from(value: CrdtActor) -> Self {
+        let buf = postcard::to_allocvec(&value).unwrap();
+        ActorId::from(buf)
+    }
+}

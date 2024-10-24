@@ -13,24 +13,26 @@ unimock = ["dep:unimock"]
 
 [dependencies]
 ontol-runtime.path = "../../ontol/ontol-runtime"
+
 anyhow = "1"
+async-stream = "0.3"
+async-trait.workspace = true
 automerge = "0.5"
-thiserror.workspace = true
-tracing.workspace = true
+chrono.workspace = true
+displaydoc = "0.2"
+futures-util = "0.3"
 fnv.workspace = true
 itertools.workspace = true
-uuid = { workspace = true, features = ["v4", "v7"] }
-async-trait.workspace = true
-chrono.workspace = true
-unimock = { workspace = true, optional = true }
+postcard.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-ulid.workspace = true
-futures-util = "0.3"
-tokio = { workspace = true, features = ["sync"] }
-async-stream = "0.3"
-displaydoc = "0.2"
 smallvec = { version = "2.0.0-alpha.7", features = ["std"] }
+thiserror.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+tracing.workspace = true
+ulid.workspace = true
+unimock = { workspace = true, optional = true }
+uuid = { workspace = true, features = ["v4", "v7"] }
 
 [dev-dependencies]
 ontol-macros.path = "../../ontol/ontol-macros"

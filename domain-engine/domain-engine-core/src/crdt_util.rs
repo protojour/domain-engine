@@ -55,8 +55,7 @@ enum AmProperty<'a> {
 
 impl<'e> MakeStorable<'e> {
     pub(crate) fn ontol_to_automerge(&self, value: Value) -> DomainResult<Value> {
-        let mut am =
-            Automerge::new().with_actor(ActorId::from(self.system.automerge_system_actor()));
+        let mut am = Automerge::new().with_actor(ActorId::from(self.system.crdt_system_actor()));
         let mut txn = am.transaction();
 
         let Value::Struct(attrs, tag) = value else {
