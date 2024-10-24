@@ -219,8 +219,9 @@ pub mod system {
             dt
         }
 
-        fn automerge_system_actor(&self) -> Vec<u8> {
-            b"domainengine".to_vec()
+        #[expect(unused)]
+        fn verify_session_user_id(&self, user_id: &str, session: Session) -> DomainResult<()> {
+            Ok(())
         }
 
         async fn call_http_json_hook(
@@ -230,6 +231,10 @@ pub mod system {
             _input: Vec<u8>,
         ) -> DomainResult<Vec<u8>> {
             unimplemented!()
+        }
+
+        fn automerge_system_actor(&self) -> Vec<u8> {
+            b"domainengine".to_vec()
         }
     }
 }

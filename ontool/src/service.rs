@@ -111,8 +111,9 @@ impl domain_engine_core::system::SystemAPI for System {
         domain_engine_core::system::current_time()
     }
 
-    fn automerge_system_actor(&self) -> Vec<u8> {
-        b"domainengine".to_vec()
+    #[expect(unused)]
+    fn verify_session_user_id(&self, user_id: &str, session: Session) -> DomainResult<()> {
+        Ok(())
     }
 
     async fn call_http_json_hook(
@@ -156,6 +157,10 @@ impl domain_engine_core::system::SystemAPI for System {
             })?;
 
         Ok(output_bytes.into())
+    }
+
+    fn automerge_system_actor(&self) -> Vec<u8> {
+        b"ontool".to_vec()
     }
 }
 

@@ -13,6 +13,12 @@ use axum::{
 use axum_extra::extract::JsonLines;
 use bytes::{BufMut, Bytes, BytesMut};
 use content_type::JsonContentType;
+use crdt::{
+    broker::{load_broker, BrokerManager},
+    doc_repository::DocRepository,
+    sync_session::SyncSession,
+    CrdtActor, DocAddr,
+};
 use domain_engine_core::{
     domain_error::DomainErrorKind,
     domain_select::domain_select_no_edges,
@@ -43,10 +49,12 @@ use ontol_runtime::{
 };
 use serde::{
     de::{value::StringDeserializer, DeserializeSeed},
-    Deserializer,
+    Deserialize, Deserializer,
 };
+use tokio::sync::Mutex;
 use tracing::{debug, error};
 
+pub mod crdt;
 pub mod http_error;
 
 mod content_type;
@@ -65,6 +73,17 @@ struct KeyedEndpoint {
     key_operator_addr: SerdeOperatorAddr,
     key_prop_id: PropId,
     operator_addr: SerdeOperatorAddr,
+}
+
+#[derive(Clone)]
+struct CrdtBrokerEndpoint {
+    doc_repository: DocRepository,
+    broker_manager: Arc<Mutex<BrokerManager>>,
+    resource_def_id: DefId,
+    key_operator_addr: SerdeOperatorAddr,
+    key_prop_id: PropId,
+    operator_addr: SerdeOperatorAddr,
+    crdt_prop_id: PropId,
 }
 
 pub fn create_httpjson_router<State, Auth>(
@@ -249,22 +268,9 @@ where
 {
     let session = auth.into();
     let ontology = endpoint.engine.ontology();
-    let key = match ontology
-        .new_serde_processor(endpoint.key_operator_addr, ProcessorMode::Read)
-        .deserialize(StringDeserializer::<serde_json::Error>::new(key.0))
-    {
-        Ok(Attr::Unit(key)) => key,
-        Ok(_) => {
-            error!("key must be a unit attr");
-            return Ok(StatusCode::INTERNAL_SERVER_ERROR.into_response());
-        }
-        Err(err) => {
-            return Ok((
-                StatusCode::BAD_REQUEST,
-                json_error(format!("invalid path parameter: {err}")),
-            )
-                .into_response());
-        }
+    let key = match key::deserialize_key(key.0, endpoint.key_operator_addr, ontology) {
+        Ok(key) => key,
+        Err(response) => return Ok(response),
     };
 
     let entity_select = {
@@ -341,6 +347,74 @@ where
         json_bytes.into_inner().freeze(),
     )
         .into_response())
+}
+
+#[derive(Deserialize)]
+struct CrdtBrokerParams {
+    actor: String,
+}
+
+async fn post_crdt_broker_ws<State, Auth>(
+    Extension(endpoint): Extension<CrdtBrokerEndpoint>,
+    auth: Auth,
+    key: axum::extract::Path<String>,
+    params: axum::extract::Query<CrdtBrokerParams>,
+    ws_upgrade: axum::extract::WebSocketUpgrade,
+) -> Result<axum::response::Response, HttpJsonError>
+where
+    State: Send + Sync + Clone + 'static,
+    Auth: FromRequestParts<State> + Into<Session> + 'static,
+{
+    let session = auth.into();
+    let ontology = endpoint.doc_repository.domain_engine().ontology();
+    let key = match key::deserialize_key(key.0, endpoint.key_operator_addr, ontology) {
+        Ok(key) => key,
+        Err(response) => return Ok(response),
+    };
+    let crdt_actor = CrdtActor::deserialize_from_hex(&params.actor)
+        .map_err(|_| DomainErrorKind::BadInputFormat("bad actor".to_string()).into_error())?;
+
+    // verify crdt actor
+    endpoint
+        .doc_repository
+        .domain_engine()
+        .system()
+        .verify_session_user_id(&crdt_actor.user_id, session.clone())?;
+
+    let actor_id = crdt_actor.to_automerge_actor_id();
+
+    let vertex_addr = endpoint
+        .doc_repository
+        .fetch_vertex_addr(endpoint.resource_def_id, key, session.clone())
+        .await?
+        .ok_or_else(|| DomainErrorKind::EntityNotFound.into_error())?;
+
+    let doc_addr = DocAddr(vertex_addr, endpoint.crdt_prop_id);
+
+    let broker_handle = match load_broker(
+        doc_addr.clone(),
+        actor_id.clone(),
+        endpoint.broker_manager.clone(),
+        &endpoint.doc_repository,
+        session.clone(),
+    )
+    .await?
+    {
+        Some(broker) => broker,
+        None => return Err(DomainErrorKind::EntityNotFound.into_error().into()),
+    };
+
+    Ok(ws_upgrade.on_upgrade(|socket| async move {
+        let session = SyncSession {
+            actor: actor_id,
+            doc_addr,
+            socket,
+            broker_handle,
+            doc_repository: endpoint.doc_repository,
+            session,
+        };
+        let _ = session.run().await;
+    }))
 }
 
 mod create {
@@ -423,6 +497,34 @@ mod create {
             .expect("There should be one sequence");
 
         Ok(sequence)
+    }
+}
+
+mod key {
+    use ontol_runtime::ontology::Ontology;
+
+    use super::*;
+
+    pub fn deserialize_key(
+        input: String,
+        key_operator_addr: SerdeOperatorAddr,
+        ontology: &Ontology,
+    ) -> Result<Value, axum::response::Response> {
+        match ontology
+            .new_serde_processor(key_operator_addr, ProcessorMode::Read)
+            .deserialize(StringDeserializer::<serde_json::Error>::new(input))
+        {
+            Ok(Attr::Unit(key)) => Ok(key),
+            Ok(_) => {
+                error!("key must be a unit attr");
+                Err(StatusCode::INTERNAL_SERVER_ERROR.into_response())
+            }
+            Err(err) => Err((
+                StatusCode::BAD_REQUEST,
+                json_error(format!("invalid path parameter: {err}")),
+            )
+                .into_response()),
+        }
     }
 }
 

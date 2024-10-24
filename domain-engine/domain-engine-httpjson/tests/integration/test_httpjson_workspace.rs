@@ -1,32 +1,20 @@
 use automerge::{transaction::Transactable, ReadDoc};
-use domain_engine_core::{
-    system::SystemApiMock,
-    transact::{AccumulateSequences, ReqMessage, TransactionMode},
-    DomainEngine, Session,
-};
+use domain_engine_core::{system::SystemApiMock, Session};
+use domain_engine_httpjson::crdt::{doc_repository::DocRepository, DocAddr};
 use domain_engine_test_utils::system::mock_current_time_monotonic;
 use domain_engine_test_utils::unimock::*;
-use futures_util::{StreamExt, TryStreamExt};
 use http::{
     header::{self, CONTENT_TYPE},
     Request, StatusCode,
 };
 use ontol_examples::workspaces;
 use ontol_macros::datastore_test;
-use ontol_runtime::{
-    attr::Attr,
-    crdt::Automerge,
-    query::{
-        filter::Filter,
-        select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
-    },
-    value::{OctetSequence, Value},
-    DefId, OntolDefTag, PropId,
-};
+use ontol_runtime::value::Value;
 use ontol_test_utils::{expect_eq, TestCompile};
 use serde_json::json;
 use tower::ServiceExt;
 use tracing::info;
+use ulid::Ulid;
 
 use crate::{fetch_body_assert_status, json_body, make_domain_engine, MakeTestRouter};
 
@@ -42,7 +30,7 @@ async fn test_workspaces(ds: &str) {
         (
             mock_current_time_monotonic(),
             SystemApiMock::automerge_system_actor
-                .some_call(matching!())
+                .each_call(matching!())
                 .returns(b"test-actor".to_vec()),
         ),
     )
@@ -55,6 +43,9 @@ async fn test_workspaces(ds: &str) {
         .data_relationship_by_name("data", test.ontology())
         .unwrap()
         .0;
+    let doc_repository = DocRepository::from(engine.clone());
+
+    info!("create an example workspace");
 
     let post_response = router
         .clone()
@@ -88,6 +79,14 @@ async fn test_workspaces(ds: &str) {
         .unwrap();
 
     let workspace_id = location.to_str().unwrap().rsplit_once('/').unwrap().1;
+    let workspace_ulid = Value::octet_sequence(
+        workspace_id
+            .parse::<Ulid>()
+            .unwrap()
+            .to_bytes()
+            .into_iter()
+            .collect(),
+    );
 
     info!(%workspace_id, "workspace created, now try to GET it");
 
@@ -109,19 +108,19 @@ async fn test_workspaces(ds: &str) {
 
     info!("fetch the full CRDT payload");
 
-    let workspace_vertex_addr = fetch_vertex_addr(workspace.def_id(), &engine).await;
-
-    let mut workspace_data = Automerge::load(
-        &fetch_crdt_payload(
-            workspace_vertex_addr.clone(),
-            workspace_data_prop_id,
-            &engine,
-        )
+    let workspace_vertex_addr = doc_repository
+        .fetch_vertex_addr(workspace.def_id(), workspace_ulid, Session::default())
         .await
-        .0,
-    )
-    .unwrap()
-    .with_actor(b"testuser".into());
+        .unwrap()
+        .unwrap();
+    let doc_addr = DocAddr(workspace_vertex_addr.clone(), workspace_data_prop_id);
+
+    let mut workspace_data = doc_repository
+        .load(&doc_addr, Session::default())
+        .await
+        .unwrap()
+        .unwrap()
+        .with_actor(b"testuser".into());
 
     let original_heads = workspace_data.get_heads();
 
@@ -144,30 +143,14 @@ async fn test_workspaces(ds: &str) {
         txn.commit();
     }
 
-    info!("save the diff to data store");
+    info!("save the incremental diff to data store");
 
-    engine
-        .get_data_store()
-        .unwrap()
-        .api()
-        .transact(
-            TransactionMode::ReadWrite,
-            futures_util::stream::iter([Ok(ReqMessage::CrdtSaveIncremental(
-                workspace_vertex_addr.0.iter().copied().collect(),
-                workspace_data_prop_id,
-                workspace_data
-                    .get_heads()
-                    .iter()
-                    .map(|hash| hash.0.to_vec())
-                    .collect(),
-                workspace_data.save_after(&original_heads),
-            ))])
-            .boxed(),
+    doc_repository
+        .save_incremental(
+            &doc_addr,
+            workspace_data.save_after(&original_heads),
             Session::default(),
         )
-        .await
-        .unwrap()
-        .try_collect::<Vec<_>>()
         .await
         .unwrap();
 
@@ -204,83 +187,4 @@ async fn http_get_workspace_entity(workspace_id: &str, router: &axum::Router) ->
     fetch_body_assert_status::<serde_json::Value>(get_repsonse, StatusCode::OK)
         .await
         .unwrap()
-}
-
-async fn fetch_crdt_payload(
-    vertex_addr: OctetSequence,
-    workspace_data_prop_id: PropId,
-    engine: &DomainEngine,
-) -> OctetSequence {
-    let Value::OctetSequence(payload, _) = engine
-        .get_data_store()
-        .unwrap()
-        .api()
-        .transact(
-            TransactionMode::ReadOnly,
-            futures_util::stream::iter([Ok(ReqMessage::CrdtGet(
-                vertex_addr.0.into_iter().collect(),
-                workspace_data_prop_id,
-            ))])
-            .boxed(),
-            Session::default(),
-        )
-        .await
-        .unwrap()
-        .accumulate_one_sequence()
-        .await
-        .unwrap()
-        .into_first()
-        .unwrap()
-    else {
-        panic!("not a binary payload");
-    };
-
-    payload
-}
-
-async fn fetch_vertex_addr(def_id: DefId, engine: &DomainEngine) -> OctetSequence {
-    let vertex = engine
-        .get_data_store()
-        .unwrap()
-        .api()
-        .transact(
-            TransactionMode::ReadOnly,
-            futures_util::stream::iter([Ok(ReqMessage::Query(
-                0,
-                EntitySelect {
-                    source: StructOrUnionSelect::Struct(StructSelect {
-                        def_id,
-                        properties: From::from([(
-                            OntolDefTag::RelationDataStoreAddress.prop_id_0(),
-                            Select::Unit,
-                        )]),
-                    }),
-                    filter: Filter::default_for_datastore(),
-                    limit: None,
-                    after_cursor: None,
-                    include_total_len: false,
-                },
-            ))])
-            .boxed(),
-            Session::default(),
-        )
-        .await
-        .unwrap()
-        .accumulate_one_sequence()
-        .await
-        .unwrap()
-        .into_first()
-        .unwrap();
-
-    let Value::Struct(mut attrs, _) = vertex else {
-        panic!();
-    };
-
-    let Attr::Unit(Value::OctetSequence(addr, _)) = attrs
-        .remove(&OntolDefTag::RelationDataStoreAddress.prop_id_0())
-        .unwrap()
-    else {
-        panic!()
-    };
-    addr
 }

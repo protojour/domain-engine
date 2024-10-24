@@ -11,7 +11,8 @@ pub trait SystemAPI: Sync {
     /// Get the system's current time.
     fn current_time(&self) -> chrono::DateTime<chrono::Utc>;
 
-    fn automerge_system_actor(&self) -> Vec<u8>;
+    /// Verify that a user id belongs to the session
+    fn verify_session_user_id(&self, user_id: &str, session: Session) -> DomainResult<()>;
 
     /// Generate a new [uuid::Uuid].
     ///
@@ -34,6 +35,8 @@ pub trait SystemAPI: Sync {
         session: Session,
         input: Vec<u8>,
     ) -> DomainResult<Vec<u8>>;
+
+    fn automerge_system_actor(&self) -> Vec<u8>;
 }
 
 /// A [SystemAPI] in an [Arc].
