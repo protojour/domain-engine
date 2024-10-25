@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use automerge::{transaction::Transactable, ReadDoc};
 use domain_engine_core::Session;
 use domain_engine_httpjson::crdt::{doc_repository::DocRepository, DocAddr};
@@ -229,16 +227,12 @@ async fn test_workspace_sync(ds: &str) {
     }
 
     client1
-        .sync_loop(Dir::Outgoing, 3)
+        .sync_loop(Dir::Outgoing)
         .instrument(info_span!("client1"))
         .await;
 
-    // unfortunately this is timing sensitive,
-    // apparently need to wait for broker broadcasting
-    tokio::time::sleep(Duration::from_millis(200)).await;
-
     client2
-        .sync_loop(Dir::Incoming, 4)
+        .sync_loop(Dir::Incoming)
         .instrument(info_span!("client2"))
         .await;
 
@@ -332,6 +326,8 @@ async fn acquire_actor(workspace_id: &str, port: u16) -> String {
 
 /// A test client to sync automerge documents over websocket on demand
 mod test_sync_client {
+    use std::time::Duration;
+
     use automerge::{
         sync::{Message as SyncMessage, State, SyncDoc},
         Automerge,
@@ -386,13 +382,25 @@ mod test_sync_client {
         /// send the "join" message and perform handshake
         pub async fn join(&mut self) {
             self.send(Message::Join).await;
-            self.sync_loop(Dir::Incoming, 4).await;
+            self.sync_loop(Dir::Incoming).await;
         }
 
-        pub async fn sync_loop(&mut self, mut dir: Dir, iterations: usize) {
-            for _ in 0..iterations {
+        pub async fn sync_loop(&mut self, mut dir: Dir) {
+            loop {
                 match dir {
-                    Dir::Incoming => self.sync_incoming_once().await,
+                    Dir::Incoming => {
+                        // wait for incoming message for, if not assume the sync is done.
+                        // the wait is quite long because of slow CI
+                        let timeout = tokio::time::sleep(Duration::from_millis(500));
+
+                        tokio::select! {
+                            _ = self.sync_incoming_once() => {}
+                            _ = timeout => {
+                                debug!("timeout: sync done");
+                                return;
+                            }
+                        }
+                    }
                     Dir::Outgoing => self.sync_outgoing_once().await,
                 }
 
