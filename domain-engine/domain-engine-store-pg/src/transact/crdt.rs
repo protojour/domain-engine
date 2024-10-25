@@ -4,7 +4,6 @@ use thin_vec::ThinVec;
 use tracing::debug;
 
 use crate::{
-    compaction::CompactionMessage,
     pg_error::PgError,
     pg_model::{PgDataKey, PgDomain, PgRegKey},
     sql::{self, Expr},
@@ -129,17 +128,8 @@ impl<'a> TransactCtx<'a> {
             .save_crdt_raw(pg_domain, prop_key, data_key, chunk_type, payload)
             .await?;
 
-        if true {
-            let _ = self
-                .compaction_tx
-                .send(CompactionMessage::CrdtSaved {
-                    domain_index,
-                    data_key,
-                    prop_key,
-                    chunk_id,
-                })
-                .await;
-        }
+        self.compaction_ctx
+            .signal_crdt_saved(domain_index, prop_key, data_key, chunk_id);
 
         Ok(())
     }

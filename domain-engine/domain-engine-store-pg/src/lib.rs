@@ -3,7 +3,7 @@
 use std::{collections::BTreeSet, sync::Arc};
 
 use anyhow::anyhow;
-use compaction::{compaction_task, CompactionMessage};
+use compaction::{compaction_task, CompactionCtx};
 use domain_engine_core::{
     data_store::DataStoreAPI,
     system::ArcSystemApi,
@@ -39,16 +39,13 @@ use tracing::{error, info, info_span, Instrument};
 
 pub type PgResult<T> = Result<T, tokio_postgres::Error>;
 
-const DEFAULT_CRDT_COMPACTION_THRESHOLD: u32 = 64;
-
 pub struct PostgresDataStore {
     pg_model: PgModel,
     ontology: Arc<Ontology>,
     pool: deadpool_postgres::Pool,
     system: ArcSystemApi,
     datastore_mutated: tokio::sync::watch::Sender<()>,
-    compaction_tx: tokio::sync::mpsc::Sender<CompactionMessage>,
-    crdt_compaction_threshold: u32,
+    compaction_ctx: CompactionCtx,
 }
 
 impl PostgresDataStore {
@@ -59,27 +56,21 @@ impl PostgresDataStore {
         system: ArcSystemApi,
         datastore_mutated: tokio::sync::watch::Sender<()>,
     ) -> Self {
-        // this is not the real channel..
-        let (compaction_tx, _compaction_rx) = tokio::sync::mpsc::channel(1);
-
         Self {
             pg_model,
             ontology,
             pool,
             system,
             datastore_mutated,
-            compaction_tx,
-            crdt_compaction_threshold: DEFAULT_CRDT_COMPACTION_THRESHOLD,
+            compaction_ctx: CompactionCtx::default(),
         }
     }
 
     /// Set the number of individual / incremental changes to a CRDT document
     /// can be saved before compaction is triggered
-    pub fn with_crdt_compaction_threshold(self, threshold: u32) -> Self {
-        Self {
-            crdt_compaction_threshold: threshold,
-            ..self
-        }
+    pub fn with_crdt_compaction_threshold(mut self, threshold: u32) -> Self {
+        self.compaction_ctx.crdt_compaction_threshold = threshold;
+        self
     }
 }
 
@@ -89,16 +80,11 @@ pub struct PostgresHandle {
 }
 
 impl From<PostgresDataStore> for PostgresHandle {
-    fn from(mut store: PostgresDataStore) -> Self {
-        // this _is_ the real channel..
-        let (compaction_tx, compaction_rx) = tokio::sync::mpsc::channel(64);
-
-        store.compaction_tx = compaction_tx.clone();
+    fn from(store: PostgresDataStore) -> Self {
         let store = Arc::new(store);
 
         let bg_tasks = vec![AbortOnDropHandle::new(tokio::spawn(
-            compaction_task(compaction_tx, compaction_rx, store.clone())
-                .instrument(info_span!("compaction")),
+            compaction_task(store.clone()).instrument(info_span!("compaction")),
         ))];
 
         PostgresHandle {

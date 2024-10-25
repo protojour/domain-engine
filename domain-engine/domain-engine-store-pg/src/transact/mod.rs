@@ -21,7 +21,7 @@ use tokio_postgres::IsolationLevel;
 use tracing::trace;
 
 use crate::{
-    compaction::CompactionMessage,
+    compaction::CompactionCtx,
     pg_error::{PgError, PgModelError},
     pg_model::PgDef,
     PgModel, PostgresDataStore,
@@ -69,7 +69,7 @@ pub struct TransactCtx<'a> {
     ontology_serde: &'a SerdeAspect,
     system: &'a (dyn SystemAPI + Send + Sync),
     pub connection_state: ConnectionState<'a>,
-    compaction_tx: &'a tokio::sync::mpsc::Sender<CompactionMessage>,
+    compaction_ctx: &'a CompactionCtx,
 }
 
 impl<'a> AsRef<DefsAspect> for TransactCtx<'a> {
@@ -97,7 +97,7 @@ impl<'a> TransactCtx<'a> {
             ontology_serde: store.ontology.as_ref().as_ref(),
             system: store.system.as_ref(),
             connection_state,
-            compaction_tx: &store.compaction_tx,
+            compaction_ctx: &store.compaction_ctx,
         }
     }
 
