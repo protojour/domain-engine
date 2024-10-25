@@ -12,17 +12,19 @@ doctest = false
 ontol-runtime.path = "../../ontol/ontol-runtime"
 domain-engine-core.path = "../domain-engine-core"
 arcstr.workspace = true
+base64 = "0.22"
+chrono = "0.4"
+compact_str = { version = "0.8", features = ["serde"] }
+futures-util = "0.3"
+fnv.workspace = true
 juniper.workspace = true
-tracing.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-fnv.workspace = true
 thiserror.workspace = true
-compact_str = { version = "0.8", features = ["serde"] }
-base64 = "0.22"
-futures-util = "0.3"
+tokio = { version = "1", features = ["sync"] }
+tracing.workspace = true
 ulid = "1"
-chrono = "0.4"
+
 
 [dev-dependencies]
 ontol-test-utils.path = "../../ontol/ontol-test-utils"

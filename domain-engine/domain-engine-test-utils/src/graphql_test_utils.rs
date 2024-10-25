@@ -122,11 +122,7 @@ pub fn gql_ctx_mock_data_store(
         .build_sync(InMemoryDataStoreFactory, Session::default())
         .unwrap();
 
-    ServiceCtx {
-        domain_engine: Arc::new(domain_engine),
-        serde_processor_profile_flags: Default::default(),
-        session: Default::default(),
-    }
+    ServiceCtx::from(Arc::new(domain_engine))
 }
 
 #[async_trait::async_trait]

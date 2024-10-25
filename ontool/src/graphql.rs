@@ -20,11 +20,7 @@ pub async fn domain_graphql_handler(
     let response = batch_request
         .execute(
             &service.schema,
-            &ServiceCtx {
-                domain_engine: service.domain_engine.clone(),
-                serde_processor_profile_flags: Default::default(),
-                session: Default::default(),
-            },
+            &ServiceCtx::from(service.domain_engine.clone()),
         )
         .await;
 

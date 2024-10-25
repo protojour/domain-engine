@@ -167,6 +167,10 @@ async fn mutation(
     let service_ctx = executor.context();
     let ctx = (schema_ctx.as_ref(), service_ctx);
 
+    // This ensures that mutations within the same request do not run in parallel,
+    // and makes it possible to do things that depend on earlier mutations.
+    let _permit = service_ctx.mutation_semaphore.acquire().await.unwrap();
+
     let look_ahead = executor.look_ahead();
     let args_wrapper = ArgsWrapper::new(look_ahead);
     let select_analyzer = SelectAnalyzer::new(schema_ctx, service_ctx);

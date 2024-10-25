@@ -23,11 +23,16 @@ use tracing::debug;
 /// ServiceCtx represents the "backend" of the GraphQL schema.
 ///
 /// it's responsible for resolving queries and mutations.
-#[derive(Clone)]
 pub struct ServiceCtx {
-    pub domain_engine: Arc<DomainEngine>,
-    pub serde_processor_profile_flags: ProcessorProfileFlags,
-    pub session: domain_engine_core::Session,
+    pub(crate) domain_engine: Arc<DomainEngine>,
+    pub(crate) serde_processor_profile_flags: ProcessorProfileFlags,
+    pub(crate) session: domain_engine_core::Session,
+
+    /// A semaphore for ensuring mutations are run serially.
+    /// It is using a semaphore of 1 permit instead of a tokio Mutex,
+    /// because it is documented that the semaphore treats permits fairly,
+    /// i.e. given out in the order they were requested.
+    pub(crate) mutation_semaphore: tokio::sync::Semaphore,
 }
 
 impl ServiceCtx {
@@ -37,15 +42,9 @@ impl ServiceCtx {
             ..self
         }
     }
-}
 
-impl From<DomainEngine> for ServiceCtx {
-    fn from(value: DomainEngine) -> Self {
-        Self {
-            domain_engine: Arc::new(value),
-            serde_processor_profile_flags: Default::default(),
-            session: Default::default(),
-        }
+    pub fn with_session(self, session: domain_engine_core::Session) -> Self {
+        Self { session, ..self }
     }
 }
 
@@ -55,7 +54,14 @@ impl From<Arc<DomainEngine>> for ServiceCtx {
             domain_engine: value,
             serde_processor_profile_flags: Default::default(),
             session: Default::default(),
+            mutation_semaphore: tokio::sync::Semaphore::new(1),
         }
+    }
+}
+
+impl From<DomainEngine> for ServiceCtx {
+    fn from(value: DomainEngine) -> Self {
+        Self::from(Arc::new(value))
     }
 }
 
