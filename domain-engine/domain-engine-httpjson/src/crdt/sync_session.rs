@@ -21,6 +21,12 @@ pub struct SyncSession {
 
 impl SyncSession {
     pub async fn run(mut self) -> DomainResult<()> {
+        let result = self.event_loop().await;
+        self.broker_handle.async_drop().await;
+        result
+    }
+
+    pub async fn event_loop(&mut self) -> DomainResult<()> {
         // A message channel for broker broadcasting
         let (sync_tx, mut sync_rx) = tokio::sync::mpsc::channel(8);
 
@@ -91,11 +97,18 @@ impl SyncSession {
         // handle broadcasting to other connected peers
         if !dispatch.broadcasts.is_empty() {
             let broadcasts = dispatch.broadcasts;
-            tokio::spawn(async move {
+            if false {
+                //
+                tokio::spawn(async move {
+                    for broadcast in broadcasts {
+                        let _ = broadcast.sync_tx.send(broadcast.message).await;
+                    }
+                });
+            } else {
                 for broadcast in broadcasts {
                     let _ = broadcast.sync_tx.send(broadcast.message).await;
                 }
-            });
+            }
         }
 
         if let Some(message) = dispatch.response {

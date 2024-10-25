@@ -98,13 +98,13 @@ async fn fetch_body_assert_status<B: FromBytes>(
 
 async fn make_domain_engine(
     ontology: Arc<Ontology>,
-    datastore: &str,
+    ds_factory: DynamicDataStoreFactory,
     system: Box<dyn SystemAPI + Send + Sync>,
 ) -> Arc<DomainEngine> {
     Arc::new(
         DomainEngine::builder(ontology)
             .system(system)
-            .build(DynamicDataStoreFactory::new(datastore), Session::default())
+            .build(ds_factory, Session::default())
             .await
             .unwrap(),
     )

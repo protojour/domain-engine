@@ -1,7 +1,11 @@
+use std::time::Duration;
+
 use automerge::{transaction::Transactable, ReadDoc};
 use domain_engine_core::Session;
 use domain_engine_httpjson::crdt::{doc_repository::DocRepository, DocAddr};
-use domain_engine_test_utils::system::MonotonicClockSystemApi;
+use domain_engine_test_utils::{
+    dynamic_data_store::DynamicDataStoreFactory, system::MonotonicClockSystemApi,
+};
 use http::header::{self};
 use ontol_examples::workspaces;
 use ontol_macros::datastore_test;
@@ -9,8 +13,9 @@ use ontol_runtime::value::Value;
 use ontol_test_utils::{expect_eq, TestCompile};
 use reqwest_websocket::CloseCode;
 use serde_json::json;
+use test_sync_client::Dir;
 use tokio_util::task::AbortOnDropHandle;
-use tracing::info;
+use tracing::{info, info_span, Instrument};
 use ulid::Ulid;
 
 use crate::{make_domain_engine, MakeTestRouter};
@@ -24,7 +29,7 @@ async fn test_workspaces_rest_api_with_edit(ds: &str) {
     let [workspace] = test.bind(["Workspace"]);
     let engine = make_domain_engine(
         test.ontology_owned(),
-        ds,
+        DynamicDataStoreFactory::new(ds),
         Box::new(MonotonicClockSystemApi::default()),
     )
     .await;
@@ -164,7 +169,7 @@ async fn test_workspace_sync(ds: &str) {
     let test = vec![workspaces()].compile();
     let engine = make_domain_engine(
         test.ontology_owned(),
-        ds,
+        DynamicDataStoreFactory::new(ds).crdt_compaction_threshold(3),
         Box::new(MonotonicClockSystemApi::default()),
     )
     .await;
@@ -201,10 +206,8 @@ async fn test_workspace_sync(ds: &str) {
     let mut client1 = test_sync_client::Client::connect(&workspace_id, &actor1, port).await;
     let mut client2 = test_sync_client::Client::connect(&workspace_id, &actor2, port).await;
 
-    info!("client1 join");
-    client1.join().await;
-    info!("client2 join");
-    client2.join().await;
+    client1.join().instrument(info_span!("client1 join")).await;
+    client2.join().instrument(info_span!("client2 join")).await;
 
     info!("client1: change the document");
 
@@ -225,11 +228,19 @@ async fn test_workspace_sync(ds: &str) {
         txn.commit();
     }
 
-    info!("client1 outgoing sync");
-    client1.outgoing_sync_loop(1).await;
+    client1
+        .sync_loop(Dir::Outgoing, 3)
+        .instrument(info_span!("client1"))
+        .await;
 
-    info!("client2 incoming sync");
-    client2.incoming_sync_loop(1).await;
+    // unfortunately this is timing sensitive,
+    // apparently need to wait for broker broadcasting
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    client2
+        .sync_loop(Dir::Incoming, 4)
+        .instrument(info_span!("client2"))
+        .await;
 
     info!("client2: should see reflected changes");
     {
@@ -328,6 +339,22 @@ mod test_sync_client {
     use domain_engine_httpjson::crdt::ws_codec::Message;
     use futures_util::{SinkExt, StreamExt};
     use reqwest_websocket::{Message as WsMessage, RequestBuilderExt, WebSocket};
+    use tracing::debug;
+
+    #[derive(Clone, Copy)]
+    pub enum Dir {
+        Incoming,
+        Outgoing,
+    }
+
+    impl Dir {
+        fn invert(self) -> Dir {
+            match self {
+                Dir::Incoming => Self::Outgoing,
+                Dir::Outgoing => Self::Incoming,
+            }
+        }
+    }
 
     pub struct Client {
         pub ws: WebSocket,
@@ -359,30 +386,29 @@ mod test_sync_client {
         /// send the "join" message and perform handshake
         pub async fn join(&mut self) {
             self.send(Message::Join).await;
-            self.incoming_sync_loop(2).await;
+            self.sync_loop(Dir::Incoming, 4).await;
         }
 
-        pub async fn outgoing_sync_loop(&mut self, n_roundtrips: usize) {
-            for _ in 0..n_roundtrips {
-                self.sync_outgoing_once().await;
-                self.sync_incoming_once().await;
-            }
-        }
+        pub async fn sync_loop(&mut self, mut dir: Dir, iterations: usize) {
+            for _ in 0..iterations {
+                match dir {
+                    Dir::Incoming => self.sync_incoming_once().await,
+                    Dir::Outgoing => self.sync_outgoing_once().await,
+                }
 
-        pub async fn incoming_sync_loop(&mut self, n_roundtrips: usize) {
-            for _ in 0..n_roundtrips {
-                self.sync_incoming_once().await;
-                self.sync_outgoing_once().await;
+                dir = dir.invert();
             }
         }
 
         async fn sync_outgoing_once(&mut self) {
+            debug!("outgoing");
             if let Some(outgoing) = self.automerge.generate_sync_message(&mut self.sync_state) {
                 self.send(Message::Sync(outgoing.encode())).await;
             }
         }
 
         async fn sync_incoming_once(&mut self) {
+            debug!("incoming");
             let Message::Sync(buf) = self.recv().await else {
                 panic!("invalid message");
             };

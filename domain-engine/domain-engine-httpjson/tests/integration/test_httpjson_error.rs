@@ -1,4 +1,7 @@
-use domain_engine_test_utils::{system::mock_current_time_monotonic, unimock::Unimock};
+use domain_engine_test_utils::{
+    dynamic_data_store::DynamicDataStoreFactory, system::mock_current_time_monotonic,
+    unimock::Unimock,
+};
 use http::{header::CONTENT_TYPE, StatusCode};
 use ontol_macros::datastore_test;
 use ontol_test_utils::{default_short_name, TestCompile};
@@ -12,7 +15,7 @@ async fn test_httpjson_put_stream_transaction_error(ds: &str) {
     let test = ontol_examples::artist_and_instrument().1.compile();
     let engine = make_domain_engine(
         test.ontology_owned(),
-        ds,
+        DynamicDataStoreFactory::new(ds),
         Box::new(Unimock::new(mock_current_time_monotonic())),
     )
     .await;

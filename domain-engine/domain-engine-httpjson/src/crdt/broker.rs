@@ -74,7 +74,7 @@ pub async fn load_broker(
         let mut manager = manager.manager.lock().await;
         match manager.brokers.entry(doc_addr.clone()) {
             Entry::Vacant(vacant) => {
-                info!(?doc_addr, %actor, "broker: first actor connected, loading document and broker");
+                info!("broker: first actor connected, loading document and broker");
 
                 let Some(automerge) = doc_repository
                     .load(resource_def_id, doc_addr.clone(), session)
@@ -88,7 +88,7 @@ pub async fn load_broker(
                     .clone()
             }
             Entry::Occupied(occupied) => {
-                info!(?doc_addr, %actor, "broker: another actor connected, reusing broker");
+                info!("broker: another actor connected, reusing broker");
                 occupied.get().clone()
             }
         }
@@ -115,22 +115,23 @@ impl BrokerHandle {
     pub async fn broker(&self) -> MutexGuard<'_, Broker> {
         self.broker.lock().await
     }
-}
 
-impl Drop for BrokerHandle {
-    fn drop(&mut self) {
+    /// must call this to clean up the broker
+    /// It's not an `impl Drop` for two reasons:
+    /// 1. Drop can not run async code
+    /// 2. Drop runs when Rust is freeing up stuff,
+    ///    tracing spans also get freed up and sometimes that means the spans are gone.
+    pub async fn async_drop(mut self) {
         let actor = std::mem::replace(&mut self.actor, b"".into());
         let manager = self.manager.take().unwrap();
         let broker = self.broker.clone();
-        tokio::spawn(async move {
-            let mut broker = broker.lock().await;
-            let mut manager = manager.manager.lock().await;
+        let mut broker = broker.lock().await;
+        let mut manager = manager.manager.lock().await;
 
-            if broker.remove_client(&actor) == 0 {
-                info!(doc_addr = ?broker.doc_addr, "broker: last actor disconnected, freeing up broker");
-                manager.brokers.remove(&broker.doc_addr);
-            }
-        });
+        if broker.remove_client(&actor) == 0 {
+            info!("broker: last actor disconnected, freeing up broker");
+            manager.brokers.remove(&broker.doc_addr);
+        }
     }
 }
 
@@ -149,7 +150,7 @@ impl Broker {
         actor: ActorId,
         sync_tx: tokio::sync::mpsc::Sender<AmMessage>,
     ) -> DomainResult<Option<AmMessage>> {
-        info!(doc_addr = ?self.doc_addr, ?actor, "broker: add client");
+        info!("broker: add client");
 
         let mut client = BrokerClient {
             actor,
@@ -165,7 +166,7 @@ impl Broker {
 
     /// Returns the number of remaining clients
     pub fn remove_client(&mut self, actor: &ActorId) -> usize {
-        info!(doc_addr = ?self.doc_addr, ?actor, "broker: remove client");
+        info!("broker: remove client");
         self.clients.remove(actor);
         self.clients.len()
     }

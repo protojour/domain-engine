@@ -51,7 +51,7 @@ use serde::{
     de::{value::StringDeserializer, DeserializeSeed},
     Deserialize, Deserializer,
 };
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, info_span, Instrument};
 use uuid::Uuid;
 
 pub mod crdt;
@@ -466,14 +466,17 @@ where
     Ok(ws_upgrade.on_upgrade(move |socket| async move {
         let session = SyncSession {
             resource_def_id,
-            actor: actor_id,
-            doc_addr,
+            actor: actor_id.clone(),
+            doc_addr: doc_addr.clone(),
             socket,
             broker_handle,
             doc_repository: endpoint.doc_repository,
             session,
         };
-        let _ = session.run().await;
+        let _ = session
+            .run()
+            .instrument(info_span!("sync", %doc_addr, %actor_id))
+            .await;
     }))
 }
 
