@@ -108,7 +108,7 @@ async fn compact_crdts(
             .map_err(|e| PgError::DbConnectionAcquire(e.into()))?;
 
         let ctx = TransactCtx::new(
-            TransactionMode::ReadWriteAtomic,
+            TransactionMode::ReadWrite,
             ConnectionState::NonAtomic(connection),
             &store,
         );
