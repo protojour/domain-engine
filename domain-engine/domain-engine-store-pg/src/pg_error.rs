@@ -99,6 +99,8 @@ pub enum PgError {
     Condition(&'static str),
     /// order error: {0}
     Order(&'static str),
+    /// vacuum
+    Vacuum(tokio_postgres::Error),
 }
 
 impl From<PgError> for DomainError {

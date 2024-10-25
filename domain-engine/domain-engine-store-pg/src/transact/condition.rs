@@ -56,7 +56,7 @@ enum CondPathItem {
 }
 
 impl<'a> TransactCtx<'a> {
-    pub fn sql_where_condition(
+    pub(super) fn sql_where_condition(
         &self,
         def_id: DefId,
         root_alias: sql::Alias,

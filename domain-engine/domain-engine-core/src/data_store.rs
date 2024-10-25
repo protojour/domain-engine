@@ -71,11 +71,24 @@ impl DataStore {
 
 #[derive(Clone)]
 pub struct DataStoreParams {
+    /// Configuration used to choose a datastore implementation.
     pub config: DataStoreConfig,
+
+    /// Session used when initializing the datastore.
     pub session: Session,
+
+    /// The ontology the datastore has access to.
     pub ontology: Arc<Ontology>,
+
+    /// The system api.
     pub system: ArcSystemApi,
+
+    /// A signal that should be emitted when the data store changes.
+    /// Can trigger reindexing or UI notification.
     pub datastore_mutated: tokio::sync::watch::Sender<()>,
+
+    /// A signal that should be emitted when the search index changes.
+    /// Can be used for UI notification.
     pub index_mutated: tokio::sync::watch::Sender<()>,
 }
 

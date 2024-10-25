@@ -21,6 +21,7 @@ use tokio_postgres::IsolationLevel;
 use tracing::trace;
 
 use crate::{
+    compaction::CompactionMessage,
     pg_error::{PgError, PgModelError},
     pg_model::PgDef,
     PgModel, PostgresDataStore,
@@ -61,13 +62,14 @@ pub enum InsertMode {
     Upsert,
 }
 
-struct TransactCtx<'a> {
+pub struct TransactCtx<'a> {
     txn_mode: TransactionMode,
     pg_model: &'a PgModel,
     ontology_defs: &'a DefsAspect,
     ontology_serde: &'a SerdeAspect,
     system: &'a (dyn SystemAPI + Send + Sync),
-    connection_state: ConnectionState<'a>,
+    pub connection_state: ConnectionState<'a>,
+    compaction_tx: &'a tokio::sync::mpsc::Sender<CompactionMessage>,
 }
 
 impl<'a> AsRef<DefsAspect> for TransactCtx<'a> {
@@ -83,6 +85,22 @@ impl<'a> AsRef<SerdeAspect> for TransactCtx<'a> {
 }
 
 impl<'a> TransactCtx<'a> {
+    pub fn new(
+        txn_mode: TransactionMode,
+        connection_state: ConnectionState<'a>,
+        store: &'a PostgresDataStore,
+    ) -> Self {
+        Self {
+            txn_mode,
+            pg_model: &store.pg_model,
+            ontology_defs: store.ontology.as_ref().as_ref(),
+            ontology_serde: store.ontology.as_ref().as_ref(),
+            system: store.system.as_ref(),
+            connection_state,
+            compaction_tx: &store.compaction_tx,
+        }
+    }
+
     pub fn client(&self) -> &tokio_postgres::Client {
         match &self.connection_state {
             ConnectionState::NonAtomic(conn) => conn,
@@ -132,7 +150,7 @@ fn write_state(
     messages
 }
 
-enum ConnectionState<'a> {
+pub enum ConnectionState<'a> {
     NonAtomic(deadpool::managed::Object<deadpool_postgres::Manager>),
     Transaction(deadpool_postgres::Transaction<'a>),
 }
@@ -141,7 +159,6 @@ pub async fn transact(
     store: Arc<PostgresDataStore>,
     mode: TransactionMode,
     messages: BoxStream<'static, DomainResult<ReqMessage>>,
-    datastore_mutated: tokio::sync::watch::Sender<()>,
 ) -> DomainResult<BoxStream<'static, DomainResult<RespMessage>>> {
     let mut connection = store
         .pool
@@ -167,15 +184,7 @@ pub async fn transact(
                 )
             }
         };
-
-        let ctx = TransactCtx {
-            txn_mode: mode,
-            pg_model: &store.pg_model,
-            ontology_defs: store.ontology.as_ref().as_ref(),
-            ontology_serde: store.ontology.as_ref().as_ref(),
-            system: store.system.as_ref(),
-            connection_state,
-        };
+        let ctx = TransactCtx::new(mode, connection_state, &store);
         let mut mut_ctx = PgMutCtx::new(mode, store.system.as_ref());
 
         let mut state: Option<State> = None;
@@ -262,7 +271,7 @@ pub async fn transact(
                     }
                 }
                 ReqMessage::CrdtGet(_def_id, vertex_addr, prop_id) => {
-                    let octets = ctx.crdt_get(vertex_addr, prop_id).await?;
+                    let octets = ctx.crdt_get_by_vertex_addr(vertex_addr, prop_id).await?;
 
                     yield RespMessage::SequenceStart(0);
                     if let Some(octets) = octets {
@@ -287,7 +296,7 @@ pub async fn transact(
 
         if let Some(write_stats) = mut_ctx.write_stats.finish(ctx.system) {
             yield RespMessage::WriteComplete(Box::new(write_stats));
-            let _ = datastore_mutated.send(());
+            let _ = store.datastore_mutated.send(());
         }
     }
     .boxed())

@@ -13,6 +13,7 @@ ontol-runtime.path = "../../ontol/ontol-runtime"
 domain-engine-core.path = "../domain-engine-core"
 async-trait.workspace = true
 tokio = { workspace = true, features = ["sync"] }
+tokio-util = { version = "0.7", features = ["rt"] }
 futures-util = "0.3"
 async-stream = "0.3"
 deadpool-postgres = { version = "0.14", features = ["rt_tokio_1"] }
@@ -42,6 +43,7 @@ pin-utils = "0.1"
 fallible-iterator = "0.2"
 byteorder = "1"
 displaydoc = "0.2"
+automerge = "0.5"
 
 [dev-dependencies]
 ontol-test-utils.path = "../../ontol/ontol-test-utils"

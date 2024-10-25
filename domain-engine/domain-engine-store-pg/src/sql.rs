@@ -82,6 +82,10 @@ pub struct Delete<'a> {
     pub returning: Vec<Expr<'a>>,
 }
 
+pub struct Vacuum<'a> {
+    pub tables: Vec<TableName<'a>>,
+}
+
 impl<'a> WhereExt<'a> for Select<'a> {
     fn where_mut(&mut self) -> &mut Option<Expr<'a>> {
         &mut self.where_
@@ -238,6 +242,10 @@ impl<'a> Expr<'a> {
 
     pub fn eq(a: impl Into<Self>, b: impl Into<Self>) -> Self {
         Self::Eq(Box::new(a.into()), Box::new(b.into()))
+    }
+
+    pub fn less_than(a: impl Into<Self>, b: impl Into<Self>) -> Self {
+        Self::Lt(Box::new(a.into()), Box::new(b.into()))
     }
 
     pub fn in_(a: impl Into<Self>, b: impl Into<Self>) -> Self {
@@ -428,6 +436,17 @@ impl<'a> Display for Delete<'a> {
             write!(f, " RETURNING {}", self.returning.iter().format(","))?;
         }
 
+        Ok(())
+    }
+}
+
+impl<'a> Display for Vacuum<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "VACUUM {tables}",
+            tables = self.tables.iter().format(", ")
+        )?;
         Ok(())
     }
 }

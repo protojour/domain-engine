@@ -1,10 +1,10 @@
 use domain_engine_core::{DomainResult, VertexAddr};
-use ontol_runtime::{crdt::Automerge, PropId};
+use ontol_runtime::{crdt::Automerge, DomainIndex, PropId};
 use thin_vec::ThinVec;
 use tracing::debug;
 
 use crate::{
-    address::deserialize_address,
+    compaction::CompactionMessage,
     pg_error::PgError,
     pg_model::{PgDataKey, PgDomain, PgRegKey},
     sql::{self, Expr},
@@ -27,7 +27,8 @@ impl<'a> TransactCtx<'a> {
             .datatable(domain_index, parent.prop_id.0)?
             .abstract_property(&parent.prop_id)?;
 
-        self.save_impl(
+        self.save_crdt_track_compaction(
+            domain_index,
             pg_domain,
             parent_prop_key,
             parent.key,
@@ -45,32 +46,44 @@ impl<'a> TransactCtx<'a> {
         prop_id: PropId,
         payload: Vec<u8>,
     ) -> DomainResult<()> {
-        let (pg_domain, prop_key, data_key) = self.crdt_meta(vertex_addr, prop_id)?;
+        let (domain_index, pg_domain, prop_key, data_key) =
+            self.pg_model.crdt_meta(vertex_addr, prop_id)?;
 
-        self.save_impl(pg_domain, prop_key, data_key, "incremental", &payload)
-            .await?;
+        self.save_crdt_track_compaction(
+            domain_index,
+            pg_domain,
+            prop_key,
+            data_key,
+            "incremental",
+            &payload,
+        )
+        .await?;
 
         Ok(())
     }
 
-    pub async fn crdt_get(
+    pub async fn crdt_get_by_vertex_addr(
         &self,
         vertex_addr: VertexAddr,
         prop_id: PropId,
     ) -> DomainResult<Option<ThinVec<u8>>> {
-        let (pg_domain, prop_key, data_key) = self.crdt_meta(vertex_addr, prop_id)?;
+        let (_, pg_domain, prop_key, data_key) = self.pg_model.crdt_meta(vertex_addr, prop_id)?;
+        self.crdt_get(pg_domain, prop_key, data_key).await
+    }
 
+    pub async fn crdt_get(
+        &self,
+        pg_domain: &PgDomain,
+        prop_key: PgRegKey,
+        data_key: PgDataKey,
+    ) -> DomainResult<Option<ThinVec<u8>>> {
         let select = sql::Select {
-            with: None,
-            expressions: sql::Expressions {
-                items: vec![sql::Expr::StringAgg(
-                    Box::new(sql::Expr::path1("chunk")),
-                    Box::new(sql::Expr::LiteralBytea(&[])),
-                )],
-                multiline: false,
-            },
+            expressions: vec![sql::Expr::StringAgg(
+                Box::new(sql::Expr::path1("chunk")),
+                Box::new(sql::Expr::LiteralBytea(&[])),
+            )]
+            .into(),
             from: vec![sql::FromItem::Select(Box::new(sql::Select {
-                with: None,
                 expressions: vec![sql::Expr::path1("chunk")].into(),
                 from: vec![sql::TableName(&pg_domain.schema_name, "crdt").into()],
                 where_: Some(sql::Expr::eq(
@@ -82,7 +95,6 @@ impl<'a> TransactCtx<'a> {
                 },
                 ..Default::default()
             }))],
-
             ..Default::default()
         };
 
@@ -104,26 +116,36 @@ impl<'a> TransactCtx<'a> {
         Ok(Some(ThinVec::from_iter(bytes.iter().copied())))
     }
 
-    fn crdt_meta(
+    async fn save_crdt_track_compaction(
         &self,
-        vertex_addr: VertexAddr,
-        prop_id: PropId,
-    ) -> DomainResult<(&PgDomain, PgRegKey, PgDataKey)> {
-        let (reg_key, data_key) = deserialize_address(&vertex_addr)?;
-        let (domain_index, def_id) = self.pg_model.datatable_key_by_def_key(reg_key)?;
-        let pg_vertex_table = self.pg_model.pg_domain_datatable(domain_index, def_id)?;
-        let pg_domain = pg_vertex_table.domain;
+        domain_index: DomainIndex,
+        pg_domain: &PgDomain,
+        prop_key: PgRegKey,
+        data_key: PgDataKey,
+        chunk_type: &str,
+        payload: &[u8],
+    ) -> DomainResult<()> {
+        let chunk_id = self
+            .save_crdt_raw(pg_domain, prop_key, data_key, chunk_type, payload)
+            .await?;
 
-        let prop_key = self
-            .pg_model
-            .datatable(domain_index, prop_id.0)?
-            .abstract_property(&prop_id)?;
+        if true {
+            let _ = self
+                .compaction_tx
+                .send(CompactionMessage::CrdtSaved {
+                    domain_index,
+                    data_key,
+                    prop_key,
+                    chunk_id,
+                })
+                .await;
+        }
 
-        Ok((pg_domain, prop_key, data_key))
+        Ok(())
     }
 
     /// Save and return the chunk ID
-    async fn save_impl(
+    pub async fn save_crdt_raw(
         &self,
         pg_domain: &PgDomain,
         prop_key: PgRegKey,
@@ -157,5 +179,36 @@ impl<'a> TransactCtx<'a> {
             .map_err(PgError::InsertQuery)?;
 
         Ok(row.get::<_, i64>(0))
+    }
+
+    pub async fn garbage_collect_crdts(
+        &self,
+        pg_domain: &PgDomain,
+        prop_key: PgRegKey,
+        data_key: PgDataKey,
+        latest_snapshot_id: i64,
+    ) -> DomainResult<usize> {
+        let delete = sql::Delete {
+            from: sql::TableName(&pg_domain.schema_name, "crdt"),
+            where_: Some(sql::Expr::And(vec![
+                sql::Expr::eq(
+                    sql::Expr::Tuple(vec![sql::Expr::path1("_fprop"), sql::Expr::path1("_fkey")]),
+                    sql::Expr::Tuple(vec![sql::Expr::param(0), sql::Expr::param(1)]),
+                ),
+                sql::Expr::less_than(sql::Expr::path1("chunk_id"), sql::Expr::param(2)),
+            ])),
+            returning: vec![sql::Expr::LiteralInt(0)],
+        };
+
+        let sql = delete.to_string();
+        debug!("{sql}");
+
+        let rows = self
+            .client()
+            .query(&sql, &[&prop_key, &data_key, &latest_snapshot_id])
+            .await
+            .map_err(PgError::InsertQuery)?;
+
+        Ok(rows.len())
     }
 }

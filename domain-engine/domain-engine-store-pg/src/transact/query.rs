@@ -532,7 +532,7 @@ impl<'a> TransactCtx<'a> {
         Ok(())
     }
 
-    pub fn sql_select_edge_properties(
+    pub(super) fn sql_select_edge_properties(
         &self,
         (def, pg): (&Def, PgDomainTable<'a>),
         data_alias: sql::Alias,

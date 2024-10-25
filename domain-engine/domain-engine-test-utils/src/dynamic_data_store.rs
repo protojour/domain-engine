@@ -15,6 +15,7 @@ pub struct DynamicDataStoreFactory {
     name: String,
     recreate_db: bool,
     tantivy_index: bool,
+    crdt_compaction_threshold: Option<u32>,
 }
 
 impl DynamicDataStoreFactory {
@@ -23,6 +24,7 @@ impl DynamicDataStoreFactory {
             name: name.into(),
             recreate_db: true,
             tantivy_index: false,
+            crdt_compaction_threshold: None,
         }
     }
 
@@ -33,6 +35,11 @@ impl DynamicDataStoreFactory {
 
     pub fn tantivy_index(mut self) -> Self {
         self.tantivy_index = true;
+        self
+    }
+
+    pub fn crdt_compaction_threshold(mut self, threshold: u32) -> Self {
+        self.crdt_compaction_threshold = Some(threshold);
         self
     }
 
@@ -87,6 +94,7 @@ impl DataStoreFactory for DynamicDataStoreFactory {
             "pg" => {
                 pg::PgTestDatastoreFactory {
                     recreate_db: self.recreate_db,
+                    crdt_compaction_threshold: self.crdt_compaction_threshold,
                 }
                 .new_api(persisted, params.clone())
                 .await
@@ -186,6 +194,7 @@ mod pg {
     #[derive(Default)]
     pub struct PgTestDatastoreFactory {
         pub recreate_db: bool,
+        pub crdt_compaction_threshold: Option<u32>,
     }
 
     struct PgTestDatastore {
@@ -203,7 +212,7 @@ mod pg {
             params: DataStoreParams,
         ) -> DomainResult<Arc<dyn domain_engine_core::data_store::DataStoreAPI + Send + Sync>>
         {
-            test_pg_api(persisted, params, self.recreate_db).await
+            test_pg_api(self, persisted, params).await
         }
     }
 
@@ -224,9 +233,9 @@ mod pg {
     }
 
     async fn test_pg_api(
+        factory: &PgTestDatastoreFactory,
         persisted: &BTreeSet<ontol_runtime::DomainIndex>,
         params: DataStoreParams,
-        recreate_db: bool,
     ) -> DomainResult<Arc<dyn domain_engine_core::data_store::DataStoreAPI + Send + Sync>> {
         let semaphore = PG_TEST_SEMAPHORE
             .get_or_init(|| Arc::new(Semaphore::new(MAX_CONCURRENT_PG_TESTS)))
@@ -239,7 +248,7 @@ mod pg {
 
         let test_name = format!("testdb_{}", super::detect_test_name("::ds_pg"));
 
-        if recreate_db {
+        if factory.recreate_db {
             let master_config = test_pg_config("domainengine");
             recreate_database(&test_name, &master_config)
                 .await
@@ -263,18 +272,23 @@ mod pg {
             },
         );
 
+        let mut data_store = PostgresDataStore::new(
+            pg_model,
+            params.ontology,
+            deadpool_postgres::Pool::builder(deadpool_manager)
+                .max_size(4)
+                .build()
+                .map_err(|err| DomainError::data_store(format!("deadpool: {err}")))?,
+            params.system,
+            params.datastore_mutated,
+        );
+
+        if let Some(threshold) = factory.crdt_compaction_threshold {
+            data_store = data_store.with_crdt_compaction_threshold(threshold);
+        }
+
         Ok(Arc::new(PgTestDatastore {
-            handle: PostgresDataStore::new(
-                pg_model,
-                params.ontology,
-                deadpool_postgres::Pool::builder(deadpool_manager)
-                    .max_size(1)
-                    .build()
-                    .map_err(|err| DomainError::data_store(format!("deadpool: {err}")))?,
-                params.system,
-                params.datastore_mutated,
-            )
-            .into(),
+            handle: data_store.into(),
             permit,
         }))
     }

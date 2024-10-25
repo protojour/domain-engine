@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, ops::Deref};
 
-use domain_engine_core::DomainResult;
+use domain_engine_core::{DomainResult, VertexAddr};
 use fnv::FnvHashMap;
 use ontol_runtime::{
     debug::OntolDebug,
@@ -20,7 +20,7 @@ use postgres_types::ToSql;
 use tokio_postgres::types::FromSql;
 use tracing::{debug, trace};
 
-use crate::{pg_error::PgModelError, sql};
+use crate::{address::deserialize_address, pg_error::PgModelError, sql};
 
 /// The key type used in the registry for metadata
 pub type PgRegKey = i32;
@@ -164,6 +164,23 @@ impl PgModel {
             return Err(PgModelError::NotFoundInRegistry(def_key).into());
         };
         Ok((*domain_index, *def_id))
+    }
+
+    pub fn crdt_meta(
+        &self,
+        vertex_addr: VertexAddr,
+        prop_id: PropId,
+    ) -> DomainResult<(DomainIndex, &PgDomain, PgRegKey, PgDataKey)> {
+        let (reg_key, data_key) = deserialize_address(&vertex_addr)?;
+        let (domain_index, def_id) = self.datatable_key_by_def_key(reg_key)?;
+        let pg_vertex_table = self.pg_domain_datatable(domain_index, def_id)?;
+        let pg_domain = pg_vertex_table.domain;
+
+        let prop_key = self
+            .datatable(domain_index, prop_id.0)?
+            .abstract_property(&prop_id)?;
+
+        Ok((domain_index, pg_domain, prop_key, data_key))
     }
 }
 
