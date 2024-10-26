@@ -2763,7 +2763,7 @@ dependencies = [
 [[package]]
 name = "juniper"
 version = "0.16.1"
-source = "git+https://github.com/protojour/juniper?branch=protojour-mods#a658e67fbab05b3d76b541f889c110172a996df5"
+source = "git+https://github.com/protojour/juniper?branch=protojour-mods#a969ae3d90ae63a2db60c5b7d69a43a133f0712d"
 dependencies = [
  "async-trait",
  "auto_enums",
@@ -2782,7 +2782,7 @@ dependencies = [
 [[package]]
 name = "juniper_axum"
 version = "0.1.0"
-source = "git+https://github.com/protojour/juniper?branch=protojour-mods#a658e67fbab05b3d76b541f889c110172a996df5"
+source = "git+https://github.com/protojour/juniper?branch=protojour-mods#a969ae3d90ae63a2db60c5b7d69a43a133f0712d"
 dependencies = [
  "axum",
  "bytes",
@@ -2795,7 +2795,7 @@ dependencies = [
 [[package]]
 name = "juniper_codegen"
 version = "0.16.0"
-source = "git+https://github.com/protojour/juniper?branch=protojour-mods#a658e67fbab05b3d76b541f889c110172a996df5"
+source = "git+https://github.com/protojour/juniper?branch=protojour-mods#a969ae3d90ae63a2db60c5b7d69a43a133f0712d"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2806,7 +2806,7 @@ dependencies = [
 [[package]]
 name = "juniper_graphql_ws"
 version = "0.4.0"
-source = "git+https://github.com/protojour/juniper?branch=protojour-mods#a658e67fbab05b3d76b541f889c110172a996df5"
+source = "git+https://github.com/protojour/juniper?branch=protojour-mods#a969ae3d90ae63a2db60c5b7d69a43a133f0712d"
 dependencies = [
  "juniper",
  "juniper_subscriptions",
@@ -2817,7 +2817,7 @@ dependencies = [
 [[package]]
 name = "juniper_subscriptions"
 version = "0.17.0"
-source = "git+https://github.com/protojour/juniper?branch=protojour-mods#a658e67fbab05b3d76b541f889c110172a996df5"
+source = "git+https://github.com/protojour/juniper?branch=protojour-mods#a969ae3d90ae63a2db60c5b7d69a43a133f0712d"
 dependencies = [
  "futures",
  "juniper",
