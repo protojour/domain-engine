@@ -443,6 +443,7 @@ where
     let vertex_addr = endpoint
         .doc_repository
         .fetch_vertex_addr(endpoint.resource_def_id, key, session.clone())
+        .instrument(info_span!("sync", %actor_id))
         .await?
         .ok_or_else(|| DomainErrorKind::EntityNotFound.into_error())?;
 
@@ -457,6 +458,7 @@ where
         endpoint.doc_repository.clone(),
         session.clone(),
     )
+    .instrument(info_span!("sync", %doc_addr, %actor_id))
     .await?
     {
         Some(broker) => broker,
