@@ -79,6 +79,7 @@ impl DataStoreFactory for DynamicDataStoreFactory {
         );
 
         let api = match self.name.as_str() {
+            #[cfg(feature = "store-arango")]
             "arango" => {
                 arango::ArangoTestDatastoreFactory {
                     recreate_db: self.recreate_db,
@@ -91,6 +92,7 @@ impl DataStoreFactory for DynamicDataStoreFactory {
                     .new_api(persisted, params.clone())
                     .await
             }
+            #[cfg(feature = "store-pg")]
             "pg" => {
                 pg::PgTestDatastoreFactory {
                     recreate_db: self.recreate_db,
@@ -125,6 +127,7 @@ impl DataStoreFactorySync for DynamicDataStoreFactory {
     }
 }
 
+#[cfg(feature = "store-arango")]
 mod arango {
     use std::{collections::BTreeSet, env, sync::Arc};
 
@@ -167,6 +170,7 @@ mod arango {
     }
 }
 
+#[cfg(feature = "store-pg")]
 mod pg {
     use std::collections::BTreeSet;
     use std::env;
@@ -310,6 +314,7 @@ mod pg {
     }
 }
 
+#[allow(unused)]
 fn detect_test_name(suffix: &str) -> String {
     let thread_name = std::thread::current().name().unwrap().to_string();
     let thread_name_no_suffix = thread_name.strip_suffix(suffix).unwrap();

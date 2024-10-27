@@ -6,14 +6,19 @@ edition = "2021"
 [lib]
 doctest = false
 
+[features]
+default = ["store-pg"]
+store-arango = ["dep:domain-engine-store-arango"]
+store-pg = ["dep:domain-engine-store-pg"]
+
 [dependencies]
 ontol-runtime.path = "../../ontol/ontol-runtime"
 ontol-test-utils.path = "../../ontol/ontol-test-utils"
 domain-engine-core = { path = "../domain-engine-core", features = ["unimock"] }
 domain-engine-graphql.path = "../domain-engine-graphql"
-domain-engine-store-arango.path = "../domain-engine-store-arango"
+domain-engine-store-arango = { path = "../domain-engine-store-arango", optional = true }
 domain-engine-store-inmemory.path = "../domain-engine-store-inmemory"
-domain-engine-store-pg.path = "../domain-engine-store-pg"
+domain-engine-store-pg = { path = "../domain-engine-store-pg", optional = true }
 domain-engine-tantivy.path = "../domain-engine-tantivy"
 tokio = { version = "1", features = ["sync"] }
 serde.workspace = true
