@@ -386,6 +386,17 @@ pub enum PgPropertyRef<'a> {
     Abstract(PgRegKey),
 }
 
+#[derive(Clone, Copy, PartialEq, ToSql, FromSql, Debug)]
+#[postgres(name = "m6m_property_type")]
+pub enum PgPropertyType {
+    #[postgres(name = "column")]
+    Column,
+    #[postgres(name = "abstract_struct")]
+    AbstractStruct,
+    #[postgres(name = "abstract_crdt")]
+    AbstractCrdt,
+}
+
 #[derive(Debug)]
 pub enum PgPropertyData {
     Scalar { col_name: Box<str>, pg_type: PgType },

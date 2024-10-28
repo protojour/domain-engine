@@ -9,7 +9,7 @@ use tracing::{info, info_span, Instrument};
 use crate::{
     pg_model::{
         PgColumn, PgDomainTableType, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexType, PgProperty,
-        PgPropertyData, PgRegKey, PgTable, PgTableIdUnion, PgType,
+        PgPropertyData, PgPropertyType, PgRegKey, PgTable, PgTableIdUnion, PgType,
     },
     sql::{self},
 };
@@ -237,10 +237,12 @@ async fn execute_migration_step<'t>(
                 .context("alter table add column")?;
             }
 
-            let (pg_type, column_name) = match &data {
-                PgPropertyData::Scalar { col_name, pg_type } => (Some(pg_type), Some(col_name)),
-                PgPropertyData::AbstractStruct => (None, None),
-                PgPropertyData::AbstractCrdt => (None, None),
+            let (pg_property_type, pg_type, column_name) = match &data {
+                PgPropertyData::Scalar { col_name, pg_type } => {
+                    (PgPropertyType::Column, Some(pg_type), Some(col_name))
+                }
+                PgPropertyData::AbstractStruct => (PgPropertyType::AbstractStruct, None, None),
+                PgPropertyData::AbstractCrdt => (PgPropertyType::AbstractCrdt, None, None),
             };
 
             let key = txn
@@ -249,12 +251,19 @@ async fn execute_migration_step<'t>(
                         INSERT INTO m6mreg.property (
                             domaintable_key,
                             prop_tag,
+                            property_type,
                             pg_type,
                             column_name
-                        ) VALUES($1, $2, $3, $4)
+                        ) VALUES($1, $2, $3, $4, $5)
                         RETURNING key
                     "},
-                    &[&pg_table.key, &(prop_tag.0 as i32), &pg_type, &column_name],
+                    &[
+                        &pg_table.key,
+                        &(prop_tag.0 as i32),
+                        &pg_property_type,
+                        &pg_type,
+                        &column_name,
+                    ],
                 )
                 .await
                 .context("create property")?

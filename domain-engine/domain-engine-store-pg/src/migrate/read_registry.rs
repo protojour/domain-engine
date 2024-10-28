@@ -10,7 +10,7 @@ use ulid::Ulid;
 
 use crate::pg_model::{
     EdgeId, PgColumn, PgDomain, PgDomainTableType, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexData,
-    PgIndexType, PgProperty, PgRegKey, PgTable, PgType,
+    PgIndexType, PgProperty, PgPropertyType, PgRegKey, PgTable, PgType,
 };
 
 use super::MigrationCtx;
@@ -136,7 +136,7 @@ pub async fn read_registry<'t>(
     // properties
     for row in txn
         .query(
-            "SELECT key, domaintable_key, prop_tag, column_name, pg_type FROM m6mreg.property",
+            "SELECT key, domaintable_key, prop_tag, property_type, column_name, pg_type FROM m6mreg.property",
             &[],
         )
         .await
@@ -145,8 +145,9 @@ pub async fn read_registry<'t>(
         let key: PgRegKey = row.get(0);
         let domaintable_key: PgRegKey = row.get(1);
         let prop_tag = DefPropTag(row.get::<_, i32>(2).try_into()?);
-        let col_name: Option<Box<str>> = row.get(3);
-        let pg_type: Option<PgType> = row.get(4);
+        let property_type: PgPropertyType = row.get(3);
+        let col_name: Option<Box<str>> = row.get(4);
+        let pg_type: Option<PgType> = row.get(5);
 
         let pg_property = match (col_name, pg_type) {
             (Some(col_name), Some(pg_type)) => PgProperty::Column(PgColumn {
@@ -154,7 +155,11 @@ pub async fn read_registry<'t>(
                 col_name,
                 pg_type,
             }),
-            (None, None) => PgProperty::AbstractStruct(key),
+            (None, None) => match property_type {
+                PgPropertyType::AbstractStruct => PgProperty::AbstractStruct(key),
+                PgPropertyType::AbstractCrdt => PgProperty::AbstractCrdt(key),
+                PgPropertyType::Column => panic!("column without name"),
+            }
             _ => unreachable!(),
         };
 

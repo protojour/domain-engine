@@ -46,8 +46,31 @@ async fn make_domain_engine(
 }
 
 #[ontol_macros::datastore_test(tokio::test)]
-async fn test_db_remigrate_noop(ds: &str) {
+async fn test_db_remigrate_noop_stix(ds: &str) {
     let test = examples::stix::stix_bundle().compile();
+    let domain_engine = DomainEngine::builder(test.ontology_owned())
+        .system(Box::new(unimock::Unimock::new(())))
+        .build(DynamicDataStoreFactory::new(ds), Session::default())
+        .await
+        .unwrap();
+
+    drop(domain_engine);
+
+    let domain_engine = DomainEngine::builder(test.ontology_owned())
+        .system(Box::new(unimock::Unimock::new(())))
+        .build(
+            DynamicDataStoreFactory::new(ds).reuse_db(),
+            Session::default(),
+        )
+        .await
+        .unwrap();
+
+    drop(domain_engine);
+}
+
+#[ontol_macros::datastore_test(tokio::test)]
+async fn test_db_remigrate_noop_workspaces(ds: &str) {
+    let test = vec![examples::workspaces()].compile();
     let domain_engine = DomainEngine::builder(test.ontology_owned())
         .system(Box::new(unimock::Unimock::new(())))
         .build(DynamicDataStoreFactory::new(ds), Session::default())
