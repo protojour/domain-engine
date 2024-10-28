@@ -1,5 +1,7 @@
+/// The workspaces domain models frequently changing code repositories.
 domain 01JAP41VG1STK1VZPWXV26SPNM ()
 
+/// A workspace is a version-controlled tree of files associated with an ID.
 def Workspace (
     /// The ULID of this workspace
     rel. 'id'[rel* gen: auto]: (rel* is: ulid)

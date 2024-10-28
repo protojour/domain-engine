@@ -267,6 +267,7 @@ impl Default for FakeAtlasServer {
         add_atlas("conduit", conduit_db(), &mut sources);
         add_atlas("conduit", blog_post_public(), &mut sources);
         add_atlas("gitmesh", gitmesh(), &mut sources);
+        add_atlas("workspaces", workspaces(), &mut sources);
 
         Self { sources }
     }
