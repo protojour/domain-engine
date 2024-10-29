@@ -120,18 +120,20 @@ impl SyncSession {
                 .map_err(|err| DomainError::protocol(format!("ws: {err:?}")))?;
         }
 
-        let save_result = self
-            .doc_repository
-            .save_incremental(
-                self.resource_def_id,
-                self.doc_addr.clone(),
-                dispatch.incremental_changes,
-                self.session.clone(),
-            )
-            .await;
+        if !dispatch.incremental_changes.is_empty() {
+            let save_result = self
+                .doc_repository
+                .save_incremental(
+                    self.resource_def_id,
+                    self.doc_addr.clone(),
+                    dispatch.incremental_changes,
+                    self.session.clone(),
+                )
+                .await;
 
-        if let Err(err) = save_result {
-            error!("document not saved: {err:?}");
+            if let Err(err) = save_result {
+                error!("document not saved: {err:?}");
+            }
         }
 
         Ok(())

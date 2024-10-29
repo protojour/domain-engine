@@ -45,6 +45,10 @@ impl<'a> TransactCtx<'a> {
         prop_id: PropId,
         payload: Vec<u8>,
     ) -> DomainResult<()> {
+        if payload.is_empty() {
+            return Ok(());
+        }
+
         let (domain_index, pg_domain, prop_key, data_key) =
             self.pg_model.crdt_meta(vertex_addr, prop_id)?;
 
