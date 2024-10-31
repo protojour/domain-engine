@@ -1,6 +1,12 @@
+use std::collections::BTreeMap;
+
+use indexmap::IndexMap;
 use ontol_runtime::{
     interface::{
-        http_json::{Endpoint, HttpJson, HttpKeyedResource, HttpResource},
+        http_json::{
+            Endpoint, HttpDefResource, HttpJson, HttpKeyedResource, HttpMapGetResource,
+            HttpResource,
+        },
         serde::{SerdeDef, SerdeModifier},
     },
     ontology::{
@@ -8,16 +14,18 @@ use ontol_runtime::{
         domain::{DataRelationshipKind, DataTreeRepr, DefKind},
         ontol::TextConstant,
     },
-    DefId, DomainIndex, PropId,
+    DefId, DomainIndex, MapDefFlags, MapKey, PropId,
 };
 
-use crate::repr::repr_model::ReprKind;
+use crate::{codegen::task::CodeCtx, repr::repr_model::ReprKind};
 
 use super::serde::{serde_generator::SerdeGenerator, SerdeKey};
 
 pub fn generate_httpjson_interface(
     domain_index: DomainIndex,
     partial_defs: &DefsAspect,
+    map_namespace: Option<&IndexMap<&str, DefId>>,
+    code_ctx: &CodeCtx,
     serde_gen: &mut SerdeGenerator,
 ) -> Option<HttpJson> {
     let domain = partial_defs.domain_by_index(domain_index).unwrap();
@@ -28,6 +36,22 @@ pub fn generate_httpjson_interface(
     }
 
     let mut http_json = HttpJson { resources: vec![] };
+
+    let mut named_maps: BTreeMap<TextConstant, MapKey> = Default::default();
+
+    if let Some(map_namespace) = map_namespace {
+        // Register named maps in the user-specified order (using the IndexMap from the namespace)
+        for name in map_namespace.keys() {
+            let name_constant = serde_gen.str_ctx.intern_constant(name);
+
+            if let Some(map_key) = code_ctx
+                .result_named_downmaps
+                .get(&(domain_index, name_constant))
+            {
+                named_maps.insert(name_constant, *map_key);
+            }
+        }
+    }
 
     for def in domain.defs() {
         match &def.kind {
@@ -60,14 +84,15 @@ pub fn generate_httpjson_interface(
                     });
                 }
 
-                http_json.resources.push(HttpResource {
+                http_json.resources.push(HttpResource::Def(HttpDefResource {
                     def_id: def.id,
                     name: entity.ident,
                     operator_addr: addr,
+                    get: make_map_get_resource(entity.ident, &mut named_maps, serde_gen),
                     put: Some(Endpoint {}),
                     post: Some(Endpoint {}),
                     keyed,
-                });
+                }));
             }
             DefKind::Data(_) => {
                 let Some(ident) = def.ident() else {
@@ -81,21 +106,55 @@ pub fn generate_httpjson_interface(
                         continue;
                     };
 
-                    http_json.resources.push(HttpResource {
+                    http_json.resources.push(HttpResource::Def(HttpDefResource {
                         def_id: def.id,
                         name: ident,
                         operator_addr: addr,
+                        get: make_map_get_resource(ident, &mut named_maps, serde_gen),
                         put: Some(Endpoint {}),
                         post: None,
                         keyed: vec![],
-                    });
+                    }));
                 }
             }
             _ => {}
         }
     }
 
+    for ident in named_maps.keys().copied().collect::<Vec<_>>() {
+        if let Some(list_resource) = make_map_get_resource(ident, &mut named_maps, serde_gen) {
+            http_json
+                .resources
+                .push(HttpResource::MapGet(list_resource));
+        }
+    }
+
     Some(http_json)
+}
+
+fn make_map_get_resource(
+    ident: TextConstant,
+    named_maps: &mut BTreeMap<TextConstant, MapKey>,
+    serde_gen: &mut SerdeGenerator,
+) -> Option<HttpMapGetResource> {
+    let map_key = named_maps.remove(&ident)?;
+
+    let mut serde_modifier = SerdeModifier::json_default();
+
+    if map_key.output.flags.contains(MapDefFlags::SEQUENCE) {
+        serde_modifier = serde_modifier.union(SerdeModifier::LIST);
+    }
+
+    let addr = serde_gen.gen_addr_greedy(SerdeKey::Def(SerdeDef::new(
+        map_key.output.def_id,
+        SerdeModifier::json_default().union(serde_modifier),
+    )))?;
+
+    Some(HttpMapGetResource {
+        name: ident,
+        output_operator_addr: addr,
+        map_key,
+    })
 }
 
 fn is_entity_union(def_id: DefId, serde_gen: &SerdeGenerator) -> bool {

@@ -161,6 +161,17 @@ async fn test_workspaces_rest_api_with_edit(ds: &str) {
             "updated_at": "1974-01-01T00:00:00Z",
         })
     );
+
+    info!("list most recent workspaces");
+
+    expect_eq!(
+        actual = list_most_recent_workspaces(port).await,
+        expected = json!([{
+            "id": workspace_id,
+            "created_at": "1971-01-01T00:00:00Z",
+            "updated_at": "1974-01-01T00:00:00Z",
+        }])
+    );
 }
 
 /// This test runs with a real webserver because of the websockets,
@@ -304,6 +315,17 @@ async fn http_get_workspace_entity(workspace_id: &str, port: u16) -> serde_json:
         .get(format!(
             "http://localhost:{port}/Workspace/id/{workspace_id}"
         ))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap()
+}
+
+async fn list_most_recent_workspaces(port: u16) -> serde_json::Value {
+    reqwest::Client::new()
+        .get(format!("http://localhost:{port}/listMostRecentWorkspaces"))
         .send()
         .await
         .unwrap()

@@ -5,6 +5,7 @@ use std::{convert::Infallible, sync::Arc};
 use axum::{
     body::Body,
     extract::{FromRequest, FromRequestParts, OriginalUri},
+    handler::Handler,
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post, MethodFilter, MethodRouter},
@@ -23,14 +24,15 @@ use domain_engine_core::{
     domain_error::DomainErrorKind,
     domain_select::domain_select_no_edges,
     transact::{AccumulateSequences, ReqMessage, TransactionMode},
-    CrdtActor, DomainEngine, DomainError, Session,
+    CrdtActor, DomainEngine, DomainError, FindEntitySelect, SelectMode, Session,
 };
 use futures_util::{stream::StreamExt, TryStreamExt};
 use http::{header, HeaderValue, Uri};
 use http_error::{json_error, HttpJsonError};
 use ontol_runtime::{
-    attr::{Attr, AttrRef},
+    attr::{Attr, AttrMatrix, AttrRef},
     interface::{
+        http_json::{HttpDefResource, HttpMapGetResource, HttpResource},
         serde::{
             operator::SerdeOperatorAddr,
             processor::{ProcessorMode, SerdeProcessor},
@@ -45,7 +47,7 @@ use ontol_runtime::{
     },
     sequence::Sequence,
     value::Value,
-    DefId, DomainIndex, PropId,
+    DefId, DomainIndex, MapKey, PropId,
 };
 use serde::{
     de::{value::StringDeserializer, DeserializeSeed},
@@ -69,6 +71,13 @@ struct UnkeyedEndpoint {
     engine: Arc<DomainEngine>,
     operator_addr: SerdeOperatorAddr,
     keyed_name: Option<TextConstant>,
+}
+
+#[derive(Clone)]
+struct UnkeyedMapGetEndpoint {
+    engine: Arc<DomainEngine>,
+    output_operator_addr: SerdeOperatorAddr,
+    map_key: MapKey,
 }
 
 #[derive(Clone)]
@@ -110,96 +119,156 @@ impl DomainRouterBuilder {
             .next()?;
 
         let mut domain_router: axum::Router<State> = axum::Router::new();
-        let ontology = engine.ontology();
 
         for resource in &httpjson.resources {
-            let mut method_router: MethodRouter<State, Infallible> = MethodRouter::default();
-
-            if resource.post.is_some() {
-                method_router =
-                    method_router.on(MethodFilter::POST, post_resource_unkeyed::<State, Auth>);
-            }
-
-            if resource.put.is_some() {
-                method_router =
-                    method_router.on(MethodFilter::PUT, put_resource_unkeyed::<State, Auth>);
-            }
-
-            let route_name = format!("/{resource}", resource = &ontology[resource.name]);
-            debug!("add route `{route_name}`");
-
-            domain_router = domain_router.route(
-                &route_name,
-                method_router.layer(Extension(UnkeyedEndpoint {
-                    engine: engine.clone(),
-                    operator_addr: resource.operator_addr,
-                    keyed_name: resource.keyed.iter().map(|keyed| keyed.key_name).next(),
-                })),
-            );
-
-            for keyed in &resource.keyed {
-                let resource_name = &ontology[resource.name];
-                let key_name = &ontology[keyed.key_name];
-
-                let mut method_router: MethodRouter<State, Infallible> = MethodRouter::default();
-
-                if keyed.get.is_some() {
-                    method_router =
-                        method_router.on(MethodFilter::GET, get_resource_keyed::<State, Auth>);
+            match resource {
+                HttpResource::Def(resource) => {
+                    domain_router =
+                        self.add_def_endpoint::<State, Auth>(resource, domain_router, &engine);
                 }
+                HttpResource::MapGet(resource) => {
+                    let route_name =
+                        format!("/{resource}", resource = &engine.ontology()[resource.name]);
 
-                let route_name = format!("/{resource_name}/{key_name}/:{key_name}");
-
-                debug!("add route `{route_name}`");
-
-                domain_router = domain_router.route(
-                    &route_name,
-                    method_router.layer(Extension(KeyedEndpoint {
-                        engine: engine.clone(),
-                        resource_def_id: resource.def_id,
-                        key_operator_addr: keyed.key_operator_addr,
-                        key_prop_id: keyed.key_prop_id,
-                        operator_addr: resource.operator_addr,
-                    })),
-                );
-
-                for (crdt_prop_id, prop_name) in &keyed.crdts {
-                    let prop_name = &ontology[*prop_name];
-
-                    let sync_route_name =
-                        format!("/{resource_name}/{key_name}/:{key_name}/{prop_name}");
-                    debug!("add route `{sync_route_name}`");
-                    domain_router = domain_router.route(
-                        &sync_route_name,
-                        get(get_crdt_broker_ws::<State, Auth>).layer(Extension(
-                            CrdtBrokerEndpoint {
-                                doc_repository: DocRepository::from(engine.clone()),
-                                broker_manager: self.broker_manager.clone(),
-                                resource_def_id: resource.def_id,
-                                key_operator_addr: keyed.key_operator_addr,
-                                crdt_prop_id: *crdt_prop_id,
-                            },
-                        )),
+                    let method_router = self.add_mapped_get_method_route::<State, Auth>(
+                        resource,
+                        MethodRouter::default(),
+                        &engine,
                     );
 
-                    let actor_route_name =
-                        format!("/{resource_name}/{key_name}/:{key_name}/{prop_name}/actor");
-                    debug!("add route `{actor_route_name}`");
-                    domain_router = domain_router.route(
-                        &actor_route_name,
-                        post(post_crdt_actor::<State, Auth>).layer(Extension(CrdtBrokerEndpoint {
-                            doc_repository: DocRepository::from(engine.clone()),
-                            broker_manager: self.broker_manager.clone(),
-                            resource_def_id: resource.def_id,
-                            key_operator_addr: keyed.key_operator_addr,
-                            crdt_prop_id: *crdt_prop_id,
-                        })),
-                    );
+                    debug!("add route `{route_name}`");
+                    domain_router = domain_router.route(&route_name, method_router);
                 }
             }
         }
 
         Some(domain_router)
+    }
+
+    fn add_def_endpoint<State, Auth>(
+        &self,
+        resource: &HttpDefResource,
+        mut domain_router: axum::Router<State>,
+        engine: &Arc<DomainEngine>,
+    ) -> axum::Router<State>
+    where
+        State: Send + Sync + Clone + 'static,
+        Auth: FromRequestParts<State> + Send + Into<Session> + 'static,
+    {
+        let ontology = engine.ontology();
+
+        let mut method_router: MethodRouter<State, Infallible> = MethodRouter::default();
+
+        if let Some(map_get_resource) = &resource.get {
+            method_router = self.add_mapped_get_method_route::<State, Auth>(
+                map_get_resource,
+                method_router,
+                engine,
+            );
+        }
+
+        if resource.post.is_some() {
+            method_router =
+                method_router.on(MethodFilter::POST, post_resource_unkeyed::<State, Auth>);
+        }
+
+        if resource.put.is_some() {
+            method_router =
+                method_router.on(MethodFilter::PUT, put_resource_unkeyed::<State, Auth>);
+        }
+
+        let route_name = format!("/{resource}", resource = &ontology[resource.name]);
+        debug!("add route `{route_name}`");
+
+        domain_router = domain_router.route(
+            &route_name,
+            method_router.layer(Extension(UnkeyedEndpoint {
+                engine: engine.clone(),
+                operator_addr: resource.operator_addr,
+                keyed_name: resource.keyed.iter().map(|keyed| keyed.key_name).next(),
+            })),
+        );
+
+        for keyed in &resource.keyed {
+            let resource_name = &ontology[resource.name];
+            let key_name = &ontology[keyed.key_name];
+
+            let mut method_router: MethodRouter<State, Infallible> = MethodRouter::default();
+
+            if keyed.get.is_some() {
+                method_router =
+                    method_router.on(MethodFilter::GET, get_resource_keyed::<State, Auth>);
+            }
+
+            let route_name = format!("/{resource_name}/{key_name}/:{key_name}");
+
+            debug!("add route `{route_name}`");
+
+            domain_router = domain_router.route(
+                &route_name,
+                method_router.layer(Extension(KeyedEndpoint {
+                    engine: engine.clone(),
+                    resource_def_id: resource.def_id,
+                    key_operator_addr: keyed.key_operator_addr,
+                    key_prop_id: keyed.key_prop_id,
+                    operator_addr: resource.operator_addr,
+                })),
+            );
+
+            for (crdt_prop_id, prop_name) in &keyed.crdts {
+                let prop_name = &ontology[*prop_name];
+
+                let sync_route_name =
+                    format!("/{resource_name}/{key_name}/:{key_name}/{prop_name}");
+                debug!("add route `{sync_route_name}`");
+                domain_router = domain_router.route(
+                    &sync_route_name,
+                    get(get_crdt_broker_ws::<State, Auth>).layer(Extension(CrdtBrokerEndpoint {
+                        doc_repository: DocRepository::from(engine.clone()),
+                        broker_manager: self.broker_manager.clone(),
+                        resource_def_id: resource.def_id,
+                        key_operator_addr: keyed.key_operator_addr,
+                        crdt_prop_id: *crdt_prop_id,
+                    })),
+                );
+
+                let actor_route_name =
+                    format!("/{resource_name}/{key_name}/:{key_name}/{prop_name}/actor");
+                debug!("add route `{actor_route_name}`");
+                domain_router = domain_router.route(
+                    &actor_route_name,
+                    post(post_crdt_actor::<State, Auth>).layer(Extension(CrdtBrokerEndpoint {
+                        doc_repository: DocRepository::from(engine.clone()),
+                        broker_manager: self.broker_manager.clone(),
+                        resource_def_id: resource.def_id,
+                        key_operator_addr: keyed.key_operator_addr,
+                        crdt_prop_id: *crdt_prop_id,
+                    })),
+                );
+            }
+        }
+
+        domain_router
+    }
+
+    fn add_mapped_get_method_route<State, Auth>(
+        &self,
+        resource: &HttpMapGetResource,
+        method_router: MethodRouter<State, Infallible>,
+        engine: &Arc<DomainEngine>,
+    ) -> MethodRouter<State, Infallible>
+    where
+        State: Send + Sync + Clone + 'static,
+        Auth: FromRequestParts<State> + Send + Into<Session> + 'static,
+    {
+        method_router.on(
+            MethodFilter::GET,
+            get_resource_mapped::<State, Auth>.layer(Extension(UnkeyedMapGetEndpoint {
+                engine: engine.clone(),
+                output_operator_addr: resource.output_operator_addr,
+                map_key: resource.map_key,
+            })),
+        )
     }
 }
 
@@ -380,6 +449,90 @@ where
         .new_serde_processor(endpoint.operator_addr, ProcessorMode::Read)
         .serialize_attr(
             AttrRef::Unit(&value),
+            &mut serde_json::Serializer::new(&mut json_bytes),
+        )
+        .map_err(|err| DomainErrorKind::Interface(format!("{err}")).into_error())?;
+
+    Ok((
+        [(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static(mime::APPLICATION_JSON.as_ref()),
+        )],
+        json_bytes.into_inner().freeze(),
+    )
+        .into_response())
+}
+
+///
+/// GET /resource
+///
+async fn get_resource_mapped<State, Auth>(
+    Extension(endpoint): Extension<UnkeyedMapGetEndpoint>,
+    auth: Auth,
+) -> Result<axum::response::Response, HttpJsonError>
+where
+    State: Send + Sync + Clone + 'static,
+    Auth: FromRequestParts<State> + Into<Session> + 'static,
+{
+    let engine = endpoint.engine;
+    let ontology = engine.ontology();
+
+    let session: Session = auth.into();
+    let struct_select =
+        match domain_select_no_edges(endpoint.map_key.output.def_id, ontology.as_ref()) {
+            Select::Struct(struct_select) => struct_select,
+            _ => {
+                error!("must be struct select");
+                return Ok(StatusCode::INTERNAL_SERVER_ERROR.into_response());
+            }
+        };
+    let entity_select = EntitySelect {
+        source: StructOrUnionSelect::Struct(struct_select),
+        filter: Filter::default_for_domain(),
+        limit: Some(engine.system().default_query_limit()),
+        after_cursor: None,
+        include_total_len: false,
+    };
+
+    struct SelectProvider(Option<EntitySelect>);
+
+    impl FindEntitySelect for SelectProvider {
+        fn find_select(
+            &mut self,
+            _match_var: ontol_runtime::var::Var,
+            _condition: &ontol_runtime::query::condition::Condition,
+        ) -> domain_engine_core::SelectMode {
+            self.0.take().map(SelectMode::Dynamic).unwrap()
+        }
+    }
+
+    let mut select_provider = SelectProvider(Some(entity_select));
+
+    let output = engine
+        .exec_map(
+            endpoint.map_key,
+            Value::unit(),
+            &mut select_provider,
+            session,
+        )
+        .await?;
+
+    let mut json_bytes = BytesMut::with_capacity(128).writer();
+
+    let output_attr = match output {
+        Value::Sequence(sequence, _) => {
+            let matrix = AttrMatrix {
+                columns: [sequence].into_iter().collect(),
+            };
+            Attr::Matrix(matrix)
+        }
+        other => Attr::Unit(other),
+    };
+
+    ontology
+        .new_serde_processor(endpoint.output_operator_addr, ProcessorMode::Read)
+        .serialize_attr(
+            output_attr.as_ref(),
             &mut serde_json::Serializer::new(&mut json_bytes),
         )
         .map_err(|err| DomainErrorKind::Interface(format!("{err}")).into_error())?;

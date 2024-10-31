@@ -11,6 +11,11 @@ def Workspace (
 
     rel* 'created_at'[rel* gen: create_time]: datetime
     rel* 'updated_at'[rel* gen: update_time]: datetime
+
+    rel* order[
+        rel* 0: 'updated_at'
+        rel* direction: descending
+    ]: latest_update
 )
 
 /// The data making up a workspace.
@@ -31,4 +36,28 @@ def File (
 
     /// the contents of the file
     rel* 'contents': text
+)
+
+/// A listing of a workspace without the data
+def WorkspaceListing (
+    rel* 'id': ulid
+    rel* 'created_at': datetime
+    rel* 'updated_at': datetime
+)
+
+/// Symbols for named orderings
+sym { latest_update }
+
+map(
+    WorkspaceListing('id': id, 'created_at': ca, 'updated_at': ua),
+    @match Workspace('id': id, 'created_at': ca, 'updated_at': ua),
+)
+
+map listMostRecentWorkspaces(
+    (),
+    WorkspaceListing {
+        ..@match Workspace(
+            order: { latest_update() }
+        )
+    }
 )
