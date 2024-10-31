@@ -27,9 +27,8 @@ use super::{
     MutationMode, TransactCtx,
 };
 
-enum UpdateCondition {
+pub enum UpdateCondition {
     FieldEq(PropId, Value),
-    #[expect(unused)]
     PgKey(PgDataKey),
 }
 
@@ -96,7 +95,7 @@ impl<'a> TransactCtx<'a> {
         Ok(row.value)
     }
 
-    async fn update_datatable<'s>(
+    pub async fn update_datatable<'s>(
         &'s self,
         value: InDomain<Value>,
         update_condition: UpdateCondition,

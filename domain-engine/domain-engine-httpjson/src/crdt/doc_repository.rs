@@ -100,7 +100,7 @@ impl DocRepository {
             .get_data_store()?
             .api()
             .transact(
-                TransactionMode::ReadWrite,
+                TransactionMode::ReadWriteAtomic,
                 futures_util::stream::iter([Ok(ReqMessage::CrdtSaveIncremental(
                     resource_def_id,
                     doc_addr.0.iter().copied().collect(),

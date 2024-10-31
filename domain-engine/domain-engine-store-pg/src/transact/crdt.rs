@@ -1,15 +1,15 @@
 use domain_engine_core::{DomainResult, VertexAddr};
-use ontol_runtime::{crdt::Automerge, DomainIndex, PropId};
+use ontol_runtime::{crdt::Automerge, value::Value, DomainIndex, PropId};
 use thin_vec::ThinVec;
 use tracing::debug;
 
 use crate::{
     pg_error::PgError,
-    pg_model::{PgDataKey, PgDomain, PgRegKey},
+    pg_model::{InDomain, PgDataKey, PgDomain, PgRegKey},
     sql::{self, Expr},
 };
 
-use super::{data::ParentProp, mut_ctx::PgMutCtx, TransactCtx};
+use super::{data::ParentProp, mut_ctx::PgMutCtx, update::UpdateCondition, TransactCtx};
 
 impl<'a> TransactCtx<'a> {
     pub async fn insert_initial_automerge_crdt(
@@ -44,7 +44,10 @@ impl<'a> TransactCtx<'a> {
         vertex_addr: VertexAddr,
         prop_id: PropId,
         payload: Vec<u8>,
+        mut_ctx: &mut PgMutCtx,
     ) -> DomainResult<()> {
+        let timestamp = self.system.current_time();
+
         if payload.is_empty() {
             return Ok(());
         }
@@ -59,6 +62,17 @@ impl<'a> TransactCtx<'a> {
             data_key,
             "incremental",
             &payload,
+        )
+        .await?;
+
+        self.update_datatable(
+            InDomain {
+                domain_index,
+                value: Value::new_struct([], prop_id.0.into()),
+            },
+            UpdateCondition::PgKey(data_key),
+            timestamp,
+            mut_ctx,
         )
         .await?;
 

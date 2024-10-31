@@ -51,6 +51,12 @@ pub struct DefsAspect {
     pub(crate) text_patterns: FnvHashMap<DefId, TextPattern>,
 }
 
+impl AsRef<DefsAspect> for DefsAspect {
+    fn as_ref(&self) -> &DefsAspect {
+        self
+    }
+}
+
 impl DefsAspect {
     pub fn domain_by_index(&self, index: DomainIndex) -> Option<&Domain> {
         self.domains.get(&index)

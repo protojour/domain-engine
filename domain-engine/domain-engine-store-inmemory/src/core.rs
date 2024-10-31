@@ -6,10 +6,12 @@ use itertools::Itertools;
 use ontol_runtime::{
     attr::Attr,
     crdt::CrdtStruct,
+    interface::serde::processor::ProcessorMode,
     ontology::{
         aspects::{DefsAspect, SerdeAspect},
         domain::{DataRelationshipInfo, Def},
     },
+    query::select::Select,
     tuple::CardinalIdx,
     value::{Serial, Value},
     DefId, OntolDefTag, PropId,
@@ -20,8 +22,8 @@ use thin_vec::ThinVec;
 use tracing::{debug, warn};
 
 use domain_engine_core::{
-    domain_error::DomainErrorKind, system::SystemAPI, transact::WriteStatsBuilder, DomainError,
-    DomainResult, VertexAddr,
+    domain_error::DomainErrorKind, make_storable::MakeStorable, system::SystemAPI,
+    transact::WriteStatsBuilder, DomainError, DomainResult, VertexAddr,
 };
 
 use crate::constraint::ConstraintCheck;
@@ -269,7 +271,30 @@ impl InMemoryStore {
         vertex_addr: VertexAddr,
         prop_id: PropId,
         payload: Vec<u8>,
+        ctx: &mut DbContext,
     ) -> DomainResult<()> {
+        {
+            // hack: update update_time if it exists
+            // this is an ugly way to do it, because inmemory doesn't have update_time for all vertices
+            let vertex_key = postcard::from_bytes::<VertexKey<DynamicKey>>(&vertex_addr)
+                .map_err(|_| DomainErrorKind::BadInputData("invalid vertex addr".to_string()))?;
+
+            let def = ctx.ontology_defs.def(vertex_key.type_def_id);
+            if let (Some(vertex), Some(entity)) = (
+                self.look_up_vertex(vertex_key.type_def_id, &vertex_key.dynamic_key),
+                def.entity(),
+            ) {
+                if let Some(id) = vertex.get(&entity.id_prop).cloned() {
+                    let mut update_vertex =
+                        Value::new_struct([(entity.id_prop, id)], vertex_key.type_def_id.into());
+                    MakeStorable::new(ProcessorMode::Update, ctx.ontology_defs, ctx.system)
+                        .make_storable(&mut update_vertex)?;
+
+                    self.update_entity(update_vertex, &Select::EntityId, ctx)?;
+                }
+            }
+        }
+
         let Some(crdt_struct) = self.get_crdt_mut(vertex_addr, prop_id)? else {
             return Err(DomainError::data_store("crdt does not exist"));
         };

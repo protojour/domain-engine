@@ -280,7 +280,7 @@ pub async fn transact(
                     yield RespMessage::SequenceEnd(0, None);
                 },
                 ReqMessage::CrdtSaveIncremental(_def_id, vertex_addr, prop_id, payload) => {
-                    ctx.save_crdt_incremental(vertex_addr, prop_id,  payload).await?;
+                    ctx.save_crdt_incremental(vertex_addr, prop_id,  payload, &mut mut_ctx).await?;
                     yield RespMessage::SequenceStart(0);
                     yield RespMessage::SequenceEnd(0, None);
                 },

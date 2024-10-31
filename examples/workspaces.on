@@ -8,11 +8,15 @@ def Workspace (
 
     /// The conflict-free replicated representation of the workspace data
     rel* 'data'[rel* repr: crdt]: WorkspaceData
+
+    rel* 'created_at'[rel* gen: create_time]: datetime
+    rel* 'updated_at'[rel* gen: update_time]: datetime
 )
 
 /// The data making up a workspace.
 def WorkspaceData (
     /// The title of the workspace
+    /// NOTE: Deprecated. Do not delete it (yet), since subsequent props will change ID, need a solution for that.
     rel* 'title': text
 
     /// The files that workspace contains

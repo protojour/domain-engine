@@ -87,7 +87,9 @@ async fn test_workspaces_rest_api_with_edit(ds: &str) {
                         "contents": "# Extremely interesting"
                     }
                 ]
-            }
+            },
+            "created_at": "1971-01-01T00:00:00Z",
+            "updated_at": "1971-01-01T00:00:00Z",
         })
     );
 
@@ -154,7 +156,9 @@ async fn test_workspaces_rest_api_with_edit(ds: &str) {
                         "contents": "# Extremely interesting"
                     }
                 ]
-            }
+            },
+            "created_at": "1971-01-01T00:00:00Z",
+            "updated_at": "1974-01-01T00:00:00Z",
         })
     );
 }
@@ -264,7 +268,9 @@ async fn test_workspace_sync(ds: &str) {
                         "contents": "# Extremely interesting"
                     }
                 ]
-            }
+            },
+            "created_at": "1971-01-01T00:00:00Z",
+            "updated_at": "1974-01-01T00:00:00Z",
         })
     );
 }

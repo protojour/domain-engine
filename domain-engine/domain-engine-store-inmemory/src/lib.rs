@@ -284,7 +284,7 @@ impl InMemoryDb {
                         yield RespMessage::SequenceEnd(0, None);
                     },
                     ReqMessage::CrdtSaveIncremental(_def_id, vertex_addr, prop_id, payload) => {
-                        self.store.write().await.crdt_save_incremental(vertex_addr, prop_id, payload)?;
+                        self.store.write().await.crdt_save_incremental(vertex_addr, prop_id, payload, &mut ctx)?;
                         yield RespMessage::SequenceStart(0);
                         yield RespMessage::SequenceEnd(0, None);
                     },
