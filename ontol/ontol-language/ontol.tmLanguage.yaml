@@ -61,7 +61,7 @@ patterns:
 
   - comment: ontol defs
     name: storage.type.ontol
-    match: \b(boolean|number|integer|i64|float|f32|f64|serial|text|uuid|datetime)\b
+    match: \b(boolean|number|integer|i64|float|f32|f64|octets|hex|base64|serial|text|uuid|ulid|datetime|vertex)\b
 
   - comment: ontol constants
     name: constant.language.ontol
@@ -69,11 +69,11 @@ patterns:
 
   - comment: ontol relation types
     name: variable.function.ontol
-    match: \b(is|id|min|max|gen|default|example)\b
+    match: \b(is|id|min|max|gen|repr|format|default|example|store_key|order|direction)\b
 
   - comment: ontol generator types
     name: entity.name.function.ontol
-    match: \b(auto|create_time|update_time)\b
+    match: \b(auto|create_time|update_time|crdt)\b
 
   - comment: domain id literal
     name: constant.numeric.ulid.ontol

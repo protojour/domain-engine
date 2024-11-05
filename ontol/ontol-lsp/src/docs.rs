@@ -117,7 +117,7 @@ impl State {
 }
 
 /// A list of Completions and their Kind
-pub const COMPLETIONS: [(&str, CompletionItemKind); 47] = [
+pub const COMPLETIONS: [(&str, CompletionItemKind); 53] = [
     ("domain", CompletionItemKind::KEYWORD),
     ("def", CompletionItemKind::KEYWORD),
     ("sym", CompletionItemKind::KEYWORD),
@@ -132,9 +132,15 @@ pub const COMPLETIONS: [(&str, CompletionItemKind); 47] = [
     ("min", CompletionItemKind::PROPERTY),
     ("max", CompletionItemKind::PROPERTY),
     ("gen", CompletionItemKind::PROPERTY),
+    ("repr", CompletionItemKind::PROPERTY),
     ("default", CompletionItemKind::PROPERTY),
     ("example", CompletionItemKind::PROPERTY),
+    ("store_key", CompletionItemKind::PROPERTY),
+    ("order", CompletionItemKind::PROPERTY),
+    ("direction", CompletionItemKind::PROPERTY),
+    ("format", CompletionItemKind::PROPERTY),
     ("auto", CompletionItemKind::FUNCTION),
+    ("crdt", CompletionItemKind::FUNCTION),
     ("create_time", CompletionItemKind::FUNCTION),
     ("update_time", CompletionItemKind::FUNCTION),
     ("ontol", CompletionItemKind::MODULE),
@@ -151,9 +157,9 @@ pub const COMPLETIONS: [(&str, CompletionItemKind); 47] = [
     ("uuid", CompletionItemKind::UNIT),
     ("ulid", CompletionItemKind::UNIT),
     ("datetime", CompletionItemKind::UNIT),
-    ("format", CompletionItemKind::FUNCTION),
     ("hex", CompletionItemKind::UNIT),
     ("base64", CompletionItemKind::UNIT),
+    ("vertex", CompletionItemKind::UNIT),
     ("true", CompletionItemKind::CONSTANT),
     ("false", CompletionItemKind::CONSTANT),
     ("@private", CompletionItemKind::TYPE_PARAMETER),

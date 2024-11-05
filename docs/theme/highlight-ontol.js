@@ -1,10 +1,10 @@
 hljs.registerLanguage("ontol", (hljs) => ({
   name: "ONTOL",
   keywords: {
-    keyword: "def fmt map rel use as",
-    rels: "is id min max gen default example",
+    keyword: "domain def sym fmt map rel arc use as",
+    rels: "is id min max gen repr format default example store_key order direction",
     built_in: "auto create_time update_time",
-    type: "boolean number integer i64 float f32 f64 serial text uuid datetime",
+    type: "boolean number integer i64 float f32 f64 octets hex base64 serial text uuid ulid datetime crdt vertex",
     literal: "true false",
     $pattern: /@?\w+|[.,?+*/=<>-]+|[:|]/,
     punctuation: ". , - + : :: * / := =",
