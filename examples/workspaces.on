@@ -48,9 +48,9 @@ def File (
 /// A listing of a workspace without the data
 def WorkspaceListing (
     rel* 'id': ulid
-    rel* 'title'?: text
     rel* 'created_at': datetime
     rel* 'updated_at': datetime
+    rel* 'title'?: text
 )
 
 /// Symbols for named orderings
