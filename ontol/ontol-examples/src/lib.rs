@@ -233,49 +233,98 @@ impl AsAtlas for Vec<Example> {
 
 /// A "resolver" that can resolve Atlas URLs to example files
 pub struct FakeAtlasServer {
-    sources: Vec<(DomainUrl, &'static str)>,
+    domains: Vec<AtlasDomain>,
+}
+
+pub enum Visibility {
+    /// The domain is an entrypoint in a package
+    Entrypoint,
+    /// The domain is private within a package
+    Private,
+}
+
+pub struct AtlasDomain {
+    pub url: DomainUrl,
+    /// Visibility within a package of domains that shares a common URL prefix
+    pub visibility: Visibility,
+    pub src: &'static str,
 }
 
 impl FakeAtlasServer {
     pub fn lookup(&self, url: &DomainUrl) -> Option<&'static str> {
-        self.sources.iter().find_map(
-            |(atlas_url, src)| {
-                if atlas_url == url {
-                    Some(*src)
-                } else {
-                    None
-                }
-            },
-        )
+        self.domains
+            .iter()
+            .find_map(|dom| if &dom.url == url { Some(dom.src) } else { None })
+    }
+
+    pub fn list(&self) -> impl Iterator<Item = &AtlasDomain> + use<'_> {
+        self.domains.iter()
     }
 }
 
 impl Default for FakeAtlasServer {
     fn default() -> Self {
-        let mut sources = vec![];
+        let mut domains = vec![];
 
-        add_atlas("geojson", geojson(), &mut sources);
-        add_atlas("wgs", wgs(), &mut sources);
-        add_atlas("SI", si(), &mut sources);
-        add_atlas("filemeta", filemeta(), &mut sources);
-        add_atlas("findings", findings(), &mut sources);
+        add_atlas("geojson", geojson(), Visibility::Entrypoint, &mut domains);
+        add_atlas("wgs", wgs(), Visibility::Entrypoint, &mut domains);
+        add_atlas("SI", si(), Visibility::Entrypoint, &mut domains);
+        add_atlas("filemeta", filemeta(), Visibility::Entrypoint, &mut domains);
+        add_atlas("findings", findings(), Visibility::Entrypoint, &mut domains);
 
-        for example in stix_bundle() {
-            add_atlas("stix", example, &mut sources);
+        for (index, example) in stix_bundle().iter().cloned().enumerate() {
+            let visibility = if index == 0 {
+                Visibility::Entrypoint
+            } else {
+                Visibility::Private
+            };
+            add_atlas("stix", example, visibility, &mut domains);
         }
 
-        add_atlas("conduit", conduit_db(), &mut sources);
-        add_atlas("conduit", blog_post_public(), &mut sources);
-        add_atlas("gitmesh", gitmesh(), &mut sources);
-        add_atlas("workspaces", workspaces(), &mut sources);
+        add_atlas(
+            "conduit",
+            conduit_db(),
+            Visibility::Entrypoint,
+            &mut domains,
+        );
+        add_atlas(
+            "conduit",
+            blog_post_public(),
+            Visibility::Entrypoint,
+            &mut domains,
+        );
+        add_atlas("gitmesh", gitmesh(), Visibility::Entrypoint, &mut domains);
+        add_atlas(
+            "workspaces",
+            workspaces(),
+            Visibility::Entrypoint,
+            &mut domains,
+        );
 
-        Self { sources }
+        Self { domains }
     }
 }
 
-fn add_atlas(bundle_name: &str, example: Example, sources: &mut Vec<(DomainUrl, &'static str)>) {
+fn add_atlas(
+    bundle_name: &str,
+    example: Example,
+    visibility: Visibility,
+    domains: &mut Vec<AtlasDomain>,
+) {
     let (atlas_url, src) = example.as_atlas(bundle_name);
-    if !sources.iter().any(|(url, _)| url == &atlas_url) {
-        sources.push((atlas_url, src));
+    if !domains.iter().any(|dom| dom.url == atlas_url) {
+        domains.push(AtlasDomain {
+            url: atlas_url.clone(),
+            visibility: Visibility::Private,
+            src,
+        });
+    }
+
+    if matches!(visibility, Visibility::Entrypoint) {
+        domains
+            .iter_mut()
+            .find(|dom| dom.url == atlas_url)
+            .unwrap()
+            .visibility = Visibility::Entrypoint;
     }
 }
