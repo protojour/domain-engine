@@ -3,6 +3,7 @@ use std::fmt::Display;
 use base64::Engine;
 use ontol_runtime::{
     attr::{Attr, AttrRef},
+    format_utils::format_value,
     interface::serde::processor::ProcessorMode,
     ontology::domain::DefRepr,
     value::{Value, ValueFormatRaw},
@@ -127,13 +128,21 @@ pub fn write_ontol_scalar(
             put_string(gobj, TYPE, "text");
             put_string(gobj, VALUE, s);
         }
-        Value::OctetSequence(s, _) => {
-            put_string(gobj, TYPE, "octets_base64");
-            put_string(
-                gobj,
-                VALUE,
-                base64::engine::general_purpose::STANDARD.encode(&s.0),
-            );
+        ref value @ Value::OctetSequence(ref s, _) => {
+            match format_value(value, ctx.ontology()).as_str() {
+                Some(str) => {
+                    put_string(gobj, TYPE, "octets_fmt");
+                    put_string(gobj, VALUE, str);
+                }
+                None => {
+                    put_string(gobj, TYPE, "octets_base64");
+                    put_string(
+                        gobj,
+                        VALUE,
+                        base64::engine::general_purpose::STANDARD.encode(&s.0),
+                    );
+                }
+            }
         }
         value @ Value::ChronoDateTime(..) => {
             put_string(gobj, TYPE, "datetime");

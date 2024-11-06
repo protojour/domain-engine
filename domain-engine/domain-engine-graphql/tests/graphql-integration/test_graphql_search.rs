@@ -261,3 +261,109 @@ async fn test_conduit_search(ds: &str) {
         }))
     );
 }
+
+#[datastore_test(tokio::test, ignore("inmemory"))]
+async fn test_search_octets_fmt(ds: &str) {
+    let (test, schema) = "
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
+
+    def foo (
+        rel. 'id': (rel* is: uuid)
+        rel* 'f1': ulid
+        rel* 'f2': Sha256
+    )
+
+    def Sha256 (
+        rel* is: octets
+        rel* is: ontol.format.hex
+    )
+    "
+    .compile_single_schema();
+    let domain_engine = Arc::new(
+        DomainEngine::builder(test.ontology_owned())
+            .system(Box::new(MonotonicClockSystemApi::default()))
+            .build(
+                DynamicDataStoreFactory::new(ds).tantivy_index(),
+                Session::default(),
+            )
+            .await
+            .unwrap(),
+    );
+    let domain_ctx: ServiceCtx = domain_engine.clone().into();
+    let ontology_ctx = OntologyCtx::new(domain_engine.clone(), Session::default());
+    let ontology_schema = OntologySchema::new_with_scalar_value(
+        Default::default(),
+        Default::default(),
+        Default::default(),
+    );
+
+    r#"mutation {
+        foo(create: [
+            {
+                id: "341da6d9-981f-44ba-9cac-823376a7dd13",
+                f1: "01BX5ZZKBKACTAV9WEVGEMMVRZ",
+                f2: "0123456789abcdef"
+            },
+        ]) {
+            node { id }
+        }
+    }"#
+    .exec([], &schema, &domain_ctx)
+    .await
+    .unwrap();
+
+    info!("awaiting index change..");
+    await_search_indexer_queue_empty(&domain_engine).await;
+
+    info!("search without query");
+    expect_eq!(
+        actual = r"{
+            vertexSearch(
+                limit: 10
+                withAddress: false
+                withDefId: false
+                withAttrs: true
+            ) {
+                results {
+                    vertex
+                    score
+                }
+            }
+        }"
+        .exec([], &ontology_schema, &ontology_ctx)
+        .await,
+        expected = Ok(graphql_value!({
+            "vertexSearch": {
+                "results": [
+                    {
+                        "score": 1.0,
+                        "vertex": {
+                            "type": "struct",
+                            "update_time": "1971-01-01T00:00:00Z",
+                            "attrs": [
+                                {
+                                    "propId": "p@1:1:0",
+                                    "attr": "unit",
+                                    "type": "octets_fmt",
+                                    "value": "341da6d9-981f-44ba-9cac-823376a7dd13"
+                                },
+                                {
+                                    "propId": "p@1:1:1",
+                                    "attr": "unit",
+                                    "type": "octets_fmt",
+                                    "value": "01BX5ZZKBKACTAV9WEVGEMMVRZ"
+                                },
+                                {
+                                    "propId": "p@1:1:2",
+                                    "attr": "unit",
+                                    "type": "octets_fmt",
+                                    "value": "0123456789abcdef"
+                                }
+                            ]
+                        },
+                    }
+                ]
+            }
+        }))
+    );
+}

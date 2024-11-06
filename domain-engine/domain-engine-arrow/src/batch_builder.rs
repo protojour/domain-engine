@@ -192,7 +192,10 @@ fn push_attr(
         FieldType::Text => {
             let b = builder.downcast_builder::<StringBuilder>()?;
             match attr {
-                Some(Attr::Unit(value)) => b.append_value(format_value(&value, ontology)),
+                Some(Attr::Unit(value)) => match format_value(&value, ontology).as_str() {
+                    Some(str) => b.append_value(str),
+                    None => b.append_null(),
+                },
                 _ => {
                     b.append_null();
                 }

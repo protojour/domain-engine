@@ -1,7 +1,4 @@
-use std::{
-    borrow::Cow,
-    fmt::{Debug, Display},
-};
+use std::fmt::{Debug, Display};
 
 use crate::{
     attr::AttrRef,
@@ -183,6 +180,35 @@ impl<'a> Debug for Literal<'a> {
     }
 }
 
+pub enum FormattedValue<'v> {
+    Str(&'v str),
+    String(String),
+    JsonFallback(String),
+    JsonError(serde_json::Error),
+}
+
+impl<'v> FormattedValue<'v> {
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            FormattedValue::Str(s) => Some(s),
+            FormattedValue::String(s) => Some(s.as_str()),
+            FormattedValue::JsonFallback(s) => Some(s.as_str()),
+            FormattedValue::JsonError(_error) => None,
+        }
+    }
+}
+
+impl<'v> Display for FormattedValue<'v> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FormattedValue::Str(s) => write!(f, "{s}"),
+            FormattedValue::String(s) => write!(f, "{s}"),
+            FormattedValue::JsonFallback(s) => write!(f, "{s}"),
+            FormattedValue::JsonError(_error) => write!(f, "N/A"),
+        }
+    }
+}
+
 /// best-effort string-formatting of a value, in accordance with domain definition.
 ///
 /// If the value has a string-based serialization, that string is returned.
@@ -190,10 +216,10 @@ impl<'a> Debug for Literal<'a> {
 pub fn format_value<'v>(
     value: &'v Value,
     ontology: &(impl AsRef<DefsAspect> + AsRef<SerdeAspect>),
-) -> Cow<'v, str> {
+) -> FormattedValue<'v> {
     if let Value::Text(text, _) = value {
         // ASSUMPTION: text values always have a transparent representation:
-        return Cow::Borrowed(text);
+        FormattedValue::Str(text)
     } else {
         let defs: &DefsAspect = ontology.as_ref();
         let def = defs.def(value.type_def_id());
@@ -208,19 +234,19 @@ pub fn format_value<'v>(
             let processor = SerdeProcessor::new(operator_addr, ProcessorMode::Read, &ctx);
 
             match processor.serialize_attr(AttrRef::Unit(value), serde_json::value::Serializer) {
-                Ok(serde_json::Value::String(string)) => Cow::Owned(string),
-                Ok(json_value) => Cow::Owned(
-                    serde_json::to_string(&json_value).unwrap_or_else(|_| "N/A".to_string()),
-                ),
+                Ok(serde_json::Value::String(string)) => FormattedValue::String(string),
+                Ok(json_value) => serde_json::to_string(&json_value)
+                    .map(FormattedValue::JsonFallback)
+                    .unwrap_or_else(FormattedValue::JsonError),
                 Err(err) => {
                     tracing::error!(
                         "failed to format_value {value:?} via serde: {err:?}, formatting as `N/A`"
                     );
-                    Cow::Borrowed("N/A")
+                    FormattedValue::JsonError(err)
                 }
             }
         } else {
-            Cow::Owned(format!(
+            FormattedValue::String(format!(
                 "{}",
                 ValueFormatRaw::new(value, value.type_def_id(), ontology.as_ref()),
             ))
