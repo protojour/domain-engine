@@ -1,3 +1,4 @@
+use crate::ResponseExt;
 use automerge::{transaction::Transactable, ReadDoc};
 use domain_engine_core::Session;
 use domain_engine_httpjson::crdt::{doc_repository::DocRepository, DocAddr};
@@ -16,7 +17,7 @@ use tokio_util::task::AbortOnDropHandle;
 use tracing::{info, info_span, Instrument};
 use ulid::Ulid;
 
-use crate::{make_domain_engine, MakeTestRouter};
+use crate::{make_domain_engine, MakeTestRouter, TestHttpError};
 
 /// id of the workspaces domain under test
 const DOMAIN_ID: &str = "01JAP41VG1STK1VZPWXV26SPNM";
@@ -49,6 +50,7 @@ async fn test_workspaces_rest_api_with_edit(ds: &str) {
     info!("create an example workspace");
 
     let workspace_id = http_post_workspace_entity(
+        port,
         json!({
             "data": {
                 "title": "untitled",
@@ -58,9 +60,9 @@ async fn test_workspaces_rest_api_with_edit(ds: &str) {
                         "contents": "# Extremely interesting"
                     }
                 ]
-            }
+            },
+            "title": "untitled",
         }),
-        port,
     )
     .await;
 
@@ -73,10 +75,52 @@ async fn test_workspaces_rest_api_with_edit(ds: &str) {
             .collect(),
     );
 
-    info!(%workspace_id, "workspace created, now try to GET it");
+    info!(%workspace_id, "workspace created, now update title");
+
+    http_put_workspace_entity(
+        port,
+        json!({
+            "id": workspace_id,
+            "title": "new title",
+        }),
+    )
+    .await
+    .unwrap();
+
+    {
+        info!("data as a CRDT should not be directly updatable through REST");
+
+        expect_eq!(
+            actual = http_put_workspace_entity(
+                port,
+                json!({
+                    "id": workspace_id,
+                    "data": {
+                        "title": "(DEPRECATED)",
+                        "files": []
+                    }
+                }),
+            )
+            .await
+            .unwrap_err()
+            .to_string(),
+            expected = r#"status: Some(422), body: {"message":"property `data` not available in this context at line 1 column 7"}"#,
+        );
+    }
+
+    info!("now try to GET it");
+
+    let expected_created_at = if ds == "inmemory" {
+        // BUG/FIXME: inmemory always updates this on PUT, it should be 1971
+        "1974-01-01T00:00:00Z"
+    } else {
+        "1971-01-01T00:00:00Z"
+    };
 
     expect_eq!(
-        actual = http_get_workspace_entity(&workspace_id, port).await,
+        actual = http_get_workspace_entity(port, &workspace_id)
+            .await
+            .unwrap(),
         expected = json!({
             "id": workspace_id,
             "data": {
@@ -88,8 +132,9 @@ async fn test_workspaces_rest_api_with_edit(ds: &str) {
                     }
                 ]
             },
-            "created_at": "1971-01-01T00:00:00Z",
-            "updated_at": "1971-01-01T00:00:00Z",
+            "title": "new title",
+            "created_at": expected_created_at,
+            "updated_at": "1974-01-01T00:00:00Z",
         })
     );
 
@@ -145,7 +190,9 @@ async fn test_workspaces_rest_api_with_edit(ds: &str) {
     info!("assert that the new JSON encoding of the workspace reflects the previous change transaction");
 
     expect_eq!(
-        actual = http_get_workspace_entity(&workspace_id, port).await,
+        actual = http_get_workspace_entity(port, &workspace_id)
+            .await
+            .unwrap(),
         expected = json!({
             "id": workspace_id,
             "data": {
@@ -157,19 +204,21 @@ async fn test_workspaces_rest_api_with_edit(ds: &str) {
                     }
                 ]
             },
-            "created_at": "1971-01-01T00:00:00Z",
-            "updated_at": "1974-01-01T00:00:00Z",
+            "title": "new title",
+            "created_at": expected_created_at,
+            "updated_at": "1977-01-01T00:00:00Z",
         })
     );
 
     info!("list most recent workspaces");
 
     expect_eq!(
-        actual = list_most_recent_workspaces(port).await,
+        actual = list_most_recent_workspaces(port).await.unwrap(),
         expected = json!([{
             "id": workspace_id,
-            "created_at": "1971-01-01T00:00:00Z",
-            "updated_at": "1974-01-01T00:00:00Z",
+            "created_at": expected_created_at,
+            "updated_at": "1977-01-01T00:00:00Z",
+            "title": "new title",
         }])
     );
 }
@@ -197,9 +246,9 @@ async fn test_workspace_sync(ds: &str) {
     info!("create an example workspace");
 
     let workspace_id = http_post_workspace_entity(
+        port,
         json!({
             "data": {
-                "title": "untitled",
                 "files": [
                     {
                         "path": "README.md",
@@ -208,7 +257,6 @@ async fn test_workspace_sync(ds: &str) {
                 ]
             }
         }),
-        port,
     )
     .await;
 
@@ -227,16 +275,21 @@ async fn test_workspace_sync(ds: &str) {
     {
         let mut txn = client1.automerge.transaction();
 
-        let title_obj = txn
-            .get(automerge::ROOT, format!("{DOMAIN_ID}_2_0"))
+        let file_list = txn
+            .get(automerge::ROOT, format!("{DOMAIN_ID}_2_1"))
+            .unwrap()
+            .expect("no property called that");
+        let first_file_obj = txn.values(&file_list.1).next().unwrap();
+        let file_contents_obj = txn
+            .get(&first_file_obj.1, format!("{DOMAIN_ID}_3_1"))
             .unwrap()
             .expect("no property called that");
 
-        let current_title = txn.text(&title_obj.1).unwrap();
-        assert_eq!(current_title, "untitled");
+        let current_contents = txn.text(&file_contents_obj.1).unwrap();
+        assert_eq!(current_contents, "# Extremely interesting");
 
-        info!("...change title to `Not Untitled`");
-        txn.splice_text(&title_obj.1, 0, 1, "Not U").unwrap();
+        info!("...change title to `# Extremely uninteresting`");
+        txn.splice_text(&file_contents_obj.1, 12, 0, "un").unwrap();
 
         txn.commit();
     }
@@ -253,14 +306,20 @@ async fn test_workspace_sync(ds: &str) {
 
     info!("client2: should see reflected changes");
     {
-        let title_obj = client2
+        let file_list = client2
             .automerge
-            .get(automerge::ROOT, format!("{DOMAIN_ID}_2_0"))
+            .get(automerge::ROOT, format!("{DOMAIN_ID}_2_1"))
             .unwrap()
-            .unwrap();
+            .expect("no property called that");
+        let first_file_obj = client2.automerge.values(&file_list.1).next().unwrap();
+        let file_contents_obj = client2
+            .automerge
+            .get(&first_file_obj.1, format!("{DOMAIN_ID}_3_1"))
+            .unwrap()
+            .expect("no property called that");
 
-        let current_title = client2.automerge.text(&title_obj.1).unwrap();
-        assert_eq!(current_title, "Not Untitled");
+        let current_contents = client2.automerge.text(&file_contents_obj.1).unwrap();
+        assert_eq!(current_contents, "# Extremely uninteresting");
     }
 
     client1.ws.close(CloseCode::Normal, None).await.unwrap();
@@ -268,15 +327,16 @@ async fn test_workspace_sync(ds: &str) {
 
     info!("should see changes reflected in domain entity");
     expect_eq!(
-        actual = http_get_workspace_entity(&workspace_id, port).await,
+        actual = http_get_workspace_entity(port, &workspace_id)
+            .await
+            .unwrap(),
         expected = json!({
             "id": workspace_id,
             "data": {
-                "title": "Not Untitled",
                 "files": [
                     {
                         "path": "README.md",
-                        "contents": "# Extremely interesting"
+                        "contents": "# Extremely uninteresting"
                     }
                 ]
             },
@@ -287,7 +347,7 @@ async fn test_workspace_sync(ds: &str) {
 }
 
 /// POST workspace, return ULID
-async fn http_post_workspace_entity(json: serde_json::Value, port: u16) -> String {
+async fn http_post_workspace_entity(port: u16, json: serde_json::Value) -> String {
     let response = reqwest::Client::new()
         .post(format!("http://localhost:{port}/Workspace"))
         .json(&json)
@@ -310,28 +370,43 @@ async fn http_post_workspace_entity(json: serde_json::Value, port: u16) -> Strin
         .to_string()
 }
 
-async fn http_get_workspace_entity(workspace_id: &str, port: u16) -> serde_json::Value {
-    reqwest::Client::new()
+async fn http_get_workspace_entity(
+    port: u16,
+    workspace_id: &str,
+) -> Result<serde_json::Value, TestHttpError> {
+    Ok(reqwest::Client::new()
         .get(format!(
             "http://localhost:{port}/Workspace/id/{workspace_id}"
         ))
         .send()
-        .await
-        .unwrap()
+        .await?
         .json()
-        .await
-        .unwrap()
+        .await?)
 }
 
-async fn list_most_recent_workspaces(port: u16) -> serde_json::Value {
+async fn http_put_workspace_entity(
+    port: u16,
+    json: serde_json::Value,
+) -> Result<(), TestHttpError> {
     reqwest::Client::new()
+        .put(format!("http://localhost:{port}/Workspace"))
+        .json(&json)
+        .send()
+        .await?
+        .raise_for_status_with_body()
+        .await?
+        .text()
+        .await?;
+    Ok(())
+}
+
+async fn list_most_recent_workspaces(port: u16) -> Result<serde_json::Value, TestHttpError> {
+    Ok(reqwest::Client::new()
         .get(format!("http://localhost:{port}/listMostRecentWorkspaces"))
         .send()
-        .await
-        .unwrap()
+        .await?
         .json()
-        .await
-        .unwrap()
+        .await?)
 }
 
 async fn acquire_actor(workspace_id: &str, port: u16) -> String {

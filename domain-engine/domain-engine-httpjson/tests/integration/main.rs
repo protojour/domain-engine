@@ -1,4 +1,4 @@
-use std::{convert::Infallible, sync::Arc, time::Duration};
+use std::{convert::Infallible, fmt::Display, sync::Arc, time::Duration};
 
 use axum::body::Body;
 use bytes::Bytes;
@@ -93,6 +93,51 @@ async fn fetch_body_assert_status<B: FromBytes>(
         Err(format!("expected {expected}, was {status}: {string_body}"))
     } else {
         Ok(B::from_bytes(binary_body))
+    }
+}
+
+#[derive(Debug)]
+struct TestHttpError {
+    reqwest: reqwest::Error,
+    body: Option<String>,
+}
+
+impl From<reqwest::Error> for TestHttpError {
+    fn from(value: reqwest::Error) -> Self {
+        Self {
+            reqwest: value,
+            body: None,
+        }
+    }
+}
+
+impl Display for TestHttpError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "status: {:?}", self.reqwest.status())?;
+        if let Some(body) = &self.body {
+            write!(f, ", body: {body}")?;
+        }
+        Ok(())
+    }
+}
+
+trait ResponseExt: Sized {
+    async fn raise_for_status_with_body(self) -> Result<Self, TestHttpError>;
+}
+
+impl ResponseExt for reqwest::Response {
+    async fn raise_for_status_with_body(self) -> Result<Self, TestHttpError> {
+        let status = self.status();
+        if status.is_client_error() || status.is_server_error() {
+            let error = self.error_for_status_ref().unwrap_err();
+            let body = self.text().await.unwrap();
+            Err(TestHttpError {
+                reqwest: error,
+                body: Some(body),
+            })
+        } else {
+            Ok(self)
+        }
     }
 }
 

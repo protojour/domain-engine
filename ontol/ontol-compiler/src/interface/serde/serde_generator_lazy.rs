@@ -215,6 +215,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             value_generator = Some(*explicit_value_generator);
         }
 
+        if let Some((repr_def_id, _)) = self.misc_ctx.relationship_repr.get(&property.rel_id) {
+            if repr_def_id == &OntolDefTag::Crdt.def_id() {
+                flags |= SerdePropertyFlags::WRITE_ONCE;
+            }
+        }
+
         if property_cardinality.is_optional() {
             flags |= SerdePropertyFlags::OPTIONAL;
         }

@@ -463,6 +463,11 @@ impl SerdeProperty {
     }
 
     #[inline]
+    pub fn is_write_once(&self) -> bool {
+        self.flags.contains(SerdePropertyFlags::WRITE_ONCE)
+    }
+
+    #[inline]
     pub fn is_generator(&self) -> bool {
         self.flags.contains(SerdePropertyFlags::GENERATOR)
     }
@@ -486,7 +491,7 @@ impl SerdeProperty {
                 }
             }
             ProcessorMode::Update | ProcessorMode::GraphqlUpdate => {
-                if self.is_read_only() && !self.is_entity_id() {
+                if (self.is_read_only() && !self.is_entity_id()) || self.is_write_once() {
                     return None;
                 }
             }
@@ -541,13 +546,15 @@ bitflags::bitflags! {
         /// Property represents parameters to a relation: e.g. "_edge"
         const REL_PARAMS       = 0b00000010;
         const READ_ONLY        = 0b00000100;
-        const GENERATOR        = 0b00001000;
+        /// Only (directly) writable when constructing resource for the first time:
+        const WRITE_ONCE       = 0b00001000;
+        const GENERATOR        = 0b00010000;
         /// The property is an identifier of the entity that owns the property
-        const ENTITY_ID        = 0b00010000;
+        const ENTITY_ID        = 0b00100000;
         /// The property is an identifier of any entity (self or foreign)
-        const ANY_ID           = 0b00100000;
+        const ANY_ID           = 0b01000000;
         /// Property is part of the entity graph
-        const IN_ENTITY_GRAPH  = 0b01000000;
+        const IN_ENTITY_GRAPH  = 0b10000000;
     }
 }
 
