@@ -2,8 +2,8 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Display;
+use std::sync::Arc;
 
-use arcstr::ArcStr;
 use ontol_parser::cst::inspect as insp;
 use ontol_parser::cst::view::NodeView;
 use ontol_parser::cst::view::NodeViewExt;
@@ -18,6 +18,7 @@ use url::Url;
 
 use crate::error::CompileError;
 use crate::error::UnifiedCompileError;
+use crate::ontol_syntax::ArcString;
 use crate::ontol_syntax::OntolSyntax;
 use crate::ontol_syntax::OntolTreeSyntax;
 use crate::SourceCodeRegistry;
@@ -131,12 +132,12 @@ impl Display for DomainUrl {
 
 #[async_trait::async_trait]
 pub trait DomainUrlResolver: Send + Sync {
-    async fn resolve_domain_url(&self, url: &DomainUrl) -> Option<ArcStr>;
+    async fn resolve_domain_url(&self, url: &DomainUrl) -> Option<Arc<String>>;
 }
 
 #[async_trait::async_trait]
 impl DomainUrlResolver for Vec<Box<dyn DomainUrlResolver>> {
-    async fn resolve_domain_url(&self, url: &DomainUrl) -> Option<ArcStr> {
+    async fn resolve_domain_url(&self, url: &DomainUrl) -> Option<Arc<String>> {
         for resolver in self.iter() {
             if let Some(source) = resolver.resolve_domain_url(url).await {
                 return Some(source);
@@ -170,7 +171,7 @@ pub async fn resolve_topology_async(
                             request,
                             Box::new(OntolTreeSyntax {
                                 tree: flat_tree.unflatten(),
-                                source_text: source_text.clone(),
+                                source_text: ArcString(source_text.clone()),
                             }),
                             errors,
                             DomainConfig::default(),

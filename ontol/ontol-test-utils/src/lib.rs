@@ -2,13 +2,12 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use arcstr::ArcStr;
 use def_binding::DefBinding;
 use diagnostics::AnnotatedCompileError;
 use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
-    ontol_syntax::OntolTreeSyntax,
+    ontol_syntax::{ArcString, OntolTreeSyntax},
     topology::{DepGraphBuilder, DomainTopology, DomainUrl, GraphState, ParsedDomain},
     SourceCodeRegistry, Sources,
 };
@@ -204,7 +203,7 @@ pub fn default_short_name() -> &'static str {
 }
 
 pub struct TestPackages {
-    sources_by_url: HashMap<DomainUrl, ArcStr>,
+    sources_by_url: HashMap<DomainUrl, Arc<String>>,
     root_urls: Vec<DomainUrl>,
     sources: Sources,
     source_code_registry: SourceCodeRegistry,
@@ -216,7 +215,7 @@ pub struct TestPackages {
 impl TestPackages {
     /// Parse a string/file with `//@` directives
     pub fn parse_multi_ontol(default_url: DomainUrl, contents: &str) -> Self {
-        let mut sources_by_url: Vec<(DomainUrl, ArcStr)> = vec![];
+        let mut sources_by_url: Vec<(DomainUrl, Arc<String>)> = vec![];
         let mut cur_url = default_url;
         let mut cur_source = String::new();
 
@@ -241,7 +240,9 @@ impl TestPackages {
 
     /// Configure with an explicit set of named sources.
     /// By default, the first one is chosen as the only root source.
-    pub fn with_sources(sources_by_name: impl IntoIterator<Item = (DomainUrl, ArcStr)>) -> Self {
+    pub fn with_sources(
+        sources_by_name: impl IntoIterator<Item = (DomainUrl, Arc<String>)>,
+    ) -> Self {
         Self::new(sources_by_name.into_iter().collect())
     }
 
@@ -253,12 +254,12 @@ impl TestPackages {
         Self::new(
             sources_by_name
                 .into_iter()
-                .map(|(name, src)| (name, ArcStr::from(src)))
+                .map(|(name, src)| (name, Arc::new(String::from(src))))
                 .collect(),
         )
     }
 
-    fn new(sources_by_name: Vec<(DomainUrl, ArcStr)>) -> Self {
+    fn new(sources_by_name: Vec<(DomainUrl, Arc<String>)>) -> Self {
         let default_root = sources_by_name.first().map(|(url, _)| url.clone());
 
         Self {
@@ -330,7 +331,7 @@ impl TestPackages {
                                 request,
                                 Box::new(OntolTreeSyntax {
                                     tree,
-                                    source_text: source_text.clone(),
+                                    source_text: ArcString(source_text.clone()),
                                 }),
                                 errors,
                                 package_config,
@@ -403,7 +404,7 @@ impl TestCompile for Vec<(DomainUrl, &'static str)> {
     }
 }
 
-impl TestCompile for Vec<(DomainUrl, ArcStr)> {
+impl TestCompile for Vec<(DomainUrl, Arc<String>)> {
     fn compile(self) -> OntolTest {
         TestPackages::with_sources(self).compile_topology_ok()
     }
@@ -449,20 +450,19 @@ impl TestCompile for TestPackages {
 
 impl TestCompile for &'static str {
     fn compile(self) -> OntolTest {
-        TestPackages::with_static_sources([(default_file_url(), self.into())]).compile()
+        TestPackages::with_static_sources([(default_file_url(), self)]).compile()
     }
 
     fn compile_fail(self) -> Vec<AnnotatedCompileError> {
-        TestPackages::with_static_sources([(default_file_url(), self.into())]).compile_fail()
+        TestPackages::with_static_sources([(default_file_url(), self)]).compile_fail()
     }
 
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
-        TestPackages::with_static_sources([(default_file_url(), self.into())])
-            .compile_fail_then(validator)
+        TestPackages::with_static_sources([(default_file_url(), self)]).compile_fail_then(validator)
     }
 }
 
-impl TestCompile for ArcStr {
+impl TestCompile for Arc<String> {
     fn compile(self) -> OntolTest {
         TestPackages::with_sources([(default_file_url(), self)]).compile()
     }

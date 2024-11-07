@@ -1,6 +1,5 @@
 use crate::docs::get_core_completions;
-use arcstr::ArcStr;
-use ontol_compiler::ontol_syntax::OntolTreeSyntax;
+use ontol_compiler::ontol_syntax::{ArcString, OntolTreeSyntax};
 use ontol_compiler::topology::DomainUrl;
 use ontol_compiler::{
     error::UnifiedCompileError,
@@ -69,7 +68,7 @@ pub struct Document {
     pub name: String,
 
     /// Document text
-    pub text: ArcStr,
+    pub text: Arc<String>,
 
     /// Unique symbols/names in this document
     pub symbols: HashSet<String>,
@@ -231,7 +230,7 @@ impl State {
                                 request,
                                 Box::new(OntolTreeSyntax {
                                     tree: flat_tree.unflatten(),
-                                    source_text: doc.text.clone(),
+                                    source_text: ArcString(doc.text.clone()),
                                 }),
                                 errors,
                                 package_config,

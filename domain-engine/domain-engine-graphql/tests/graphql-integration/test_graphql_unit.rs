@@ -1,6 +1,7 @@
 //! GraphQL "unit" tests, i.e. only mocked datastore
 
-use arcstr::literal;
+use std::sync::Arc;
+
 use domain_engine_core::transact::{DataOperation, ReqMessage, RespMessage, TransactionMode};
 use domain_engine_graphql::{
     domain::{context::ServiceCtx, DomainSchema},
@@ -954,7 +955,7 @@ async fn create_through_mapped_domain() {
     let (test, [schema]) = TestPackages::with_sources([
         (
             default_file_url(),
-            literal!(
+            Arc::new(
                 "
                 use 'artist_and_instrument' as ai
     
@@ -974,6 +975,7 @@ async fn create_through_mapped_domain() {
                     ),
                 )
             "
+                .to_string(),
             ),
         ),
         artist_and_instrument(),
@@ -1027,7 +1029,7 @@ async fn create_through_three_domains() {
     let (test, [schema]) = TestPackages::with_sources([
         (
             default_file_url(),
-            literal!(
+            Arc::new(
                 "
                 use 'player' as player
 
@@ -1041,11 +1043,12 @@ async fn create_through_three_domains() {
                     player.player('id': id, 'nick': c),
                 )
             "
+                .to_string(),
             ),
         ),
         (
             file_url("player"),
-            literal!(
+            Arc::new(
                 "
                 use 'artist_and_instrument' as ai
 
@@ -1059,6 +1062,7 @@ async fn create_through_three_domains() {
                     ai.artist('ID': id, 'name': n),
                 )
             "
+                .to_string(),
             ),
         ),
         artist_and_instrument(),

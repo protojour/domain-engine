@@ -1,4 +1,4 @@
-use std::panic::UnwindSafe;
+use std::{panic::UnwindSafe, sync::Arc};
 
 use ontol_parser::{cst::tree::SyntaxTree, U32Span};
 use ontol_runtime::DefId;
@@ -50,5 +50,14 @@ impl<S: AsRef<str> + UnwindSafe> OntolSyntax for OntolTreeSyntax<S> {
             src,
             session,
         )
+    }
+}
+
+/// Thin wrapper around Arc<String> that implements AsRef<str>
+pub struct ArcString(pub Arc<String>);
+
+impl AsRef<str> for ArcString {
+    fn as_ref(&self) -> &str {
+        &self.0
     }
 }

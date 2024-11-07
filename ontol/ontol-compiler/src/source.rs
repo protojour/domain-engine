@@ -1,6 +1,5 @@
-use std::{fmt::Debug, ops::Deref};
+use std::{fmt::Debug, ops::Deref, sync::Arc};
 
-use arcstr::ArcStr;
 use fnv::FnvHashMap;
 use ontol_parser::U32Span;
 use ontol_runtime::DomainIndex;
@@ -100,7 +99,7 @@ impl<'m, T> SpannedBorrow<'m, T> {
 /// The compiler does not hold an instance of this.
 #[derive(Default)]
 pub struct SourceCodeRegistry {
-    pub registry: FnvHashMap<SourceId, ArcStr>,
+    pub registry: FnvHashMap<SourceId, Arc<String>>,
 }
 
 /// Sources currently being compiled

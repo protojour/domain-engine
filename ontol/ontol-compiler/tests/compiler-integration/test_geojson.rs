@@ -1,4 +1,5 @@
-use arcstr::literal;
+use std::sync::Arc;
+
 use ontol_examples::{geojson, wgs, AsAtlas};
 use ontol_macros::test;
 use ontol_test_utils::{
@@ -67,7 +68,7 @@ fn test_municipalities() {
     TestPackages::with_sources([
         (
             file_url("entry"),
-            literal!(
+            Arc::new(
                 "
                 domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
                 use 'geojson' as geojson
@@ -80,7 +81,8 @@ fn test_municipalities() {
                     rel. 'kommunenummer': kommunenummer
                     rel* 'geometry': geojson.Polygon
                 )
-                ",
+                "
+                .to_string(),
             ),
         ),
         geojson(),

@@ -1,6 +1,5 @@
 #![forbid(unsafe_code)]
 
-use arcstr::{literal, ArcStr};
 use ariadne::{ColorGenerator, Label, Report, ReportKind, Source};
 use axum::{
     extract::{
@@ -20,6 +19,7 @@ use notify_debouncer_full::{
 use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
+    ontol_syntax::ArcString,
     topology::{DomainUrl, DomainUrlParser, DomainUrlResolver},
     SourceCodeRegistry, SourceId, Sources,
 };
@@ -263,12 +263,12 @@ fn init_tracing_stderr() {
 
 #[derive(Default)]
 struct SourcesByUrl {
-    table: HashMap<DomainUrl, ArcStr>,
+    table: HashMap<DomainUrl, Arc<String>>,
 }
 
 #[async_trait::async_trait]
 impl DomainUrlResolver for SourcesByUrl {
-    async fn resolve_domain_url(&self, url: &DomainUrl) -> Option<ArcStr> {
+    async fn resolve_domain_url(&self, url: &DomainUrl) -> Option<Arc<String>> {
         self.table.get(url).cloned()
     }
 }
@@ -283,7 +283,7 @@ async fn compile(
     }
 
     let mut ontol_sources = Sources::default();
-    let mut sources_by_url: HashMap<DomainUrl, ArcStr> = Default::default();
+    let mut sources_by_url: HashMap<DomainUrl, Arc<String>> = Default::default();
     let mut paths_by_url: HashMap<DomainUrl, PathBuf> = Default::default();
 
     for entry in read_dir(root_dir)? {
@@ -297,7 +297,7 @@ async fn compile(
             let source = fs::read_to_string(&path)?;
             let source_url = get_source_url(path.to_str().unwrap())?;
 
-            sources_by_url.insert(source_url.clone(), source.into());
+            sources_by_url.insert(source_url.clone(), Arc::new(source));
             paths_by_url.insert(source_url, path);
         }
     }
@@ -389,7 +389,7 @@ fn print_unified_compile_error(
                     .with_color(colors.next()),
             )
             .finish()
-            .eprint((&origin, Source::from(literal_source)))?;
+            .eprint((&origin, Source::from(ArcString(literal_source))))?;
 
         for note in error.notes {
             let note_span = note.span();
@@ -406,7 +406,7 @@ fn print_unified_compile_error(
                         .with_color(colors.next()),
                 )
                 .finish()
-                .eprint((&origin, Source::from(literal_source)))?;
+                .eprint((&origin, Source::from(ArcString(literal_source))))?;
         }
     }
 
@@ -432,7 +432,7 @@ fn report_source_name(
     source_id: SourceId,
     ontol_sources: &Sources,
     registry: &SourceCodeRegistry,
-) -> (DomainUrlOrigin, ArcStr) {
+) -> (DomainUrlOrigin, Arc<String>) {
     // FIXME: If the error can't be mapped to a source file,
     // things will look quite strange. Fix later..
     match ontol_sources.get_source(source_id) {
@@ -443,12 +443,12 @@ fn report_source_name(
                 DomainUrlOrigin::Domain(ontol_source.url.clone()),
                 literal_source
                     .cloned()
-                    .unwrap_or_else(|| literal!("<ontol>")),
+                    .unwrap_or_else(|| Arc::new("<ontol>".to_string())),
             )
         }
         None => {
-            let ontol = literal!("<arg>");
-            (DomainUrlOrigin::CliArg, ontol)
+            let ontol = "<arg>";
+            (DomainUrlOrigin::CliArg, Arc::new(ontol.to_string()))
         }
     }
 }

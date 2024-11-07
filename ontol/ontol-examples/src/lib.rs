@@ -1,56 +1,57 @@
-use arcstr::{literal, ArcStr};
+use std::sync::Arc;
+
 use conduit::{blog_post_public, conduit_db};
 use ontol_compiler::topology::{DomainUrl, DomainUrlResolver};
 use stix::stix_bundle;
 use url::Url;
 
-type Example = (DomainUrl, ArcStr);
+type Example = (DomainUrl, Arc<String>);
 
 fn file_url(name: &str) -> DomainUrl {
     DomainUrl::parse(name)
 }
 
-pub mod stix {
-    use arcstr::literal;
+macro_rules! include_arcstring {
+    ($path:literal) => {
+        std::sync::Arc::new(include_str!($path).to_string())
+    };
+}
 
+pub mod stix {
     use super::*;
 
     pub fn stix() -> Example {
         (
             file_url("stix"),
-            literal!(include_str!("../../../examples/stix_lite/stix.on")),
+            include_arcstring!("../../../examples/stix_lite/stix.on"),
         )
     }
 
     pub fn stix_edges() -> Example {
         (
             file_url("stix_edges"),
-            literal!(include_str!("../../../examples/stix_lite/stix_edges.on")),
+            include_arcstring!("../../../examples/stix_lite/stix_edges.on"),
         )
     }
 
     pub fn stix_common() -> Example {
         (
             file_url("stix_common"),
-            literal!(include_str!("../../../examples/stix_lite/stix_common.on")),
+            include_arcstring!("../../../examples/stix_lite/stix_common.on"),
         )
     }
 
     pub fn stix_interface() -> Example {
         (
             file_url("stix_interface"),
-            literal!(include_str!(
-                "../../../examples/stix_lite/stix_interface.on"
-            )),
+            include_arcstring!("../../../examples/stix_lite/stix_interface.on"),
         )
     }
 
     pub fn stix_open_vocab() -> Example {
         (
             file_url("stix_open_vocab"),
-            literal!(include_str!(
-                "../../../examples/stix_lite/stix_open_vocab.on"
-            )),
+            include_arcstring!("../../../examples/stix_lite/stix_open_vocab.on"),
         )
     }
 
@@ -67,48 +68,40 @@ pub mod stix {
 }
 
 pub mod conduit {
-    use arcstr::literal;
-
     use super::*;
 
     pub fn conduit_db() -> Example {
         (
             file_url("conduit_db"),
-            literal!(include_str!("../../../examples/conduit/conduit_db.on")),
+            include_arcstring!("../../../examples/conduit/conduit_db.on"),
         )
     }
 
     pub fn conduit_public() -> Example {
         (
             file_url("conduit_public"),
-            literal!(include_str!(
-                "../../../examples/conduit/TODO_conduit_public.on"
-            )),
+            include_arcstring!("../../../examples/conduit/TODO_conduit_public.on"),
         )
     }
 
     pub fn conduit_contrived_signup() -> Example {
         (
             file_url("conduit_contrived_signup"),
-            literal!(include_str!(
-                "../../../examples/conduit/TODO_conduit_contrived_signup.on"
-            )),
+            include_arcstring!("../../../examples/conduit/TODO_conduit_contrived_signup.on"),
         )
     }
 
     pub fn blog_post_public() -> Example {
         (
             file_url("blog_post_public"),
-            literal!(include_str!(
-                "../../../examples/conduit/blog_post_public.on"
-            )),
+            include_arcstring!("../../../examples/conduit/blog_post_public.on"),
         )
     }
 
     pub fn feed_public() -> Example {
         (
             file_url("feed_public"),
-            literal!(include_str!("../../../examples/conduit/feed_public.on")),
+            include_arcstring!("../../../examples/conduit/feed_public.on"),
         )
     }
 }
@@ -116,91 +109,91 @@ pub mod conduit {
 pub fn artist_and_instrument() -> Example {
     (
         file_url("artist_and_instrument"),
-        literal!(include_str!("../../../examples/artist_and_instrument.on")),
+        include_arcstring!("../../../examples/artist_and_instrument.on"),
     )
 }
 
 pub fn demo() -> Example {
     (
         file_url("demo"),
-        literal!(include_str!("../../../examples/demo.on")),
+        include_arcstring!("../../../examples/demo.on"),
     )
 }
 
 pub fn filemeta() -> Example {
     (
         file_url("filemeta"),
-        literal!(include_str!("../../../examples/filemeta.on")),
+        include_arcstring!("../../../examples/filemeta.on"),
     )
 }
 
 pub fn findings() -> Example {
     (
         file_url("findings"),
-        literal!(include_str!("../../../examples/findings.on")),
+        include_arcstring!("../../../examples/findings.on"),
     )
 }
 
 pub fn edge_entity_simple() -> Example {
     (
         file_url("edge_entity"),
-        literal!(include_str!("../../../examples/edge_entity_simple.on")),
+        include_arcstring!("../../../examples/edge_entity_simple.on"),
     )
 }
 
 pub fn edge_entity_union() -> Example {
     (
         file_url("edge_entity_union"),
-        literal!(include_str!("../../../examples/edge_entity_union.on")),
+        include_arcstring!("../../../examples/edge_entity_union.on"),
     )
 }
 
 pub fn gitmesh() -> Example {
     (
         file_url("gitmesh"),
-        literal!(include_str!("../../../examples/gitmesh.on")),
+        include_arcstring!("../../../examples/gitmesh.on"),
     )
 }
 
 pub fn geojson() -> Example {
     (
         file_url("geojson"),
-        literal!(include_str!("../../../examples/geojson.on")),
+        include_arcstring!("../../../examples/geojson.on"),
     )
 }
 
 pub fn guitar_synth_union() -> Example {
     (
         file_url("guitar_synth_union"),
-        literal!(include_str!("../../../examples/guitar_synth_union.on")),
+        include_arcstring!("../../../examples/guitar_synth_union.on"),
     )
 }
 
 pub fn municipalities() -> Example {
     (
         file_url("municipalities"),
-        literal!(include_str!("../../../examples/municipalities.on")),
+        include_arcstring!("../../../examples/municipalities.on"),
     )
 }
 
 pub fn si() -> Example {
     (
         file_url("SI"),
-        literal!(include_str!("../../../examples/SI.on")),
+        include_arcstring!("../../../examples/SI.on"),
     )
 }
 
 pub fn workspaces() -> Example {
     (
         file_url("workspaces"),
-        literal!(include_str!("../../../examples/workspaces.on")),
+        include_arcstring!("../../../examples/workspaces.on"),
     )
 }
 
 pub fn wgs() -> Example {
     (
         file_url("wgs"),
-        literal!(include_str!("../../../examples/wgs.on")),
+        include_arcstring!("../../../examples/wgs.on"),
     )
 }
 
@@ -210,14 +203,14 @@ pub mod entity_subtype {
     pub fn db() -> Example {
         (
             file_url("db"),
-            literal!(include_str!("../../../examples/entity_subtype/db.on")),
+            include_arcstring!("../../../examples/entity_subtype/db.on"),
         )
     }
 
     pub fn derived() -> Example {
         (
             file_url("derived"),
-            literal!(include_str!("../../../examples/entity_subtype/derived.on")),
+            include_arcstring!("../../../examples/entity_subtype/derived.on"),
         )
     }
 }
@@ -271,18 +264,18 @@ pub struct AtlasDomain {
     pub url: DomainUrl,
     /// Visibility within a package of domains that shares a common URL prefix
     pub visibility: Visibility,
-    pub src: ArcStr,
+    pub src: Arc<String>,
 }
 
 #[async_trait::async_trait]
 impl DomainUrlResolver for FakeAtlasServer {
-    async fn resolve_domain_url(&self, url: &DomainUrl) -> Option<ArcStr> {
+    async fn resolve_domain_url(&self, url: &DomainUrl) -> Option<Arc<String>> {
         self.lookup(url)
     }
 }
 
 impl FakeAtlasServer {
-    pub fn lookup(&self, url: &DomainUrl) -> Option<ArcStr> {
+    pub fn lookup(&self, url: &DomainUrl) -> Option<Arc<String>> {
         self.domains.iter().find_map(|dom| {
             if &dom.url == url {
                 Some(dom.src.clone())

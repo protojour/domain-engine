@@ -1954,7 +1954,6 @@ dependencies = [
 name = "domain-engine-test-utils"
 version = "0.1.0"
 dependencies = [
- "arcstr",
  "async-trait",
  "axum",
  "chrono",
@@ -3499,7 +3498,6 @@ dependencies = [
 name = "ontol-examples"
 version = "0.1.0"
 dependencies = [
- "arcstr",
  "async-trait",
  "ontol-compiler",
  "url",
@@ -3537,7 +3535,6 @@ dependencies = [
 name = "ontol-lsp"
 version = "0.4.0"
 dependencies = [
- "arcstr",
  "ontol-compiler",
  "ontol-parser",
  "ontol-runtime",
@@ -3631,7 +3628,6 @@ dependencies = [
 name = "ontol-test-utils"
 version = "0.1.0"
 dependencies = [
- "arcstr",
  "fnv",
  "jsonschema",
  "ontol-compiler",
@@ -3652,7 +3648,6 @@ name = "ontool"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "arcstr",
  "ariadne",
  "async-trait",
  "axum",
