@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, marker::PhantomData, rc::Rc, str::FromStr};
+use std::{collections::BTreeMap, marker::PhantomData, str::FromStr};
 
 use ontol_parser::cst::{
     inspect::{self as insp},
@@ -43,7 +43,7 @@ enum Section {
 
 impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     pub fn new(
-        url: Rc<DomainUrl>,
+        url: DomainUrl,
         domain_def_id: DefId,
         src: Src,
         compiler: &'c mut Compiler<'m>,

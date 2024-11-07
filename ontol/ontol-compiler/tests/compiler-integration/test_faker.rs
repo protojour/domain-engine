@@ -46,7 +46,7 @@ fn test_fake_text_like_types() {
 
 #[test]
 fn test_fake_geojson() {
-    let test = TestPackages::with_static_sources([geojson(), wgs().as_atlas("wgs")]).compile();
+    let test = TestPackages::with_sources([geojson(), wgs().as_atlas("wgs")]).compile();
     let [geometry] = test.bind(["Geometry"]);
     expect_eq!(
         actual =

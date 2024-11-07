@@ -49,8 +49,7 @@ async fn gitmesh_id_error() {
 
 #[datastore_test(tokio::test)]
 async fn misc(ds: &str) {
-    let (test, [schema]) =
-        TestPackages::with_static_sources([gitmesh()]).compile_schemas(["gitmesh"]);
+    let (test, [schema]) = TestPackages::with_sources([gitmesh()]).compile_schemas(["gitmesh"]);
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     info!("Create two users");
@@ -290,8 +289,7 @@ async fn misc(ds: &str) {
 
 #[datastore_test(tokio::test)]
 async fn fancy_filters(ds: &str) {
-    let (test, [schema]) =
-        TestPackages::with_static_sources([gitmesh()]).compile_schemas(["gitmesh"]);
+    let (test, [schema]) = TestPackages::with_sources([gitmesh()]).compile_schemas(["gitmesh"]);
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     r#"mutation {
@@ -360,8 +358,7 @@ async fn fancy_filters(ds: &str) {
 
 #[datastore_test(tokio::test)]
 async fn update_owner_relation(ds: &str) {
-    let (test, [schema]) =
-        TestPackages::with_static_sources([gitmesh()]).compile_schemas(["gitmesh"]);
+    let (test, [schema]) = TestPackages::with_sources([gitmesh()]).compile_schemas(["gitmesh"]);
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     let response = r#"mutation {
@@ -441,8 +438,7 @@ async fn update_owner_relation(ds: &str) {
 /// FIXME: implement for arango
 #[datastore_test(tokio::test)]
 async fn patch_members(ds: &str) {
-    let (test, [schema]) =
-        TestPackages::with_static_sources([gitmesh()]).compile_schemas(["gitmesh"]);
+    let (test, [schema]) = TestPackages::with_sources([gitmesh()]).compile_schemas(["gitmesh"]);
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     r#"mutation {
@@ -586,8 +582,7 @@ async fn patch_members(ds: &str) {
 
 #[datastore_test(tokio::test)]
 async fn ownership_transfer(ds: &str) {
-    let (test, [schema]) =
-        TestPackages::with_static_sources([gitmesh()]).compile_schemas(["gitmesh"]);
+    let (test, [schema]) = TestPackages::with_sources([gitmesh()]).compile_schemas(["gitmesh"]);
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     let response = r#"mutation {

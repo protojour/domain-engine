@@ -1,7 +1,5 @@
 #![forbid(unsafe_code)]
 
-use std::sync::Arc;
-
 use ontol_parser::cst::inspect as insp;
 use ontol_parser::cst::view::{NodeView, NodeViewExt};
 use serde::{Deserialize, Serialize};
@@ -93,7 +91,7 @@ impl Backend {
                                         uri: ref_uri.to_string(),
                                         path: path.to_string(),
                                         name: source_name.to_string(),
-                                        text: Arc::new(text),
+                                        text: text.into(),
                                         ..Default::default()
                                     },
                                 );
@@ -202,7 +200,7 @@ impl LanguageServer for Backend {
                     uri: uri.to_string(),
                     path: path.to_string(),
                     name: name.to_string(),
-                    text: Arc::new(params.text_document.text),
+                    text: params.text_document.text.into(),
                     ..Default::default()
                 },
             );
@@ -217,7 +215,7 @@ impl LanguageServer for Backend {
             let mut state = self.state.write().await;
             if let Some(doc) = state.docs.get_mut(uri) {
                 for change in params.content_changes {
-                    doc.text = Arc::new(change.text);
+                    doc.text = change.text.into();
                 }
                 state.parse_statements(uri);
             }

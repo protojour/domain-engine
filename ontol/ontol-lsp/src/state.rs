@@ -1,4 +1,5 @@
 use crate::docs::get_core_completions;
+use arcstr::ArcStr;
 use ontol_compiler::ontol_syntax::OntolTreeSyntax;
 use ontol_compiler::topology::DomainUrl;
 use ontol_compiler::{
@@ -68,7 +69,7 @@ pub struct Document {
     pub name: String,
 
     /// Document text
-    pub text: Arc<String>,
+    pub text: ArcStr,
 
     /// Unique symbols/names in this document
     pub symbols: HashSet<String>,

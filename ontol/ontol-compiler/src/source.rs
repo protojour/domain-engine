@@ -1,5 +1,6 @@
-use std::{fmt::Debug, ops::Deref, rc::Rc};
+use std::{fmt::Debug, ops::Deref};
 
+use arcstr::ArcStr;
 use fnv::FnvHashMap;
 use ontol_parser::U32Span;
 use ontol_runtime::DomainIndex;
@@ -17,12 +18,12 @@ pub const NATIVE_SOURCE: SourceId = SourceId(0);
 pub struct Src {
     pub id: SourceId,
     pub domain_index: DomainIndex,
-    pub url: Rc<DomainUrl>,
+    pub url: DomainUrl,
 }
 
 impl Src {
-    pub fn url(&self) -> Rc<DomainUrl> {
-        self.url.clone()
+    pub fn url(&self) -> &DomainUrl {
+        &self.url
     }
 
     pub fn span(&self, span: U32Span) -> SourceSpan {
@@ -99,7 +100,7 @@ impl<'m, T> SpannedBorrow<'m, T> {
 /// The compiler does not hold an instance of this.
 #[derive(Default)]
 pub struct SourceCodeRegistry {
-    pub registry: FnvHashMap<SourceId, Rc<String>>,
+    pub registry: FnvHashMap<SourceId, ArcStr>,
 }
 
 /// Sources currently being compiled
@@ -143,7 +144,7 @@ impl Sources {
         self.sources.get(&id).cloned()
     }
 
-    pub fn add_source(&mut self, domain_index: DomainIndex, url: Rc<DomainUrl>) -> Src {
+    pub fn add_source(&mut self, domain_index: DomainIndex, url: DomainUrl) -> Src {
         let id = self.next_source_id;
         self.next_source_id.0 += 1;
         self.domain_index = domain_index;

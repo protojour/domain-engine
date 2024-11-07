@@ -1,5 +1,6 @@
 //! GraphQL "unit" tests, i.e. only mocked datastore
 
+use arcstr::literal;
 use domain_engine_core::transact::{DataOperation, ReqMessage, RespMessage, TransactionMode};
 use domain_engine_graphql::{
     domain::{context::ServiceCtx, DomainSchema},
@@ -950,28 +951,30 @@ async fn unified_mutation_create() {
 
 #[test(tokio::test)]
 async fn create_through_mapped_domain() {
-    let (test, [schema]) = TestPackages::with_static_sources([
+    let (test, [schema]) = TestPackages::with_sources([
         (
             default_file_url(),
+            literal!(
+                "
+                use 'artist_and_instrument' as ai
+    
+                def player (
+                    rel. 'id'[rel* gen: auto]: (rel* is: uuid)
+                    rel* 'nick': text
+                )
+    
+                map(
+                    player(
+                        'id': id,
+                        'nick': n,
+                    ),
+                    ai.artist(
+                        'ID': id,
+                        'name': n,
+                    ),
+                )
             "
-            use 'artist_and_instrument' as ai
-
-            def player (
-                rel. 'id'[rel* gen: auto]: (rel* is: uuid)
-                rel* 'nick': text
-            )
-
-            map(
-                player(
-                    'id': id,
-                    'nick': n,
-                ),
-                ai.artist(
-                    'ID': id,
-                    'name': n,
-                ),
-            )
-        ",
+            ),
         ),
         artist_and_instrument(),
     ])
@@ -1021,38 +1024,42 @@ async fn create_through_mapped_domain() {
 
 #[test(tokio::test)]
 async fn create_through_three_domains() {
-    let (test, [schema]) = TestPackages::with_static_sources([
+    let (test, [schema]) = TestPackages::with_sources([
         (
             default_file_url(),
+            literal!(
+                "
+                use 'player' as player
+
+                def actor (
+                    rel. 'ID'[rel* gen: auto]: (fmt '' => 'actor/' => uuid => .)
+                    rel* 'alias': text
+                )
+
+                map(
+                    actor('ID': id, 'alias': c),
+                    player.player('id': id, 'nick': c),
+                )
             "
-            use 'player' as player
-
-            def actor (
-                rel. 'ID'[rel* gen: auto]: (fmt '' => 'actor/' => uuid => .)
-                rel* 'alias': text
-            )
-
-            map(
-                actor('ID': id, 'alias': c),
-                player.player('id': id, 'nick': c),
-            )
-        ",
+            ),
         ),
         (
             file_url("player"),
+            literal!(
+                "
+                use 'artist_and_instrument' as ai
+
+                def player (
+                    rel. 'id'[rel* gen: auto]: (rel* is: uuid)
+                    rel* 'nick': text
+                )
+
+                map(
+                    player('id': id, 'nick': n),
+                    ai.artist('ID': id, 'name': n),
+                )
             "
-            use 'artist_and_instrument' as ai
-
-            def player (
-                rel. 'id'[rel* gen: auto]: (rel* is: uuid)
-                rel* 'nick': text
-            )
-
-            map(
-                player('id': id, 'nick': n),
-                ai.artist('ID': id, 'name': n),
-            )
-        ",
+            ),
         ),
         artist_and_instrument(),
     ])
@@ -1296,7 +1303,7 @@ async fn guitar_synth_union_input_error_span() {
 
 #[test(tokio::test)]
 async fn test_municipalities() {
-    let (test, [schema]) = TestPackages::with_static_sources([
+    let (test, [schema]) = TestPackages::with_sources([
         municipalities(),
         geojson().as_atlas("geojson"),
         wgs().as_atlas("wgs"),
@@ -1346,7 +1353,7 @@ async fn test_municipalities() {
 
 #[test(tokio::test)]
 async fn municipalities_named_query() {
-    let (test, [schema]) = TestPackages::with_static_sources([
+    let (test, [schema]) = TestPackages::with_sources([
         municipalities(),
         geojson().as_atlas("geojson"),
         wgs().as_atlas("wgs"),
@@ -1446,7 +1453,7 @@ async fn municipalities_named_query() {
 
 #[test]
 fn municipalities_geojson_union() {
-    let (_test, [schema]) = TestPackages::with_static_sources([
+    let (_test, [schema]) = TestPackages::with_sources([
         municipalities(),
         geojson().as_atlas("geojson"),
         wgs().as_atlas("wgs"),

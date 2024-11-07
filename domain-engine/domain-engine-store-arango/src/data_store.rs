@@ -468,7 +468,7 @@ mod tests {
     }
 
     fn artist_and_instrument() -> TestPackages {
-        TestPackages::with_static_sources([ontol_examples::artist_and_instrument()])
+        TestPackages::with_sources([ontol_examples::artist_and_instrument()])
     }
 
     #[test]

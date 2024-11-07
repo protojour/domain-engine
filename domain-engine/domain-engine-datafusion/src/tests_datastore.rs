@@ -26,7 +26,7 @@ use crate::{DomainEngineAPI, OntologyCatalogProvider};
 
 #[datastore_test(tokio::test)]
 async fn datastore_test_artist_with_chunking(ds: &str) {
-    let test = TestPackages::with_static_sources([artist_and_instrument()]).compile();
+    let test = TestPackages::with_sources([artist_and_instrument()]).compile();
     let [artist] = test.bind(["artist"]);
     let engine = make_domain_engine(test.ontology_owned(), ds).await;
 

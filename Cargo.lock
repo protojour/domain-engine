@@ -1954,6 +1954,7 @@ dependencies = [
 name = "domain-engine-test-utils"
 version = "0.1.0"
 dependencies = [
+ "arcstr",
  "async-trait",
  "axum",
  "chrono",
@@ -3443,6 +3444,7 @@ version = "0.1.0"
 dependencies = [
  "arcstr",
  "assert_matches",
+ "async-trait",
  "bit-set 0.8.0",
  "bitflags 2.6.0",
  "bumpalo",
@@ -3497,6 +3499,8 @@ dependencies = [
 name = "ontol-examples"
 version = "0.1.0"
 dependencies = [
+ "arcstr",
+ "async-trait",
  "ontol-compiler",
  "url",
 ]
@@ -3533,6 +3537,7 @@ dependencies = [
 name = "ontol-lsp"
 version = "0.4.0"
 dependencies = [
+ "arcstr",
  "ontol-compiler",
  "ontol-parser",
  "ontol-runtime",
@@ -3626,6 +3631,7 @@ dependencies = [
 name = "ontol-test-utils"
 version = "0.1.0"
 dependencies = [
+ "arcstr",
  "fnv",
  "jsonschema",
  "ontol-compiler",
@@ -3646,6 +3652,7 @@ name = "ontool"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arcstr",
  "ariadne",
  "async-trait",
  "axum",

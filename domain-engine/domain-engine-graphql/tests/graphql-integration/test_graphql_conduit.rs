@@ -22,7 +22,7 @@ use ontol_test_utils::{expect_eq, TestPackages};
 use tracing::info;
 
 fn conduit_db_only() -> TestPackages {
-    TestPackages::with_static_sources([conduit_db()])
+    TestPackages::with_sources([conduit_db()])
 }
 
 async fn make_domain_engine(
@@ -247,7 +247,7 @@ struct ConduitBundle {
 impl ConduitBundle {
     async fn new(mock_clauses: impl unimock::Clause, ds: &str) -> Self {
         let test_packages =
-            TestPackages::with_static_sources([blog_post_public(), feed_public(), conduit_db()])
+            TestPackages::with_sources([blog_post_public(), feed_public(), conduit_db()])
                 .with_roots([blog_post_public().0, feed_public().0]);
 
         let (test, [blog_schema, feed_schema, db_schema]) =

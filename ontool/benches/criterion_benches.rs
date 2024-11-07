@@ -70,7 +70,7 @@ pub fn compile_benchmark(c: &mut Criterion) {
     });
     c.bench_function("compile_conduit", |b| {
         b.iter(|| {
-            TestPackages::with_static_sources(black_box([
+            TestPackages::with_sources(black_box([
                 blog_post_public(),
                 feed_public(),
                 conduit_db(),

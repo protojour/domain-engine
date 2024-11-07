@@ -4,6 +4,7 @@ use std::{
     sync::Arc,
 };
 
+use arcstr::ArcStr;
 use domain_engine_core::{data_store::DataStore, DomainEngine, Session};
 use domain_engine_graphql::{
     domain::{context::ServiceCtx, create_graphql_schema, DomainSchema},
@@ -47,6 +48,17 @@ impl TestCompileSingletonSchema for &'static str {
     fn compile_single_schema(self) -> (OntolTest, DomainSchema) {
         let (ontol_test, [schema]) = compile_schemas_inner(
             TestPackages::with_static_sources([(default_file_url(), self)]).compile(),
+            [default_short_name()],
+        );
+        (ontol_test, schema)
+    }
+}
+
+impl TestCompileSingletonSchema for ArcStr {
+    #[track_caller]
+    fn compile_single_schema(self) -> (OntolTest, DomainSchema) {
+        let (ontol_test, [schema]) = compile_schemas_inner(
+            TestPackages::with_sources([(default_file_url(), self)]).compile(),
             [default_short_name()],
         );
         (ontol_test, schema)

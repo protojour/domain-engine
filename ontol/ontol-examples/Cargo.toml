@@ -10,4 +10,6 @@ doctest = false
 
 [dependencies]
 ontol-compiler.path = "../ontol-compiler"
+arcstr.workspace = true
+async-trait.workspace = true
 url = "2"

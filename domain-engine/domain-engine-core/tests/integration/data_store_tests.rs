@@ -24,11 +24,11 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 fn conduit_db() -> TestPackages {
-    TestPackages::with_static_sources([examples::conduit::conduit_db()])
+    TestPackages::with_sources([examples::conduit::conduit_db()])
 }
 
 fn artist_and_instrument() -> TestPackages {
-    TestPackages::with_static_sources([examples::artist_and_instrument()])
+    TestPackages::with_sources([examples::artist_and_instrument()])
 }
 
 async fn make_domain_engine(
@@ -93,7 +93,7 @@ async fn test_db_remigrate_noop_workspaces(ds: &str) {
 
 #[ontol_macros::datastore_test(tokio::test)]
 async fn test_db_remove_one_domain(ds: &str) {
-    let test1 = TestPackages::with_static_sources([
+    let test1 = TestPackages::with_sources([
         examples::conduit::conduit_db(),
         examples::artist_and_instrument(),
     ])
@@ -112,7 +112,7 @@ async fn test_db_remove_one_domain(ds: &str) {
     drop(domain_engine);
 
     // This time without ARTIST_AND_INSTRUMENT
-    let test2 = TestPackages::with_static_sources([examples::conduit::conduit_db()])
+    let test2 = TestPackages::with_sources([examples::conduit::conduit_db()])
         .with_roots([examples::conduit::conduit_db().0])
         .compile();
 
@@ -131,7 +131,7 @@ async fn test_db_remove_one_domain(ds: &str) {
 
 #[ontol_macros::datastore_test(tokio::test)]
 async fn test_db_multiple_persistent_domains(ds: &str) {
-    let test = TestPackages::with_static_sources([
+    let test = TestPackages::with_sources([
         examples::conduit::conduit_db(),
         examples::artist_and_instrument(),
     ])

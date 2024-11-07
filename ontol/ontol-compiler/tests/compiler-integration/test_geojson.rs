@@ -1,3 +1,4 @@
+use arcstr::literal;
 use ontol_examples::{geojson, wgs, AsAtlas};
 use ontol_macros::test;
 use ontol_test_utils::{
@@ -7,7 +8,7 @@ use serde_json::json;
 
 #[test]
 fn test_geojson() {
-    TestPackages::with_static_sources(
+    TestPackages::with_sources(
         [geojson(), wgs().as_atlas("wgs")]
     ).compile_then(|test| {
         let [geometry] = test.bind(["Geometry"]);
@@ -63,22 +64,24 @@ fn test_geojson() {
 
 #[test]
 fn test_municipalities() {
-    TestPackages::with_static_sources([
+    TestPackages::with_sources([
         (
             file_url("entry"),
-            "
-            domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
-            use 'geojson' as geojson
-
-            def kommunenummer(
-                fmt '' => /[0-9]{4}/ => .
-            )
-
-            def kommune(
-                rel. 'kommunenummer': kommunenummer
-                rel* 'geometry': geojson.Polygon
-            )
-            ",
+            literal!(
+                "
+                domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
+                use 'geojson' as geojson
+    
+                def kommunenummer(
+                    fmt '' => /[0-9]{4}/ => .
+                )
+    
+                def kommune(
+                    rel. 'kommunenummer': kommunenummer
+                    rel* 'geometry': geojson.Polygon
+                )
+                ",
+            ),
         ),
         geojson(),
         wgs().as_atlas("wgs"),

@@ -17,7 +17,7 @@ use crate::{DomainEngineAPI, OntologyCatalogProvider};
 
 #[test(tokio::test)]
 async fn test_where_text_equals() {
-    let test = TestPackages::with_static_sources([artist_and_instrument()]).compile();
+    let test = TestPackages::with_sources([artist_and_instrument()]).compile();
     let unimock = Unimock::new(verify_transact_filter(indoc! { "
         (root $a)
         (match-prop $a p@1:1:1 (element-in $b))
@@ -33,7 +33,7 @@ async fn test_where_text_equals() {
 
 #[test(tokio::test)]
 async fn test_where_timestamp_lt() {
-    let test = TestPackages::with_static_sources([conduit::conduit_db()]).compile();
+    let test = TestPackages::with_sources([conduit::conduit_db()]).compile();
     let unimock = Unimock::new(verify_transact_filter(indoc! { "
         (root $a)
         (match-prop $a p@1:5:5 (element-in $b))
@@ -49,7 +49,7 @@ async fn test_where_timestamp_lt() {
 
 #[test(tokio::test)]
 async fn test_limit() {
-    let test = TestPackages::with_static_sources([artist_and_instrument()]).compile();
+    let test = TestPackages::with_sources([artist_and_instrument()]).compile();
     let unimock = Unimock::new(
         LinearTransactMock::transact
             .next_call(matching!(_))

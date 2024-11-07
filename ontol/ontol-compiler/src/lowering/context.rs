@@ -3,7 +3,6 @@
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     marker::PhantomData,
-    rc::Rc,
 };
 
 use arcstr::ArcStr;
@@ -32,7 +31,7 @@ use crate::{
 
 pub struct LoweringCtx<'c, 'm> {
     pub compiler: &'c mut Compiler<'m>,
-    pub url: Rc<DomainUrl>,
+    pub url: DomainUrl,
     pub domain_def_id: DefId,
     pub domain_index: DomainIndex,
     pub source_id: SourceId,

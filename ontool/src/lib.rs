@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+use arcstr::{literal, ArcStr};
 use ariadne::{ColorGenerator, Label, Report, ReportKind, Source};
 use axum::{
     extract::{
@@ -19,19 +20,14 @@ use notify_debouncer_full::{
 use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
-    ontol_syntax::OntolTreeSyntax,
-    topology::{DepGraphBuilder, DomainUrl, DomainUrlParser, GraphState, ParsedDomain},
+    topology::{DomainUrl, DomainUrlParser, DomainUrlResolver},
     SourceCodeRegistry, SourceId, Sources,
 };
 use ontol_examples::FakeAtlasServer;
 use ontol_lsp::Backend;
-use ontol_parser::cst_parse;
 use ontol_runtime::{
     interface::json_schema::build_openapi_schemas,
-    ontology::{
-        config::{DataStoreConfig, DomainConfig},
-        Ontology,
-    },
+    ontology::{config::DataStoreConfig, Ontology},
 };
 use service::{domains_router, ontology_router};
 use std::{
@@ -41,7 +37,6 @@ use std::{
     io::{stdout, Stdout},
     net::SocketAddr,
     path::PathBuf,
-    rc::Rc,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -190,7 +185,7 @@ pub async fn run() -> Result<(), OntoolError> {
 pub async fn run_command(command: Command) -> Result<(), OntoolError> {
     match command {
         Command::Check(args) => {
-            compile(args.dir, args.domains, None)?;
+            compile(args.dir, args.domains, None).await?;
             println!("No errors found.");
 
             Ok(())
@@ -198,7 +193,7 @@ pub async fn run_command(command: Command) -> Result<(), OntoolError> {
         Command::Compile(args) => {
             let output_file = File::create(args.output)?;
 
-            let ontology = compile(args.dir, args.domains, args.backend)?;
+            let ontology = compile(args.dir, args.domains, args.backend).await?;
             ontology.try_serialize_to_postcard(output_file).unwrap();
 
             Ok(())
@@ -212,7 +207,7 @@ pub async fn run_command(command: Command) -> Result<(), OntoolError> {
                     .expect("no input files"),
             )?;
 
-            let ontology = compile(args.dir, args.domains, None)?;
+            let ontology = compile(args.dir, args.domains, None).await?;
 
             let (domain_index, domain) = ontology
                 .domains()
@@ -266,7 +261,19 @@ fn init_tracing_stderr() {
         .init();
 }
 
-fn compile(
+#[derive(Default)]
+struct SourcesByUrl {
+    table: HashMap<DomainUrl, ArcStr>,
+}
+
+#[async_trait::async_trait]
+impl DomainUrlResolver for SourcesByUrl {
+    async fn resolve_domain_url(&self, url: &DomainUrl) -> Option<ArcStr> {
+        self.table.get(url).cloned()
+    }
+}
+
+async fn compile(
     root_dir: PathBuf,
     domains: Vec<String>,
     backend: Option<String>,
@@ -276,10 +283,8 @@ fn compile(
     }
 
     let mut ontol_sources = Sources::default();
-    let mut sources_by_url: HashMap<DomainUrl, Rc<String>> = Default::default();
+    let mut sources_by_url: HashMap<DomainUrl, ArcStr> = Default::default();
     let mut paths_by_url: HashMap<DomainUrl, PathBuf> = Default::default();
-
-    let fake_atlas_server = FakeAtlasServer::default();
 
     for entry in read_dir(root_dir)? {
         let entry = entry?;
@@ -292,7 +297,7 @@ fn compile(
             let source = fs::read_to_string(&path)?;
             let source_url = get_source_url(path.to_str().unwrap())?;
 
-            sources_by_url.insert(source_url.clone(), Rc::new(source));
+            sources_by_url.insert(source_url.clone(), source.into());
             paths_by_url.insert(source_url, path);
         }
     }
@@ -302,49 +307,26 @@ fn compile(
         roots.push(get_source_url(&domain_ref)?);
     }
 
+    let url_resolvers: Vec<Box<dyn DomainUrlResolver>> = vec![
+        Box::new(SourcesByUrl {
+            table: sources_by_url,
+        }),
+        Box::new(FakeAtlasServer::default()),
+    ];
+
     let mut source_code_registry = SourceCodeRegistry::default();
-    let mut package_graph_builder = DepGraphBuilder::with_roots(roots);
 
-    let topology = loop {
-        let graph_state = package_graph_builder.transition().map_err(|err| {
-            print_unified_compile_error(err, &ontol_sources, &source_code_registry).unwrap();
-            OntoolError::Compile
-        })?;
-
-        match graph_state {
-            GraphState::RequestPackages { builder, requests } => {
-                package_graph_builder = builder;
-
-                for request in requests {
-                    if let Some(source_text) =
-                        sources_by_url.remove(&request.url).or(fake_atlas_server
-                            .lookup(&request.url)
-                            .map(|src| Rc::new(src.to_string())))
-                    {
-                        let (flat_tree, errors) = cst_parse(&source_text);
-
-                        let parsed = ParsedDomain::new(
-                            request,
-                            Box::new(OntolTreeSyntax {
-                                tree: flat_tree.unflatten(),
-                                source_text: source_text.clone(),
-                            }),
-                            errors,
-                            DomainConfig::default(),
-                            &mut ontol_sources,
-                        );
-                        source_code_registry
-                            .registry
-                            .insert(parsed.src.id, source_text);
-                        package_graph_builder.provide_domain(parsed);
-                    } else {
-                        eprintln!("Could not load `{}`", request.url);
-                    }
-                }
-            }
-            GraphState::Built(topology) => break topology,
-        }
-    };
+    let topology = ontol_compiler::topology::resolve_topology_async(
+        roots,
+        &mut ontol_sources,
+        &mut source_code_registry,
+        &url_resolvers,
+    )
+    .await
+    .map_err(|err| {
+        print_unified_compile_error(err, &ontol_sources, &source_code_registry).unwrap();
+        OntoolError::Compile
+    })?;
 
     let mem = Mem::default();
     ontol_compiler::compile(topology, ontol_sources.clone(), &mem)
@@ -407,7 +389,7 @@ fn print_unified_compile_error(
                     .with_color(colors.next()),
             )
             .finish()
-            .eprint((&origin, Source::from(literal_source.as_ref())))?;
+            .eprint((&origin, Source::from(literal_source)))?;
 
         for note in error.notes {
             let note_span = note.span();
@@ -424,7 +406,7 @@ fn print_unified_compile_error(
                         .with_color(colors.next()),
                 )
                 .finish()
-                .eprint((&origin, Source::from(literal_source.as_ref())))?;
+                .eprint((&origin, Source::from(literal_source)))?;
         }
     }
 
@@ -433,7 +415,7 @@ fn print_unified_compile_error(
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 enum DomainUrlOrigin {
-    Domain(Rc<DomainUrl>),
+    Domain(DomainUrl),
     CliArg,
 }
 
@@ -450,7 +432,7 @@ fn report_source_name(
     source_id: SourceId,
     ontol_sources: &Sources,
     registry: &SourceCodeRegistry,
-) -> (DomainUrlOrigin, Rc<String>) {
+) -> (DomainUrlOrigin, ArcStr) {
     // FIXME: If the error can't be mapped to a source file,
     // things will look quite strange. Fix later..
     match ontol_sources.get_source(source_id) {
@@ -461,11 +443,11 @@ fn report_source_name(
                 DomainUrlOrigin::Domain(ontol_source.url.clone()),
                 literal_source
                     .cloned()
-                    .unwrap_or_else(|| Rc::new("<ontol>".to_string())),
+                    .unwrap_or_else(|| literal!("<ontol>")),
             )
         }
         None => {
-            let ontol = Rc::new("<arg>".to_string());
+            let ontol = literal!("<arg>");
             (DomainUrlOrigin::CliArg, ontol)
         }
     }
@@ -537,7 +519,7 @@ async fn serve(root_dir: PathBuf, domains: Vec<String>, port: u16) -> Result<(),
 
     // initial compilation
     let backend = Some(String::from("inmemory"));
-    let ontology_result = compile(root_dir.clone(), domains.clone(), backend.clone());
+    let ontology_result = compile(root_dir.clone(), domains.clone(), backend.clone()).await;
     match ontology_result {
         Ok(ontology) => {
             reload_routes(ontology, &dynamic_routers, &base_url).await;
@@ -560,7 +542,7 @@ async fn serve(root_dir: PathBuf, domains: Vec<String>, port: u16) -> Result<(),
                         clear_term_if_supported(&mut stdout);
 
                         let ontology_result =
-                            compile(root_dir.clone(), domains.clone(), backend.clone());
+                            compile(root_dir.clone(), domains.clone(), backend.clone()).await;
                         match ontology_result {
                             Ok(ontology) => {
                                 reload_routes(ontology, &dynamic_routers, &base_url).await;

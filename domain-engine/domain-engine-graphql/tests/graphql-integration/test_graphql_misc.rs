@@ -14,8 +14,8 @@ use crate::mk_engine_default;
 
 #[datastore_test(tokio::test)]
 async fn test_guitar_synth_union_mutation_and_query(ds: &str) {
-    let (test, [schema]) = TestPackages::with_static_sources([guitar_synth_union()])
-        .compile_schemas(["guitar_synth_union"]);
+    let (test, [schema]) =
+        TestPackages::with_sources([guitar_synth_union()]).compile_schemas(["guitar_synth_union"]);
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
     expect_eq!(
@@ -135,7 +135,7 @@ async fn test_guitar_synth_union_mutation_and_query(ds: &str) {
 #[datastore_test(tokio::test)]
 async fn test_entity_subtype(ds: &str) {
     let (test, [derived_schema, db_schema]) =
-        TestPackages::with_static_sources([entity_subtype::derived(), entity_subtype::db()])
+        TestPackages::with_sources([entity_subtype::derived(), entity_subtype::db()])
             .compile_schemas(["derived", "db"]);
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
@@ -252,7 +252,7 @@ async fn arc_simple(ds: &str) {
 #[datastore_test(tokio::test)]
 async fn edge_entity_simple_happy_path(ds: &str) {
     let (test, [schema]) =
-        TestPackages::with_static_sources([edge_entity_simple()]).compile_schemas(["edge_entity"]);
+        TestPackages::with_sources([edge_entity_simple()]).compile_schemas(["edge_entity"]);
 
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
@@ -329,7 +329,7 @@ async fn edge_entity_simple_happy_path(ds: &str) {
 #[datastore_test(tokio::test)]
 async fn edge_entity_simple_foreign_violation(ds: &str) {
     let (test, [schema]) =
-        TestPackages::with_static_sources([edge_entity_simple()]).compile_schemas(["edge_entity"]);
+        TestPackages::with_sources([edge_entity_simple()]).compile_schemas(["edge_entity"]);
 
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
@@ -350,8 +350,8 @@ async fn edge_entity_simple_foreign_violation(ds: &str) {
 /// FIXME: implement for arango
 #[datastore_test(tokio::test)]
 async fn edge_entity_union_happy_path(ds: &str) {
-    let (test, [schema]) = TestPackages::with_static_sources([edge_entity_union()])
-        .compile_schemas(["edge_entity_union"]);
+    let (test, [schema]) =
+        TestPackages::with_sources([edge_entity_union()]).compile_schemas(["edge_entity_union"]);
 
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 
@@ -444,8 +444,8 @@ async fn edge_entity_union_happy_path(ds: &str) {
 
 #[datastore_test(tokio::test)]
 async fn edge_entity_union_foreign_violation(ds: &str) {
-    let (test, [schema]) = TestPackages::with_static_sources([edge_entity_union()])
-        .compile_schemas(["edge_entity_union"]);
+    let (test, [schema]) =
+        TestPackages::with_sources([edge_entity_union()]).compile_schemas(["edge_entity_union"]);
 
     let ctx: ServiceCtx = mk_engine_default(test.ontology_owned(), ds).await.into();
 

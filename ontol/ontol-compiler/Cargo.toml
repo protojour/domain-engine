@@ -13,6 +13,7 @@ ontol-macros.path = "../ontol-macros"
 ontol-hir.path = "../ontol-hir"
 ontol-runtime.path = "../ontol-runtime"
 ontol-parser.path = "../ontol-parser"
+async-trait.workspace = true
 fnv.workspace = true
 indexmap.workspace = true
 serde.workspace = true

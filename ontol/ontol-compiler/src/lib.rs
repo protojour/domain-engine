@@ -11,7 +11,6 @@ use properties::PropCtx;
 use std::{
     collections::{BTreeMap, BTreeSet},
     ops::{Deref, Index},
-    rc::Rc,
 };
 
 use codegen::task::{execute_codegen_tasks, CodeCtx};
@@ -273,7 +272,7 @@ impl<'m> Index<TextConstant> for Compiler<'m> {
 /// Lower the ontol syntax to populate the compiler's data structures
 pub fn lower_ontol_syntax<V: ontol_parser::cst::view::NodeView>(
     ontol_view: V,
-    url: Rc<DomainUrl>,
+    url: DomainUrl,
     domain_def_id: DefId,
     src: Src,
     session: Session,

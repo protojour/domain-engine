@@ -1,7 +1,8 @@
 #![forbid(unsafe_code)]
 
-use std::{borrow::Cow, collections::HashMap, rc::Rc, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
+use arcstr::ArcStr;
 use def_binding::DefBinding;
 use diagnostics::AnnotatedCompileError;
 use ontol_compiler::{
@@ -203,7 +204,7 @@ pub fn default_short_name() -> &'static str {
 }
 
 pub struct TestPackages {
-    sources_by_url: HashMap<DomainUrl, Cow<'static, str>>,
+    sources_by_url: HashMap<DomainUrl, ArcStr>,
     root_urls: Vec<DomainUrl>,
     sources: Sources,
     source_code_registry: SourceCodeRegistry,
@@ -215,15 +216,14 @@ pub struct TestPackages {
 impl TestPackages {
     /// Parse a string/file with `//@` directives
     pub fn parse_multi_ontol(default_url: DomainUrl, contents: &str) -> Self {
-        let mut sources_by_url: Vec<(DomainUrl, Cow<'static, str>)> = vec![];
+        let mut sources_by_url: Vec<(DomainUrl, ArcStr)> = vec![];
         let mut cur_url = default_url;
         let mut cur_source = String::new();
 
         for (line_no, line) in contents.lines().enumerate() {
             if line.starts_with("//@") {
                 if line_no > 1 {
-                    sources_by_url
-                        .push((cur_url.clone(), Cow::Owned(std::mem::take(&mut cur_source))));
+                    sources_by_url.push((cur_url.clone(), std::mem::take(&mut cur_source).into()));
                 }
 
                 let source_name = line.strip_prefix("//@ src_name=").unwrap();
@@ -234,35 +234,31 @@ impl TestPackages {
             }
         }
 
-        sources_by_url.push((cur_url, Cow::Owned(cur_source)));
+        sources_by_url.push((cur_url, cur_source.into()));
 
         Self::new(sources_by_url)
     }
 
     /// Configure with an explicit set of named sources.
     /// By default, the first one is chosen as the only root source.
-    pub fn with_sources(
-        sources_by_name: impl IntoIterator<Item = (DomainUrl, Cow<'static, str>)>,
-    ) -> Self {
+    pub fn with_sources(sources_by_name: impl IntoIterator<Item = (DomainUrl, ArcStr)>) -> Self {
         Self::new(sources_by_name.into_iter().collect())
     }
 
     /// Configure with an explicit set of named sources.
     /// By default, the first one is chosen as the only root source.
-    ///
-    /// This version requires the ONTOL sources to be &'static str.
     pub fn with_static_sources(
         sources_by_name: impl IntoIterator<Item = (DomainUrl, &'static str)>,
     ) -> Self {
         Self::new(
             sources_by_name
                 .into_iter()
-                .map(|(name, src)| (name, Cow::Borrowed(src)))
+                .map(|(name, src)| (name, ArcStr::from(src)))
                 .collect(),
         )
     }
 
-    fn new(sources_by_name: Vec<(DomainUrl, Cow<'static, str>)>) -> Self {
+    fn new(sources_by_name: Vec<(DomainUrl, ArcStr)>) -> Self {
         let default_root = sources_by_name.first().map(|(url, _)| url.clone());
 
         Self {
@@ -327,15 +323,14 @@ impl TestPackages {
                         }
 
                         if let Some(source_text) = self.sources_by_url.remove(&request.url) {
-                            let rc_source = Rc::new(source_text.as_ref().to_string());
-                            let (flat_tree, errors) = cst_parse(&rc_source);
+                            let (flat_tree, errors) = cst_parse(&source_text);
                             let tree = flat_tree.unflatten();
 
                             let parsed = ParsedDomain::new(
                                 request,
                                 Box::new(OntolTreeSyntax {
                                     tree,
-                                    source_text: rc_source.clone(),
+                                    source_text: source_text.clone(),
                                 }),
                                 errors,
                                 package_config,
@@ -343,7 +338,7 @@ impl TestPackages {
                             );
                             self.source_code_registry
                                 .registry
-                                .insert(parsed.src.id, rc_source);
+                                .insert(parsed.src.id, source_text);
 
                             package_graph_builder.provide_domain(parsed);
                         }
@@ -408,6 +403,20 @@ impl TestCompile for Vec<(DomainUrl, &'static str)> {
     }
 }
 
+impl TestCompile for Vec<(DomainUrl, ArcStr)> {
+    fn compile(self) -> OntolTest {
+        TestPackages::with_sources(self).compile_topology_ok()
+    }
+
+    fn compile_fail(self) -> Vec<AnnotatedCompileError> {
+        TestPackages::with_sources(self).compile_fail()
+    }
+
+    fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
+        TestPackages::with_sources(self).compile_fail_then(validator)
+    }
+}
+
 impl TestCompile for TestPackages {
     fn compile(mut self) -> OntolTest {
         self.compile_topology_ok()
@@ -440,15 +449,30 @@ impl TestCompile for TestPackages {
 
 impl TestCompile for &'static str {
     fn compile(self) -> OntolTest {
-        TestPackages::with_static_sources([(default_file_url(), self)]).compile()
+        TestPackages::with_static_sources([(default_file_url(), self.into())]).compile()
     }
 
     fn compile_fail(self) -> Vec<AnnotatedCompileError> {
-        TestPackages::with_static_sources([(default_file_url(), self)]).compile_fail()
+        TestPackages::with_static_sources([(default_file_url(), self.into())]).compile_fail()
     }
 
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
-        TestPackages::with_static_sources([(default_file_url(), self)]).compile_fail_then(validator)
+        TestPackages::with_static_sources([(default_file_url(), self.into())])
+            .compile_fail_then(validator)
+    }
+}
+
+impl TestCompile for ArcStr {
+    fn compile(self) -> OntolTest {
+        TestPackages::with_sources([(default_file_url(), self)]).compile()
+    }
+
+    fn compile_fail(self) -> Vec<AnnotatedCompileError> {
+        TestPackages::with_sources([(default_file_url(), self)]).compile_fail()
+    }
+
+    fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
+        TestPackages::with_sources([(default_file_url(), self)]).compile_fail_then(validator)
     }
 }
 

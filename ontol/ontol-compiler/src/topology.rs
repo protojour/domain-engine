@@ -2,11 +2,12 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Display;
-use std::rc::Rc;
 
+use arcstr::ArcStr;
 use ontol_parser::cst::inspect as insp;
 use ontol_parser::cst::view::NodeView;
 use ontol_parser::cst::view::NodeViewExt;
+use ontol_parser::cst_parse;
 use ontol_parser::ParserError;
 use ontol_parser::U32Span;
 use ontol_runtime::ontology::config::DomainConfig;
@@ -18,6 +19,8 @@ use url::Url;
 use crate::error::CompileError;
 use crate::error::UnifiedCompileError;
 use crate::ontol_syntax::OntolSyntax;
+use crate::ontol_syntax::OntolTreeSyntax;
+use crate::SourceCodeRegistry;
 use crate::SourceSpan;
 use crate::Sources;
 use crate::Src;
@@ -27,7 +30,7 @@ use crate::NO_SPAN;
 /// to be able to compile `use` statements
 #[derive(Default)]
 pub(crate) struct LoadedDomains {
-    pub by_url: HashMap<Rc<DomainUrl>, DefId>,
+    pub by_url: HashMap<DomainUrl, DefId>,
 }
 
 pub enum GraphState {
@@ -126,11 +129,74 @@ impl Display for DomainUrl {
     }
 }
 
+#[async_trait::async_trait]
+pub trait DomainUrlResolver: Send + Sync {
+    async fn resolve_domain_url(&self, url: &DomainUrl) -> Option<ArcStr>;
+}
+
+#[async_trait::async_trait]
+impl DomainUrlResolver for Vec<Box<dyn DomainUrlResolver>> {
+    async fn resolve_domain_url(&self, url: &DomainUrl) -> Option<ArcStr> {
+        for resolver in self.iter() {
+            if let Some(source) = resolver.resolve_domain_url(url).await {
+                return Some(source);
+            }
+        }
+
+        None
+    }
+}
+
+pub async fn resolve_topology_async(
+    roots: Vec<DomainUrl>,
+    ontol_sources: &mut Sources,
+    source_code_registry: &mut SourceCodeRegistry,
+    url_resolver: &dyn DomainUrlResolver,
+) -> Result<DomainTopology, UnifiedCompileError> {
+    let mut package_graph_builder = DepGraphBuilder::with_roots(roots);
+
+    let topology = loop {
+        let graph_state = package_graph_builder.transition()?;
+
+        match graph_state {
+            GraphState::RequestPackages { builder, requests } => {
+                package_graph_builder = builder;
+
+                for request in requests {
+                    if let Some(source_text) = url_resolver.resolve_domain_url(&request.url).await {
+                        let (flat_tree, errors) = cst_parse(&source_text);
+
+                        let parsed = ParsedDomain::new(
+                            request,
+                            Box::new(OntolTreeSyntax {
+                                tree: flat_tree.unflatten(),
+                                source_text: source_text.clone(),
+                            }),
+                            errors,
+                            DomainConfig::default(),
+                            ontol_sources,
+                        );
+                        source_code_registry
+                            .registry
+                            .insert(parsed.src.id, source_text);
+                        package_graph_builder.provide_domain(parsed);
+                    } else {
+                        eprintln!("Could not load `{}`", request.url);
+                    }
+                }
+            }
+            GraphState::Built(topology) => break topology,
+        }
+    };
+
+    Ok(topology)
+}
+
 /// A package in its parsed form.
 /// The parsed form is needed to know which dependencies to request.
 pub struct ParsedDomain {
     pub domain_index: DomainIndex,
-    pub url: Rc<DomainUrl>,
+    pub url: DomainUrl,
     pub config: DomainConfig,
     pub src: Src,
     pub syntax: Box<dyn OntolSyntax>,
@@ -148,7 +214,7 @@ impl ParsedDomain {
         let domain_index = request.domain_index;
 
         // TODO: Resolve local url
-        let url = Rc::new(request.url);
+        let url = request.url.clone();
 
         let src = sources.add_source(domain_index, url.clone());
 

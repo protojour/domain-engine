@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, panic::UnwindSafe, rc::Rc};
+use std::panic::UnwindSafe;
 
 use ontol_parser::{cst::tree::SyntaxTree, U32Span};
 use ontol_runtime::DefId;
@@ -18,7 +18,7 @@ pub trait OntolSyntax: UnwindSafe {
     fn dependencies(&self, errors: &mut Vec<ontol_parser::Error>) -> Vec<(DomainUrl, U32Span)>;
     fn lower(
         &self,
-        url: Rc<DomainUrl>,
+        url: DomainUrl,
         pkg_def_id: DefId,
         src: Src,
         session: Session,
@@ -31,20 +31,20 @@ pub struct OntolTreeSyntax<S> {
     pub source_text: S,
 }
 
-impl<S: Borrow<String> + UnwindSafe> OntolSyntax for OntolTreeSyntax<S> {
+impl<S: AsRef<str> + UnwindSafe> OntolSyntax for OntolTreeSyntax<S> {
     fn dependencies(&self, errors: &mut Vec<ontol_parser::Error>) -> Vec<(DomainUrl, U32Span)> {
-        extract_ontol_dependencies(self.tree.view(self.source_text.borrow()), errors)
+        extract_ontol_dependencies(self.tree.view(self.source_text.as_ref()), errors)
     }
 
     fn lower(
         &self,
-        url: Rc<DomainUrl>,
+        url: DomainUrl,
         domain_def_id: DefId,
         src: Src,
         session: Session,
     ) -> LoweringOutcome {
         lower_ontol_syntax(
-            self.tree.view(self.source_text.borrow()),
+            self.tree.view(self.source_text.as_ref()),
             url,
             domain_def_id,
             src,

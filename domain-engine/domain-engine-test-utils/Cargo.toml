@@ -20,6 +20,7 @@ domain-engine-store-arango = { path = "../domain-engine-store-arango", optional 
 domain-engine-store-inmemory.path = "../domain-engine-store-inmemory"
 domain-engine-store-pg = { path = "../domain-engine-store-pg", optional = true }
 domain-engine-tantivy.path = "../domain-engine-tantivy"
+arcstr.workspace = true
 tokio = { version = "1", features = ["sync"] }
 serde.workspace = true
 serde_json.workspace = true
