@@ -60,6 +60,10 @@ impl State {
                     ident,
                     "#### Def modifier\nThe definition is _private_. It will not be accessible to other domains if the domain is imported in a `use` statement."
                 )),
+                "@macro" => Some(HoverDoc::from(
+                    ident,
+                    "#### Def modifier\nThe definition describes a reusable partial fragment, such as an individual common field used in many types."
+                )),
                 "@open" => Some(HoverDoc::from(
                     ident,
                     "#### Def modifier\nThe definition and its immediate non-entity relationships are _open_. Arbitrary data can be associated with it."
@@ -117,7 +121,7 @@ impl State {
 }
 
 /// A list of Completions and their Kind
-pub const COMPLETIONS: [(&str, CompletionItemKind); 53] = [
+pub const COMPLETIONS: [(&str, CompletionItemKind); 54] = [
     ("domain", CompletionItemKind::KEYWORD),
     ("def", CompletionItemKind::KEYWORD),
     ("sym", CompletionItemKind::KEYWORD),
@@ -163,6 +167,7 @@ pub const COMPLETIONS: [(&str, CompletionItemKind); 53] = [
     ("true", CompletionItemKind::CONSTANT),
     ("false", CompletionItemKind::CONSTANT),
     ("@private", CompletionItemKind::TYPE_PARAMETER),
+    ("@macro", CompletionItemKind::TYPE_PARAMETER),
     ("@open", CompletionItemKind::TYPE_PARAMETER),
     ("@extern", CompletionItemKind::TYPE_PARAMETER),
     ("@match", CompletionItemKind::TYPE_PARAMETER),
