@@ -14,13 +14,16 @@
   "engines": {
     "vscode": "^1.94.0"
   },
-  "main": "./dist/extension.js",
+  "main": "./dist/node/extension.js",
+  "browser": "./dist/browser/extension.js",
   "scripts": {
     "check": "tsc --noEmit",
     "tidy": "prettier --write src/**/*.ts",
     "test": "node test/test.js | wasmtime --wasm threads --wasi threads wasm/ontol-lsp.wasm",
-    "build": "esbuild src/extension.ts --bundle --minify --outdir=dist --external:vscode --format=cjs --platform=node",
-    "package": "vsce package --out ontol.vsix"
+    "build": "npm run build:main && npm run build:browser",
+    "build:main": "esbuild src/extension.ts --bundle --minify --outdir=dist/node --external:vscode --format=cjs --platform=node --define:process.env.PLATFORM=\\\"node\\\"",
+    "build:browser": "esbuild src/extension.ts --bundle --minify --outdir=dist/browser --external:vscode --format=cjs --platform=browser --define:process.env.PLATFORM=\\\"browser\\\"",
+    "package": "vsce package --target web --out ontol.vsix"
   },
   "keywords": [
     "ontol",
@@ -66,6 +69,12 @@
       {
         "language": "ontol",
         "path": "./ontol.tmSnippet.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "ontol.restartLanguageServer",
+        "title": "ONTOL: Restart language server"
       }
     ]
   },
