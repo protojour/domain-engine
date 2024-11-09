@@ -74,17 +74,13 @@ impl Backend {
 
                         // handle missing packages if any
                         let mut data: Value = json!({});
-                        if let ontol_compiler::CompileError::DomainNotFound(url) = &err.error {
-                            let (path, _) = get_path_and_name(url.short_name());
-                            let source_name = url.short_name();
+                        if let ontol_compiler::CompileError::DomainNotFound(domain_url) = &err.error
+                        {
+                            let (path, _) = get_path_and_name(url.as_str());
+                            let source_name = domain_url.short_name();
                             let ref_uri = build_uri(path, source_name);
 
-                            if cfg!(feature = "wasm") {
-                                data = json!(OpenFileArgs {
-                                    ref_uri: ref_uri.clone(),
-                                    src_uri: url.to_string(),
-                                });
-                            } else if let Ok(text) = read_file(&ref_uri) {
+                            if let Ok(text) = read_file(&ref_uri) {
                                 state.docs.insert(
                                     ref_uri.to_string(),
                                     Document {
@@ -97,6 +93,11 @@ impl Backend {
                                 );
                                 state.parse_statements(&ref_uri);
                                 restart = true;
+                            } else {
+                                data = json!(OpenFileArgs {
+                                    ref_uri: ref_uri.clone(),
+                                    src_uri: url.to_string(),
+                                });
                             }
                         }
 
