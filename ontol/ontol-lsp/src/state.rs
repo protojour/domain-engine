@@ -23,6 +23,7 @@ use std::{
     sync::Arc,
 };
 use tower_lsp::lsp_types::{CompletionItem, Location, MarkedString, Position, Range, Url};
+use tracing::debug;
 
 type UsizeRange = std::ops::Range<usize>;
 
@@ -223,7 +224,11 @@ impl State {
                         let package_config = DomainConfig::default();
                         let request_uri = build_uri(root_path, source_name);
 
+                        debug!("missing file {request_uri}");
+
                         if let Some(doc) = self.docs.get(&request_uri) {
+                            debug!("have file {request_uri}!");
+
                             let (flat_tree, errors) = ontol_parser::cst_parse(&doc.text);
 
                             let package = ParsedDomain::new(
@@ -296,6 +301,8 @@ impl State {
                     .symbols()
                     .map(|sym| sym.slice().to_string())
                     .collect();
+
+                debug!("get_definition lookup_path {lookup_path:?}");
 
                 match lookup_path.len() {
                     0 => {
@@ -470,7 +477,7 @@ impl HoverDoc {
         }
     }
 
-    /// Convert HoverDoc a Vec of Markdown strings
+    /// Convert HoverDoc to a Vec of Markdown strings
     pub fn to_markdown_vec(&self) -> Vec<MarkedString> {
         let mut vec = vec![MarkedString::from_language_code(
             "ontol".to_string(),
@@ -488,8 +495,9 @@ impl HoverDoc {
     }
 }
 
-/// Read file contents for URI
+/// Read file contents, must be a full `file://workspace/path/etc`
 pub fn read_file(uri: &str) -> Result<String, Error> {
+    debug!("read_file {uri}");
     let path = get_base_path(uri);
     let text = std::fs::read_to_string(std::path::Path::new(&path))?;
     Ok(text)
@@ -606,12 +614,19 @@ fn locate_token(pos: u32, parent: TreeNodeView) -> Option<(Vec<TreeNodeView>, Tr
     search(pos, &mut path, parent).map(|token| (path, token))
 }
 
+/// Get doc comment of a node, if any (no slashes)
 fn get_doc_comments(parent: impl NodeViewExt) -> Option<String> {
     let mut doc_comments = parent.local_tokens_filter(Kind::DocComment).peekable();
 
     if doc_comments.peek().is_some() {
-        let lines =
-            doc_comments.map(|token| token.slice().strip_prefix("///").unwrap().to_string());
+        let lines = doc_comments.map(|token| {
+            token
+                .slice()
+                .strip_prefix("///")
+                .unwrap()
+                .trim()
+                .to_string()
+        });
 
         Some(ontol_parser::join_doc_lines(lines).unwrap_or(Default::default()))
     } else {

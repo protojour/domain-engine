@@ -7,4 +7,5 @@ edition = "2021"
 ontol-lsp = { path = "../ontol-lsp", features = ["wasm"] }
 tokio = { version = "1", features = ["io-std", "rt-multi-thread", "macros"]}
 tower-lsp = "0.20"
-
+tracing.workspace = true
+tracing-subscriber.workspace = true
