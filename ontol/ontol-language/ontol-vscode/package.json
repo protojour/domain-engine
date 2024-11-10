@@ -74,7 +74,11 @@
     "commands": [
       {
         "command": "ontol.restartLanguageServer",
-        "title": "ONTOL: Restart language server"
+        "title": "ONTOL: Restart language server and client"
+      },
+      {
+        "command": "ontol.openMissingFile",
+        "title": "ONTOL: Open missing file..."
       }
     ]
   },

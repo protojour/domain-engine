@@ -167,7 +167,7 @@ impl LanguageServer for Backend {
                 document_symbol_provider: Some(OneOf::Left(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
                 execute_command_provider: Some(ExecuteCommandOptions {
-                    commands: vec!["ontol-lsp/openFile".to_string()],
+                    commands: vec!["ontol.openMissingFile".to_string()],
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -175,17 +175,7 @@ impl LanguageServer for Backend {
         })
     }
 
-    async fn initialized(&self, _: InitializedParams) {
-        // self.client
-        //     .log_message(MessageType::LOG, "Client and server initialized")
-        //     .await;
-    }
-
     async fn shutdown(&self) -> Result<()> {
-        // self.client
-        //     .log_message(MessageType::LOG, "Shutting down language server")
-        //     .await;
-
         Ok(())
     }
 
@@ -374,7 +364,7 @@ impl LanguageServer for Backend {
                 diagnostics: Some(vec![diag.clone()]),
                 command: Some(Command {
                     title: "Open missing file...".to_string(),
-                    command: "ontol-lsp.openFile".to_string(),
+                    command: "ontol.openMissingFile".to_string(),
                     arguments: Some(vec![diag.data.clone().into()]),
                 }),
                 is_preferred: Some(true),
@@ -385,7 +375,7 @@ impl LanguageServer for Backend {
     }
 
     async fn execute_command(&self, params: ExecuteCommandParams) -> Result<Option<Value>> {
-        if params.command.as_str() == "ontol-lsp.openFile" {
+        if params.command.as_str() == "ontol.openMissingFile" {
             if let Some(val) = params.arguments.first() {
                 let args: OpenFileArgs = serde_json::from_value(val.clone()).unwrap_or_default();
                 let uri = Url::parse(&args.ref_uri).unwrap();
