@@ -3,7 +3,6 @@ use std::{
     ops::Range,
 };
 
-use arcstr::ArcStr;
 use ontol_parser::{
     cst::{
         inspect as insp,
@@ -18,6 +17,7 @@ use tracing::debug;
 use crate::{
     def::{DefKind, TypeDef, TypeDefFlags},
     namespace::DocId,
+    ontol_syntax::extract_documentation,
     CompileError,
 };
 
@@ -292,22 +292,14 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         }
     }
 
-    pub(super) fn extract_documentation(node_view: V) -> Option<ArcStr> {
-        let doc_comments = node_view
-            .local_tokens_filter(Kind::DocComment)
-            .map(|token| token.slice().strip_prefix("///").unwrap().to_string());
-
-        ontol_parser::join_doc_lines(doc_comments).map(|s| s.into())
-    }
-
     pub(super) fn append_documentation(&mut self, doc_id: DocId, node_view: V) {
-        let Some(docs) = Self::extract_documentation(node_view) else {
+        let Some(docs) = extract_documentation(node_view) else {
             return;
         };
 
         match self.ctx.compiler.namespaces.docs.entry(doc_id) {
             Entry::Vacant(vacant) => {
-                vacant.insert(docs);
+                vacant.insert(docs.into());
             }
             Entry::Occupied(mut occupied) => {
                 let mut string = occupied.get().to_string();

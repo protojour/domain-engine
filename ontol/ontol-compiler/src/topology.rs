@@ -4,12 +4,7 @@ use std::collections::HashSet;
 use std::fmt::Display;
 use std::sync::Arc;
 
-use ontol_parser::cst::inspect as insp;
-use ontol_parser::cst::view::NodeView;
-use ontol_parser::cst::view::NodeViewExt;
 use ontol_parser::cst_parse;
-use ontol_parser::ParserError;
-use ontol_parser::U32Span;
 use ontol_runtime::ontology::config::DomainConfig;
 use ontol_runtime::vec_map::VecMap;
 use ontol_runtime::DefId;
@@ -21,6 +16,7 @@ use crate::error::UnifiedCompileError;
 use crate::ontol_syntax::ArcString;
 use crate::ontol_syntax::OntolSyntax;
 use crate::ontol_syntax::OntolTreeSyntax;
+use crate::ontol_syntax::WithDocs;
 use crate::SourceCodeRegistry;
 use crate::SourceSpan;
 use crate::Sources;
@@ -230,55 +226,6 @@ impl ParsedDomain {
     }
 }
 
-pub fn extract_ontol_dependencies<V: NodeView>(
-    ontol_view: V,
-    parse_errors: &mut Vec<ontol_parser::Error>,
-) -> Vec<(DomainUrl, U32Span)> {
-    let mut deps: Vec<(DomainUrl, U32Span)> = vec![];
-
-    let parser = DomainUrlParser::default();
-
-    if let insp::Node::Ontol(ontol) = ontol_view.node() {
-        for statement in ontol.statements() {
-            match statement {
-                insp::Statement::DomainStatement(_) => continue,
-                insp::Statement::UseStatement(use_stmt) => {
-                    if use_stmt
-                        .ident_path()
-                        .and_then(|path| path.symbols().next())
-                        .is_none()
-                    {
-                        // avoid processing syntactically invalid statement
-                        continue;
-                    }
-
-                    let Some(uri) = use_stmt.uri() else {
-                        continue;
-                    };
-                    let Some(Ok(text)) = uri.text() else {
-                        continue;
-                    };
-
-                    match parser.parse(&text) {
-                        Ok(reference) => {
-                            deps.push((reference, uri.0.span()));
-                        }
-                        Err(_error) => {
-                            parse_errors.push(ontol_parser::Error::Parse(ParserError {
-                                msg: "invalid reference".to_string(),
-                                span: uri.0.span(),
-                            }));
-                        }
-                    }
-                }
-                _ => break,
-            }
-        }
-    }
-
-    deps
-}
-
 /// Topological sort of the built package graph
 #[derive(Default)]
 pub struct DomainTopology {
@@ -335,7 +282,11 @@ impl DepGraphBuilder {
     pub fn provide_domain(&mut self, mut package: ParsedDomain) {
         let mut children: HashSet<DomainUrl> = HashSet::default();
 
-        for (reference, span) in package.syntax.dependencies(&mut package.parse_errors) {
+        let header_data = package
+            .syntax
+            .header_data(WithDocs(false), &mut package.parse_errors);
+
+        for (reference, span) in header_data.deps {
             let url = package.url.join(&reference);
 
             self.request_domain(url.clone(), package.src.span(span));
