@@ -4,6 +4,7 @@ use std::{ops::Range, str::FromStr};
 
 use indexmap::IndexMap;
 use ontol_hir::OverloadFunc;
+use ontol_macros::RustDoc;
 use ontol_runtime::{
     ontology::{domain::DomainId, ontol::TextLikeType},
     DefId, DomainIndex, OntolDefTag,
@@ -27,6 +28,15 @@ use crate::{
 ///
 /// No other domain should have a timestamp earlier than what's encoded inside this ULID (2023-01-04)
 const ONTOL_DOMAIN_ID: &str = "01GNYFZP30ED0EZ1579TH0D55P";
+
+/// documentation for the ontol domain
+#[derive(RustDoc)]
+pub enum Ontol {
+    /// The original domain.
+    ///
+    /// ontol defines fundamental primitives that are used to compose definitions in higher level domains.
+    Ontol,
+}
 
 struct DefPath<'a, 'm>(&'a [&'m str], DefId);
 

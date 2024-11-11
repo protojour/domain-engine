@@ -96,16 +96,21 @@ fn ontol_domain_is_defined_in_the_namespace() {
 
 #[test]
 fn ontol_domain_is_documented() {
-    "".compile_then(|test| {
-        let ontol_domain = test
-            .ontology()
-            .domain_by_index(DomainIndex::ontol())
-            .unwrap();
-        let text = ontol_domain
-            .find_def_by_name(test.ontology().find_text_constant("text").unwrap())
-            .unwrap();
-        assert!(test.ontology().get_def_docs(text.id).is_some());
-    });
+    let test = "".compile();
+    let ontol_domain = test
+        .ontology()
+        .domain_by_index(DomainIndex::ontol())
+        .unwrap();
+
+    let text = ontol_domain
+        .find_def_by_name(test.ontology().find_text_constant("text").unwrap())
+        .unwrap();
+    assert!(test.ontology().get_def_docs(text.id).is_some());
+
+    let domain_doc = test
+        .ontology()
+        .get_def_docs(test.ontology().domains().next().unwrap().1.def_id());
+    assert!(domain_doc.is_some());
 }
 
 #[test]

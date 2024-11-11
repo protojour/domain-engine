@@ -35,6 +35,7 @@ use crate::{
         serde::{serde_generator::SerdeGenerator, SerdeKey, EDGE_PROPERTY},
     },
     namespace::{DocId, Space},
+    ontol_domain::Ontol,
     primitive::PrimitiveKind,
     properties::Properties,
     relation::{rel_def_meta, rel_repr_meta, RelDefMeta, RelId, Relationship, UnionMemberCache},
@@ -54,6 +55,12 @@ impl<'m> Compiler<'m> {
 
         for def_id in self.defs.iter_domain_def_ids(DomainIndex::ontol()) {
             match self.defs.def_kind(def_id) {
+                DefKind::Domain(_) => {
+                    docs_table.insert(
+                        DocId::Def(def_id),
+                        Ontol::get_field_rustdoc(&Ontol::Ontol).unwrap(),
+                    );
+                }
                 DefKind::Primitive(kind, _ident) => {
                     if let Some(field_docs) = PrimitiveKind::get_field_rustdoc(kind) {
                         docs_table.insert(DocId::Def(def_id), field_docs);

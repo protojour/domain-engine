@@ -74,6 +74,7 @@ impl Domain {
         &self.domain_id
     }
 
+    /// The DefId of the domain itself
     pub fn def_id(&self) -> DefId {
         self.def_id
     }
