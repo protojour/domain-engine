@@ -17,7 +17,7 @@ use crate::{mk_engine_default, test_graphql_ontology::OntologyParams};
 async fn test_findings(ds: &str) {
     let (test, [findings_schema, guitar_schema]) =
         TestPackages::with_sources([findings(), guitar_synth_union()])
-            .with_roots([findings().0, guitar_synth_union().0])
+            .with_entrypoints([findings().0, guitar_synth_union().0])
             .compile_schemas(["findings", "guitar_synth_union"]);
     let engine = mk_engine_default(test.ontology_owned(), ds).await;
     let domain_ctx: ServiceCtx = engine.clone().into();

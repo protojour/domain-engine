@@ -78,10 +78,8 @@ fn test_artist_and_instrument_json_schema() {
     artist_and_instrument().1.compile_then(|test| {
         serde_json::to_string(&build_openapi_schemas(
             test.ontology(),
-            test.root_package(),
-            test.ontology()
-                .domain_by_index(test.root_package())
-                .unwrap(),
+            test.entrypoint(),
+            test.ontology().domain_by_index(test.entrypoint()).unwrap(),
         ))
         .unwrap();
     });

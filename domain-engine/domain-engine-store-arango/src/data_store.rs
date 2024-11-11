@@ -479,7 +479,7 @@ mod tests {
             test.ontology_owned(),
             Arc::new(Unimock::new(())),
         );
-        database.populate_collections(test.root_package()).unwrap();
+        database.populate_collections(test.entrypoint()).unwrap();
 
         let [artist] = test.bind(["artist"]);
         let select: Select = artist.struct_select([("plays", Select::Unit)]).into();
@@ -508,7 +508,7 @@ mod tests {
             test.ontology_owned(),
             Arc::new(Unimock::new(())),
         );
-        database.populate_collections(test.root_package()).unwrap();
+        database.populate_collections(test.entrypoint()).unwrap();
 
         let [artist] = test.bind(["artist"]);
 
@@ -541,7 +541,7 @@ mod tests {
             test.ontology_owned(),
             Arc::new(Unimock::new(())),
         );
-        database.populate_collections(test.root_package()).unwrap();
+        database.populate_collections(test.entrypoint()).unwrap();
 
         let [artist] = test.bind(["artist"]);
 
@@ -574,7 +574,7 @@ mod tests {
             test.ontology_owned(),
             Arc::new(Unimock::new(())),
         );
-        database.populate_collections(test.root_package()).unwrap();
+        database.populate_collections(test.entrypoint()).unwrap();
 
         let [artist] = test.bind(["artist"]);
 

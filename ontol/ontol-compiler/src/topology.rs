@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use ontol_parser::cst_parse;
 use ontol_runtime::ontology::config::DomainConfig;
+use ontol_runtime::ontology::domain::TopologyGeneration;
 use ontol_runtime::vec_map::VecMap;
 use ontol_runtime::DefId;
 use ontol_runtime::DomainIndex;
@@ -43,6 +44,7 @@ pub enum GraphState {
 pub struct DomainRequest {
     pub domain_index: DomainIndex,
     pub url: DomainUrl,
+    generation: TopologyGeneration,
 }
 
 pub struct DomainUrlParser {
@@ -145,12 +147,12 @@ impl DomainUrlResolver for Vec<Box<dyn DomainUrlResolver>> {
 }
 
 pub async fn resolve_topology_async(
-    roots: Vec<DomainUrl>,
+    entrypoints: Vec<DomainUrl>,
     ontol_sources: &mut Sources,
     source_code_registry: &mut SourceCodeRegistry,
     url_resolver: &dyn DomainUrlResolver,
 ) -> Result<DomainTopology, UnifiedCompileError> {
-    let mut package_graph_builder = DepGraphBuilder::with_roots(roots);
+    let mut package_graph_builder = DepGraphBuilder::with_entrypoints(entrypoints);
 
     let topology = loop {
         let graph_state = package_graph_builder.transition()?;
@@ -194,6 +196,7 @@ pub async fn resolve_topology_async(
 pub struct ParsedDomain {
     pub domain_index: DomainIndex,
     pub url: DomainUrl,
+    pub generation: TopologyGeneration,
     pub config: DomainConfig,
     pub src: Src,
     pub syntax: Box<dyn OntolSyntax>,
@@ -218,6 +221,7 @@ impl ParsedDomain {
         Self {
             domain_index: src.domain_index,
             url,
+            generation: request.generation,
             config,
             src,
             syntax,
@@ -239,7 +243,7 @@ pub enum PackageGraphError {
 
 pub struct DepGraphBuilder {
     next_domain_index: DomainIndex,
-    generation: usize,
+    generation: TopologyGeneration,
     parsed_packages: VecMap<DomainIndex, ParsedDomain>,
     request_graph: HashMap<DomainUrl, RequestedDomain>,
 }
@@ -247,7 +251,7 @@ pub struct DepGraphBuilder {
 impl DepGraphBuilder {
     /// Create an empty builder, seeded with the given root package names,
     /// which will the builder will attempt to resolve in the next transition.
-    pub fn with_roots(root_references: impl IntoIterator<Item = DomainUrl>) -> Self {
+    pub fn with_entrypoints(root_references: impl IntoIterator<Item = DomainUrl>) -> Self {
         let mut next_domain_index = DomainIndex::second();
         let request_graph = root_references
             .into_iter()
@@ -262,7 +266,7 @@ impl DepGraphBuilder {
                     RequestedDomain {
                         domain_index,
                         use_source_span: NO_SPAN,
-                        requested_at_generation: 0,
+                        requested_at_generation: TopologyGeneration(0),
                         dependencies: Default::default(),
                         found: false,
                     },
@@ -272,7 +276,7 @@ impl DepGraphBuilder {
 
         Self {
             next_domain_index,
-            generation: 0,
+            generation: TopologyGeneration(0),
             parsed_packages: Default::default(),
             request_graph,
         }
@@ -311,7 +315,7 @@ impl DepGraphBuilder {
 
         for (url, requested_package) in &self.request_graph {
             if !requested_package.found {
-                if requested_package.requested_at_generation < self.generation {
+                if requested_package.requested_at_generation.0 < self.generation.0 {
                     load_errors.push(
                         CompileError::DomainNotFound(url.clone())
                             .span(requested_package.use_source_span),
@@ -320,6 +324,7 @@ impl DepGraphBuilder {
                     requests.push(DomainRequest {
                         domain_index: requested_package.domain_index,
                         url: url.clone(),
+                        generation: self.generation,
                     })
                 }
             }
@@ -331,7 +336,7 @@ impl DepGraphBuilder {
             });
         }
 
-        self.generation += 1;
+        self.generation.0 += 1;
 
         if requests.is_empty() {
             Ok(GraphState::Built(self.topo_sort()))
@@ -415,7 +420,7 @@ impl DepGraphBuilder {
 struct RequestedDomain {
     domain_index: DomainIndex,
     use_source_span: SourceSpan,
-    requested_at_generation: usize,
+    requested_at_generation: TopologyGeneration,
     dependencies: HashSet<DomainUrl>,
     found: bool,
 }

@@ -248,7 +248,7 @@ impl ConduitBundle {
     async fn new(mock_clauses: impl unimock::Clause, ds: &str) -> Self {
         let test_packages =
             TestPackages::with_sources([blog_post_public(), feed_public(), conduit_db()])
-                .with_roots([blog_post_public().0, feed_public().0]);
+                .with_entrypoints([blog_post_public().0, feed_public().0]);
 
         let (test, [blog_schema, feed_schema, db_schema]) =
             test_packages.compile_schemas(["blog_post_public", "feed_public", "conduit_db"]);

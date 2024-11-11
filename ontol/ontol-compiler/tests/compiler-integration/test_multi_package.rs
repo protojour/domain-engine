@@ -107,7 +107,7 @@ fn multiple_roots() {
             ",
         ),
     ])
-    .with_roots([file_url("foo"), file_url("bar")])
+    .with_entrypoints([file_url("foo"), file_url("bar")])
     .compile_then(|test| {
         let _ = test.bind(["foo.foo", "bar.bar", "baz.baz"]);
     });

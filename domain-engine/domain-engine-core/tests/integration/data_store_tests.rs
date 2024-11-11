@@ -97,7 +97,7 @@ async fn test_db_remove_one_domain(ds: &str) {
         examples::conduit::conduit_db(),
         examples::artist_and_instrument(),
     ])
-    .with_roots([
+    .with_entrypoints([
         examples::conduit::conduit_db().0,
         examples::artist_and_instrument().0,
     ])
@@ -113,7 +113,7 @@ async fn test_db_remove_one_domain(ds: &str) {
 
     // This time without ARTIST_AND_INSTRUMENT
     let test2 = TestPackages::with_sources([examples::conduit::conduit_db()])
-        .with_roots([examples::conduit::conduit_db().0])
+        .with_entrypoints([examples::conduit::conduit_db().0])
         .compile();
 
     let domain_engine = DomainEngine::builder(test2.ontology_owned())
@@ -135,7 +135,7 @@ async fn test_db_multiple_persistent_domains(ds: &str) {
         examples::conduit::conduit_db(),
         examples::artist_and_instrument(),
     ])
-    .with_roots([
+    .with_entrypoints([
         examples::conduit::conduit_db().0,
         examples::artist_and_instrument().0,
     ])

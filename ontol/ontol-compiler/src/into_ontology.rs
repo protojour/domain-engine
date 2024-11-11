@@ -11,6 +11,7 @@ use ontol_runtime::{
             self, BasicDef, DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource,
             DataRelationshipTarget, DataTreeRepr, Def, DefRepr, DefReprUnionBound, Domain,
             EdgeCardinal, EdgeCardinalFlags, EdgeCardinalProjection, EdgeInfo, Entity,
+            TopologyGeneration,
         },
         map::MapMeta,
         ontol::{OntolDomainMeta, TextConstant, TextLikeType},
@@ -143,6 +144,10 @@ impl<'m> Compiler<'m> {
                 self.domain_ids.get(&domain_index).cloned().unwrap(),
                 domain_def_id,
                 domain_name,
+                self.topology_generation
+                    .get(&domain_index)
+                    .copied()
+                    .unwrap_or(TopologyGeneration(1)),
             );
 
             let namespace = namespaces.remove(&domain_def_id).unwrap();

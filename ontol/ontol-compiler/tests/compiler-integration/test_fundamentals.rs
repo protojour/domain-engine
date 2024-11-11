@@ -107,3 +107,25 @@ fn ontol_domain_is_documented() {
         assert!(test.ontology().get_def_docs(text.id).is_some());
     });
 }
+
+#[test]
+fn test_domain_topology_generation() {
+    let test = TestPackages::with_static_sources([
+        (file_url("entry"), "use 'other' as other"),
+        (file_url("other"), ""),
+    ])
+    .compile();
+
+    let mut domains = test.ontology().domains();
+    let ontol = domains.next().unwrap().1;
+    assert_eq!("ontol", &test.ontology()[ontol.unique_name()]);
+    assert_eq!(1, ontol.topology_generation().0, "not entrypoint");
+
+    let entry = domains.next().unwrap().1;
+    assert_eq!("entry", &test.ontology()[entry.unique_name()]);
+    assert_eq!(0, entry.topology_generation().0, "entrypoint");
+
+    let other = domains.next().unwrap().1;
+    assert_eq!("other", &test.ontology()[other.unique_name()]);
+    assert_eq!(1, other.topology_generation().0, "not entrypoint");
+}

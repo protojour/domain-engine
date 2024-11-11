@@ -20,7 +20,7 @@ use namespace::Namespaces;
 use ontol_runtime::{
     ontology::{
         config::{DataStoreConfig, DomainConfig},
-        domain::DomainId,
+        domain::{DomainId, TopologyGeneration},
         ontol::TextConstant,
         Ontology,
     },
@@ -173,6 +173,7 @@ struct Compiler<'m> {
     domain_def_ids: FnvHashMap<DomainIndex, DefId>,
     domain_ids: BTreeMap<DomainIndex, DomainId>,
     domain_config_table: FnvHashMap<DomainIndex, DomainConfig>,
+    topology_generation: FnvHashMap<DomainIndex, TopologyGeneration>,
     patterns: Patterns,
 
     str_ctx: StringCtx<'m>,
@@ -211,6 +212,7 @@ impl<'m> Compiler<'m> {
             domain_def_ids: Default::default(),
             domain_ids: Default::default(),
             domain_config_table: Default::default(),
+            topology_generation: Default::default(),
             patterns: Default::default(),
             str_ctx: StringCtx::new(mem),
             ty_ctx: TypeCtx::new(mem),

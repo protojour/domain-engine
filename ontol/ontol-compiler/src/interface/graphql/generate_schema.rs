@@ -63,7 +63,7 @@ pub fn generate_graphql_schema<'c>(
 
     let _entered = debug_span!("gql", pkg = ?domain_index.index()).entered();
 
-    let mut schema = new_schema_with_capacity(domain_index, domain.type_count());
+    let mut schema = new_schema_with_capacity(domain_index, domain.def_count());
     let mut namespace = GraphqlNamespace::with_domain_disambiguation(DomainDisambiguation {
         root_domain: domain_index,
         ontology_defs,

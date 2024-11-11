@@ -58,6 +58,8 @@ impl<'m> Compiler<'m> {
 
         self.domain_config_table
             .insert(parsed.domain_index, parsed.config);
+        self.topology_generation
+            .insert(parsed.domain_index, parsed.generation);
 
         let outcome = parsed.syntax.lower(
             parsed.url.clone(),

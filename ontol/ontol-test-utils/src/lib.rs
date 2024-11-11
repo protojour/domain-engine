@@ -87,7 +87,7 @@ macro_rules! assert_json_io_matches {
 #[derive(Clone)]
 pub struct OntolTest {
     ontology: Arc<Ontology>,
-    root_package: DomainIndex,
+    entrypoint: DomainIndex,
     compile_json_schema: bool,
     domains_by_url: HashMap<DomainUrl, DomainIndex>,
 }
@@ -101,8 +101,8 @@ impl OntolTest {
         self.ontology.clone()
     }
 
-    pub fn root_package(&self) -> DomainIndex {
-        self.root_package
+    pub fn entrypoint(&self) -> DomainIndex {
+        self.entrypoint
     }
 
     pub fn set_compile_json_schema(&mut self, enabled: bool) {
@@ -117,7 +117,7 @@ impl OntolTest {
 
             (self.get_domain_index(source_name), local_ident)
         } else {
-            (self.root_package, ident)
+            (self.entrypoint, ident)
         }
     }
 
@@ -137,7 +137,7 @@ impl OntolTest {
 
     /// Make new type bindings with the given type names.
     /// The type name may be written as "SourceName::Type" to specify a specific domain.
-    /// A type without prefix is interpreted as the root domain/package.
+    /// A type without prefix is interpreted as the entrypoint domain/package.
     pub fn bind<const N: usize>(&self, type_names: [&str; N]) -> [DefBinding; N] {
         type_names.map(|type_name| DefBinding::new(self, type_name))
     }
@@ -204,7 +204,7 @@ pub fn default_short_name() -> &'static str {
 
 pub struct TestPackages {
     sources_by_url: HashMap<DomainUrl, Arc<String>>,
-    root_urls: Vec<DomainUrl>,
+    entrypoint_urls: Vec<DomainUrl>,
     sources: Sources,
     source_code_registry: SourceCodeRegistry,
     data_store: Option<(DomainUrl, DataStoreConfig)>,
@@ -239,7 +239,7 @@ impl TestPackages {
     }
 
     /// Configure with an explicit set of named sources.
-    /// By default, the first one is chosen as the only root source.
+    /// By default, the first one is chosen as the only entrypoint source.
     pub fn with_sources(
         sources_by_name: impl IntoIterator<Item = (DomainUrl, Arc<String>)>,
     ) -> Self {
@@ -247,7 +247,7 @@ impl TestPackages {
     }
 
     /// Configure with an explicit set of named sources.
-    /// By default, the first one is chosen as the only root source.
+    /// By default, the first one is chosen as the only entrypoint source.
     pub fn with_static_sources(
         sources_by_name: impl IntoIterator<Item = (DomainUrl, &'static str)>,
     ) -> Self {
@@ -260,14 +260,14 @@ impl TestPackages {
     }
 
     fn new(sources_by_name: Vec<(DomainUrl, Arc<String>)>) -> Self {
-        let default_root = sources_by_name.first().map(|(url, _)| url.clone());
+        let default_entrypoint = sources_by_name.first().map(|(url, _)| url.clone());
 
         Self {
             sources_by_url: sources_by_name
                 .into_iter()
                 .map(|(url, text)| (url.clone(), text))
                 .collect(),
-            root_urls: default_root.into_iter().collect(),
+            entrypoint_urls: default_entrypoint.into_iter().collect(),
             sources: Default::default(),
             source_code_registry: Default::default(),
             data_store: None,
@@ -276,12 +276,12 @@ impl TestPackages {
         }
     }
 
-    /// Override the set of root packages.
+    /// Override the set of entrypoint packages.
     /// By default, the first source file is the only root file, and all other files will be loaded from that file.
     ///
     /// This method can configure any number of root sources which will be used to seed the package topology resolver.
-    pub fn with_roots(mut self, roots: impl IntoIterator<Item = DomainUrl>) -> Self {
-        self.root_urls = roots.into_iter().collect();
+    pub fn with_entrypoints(mut self, entrypoints: impl IntoIterator<Item = DomainUrl>) -> Self {
+        self.entrypoint_urls = entrypoints.into_iter().collect();
         self
     }
 
@@ -297,8 +297,9 @@ impl TestPackages {
     }
 
     fn load_topology(&mut self) -> Result<(DomainTopology, DomainIndex), UnifiedCompileError> {
-        let mut package_graph_builder = DepGraphBuilder::with_roots(self.root_urls.iter().cloned());
-        let mut root_package = None;
+        let mut package_graph_builder =
+            DepGraphBuilder::with_entrypoints(self.entrypoint_urls.iter().cloned());
+        let mut entrypoint = None;
 
         loop {
             match package_graph_builder.transition()? {
@@ -309,9 +310,9 @@ impl TestPackages {
                         self.domains_by_url
                             .insert(request.url.clone(), request.domain_index);
 
-                        if let Some(first_root) = self.root_urls.first() {
-                            if &request.url == first_root {
-                                root_package = Some(request.domain_index);
+                        if let Some(first_entrypoint) = self.entrypoint_urls.first() {
+                            if &request.url == first_entrypoint {
+                                entrypoint = Some(request.domain_index);
                             }
                         }
 
@@ -345,14 +346,14 @@ impl TestPackages {
                         }
                     }
                 }
-                GraphState::Built(topology) => return Ok((topology, root_package.unwrap())),
+                GraphState::Built(topology) => return Ok((topology, entrypoint.unwrap())),
             }
         }
     }
 
     fn compile_topology(&mut self) -> Result<OntolTest, UnifiedCompileError> {
         let mem = Mem::default();
-        let (package_topology, root_package) = self.load_topology()?;
+        let (package_topology, entrypoint) = self.load_topology()?;
 
         let mut ontology =
             ontol_compiler::compile(package_topology, self.sources.clone(), &mem)?.into_ontology();
@@ -367,7 +368,7 @@ impl TestPackages {
 
         Ok(OntolTest {
             ontology: Arc::new(ontology),
-            root_package,
+            entrypoint,
             // NOTE: waiting on https://github.com/Stranger6667/jsonschema-rs/issues/420
             compile_json_schema: false,
             domains_by_url: self.domains_by_url.clone(),

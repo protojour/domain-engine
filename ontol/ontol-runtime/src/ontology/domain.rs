@@ -36,10 +36,15 @@ pub struct Domain {
     def_id: DefId,
 
     unique_name: TextConstant,
+    generation: TopologyGeneration,
 
     /// Types by def tag (the type's index within the domain)
     defs: VecMap<DefTag, Def>,
 }
+
+/// An ordinal representing a domain's topological sort in the dependency graph for the ontology
+#[derive(Clone, Copy, Serialize, Deserialize)]
+pub struct TopologyGeneration(pub u32);
 
 struct DefTag(pub u16);
 
@@ -50,11 +55,17 @@ impl VecMapKey for DefTag {
 }
 
 impl Domain {
-    pub fn new(domain_id: DomainId, def_id: DefId, unique_name: TextConstant) -> Self {
+    pub fn new(
+        domain_id: DomainId,
+        def_id: DefId,
+        unique_name: TextConstant,
+        generation: TopologyGeneration,
+    ) -> Self {
         Self {
             domain_id,
             def_id,
             unique_name,
+            generation,
             defs: Default::default(),
         }
     }
@@ -71,7 +82,11 @@ impl Domain {
         self.unique_name
     }
 
-    pub fn type_count(&self) -> usize {
+    pub fn topology_generation(&self) -> TopologyGeneration {
+        self.generation
+    }
+
+    pub fn def_count(&self) -> usize {
         self.defs.len()
     }
 
