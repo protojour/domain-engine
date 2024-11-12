@@ -1,3 +1,6 @@
+/// A simple blogging abstraction that uses conduit_db as persistence layer.
+domain 01JCF1ZWTPMFWK8C9D42CDDR70 ()
+
 use 'conduit_db' as db
 
 def BlogPost (
