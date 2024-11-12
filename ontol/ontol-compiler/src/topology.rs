@@ -122,6 +122,18 @@ impl DomainUrl {
     }
 }
 
+impl From<Url> for DomainUrl {
+    fn from(value: Url) -> Self {
+        Self(value)
+    }
+}
+
+impl From<DomainUrl> for Url {
+    fn from(value: DomainUrl) -> Self {
+        value.0
+    }
+}
+
 impl Display for DomainUrl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
