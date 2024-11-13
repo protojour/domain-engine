@@ -15,7 +15,10 @@ use domain_engine_test_utils::{
     unimock,
     unimock::MockFn,
 };
-use ontol_examples::conduit::{blog_post_public, conduit_db, feed_public};
+use ontol_examples::{
+    conduit::{blog_post_public, conduit_db, feed_public},
+    AsAtlas,
+};
 use ontol_macros::datastore_test;
 use ontol_runtime::ontology::Ontology;
 use ontol_test_utils::{expect_eq, TestPackages};
@@ -246,9 +249,12 @@ struct ConduitBundle {
 
 impl ConduitBundle {
     async fn new(mock_clauses: impl unimock::Clause, ds: &str) -> Self {
-        let test_packages =
-            TestPackages::with_sources([blog_post_public(), feed_public(), conduit_db()])
-                .with_entrypoints([blog_post_public().0, feed_public().0]);
+        let test_packages = TestPackages::with_sources([
+            blog_post_public(),
+            feed_public(),
+            conduit_db().as_atlas("conduit"),
+        ])
+        .with_entrypoints([blog_post_public().0, feed_public().0]);
 
         let (test, [blog_schema, feed_schema, db_schema]) =
             test_packages.compile_schemas(["blog_post_public", "feed_public", "conduit_db"]);

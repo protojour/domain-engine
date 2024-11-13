@@ -1,6 +1,9 @@
 use indoc::indoc;
-use ontol_examples::conduit::{
-    blog_post_public, conduit_contrived_signup, conduit_db, conduit_public, feed_public,
+use ontol_examples::{
+    conduit::{
+        blog_post_public, conduit_contrived_signup, conduit_db, conduit_public, feed_public,
+    },
+    AsAtlas,
 };
 use ontol_macros::test;
 use ontol_runtime::{
@@ -51,7 +54,8 @@ fn test_conduit_db_ontology_smoke() {
 
 #[test]
 fn test_map_conduit_blog_post() {
-    let test = TestPackages::with_sources([blog_post_public(), conduit_db()]).compile();
+    let test = TestPackages::with_sources([blog_post_public(), conduit_db().as_atlas("conduit")])
+        .compile();
     test.mapper().assert_map_eq(
         ("conduit_db.Article", "BlogPost"),
         json!({
@@ -83,7 +87,8 @@ fn test_map_conduit_blog_post() {
 /// Test that the mapping works without providing the "tags" property in the input.
 #[test]
 fn test_map_conduit_no_tags_in_db_object() {
-    let test = TestPackages::with_sources([blog_post_public(), conduit_db()]).compile();
+    let test = TestPackages::with_sources([blog_post_public(), conduit_db().as_atlas("conduit")])
+        .compile();
     test.mapper().assert_map_eq(
         ("conduit_db.Article", "BlogPost"),
         json!({
@@ -113,7 +118,8 @@ fn test_map_conduit_no_tags_in_db_object() {
 
 #[test]
 fn test_map_match_conduit_blog_post_cond_clauses() {
-    let test = TestPackages::with_sources([blog_post_public(), conduit_db()]).compile();
+    let test = TestPackages::with_sources([blog_post_public(), conduit_db().as_atlas("conduit")])
+        .compile();
     let [article] = test.bind(["conduit_db.Article"]);
     let return_value = Value::sequence_of([article
         .entity_builder(
@@ -159,7 +165,8 @@ fn test_map_match_conduit_blog_post_cond_clauses() {
 
 #[test]
 fn test_conduit_feed_public() {
-    let test = TestPackages::with_sources([feed_public(), conduit_db()]).compile();
+    let test =
+        TestPackages::with_sources([feed_public(), conduit_db().as_atlas("conduit")]).compile();
     let [article] = test.bind(["conduit_db.Article"]);
     let article_return_value = Value::sequence_of([article
         .entity_builder(

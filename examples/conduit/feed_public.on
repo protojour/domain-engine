@@ -1,4 +1,4 @@
-use 'conduit_db' as db
+use 'atlas:/protojour/conduit/conduit_db' as db
 
 /// An RRS-like channel
 def channel (
