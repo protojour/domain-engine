@@ -44,6 +44,12 @@ pub trait DataStoreAPI {
         false
     }
 
+    /// Initiate and await shutdown. Must release any resources
+    /// so that it's safe to recreate/reinitialize the data store afterwards.
+    async fn shutdown(&self) -> DomainResult<()> {
+        Ok(())
+    }
+
     #[expect(unused)]
     fn stable_property_index(&self, prop_id: PropId) -> Option<u32> {
         None

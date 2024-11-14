@@ -11,7 +11,7 @@ use domain_engine_core::{
 };
 use futures_util::{stream::BoxStream, StreamExt};
 use indexer::WorkTracker;
-use indexer::{indexer_blocking_task, synchronizer_async_task, SyncQueue, Synrchonizer};
+use indexer::{synchronizer_async_task, writer_blocking_task, SyncQueue, Synrchonizer};
 use ontol_runtime::ontology::Ontology;
 use schema::{make_schema, SchemaWithMeta};
 use tantivy::directory::MmapDirectory;
@@ -75,10 +75,14 @@ struct TantivyDataStoreLayer {
     index_reader: IndexReader,
     indexer_work_tracker: Arc<WorkTracker>,
 
+    indexer_cancel: CancellationToken,
+
     #[expect(unused)]
     /// Cancellation token for all indexing tasks.
     /// Cancelling happens automatically upon dropping the layer (Drop impl).
     indexer_cancel_dropguard: Arc<DropGuard>,
+
+    writer_thread_finished: Arc<tokio::sync::Notify>,
 }
 
 #[async_trait::async_trait]
@@ -120,6 +124,15 @@ impl DataStoreAPI for TantivyDataStoreLayer {
         debug!("client pending work: {pending_work}");
         pending_work > 0
     }
+
+    async fn shutdown(&self) -> DomainResult<()> {
+        self.config.datastore.shutdown().await?;
+
+        self.indexer_cancel.cancel();
+        self.writer_thread_finished.notified().await;
+
+        Ok(())
+    }
 }
 
 impl TantivyDataStoreLayer {
@@ -129,9 +142,8 @@ impl TantivyDataStoreLayer {
 
         let indexer_cancel = config.cancel.child_token();
         let indexer_work_tracker = Arc::new(WorkTracker::default());
-        let (notify_tx, notify_rx) = tokio::sync::watch::channel(());
         let (vertex_tx, vertex_rx) = tokio::sync::mpsc::channel(config.vertex_index_queue_size);
-        let sync_queue = SyncQueue::new(notify_tx, indexer_work_tracker.clone());
+        let sync_queue = SyncQueue::new(indexer_work_tracker.clone());
 
         let tokenizer = TextAnalyzer::builder(SimpleTokenizer::default())
             .filter(LowerCaser)
@@ -165,7 +177,7 @@ impl TantivyDataStoreLayer {
 
         // start async task that synchronizes the work queue for the real indexer task
         tokio::task::spawn({
-            let indexer_queue = sync_queue.clone();
+            let sync_queue = sync_queue.clone();
             let indexer_cancel = indexer_cancel.clone();
             let synchronizer = Synrchonizer {
                 ontology: config.data_store_params.ontology.clone(),
@@ -173,13 +185,7 @@ impl TantivyDataStoreLayer {
                 vertex_tx,
             };
             async move {
-                synchronizer_async_task(
-                    synchronizer,
-                    indexer_queue.clone(),
-                    notify_rx,
-                    indexer_cancel,
-                )
-                .await;
+                synchronizer_async_task(synchronizer, sync_queue.clone(), indexer_cancel).await;
             }
         });
 
@@ -191,20 +197,24 @@ impl TantivyDataStoreLayer {
 
         let index_mutated = config.data_store_params.index_mutated.clone();
 
+        let writer_thread_finished = Arc::new(tokio::sync::Notify::new());
+
         // real indexer task
         std::thread::Builder::new()
             .name("tantivy-indexer".to_string())
             .spawn({
                 let index_reader = index_reader.clone();
                 let indexer_work_tracker = indexer_work_tracker.clone();
+                let writer_thread_finished = writer_thread_finished.clone();
                 move || {
-                    indexer_blocking_task(
+                    writer_blocking_task(
                         indexing_context,
                         vertex_rx,
                         index_mutated,
                         index_writer,
                         index_reader,
                         indexer_work_tracker,
+                        writer_thread_finished,
                     );
                 }
             })
@@ -216,8 +226,10 @@ impl TantivyDataStoreLayer {
             schema,
             index,
             index_reader,
+            indexer_cancel: indexer_cancel.clone(),
             indexer_cancel_dropguard: Arc::new(indexer_cancel.drop_guard()),
             indexer_work_tracker,
+            writer_thread_finished,
         })
     }
 

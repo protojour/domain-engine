@@ -53,7 +53,7 @@ pub struct Synrchonizer {
 
 pub struct SyncQueue {
     queue: Mutex<VecDeque<SyncMsg>>,
-    queue_watch: tokio::sync::watch::Sender<()>,
+    sync_trigger: tokio::sync::Notify,
     work_tracker: Arc<WorkTracker>,
 }
 
@@ -95,12 +95,11 @@ pub struct WorkToken(Arc<()>);
 pub async fn synchronizer_async_task(
     synchronizer: Synrchonizer,
     sync_queue: Arc<SyncQueue>,
-    mut queue_watch: tokio::sync::watch::Receiver<()>,
     indexer_cancel: CancellationToken,
 ) {
     loop {
         tokio::select! {
-            _ = queue_watch.changed() => {
+            _ = sync_queue.sync_trigger.notified() => {
                 // repeatedly pop messages from the queue front,
                 // keeping the rest in the queue for potential merging
                 while let Some(msg) = sync_queue.take_one() {
@@ -117,13 +116,14 @@ pub async fn synchronizer_async_task(
 
 /// The indexer's responsibility is to receive vertex data,
 /// convert into searchable documents, and commit the new inverted index.
-pub fn indexer_blocking_task(
+pub fn writer_blocking_task(
     indexing_context: IndexingContext,
     mut vertex_rx: tokio::sync::mpsc::Receiver<VertexMsg>,
     index_mutated: tokio::sync::watch::Sender<()>,
     mut index_writer: IndexWriter,
     index_reader: IndexReader,
     work_tracker: Arc<WorkTracker>,
+    writer_thread_finished: Arc<tokio::sync::Notify>,
 ) {
     let mut update_count: usize = 0;
     let mut delete_count: usize = 0;
@@ -151,11 +151,11 @@ pub fn indexer_blocking_task(
             }
             Some(VertexMsg::Cancel) => {
                 debug!("indexer task cancelled");
-                return;
+                break;
             }
             None => {
                 debug!("indexer task killed: message queue closed");
-                return;
+                break;
             }
         };
 
@@ -180,6 +180,9 @@ pub fn indexer_blocking_task(
             drop(work_tokens);
         }
     }
+
+    index_writer.wait_merging_threads().unwrap();
+    writer_thread_finished.notify_waiters();
 }
 
 impl IndexingContext {
@@ -323,13 +326,10 @@ impl Synrchonizer {
 }
 
 impl SyncQueue {
-    pub fn new(
-        queue_watch: tokio::sync::watch::Sender<()>,
-        work_tracker: Arc<WorkTracker>,
-    ) -> Arc<Self> {
+    pub fn new(work_tracker: Arc<WorkTracker>) -> Arc<Self> {
         Arc::new(SyncQueue {
             queue: Mutex::new(VecDeque::new()),
-            queue_watch,
+            sync_trigger: tokio::sync::Notify::const_new(),
             work_tracker,
         })
     }
@@ -341,9 +341,7 @@ impl SyncQueue {
         }
 
         // send signal to the synchronizer, so it may start processing messages from the queue
-        if let Err(err) = self.queue_watch.send(()) {
-            error!("could not send change notification to indexing queue: {err}");
-        }
+        self.sync_trigger.notify_waiters();
     }
 
     fn take_one(&self) -> Option<SyncMsg> {

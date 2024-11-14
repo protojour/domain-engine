@@ -260,6 +260,16 @@ async fn test_conduit_search(ds: &str) {
             }
         }))
     );
+
+    info!("test shutdown");
+
+    domain_engine
+        .get_data_store()
+        .unwrap()
+        .api()
+        .shutdown()
+        .await
+        .unwrap();
 }
 
 #[datastore_test(tokio::test, ignore("inmemory"))]
