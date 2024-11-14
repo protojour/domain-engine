@@ -60,6 +60,21 @@ Note that including `private_def` in `public_def` will indirectly expose `privat
 Private defs are also excluded from [data stores](data_stores.md) and [interfaces](interfaces.md), unless they are indirectly exposed this way.
 
 
+### `@macro`
+
+`def @macro` can be used for reusable partial fragments, usually some common field or structure to be re-used in multiple types. The `def @macro` itself gets ignored, and its body can be added to other `def`s used through an [`is` relationship](rel.md#is-relationships).
+
+```ontol
+def @macro described (
+    rel* 'decription': text
+)
+
+def thing (
+    rel* is: described
+)
+```
+
+
 ### `@open`
 
 `def @open` makes the definition's immediate tree-like relationships _open_, which means arbitrary data can be associated with it.
