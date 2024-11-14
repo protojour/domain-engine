@@ -7,7 +7,10 @@ use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use domain_engine_test_utils::graphql_test_utils::Exec;
 use indoc::indoc;
 use ontol_compiler::topology::DomainUrl;
-use ontol_examples::conduit::{blog_post_public, conduit_db, feed_public};
+use ontol_examples::{
+    conduit::{blog_post_public, conduit_db, feed_public},
+    AsAtlas,
+};
 use ontol_runtime::{
     attr::AttrRef, interface::serde::operator::SerdeOperatorAddr, ontology::Ontology,
 };
@@ -73,7 +76,7 @@ pub fn compile_benchmark(c: &mut Criterion) {
             TestPackages::with_sources(black_box([
                 blog_post_public(),
                 feed_public(),
-                conduit_db(),
+                conduit_db().as_atlas("conduit"),
             ]))
             .bench_disable_ontology_serde()
             .compile();
