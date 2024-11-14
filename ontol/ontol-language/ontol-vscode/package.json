@@ -4,7 +4,7 @@
   "description": "ONTOL language support for VS Code",
   "version": "0.4.0",
   "publisher": "Protojour",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "private": true,
   "icon": "assets/ontol.png",
   "repository": {

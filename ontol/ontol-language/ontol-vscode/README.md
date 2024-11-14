@@ -18,4 +18,4 @@ The language server is compiled to WASM with a [WASI](https://github.com/WebAsse
 
 ## License
 
-MIT
+ONTOL is licensed under GNU Affero General Public License, version 3 (AGPL-3.0).
