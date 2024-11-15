@@ -23,7 +23,9 @@ fn tiny() -> (DomainUrl, &'static str) {
     (
         file_url("tiny"),
         indoc! {r#"
-            domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
+            domain ZZZZZZZZZZZTESTZZZZZZZZZZZ (
+                rel. name: 'tiny'
+            )
             def @macro created (
                 rel* 'created'[rel* gen: create_time]?: datetime
             )
