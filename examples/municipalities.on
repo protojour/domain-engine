@@ -1,4 +1,6 @@
-domain 01GQNEWZ00N7FMHACAWZ973DT7 ()
+domain 01GQNEWZ00N7FMHACAWZ973DT7 (
+    rel. name: 'municipalities'
+)
 
 use 'atlas:/protojour/geojson/geojson' as geojson
 

@@ -5,7 +5,9 @@
 /// STIX is designed to improve many different capabilities, such as collaborative threat analysis, automated threat exchange, automated detection and response, and more.
 ///
 /// The objects and features added for inclusion in STIX 2.1 represent an iterative approach to fulfilling basic consumer and producer requirements for CTI sharing. Objects and properties not included in this version of STIX, but deemed necessary by the community, will be included in future releases.
-domain 01GZ13EAM0RY693MSJ75XZARHY ()
+domain 01GZ13EAM0RY693MSJ75XZARHY (
+    rel. name: 'stix'
+)
 
 use 'stix_common' as common
 use 'stix_edges' as edges

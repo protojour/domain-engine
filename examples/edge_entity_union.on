@@ -1,5 +1,7 @@
 /// This example shows how to model a hybrid between an entity and and edge.
-domain 01J2QAP8H1WWPA8A3QB8NKEGZE ()
+domain 01J2QAP8H1WWPA8A3QB8NKEGZE (
+    rel. name: 'edge_entity_union'
+)
 
 sym { id }
 

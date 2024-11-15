@@ -1,4 +1,6 @@
-domain 01GXBEHB9G0PGFM7JY9Q5S2QJK ()
+domain 01GXBEHB9G0PGFM7JY9Q5S2QJK (
+    rel. name: 'guitar_synth_union'
+)
 
 def guitar_id (
     fmt '' => 'guitar/' => uuid => .

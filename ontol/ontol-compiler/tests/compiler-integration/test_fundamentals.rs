@@ -11,6 +11,8 @@ fn test_relations_are_distinct_for_different_domains() {
         (
             file_url("entry"),
             "
+            domain 01JCRBWXR3QZHH9ESGN6VGBCZZ (rel. name: 'entry')
+
             use 'other' as other
 
             def foo (
@@ -21,6 +23,8 @@ fn test_relations_are_distinct_for_different_domains() {
         (
             file_url("other"),
             "
+            domain 01JCRBXMW8XHGJFAQRWCFSJT1J (rel. name: 'other')
+
             def foo (
                 rel* 'prop': text
             )
@@ -116,8 +120,19 @@ fn ontol_domain_is_documented() {
 #[test]
 fn test_domain_topology_generation() {
     let test = TestPackages::with_static_sources([
-        (file_url("entry"), "use 'other' as other"),
-        (file_url("other"), ""),
+        (
+            file_url("entry"),
+            "
+            domain 01JCRBWXR3QZHH9ESGN6VGBCZZ (rel. name: 'entry')
+            use 'other' as other
+            ",
+        ),
+        (
+            file_url("other"),
+            "
+            domain 01JCRBXMW8XHGJFAQRWCFSJT1J (rel. name: 'other')
+            ",
+        ),
     ])
     .compile();
 

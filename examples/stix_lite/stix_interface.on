@@ -1,5 +1,7 @@
 /// Collection of stix interfaces that only uses the primitives from stix_common.
-domain 01H7ZN6PJ0NHEFMHW2PBN4FEPZ ()
+domain 01H7ZN6PJ0NHEFMHW2PBN4FEPZ (
+    rel. name: 'stix_interface'
+)
 
 use 'stix_common' as common
 

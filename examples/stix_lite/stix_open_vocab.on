@@ -1,4 +1,6 @@
-domain 01J5C5JJKM7XWR56TTYH9B7VRN ()
+domain 01J5C5JJKM7XWR56TTYH9B7VRN (
+    rel. name: 'stix_open_vocab'
+)
 
 /// A value from a STIX open or suggested vocabulary.
 def open-vocab (

@@ -110,7 +110,9 @@ async fn datastore_test_arrow_encoding(ds: &str) {
     let ontol_source = (
         file_url("test"),
         "
-        domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
+        domain ZZZZZZZZZZZTESTZZZZZZZZZZZ (
+            rel. name: 'test'
+        )
 
         def entity (
             rel. 'id': (rel* is: text)

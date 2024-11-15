@@ -1,4 +1,6 @@
-domain 01J5C5GB45Q3C0E4YYRPP8SN4R ()
+domain 01J5C5GB45Q3C0E4YYRPP8SN4R (
+    rel. name: 'stix_common'
+)
 
 /// The string data type represents a finite-length string of valid characters from the Unicode coded character set [ISO10646]. Unicode incorporates ASCII and the characters of many other international character sets.
 ///

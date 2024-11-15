@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, marker::PhantomData, str::FromStr};
+use std::{collections::BTreeMap, marker::PhantomData};
 
 use ontol_parser::cst::{
     inspect::{self as insp},
@@ -6,11 +6,11 @@ use ontol_parser::cst::{
 };
 use ontol_runtime::{ontology::domain::DomainId, tuple::CardinalIdx, DefId};
 use tracing::debug_span;
-use ulid::Ulid;
 
 use crate::{
     edge::{CardinalKind, EdgeId},
     namespace::{DocId, Space},
+    ontol_syntax::{extract_domain_headerdata, WithDocs},
     topology::DomainUrl,
     CompileError, Compiler, Src,
 };
@@ -101,38 +101,44 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     ) -> Option<RootDefs> {
         match statement {
             insp::Statement::DomainStatement(stmt) => {
-                self.append_documentation(DocId::Def(self.ctx.domain_def_id), stmt.0.clone());
+                let mut errors = vec![];
+                let header_data =
+                    extract_domain_headerdata(stmt.clone(), WithDocs(true), &mut errors);
 
-                let domain_id = stmt.domain_id()?;
-
-                let Some(domain_ulid) = domain_id
-                    .try_concat_ulid()
-                    .and_then(|ulid| Ulid::from_str(&ulid).ok())
-                else {
-                    CompileError::TODO("misformatted domain id")
-                        .span_report(domain_id.view().span(), &mut self.ctx);
-                    return None;
-                };
-
-                if self
-                    .ctx
-                    .compiler
-                    .domain_ids
-                    .values()
-                    .any(|domain_id| domain_id.ulid == domain_ulid)
-                {
-                    CompileError::TODO("domain has already been compiled")
-                        .span_report(domain_id.view().span(), &mut self.ctx);
-                    return None;
+                for (error, span) in errors {
+                    error.span_report(span, &mut self.ctx);
                 }
 
-                self.ctx.compiler.domain_ids.insert(
-                    self.ctx.domain_index,
-                    DomainId {
-                        ulid: domain_ulid,
-                        stable: true,
-                    },
-                );
+                if let Some(docs) = header_data.domain_docs {
+                    self.ctx
+                        .compiler
+                        .namespaces
+                        .docs
+                        .insert(DocId::Def(self.ctx.domain_def_id), docs.into());
+                }
+
+                if let Some((domain_ulid, ulid_span)) = header_data.domain_ulid {
+                    if self
+                        .ctx
+                        .compiler
+                        .domain_ids
+                        .values()
+                        .any(|domain_id| domain_id.ulid == domain_ulid)
+                    {
+                        CompileError::TODO("domain has already been compiled")
+                            .span_report(ulid_span, &mut self.ctx);
+                        return None;
+                    }
+                    self.ctx.compiler.domain_ids.insert(
+                        self.ctx.domain_index,
+                        DomainId {
+                            ulid: domain_ulid,
+                            stable: true,
+                        },
+                    );
+                }
+
+                self.ctx.outcome.domain_properties = header_data.properties;
 
                 None
             }

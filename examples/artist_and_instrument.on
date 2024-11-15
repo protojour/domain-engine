@@ -1,4 +1,6 @@
-domain 01GXBEBKPGNNP387Y912V5FY7V ()
+domain 01GXBEBKPGNNP387Y912V5FY7V (
+    rel. name: 'artist_and_instrument'
+)
 
 def artist (
     rel. 'ID'[rel* gen: auto]: ( fmt '' => 'artist/' => uuid => . )

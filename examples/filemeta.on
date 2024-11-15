@@ -1,5 +1,7 @@
 /// Memoriam domain for object storage file metadata
-domain 01J358NG2T3XCNG45JF1TVNY0C ()
+domain 01J358NG2T3XCNG45JF1TVNY0C (
+    rel. name: 'filemeta'
+)
 
 /// Represents a file in object storage
 def FileMetaData (

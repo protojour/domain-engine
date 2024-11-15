@@ -5,7 +5,6 @@
 /// GeoJSON uses a geographic coordinate reference system, World Geodetic System 1984, and units of decimal degrees.
 domain 01GQNEWZ00HWPTCVJ7VTAV0NHR (
     rel. name: 'geojson'
-    rel. version: '0.1.0'
 )
 
 use 'atlas:/protojour/wgs/wgs' as wgs

@@ -1,4 +1,6 @@
-domain 01J6YRT0EB97ZY7NCDDBX00YXK ()
+domain 01J6YRT0EB97ZY7NCDDBX00YXK (
+    rel. name: 'findings'
+)
 
 def FindingSession (
     rel. 'id'[rel* gen: auto]: (rel* is: uuid)

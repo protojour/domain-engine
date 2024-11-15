@@ -17,6 +17,7 @@ use crate::{
     lowering::context::LoweringOutcome,
     misc::{MacroExpand, MacroItem, MiscCtx},
     namespace::DocId,
+    ontol_syntax::HeaderProperty,
     relation::{rel_def_meta, RelId, RelParams, Relationship},
     repr::repr_model::ReprKind,
     thesaurus::{Thesaurus, TypeRelation},
@@ -68,7 +69,8 @@ impl<'m> Compiler<'m> {
             Session(self),
         );
 
-        self.domain_ids
+        let domain_id = self
+            .domain_ids
             .entry(parsed.domain_index)
             .or_insert_with(|| {
                 let domain_id = Ulid::new();
@@ -78,14 +80,15 @@ impl<'m> Compiler<'m> {
                     stable: false,
                 }
             });
+        let domain_name = match outcome.domain_properties.get(&HeaderProperty::Name) {
+            Some(name) => self.str_ctx.intern_constant(name),
+            None => self.str_ctx.intern_constant(&format!("{}", domain_id.ulid)),
+        };
 
         self.handle_lowering_outcome(outcome);
         self.seal_domain(parsed.domain_index);
 
-        self.domain_names.push((
-            parsed.domain_index,
-            self.str_ctx.intern_constant(src.url().short_name()),
-        ));
+        self.domain_names.push((parsed.domain_index, domain_name));
 
         self.check_error()
     }

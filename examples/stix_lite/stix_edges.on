@@ -1,5 +1,7 @@
 /// This domain defines edges for stix
-domain 01J6SACJ2A3P8FNEQ2S20M3DV7 ()
+domain 01J6SACJ2A3P8FNEQ2S20M3DV7 (
+    rel. name: 'stix_edges'
+)
 
 arc relationship {
     (src) related_to: (target) with_rel: (relationship),

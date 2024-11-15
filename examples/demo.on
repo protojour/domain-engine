@@ -1,4 +1,6 @@
-domain 01H2AQNH6RZ40ANSPN6WR39TXY ()
+domain 01H2AQNH6RZ40ANSPN6WR39TXY (
+    rel. name: 'demo'
+)
 
 // -----------------------------------
 // database

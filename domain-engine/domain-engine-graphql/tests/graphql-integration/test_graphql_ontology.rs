@@ -109,7 +109,9 @@ fn expected_defs() -> juniper::Value<GqlScalar> {
 #[datastore_test(tokio::test)]
 async fn test_ontology_ontol(ds: &str) {
     let test = "
-    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ ()
+    domain ZZZZZZZZZZZTESTZZZZZZZZZZZ (
+        rel. name: 'test'
+    )
     "
     .compile();
     let engine = mk_engine_with_mock(test.ontology_owned(), (), ds).await;
@@ -132,7 +134,7 @@ async fn test_ontology_ontol(ds: &str) {
                 },
                 {
                     "id": "7ZZZZZZZZZZTESTZZZZZZZZZZZ",
-                    "name": "test_root.on"
+                    "name": "test"
                 }
             ]
         }))
