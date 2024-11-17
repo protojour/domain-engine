@@ -7,7 +7,7 @@ use std::{
 
 use arcstr::ArcStr;
 use fnv::FnvHashMap;
-use indexmap::{map::Entry, IndexMap};
+use indexmap::map::Entry;
 use ontol_parser::{
     cst::view::{NodeView, TokenView},
     ParserError, U32Span,
@@ -23,7 +23,7 @@ use crate::{
     def::{Def, DefKind, TypeDef, TypeDefFlags},
     fmt::FmtChain,
     namespace::Space,
-    ontol_syntax::HeaderProperty,
+    ontol_syntax::OntolHeaderData,
     pattern::{Pattern, PatternKind},
     relation::{DefRelTag, RelId, RelParams, Relationship},
     topology::{DomainUrl, DomainUrlParser},
@@ -55,7 +55,7 @@ pub struct LoweringOutcome {
     pub root_defs: Vec<DefId>,
     pub rels: BTreeMap<DomainIndex, BTreeMap<u16, Vec<LoweredRel>>>,
     pub fmt_chains: Vec<(DefId, FmtChain)>,
-    pub domain_properties: IndexMap<HeaderProperty, String>,
+    pub header_data: Option<OntolHeaderData>,
 }
 
 impl LoweringOutcome {
