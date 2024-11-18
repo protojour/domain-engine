@@ -57,6 +57,12 @@ impl From<Arc<dyn DomainEngineAPI + Send + Sync>> for OntologyCatalogProvider {
     }
 }
 
+impl Debug for OntologyCatalogProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OntologyCatalogProvider").finish()
+    }
+}
+
 impl CatalogProvider for OntologyCatalogProvider {
     fn as_any(&self) -> &dyn Any {
         self
@@ -106,6 +112,12 @@ impl DomainSchemaProvider {
     fn entity_by_name(&self, name: &str) -> Option<(DefId, &Def, &Entity)> {
         self.entities()
             .find(|(.., entity)| &self.engine.ontology_defs()[entity.ident] == name)
+    }
+}
+
+impl Debug for DomainSchemaProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DomainSchemaProvider").finish()
     }
 }
 
@@ -164,6 +176,12 @@ struct EntityTableProvider {
     engine: Arc<dyn DomainEngineAPI + Send + Sync>,
     arrow_schema: SchemaRef,
     def_id: DefId,
+}
+
+impl Debug for EntityTableProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EntityTableProvider").finish()
+    }
 }
 
 #[async_trait::async_trait]

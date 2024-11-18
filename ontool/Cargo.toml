@@ -21,11 +21,11 @@ thiserror.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 clap.workspace = true
-ariadne = { version = "0.4.0", features = ["auto-color"] }
+ariadne = { version = "0.5.0", features = ["auto-color"] }
 tower-lsp = "0.20.0"
 tokio = { workspace = true, features = ["full"] }
 tokio-util = "0.7.10"
-notify-debouncer-full = "0.3.1"
+notify-debouncer-full = "0.4"
 futures = "0.3"
 tempfile = "3.5.0"
 domain-engine-core.path = "../domain-engine/domain-engine-core"

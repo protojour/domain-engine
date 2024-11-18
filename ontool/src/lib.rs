@@ -12,10 +12,7 @@ use axum::{
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use domain_engine_core::{DomainEngine, Session};
 use domain_engine_store_inmemory::InMemoryDataStoreFactory;
-use notify_debouncer_full::{
-    new_debouncer,
-    notify::{RecursiveMode, Watcher},
-};
+use notify_debouncer_full::{new_debouncer, notify::RecursiveMode};
 use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
@@ -382,7 +379,7 @@ fn print_unified_compile_error(
         let (origin, literal_source) =
             report_source_name(err_span.source_id, ontol_sources, source_code_registry);
 
-        Report::build(ReportKind::Error, &origin, span.start)
+        Report::build(ReportKind::Error, (&origin, span.clone()))
             .with_label(
                 Label::new((&origin, span))
                     .with_message(message)
@@ -399,7 +396,7 @@ fn print_unified_compile_error(
             let (origin, literal_source) =
                 report_source_name(note_span.source_id, ontol_sources, source_code_registry);
 
-            Report::build(ReportKind::Advice, &origin, span.start)
+            Report::build(ReportKind::Advice, (&origin, span.clone()))
                 .with_label(
                     Label::new((&origin, span))
                         .with_message(message)
@@ -482,7 +479,6 @@ async fn serve(root_dir: PathBuf, domains: Vec<String>, port: u16) -> Result<(),
     clear_term_if_supported(&mut stdout);
 
     debouncer
-        .watcher()
         .watch(&root_dir, RecursiveMode::NonRecursive)
         .unwrap();
 

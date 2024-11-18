@@ -98,7 +98,7 @@ impl<'on> SelectFlowProcessor<'on> {
         output_domain_index: DomainIndex,
         target: &mut BTreeMap<PropId, Select>,
     ) {
-        for (prop_id, flows) in &self.prop_flow_slice.iter().group_by(|flow| flow.id) {
+        for (prop_id, flows) in &self.prop_flow_slice.iter().chunk_by(|flow| flow.id) {
             // Only consider output properties:
             if prop_id.0.domain_index() != output_domain_index {
                 continue;

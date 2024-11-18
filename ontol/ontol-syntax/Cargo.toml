@@ -10,7 +10,7 @@ doctest = false
 
 [dependencies]
 ontol-parser.path = "../ontol-parser"
-rowan = "0.15"
+rowan = "0.16"
 
 [dev-dependencies]
 pretty_assertions = "1"
