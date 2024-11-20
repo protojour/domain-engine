@@ -61,6 +61,7 @@ struct MigrationCtx {
 struct Stats {
     new_domains_deployed: usize,
     domains_already_deployed: usize,
+    orphan_domains: usize,
 }
 
 #[derive(Default)]
@@ -231,9 +232,10 @@ pub async fn migrate(
     txn.commit().await?;
 
     info!(
-        "{new} new domain(s) deployed, {existing} domain(s) were already deployed",
+        "{new} new domain(s) deployed, {existing} domain(s) were already deployed, {orphans} orphans",
         new = ctx.stats.new_domains_deployed,
-        existing = ctx.stats.domains_already_deployed
+        existing = ctx.stats.domains_already_deployed,
+        orphans = ctx.stats.orphan_domains
     );
 
     Ok(PgModel::new(ctx.domains, entity_id_to_entity))

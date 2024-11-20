@@ -5,7 +5,7 @@ use ontol_runtime::{
     ontology::aspects::DefsAspect, tuple::CardinalIdx, DefId, DefPropTag, DomainIndex,
 };
 use tokio_postgres::Transaction;
-use tracing::{debug, info};
+use tracing::debug;
 use ulid::Ulid;
 
 use crate::pg_model::{
@@ -61,7 +61,7 @@ pub async fn read_registry<'t>(
             ctx.domains.insert(*domain_index, pg_domain.clone());
             domain_index_by_key.insert(key, *domain_index);
         } else {
-            info!(domain_id = %uid, "domain persisted but no longer in the ontology, ignoring");
+            ctx.stats.orphan_domains += 1;
         }
     }
 
