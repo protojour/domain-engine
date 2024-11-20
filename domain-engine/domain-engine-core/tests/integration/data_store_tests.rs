@@ -17,7 +17,7 @@ use ontol_test_utils::{
     expect_eq,
     json_utils::{json_map, json_prop},
     serde_helper::{serde_create, serde_read},
-    TestCompile, TestPackages,
+    OntolTest, TestCompile, TestPackages,
 };
 use serde_json::json;
 use std::sync::Arc;
@@ -43,6 +43,35 @@ async fn make_domain_engine(
             .await
             .unwrap(),
     )
+}
+
+/// An orphaned domain was previously in the ontlogy, but has disappeared.
+/// This test utility migrates different OntolTests in sequence.
+async fn orphan_test(ds: &str, test_sequence: Vec<&OntolTest>) {
+    let mut iterator = test_sequence.into_iter();
+
+    let Some(init) = iterator.next() else {
+        return;
+    };
+
+    let domain_engine = DomainEngine::builder(init.ontology_owned())
+        .system(Box::new(unimock::Unimock::new(())))
+        .build(DynamicDataStoreFactory::new(ds), Session::default())
+        .await
+        .unwrap();
+
+    drop(domain_engine);
+
+    let reuse_factory = DynamicDataStoreFactory::new(ds).reuse_db();
+    for next in iterator {
+        let domain_engine = DomainEngine::builder(next.ontology_owned())
+            .system(Box::new(unimock::Unimock::new(())))
+            .build(reuse_factory.clone(), Session::default())
+            .await
+            .unwrap();
+
+        drop(domain_engine);
+    }
 }
 
 #[ontol_macros::datastore_test(tokio::test)]
@@ -89,6 +118,13 @@ async fn test_db_remigrate_noop_workspaces(ds: &str) {
         .unwrap();
 
     drop(domain_engine);
+}
+
+#[ontol_macros::datastore_test(tokio::test)]
+async fn test_db_orphan_stix_workspaces(ds: &str) {
+    let stix = examples::stix::stix_bundle().compile();
+    let workspaces = vec![examples::workspaces()].compile();
+    orphan_test(ds, vec![&stix, &workspaces, &stix]).await;
 }
 
 #[ontol_macros::datastore_test(tokio::test)]

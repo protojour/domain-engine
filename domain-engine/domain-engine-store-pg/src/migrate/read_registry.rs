@@ -5,7 +5,7 @@ use ontol_runtime::{
     ontology::aspects::DefsAspect, tuple::CardinalIdx, DefId, DefPropTag, DomainIndex,
 };
 use tokio_postgres::Transaction;
-use tracing::info;
+use tracing::{debug, info};
 use ulid::Ulid;
 
 use crate::pg_model::{
@@ -250,11 +250,12 @@ pub async fn read_registry<'t>(
         let key_col_name: Option<Box<str>> = row.get(6);
         let index_type: Option<PgIndexType> = row.get(7);
 
-        let pinned_domaintable_def_id = pinned_domaintable_key.map(|key| {
+        let pinned_domaintable_def_id = pinned_domaintable_key.and_then(|key| {
             let Some(TableRef::Vertex(_, def_id)) = table_by_key.get(&key) else {
-                panic!()
+                debug!("orphaned pinned domaintable");
+                return None;
             };
-            *def_id
+            Some(*def_id)
         });
 
         let Some(TableRef::Edge(edge_id)) = table_by_key.get(&domaintable_key) else {
