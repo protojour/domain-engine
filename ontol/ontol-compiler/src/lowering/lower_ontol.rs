@@ -81,7 +81,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         // first pass: Register all named definitions into the namespace
         for statement in ontol.statements() {
             if let Some(pre_defined) = self.pre_define_statement(statement, &mut section) {
-                pre_defined_statements.push((pre_defined, section.clone()));
+                pre_defined_statements.push((pre_defined, section));
             }
         }
 
