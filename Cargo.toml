@@ -69,3 +69,6 @@ strip = true
 opt-level = "z"
 lto = true
 codegen-units = 1
+
+[patch.crates-io]
+tower-lsp = { git = "https://github.com/audunhalland/tower-lsp.git", branch = "flushingframedwrite" }
