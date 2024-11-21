@@ -1,7 +1,7 @@
 use ontol_lsp::Backend;
 use tower_lsp::{LspService, Server};
 
-#[tokio::main(worker_threads = 2)]
+#[tokio::main]
 async fn main() -> tokio::io::Result<()> {
     tracing_subscriber::fmt()
         .without_time()
@@ -14,10 +14,7 @@ async fn main() -> tokio::io::Result<()> {
     let stdout = tokio::io::stdout();
 
     let (service, socket) = LspService::new(Backend::new);
-    Server::new(stdin, stdout, socket)
-        .concurrency_level(2)
-        .serve(service)
-        .await;
+    Server::new(stdin, stdout, socket).serve(service).await;
 
     Ok(())
 }
