@@ -51,8 +51,9 @@ def some_def ()
 rel {some_def} 'property': text
 ```
 
-* The `*` is the set-quantified _"self"_, equivalent to `{self}` and `{.}`.
-* The `.` is the unit-quantified _"self"_, equivalent to `self`
+The `*` is the set-quantified _"self"_, equivalent to `{self}` and `{.}`.
+
+The `.` is the unit-quantified _"self"_, equivalent to `self`.
 
 ONTOL is lenient with spacing and line breaks, and the `*` is often contracted into the rel keyword:
 

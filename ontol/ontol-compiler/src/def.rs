@@ -177,8 +177,11 @@ pub enum BuiltinRelationKind {
     /// rel* 'id'[rel* gen: auto]|id: (rel* is: uuid)
     /// ```
     Gen,
-    /// Used as an `rel` annotation to instruct ONTOL to use a specific data representation
-    /// for the object of that relation.
+    /// Used as a `rel` annotation to instruct ONTOL to use a specific data representation
+    /// (e.g. `crdt`) for the object of that relation.
+    /// ```ontol
+    /// rel* 'data'[rel* repr: crdt]: Data
+    /// ```
     Repr,
     /// A relation between an entity and an [ordering](interfaces.md#ordering).
     /// ```ontol
@@ -198,6 +201,15 @@ pub enum BuiltinRelationKind {
     /// rel* example: 'Carlos'
     /// ```
     Example,
+    /// A de/serialization format for an abstract type.
+    /// Implemented for `octets`, which can be _formatted_ in
+    /// `hex` (hexadecimal representation) or
+    /// `base64` (base64 representation).
+    /// ```ontol
+    /// rel* is: octets
+    /// rel* is: format.hex
+    /// rel* is: format.base64
+    /// ```
     Format,
     FmtTransition,
 }

@@ -9,6 +9,7 @@
 - [Relationships (`rel`)](./rel.md)
 - [Imports (`use`)](./use.md)
 - [Symbols (`sym`)](./sym.md)
+- [Edges (`arc`)](./arc.md)
 - [Patterns (`fmt` and regex)](./fmt.md)
 - [Mappings (`map`)](./map.md)
 - [Comments](./comments.md)

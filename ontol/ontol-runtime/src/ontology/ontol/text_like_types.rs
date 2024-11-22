@@ -23,6 +23,9 @@ pub enum TextLikeType {
     /// ```
     Uuid,
     /// A [Universally Unique Lexicographically Sortable Identifier](https://github.com/ulid/spec).
+    /// ```ontol
+    /// rel* is: ulid
+    /// ```
     Ulid,
     /// An [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339)-formatted
     /// datetime string, e.g. `'1970-01-01T00:00:00.000Z'`.

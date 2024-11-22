@@ -69,10 +69,19 @@ pub enum PrimitiveKind {
     /// rel* is: text
     /// ```
     Text,
-    /// A sequence of octets.
+    /// A sequence of octets, or bytes.
+    /// `octets` is an abstract type, and should be paired with a `format`.
+    /// ```ontol
+    /// rel* is: octets
+    /// ```
     Octets,
+    /// A de/serialization format for an abstract type.
+    Format,
     /// Reference to some vertex.
     /// The vertex can come from any domain.
+    /// ```ontol
+    /// rel* 'related_nodes': {vertex}
+    /// ```
     Vertex,
     /// Address of something in a data store
     DataStoreAddress,
@@ -80,7 +89,6 @@ pub enum PrimitiveKind {
     OpenDataRelationship,
     EdgeRelationship,
     FlatUnionRelationship,
-    Format,
 }
 
 impl PrimitiveKind {
