@@ -339,10 +339,7 @@ impl LanguageServer for Backend {
                         .map(|m| m.slice().to_string())
                         .collect::<Vec<_>>()
                         .join(" ");
-                    let detail = match !modifiers.is_empty() {
-                        true => Some(modifiers),
-                        false => None,
-                    };
+                    let detail = (!modifiers.is_empty()).then_some(modifiers);
                     let id = match stmt.ident_path() {
                         Some(ident_path) => match ident_path.symbols().next() {
                             Some(sym) => sym.slice().to_string(),
@@ -377,6 +374,12 @@ impl LanguageServer for Backend {
                     (format!("arc {id}"), None, SymbolKind::INTERFACE)
                 }
                 insp::Statement::MapStatement(stmt) => {
+                    let modifiers = stmt
+                        .modifiers()
+                        .map(|m| m.slice().to_string())
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    let detail = (!modifiers.is_empty()).then_some(modifiers);
                     let id = match stmt.ident_path() {
                         Some(ident_path) => match ident_path.symbols().next() {
                             Some(sym) => sym.slice().to_string(),
@@ -384,7 +387,7 @@ impl LanguageServer for Backend {
                         },
                         None => "()".to_string(),
                     };
-                    (format!("map {id}"), None, SymbolKind::INTERFACE)
+                    (format!("map {id}"), detail, SymbolKind::INTERFACE)
                 }
                 _ => continue,
             };

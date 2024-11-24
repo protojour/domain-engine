@@ -532,10 +532,8 @@ impl State {
                                     };
                                     format!("{}{}{{...}}", modifiers, path)
                                 }
-                                insp::Pattern::PatAtom(atom) => {
-                                    format!("({})", atom.view().display())
-                                }
-                                insp::Pattern::PatBinary(_) => "(binary)".to_string(),
+                                insp::Pattern::PatAtom(atom) => atom.view().display().to_string(),
+                                insp::Pattern::PatBinary(bin) => bin.view().display().to_string(),
                             }
                         })
                         .collect::<Vec<_>>();
