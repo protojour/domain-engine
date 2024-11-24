@@ -314,46 +314,98 @@ impl LanguageServer for Backend {
             return Ok(None);
         };
 
-        let mut symbols = Vec::<SymbolInformation>::new();
+        let mut symbols = Vec::<DocumentSymbol>::new();
 
         for statement in ontol.statements() {
-            let name = match statement {
-                insp::Statement::DomainStatement(_) => "domain".to_string(),
-                insp::Statement::UseStatement(_) => "use".to_string(),
-                insp::Statement::DefStatement(_) => "def".to_string(),
-                insp::Statement::SymStatement(_) => "sym".to_string(),
-                insp::Statement::ArcStatement(_) => "arc".to_string(),
-                insp::Statement::RelStatement(_) => "rel".to_string(),
-                insp::Statement::FmtStatement(_) => "fmt".to_string(),
-                insp::Statement::MapStatement(_) => "map".to_string(),
-            };
-            let kind = match statement {
-                insp::Statement::DomainStatement(_) => SymbolKind::NAMESPACE,
-                insp::Statement::UseStatement(_) => SymbolKind::NAMESPACE,
-                insp::Statement::DefStatement(_) => SymbolKind::STRUCT,
-                insp::Statement::SymStatement(_) => SymbolKind::PROPERTY,
-                insp::Statement::ArcStatement(_) => SymbolKind::INTERFACE,
-                insp::Statement::RelStatement(_) => SymbolKind::FIELD,
-                insp::Statement::FmtStatement(_) => SymbolKind::CONSTRUCTOR,
-                insp::Statement::MapStatement(_) => SymbolKind::INTERFACE,
+            let (name, detail, kind) = match statement {
+                insp::Statement::DomainStatement(_) => (
+                    "domain".to_string(),
+                    Some(doc.name.clone()),
+                    SymbolKind::NAMESPACE,
+                ),
+                insp::Statement::UseStatement(stmt) => {
+                    let uri = match stmt.uri() {
+                        Some(uri) => match uri.text() {
+                            Some(Ok(uri)) => uri,
+                            _ => String::default(),
+                        },
+                        None => String::default(),
+                    };
+                    (format!("use {uri}"), None, SymbolKind::NAMESPACE)
+                }
+                insp::Statement::DefStatement(stmt) => {
+                    let modifiers = stmt
+                        .modifiers()
+                        .map(|m| m.slice().to_string())
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    let detail = match !modifiers.is_empty() {
+                        true => Some(modifiers),
+                        false => None,
+                    };
+                    let id = match stmt.ident_path() {
+                        Some(ident_path) => match ident_path.symbols().next() {
+                            Some(sym) => sym.slice().to_string(),
+                            None => String::default(),
+                        },
+                        None => String::default(),
+                    };
+                    (format!("def {id}"), detail, SymbolKind::STRUCT)
+                }
+                insp::Statement::SymStatement(stmt) => {
+                    let syms = stmt
+                        .sym_relations()
+                        .map(|rel| match rel.decl() {
+                            Some(decl) => match decl.symbol() {
+                                Some(sym) => sym.slice().to_string(),
+                                None => String::default(),
+                            },
+                            None => String::default(),
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    (format!("sym {syms}"), None, SymbolKind::PROPERTY)
+                }
+                insp::Statement::ArcStatement(stmt) => {
+                    let id = match stmt.ident_path() {
+                        Some(ident_path) => match ident_path.symbols().next() {
+                            Some(sym) => sym.slice().to_string(),
+                            None => String::default(),
+                        },
+                        None => String::default(),
+                    };
+                    (format!("arc {id}"), None, SymbolKind::INTERFACE)
+                }
+                insp::Statement::MapStatement(stmt) => {
+                    let id = match stmt.ident_path() {
+                        Some(ident_path) => match ident_path.symbols().next() {
+                            Some(sym) => sym.slice().to_string(),
+                            None => "()".to_string(),
+                        },
+                        None => "()".to_string(),
+                    };
+                    (format!("map {id}"), None, SymbolKind::INTERFACE)
+                }
+                _ => continue,
             };
 
+            let range = get_range(&doc.text, &statement.view().span().into());
+
             #[expect(deprecated)]
-            let symbol = SymbolInformation {
+            let symbol = DocumentSymbol {
                 name,
+                detail,
                 kind,
+                range,
+                selection_range: range,
                 tags: None,
                 deprecated: None,
-                location: Location {
-                    uri: params.text_document.uri.clone(),
-                    range: get_range(&doc.text, &statement.view().span().into()),
-                },
-                container_name: None,
+                children: None,
             };
             symbols.push(symbol);
         }
 
-        Ok(Some(DocumentSymbolResponse::Flat(symbols)))
+        Ok(Some(DocumentSymbolResponse::Nested(symbols)))
     }
 
     async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
