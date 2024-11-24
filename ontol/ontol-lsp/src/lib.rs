@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
 use ontol_parser::cst::inspect as insp;
-use ontol_parser::cst::view::{NodeView, NodeViewExt};
+use ontol_parser::cst::view::{NodeView, NodeViewExt, TokenView};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use state::{

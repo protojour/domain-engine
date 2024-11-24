@@ -1,4 +1,6 @@
 use crate::docs::get_core_completions;
+use indoc::formatdoc;
+use lazy_regex::regex_replace_all;
 use ontol_compiler::ontol_syntax::{ArcString, OntolTreeSyntax};
 use ontol_compiler::topology::DomainUrl;
 use ontol_compiler::{
@@ -7,11 +9,12 @@ use ontol_compiler::{
     topology::{DepGraphBuilder, GraphState, ParsedDomain},
     CompileError, SourceId, SourceSpan, Sources, NO_SPAN,
 };
-use ontol_parser::cst::inspect as insp;
+use ontol_parser::cst::inspect::{self as insp};
 use ontol_parser::cst::tree::{SyntaxNode, TreeNodeView, TreeTokenView};
 use ontol_parser::cst::view::{self, NodeView, NodeViewExt, TokenView};
 use ontol_parser::lexer::kind::Kind;
 use ontol_parser::lexer::Lex;
+use ontol_parser::ToUsizeRange;
 use ontol_runtime::ontology::{config::DomainConfig, domain::Def, Ontology};
 use ontol_runtime::DomainIndex;
 use std::fmt::Debug;
@@ -175,8 +178,29 @@ impl State {
                                 cst_explore(body.statements(), aliases, defs);
                             }
                         }
-                        insp::Statement::SymStatement(_) => {}
-                        insp::Statement::ArcStatement(_) => {}
+                        insp::Statement::SymStatement(stmt) => {
+                            for sym in stmt.sym_relations() {
+                                if let Some(decl) = sym.decl() {
+                                    if let Some(sym) = decl.symbol() {
+                                        defs.insert(
+                                            sym.slice().to_string(),
+                                            stmt.view().syntax_node().clone(),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        insp::Statement::ArcStatement(stmt) => {
+                            if let Some(path) = stmt.ident_path() {
+                                if let Some(sym) = path.symbols().last() {
+                                    defs.insert(
+                                        sym.slice().to_string(),
+                                        stmt.view().syntax_node().clone(),
+                                    );
+                                }
+                            }
+                        }
+                        insp::Statement::MapStatement(_) => {}
                         insp::Statement::RelStatement(stmt) => {
                             if let Some(set) = stmt.relation_set() {
                                 for relation in set.relations() {
@@ -187,7 +211,6 @@ impl State {
                             }
                         }
                         insp::Statement::FmtStatement(_) => {}
-                        insp::Statement::MapStatement(_) => {}
                     }
                 }
             }
@@ -367,65 +390,113 @@ impl State {
             Kind::Modifier => {
                 return self.get_ontol_docs(token.slice());
             }
+            Kind::Symbol => match token.slice() {
+                // handle certain symbols directly
+                "format" => return self.get_ontol_docs("format"),
+                _ => {}
+            },
             _ => {}
         }
 
         let mut hover = HoverDoc::default();
 
-        fn hover_path_if_unset(hover: &mut HoverDoc, path: &str) {
-            if hover.path.is_empty() {
-                hover.path = path.to_string();
-            }
-        }
-
         // bottom-up search, from leaf token to root
         for parent in path.into_iter().rev() {
             match parent.node() {
+                insp::Node::ThisUnit(_) => return self.get_ontol_docs("."),
+                insp::Node::ThisSet(_) => return self.get_ontol_docs("*"),
                 insp::Node::IdentPath(ident_path) => {
                     let lookup_path: Vec<String> = ident_path
                         .symbols()
                         .map(|sym| sym.slice().to_string())
                         .collect::<Vec<_>>();
 
-                    match lookup_path.len() {
-                        0 => {}
-                        1 => {
-                            return self.get_hoverdoc_for_ident(doc, &lookup_path[0]);
-                        }
-                        _ => return self.get_hoverdoc_for_ext_ident(doc, &lookup_path),
+                    if lookup_path.is_empty() {
+                        continue;
                     }
+
+                    let first = lookup_path.first().unwrap();
+                    let last = lookup_path.last().unwrap();
+
+                    // local defs
+                    if lookup_path.len() == 1 && doc.cst_defs.contains_key(last) {
+                        let docs = self.get_hoverdoc_for_ident(doc, last);
+                        if docs.is_some() {
+                            return docs;
+                        }
+                    }
+                    // local arc slots
+                    if doc.cst_defs.contains_key(first) {
+                        let docs = self.get_hoverdoc_for_ident(doc, first);
+                        if docs.is_some() {
+                            return docs;
+                        }
+                    }
+                    // external defs
+                    if lookup_path.len() > 1 {
+                        let docs = self.get_hoverdoc_for_ext_ident(doc, &lookup_path);
+                        if docs.is_some() {
+                            return docs;
+                        }
+                    };
                 }
                 insp::Node::DomainStatement(_) => {
-                    hover_path_if_unset(&mut hover, "domain");
+                    hover.path = doc.name.clone();
+                    hover.sign_if_unset(&get_signature(&doc.text[parent.span().to_usize_range()]));
                 }
-                insp::Node::UseStatement(_) => {
-                    hover_path_if_unset(&mut hover, "use");
+                insp::Node::UseStatement(stmt) => {
+                    if let Some(uri) = stmt.uri() {
+                        if let Some(Ok(uri)) = uri.text() {
+                            hover.path_if_unset(get_path_and_name(&uri).1);
+                        }
+                    }
+                    hover.sign_if_unset(&get_signature(&doc.text[parent.span().to_usize_range()]));
                 }
-                insp::Node::DefStatement(_) => {
-                    hover_path_if_unset(&mut hover, "def");
+                insp::Node::DefStatement(stmt) => {
+                    if let Some(ident_path) = stmt.ident_path() {
+                        if let Some(sym) = ident_path.symbols().next() {
+                            hover.path_if_unset(&format!("{}.{}", &doc.name, sym.slice()));
+                        }
+                    }
+                    hover.sign_if_unset(&get_signature(&doc.text[parent.span().to_usize_range()]));
                 }
-                insp::Node::RelStatement(_) => {
-                    hover_path_if_unset(&mut hover, "rel");
+                insp::Node::SymStatement(_) => {
+                    if matches!(token.kind(), Kind::Symbol) {
+                        hover.path_if_unset(&format!("{}.{}", doc.name, token.slice()));
+                    }
+                    hover.sign_if_unset(&get_signature(&doc.text[parent.span().to_usize_range()]));
+                }
+                insp::Node::ArcStatement(stmt) => {
+                    if let Some(ident_path) = stmt.ident_path() {
+                        if let Some(sym) = ident_path.symbols().next() {
+                            hover.path_if_unset(&format!("{}.{}", &doc.name, sym.slice()));
+                        }
+                    }
+                    hover.sign_if_unset(&get_signature(&doc.text[parent.span().to_usize_range()]));
+                }
+                insp::Node::MapStatement(stmt) => {
+                    if let Some(ident_path) = stmt.ident_path() {
+                        if let Some(sym) = ident_path.symbols().next() {
+                            hover.path_if_unset(&format!("{}.{}", &doc.name, sym.slice()));
+                        }
+                    }
+                }
+                insp::Node::ArcClause(_) => {
+                    hover.sign_if_unset(&get_signature(&doc.text[parent.span().to_usize_range()]));
                 }
                 insp::Node::FmtStatement(_) => {
-                    hover_path_if_unset(&mut hover, "fmt");
+                    hover.sign_if_unset(&get_signature(&doc.text[parent.span().to_usize_range()]));
+                }
+                insp::Node::RelStatement(_) => {
+                    hover.sign_if_unset(&get_signature(&doc.text[parent.span().to_usize_range()]));
                 }
                 _ => {}
             }
 
             if hover.docs.is_empty() {
-                let mut doc_comments = parent.local_tokens_filter(Kind::DocComment).peekable();
-
-                if doc_comments.peek().is_some() {
-                    let lines = doc_comments
-                        .map(|token| token.slice().strip_prefix("///").unwrap().to_string());
-
-                    hover.docs = ontol_parser::join_doc_lines(lines).unwrap_or(Default::default());
-                }
+                hover.docs = get_doc_comments(parent).unwrap_or_default();
             }
         }
-
-        hover_path_if_unset(&mut hover, &doc.name);
 
         Some(hover)
     }
@@ -450,7 +521,7 @@ impl State {
                 name = doc.name,
                 ident = last_segment.slice()
             ),
-            signature: format!("def {ident}"),
+            signature: get_signature(&doc.text[stmt.view().span().to_usize_range()]),
             docs: doc_comments.unwrap_or(String::new()),
             ..Default::default()
         })
@@ -494,9 +565,23 @@ impl HoverDoc {
         vec.push(MarkedString::from_markdown(self.debug.clone()));
         vec
     }
+
+    /// Set HoverDoc path to `path`, but only if it's empty
+    pub fn path_if_unset(&mut self, path: &str) {
+        if self.path.is_empty() {
+            self.path = path.to_string();
+        }
+    }
+
+    /// Set HoverDoc signature to `signature`, but only if it's empty
+    pub fn sign_if_unset(&mut self, signature: &str) {
+        if self.signature.is_empty() {
+            self.signature = signature.to_string();
+        }
+    }
 }
 
-/// Read file contents, must be a full `file://workspace/path/etc`
+/// Read file contents from `file://` url in available filesystem(s)
 pub fn read_file(uri: &str) -> Result<String, Error> {
     debug!("read_file {uri}");
     let path = get_base_path(uri);
@@ -633,4 +718,12 @@ fn get_doc_comments(parent: impl NodeViewExt) -> Option<String> {
     } else {
         None
     }
+}
+
+/// Get signature from raw source, stripped of (doc) comments
+fn get_signature(signature: &str) -> String {
+    return regex_replace_all!(r"(?m-s)^.*?\/\/.*\n?", signature, "")
+        .replace("\n\n", "\n")
+        .trim()
+        .to_string();
 }

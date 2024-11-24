@@ -12,111 +12,131 @@ impl State {
     /// Get a HoverDoc for ONTOL core keywords, values and types
     pub fn get_ontol_docs(&self, ident: &str) -> Option<HoverDoc> {
         match ident {
-                "domain" => Some(HoverDoc::from(
-                    ident,
-                    "#### Domain statement\nIdentifies a domain by a global ulid. Doc comments and rel properties serve as documentation and metadata.",
-                )),
-                "use" => Some(HoverDoc::from(
-                    ident,
-                    "#### Use statement\nImports a domain by name, and defines a local namespace alias.",
-                )),
-                "def" => Some(HoverDoc::from(
-                    ident,
-                    "#### Def statement\nDefines a concept, type or data structure.",
-                )),
-                "sym" => Some(HoverDoc::from(
-                    ident,
-                    "#### Sym statement\nDefines a symbol, a label representing the symbol name itself."
-                )),
-                "arc" => Some(HoverDoc::from(
-                    ident,
-                    "#### Arc statement\nDefines a relationship map, or a set of hypergraph relations."
-                )),
-                "rel" => Some(HoverDoc::from(
-                    ident,
-                    "#### Relation statement\nDefines properties of a definition, properties of a relation, or relationships between entities."
-                )),
-                "fmt" => Some(HoverDoc::from(
-                    ident,
-                    "#### Format statement\nDescribes a build/match pattern for strings or sequences."
-                )),
-                "map" => Some(HoverDoc::from(
-                    ident,
-                    "#### Map statement\nDescribes a map of the data flow between two definitions."
-                )),
-                "." => Some(HoverDoc::from(
-                    ident,
-                    "#### Self reference\nRefers to the identity of the enclosing scope.",
-                )),
-                ".." => Some(HoverDoc::from(
-                    ident,
-                    "#### Loop operator\nIndicates looping over the values of the containing set.",
-                )),
-                "?" => Some(HoverDoc::from(
-                    ident,
-                    "#### Optional modifier\nMakes the property optional.",
-                )),
-                "@private" => Some(HoverDoc::from(
-                    ident,
-                    "#### Def modifier\nThe definition is _private_. It will not be accessible to other domains if the domain is imported in a `use` statement."
-                )),
-                "@macro" => Some(HoverDoc::from(
-                    ident,
-                    "#### Def modifier\nThe definition describes a reusable partial fragment, such as an individual common field used in many types."
-                )),
-                "@open" => Some(HoverDoc::from(
-                    ident,
-                    "#### Def modifier\nThe definition and its immediate non-entity relationships are _open_. Arbitrary data can be associated with it."
-                )),
-                "@extern" => Some(HoverDoc::from(
-                    ident,
-                    "#### Def modifier\nThe definition describes an _external_ hook."
-                )),
-                "@match" => Some(HoverDoc::from(
-                    ident,
-                    "#### Map modifier\nThe map becomes one-way and the `@match` arm tries to match given variables against structures that follow."
-                )),
-                "@in" => Some(HoverDoc::from(
-                    ident,
-                    "#### Set modifier\nThe given value must be in the set that follows."
-                )),
-                "@all_in" => Some(HoverDoc::from(
-                    ident,
-                    "#### Set modifier\nThe given values must all be in the set that follows."
-                )),
-                "@contains_all" => Some(HoverDoc::from(
-                    ident,
-                    "#### Set modifier\nThe set must contain all the values that follow."
-                )),
-                "@intersects" => Some(HoverDoc::from(
-                    ident,
-                    "#### Set modifier\nThe set must intersect with the set that follows."
-                )),
-                "@equals" => Some(HoverDoc::from(
-                    ident,
-                    "#### Set modifier\nThe values must be equal."
-                )),
-                ident => {
-                    match self.ontol_def.get(ident) {
-                        Some(def) => {
-                            let doc = self.ontology.get_def_docs(def.id)
-                                .map(|doc| doc.as_str())
-                                .unwrap_or_default();
-                            let kind = match def.kind {
-                                DefKind::Entity(_) | DefKind::Data(_) => Some("Primitive"),
-                                DefKind::Relation(_) => Some("Relation type"),
-                                DefKind::Generator(_) => Some("Generator type"),
-                                _ => Some("")
-                            };
-                            kind.map(|kind| HoverDoc::from(
-                                &format!("ontol.{ident}"),
-                                &format!("#### {kind}\n{doc}")
-                            ))
-                        }
-                        None => None
+            "domain" => Some(HoverDoc::from(
+                ident,
+                "#### Domain statement\nIdentifies a domain by a global ulid. Doc comments and rel properties serve as documentation and metadata.",
+            )),
+            "use" => Some(HoverDoc::from(
+                ident,
+                "#### Use statement\nImports a domain by name or Atlas url, and defines a local namespace handle.",
+            )),
+            "def" => Some(HoverDoc::from(
+                ident,
+                "#### Def statement\nDefines a concept, type or data structure.",
+            )),
+            "sym" => Some(HoverDoc::from(
+                ident,
+                "#### Sym statement\nDefines a symbol, a label representing the symbol name itself."
+            )),
+            "arc" => Some(HoverDoc::from(
+                ident,
+                "#### Arc statement\nDefines a relationship map, or a set of hypergraph relations."
+            )),
+            "rel" => Some(HoverDoc::from(
+                ident,
+                "#### Relation statement\nDefines properties of a definition, properties of a relation, or relationships between entity types."
+            )),
+            "fmt" => Some(HoverDoc::from(
+                ident,
+                "#### Format statement\nDescribes a build/match pattern for strings or sequences."
+            )),
+            "map" => Some(HoverDoc::from(
+                ident,
+                "#### Map statement\nDescribes a map of the data flow between two definitions."
+            )),
+            "." => Some(HoverDoc::from(
+                ident,
+                "#### Self reference\nRefers to the identity of the enclosing scope (`self`). `.` is used when the relation is singular/unique.",
+            )),
+            ".." => Some(HoverDoc::from(
+                ident,
+                "#### Loop operator\nIndicates looping over the values of the containing set.",
+            )),
+            "*" => Some(HoverDoc::from(
+                ident,
+                "#### Self reference\nRefers to the identity of the enclosing scope (`self`). `*` is used when the relation is plural.",
+            )),
+            "?" => Some(HoverDoc::from(
+                ident,
+                "#### Optional modifier\nMakes the property optional.",
+            )),
+            "@private" => Some(HoverDoc::from(
+                ident,
+                "#### Def modifier\nThe definition is _private_. It will not be accessible to other domains if the domain is imported in a `use` statement."
+            )),
+            "@macro" => Some(HoverDoc::from(
+                ident,
+                "#### Def modifier\nThe definition describes a reusable partial fragment, usually some common field or structure used in many types.>"
+            )),
+            "@open" => Some(HoverDoc::from(
+                ident,
+                "#### Def modifier\nThe definition and its immediate non-entity relationships are _open_. Arbitrary data can be associated with it."
+            )),
+            "@extern" => Some(HoverDoc::from(
+                ident,
+                "#### Def modifier\nThe definition describes an _external_ hook."
+            )),
+            "@match" => Some(HoverDoc::from(
+                ident,
+                "#### Map modifier\nThe map becomes one-way and the `@match` arm tries to match given variables against structures that follow."
+            )),
+            "@in" => Some(HoverDoc::from(
+                ident,
+                "#### Set operator\nThe given value must be in the set that follows."
+            )),
+            "@all_in" => Some(HoverDoc::from(
+                ident,
+                "#### Set operator\nThe given values must all be in the set that follows."
+            )),
+            "@contains_all" => Some(HoverDoc::from(
+                ident,
+                "#### Set operator\nThe set must contain all the values that follow."
+            )),
+            "@intersects" => Some(HoverDoc::from(
+                ident,
+                "#### Set operator\nThe set must intersect with the set that follows."
+            )),
+            "@equals" => Some(HoverDoc::from(
+                ident,
+                "#### Set operator\nThe values must be equal."
+            )),
+            "format" => Some(HoverDoc::from(
+                "ontol.format",
+                "#### Encoding modifier\nA concrete de/serialization instruction for an abstract type, such as `octets`."
+            )),
+            "hex" => Some(HoverDoc::from(
+                "ontol.format.hex",
+                "#### Binary encoding format\nRepresents binary byte data (`octets`) in hexadecimal encoding."
+            )),
+            "base64" => Some(HoverDoc::from(
+                "ontol.format.base64",
+                "#### Binary encoding format\nRepresents binary byte data (`octets`) in base64 encoding."
+            )),
+            ident => {
+                match self.ontol_def.get(ident) {
+                    Some(def) => {
+                        let doc = self.ontology.get_def_docs(def.id)
+                            .map(|doc| doc.as_str())
+                            .unwrap_or_default();
+                        let kind = match def.kind {
+                            DefKind::Entity(_) | DefKind::Data(_) => Some("Primitive"),
+                            DefKind::Relation(_) => Some("Relation type"),
+                            DefKind::Generator(_) => Some("Generator type"),
+                            _ => Some("")
+                        };
+                        let ident_path = match ident {
+                            "ontol" => "ontol",
+                            _ => &format!("ontol.{ident}"),
+                        };
+                        kind.map(|kind| HoverDoc::from(
+                            ident_path,
+                            &format!("#### {kind}\n{doc}")
+                        ))
                     }
+                    None => None
                 }
             }
+        }
     }
 }
 
