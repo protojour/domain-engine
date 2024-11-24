@@ -80,6 +80,10 @@ impl Backend {
                             let source_name = domain_url.short_name();
                             let ref_uri = build_uri(path, source_name);
 
+                            if domain_url.url().scheme() == "atlas" {
+                                continue;
+                            }
+
                             if let Ok(text) = read_file(&ref_uri) {
                                 state.docs.insert(
                                     ref_uri.to_string(),
