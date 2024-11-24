@@ -1,3 +1,4 @@
+/// Simple example domain model of Git repositories
 domain 01HH2687A8SPTZSX05YMBR43AH (
     rel. name: 'gitmesh'
 )

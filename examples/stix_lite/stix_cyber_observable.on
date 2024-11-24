@@ -1,3 +1,4 @@
+/// STIX Cyber-observable Objects (SCOs)
 domain 01J5C5HBEYR7FT3M7VJ3XJENKV (
     rel. name: 'stix_cyber_observable'
 )

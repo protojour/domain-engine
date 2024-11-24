@@ -1,4 +1,6 @@
-/// The conduit persistence layer
+/// The `conduit` database persistence layer for an example blogging platform.
+///
+/// A "RealWorld" implementation, see https://realworld-docs.netlify.app/
 domain 01GZQ1ZRW0WJR72GHM6VWRMFES (
     rel. name: 'conduit_db'
 )
@@ -13,7 +15,7 @@ def User (
     // TODO: This is.. an authly user name? Maybe?
     rel* 'username': text
 
-    // TODO: Should not store auth-related fields in memoriam,
+    // TODO: Should not store auth-related fields in Memoriam,
     // this is the responsibility of Authly.
     rel* 'email': text
     rel* 'password_hash': text
@@ -106,12 +108,12 @@ sym {
     alphabetical,
 }
 
-map users(
+map users (
     (),
     User { ..@match User() }
 )
 
-map articles(
+map articles (
     (),
     Article { ..@match Article() }
 )

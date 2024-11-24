@@ -1,11 +1,12 @@
+/// Common data structures for STIX
 domain 01J5C5GB45Q3C0E4YYRPP8SN4R (
     rel. name: 'stix_common'
 )
 
-/// The string data type represents a finite-length string of valid characters from the Unicode coded character set [ISO10646]. Unicode incorporates ASCII and the characters of many other international character sets.
+/// The `string` data type represents a finite-length string of valid characters from the Unicode coded character set [ISO10646]. Unicode incorporates ASCII and the characters of many other international character sets.
 ///
 /// The JSON MTI serialization uses the JSON String type [RFC8259], which mandates the UTF-8 encoding for supporting Unicode.
-/// 
+///
 /// Examples
 /// ```
 /// {
@@ -31,7 +32,7 @@ def url (
     rel* is: ontol.text
 )
 
-/// The integer data type represents a whole number. Unless otherwise specified, all integers MUST be capable of being represented as a signed 54-bit value ([-(2**53)+1, (2**53)-1]) as defined in [RFC7493].
+/// The `integer` data type represents a whole number. Unless otherwise specified, all integers MUST be capable of being represented as a signed 54-bit value ([-(2**53)+1, (2**53)-1]) as defined in [RFC7493].
 /// Additional restrictions MAY be placed on the type as described where it is used. The integer size is limited to a 54-bit value not a 64-bit value as per the RFC.
 ///
 /// In the JSON MTI serialization, integers are represented by the JSON Number type [RFC7493].
@@ -39,14 +40,14 @@ def integer (
     rel* is: i64
 )
 
-/// The timestamp type defines how dates and times are represented in STIX.
+/// The `timestamp` type defines how dates and times are represented in STIX.
 ///
 /// The JSON MTI serialization uses the JSON String type [RFC8259] when representing timestamp.
 def timestamp (
     rel* is: datetime
 )
 
-/// The hex data type encodes an array of octets (8-bit bytes) as hexadecimal.
+/// The `hex` data type encodes an array of octets (8-bit bytes) as hexadecimal.
 /// The string MUST consist of an even number of hexadecimal characters, which are the digits '0' through '9' and the lower-case letters 'a' through 'f'.
 /// In order to allow pattern matching on custom objects, for all properties that use the hex type, the property name MUST end with '_hex'.
 def hex (

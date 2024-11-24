@@ -1,17 +1,95 @@
-/// This is an incomplete version of SI, containing just the type definitions, not maps yet.
-/// waiting for https://gitlab.com/protojour/memoriam/domain-engine/-/issues/47.
-///
-/// Also not sure wheter to use singular or plural names for units.
+// This is an incomplete version of SI, containing just the type definitions, not maps yet.
+// waiting for https://gitlab.com/protojour/memoriam/domain-engine/-/issues/47.
+// Also not sure wheter to use singular or plural names for units.
+
+/// Domain representation of the International System of Units, SI (incomplete).
 domain 01H7ZZ5KMG538CXJMNJQVTMP9K (
     rel. name: 'SI'
 )
 
-/// The meter (m) is defined by taking the fixed numerical value of the speed of light in vacuum c to be 299,792,458 when expressed in the unit m s−1, where the second is defined in terms of ∆νCs.
+/// The second (s) is a unit of time, defined by taking the fixed numerical value of the caesium frequency, ΔνCs, the unperturbed ground-state hyperfine transition frequency of the caesium 133 atom, to be 9192631770 when expressed in the unit Hz, which is equal to s−1
 ///
-/// The meter was once defined by a physical artifact - two marks inscribed on a platinum-iridium bar, like these from the NIST Museum.
+/// In other words, a second is the time it takes for a caesium 133 atom to oscillate 9192631770 times.
+def second (
+    rel* is: number
+)
+
+/// The millisecond is defined as 1/1000 of a second.
+def millisecond (
+    rel* is: number
+)
+map @abstract (
+    millisecond(s / 1000),
+    second(s),
+)
+
+/// The microsecond is defined as 1/1,000,000 of a second.
+def microsecond (
+    rel* is: number
+)
+map @abstract (
+    microsecond(s / 1000000),
+    second(s),
+)
+
+/// The nanosecond is defined as 1/1,000,000,000 of a second.
+def nanosecond (
+    rel* is: number
+)
+map @abstract (
+    nanosecond(s / 1000000000),
+    second(s),
+)
+
+/// A minute is equal to 60 seconds
+def minute (
+    rel* is: number
+)
+map @abstract (
+    minute(s * 60),
+    second(s),
+)
+
+/// An hour is equal to 60 minutes
+def hour (
+    rel* is: number
+)
+map @abstract (
+    hour(m * 60),
+    minute(m),
+)
+
+/// A day is roughly equal to 24 hours, but being based on the solar day (the time Earth takes to rotate once around its axis), this may vary by definition.
+def day (
+    rel* is: number
+)
+map @abstract (
+    day(h * 24),
+    hour(h),
+)
+
+/// A week is equal to 7 days
+def week (
+    rel* is: number
+)
+map @abstract (
+    week(d * 7),
+    day(d),
+)
+
+/// A year is roughly equal to 365 days, but 366 days every fourth (leap) year, and being based on the solar year (the time Earth takes for a full orbit around the sun), this may vary by definition.
+def year (
+    rel* is: number
+)
+map @abstract (
+    year(d * 365),
+    day(d),
+)
+
+/// The meter (m) is a measure of length, defined by taking the fixed numerical value of the speed of light in vacuum c to be 299,792,458 when expressed in the unit m s−1, where the second is defined in terms of ∆νCs.
 ///
 /// From the meter, several other units of measure are derived such as the:
-/// 
+///
 /// * unit of speed is the meter per second (m/s). The speed of light in vacuum is 299 792 458 meters per second.
 /// * unit of acceleration is the meter per second per second (m/s2).
 /// * unit of area is the square meter (m2).
@@ -24,18 +102,141 @@ def meter (
 def millimeter (
     rel* is: number
 )
+map @abstract (
+    millimeter(m * 1000),
+    meter(m),
+)
 
 /// The kilometer is defined as 1000 meters.
 def kilometer (
     rel* is: number
 )
-
-map @abstract(
-    millimeter(m * 1000),
-    meter(m),
-)
-
-map @abstract(
+map @abstract (
     kilometer(m / 1000),
     meter(m),
 )
+
+/// The kilogram (kg) is a unit of mass, defined in terms of three defining constants of the SI, namely a specific transition frequency of 133Cs, the speed of light, and the Planck constant.
+///
+/// It is defined by taking the fixed numerical value of the Planck constant h to be 6.62607015×10−34 when expressed in the unit J⋅s, which is equal to kg⋅m2⋅s−1, where the metre and the second are defined in terms of c and ΔνCs.
+def kilogram (
+    rel* is: number
+)
+
+/// The gram is defined as 1/1000 of a kilogram.
+def gram (
+    rel* is: number
+)
+map @abstract (
+    gram(kg / 1000),
+    kilogram(kg),
+)
+
+/// The milligram is defined as 1/1000 of a gram.
+def milligram (
+    rel* is: number
+)
+map @abstract (
+    milligram(g / 1000),
+    gram(g),
+)
+
+/// The metric ton is defined as 1000 kilograms.
+def ton (
+    rel* is: number
+)
+map @abstract (
+    ton(kg * 1000),
+    kilogram(kg),
+)
+
+// def ampere (
+//     rel* is: number
+// )
+
+// def kelvin (
+//     rel* is: number
+// )
+
+// def mole (
+//     rel* is: number
+// )
+
+// def candela (
+//     rel* is: number
+// )
+
+// DERIVED UNITS
+
+/// The hertz (Hz) is the unit of frequency, often described as being equivalent to one event (or cycle) per second.
+def hertz (
+    rel* is: number
+)
+map @abstract (
+    hertz(1 / s),
+    second(s),
+)
+
+// def radian (
+//     rel* is: number
+// )
+// def steradian (
+//     rel* is: number
+// )
+// def newton (
+//     rel* is: number
+// )
+// def pascal (
+//     rel* is: number
+// )
+// def joule (
+//     rel* is: number
+// )
+// def watt (
+//     rel* is: number
+// )
+// def coulomb (
+//     rel* is: number
+// )
+// def volt (
+//     rel* is: number
+// )
+// def farad (
+//     rel* is: number
+// )
+// def ohm (
+//     rel* is: number
+// )
+// def siemens (
+//     rel* is: number
+// )
+// def weber (
+//     rel* is: number
+// )
+// def tesla (
+//     rel* is: number
+// )
+// def henry (
+//     rel* is: number
+// )
+// def degree (
+//     rel* is: number
+// )
+// def lumen (
+//     rel* is: number
+// )
+// def lux (
+//     rel* is: number
+// )
+// def becquerel (
+//     rel* is: number
+// )
+// def gray (
+//     rel* is: number
+// )
+// def sievert (
+//     rel* is: number
+// )
+// def katal (
+//     rel* is: number
+// )

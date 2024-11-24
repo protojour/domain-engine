@@ -1,3 +1,4 @@
+/// STIX open vocabularies
 domain 01J5C5JJKM7XWR56TTYH9B7VRN (
     rel. name: 'stix_open_vocab'
 )
@@ -109,7 +110,7 @@ def attack-resource-level-ov (
 def course-of-action-type-ov (
     rel* is: open-vocab
 
-    /// Unstructured textual/prose description of a course of action that does not conform to any standard language 
+    /// Unstructured textual/prose description of a course of action that does not conform to any standard language
     rel* example: 'textual:text/plain'
 
     /// Prose description of a course of action defined in structured HTML content
@@ -118,7 +119,7 @@ def course-of-action-type-ov (
     /// Prose description of a course of action defined in structured markdown content
     rel* example: 'textual:text/md'
 
-    /// Prose description of a course of action defined in structured PDF content 
+    /// Prose description of a course of action defined in structured PDF content
     rel* example: 'textual:pdf'
 )
 
@@ -143,7 +144,7 @@ def encryption-algorithm-enum (
 def grouping-context-ov (
     rel* is: open-vocab
 
-    /// A set of STIX content related to a particular suspicious activity event. 
+    /// A set of STIX content related to a particular suspicious activity event.
     rel* example: 'suspicious-activity'
 
     /// A set of STIX content related to a particular malware instance or family.
@@ -297,7 +298,7 @@ def infrastructure-type-ov (
 
     /// Specific infrastructure used for anonymization, such as a proxy.
     rel* example: 'anonymization'
-	
+
     /// Specifies the membership/makeup of a botnet, in terms of the network addresses of the hosts that comprise the botnet.
     rel* example: 'botnet'
 
@@ -349,40 +350,40 @@ def malware-capabilities-ov (
 
     /// Indicates that the malware instance or family is able to access one or more remote machines.
     rel* example: 'accesses-remote-machines'
-	
+
     /// Indicates that the malware instance or family is able to prevent itself from being debugged and/or from being run in a debugger or is able to make debugging more difficult.
     rel* example: 'anti-debugging'
-	
+
     /// Indicates that the malware instance or family is able to prevent itself from being disassembled or make disassembly more difficult.
     rel* example: 'anti-disassembly'
-	
+
     /// Indicates that the malware instance or family is able to prevent its execution inside of an emulator or is able to make emulation more difficult.
     rel* example: 'anti-emulation'
-	
+
     /// Indicates that the malware instance or family is able to prevent or make memory forensics more difficult.
     rel* example: 'anti-memory-forensics'
-	
+
     /// Indicates that the malware instance or family is able to prevent sandbox-based behavioral analysis or make it more difficult.
     rel* example: 'anti-sandbox'
-	
+
     /// Indicates that the malware instance or family is able to prevent virtual machine (VM) based behavioral analysis or make it more difficult.
     rel* example: 'anti-vm'
-	
+
     /// Indicates that the malware instance or family is able to capture data from a system's input peripheral devices, such as a keyboard or mouse. This includes things like keylogging.
     rel* example: 'captures-input-peripherals'
-	
+
     /// Indicates that the malware instance or family captures data sent to a system's output peripherals, such as a display. Examples include things like screen scraping.
     rel* example: 'captures-output-peripherals'
-	
+
     /// Indicates that the malware instance or family is able to capture information about a system's state (e.g., data currently in its RAM).
     rel* example: 'captures-system-state-data'
-	
+
     /// Indicates that the malware instance or family is able to clean traces of its infection (e.g., file system artifacts) from a system.
     rel* example: 'cleans-traces-of-infection'
-	
+
     /// Indicates that the malware instance or family commits fraud, such as click fraud (for example).
     rel* example: 'commits-fraud'
-	
+
     /// Indicates that the malware instance or family is able to communicate (i.e., send or receive data) with a command and control (C2) server.
     rel* example: 'communicates-with-c2'
 
@@ -779,21 +780,21 @@ def threat-actor-sophistication-ov (
 
     /// Can carry out random acts of disruption or destruction by running tools they do not understand.
     /// Actors in this category have average computer skills.
-    /// 
+    ///
     /// Example Roles: Average User
-    /// 
+    ///
     /// These actors:
     /// * can not launch targeted attacks
     rel* example: 'none'
 
     /// Can minimally use existing and frequently well known and easy-to-find techniques and programs or scripts to search for and exploit weaknesses in other computers.
     /// Commonly referred to as a script-kiddie.
-    /// 
+    ///
     /// These actors rely on others to develop the malicious tools, delivery mechanisms, and execution strategy and often do not fully understand the tool they are using or how they work.
     /// They also lack the ability to conduct their own reconnaissance and targeting research.
-    /// 
+    ///
     /// Example Roles: Script-Kiddie
-    /// 
+    ///
     /// These actors:
     /// * attack known weaknesses;
     /// * use well known scripts and tools; and
@@ -802,12 +803,12 @@ def threat-actor-sophistication-ov (
 
     /// Can proficiently use existing attack frameworks and toolkits to search for and exploit vulnerabilities in computers or systems.
     /// Actors in this category have computer skills equivalent to an IT professional and typically have a working knowledge of networks, operating systems, and possibly even defensive techniques and will typically exhibit some operational security.
-    /// 
+    ///
     /// These actors rely others to develop the malicious tools and delivery mechanisms but are able to plan their own execution strategy.
     /// They are proficient in the tools they are using and how they work and can even make minimal modifications as needed.
-    /// 
+    ///
     /// Example Roles: Toolkit User
-    /// 
+    ///
     /// These actors:
     /// * attack known vulnerabilities;
     /// * use attack frameworks and toolkits; and
@@ -816,11 +817,11 @@ def threat-actor-sophistication-ov (
 
     /// Can develop their own tools or scripts from publicly known vulnerabilities to target systems and users.
     /// Actors in this category are very adept at IT systems and have a background in software development along with a solid understanding of defensive techniques and operational security.
-    /// 
+    ///
     /// These actors rely on others to find and identify weaknesses and vulnerabilities in systems, but are able to create their own tools, delivery mechanisms, and execution strategies.
-    /// 
+    ///
     /// Example Roles: Toolkit Developer
-    /// 
+    ///
     /// These actors:
     /// * attack known vulnerabilities;
     /// * can create their own tools; and
@@ -828,9 +829,9 @@ def threat-actor-sophistication-ov (
     rel* example: 'advanced'
 
     /// Can focus on the discovery and use of unknown malicious code, are is adept at installing user and kernel mode rootkits, frequently use data mining tools, target corporate executives and key users (government and industry) for the purpose of stealing personal and corporate data. Actors in this category are very adept at IT systems and software development and are experts with security systems, defensive techniques, attack methods, and operational security.
-    /// 
+    ///
     /// Example Roles: Vulnerability Researcher, Reverse Engineer, Threat Researcher, Malware Creator
-    /// 
+    ///
     /// These actors:
     /// * attack unknown and known vulnerabilities;
     /// * can create their own tools from scratch; and
@@ -838,13 +839,13 @@ def threat-actor-sophistication-ov (
     rel* example: 'expert'
 
     /// Typically, criminal or state actors who are organized, highly technical, proficient, well-funded professionals working in teams to discover new vulnerabilities and develop exploits.
-    /// 
+    ///
     /// Demonstrates sophisticated capability. An innovator has the ability to create and script unique programs and codes targeting virtually any form of technology.
     /// At this level, this actor has a deep knowledge of networks, operating systems, programming languages, firmware, and infrastructure topologies and will demonstrate operational security when conducting his activities.
     /// Innovators are largely responsible for the discovery of 0-day vulnerabilities and the development of new attack techniques.
-    /// 
+    ///
     /// Example Roles: Toolkit Innovator, 0-Day Exploit Author
-    /// 
+    ///
     /// These actors:
     /// * attack unknown and known vulnerabilities;
     /// * create attacks against 0-Day exploits from scratch; and
@@ -852,7 +853,7 @@ def threat-actor-sophistication-ov (
     rel* example: 'innovator'
 
     /// State actors who create vulnerabilities through an active program to “influence” commercial products and services during design, development or manufacturing, or with the ability to impact products while in the supply chain to enable exploitation of networks and systems of interest.
-    /// 
+    ///
     /// These actors:
     /// * can create or use entire supply chains to launch an attack;
     /// * can create and design attacks for any systems, software package, or device; and

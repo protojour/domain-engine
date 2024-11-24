@@ -1,4 +1,4 @@
-/// This domain defines edges for stix
+/// This domain defines edges for STIX
 domain 01J6SACJ2A3P8FNEQ2S20M3DV7 (
     rel. name: 'stix_edges'
 )
@@ -10,7 +10,7 @@ arc relationship {
     (relationship) target_ref: (target),
 }
 
-/// The entity which created a stix object
+/// The entity which created a STIX object
 arc created {
     (artifact) created_by_ref: (identity),
 }

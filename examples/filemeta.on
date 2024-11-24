@@ -1,4 +1,5 @@
-/// Memoriam domain for object storage file metadata
+/// Memoriam core domain for object storage file metadata,
+/// allowing files to be represented in the ontology graph.
 domain 01J358NG2T3XCNG45JF1TVNY0C (
     rel. name: 'filemeta'
 )

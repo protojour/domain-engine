@@ -1,4 +1,6 @@
-/// The workspaces domain models frequently changing code repositories.
+/// Memoriam core domain modelling frequently changing code repositories.
+///
+/// Workspaces are version-controlled trees of files, where the data is represented by conflict-free replicated data types (CRDTs).
 domain 01JAP41VG1STK1VZPWXV26SPNM (
     rel. name: 'workspaces'
 )

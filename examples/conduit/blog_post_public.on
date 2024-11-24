@@ -1,4 +1,6 @@
-/// A simple blogging abstraction that uses conduit_db as persistence layer.
+/// A simple blogging platform API that uses `conduit_db` as persistence layer.
+///
+/// A "RealWorld" implementation, see https://realworld-docs.netlify.app/
 domain 01JCF1ZWTPMFWK8C9D42CDDR70 (
     rel. name: 'blog_post_public'
 )
@@ -13,28 +15,28 @@ def BlogPost (
     rel* 'tags': {text}
 )
 
-map(
-    BlogPost(
+map (
+    BlogPost (
         'post_id': id,
         'name': title,
         'contents': body,
         'written_by': author,
         'tags': {..tag},
     ),
-    @match db.Article(
+    @match db.Article (
         'article_id': id,
         'body': body,
         'title': title,
-        db.article_authorship.author: db.User(
+        db.article_authorship.author: db.User (
             'username': author
         ),
         db.tagging.tags: {
             ..db.TagEntity('tag': tag)
-        },
-    ),
+        }
+    )
 )
 
-map posts(
+map posts (
     (
         'written_by'?: by
     ),

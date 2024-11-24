@@ -1,3 +1,4 @@
+/// Memoriam core domain for exploratory data mining sessions.
 domain 01J6YRT0EB97ZY7NCDDBX00YXK (
     rel. name: 'findings'
 )
