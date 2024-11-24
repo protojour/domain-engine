@@ -390,11 +390,11 @@ impl State {
             Kind::Modifier => {
                 return self.get_ontol_docs(token.slice());
             }
-            Kind::Symbol => match token.slice() {
-                // handle certain symbols directly
-                "format" => return self.get_ontol_docs("format"),
-                _ => {}
-            },
+            Kind::Symbol => {
+                if token.slice() == "format" {
+                    return self.get_ontol_docs("format");
+                }
+            }
             _ => {}
         }
 
@@ -475,11 +475,77 @@ impl State {
                     hover.sign_if_unset(&get_signature(&doc.text[parent.span().to_usize_range()]));
                 }
                 insp::Node::MapStatement(stmt) => {
+                    let mut id = String::default();
                     if let Some(ident_path) = stmt.ident_path() {
                         if let Some(sym) = ident_path.symbols().next() {
                             hover.path_if_unset(&format!("{}.{}", &doc.name, sym.slice()));
+                            id = format!("{} ", sym.slice());
                         }
                     }
+
+                    let arm_docs = stmt
+                        .arms()
+                        .map(|arm| -> String {
+                            let Some(pattern) = arm.pattern() else {
+                                return String::default();
+                            };
+                            match pattern {
+                                insp::Pattern::PatStruct(pat) => {
+                                    let mut modifiers = pat
+                                        .modifiers()
+                                        .map(|m| m.slice().to_string())
+                                        .collect::<Vec<_>>()
+                                        .join(" ");
+                                    if !modifiers.is_empty() {
+                                        modifiers.push(' ');
+                                    };
+                                    let path = match pat.ident_path() {
+                                        Some(path) => format!(
+                                            "{} ",
+                                            path.symbols()
+                                                .map(|s| s.slice().to_string())
+                                                .collect::<Vec<_>>()
+                                                .join(".")
+                                        ),
+                                        None => "".to_string(),
+                                    };
+                                    let ellipsis = match pat.params().next().is_some() {
+                                        true => "...",
+                                        false => "",
+                                    };
+                                    format!("{}{}({})", modifiers, path, ellipsis)
+                                }
+                                insp::Pattern::PatSet(pat) => {
+                                    let modifiers = match pat.modifier() {
+                                        Some(m) => format!("{} ", m.slice()),
+                                        None => "".to_string(),
+                                    };
+                                    let path = match pat.ident_path() {
+                                        Some(path) => format!(
+                                            "{} ",
+                                            path.symbols()
+                                                .map(|s| s.slice().to_string())
+                                                .collect::<Vec<_>>()
+                                                .join(".")
+                                        ),
+                                        None => "".to_string(),
+                                    };
+                                    format!("{}{}{{...}}", modifiers, path)
+                                }
+                                insp::Pattern::PatAtom(atom) => {
+                                    format!("({})", atom.view().display())
+                                }
+                                insp::Pattern::PatBinary(_) => "(binary)".to_string(),
+                            }
+                        })
+                        .collect::<Vec<_>>();
+
+                    hover.sign_if_unset(&formatdoc! {"
+                        map {}(
+                            {},
+                            {}
+                        )
+                    ", id, arm_docs[0], arm_docs[1]});
                 }
                 insp::Node::ArcClause(_) => {
                     hover.sign_if_unset(&get_signature(&doc.text[parent.span().to_usize_range()]));
