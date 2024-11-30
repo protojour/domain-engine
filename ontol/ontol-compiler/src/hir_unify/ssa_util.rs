@@ -206,7 +206,7 @@ pub struct TypeMapping<'m> {
     pub to: TypeRef<'m>,
 }
 
-impl<'c, 'm> SsaUnifier<'c, 'm> {
+impl SsaUnifier<'_, '_> {
     pub fn scan_immediate_free_vars(
         &self,
         arena: &ontol_hir::arena::Arena<TypedHir>,
@@ -218,7 +218,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             iter_tuple_vars: &'s FnvHashMap<Var, FnvHashMap<u8, Var>>,
         }
 
-        impl<'h, 'm: 'h, 's> ontol_hir::visitor::HirVisitor<'h, 'm, TypedHir> for FreeVarsAnalyzer<'s> {
+        impl<'h, 'm: 'h> ontol_hir::visitor::HirVisitor<'h, 'm, TypedHir> for FreeVarsAnalyzer<'_> {
             fn visit_prop(
                 &mut self,
                 flags: PropFlags,

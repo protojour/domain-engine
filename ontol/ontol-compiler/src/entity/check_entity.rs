@@ -6,7 +6,7 @@ use crate::{
     CompileError, Compiler,
 };
 
-impl<'m> Compiler<'m> {
+impl Compiler<'_> {
     /// Check entity-related relationships.
     /// This is also run for non-entities.
     pub fn check_entity(&mut self, def_id: DefId) {

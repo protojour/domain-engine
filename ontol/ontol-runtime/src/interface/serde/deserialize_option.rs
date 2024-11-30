@@ -17,7 +17,7 @@ pub struct OptionProcessor<'on, 'p> {
     inner: SerdeProcessor<'on, 'p>,
 }
 
-impl<'on, 'p, 'de> DeserializeSeed<'de> for OptionProcessor<'on, 'p> {
+impl<'de> DeserializeSeed<'de> for OptionProcessor<'_, '_> {
     type Value = Option<Attr>;
 
     fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
@@ -25,7 +25,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for OptionProcessor<'on, 'p> {
     }
 }
 
-impl<'on, 'p, 'de> Visitor<'de> for OptionProcessor<'on, 'p> {
+impl<'de> Visitor<'de> for OptionProcessor<'_, '_> {
     type Value = Option<Attr>;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

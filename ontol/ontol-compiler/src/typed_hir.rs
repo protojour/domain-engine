@@ -10,7 +10,10 @@ use crate::{
 pub struct TypedHir;
 
 impl ontol_hir::Lang for TypedHir {
-    type Data<'m, H> = TypedHirData<'m, H> where H: Clone;
+    type Data<'m, H>
+        = TypedHirData<'m, H>
+    where
+        H: Clone;
 
     fn default_data<'m, H: Clone>(&self, hir: H) -> Self::Data<'m, H> {
         TypedHirData(hir, ERROR_META)
@@ -60,7 +63,7 @@ impl<'m, H> TypedHirData<'m, H> {
     }
 }
 
-impl<'m, T: Debug> std::fmt::Debug for TypedHirData<'m, T> {
+impl<T: Debug> std::fmt::Debug for TypedHirData<'_, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut tup = f.debug_tuple("Data");
         tup.field(&self.0);
@@ -109,7 +112,7 @@ pub struct HirFunc<'m> {
     pub body: ontol_hir::RootNode<'m, TypedHir>,
 }
 
-impl<'m> Display for HirFunc<'m> {
+impl Display for HirFunc<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "|{}| {}", self.arg.0.var, self.body)
     }

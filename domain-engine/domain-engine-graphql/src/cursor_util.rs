@@ -17,7 +17,7 @@ impl<'de> serde::de::Deserialize<'de> for GraphQLCursor {
 
 pub struct CursorVisitor;
 
-impl<'de> serde::de::Visitor<'de> for CursorVisitor {
+impl serde::de::Visitor<'_> for CursorVisitor {
     type Value = GraphQLCursor;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

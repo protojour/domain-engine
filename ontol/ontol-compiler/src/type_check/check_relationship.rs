@@ -19,7 +19,7 @@ use crate::{
 
 use super::TypeCheck;
 
-impl<'c, 'm> TypeCheck<'c, 'm> {
+impl<'m> TypeCheck<'_, 'm> {
     pub fn check_rel(&mut self, rel_id: RelId, macro_expand: Option<&mut Option<MacroExpand>>) {
         let spanned = self.rel_ctx.spanned_relationship_by_id(rel_id);
         self.check_relationship(rel_id, spanned.value, spanned.span, macro_expand, None);

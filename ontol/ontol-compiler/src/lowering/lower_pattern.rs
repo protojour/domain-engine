@@ -32,7 +32,7 @@ enum LoweredStructPatternParams {
     Error,
 }
 
-impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
+impl<V: NodeView> CstLowering<'_, '_, V> {
     pub(super) fn lower_pattern(
         &mut self,
         pat: insp::Pattern<V>,

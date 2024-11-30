@@ -92,7 +92,7 @@ struct SelectFlowProcessor<'on> {
     prop_flow_slice: &'on [PropertyFlow],
 }
 
-impl<'on> SelectFlowProcessor<'on> {
+impl SelectFlowProcessor<'_> {
     fn autoselect_output_properties(
         &self,
         output_domain_index: DomainIndex,

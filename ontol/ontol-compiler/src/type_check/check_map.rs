@@ -49,7 +49,7 @@ pub enum CheckMapError {
     TooManyLeaves(Vec<Label>),
 }
 
-impl<'c, 'm> TypeCheck<'c, 'm> {
+impl<'m> TypeCheck<'_, 'm> {
     pub fn check_map(
         &mut self,
         map_def: (DefId, SourceSpan),

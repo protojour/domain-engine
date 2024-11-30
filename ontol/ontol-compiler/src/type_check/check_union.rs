@@ -27,7 +27,7 @@ use crate::{
 
 use super::TypeCheck;
 
-impl<'c, 'm> TypeCheck<'c, 'm> {
+impl<'m> TypeCheck<'_, 'm> {
     pub fn check_union(&mut self, value_union_def_id: DefId) -> Vec<SpannedCompileError> {
         let _entered = debug_span!("union", id = ?value_union_def_id).entered();
 

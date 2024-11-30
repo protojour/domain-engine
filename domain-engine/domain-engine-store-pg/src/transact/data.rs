@@ -62,7 +62,7 @@ pub struct ParentProp {
     pub key: PgDataKey,
 }
 
-impl<'a> TransactCtx<'a> {
+impl TransactCtx<'_> {
     pub fn deserialize_sql(&self, def_id: DefId, sql_val: SqlScalar) -> DomainResult<Value> {
         let tag = ValueTag::from(def_id);
 

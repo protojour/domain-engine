@@ -35,7 +35,7 @@ use super::{
     SerdeIntersection, SerdeKey, EDGE_PROPERTY,
 };
 
-impl<'c, 'm> SerdeGenerator<'c, 'm> {
+impl<'c> SerdeGenerator<'c, '_> {
     pub(super) fn populate_struct_operator(
         &mut self,
         addr: SerdeOperatorAddr,

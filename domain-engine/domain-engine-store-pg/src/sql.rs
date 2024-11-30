@@ -337,7 +337,7 @@ impl<'a> TableName<'a> {
     }
 }
 
-impl<'a> Display for Stmt<'a> {
+impl Display for Stmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Select(select) => write!(f, "{select}"),
@@ -345,7 +345,7 @@ impl<'a> Display for Stmt<'a> {
     }
 }
 
-impl<'a> Display for Select<'a> {
+impl Display for Select<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(with) = &self.with {
             writeln!(f, "{with}")?;
@@ -368,7 +368,7 @@ impl<'a> Display for Select<'a> {
     }
 }
 
-impl<'a> Display for Insert<'a> {
+impl Display for Insert<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(with) = &self.with {
             writeln!(f, "{with}")?;
@@ -399,7 +399,7 @@ impl<'a> Display for Insert<'a> {
     }
 }
 
-impl<'a> Display for Update<'a> {
+impl Display for Update<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(with) = &self.with {
             writeln!(f, "{with}")?;
@@ -424,7 +424,7 @@ impl<'a> Display for Update<'a> {
     }
 }
 
-impl<'a> Display for Delete<'a> {
+impl Display for Delete<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "DELETE FROM {from}", from = self.from)?;
 
@@ -440,7 +440,7 @@ impl<'a> Display for Delete<'a> {
     }
 }
 
-impl<'a> Display for Vacuum<'a> {
+impl Display for Vacuum<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -451,7 +451,7 @@ impl<'a> Display for Vacuum<'a> {
     }
 }
 
-impl<'a> Display for Expressions<'a> {
+impl Display for Expressions<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.multiline {
             writeln!(f, "{}", self.items.iter().format(",\n"))
@@ -475,7 +475,7 @@ impl Display for Limit {
     }
 }
 
-impl<'a> Display for OrderBy<'a> {
+impl Display for OrderBy<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.expressions.is_empty() {
             return Ok(());
@@ -485,7 +485,7 @@ impl<'a> Display for OrderBy<'a> {
     }
 }
 
-impl<'a> Display for OrderByExpr<'a> {
+impl Display for OrderByExpr<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)?;
 
@@ -497,7 +497,7 @@ impl<'a> Display for OrderByExpr<'a> {
     }
 }
 
-impl<'a> Display for With<'a> {
+impl Display for With<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.recursive {
             writeln!(f, "WITH RECURSIVE")?;
@@ -509,7 +509,7 @@ impl<'a> Display for With<'a> {
     }
 }
 
-impl<'a> Display for WithQuery<'a> {
+impl Display for WithQuery<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{name}", name = self.name)?;
 
@@ -521,7 +521,7 @@ impl<'a> Display for WithQuery<'a> {
     }
 }
 
-impl<'a> Display for OnConflict<'a> {
+impl Display for OnConflict<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(target) = &self.target {
             write!(f, "{target} ")?;
@@ -531,7 +531,7 @@ impl<'a> Display for OnConflict<'a> {
     }
 }
 
-impl<'a> Display for ConflictTarget<'a> {
+impl Display for ConflictTarget<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Columns(columns) => write!(f, "({})", columns.iter().map(Ident).format(",")),
@@ -539,7 +539,7 @@ impl<'a> Display for ConflictTarget<'a> {
     }
 }
 
-impl<'a> Display for ConflictAction<'a> {
+impl Display for ConflictAction<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::DoUpdateSet(update_columns) => {
@@ -556,7 +556,7 @@ impl<'a> Display for ConflictAction<'a> {
     }
 }
 
-impl<'a> Display for UpdateColumn<'a> {
+impl Display for UpdateColumn<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -575,7 +575,7 @@ impl Display for Name {
     }
 }
 
-impl<'a> Display for Expr<'a> {
+impl Display for Expr<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Path(path) => write!(f, "{path}"),
@@ -610,13 +610,13 @@ impl<'a> Display for Expr<'a> {
     }
 }
 
-impl<'a> Display for Path<'a> {
+impl Display for Path<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0.iter().format("."))
     }
 }
 
-impl<'a> Display for PathSegment<'a> {
+impl Display for PathSegment<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             PathSegment::Ident(i) => write!(f, "{}", Ident(i)),
@@ -627,7 +627,7 @@ impl<'a> Display for PathSegment<'a> {
     }
 }
 
-impl<'a> Display for FromItem<'a> {
+impl Display for FromItem<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::TableName(tn) => write!(f, "{tn}"),
@@ -639,7 +639,7 @@ impl<'a> Display for FromItem<'a> {
     }
 }
 
-impl<'a> Display for Join<'a> {
+impl Display for Join<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let first = &self.first;
         let second = &self.second;
@@ -649,7 +649,7 @@ impl<'a> Display for Join<'a> {
     }
 }
 
-impl<'a> Display for Union<'a> {
+impl Display for Union<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let first = &self.first;
         let second = &self.second;
@@ -699,19 +699,19 @@ impl<'a> std::convert::From<&'a str> for PathSegment<'a> {
     }
 }
 
-impl<'a> std::convert::From<Alias> for PathSegment<'a> {
+impl std::convert::From<Alias> for PathSegment<'_> {
     fn from(value: Alias) -> Self {
         Self::Alias(value)
     }
 }
 
-impl<'a> std::convert::From<Param> for PathSegment<'a> {
+impl std::convert::From<Param> for PathSegment<'_> {
     fn from(value: Param) -> Self {
         Self::Param(value)
     }
 }
 
-impl<'a> Display for TableName<'a> {
+impl Display for TableName<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}.{}", Ident(self.0), Ident(self.1))
     }

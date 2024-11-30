@@ -72,7 +72,7 @@ pub struct OpenApiSchemas<'e> {
     ontology: &'e Ontology,
 }
 
-impl<'e> Serialize for OpenApiSchemas<'e> {
+impl Serialize for OpenApiSchemas<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let domain_index = self.domain_index;
         let next_domain_index = DomainIndex(self.domain_index.0 + 1);
@@ -113,7 +113,7 @@ pub struct StandaloneJsonSchema<'e> {
     mode: ProcessorMode,
 }
 
-impl<'e> Serialize for StandaloneJsonSchema<'e> {
+impl Serialize for StandaloneJsonSchema<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let docs = self.ontology.get_def_docs(self.def_id);
         let ctx = SchemaCtx {
@@ -293,7 +293,7 @@ struct SchemaDefinition<'e> {
     value_operator: &'e SerdeOperator,
 }
 
-impl<'e> Serialize for SchemaDefinition<'e> {
+impl Serialize for SchemaDefinition<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(None)?;
         serialize_schema_inline::<S>(&self.ctx, self.value_operator, None, &mut map)?;
@@ -475,7 +475,7 @@ struct SchemaReference<'d, 'e> {
     def_map: Option<&'d DefMap>,
 }
 
-impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
+impl Serialize for SchemaReference<'_, '_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let value_operator = &self.ctx.ontology[self.operator_addr];
 
@@ -527,7 +527,7 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
     }
 }
 
-impl<'d, 'e> SchemaReference<'d, 'e> {
+impl SchemaReference<'_, '_> {
     fn compose<T: Serialize>(&self, inner: T) -> Compose<T> {
         Compose {
             ctx: self.ctx,
@@ -545,7 +545,7 @@ struct Compose<'d, 'e, T> {
     def_map: Option<&'d DefMap>,
 }
 
-impl<'d, 'e, T: Serialize> Serialize for Compose<'d, 'e, T> {
+impl<T: Serialize> Serialize for Compose<'_, '_, T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         if let Some(rel_params_operator_addr) = self.ctx.rel_params_operator_addr {
             let mut map = serializer.serialize_map(Some(1))?;
@@ -586,7 +586,7 @@ struct ClosedMap<'d, 'e, T> {
     def_map: Option<&'d BTreeMap<SerdeDef, SerdeOperatorAddr>>,
 }
 
-impl<'d, 'e, T: Serialize> Serialize for ClosedMap<'d, 'e, T> {
+impl<T: Serialize> Serialize for ClosedMap<'_, '_, T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(None)?;
 
@@ -604,7 +604,7 @@ struct UnionRefLinks<'e> {
     union_op: &'e UnionOperator,
 }
 
-impl<'e> Serialize for UnionRefLinks<'e> {
+impl Serialize for UnionRefLinks<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut seq = serializer.serialize_seq(None)?;
 
@@ -625,7 +625,7 @@ struct ArrayItemsRefLinks<'e> {
     ranges: &'e [SequenceRange],
 }
 
-impl<'e> Serialize for ArrayItemsRefLinks<'e> {
+impl Serialize for ArrayItemsRefLinks<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut seq = serializer.serialize_seq(None)?;
         for range in self.ranges {
@@ -645,7 +645,7 @@ struct MapProperties<'e> {
     struct_op: &'e StructOperator,
 }
 
-impl<'e> Serialize for MapProperties<'e> {
+impl Serialize for MapProperties<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(None)?;
         for (key, property) in self.struct_op.struct_properties() {
@@ -679,7 +679,7 @@ struct RequiredMapProperties<'e> {
     map_type: &'e StructOperator,
 }
 
-impl<'e> Serialize for RequiredMapProperties<'e> {
+impl Serialize for RequiredMapProperties<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut seq = serializer.serialize_seq(None)?;
         for (key, property) in self.map_type.properties.iter() {
@@ -697,7 +697,7 @@ struct SingletonObjectSchema<'e> {
     operator_addr: SerdeOperatorAddr,
 }
 
-impl<'e> Serialize for SingletonObjectSchema<'e> {
+impl Serialize for SingletonObjectSchema<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(None)?;
         let prop = self.property_name.as_str();
@@ -718,7 +718,7 @@ struct RefLink<'e> {
     serde_def: SerdeDef,
 }
 
-impl<'e> Serialize for RefLink<'e> {
+impl Serialize for RefLink<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(None)?;
         map.serialize_entry("$ref", &self.ctx.format_ref_link(self.serde_def))?;
@@ -746,7 +746,7 @@ impl<'d, 'e> Defs<'d, 'e> {
     }
 }
 
-impl<'d, 'e> Serialize for Defs<'d, 'e> {
+impl Serialize for Defs<'_, '_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(None)?;
 

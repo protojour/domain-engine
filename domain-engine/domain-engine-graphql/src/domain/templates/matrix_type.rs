@@ -12,7 +12,7 @@ pub struct MatrixType<'v> {
     pub matrix: AttrMatrixRef<'v>,
 }
 
-impl<'v> juniper::GraphQLValue<GqlScalar> for MatrixType<'v> {
+impl juniper::GraphQLValue<GqlScalar> for MatrixType<'_> {
     type Context = ServiceCtx;
     type TypeInfo = SchemaType;
 
@@ -60,7 +60,7 @@ impl<'v> juniper::GraphQLValue<GqlScalar> for MatrixType<'v> {
     }
 }
 
-impl<'v> juniper::GraphQLType<GqlScalar> for MatrixType<'v> {
+impl juniper::GraphQLType<GqlScalar> for MatrixType<'_> {
     fn name(_info: &Self::TypeInfo) -> Option<&str> {
         None
     }

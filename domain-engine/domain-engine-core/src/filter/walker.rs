@@ -53,7 +53,7 @@ pub enum MemberPredicate<'a> {
 
 pub struct SetMembers<'a>(&'a [Clause<Var, CondTerm>]);
 
-impl<'a> SetMembers<'a> {
+impl SetMembers<'_> {
     pub fn size(&self) -> usize {
         self.iter().count()
     }

@@ -150,7 +150,7 @@ impl<'d, 'on> FormatPattern<'d, 'on> {
     }
 }
 
-impl<'d, 'on> Display for FormatPattern<'d, 'on> {
+impl Display for FormatPattern<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for constant_part in &self.pattern.constant_parts {
             match (constant_part, self.value) {

@@ -248,7 +248,7 @@ struct Probe<'on, 'a> {
     visited: &'a mut FnvHashSet<DefId>,
 }
 
-impl<'on, 'a> Probe<'on, 'a> {
+impl Probe<'_, '_> {
     fn probe_rec(&mut self, def_id: DefId) -> bool {
         trace!(
             "probe {def_id:?} path={:?} dir={:?}",

@@ -74,7 +74,7 @@ struct FakeGenerator<'a, R: Rng> {
     edge_saturation: HashSet<DefId>,
 }
 
-impl<'a, R: Rng> FakeGenerator<'a, R> {
+impl<R: Rng> FakeGenerator<'_, R> {
     pub fn fake_value(&mut self, def_id: DefId) -> Result<Value, Error> {
         let def = self.ontology.def(def_id);
         let addr = def.operator_addr.ok_or(Error::NoSerializationInfo)?;

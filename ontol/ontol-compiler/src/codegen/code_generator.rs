@@ -192,7 +192,7 @@ pub(super) struct CodeGenerator<'a, 'm> {
     catch_points: FnvHashMap<ontol_hir::Label, BlockLabel>,
 }
 
-impl<'a, 'm> CodeGenerator<'a, 'm> {
+impl<'m> CodeGenerator<'_, 'm> {
     fn gen_node<'h>(&mut self, node_ref: TypedNodeRef<'h, 'm>, block: &mut Block) {
         let arena = node_ref.arena();
         let (kind, meta) = (&node_ref.0, &node_ref.1);

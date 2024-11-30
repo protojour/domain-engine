@@ -21,7 +21,7 @@ pub struct FmtTransition {
     pub span: SourceSpan,
 }
 
-impl<'m> Compiler<'m> {
+impl Compiler<'_> {
     pub fn check_fmt_chain(&mut self, def_id: DefId, chain: FmtChain) {
         let Ok(origin_segment) = self.get_segment(def_id, chain.origin.def, chain.origin.span)
         else {

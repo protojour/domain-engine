@@ -72,7 +72,7 @@ pub enum DefKind<'m> {
     Extern(&'m str),
 }
 
-impl<'m> DefKind<'m> {
+impl DefKind<'_> {
     pub fn opt_identifier(&self) -> Option<Cow<str>> {
         match self {
             Self::Domain(_) => None,
@@ -250,7 +250,7 @@ pub struct Defs<'m> {
     pub(crate) text_like_types: FnvHashMap<DefId, TextLikeType>,
 }
 
-impl<'m> Default for Defs<'m> {
+impl Default for Defs<'_> {
     fn default() -> Self {
         Self::new()
     }

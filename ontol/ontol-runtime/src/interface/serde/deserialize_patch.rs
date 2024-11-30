@@ -16,7 +16,7 @@ enum Operation {
     Remove,
 }
 
-impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
+impl<'de> Visitor<'de> for GraphqlPatchVisitor<'_, '_> {
     type Value = Attr;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

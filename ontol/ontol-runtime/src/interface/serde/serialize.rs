@@ -32,7 +32,7 @@ type Res<S> = Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Err
 
 const UNIT_ATTR: Attr = Attr::Unit(Value::unit());
 
-impl<'on, 'p> SerdeProcessor<'on, 'p> {
+impl SerdeProcessor<'_, '_> {
     /// Serialize a value using this processor.
     pub fn serialize_attr<S: Serializer>(&self, attr: AttrRef, serializer: S) -> Res<S> {
         trace!(
@@ -685,7 +685,7 @@ struct Proxy<'v, 'on, 'p> {
     processor: SerdeProcessor<'on, 'p>,
 }
 
-impl<'v, 'on, 'p> serde::Serialize for Proxy<'v, 'on, 'p> {
+impl serde::Serialize for Proxy<'_, '_, '_> {
     fn serialize<S>(&self, serializer: S) -> Res<S>
     where
         S: serde::Serializer,

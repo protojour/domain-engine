@@ -35,7 +35,7 @@ pub enum ReportError {
     No,
 }
 
-impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
+impl<V: NodeView> CstLowering<'_, '_, V> {
     pub(super) fn catch<T>(&mut self, f: impl FnOnce(&mut Self) -> Res<T>) -> Option<T> {
         match f(self) {
             Ok(value) => Some(value),

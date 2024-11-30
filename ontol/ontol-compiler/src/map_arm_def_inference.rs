@@ -52,7 +52,7 @@ pub struct MapArmDefInferencer<'c, 'm> {
     errors: &'c mut CompileErrors,
 }
 
-impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
+impl MapArmDefInferencer<'_, '_> {
     pub fn infer_map_arm_type(&mut self, info: MapArmTypeInferred) -> Outcome {
         let target_pattern = self.patterns.table.get(&info.target.0).unwrap();
 
@@ -489,7 +489,7 @@ impl<'m> Compiler<'m> {
     }
 }
 
-impl<'c, 'm> AsMut<CompileErrors> for MapArmDefInferencer<'c, 'm> {
+impl AsMut<CompileErrors> for MapArmDefInferencer<'_, '_> {
     fn as_mut(&mut self) -> &mut CompileErrors {
         self.errors
     }

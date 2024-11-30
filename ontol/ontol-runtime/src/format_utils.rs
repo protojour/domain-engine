@@ -120,7 +120,7 @@ impl Display for Indent {
 
 pub struct DebugViaDisplay<'a, T>(pub &'a T);
 
-impl<'a, T> Debug for DebugViaDisplay<'a, T>
+impl<T> Debug for DebugViaDisplay<'_, T>
 where
     T: Display,
 {
@@ -168,13 +168,13 @@ impl Display for AsAlpha {
 
 pub struct Literal<'a>(pub &'a str);
 
-impl<'a> Display for Literal<'a> {
+impl Display for Literal<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl<'a> Debug for Literal<'a> {
+impl Debug for Literal<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -187,7 +187,7 @@ pub enum FormattedValue<'v> {
     JsonError(serde_json::Error),
 }
 
-impl<'v> FormattedValue<'v> {
+impl FormattedValue<'_> {
     pub fn as_str(&self) -> Option<&str> {
         match self {
             FormattedValue::Str(s) => Some(s),
@@ -198,7 +198,7 @@ impl<'v> FormattedValue<'v> {
     }
 }
 
-impl<'v> Display for FormattedValue<'v> {
+impl Display for FormattedValue<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             FormattedValue::Str(s) => write!(f, "{s}"),

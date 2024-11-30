@@ -13,7 +13,7 @@ use crate::{
 
 use super::context::{BlockContext, CstLowering, RootDefs};
 
-impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
+impl<V: NodeView> CstLowering<'_, '_, V> {
     pub(super) fn lower_fmt_statement(
         &mut self,
         stmt: insp::FmtStatement<V>,

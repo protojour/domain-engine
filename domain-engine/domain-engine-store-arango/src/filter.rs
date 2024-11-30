@@ -37,7 +37,7 @@ impl FilterQuery {
     }
 }
 
-impl<'a> MetaQuery<'a> {
+impl MetaQuery<'_> {
     /// Add an ONTOL Filter to MetaQuery
     pub fn add_filter(&mut self, def_id: DefId, filter: &OntolFilter) -> DomainResult<()> {
         debug!("add filter {filter:#?}");

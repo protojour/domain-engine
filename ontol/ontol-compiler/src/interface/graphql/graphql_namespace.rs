@@ -176,7 +176,7 @@ pub struct NameCtx<'c, 'm> {
 
 pub struct Typename<'a, 'm>(DefId, NameCtx<'a, 'm>);
 
-impl<'a, 'm> ProcessName for Typename<'a, 'm> {
+impl ProcessName for Typename<'_, '_> {
     fn def_id(&self) -> Option<DefId> {
         Some(self.0)
     }
@@ -243,7 +243,7 @@ pub enum GqlAdaptedIdent<'a> {
     Adapted(String),
 }
 
-impl<'a> GqlAdaptedIdent<'a> {
+impl GqlAdaptedIdent<'_> {
     fn into_adapted(self) -> String {
         match self {
             Self::Valid(valid) => valid.into(),

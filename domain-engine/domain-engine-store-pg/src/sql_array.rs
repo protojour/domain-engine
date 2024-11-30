@@ -47,7 +47,7 @@ impl<'b> FromSql<'b> for SqlArray<'b> {
     }
 }
 
-impl<'b> Debug for SqlArray<'b> {
+impl Debug for SqlArray<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SqlArray").finish()
     }

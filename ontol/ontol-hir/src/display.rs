@@ -13,7 +13,7 @@ use crate::{
     PropVariant, RootNode, StructFlags,
 };
 
-impl<'h, 'a, L: Lang> std::fmt::Display for NodeRef<'h, 'a, L> {
+impl<L: Lang> std::fmt::Display for NodeRef<'_, '_, L> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let printer = Printer {
             indent: Sep::None,
@@ -24,13 +24,13 @@ impl<'h, 'a, L: Lang> std::fmt::Display for NodeRef<'h, 'a, L> {
     }
 }
 
-impl<'a, L: Lang> std::fmt::Display for RootNode<'a, L> {
+impl<L: Lang> std::fmt::Display for RootNode<'_, L> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.as_ref().fmt(f)
     }
 }
 
-impl<'a, L: Lang> std::fmt::Debug for RootNode<'a, L> {
+impl<L: Lang> std::fmt::Debug for RootNode<'_, L> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.as_ref().fmt(f)
     }
@@ -61,7 +61,7 @@ impl<'h, 'a, L: Lang> Printer<'h, 'a, L> {
     }
 }
 
-impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
+impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<'_, 'a, L> {
     fn print(self, f: &mut std::fmt::Formatter, sep: Sep, kind: &Kind<'a, L>) -> PrintResult {
         let indent = self.indent;
         match kind {
@@ -329,7 +329,7 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
     }
 }
 
-impl<'h, 'a, L: Lang> Print<Pack<Binding<'a, L>>> for Printer<'h, 'a, L> {
+impl<'a, L: Lang> Print<Pack<Binding<'a, L>>> for Printer<'_, 'a, L> {
     fn print(
         self,
         f: &mut std::fmt::Formatter,
@@ -353,7 +353,7 @@ impl<'h, 'a, L: Lang> Print<Pack<Binding<'a, L>>> for Printer<'h, 'a, L> {
     }
 }
 
-impl<'h, 'a, L: Lang> Print<PropVariant> for Printer<'h, 'a, L> {
+impl<L: Lang> Print<PropVariant> for Printer<'_, '_, L> {
     fn print(self, f: &mut std::fmt::Formatter, _sep: Sep, variant: &PropVariant) -> PrintResult {
         let indent = self.indent;
 
@@ -379,7 +379,7 @@ impl<'h, 'a, L: Lang> Print<PropVariant> for Printer<'h, 'a, L> {
     }
 }
 
-impl<'h, 'a, L: Lang> Print<ClausePair<Var, EvalCondTerm>> for Printer<'h, 'a, L> {
+impl<L: Lang> Print<ClausePair<Var, EvalCondTerm>> for Printer<'_, '_, L> {
     fn print(
         self,
         f: &mut std::fmt::Formatter,
@@ -419,7 +419,7 @@ impl<'h, 'a, L: Lang> Print<ClausePair<Var, EvalCondTerm>> for Printer<'h, 'a, L
     }
 }
 
-impl<'h, 'a, L: Lang> Print<EvalCondTerm> for Printer<'h, 'a, L> {
+impl<L: Lang> Print<EvalCondTerm> for Printer<'_, '_, L> {
     fn print(self, f: &mut std::fmt::Formatter, sep: Sep, term: &EvalCondTerm) -> PrintResult {
         // let indent = self.indent;
         // write!(f, "{indent}")?;
@@ -437,7 +437,7 @@ impl<'h, 'a, L: Lang> Print<EvalCondTerm> for Printer<'h, 'a, L> {
     }
 }
 
-impl<'h, 'a, L: Lang> Print<Binding<'a, L>> for Printer<'h, 'a, L> {
+impl<'a, L: Lang> Print<Binding<'a, L>> for Printer<'_, 'a, L> {
     fn print(self, f: &mut std::fmt::Formatter, sep: Sep, ast: &Binding<'a, L>) -> PrintResult {
         match ast {
             Binding::Binder(binder) => {
@@ -451,7 +451,7 @@ impl<'h, 'a, L: Lang> Print<Binding<'a, L>> for Printer<'h, 'a, L> {
     }
 }
 
-impl<'h, 'a, L: Lang> Print<CaptureGroup<'a, L>> for Printer<'h, 'a, L> {
+impl<'a, L: Lang> Print<CaptureGroup<'a, L>> for Printer<'_, 'a, L> {
     fn print(
         self,
         f: &mut std::fmt::Formatter,
@@ -463,7 +463,7 @@ impl<'h, 'a, L: Lang> Print<CaptureGroup<'a, L>> for Printer<'h, 'a, L> {
     }
 }
 
-impl<'h, 'a, L: Lang> Print<MatrixRow<'a, L>> for Printer<'h, 'a, L> {
+impl<'a, L: Lang> Print<MatrixRow<'a, L>> for Printer<'_, 'a, L> {
     fn print(
         self,
         f: &mut std::fmt::Formatter,
@@ -505,7 +505,7 @@ where
     }
 }
 
-impl<'h, 'a, L: Lang> Printer<'h, 'a, L> {
+impl<L: Lang> Printer<'_, '_, L> {
     fn print_rparen(self, f: &mut std::fmt::Formatter, multi: Multiline) -> std::fmt::Result {
         if multi.0 {
             let indent = self.indent.force_indent();
@@ -627,7 +627,7 @@ impl std::fmt::Display for Indent {
     }
 }
 
-impl<'a, L: Lang> Display for Binding<'a, L> {
+impl<L: Lang> Display for Binding<'_, L> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Wildcard => write!(f, "$_"),

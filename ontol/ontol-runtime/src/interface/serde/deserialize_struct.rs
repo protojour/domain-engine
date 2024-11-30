@@ -103,7 +103,7 @@ impl Default for Struct {
     }
 }
 
-impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
+impl<'de> Visitor<'de> for StructVisitor<'_, '_> {
     type Value = Attr;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

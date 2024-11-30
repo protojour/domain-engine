@@ -139,7 +139,7 @@ pub struct Compiled<'m> {
     compiler: Compiler<'m>,
 }
 
-impl<'m> Compiled<'m> {
+impl Compiled<'_> {
     /// Convert the compiled code into an ontol_runtime Ontology.
     pub fn into_ontology(self) -> Ontology {
         self.compiler.into_ontology_inner()
@@ -257,13 +257,13 @@ impl<'m> AsRef<DefTypeCtx<'m>> for Compiler<'m> {
     }
 }
 
-impl<'m> AsRef<RelCtx> for Compiler<'m> {
+impl AsRef<RelCtx> for Compiler<'_> {
     fn as_ref(&self) -> &RelCtx {
         &self.rel_ctx
     }
 }
 
-impl<'m> Index<TextConstant> for Compiler<'m> {
+impl Index<TextConstant> for Compiler<'_> {
     type Output = str;
 
     fn index(&self, index: TextConstant) -> &Self::Output {
@@ -286,7 +286,7 @@ pub fn lower_ontol_syntax<V: ontol_parser::cst::view::NodeView>(
         .finish()
 }
 
-impl<'m> AsMut<CompileErrors> for Compiler<'m> {
+impl AsMut<CompileErrors> for Compiler<'_> {
     fn as_mut(&mut self) -> &mut CompileErrors {
         &mut self.errors
     }
@@ -297,7 +297,7 @@ enum OwnedOrRef<'a, T> {
     Borrowed(&'a T),
 }
 
-impl<'a, T> Deref for OwnedOrRef<'a, T> {
+impl<T> Deref for OwnedOrRef<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {

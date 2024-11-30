@@ -40,7 +40,7 @@ pub(super) struct MatcherVisitor<'on, 'p, M> {
     matcher: M,
 }
 
-impl<'on, 'p> SerdeProcessor<'on, 'p> {
+impl SerdeProcessor<'_, '_> {
     fn assert_no_rel_params(&self) {
         assert!(
             self.sub_ctx.rel_params_addr.is_none(),
@@ -67,7 +67,7 @@ trait IntoVisitor<'on, 'p>: ValueMatcher + Sized {
     }
 }
 
-impl<'on, 'p, M: ValueMatcher + Sized> IntoVisitor<'on, 'p> for M {}
+impl<M: ValueMatcher + Sized> IntoVisitor<'_, '_> for M {}
 
 /// The serde implementation deserializes Attributes instead of Values.
 ///
@@ -78,7 +78,7 @@ impl<'on, 'p, M: ValueMatcher + Sized> IntoVisitor<'on, 'p> for M {}
 ///
 /// This is also the reason that only map types may be related through parameterized relationships.
 /// Other types only support unparameterized relationships.
-impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
+impl<'de> DeserializeSeed<'de> for SerdeProcessor<'_, '_> {
     type Value = Attr;
 
     fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
@@ -284,7 +284,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
     }
 }
 
-impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> {
+impl<'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'_, '_, M> {
     type Value = Attr;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -467,7 +467,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
     }
 }
 
-impl<'on, 'p, 'de, M: ValueMatcher> MatcherVisitor<'on, 'p, M> {
+impl<'on, 'de, M: ValueMatcher> MatcherVisitor<'on, '_, M> {
     fn deserialize_sequence<A: SeqAccess<'de>, MK: MakeVectorAttr>(
         &self,
         mut seq: A,

@@ -87,7 +87,7 @@ pub struct OntolProcessor<'on> {
     defs: &'on DefsAspect,
 }
 
-impl<'on> Processor for OntolProcessor<'on> {
+impl Processor for OntolProcessor<'_> {
     type Value = Value;
     type Yield = Yield;
 
@@ -502,7 +502,7 @@ impl<'on> Processor for OntolProcessor<'on> {
     }
 }
 
-impl<'o> OntolProcessor<'o> {
+impl OntolProcessor<'_> {
     fn eval_builtin(&mut self, proc: BuiltinProc, tag: ValueTag) -> Value {
         match proc {
             BuiltinProc::AddI64 => {

@@ -307,7 +307,7 @@ mod msg_header_reader {
         _tab: flatbuffers::Table<'a>,
     }
 
-    impl<'a> MsgHeaderReader<'a> {
+    impl MsgHeaderReader<'_> {
         pub fn header_type(&self) -> MessageHeader {
             // Safety:
             // Created from valid Table for this object

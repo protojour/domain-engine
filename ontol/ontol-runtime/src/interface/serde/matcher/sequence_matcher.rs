@@ -34,7 +34,7 @@ pub enum SequenceKind {
     ValueList,
 }
 
-impl<'on> ValueMatcher for SequenceRangesMatcher<'on> {
+impl ValueMatcher for SequenceRangesMatcher<'_> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut len: usize = 0;
         let mut finite = true;

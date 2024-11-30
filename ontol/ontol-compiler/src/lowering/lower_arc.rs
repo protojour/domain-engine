@@ -28,7 +28,7 @@ struct EdgeBuilder<V> {
     params: BTreeMap<CardinalIdx, insp::ArcTypeParam<V>>,
 }
 
-impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
+impl<V: NodeView> CstLowering<'_, '_, V> {
     pub fn lower_arc_statement(
         &mut self,
         arc_stmt: insp::ArcStatement<V>,

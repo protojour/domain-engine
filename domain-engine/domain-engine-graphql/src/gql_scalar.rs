@@ -141,7 +141,7 @@ impl ser::Serialize for GqlScalar {
 #[derive(Default)]
 pub struct ScalarDeserializeVisitor;
 
-impl<'de> de::Visitor<'de> for ScalarDeserializeVisitor {
+impl de::Visitor<'_> for ScalarDeserializeVisitor {
     type Value = GqlScalar;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

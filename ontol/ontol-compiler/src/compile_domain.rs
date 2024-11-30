@@ -26,7 +26,7 @@ use crate::{
     CompileError, Compiler, Session, SourceSpan, Src, UnifiedCompileError,
 };
 
-impl<'m> Compiler<'m> {
+impl Compiler<'_> {
     /// Lower statements from the next domain,
     /// perform type check against its dependent domains,
     /// and seal the types at the end.

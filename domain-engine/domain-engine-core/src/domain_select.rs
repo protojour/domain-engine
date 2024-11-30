@@ -22,7 +22,7 @@ struct DomainSelectBuilder<'o> {
     ontology_defs: &'o DefsAspect,
 }
 
-impl<'o> DomainSelectBuilder<'o> {
+impl DomainSelectBuilder<'_> {
     fn domain_select(&self, def_id: DefId, follow_edge: bool) -> Select {
         let def = self.ontology_defs.def(def_id);
 

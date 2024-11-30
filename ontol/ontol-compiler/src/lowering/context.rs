@@ -149,7 +149,7 @@ impl<'a> BlockContext<'a> {
     }
 }
 
-impl<'c, 'm> LoweringCtx<'c, 'm> {
+impl<'m> LoweringCtx<'_, 'm> {
     pub fn source_span(&self, span: U32Span) -> SourceSpan {
         SourceSpan {
             source_id: self.source_id,

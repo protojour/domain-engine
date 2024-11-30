@@ -82,13 +82,13 @@ impl_ontol_debug!(CompactString);
 impl_ontol_debug!(arcstr::ArcStr);
 impl_ontol_debug!(bit_vec::BitVec);
 
-impl<'a, T: ?Sized + OntolDebug> OntolDebug for &'a T {
+impl<T: ?Sized + OntolDebug> OntolDebug for &T {
     fn fmt(&self, ofmt: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result {
         (*self).fmt(ofmt, f)
     }
 }
 
-impl<'a> OntolDebug for &'a str {
+impl OntolDebug for &str {
     fn fmt(&self, _: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result {
         write!(f, "{self:?}")
     }

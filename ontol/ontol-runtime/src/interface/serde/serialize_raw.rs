@@ -80,7 +80,7 @@ impl<'v> RawProxy<'v> {
     }
 }
 
-impl<'v> serde::Serialize for RawProxy<'v> {
+impl serde::Serialize for RawProxy<'_> {
     fn serialize<S>(&self, serializer: S) -> Res<S>
     where
         S: serde::Serializer,

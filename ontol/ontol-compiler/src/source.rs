@@ -62,7 +62,7 @@ pub struct SpannedBorrow<'m, T> {
     pub span: &'m SourceSpan,
 }
 
-impl<'m, T> Clone for SpannedBorrow<'m, T> {
+impl<T> Clone for SpannedBorrow<'_, T> {
     fn clone(&self) -> Self {
         Self {
             value: self.value,
@@ -71,7 +71,7 @@ impl<'m, T> Clone for SpannedBorrow<'m, T> {
     }
 }
 
-impl<'m, T> Deref for SpannedBorrow<'m, T> {
+impl<T> Deref for SpannedBorrow<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -79,7 +79,7 @@ impl<'m, T> Deref for SpannedBorrow<'m, T> {
     }
 }
 
-impl<'m, T: Debug> Debug for SpannedBorrow<'m, T> {
+impl<T: Debug> Debug for SpannedBorrow<'_, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.value.fmt(f)
     }

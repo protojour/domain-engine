@@ -198,7 +198,7 @@ pub(super) struct ExplicitMapCodegenTask<'m> {
     pub backward_extern: Option<ExternMap>,
 }
 
-impl<'m> ExplicitMapCodegenTask<'m> {
+impl ExplicitMapCodegenTask<'_> {
     fn domain_index(&self) -> Option<DomainIndex> {
         if let Some(ontol_map) = self.ontol_map.as_ref() {
             Some(ontol_map.map_def_id.domain_index())
@@ -217,7 +217,7 @@ pub struct ExternMap {
     pub map_def_id: DefId,
 }
 
-impl<'m> Debug for ConstCodegenTask<'m> {
+impl Debug for ConstCodegenTask<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ConstCodegenTask")
             .field("node", &DebugViaDisplay(&self.node))
@@ -225,7 +225,7 @@ impl<'m> Debug for ConstCodegenTask<'m> {
     }
 }
 
-impl<'m> Debug for ExplicitMapCodegenTask<'m> {
+impl Debug for ExplicitMapCodegenTask<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut dbg = f.debug_struct("MapCodegenTask");
         if let Some(ontol) = &self.ontol_map {

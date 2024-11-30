@@ -46,7 +46,7 @@ pub struct Entries<'a> {
     domain_entries: &'a IndexMap<Is, SourceSpan>,
 }
 
-impl<'a> Entries<'a> {
+impl Entries<'_> {
     #[expect(unused)]
     pub fn is_empty(&self) -> bool {
         self.builtin_entries.is_empty() && self.domain_entries.is_empty()

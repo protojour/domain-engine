@@ -136,7 +136,7 @@ impl QLevel {
     }
 }
 
-impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
+impl<'c, 'm> SchemaBuilder<'_, '_, 'c, 'm> {
     pub fn exec_lazy_tasks(&mut self) {
         while !self.lazy_tasks.is_empty() {
             for lazy_task in std::mem::take(&mut self.lazy_tasks) {

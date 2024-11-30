@@ -20,7 +20,7 @@ struct Importer<'i, 'o, 'a, L: Lang> {
     target: &'o mut Arena<'a, L>,
 }
 
-impl<'i, 'o, 'a, L: Lang> Importer<'i, 'o, 'a, L> {
+impl<'a, L: Lang> Importer<'_, '_, 'a, L> {
     fn import(&mut self, node: Node) -> Node {
         let data = &self.source[node];
         let kind = L::as_hir(data);

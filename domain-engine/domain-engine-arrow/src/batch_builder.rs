@@ -141,7 +141,7 @@ trait DowncastArrayBuilder {
 
 struct IdentityDowncast<'a>(&'a mut dyn ArrayBuilder);
 
-impl<'a> DowncastArrayBuilder for IdentityDowncast<'a> {
+impl DowncastArrayBuilder for IdentityDowncast<'_> {
     fn downcast_builder<T: ArrayBuilder>(&mut self) -> Option<&mut T> {
         self.0.as_any_mut().downcast_mut::<T>()
     }
@@ -152,7 +152,7 @@ struct StructFieldDowncast<'a> {
     index: usize,
 }
 
-impl<'a> DowncastArrayBuilder for StructFieldDowncast<'a> {
+impl DowncastArrayBuilder for StructFieldDowncast<'_> {
     fn downcast_builder<T: ArrayBuilder>(&mut self) -> Option<&mut T> {
         self.struct_builder.field_builder::<T>(self.index)
     }

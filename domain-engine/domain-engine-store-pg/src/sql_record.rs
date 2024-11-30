@@ -44,7 +44,7 @@ impl<'b> FromSql<'b> for SqlRecord<'b> {
     }
 }
 
-impl<'b> Debug for SqlRecord<'b> {
+impl Debug for SqlRecord<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SqlRecord")
             .field("field_count", &self.field_count)

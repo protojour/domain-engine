@@ -38,7 +38,7 @@ enum Action {
     },
 }
 
-impl<'c, 'm> TypeCheck<'c, 'm> {
+impl TypeCheck<'_, '_> {
     pub fn check_domain_type_pre_repr(&mut self, def_id: DefId, _def: &Def) {
         let Some(table) = self.prop_ctx.properties_table_by_def_id(def_id) else {
             return;

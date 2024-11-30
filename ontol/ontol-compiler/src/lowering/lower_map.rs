@@ -8,7 +8,7 @@ use crate::{def::DefKind, namespace::Space, pattern::PatId, CompileError};
 
 use super::context::{BlockContext, Coinage, CstLowering, MapVarTable};
 
-impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
+impl<V: NodeView> CstLowering<'_, '_, V> {
     pub(super) fn lower_map_statement(
         &mut self,
         stmt: insp::MapStatement<V>,

@@ -15,7 +15,7 @@ pub struct RegexStringInterpolator<'g, 'c, 'm> {
     pub components: &'c mut Vec<StringInterpolationComponent>,
 }
 
-impl<'g, 'c, 'm> RegexStringInterpolator<'g, 'c, 'm> {
+impl RegexStringInterpolator<'_, '_, '_> {
     pub fn commit_constant(&mut self) {
         let constant = std::mem::take(&mut self.current_constant);
         if !constant.is_empty() {

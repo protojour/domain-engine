@@ -8,7 +8,7 @@ use ontol_runtime::{
 
 use crate::{CompileError, Compiler, SourceSpan};
 
-impl<'m> Compiler<'m> {
+impl Compiler<'_> {
     pub(super) fn persistence_check(&mut self) {
         self.resolver_graph =
             ResolverGraph::new(self.code_ctx.result_map_proc_table.keys().map(|key| {

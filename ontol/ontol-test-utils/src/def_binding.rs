@@ -188,7 +188,7 @@ pub struct ValueBuilder<'t, 'on> {
     value: Value,
 }
 
-impl<'t, 'on> ValueBuilder<'t, 'on> {
+impl ValueBuilder<'_, '_> {
     pub fn to_value(self) -> Value {
         self.value
     }
@@ -206,7 +206,7 @@ impl<'t, 'on> From<ValueBuilder<'t, 'on>> for Attr {
     }
 }
 
-impl<'t, 'on> ValueBuilder<'t, 'on> {
+impl ValueBuilder<'_, '_> {
     pub fn relationship(self, name: &str, attr: Attr) -> Self {
         let prop_id = self.binding.find_property(name).expect("unknown property");
         self.merge_attribute(prop_id, attr)

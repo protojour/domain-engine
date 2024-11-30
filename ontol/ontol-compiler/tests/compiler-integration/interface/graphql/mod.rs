@@ -11,7 +11,7 @@ struct SchemaTest<'o> {
     schema: &'o GraphqlSchema,
 }
 
-impl<'o> SchemaTest<'o> {
+impl SchemaTest<'_> {
     fn query_object_data(&self) -> &ObjectData {
         self.schema.type_data(self.schema.query).object_data()
     }

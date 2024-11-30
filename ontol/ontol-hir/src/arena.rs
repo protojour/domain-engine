@@ -59,7 +59,7 @@ impl<'a, L: Lang> std::ops::Index<Node> for Arena<'a, L> {
     }
 }
 
-impl<'a, L: Lang> std::ops::IndexMut<Node> for Arena<'a, L> {
+impl<L: Lang> std::ops::IndexMut<Node> for Arena<'_, L> {
     fn index_mut(&mut self, node: Node) -> &mut Self::Output {
         &mut self.entries[node.0 as usize]
     }
@@ -77,7 +77,7 @@ impl PreAllocator {
     }
 }
 
-impl<'a, L: Lang> Default for Arena<'a, L> {
+impl<L: Lang> Default for Arena<'_, L> {
     fn default() -> Self {
         Arena {
             entries: Vec::with_capacity(16),
@@ -105,7 +105,7 @@ impl<'h, 'a, L: Lang> NodeRef<'h, 'a, L> {
     }
 }
 
-impl<'h, 'a, L: Lang> std::ops::Deref for NodeRef<'h, 'a, L> {
+impl<'a, L: Lang> std::ops::Deref for NodeRef<'_, 'a, L> {
     type Target = L::Data<'a, Kind<'a, L>>;
 
     fn deref(&self) -> &Self::Target {

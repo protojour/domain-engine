@@ -10,7 +10,7 @@ pub struct IdSingletonStructVisitor<'on, 'p> {
     pub inner_addr: SerdeOperatorAddr,
 }
 
-impl<'on, 'p, 'de> Visitor<'de> for IdSingletonStructVisitor<'on, 'p> {
+impl<'de> Visitor<'de> for IdSingletonStructVisitor<'_, '_> {
     type Value = Attr;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

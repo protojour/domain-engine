@@ -14,7 +14,7 @@ use super::{TypeEquation, TypeError};
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct TypeVar<'m>(pub u32, PhantomData<&'m ()>);
 
-impl<'m> Debug for TypeVar<'m> {
+impl Debug for TypeVar<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("TypeVar").field(&self.0).finish()
     }
@@ -106,7 +106,7 @@ pub struct Infer<'c, 'm> {
     pub eq_relations: &'c mut ena::unify::InPlaceUnificationTable<TypeVar<'m>>,
 }
 
-impl<'c, 'm> Infer<'c, 'm> {
+impl<'m> Infer<'_, 'm> {
     pub fn infer_recursive(&mut self, ty: TypeRef<'m>) -> Result<TypeRef<'m>, TypeError<'m>> {
         match ty {
             Type::Error => Err(TypeError::Propagated),

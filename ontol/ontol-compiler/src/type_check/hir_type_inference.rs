@@ -21,7 +21,7 @@ pub(super) struct HirArmTypeInference<'c, 'm> {
     pub(super) errors: &'c mut CompileErrors,
 }
 
-impl<'c, 'm> HirArmTypeInference<'c, 'm> {
+impl<'m> HirArmTypeInference<'_, 'm> {
     pub fn infer(&mut self, data: &mut TypedHirData<'m, ontol_hir::Kind<'m, TypedHir>>) {
         let mut infer = Infer {
             types: self.types,
@@ -47,7 +47,7 @@ pub(super) struct HirVariableMapper<'c, 'm> {
     pub arm: Arm,
 }
 
-impl<'c, 'm> HirVariableMapper<'c, 'm> {
+impl<'m> HirVariableMapper<'_, 'm> {
     pub fn map_vars(&mut self, arena: &mut TypedArena<'m>) {
         let mut alloc = arena.pre_allocator();
         let mut new_var_nodes: Vec<TypedHirData<'m, ontol_hir::Kind<'m, TypedHir>>> = vec![];

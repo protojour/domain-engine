@@ -34,7 +34,7 @@ impl JsonConvert for serde_json::Value {
     }
 }
 
-impl<'a> JsonConvert for &'a str {
+impl JsonConvert for &str {
     fn to_json_string(&self) -> String {
         self.to_string()
     }
@@ -51,7 +51,7 @@ pub struct SerdeHelper<'b, 'on, 'p> {
     profile: ProcessorProfile<'p>,
 }
 
-impl<'b, 'on, 'p> SerdeHelper<'b, 'on, 'p> {
+impl<'p> SerdeHelper<'_, '_, 'p> {
     pub fn with_profile(self, profile: ProcessorProfile<'p>) -> Self {
         Self { profile, ..self }
     }

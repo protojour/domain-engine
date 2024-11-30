@@ -292,7 +292,7 @@ pub struct RegexSyntaxVisitor<'l, 'a>(pub &'l mut RegexToPatternLowerer<'a>);
 
 /// This is the first pass of regex for pattern/expr analysis.
 /// The AST visitor figures out variable spans of named capture groups.
-impl<'l, 'a> regex_syntax::ast::Visitor for RegexSyntaxVisitor<'l, 'a> {
+impl regex_syntax::ast::Visitor for RegexSyntaxVisitor<'_, '_> {
     type Output = ();
     type Err = ();
 
@@ -321,7 +321,7 @@ impl<'l, 'a> regex_syntax::ast::Visitor for RegexSyntaxVisitor<'l, 'a> {
 }
 
 /// Second pass of regex for pattern/expr analysis.
-impl<'l, 'a> regex_syntax::hir::Visitor for RegexSyntaxVisitor<'l, 'a> {
+impl regex_syntax::hir::Visitor for RegexSyntaxVisitor<'_, '_> {
     type Output = ();
     type Err = ();
 

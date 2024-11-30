@@ -20,7 +20,7 @@ use super::{
     repr_model::{NumberResolution, Repr, ReprBuilder, ReprFormat, ReprKind, ReprScalarKind},
 };
 
-impl<'c, 'm> ReprCheck<'c, 'm> {
+impl<'m> ReprCheck<'_, 'm> {
     pub(super) fn check_soundness(
         &mut self,
         mut builder: ReprBuilder,

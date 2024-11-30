@@ -94,7 +94,7 @@ impl<'m> Let<'m> {
 
 pub type SpannedLet<'m> = (Let<'m>, SourceSpan);
 
-impl<'c, 'm> SsaUnifier<'c, 'm> {
+impl<'m> SsaUnifier<'_, 'm> {
     pub fn process_let_graph(
         &mut self,
         graph: Vec<SpannedLet<'m>>,

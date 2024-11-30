@@ -104,13 +104,13 @@ fn push_constant<'m>(vec: &mut Vec<&'m str>, str: &'m str) -> TextConstant {
     TextConstant(next as u32)
 }
 
-impl<'m> Debug for StringCtx<'m> {
+impl Debug for StringCtx<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Strings").finish()
     }
 }
 
-impl<'m> Index<TextConstant> for StringCtx<'m> {
+impl Index<TextConstant> for StringCtx<'_> {
     type Output = str;
 
     fn index(&self, index: TextConstant) -> &Self::Output {
@@ -118,7 +118,7 @@ impl<'m> Index<TextConstant> for StringCtx<'m> {
     }
 }
 
-impl<'m> OntolFormatter for StringCtx<'m> {
+impl OntolFormatter for StringCtx<'_> {
     fn fmt_text_constant(
         &self,
         constant: TextConstant,

@@ -27,7 +27,7 @@ use super::{
     lower_misc::{ReportError, ResolvedType},
 };
 
-impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
+impl<V: NodeView> CstLowering<'_, '_, V> {
     pub(super) fn lower_rel_statement(
         &mut self,
         stmt: insp::RelStatement<V>,

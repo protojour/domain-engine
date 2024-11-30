@@ -786,8 +786,8 @@ fn get_doc_comments(parent: impl NodeViewExt) -> Option<String> {
 
 /// Get signature from raw source, stripped of (doc) comments
 fn get_signature(signature: &str) -> String {
-    return regex_replace_all!(r"(?m-s)^.*?\/\/.*\n?", signature, "")
+    regex_replace_all!(r"(?m-s)^.*?\/\/.*\n?", signature, "")
         .replace("\n\n", "\n")
         .trim()
-        .to_string();
+        .to_string()
 }

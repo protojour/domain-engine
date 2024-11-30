@@ -42,13 +42,13 @@ pub(super) struct DbContext<'a> {
     pub write_stats: WriteStatsBuilder,
 }
 
-impl<'a> AsRef<DefsAspect> for DbContext<'a> {
+impl AsRef<DefsAspect> for DbContext<'_> {
     fn as_ref(&self) -> &DefsAspect {
         self.ontology_defs
     }
 }
 
-impl<'a> AsRef<SerdeAspect> for DbContext<'a> {
+impl AsRef<SerdeAspect> for DbContext<'_> {
     fn as_ref(&self) -> &SerdeAspect {
         self.ontology_serde
     }

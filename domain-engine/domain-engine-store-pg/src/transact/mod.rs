@@ -72,13 +72,13 @@ pub struct TransactCtx<'a> {
     compaction_ctx: &'a CompactionCtx,
 }
 
-impl<'a> AsRef<DefsAspect> for TransactCtx<'a> {
+impl AsRef<DefsAspect> for TransactCtx<'_> {
     fn as_ref(&self) -> &DefsAspect {
         self.ontology_defs
     }
 }
 
-impl<'a> AsRef<SerdeAspect> for TransactCtx<'a> {
+impl AsRef<SerdeAspect> for TransactCtx<'_> {
     fn as_ref(&self) -> &SerdeAspect {
         self.ontology_serde
     }

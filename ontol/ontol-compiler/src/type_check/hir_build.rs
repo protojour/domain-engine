@@ -38,7 +38,7 @@ pub(super) struct NodeInfo<'m> {
 
 /// This is the type check of map statements.
 /// The types that are used must be checked with `check_def_sealed`.
-impl<'c, 'm> TypeCheck<'c, 'm> {
+impl<'m> TypeCheck<'_, 'm> {
     pub(super) fn build_root_pattern(
         &mut self,
         pat_id: PatId,

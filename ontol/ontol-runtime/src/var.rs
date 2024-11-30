@@ -141,7 +141,7 @@ impl<'a> IntoIterator for &'a VarSet {
 
 pub struct VarSetIter<'b>(bit_set::Iter<'b, u32>);
 
-impl<'b> Iterator for VarSetIter<'b> {
+impl Iterator for VarSetIter<'_> {
     type Item = Var;
 
     fn next(&mut self) -> Option<Self::Item> {

@@ -35,19 +35,19 @@ pub(crate) struct OntologyCtx<'on> {
     pub execution: &'on ExecutionAspect,
 }
 
-impl<'on> AsRef<SerdeAspect> for OntologyCtx<'on> {
+impl AsRef<SerdeAspect> for OntologyCtx<'_> {
     fn as_ref(&self) -> &SerdeAspect {
         self.serde
     }
 }
 
-impl<'on> AsRef<DefsAspect> for OntologyCtx<'on> {
+impl AsRef<DefsAspect> for OntologyCtx<'_> {
     fn as_ref(&self) -> &DefsAspect {
         self.defs
     }
 }
 
-impl<'on> AsRef<ExecutionAspect> for OntologyCtx<'on> {
+impl AsRef<ExecutionAspect> for OntologyCtx<'_> {
     fn as_ref(&self) -> &ExecutionAspect {
         self.execution
     }

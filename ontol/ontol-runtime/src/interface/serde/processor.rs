@@ -210,13 +210,13 @@ pub struct ProcessorProfile<'p> {
     pub api: &'p (dyn ProcessorProfileApi + Send + Sync),
 }
 
-impl<'p> Default for ProcessorProfile<'p> {
+impl Default for ProcessorProfile<'_> {
     fn default() -> Self {
         DOMAIN_PROFILE.clone()
     }
 }
 
-impl<'p> ProcessorProfile<'p> {
+impl ProcessorProfile<'_> {
     pub fn with_flags(self, flags: ProcessorProfileFlags) -> Self {
         Self { flags, ..self }
     }
@@ -387,7 +387,7 @@ impl SubProcessorContext {
     }
 }
 
-impl<'on, 'p> Debug for SerdeProcessor<'on, 'p> {
+impl Debug for SerdeProcessor<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // This structure might contain cycles (through operator addr),
         // so just print the topmost level.
@@ -398,7 +398,7 @@ impl<'on, 'p> Debug for SerdeProcessor<'on, 'p> {
     }
 }
 
-impl<'on, 'p> Display for SerdeProcessor<'on, 'p> {
+impl Display for SerdeProcessor<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.value_operator {
             SerdeOperator::AnyPlaceholder => write!(f, "any"),

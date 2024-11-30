@@ -199,7 +199,7 @@ impl<'e> MakeStorable<'e> {
     }
 }
 
-impl<'a> AmProperty<'a> {
+impl AmProperty<'_> {
     fn write_scalar(self, scalar: ScalarValue, txn: &mut Transaction) -> Result<(), ToCrdtError> {
         match self {
             AmProperty::MapAttr(obj_id, key) => txn.put(obj_id, key, scalar)?,
@@ -221,7 +221,7 @@ impl<'a> AmProperty<'a> {
     }
 }
 
-impl<'e> MakeInterfacable<'e> {
+impl MakeInterfacable<'_> {
     pub(crate) fn automerge_to_ontol(&self, am: &Automerge, def_id: DefId) -> DomainResult<Value> {
         let deserializer = AutomergeDeserializer {
             defs: self.defs,

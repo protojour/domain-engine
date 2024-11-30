@@ -116,7 +116,7 @@ pub enum CardinalKind {
     },
 }
 
-impl<'m> Compiler<'m> {
+impl Compiler<'_> {
     /// Check/process all symbolic edges.
     ///
     /// This happens after all domains have been compiled

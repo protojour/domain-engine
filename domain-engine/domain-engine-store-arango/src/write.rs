@@ -427,7 +427,7 @@ fn generate_id(
     Ok(())
 }
 
-impl<'a> MetaQuery<'a> {
+impl MetaQuery<'_> {
     /// Add a relation to a write MetaQuery
     fn write_relation(
         &mut self,

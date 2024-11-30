@@ -44,7 +44,7 @@ use crate::{
 
 use super::{graphql_namespace::GraphqlNamespace, schema_builder::*};
 
-impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
+impl<'c> SchemaBuilder<'_, '_, 'c, '_> {
     pub fn make_def_type(&mut self, def_id: DefId, level: QLevel) -> NewType {
         match level {
             QLevel::Node => self.make_node_type(def_id),

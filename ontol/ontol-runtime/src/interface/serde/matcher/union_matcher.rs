@@ -180,7 +180,7 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
     }
 }
 
-impl<'on, 'p> UnionMatcher<'on, 'p> {
+impl UnionMatcher<'_, '_> {
     fn match_leaf_discriminant(&self, discriminant: LeafDiscriminant) -> Result<DefId, ()> {
         for variant in self.possible_variants {
             let Discriminant::MatchesLeaf(leaf_discriminant) = variant.discriminant() else {

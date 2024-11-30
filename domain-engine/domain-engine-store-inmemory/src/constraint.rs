@@ -22,13 +22,13 @@ struct FormatCtx<'a> {
     serde: &'a SerdeAspect,
 }
 
-impl<'a> AsRef<DefsAspect> for FormatCtx<'a> {
+impl AsRef<DefsAspect> for FormatCtx<'_> {
     fn as_ref(&self) -> &DefsAspect {
         self.defs
     }
 }
 
-impl<'a> AsRef<SerdeAspect> for FormatCtx<'a> {
+impl AsRef<SerdeAspect> for FormatCtx<'_> {
     fn as_ref(&self) -> &SerdeAspect {
         self.serde
     }

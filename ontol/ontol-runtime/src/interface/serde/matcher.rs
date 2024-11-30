@@ -15,7 +15,7 @@ pub mod union_matcher;
 
 pub struct ExpectingMatching<'v>(pub &'v dyn ValueMatcher);
 
-impl<'v> Display for ExpectingMatching<'v> {
+impl Display for ExpectingMatching<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.expecting(f)
     }
@@ -60,7 +60,7 @@ pub trait ValueMatcher {
 
 struct OptWithinRangeDisplay<'a, T>(&'a Option<RangeInclusive<T>>);
 
-impl<'a, T: Display> Display for OptWithinRangeDisplay<'a, T> {
+impl<T: Display> Display for OptWithinRangeDisplay<'_, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(range) = self.0 {
             write!(f, " in range {}..={}", range.start(), range.end())

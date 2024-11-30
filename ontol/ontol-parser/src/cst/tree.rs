@@ -260,7 +260,7 @@ pub struct DebugTree<'a> {
     display_end: bool,
 }
 
-impl<'a> Display for DebugTree<'a> {
+impl Display for DebugTree<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut indent: i64 = 0;
         for syntax in &self.tree.markers {

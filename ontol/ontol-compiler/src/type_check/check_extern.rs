@@ -23,7 +23,7 @@ struct ExternBuilder {
     url: Option<TextConstant>,
 }
 
-impl<'c, 'm> TypeCheck<'c, 'm> {
+impl<'m> TypeCheck<'_, 'm> {
     pub fn check_extern(&mut self, def_id: DefId, span: SourceSpan) {
         warn!("check extern");
 

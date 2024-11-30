@@ -1195,7 +1195,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
     }
 }
 
-impl<'c, 'm> AsMut<CompileErrors> for SsaUnifier<'c, 'm> {
+impl AsMut<CompileErrors> for SsaUnifier<'_, '_> {
     fn as_mut(&mut self) -> &mut CompileErrors {
         self.errors
     }

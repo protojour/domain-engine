@@ -42,13 +42,13 @@ struct ConditionBuilder<'c, 'm> {
     errors: CompileErrors,
 }
 
-impl<'c, 'm> AsMut<CompileErrors> for ConditionBuilder<'c, 'm> {
+impl AsMut<CompileErrors> for ConditionBuilder<'_, '_> {
     fn as_mut(&mut self) -> &mut CompileErrors {
         &mut self.errors
     }
 }
 
-impl<'c, 'm> ConditionBuilder<'c, 'm> {
+impl ConditionBuilder<'_, '_> {
     fn term(&mut self, node: Node, parent_var: Option<Var>) -> CondTerm {
         match self.arena[node].hir() {
             Kind::Struct(_, _, nodes) => {

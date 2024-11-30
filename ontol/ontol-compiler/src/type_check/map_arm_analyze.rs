@@ -28,7 +28,7 @@ pub struct PreAnalyzer<'c> {
     pub errors: &'c mut CompileErrors,
 }
 
-impl<'c> PreAnalyzer<'c> {
+impl PreAnalyzer<'_> {
     pub fn analyze_arm(
         &mut self,
         pat: &Pattern,

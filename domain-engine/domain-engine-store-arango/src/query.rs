@@ -63,7 +63,7 @@ impl AqlQuery {
     }
 }
 
-impl<'a> MetaQuery<'a> {
+impl MetaQuery<'_> {
     /// Add a Select to MetaQuery
     pub fn query_select(&mut self, select: &Select) -> DomainResult<()> {
         match select {

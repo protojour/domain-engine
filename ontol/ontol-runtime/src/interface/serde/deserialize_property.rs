@@ -44,7 +44,7 @@ impl<'a, 'de> DeserializeSeed<'de> for PropertyMapVisitor<'a> {
     }
 }
 
-impl<'a, 'de> Visitor<'de> for PropertyMapVisitor<'a> {
+impl<'a> Visitor<'_> for PropertyMapVisitor<'a> {
     type Value = PropKind<'a>;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -119,7 +119,7 @@ impl<'a, 'de> DeserializeSeed<'de> for IdSingletonPropVisitor<'a> {
     }
 }
 
-impl<'a, 'de> Visitor<'de> for IdSingletonPropVisitor<'a> {
+impl<'a> Visitor<'_> for IdSingletonPropVisitor<'a> {
     type Value = PropKind<'a>;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

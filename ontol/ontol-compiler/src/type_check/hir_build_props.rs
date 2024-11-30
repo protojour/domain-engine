@@ -52,7 +52,7 @@ pub enum MatchAttributeKey<'m> {
     Def(DefId),
 }
 
-impl<'c, 'm> TypeCheck<'c, 'm> {
+impl<'m> TypeCheck<'_, 'm> {
     /// Build an ontol_hir node that unpacks some higher level compound pattern
     pub(super) fn build_unpacker(
         &mut self,

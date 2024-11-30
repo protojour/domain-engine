@@ -253,7 +253,7 @@ impl<'a> From<juniper::LookAheadArgument<'a, GqlScalar>> for LookAheadValueDeser
     }
 }
 
-impl<'a, 'de> de::Deserializer<'de> for LookAheadValueDeserializer<'a> {
+impl<'de> de::Deserializer<'de> for LookAheadValueDeserializer<'_> {
     type Error = Error;
 
     fn deserialize_any<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
@@ -326,7 +326,7 @@ impl<'i, I: Iterator> SeqDeserializer<'i, I> {
     }
 }
 
-impl<'a, 'i, 'de, I> de::SeqAccess<'de> for SeqDeserializer<'i, I>
+impl<'a, 'de, I> de::SeqAccess<'de> for SeqDeserializer<'_, I>
 where
     I: Iterator<Item = BorrowedSpanning<'a, LookAheadValue<'a, GqlScalar>>>,
 {
@@ -363,7 +363,7 @@ struct ObjectDeserializer<'a, 'i, I> {
     _count: usize,
 }
 
-impl<'a, 'i, I: Iterator> ObjectDeserializer<'a, 'i, I> {
+impl<'i, I: Iterator> ObjectDeserializer<'_, 'i, I> {
     fn new(iter: &'i mut std::iter::Fuse<I>) -> Self {
         Self {
             iter,
@@ -373,7 +373,7 @@ impl<'a, 'i, I: Iterator> ObjectDeserializer<'a, 'i, I> {
     }
 }
 
-impl<'a, 'i, 'de, I> de::MapAccess<'de> for ObjectDeserializer<'a, 'i, I>
+impl<'a, 'de, I> de::MapAccess<'de> for ObjectDeserializer<'a, '_, I>
 where
     I: Iterator<
         Item = (

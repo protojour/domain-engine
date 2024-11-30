@@ -276,7 +276,7 @@ impl<'d, 'on> ValueFormatRaw<'d, 'on> {
     }
 }
 
-impl<'d, 'o> Display for ValueFormatRaw<'d, 'o> {
+impl Display for ValueFormatRaw<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(text_like_type) = self.defs.text_like_types.get(&self.type_def_id) {
             text_like_type.format(self.value, f)
@@ -406,7 +406,7 @@ bitflags::bitflags! {
 
 pub struct ValueDebug<'v, V>(pub &'v V);
 
-impl<'v> Display for ValueDebug<'v, Value> {
+impl Display for ValueDebug<'_, Value> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value = &self.0;
         match &value {
@@ -450,7 +450,7 @@ impl<'v> Display for ValueDebug<'v, Value> {
     }
 }
 
-impl<'a> Display for ValueDebug<'a, Attr> {
+impl Display for ValueDebug<'_, Attr> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let attr = &self.0;
 
@@ -502,7 +502,7 @@ where
     }
 }
 
-impl<'a> Display for ValueDebug<'a, AttrMatrix> {
+impl Display for ValueDebug<'_, AttrMatrix> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "mat{}", ValueDebug(&self.0.columns))
     }

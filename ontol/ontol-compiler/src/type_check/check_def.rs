@@ -14,7 +14,7 @@ use crate::{
 
 use super::{ena_inference::Strength, hir_build::NodeInfo, TypeCheck};
 
-impl<'c, 'm> TypeCheck<'c, 'm> {
+impl<'m> TypeCheck<'_, 'm> {
     /// Compute the immediate type of a definition.
     /// Performs relationship analysis for relationship definitions (rel statements).
     pub fn check_def(&mut self, def_id: DefId) -> TypeRef<'m> {

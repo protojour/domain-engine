@@ -52,7 +52,7 @@ pub struct AttributeType<'v> {
     pub attr: AttrRef<'v>,
 }
 
-impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
+impl ::juniper::GraphQLValue<GqlScalar> for AttributeType<'_> {
     type Context = ServiceCtx;
     type TypeInfo = SchemaType;
 
@@ -101,7 +101,7 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
     }
 }
 
-impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
+impl juniper::GraphQLType<GqlScalar> for AttributeType<'_> {
     fn name(info: &SchemaType) -> Option<&str> {
         Some(info.typename())
     }
@@ -222,7 +222,7 @@ impl<'v> juniper::GraphQLValueAsync<GqlScalar> for IndexedType<'v> {
 }
 */
 
-impl<'v> AttributeType<'v> {
+impl AttributeType<'_> {
     fn resolve_to_concrete_type_data<'s>(&self, info: &'s SchemaType) -> (TypeAddr, &'s TypeData) {
         match &info.type_data().kind {
             TypeKind::Union(union_data) => {

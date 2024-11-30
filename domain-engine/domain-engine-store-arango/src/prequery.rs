@@ -62,7 +62,7 @@ impl AqlQuery {
     }
 }
 
-impl<'a> MetaQuery<'a> {
+impl MetaQuery<'_> {
     /// Recursively find inherent ids in relations and add to MetaQuery
     pub fn prequery_relation(
         &mut self,

@@ -32,7 +32,7 @@ pub struct DataFlowAnalyzer<'c, 'm> {
     property_flow: BTreeSet<PropertyFlow>,
 }
 
-impl<'c, 'm> Debug for DataFlowAnalyzer<'c, 'm> {
+impl Debug for DataFlowAnalyzer<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DataFlowAnalyzer")
             .field("prop_origins", &self.prop_origins)

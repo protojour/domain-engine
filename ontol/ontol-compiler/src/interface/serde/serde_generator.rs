@@ -83,7 +83,7 @@ enum OperatorAllocation {
     Redirect(SerdeDef),
 }
 
-impl<'c, 'm> SerdeGenerator<'c, 'm> {
+impl<'c> SerdeGenerator<'c, '_> {
     pub fn finish(mut self) -> (Vec<SerdeOperator>, HashMap<SerdeKey, SerdeOperatorAddr>) {
         self.execute_tasks();
 
@@ -1027,19 +1027,19 @@ pub(super) fn operator_to_leaf_discriminant(operator: &SerdeOperator) -> LeafDis
     }
 }
 
-impl<'c, 'm> AsRef<Defs<'m>> for SerdeGenerator<'c, 'm> {
+impl<'m> AsRef<Defs<'m>> for SerdeGenerator<'_, 'm> {
     fn as_ref(&self) -> &Defs<'m> {
         self.defs
     }
 }
 
-impl<'c, 'm> AsRef<DefTypeCtx<'m>> for SerdeGenerator<'c, 'm> {
+impl<'m> AsRef<DefTypeCtx<'m>> for SerdeGenerator<'_, 'm> {
     fn as_ref(&self) -> &DefTypeCtx<'m> {
         self.def_ty_ctx
     }
 }
 
-impl<'c, 'm> AsRef<RelCtx> for SerdeGenerator<'c, 'm> {
+impl AsRef<RelCtx> for SerdeGenerator<'_, '_> {
     fn as_ref(&self) -> &RelCtx {
         self.rel_ctx
     }

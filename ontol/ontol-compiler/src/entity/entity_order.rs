@@ -14,7 +14,7 @@ use crate::{
     CompileError, CompileErrors, Compiler, SourceSpan,
 };
 
-impl<'m> Compiler<'m> {
+impl Compiler<'_> {
     /// Returns the object (symbol) of the order.
     /// Adds the order as a subvariant to the order union
     pub(super) fn check_order(

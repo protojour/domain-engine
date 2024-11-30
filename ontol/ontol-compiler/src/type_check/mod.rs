@@ -126,7 +126,7 @@ impl<'m> TypeError<'m> {
     }
 }
 
-impl<'c, 'm> TypeCheck<'c, 'm> {
+impl<'m> TypeCheck<'_, 'm> {
     pub(crate) fn repr_check<'tc>(&'tc mut self, root_def_id: DefId) -> ReprCheck<'tc, 'm> {
         ReprCheck {
             root_def_id,
@@ -143,19 +143,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 }
 
-impl<'c, 'm> AsRef<Defs<'m>> for TypeCheck<'c, 'm> {
+impl<'m> AsRef<Defs<'m>> for TypeCheck<'_, 'm> {
     fn as_ref(&self) -> &Defs<'m> {
         self.defs
     }
 }
 
-impl<'c, 'm> AsRef<RelCtx> for TypeCheck<'c, 'm> {
+impl AsRef<RelCtx> for TypeCheck<'_, '_> {
     fn as_ref(&self) -> &RelCtx {
         self.rel_ctx
     }
 }
 
-impl<'c, 'm> AsMut<CompileErrors> for TypeCheck<'c, 'm> {
+impl AsMut<CompileErrors> for TypeCheck<'_, '_> {
     fn as_mut(&mut self) -> &mut CompileErrors {
         self.errors
     }

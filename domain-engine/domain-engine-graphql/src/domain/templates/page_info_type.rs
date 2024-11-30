@@ -10,13 +10,13 @@ pub struct PageInfoType<'v> {
     pub matrix: AttrMatrixRef<'v>,
 }
 
-impl<'v> PageInfoType<'v> {
+impl PageInfoType<'_> {
     fn find_sub(&self) -> Option<&SubSequence> {
         self.matrix.columns.iter().find_map(|column| column.sub())
     }
 }
 
-impl<'v> juniper::GraphQLValue<GqlScalar> for PageInfoType<'v> {
+impl juniper::GraphQLValue<GqlScalar> for PageInfoType<'_> {
     type Context = ServiceCtx;
     type TypeInfo = SchemaType;
 
@@ -59,7 +59,7 @@ impl<'v> juniper::GraphQLValue<GqlScalar> for PageInfoType<'v> {
     }
 }
 
-impl<'v> juniper::GraphQLType<GqlScalar> for PageInfoType<'v> {
+impl juniper::GraphQLType<GqlScalar> for PageInfoType<'_> {
     fn name(_info: &Self::TypeInfo) -> Option<&str> {
         None
     }

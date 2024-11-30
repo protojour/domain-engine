@@ -50,7 +50,7 @@ pub struct ReprCheck<'c, 'm> {
     pub state: State,
 }
 
-impl<'c, 'm> AsMut<CompileErrors> for ReprCheck<'c, 'm> {
+impl AsMut<CompileErrors> for ReprCheck<'_, '_> {
     fn as_mut(&mut self) -> &mut CompileErrors {
         self.errors
     }
@@ -89,7 +89,7 @@ enum SpanKind {
     Field,
 }
 
-impl<'c, 'm> ReprCheck<'c, 'm> {
+impl ReprCheck<'_, '_> {
     /// Check the representation of a type
     pub fn check_repr_root(&mut self) {
         let Some(def) = self.defs.table.get(&self.root_def_id) else {

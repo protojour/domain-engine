@@ -40,7 +40,7 @@ pub struct ConstantStringMatcher<'on> {
     pub def_id: DefId,
 }
 
-impl<'on> ValueMatcher for ConstantStringMatcher<'on> {
+impl ValueMatcher for ConstantStringMatcher<'_> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "\"{}\"", self.constant)
     }
@@ -60,7 +60,7 @@ pub struct TextPatternMatcher<'on> {
     pub ontology: OntologyCtx<'on>,
 }
 
-impl<'on> ValueMatcher for TextPatternMatcher<'on> {
+impl ValueMatcher for TextPatternMatcher<'_> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         expecting_custom_string(self.ontology, self.def_id, f)
             .unwrap_or_else(|| write!(f, "string matching /{}/", self.pattern.regex.as_str()))
@@ -85,7 +85,7 @@ pub struct CapturingTextPatternMatcher<'on> {
     pub scalar_format: ScalarFormat,
 }
 
-impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
+impl ValueMatcher for CapturingTextPatternMatcher<'_> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "string matching /{}/", self.pattern.regex.as_str())
     }

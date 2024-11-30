@@ -128,13 +128,13 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
     }
 }
 
-impl<'c, 'm> AsRef<RelCtx> for TypeMapper<'c, 'm> {
+impl AsRef<RelCtx> for TypeMapper<'_, '_> {
     fn as_ref(&self) -> &RelCtx {
         self.relations
     }
 }
 
-impl<'c, 'm> AsRef<Defs<'m>> for TypeMapper<'c, 'm> {
+impl<'m> AsRef<Defs<'m>> for TypeMapper<'_, 'm> {
     fn as_ref(&self) -> &Defs<'m> {
         self.defs
     }
