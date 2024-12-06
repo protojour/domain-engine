@@ -10,7 +10,10 @@ use pretty_assertions::assert_eq;
 struct TestLang;
 
 impl Lang for TestLang {
-    type Data<'a, H> = H where H: Clone;
+    type Data<'a, H>
+        = H
+    where
+        H: Clone;
 
     fn default_data<'a, H: Clone>(&self, hir: H) -> Self::Data<'a, H> {
         hir
