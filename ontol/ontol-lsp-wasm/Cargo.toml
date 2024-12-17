@@ -1,7 +1,11 @@
 [package]
 name = "ontol-lsp-wasm"
 version = "0.4.0"
-edition = "2021"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 ontol-lsp = { path = "../ontol-lsp", features = ["wasm"] }
