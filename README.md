@@ -146,3 +146,7 @@ mdbook serve
 # build HTML documentation
 mdbook build
 ```
+
+## License
+
+domain-engine is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPLv3) license. Contact us for commercial licensing options.
