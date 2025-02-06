@@ -11,10 +11,7 @@ A domain description and mapping _language_.
 The name is a silly spin on ALGOL (for algorithms!), this is a language for
 ontologies.
 
-### Language fundamentals
-
-Work in progress. See
-[MDP 6](https://gitlab.com/protojour/x-design-proposals/-/issues/8).
+See [documentation](./docs/src/SUMMARY.md).
 
 ## ONTOL Architecture
 
