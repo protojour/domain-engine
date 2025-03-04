@@ -24,6 +24,6 @@ serde.workspace = true
 serde_json.workspace = true
 fnv.workspace = true
 unimock.workspace = true
-jsonschema = { version = "0.26", optional = true, default-features = false }
+jsonschema = { version = "0.29", optional = true, default-features = false }
 serde-value = "0.7"
 url = "2"

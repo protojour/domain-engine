@@ -17,7 +17,7 @@ tracing.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 async-stream = "0.3"
-automerge = "0.5"
+automerge.workspace = true
 axum = { version = "0.7", features = ["ws"] }
 axum-extra = { version = "0.9", features = ["json-lines"] }
 bytes = "1"
@@ -25,7 +25,9 @@ futures-util = "0.3"
 hex = "0.4"
 http = "1"
 mime = "0.3"
-minicbor = { version = "0.25.1", default-features = false, features = ["alloc"] }
+minicbor = { version = "0.26.1", default-features = false, features = [
+    "alloc",
+] }
 postcard.workspace = true
 tokio = { workspace = true, features = ["sync"] }
 uuid = "1"
@@ -42,6 +44,10 @@ pretty_assertions = "1"
 tower = { version = "0.5", default-features = false, features = ["util"] }
 http-body = "1"
 http-body-util = "0.1"
-reqwest = { version = "0.12", default-features = false, features = ["http2", "json", "stream"] }
+reqwest = { version = "0.12", default-features = false, features = [
+    "http2",
+    "json",
+    "stream",
+] }
 reqwest-websocket = "0.4"
 ulid = "1"

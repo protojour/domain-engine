@@ -17,7 +17,7 @@ fn test_fake_primitives() {
         expect_eq!(
             actual = serde_read(&foo).as_json(AttrRef::Unit(&foo.new_fake(ProcessorMode::Raw))),
             expected = json!({
-                "s": "mollitia sit porro tenetur",
+                "s": "culpa mollitia sit porro tenetur",
                 "i": 2117826670,
             }),
         );
@@ -52,14 +52,14 @@ fn test_fake_geojson() {
         actual =
             serde_read(&geometry).as_json(AttrRef::Unit(&geometry.new_fake(ProcessorMode::Raw))),
         expected = json!({
-            "type": "Polygon",
-            "coordinates": [
-                [0.016321353287595652, 0.9547727023524024],
-                [0.6674473470759333, 0.5091214128693887],
-                [0.2626779163488635, 0.1856411528755303],
-                [0.720634883796082, 0.47809322766615],
-                [0.7067125942841727, 0.7238569168072458],
-            ]
+            "type": "MultiPolygon",
+            "coordinates": [[
+                [0.5966856962957163, 0.7171114683189246],
+                [0.4930949469457317, 0.9673383246798644],
+                [0.09979267849333606, 0.3921394141536853],
+                [0.2609328155372387, 0.2651969652438151],
+                [0.12183820979625291, 0.6705140631428715],
+            ]]
         }),
     );
 }
@@ -71,13 +71,13 @@ fn test_fake_guitar_synth() {
     expect_eq!(
         actual = serde_read(&artist).as_json(AttrRef::Unit(&artist.new_fake(ProcessorMode::Raw))),
         expected = json!({
-            "artist-id": "mollitia sit porro tenetur",
-            "name": "delectus molestias aspernatur voluptatem reprehenderit",
+            "artist-id": "culpa mollitia sit porro tenetur",
+            "name": "libero delectus molestias aspernatur",
             "plays": [
                 {
-                    "instrument-id": "guitar/aec6f2c9-eccf-9a1c-faba-639dd16ca1ba",
+                    "instrument-id": "guitar/7eabbaec-c2c9-eccf-9a1c-fabab639dd16",
                     "type": "guitar",
-                    "string_count": -1917199177,
+                    "string_count": 1684225959,
                 }
             ]
         }),

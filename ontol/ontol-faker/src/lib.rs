@@ -23,7 +23,6 @@ use ontol_runtime::{
     value::{OctetSequence, Serial, Value, ValueTag},
     DefId,
 };
-use rand::{rngs::StdRng, Rng, SeedableRng};
 use regex_generate::Generator;
 use smallvec::smallvec;
 use tracing::debug;
@@ -55,26 +54,29 @@ pub fn new_constant_fake(
         1, 0, 0, 0, 23, 0, 0, 0, 200, 1, 0, 0, 210, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0,
     ];
-    let mut rng = StdRng::from_seed(seed);
+    let mut rng8: rand_08::rngs::StdRng = rand_08::SeedableRng::from_seed(seed);
+    let mut rng9: rand::rngs::StdRng = rand::SeedableRng::from_seed(seed);
     FakeGenerator {
         ontology,
-        rng: &mut rng,
+        rng8: &mut rng8,
+        rng9: &mut rng9,
         processor_mode,
         edge_saturation: Default::default(),
     }
     .fake_value(def_id)
 }
 
-struct FakeGenerator<'a, R: Rng> {
+struct FakeGenerator<'a, R8, R9> {
     ontology: &'a Ontology,
-    rng: &'a mut R,
+    rng8: &'a mut R8,
+    rng9: &'a mut R9,
     processor_mode: ProcessorMode,
 
     // A guard that prevents the generator from generating data for the same edge recursively
     edge_saturation: HashSet<DefId>,
 }
 
-impl<R: Rng> FakeGenerator<'_, R> {
+impl<R8: rand_08::Rng, R9: rand::Rng> FakeGenerator<'_, R8, R9> {
     pub fn fake_value(&mut self, def_id: DefId) -> Result<Value, Error> {
         let def = self.ontology.def(def_id);
         let addr = def.operator_addr.ok_or(Error::NoSerializationInfo)?;
@@ -96,32 +98,32 @@ impl<R: Rng> FakeGenerator<'_, R> {
             SerdeOperator::False(def_id) => Value::I64(0, (*def_id).into()),
             SerdeOperator::True(def_id) => Value::I64(1, (*def_id).into()),
             SerdeOperator::Boolean(def_id) => {
-                let value: bool = Faker.fake_with_rng(self.rng);
+                let value: bool = Faker.fake_with_rng(self.rng9);
                 Value::I64(if value { 1 } else { 0 }, (*def_id).into())
             }
             SerdeOperator::I64(def_id, range) => {
                 let int: i64 = if let Some(range) = range {
-                    self.rng.gen_range(range.clone())
+                    self.rng9.random_range(range.clone())
                 } else {
                     // limit range
-                    let int: i32 = self.rng.gen();
+                    let int: i32 = self.rng9.random();
                     int.into()
                 };
                 Value::I64(int, (*def_id).into())
             }
             SerdeOperator::I32(def_id, range) => {
                 let int: i32 = if let Some(range) = range {
-                    self.rng.gen_range(range.clone())
+                    self.rng9.random_range(range.clone())
                 } else {
-                    self.rng.gen()
+                    self.rng9.random()
                 };
                 Value::I64(int as i64, (*def_id).into())
             }
             SerdeOperator::F64(def_id, range) => {
                 let float: f64 = if let Some(range) = range {
-                    self.rng.gen_range(range.clone())
+                    self.rng9.random_range(range.clone())
                 } else {
-                    self.rng.gen()
+                    self.rng9.random()
                 };
                 Value::F64(
                     if float == 0.0 || float == -0.0 {
@@ -133,22 +135,22 @@ impl<R: Rng> FakeGenerator<'_, R> {
                 )
             }
             SerdeOperator::Octets(octets_op) => {
-                let len = self.rng.gen_range(0usize..1000);
+                let len = self.rng9.random_range(0usize..1000);
                 let mut bytes: Vec<u8> = Vec::with_capacity(len);
 
                 for _ in 0..len {
-                    bytes.push(self.rng.r#gen());
+                    bytes.push(self.rng9.random());
                 }
 
                 let seq = OctetSequence(bytes.into());
                 Value::OctetSequence(seq, octets_op.target_def_id.into())
             }
             SerdeOperator::Serial(def_id) => {
-                Value::Serial(Serial(self.rng.gen()), (*def_id).into())
+                Value::Serial(Serial(self.rng9.random()), (*def_id).into())
             }
             SerdeOperator::String(def_id) => {
                 let mut string: std::string::String =
-                    fake::faker::lorem::en::Sentence(3..6).fake_with_rng(self.rng);
+                    fake::faker::lorem::en::Sentence(3..6).fake_with_rng(self.rng9);
                 // Remove the last dot
                 string.pop();
                 Value::Text(string.into(), (*def_id).into())
@@ -160,7 +162,7 @@ impl<R: Rng> FakeGenerator<'_, R> {
                 if let Some(string_like_type) = self.ontology.get_text_like_type(*def_id) {
                     match string_like_type {
                         TextLikeType::Uuid => {
-                            let mut builder = uuid::Builder::from_bytes(self.rng.gen());
+                            let mut builder = uuid::Builder::from_bytes(self.rng9.random());
                             builder.set_version(uuid::Version::Random);
 
                             Value::OctetSequence(
@@ -171,9 +173,10 @@ impl<R: Rng> FakeGenerator<'_, R> {
                             )
                         }
                         TextLikeType::Ulid => {
-                            let time = SystemTime::UNIX_EPOCH
-                                .add(Duration::from_secs(self.rng.gen_range(0..1_800_000_000)));
-                            let ulid = Ulid::from_datetime_with_source(time, self.rng);
+                            let time = SystemTime::UNIX_EPOCH.add(Duration::from_secs(
+                                self.rng9.random_range(0..1_800_000_000),
+                            ));
+                            let ulid = Ulid::from_datetime_with_source(time, self.rng9);
 
                             Value::OctetSequence(
                                 OctetSequence(ulid.to_bytes().into_iter().collect()),
@@ -181,18 +184,18 @@ impl<R: Rng> FakeGenerator<'_, R> {
                             )
                         }
                         TextLikeType::DateTime => {
-                            Value::ChronoDateTime(Faker.fake_with_rng(self.rng), (*def_id).into())
+                            Value::ChronoDateTime(Faker.fake_with_rng(self.rng9), (*def_id).into())
                         }
                     }
                 } else {
                     let text_pattern = self.ontology.get_text_pattern(*def_id).unwrap();
-                    let text = rand_text_matching_pattern(text_pattern, &mut self.rng);
+                    let text = rand_text_matching_pattern(text_pattern, &mut self.rng8);
                     Value::Text(text.into(), (*def_id).into())
                 }
             }
             SerdeOperator::CapturingTextPattern(def_id) => {
                 let text_pattern = self.ontology.get_text_pattern(*def_id).unwrap();
-                let text = rand_text_matching_pattern(text_pattern, &mut self.rng);
+                let text = rand_text_matching_pattern(text_pattern, &mut self.rng8);
                 text_pattern
                     .try_capturing_match(&text, *def_id, self.ontology)
                     .unwrap()
@@ -250,7 +253,7 @@ impl<R: Rng> FakeGenerator<'_, R> {
                     AppliedVariants::OneOf(possible_variants) => {
                         let variants = possible_variants.into_iter().collect::<Vec<_>>();
 
-                        let index: usize = self.rng.gen_range(0..variants.len());
+                        let index: usize = self.rng9.random_range(0..variants.len());
                         let variant = &variants[index];
 
                         self.fake_attribute(processor.narrow(variant.deserialize.addr))
@@ -301,7 +304,7 @@ impl<R: Rng> FakeGenerator<'_, R> {
     }
 }
 
-fn rand_text_matching_pattern(text_pattern: &TextPattern, rng: &mut impl Rng) -> String {
+fn rand_text_matching_pattern(text_pattern: &TextPattern, rng: &mut impl rand_08::Rng) -> String {
     let mut gen = Generator::new(text_pattern.regex.as_str(), rng, MAX_REPEAT).unwrap();
     let mut bytes = vec![];
     gen.generate(&mut bytes).unwrap();
