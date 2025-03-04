@@ -5,11 +5,11 @@ use serde::{Deserialize, Serialize};
 use thin_vec::ThinVec;
 
 use crate::{
+    DefId, PropId,
     debug::OntolDebug,
     impl_ontol_debug,
     value::{Value, ValueDebug},
     var::Var,
-    DefId, PropId,
 };
 
 #[derive(Clone, Serialize, Deserialize)]

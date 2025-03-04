@@ -8,9 +8,9 @@ use ontol_runtime::{
 use thin_vec::ThinVec;
 
 use crate::{
-    arena::{Arena, NodeRef},
     Binding, CaptureGroup, EvalCondTerm, Kind, Label, Lang, MatrixRow, Node, OverloadFunc, Pack,
     PropVariant, RootNode, StructFlags,
+    arena::{Arena, NodeRef},
 };
 
 impl<L: Lang> std::fmt::Display for NodeRef<'_, '_, L> {

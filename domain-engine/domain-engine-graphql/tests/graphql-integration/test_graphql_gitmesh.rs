@@ -1,9 +1,9 @@
 use domain_engine_graphql::{
     domain::context::ServiceCtx,
-    juniper::{graphql_value, InputValue},
+    juniper::{InputValue, graphql_value},
 };
 use domain_engine_test_utils::graphql_test_utils::{
-    gql_ctx_mock_data_store, TestCompileSingletonSchema,
+    TestCompileSingletonSchema, gql_ctx_mock_data_store,
 };
 use domain_engine_test_utils::{
     graphql_test_utils::{
@@ -13,7 +13,7 @@ use domain_engine_test_utils::{
 };
 use ontol_examples::gitmesh;
 use ontol_macros::{datastore_test, test};
-use ontol_test_utils::{default_short_name, expect_eq, TestPackages};
+use ontol_test_utils::{TestPackages, default_short_name, expect_eq};
 use tracing::info;
 
 use crate::mk_engine_default;
@@ -42,8 +42,7 @@ async fn gitmesh_id_error() {
         )
         .await
         .unwrap_first_exec_error_msg(),
-        expected =
-            "invalid type, expected `RepositoryOwner` (`User` or `Organization`) in input at line 5 column 31"
+        expected = "invalid type, expected `RepositoryOwner` (`User` or `Organization`) in input at line 5 column 31"
     );
 }
 

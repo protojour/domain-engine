@@ -6,13 +6,13 @@ use ontol_runtime::{DefId, OntolDefTag};
 use ordered_float::NotNan;
 
 use crate::{
+    Note,
     def::{BuiltinRelationKind, DefKind},
     error::CompileError,
     misc::RelObjectConstraint,
     primitive::PrimitiveKind,
     thesaurus::TypeRelation,
     types::FormatType,
-    Note,
 };
 
 use super::{

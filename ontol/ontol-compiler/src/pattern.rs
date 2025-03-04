@@ -1,5 +1,5 @@
 use fnv::FnvHashMap;
-use ontol_runtime::{var::Var, DefId};
+use ontol_runtime::{DefId, var::Var};
 
 use crate::source::SourceSpan;
 

@@ -1,26 +1,26 @@
 use std::future::IntoFuture;
 
 use domain_engine_core::{
+    DomainError, DomainResult, Session, VertexAddr,
     domain_error::DomainErrorKind,
     search::{
         FacetCount, SearchDomainOrDef, SearchFilters, VertexSearchFacets, VertexSearchParams,
         VertexSearchResults,
     },
-    DomainError, DomainResult, Session, VertexAddr,
 };
 use ontol_runtime::DefId;
 use tantivy::{
+    DateTime, DocAddress, Order, Searcher, TantivyError, Term,
     collector::{FacetCollector, FacetCounts, TopDocs},
     fastfield::FacetReader,
     query::{AllQuery, BooleanQuery, Occur, Query, QueryParser, QueryParserError, TermQuery},
     schema::{Facet, IndexRecordOption},
-    DateTime, DocAddress, Order, Searcher, TantivyError, Term,
 };
 use tokio::task::JoinError;
 use tracing::{debug, error, info};
 use ulid::Ulid;
 
-use crate::{schema::fieldname, TantivyDataStoreLayer};
+use crate::{TantivyDataStoreLayer, schema::fieldname};
 
 /// Raw output from tantivy search
 pub struct RawSearchResults {

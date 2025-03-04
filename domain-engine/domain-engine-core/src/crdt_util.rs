@@ -1,12 +1,13 @@
 use std::str::FromStr;
 
 use automerge::{
-    transaction::{Transactable, Transaction},
     ActorId, Automerge, AutomergeError, ChangeHash, ObjId, ObjType, ReadDoc, ScalarValue,
     Value as AmValue,
+    transaction::{Transactable, Transaction},
 };
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    DefId, DefPropTag, PropId,
     attr::{Attr, AttrMatrix},
     crdt::CrdtStruct,
     ontology::{
@@ -15,15 +16,14 @@ use ontol_runtime::{
     },
     sequence::Sequence,
     value::{OctetSequence, Value, ValueTag},
-    DefId, DefPropTag, PropId,
 };
 use smallvec::smallvec;
 use tracing::error;
 use ulid::Ulid;
 
 use crate::{
-    domain_error::DomainErrorKind, make_interfacable::MakeInterfacable,
-    make_storable::MakeStorable, DomainResult,
+    DomainResult, domain_error::DomainErrorKind, make_interfacable::MakeInterfacable,
+    make_storable::MakeStorable,
 };
 
 enum ToCrdtError {
@@ -193,7 +193,7 @@ impl<'e> MakeStorable<'e> {
         let domain = self.defs.domain_by_index(def_id.domain_index()).unwrap();
         let ulid = domain.domain_id().ulid;
         let def_tag = def_id.1;
-        let prop_tag = prop_id.1 .0;
+        let prop_tag = prop_id.1.0;
 
         format!("{ulid}_{def_tag}_{prop_tag}")
     }

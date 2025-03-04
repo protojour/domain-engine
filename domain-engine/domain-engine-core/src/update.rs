@@ -1,5 +1,5 @@
 use fnv::FnvHashMap;
-use ontol_runtime::{attr::Attr, value::Value, PropId};
+use ontol_runtime::{PropId, attr::Attr, value::Value};
 
 /// Sanitize something that is known to be a data store update
 /// after it has gone through domain translation.

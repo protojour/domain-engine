@@ -1,6 +1,6 @@
 use arcstr::ArcStr;
-use domain_engine_core::{domain_error::DomainErrorKind, DomainError};
-use ontol_runtime::{tuple::CardinalIdx, DefId, DomainIndex, PropId};
+use domain_engine_core::{DomainError, domain_error::DomainErrorKind};
+use ontol_runtime::{DefId, DomainIndex, PropId, tuple::CardinalIdx};
 use tracing::{error, info, warn};
 
 use crate::pg_model::{EdgeId, PgDomainTableType, PgRegKey};

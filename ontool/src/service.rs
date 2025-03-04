@@ -6,11 +6,11 @@ use std::{
     task::Poll,
 };
 
-use crate::graphql::{domain_graphql_handler, graphiql_handler, GraphqlService};
+use crate::graphql::{GraphqlService, domain_graphql_handler, graphiql_handler};
 
-use axum::{extract::FromRequestParts, routing::post, Extension};
+use axum::{Extension, extract::FromRequestParts, routing::post};
 use domain_engine_core::{
-    domain_error::DomainErrorKind, CrdtActor, DomainEngine, DomainResult, Session,
+    CrdtActor, DomainEngine, DomainResult, Session, domain_error::DomainErrorKind,
 };
 use domain_engine_graphql::{
     domain::CreateSchemaError,

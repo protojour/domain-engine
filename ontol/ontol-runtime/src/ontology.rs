@@ -13,17 +13,17 @@ use tracing::debug;
 use ulid::Ulid;
 
 use crate::{
+    DefId, DomainIndex, MapKey, PropId,
     debug::OntolFormatter,
     interface::{
+        DomainInterface,
         serde::{
             operator::{SerdeOperator, SerdeOperatorAddr},
             processor::{ProcessorMode, SerdeProcessor},
         },
-        DomainInterface,
     },
     query::condition::Condition,
     vm::{ontol_vm::OntolVm, proc::Procedure},
-    DefId, DomainIndex, MapKey, PropId,
 };
 
 use self::{
@@ -31,7 +31,7 @@ use self::{
     config::DomainConfig,
     domain::{Def, Domain, ExtendedEntityInfo},
     map::{Extern, MapMeta, PropertyFlow},
-    ontol::{text_pattern::TextPattern, OntolDomainMeta, TextConstant, TextLikeType},
+    ontol::{OntolDomainMeta, TextConstant, TextLikeType, text_pattern::TextPattern},
 };
 
 pub mod aspects;

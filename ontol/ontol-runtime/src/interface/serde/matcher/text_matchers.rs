@@ -1,19 +1,19 @@
 use fnv::FnvHashMap;
-use serde::de::{value::StrDeserializer, DeserializeSeed};
+use serde::de::{DeserializeSeed, value::StrDeserializer};
 use tracing::error;
 
 use crate::{
+    DefId, DefPropTag, OntolDefTag, PropId,
     attr::Attr,
     interface::serde::{
-        processor::{ProcessorMode, ScalarFormat, SerdeProcessor},
         OntologyCtx,
+        processor::{ProcessorMode, ScalarFormat, SerdeProcessor},
     },
     ontology::ontol::{
-        text_pattern::{TextPattern, TextPatternConstantPart},
         ParseError,
+        text_pattern::{TextPattern, TextPatternConstantPart},
     },
     value::{Value, ValueTag},
-    DefId, DefPropTag, OntolDefTag, PropId,
 };
 
 use super::ValueMatcher;

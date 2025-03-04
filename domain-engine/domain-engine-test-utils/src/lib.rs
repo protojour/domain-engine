@@ -2,8 +2,9 @@
 
 use std::sync::Arc;
 
-use domain_engine_core::{domain_select::domain_select, DomainEngine, SelectMode, Session};
+use domain_engine_core::{DomainEngine, SelectMode, Session, domain_select::domain_select};
 use ontol_runtime::{
+    DomainIndex,
     attr::AttrRef,
     interface::serde::processor::ProcessorMode,
     ontology::Ontology,
@@ -14,7 +15,6 @@ use ontol_runtime::{
     },
     value::Value,
     var::Var,
-    DomainIndex,
 };
 use serde::de::DeserializeSeed;
 
@@ -167,8 +167,8 @@ pub mod system {
 
     use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
     use domain_engine_core::{
-        system::{SystemAPI, SystemApiMock},
         CrdtActor, DomainResult, Session,
+        system::{SystemAPI, SystemApiMock},
     };
     use tracing::trace;
     use unimock::*;

@@ -1,5 +1,5 @@
 use ontol_macros::test;
-use ontol_test_utils::{file_url, TestCompile, TestPackages};
+use ontol_test_utils::{TestCompile, TestPackages, file_url};
 use serde_json::json;
 
 #[test]

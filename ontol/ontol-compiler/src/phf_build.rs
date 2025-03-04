@@ -87,7 +87,7 @@ mod tests {
     use super::*;
     use std::{mem::size_of, ops::Index};
 
-    use arcstr::{literal, ArcStr};
+    use arcstr::{ArcStr, literal};
     use ontol_runtime::ontology::ontol::TextConstant;
 
     #[derive(Default)]

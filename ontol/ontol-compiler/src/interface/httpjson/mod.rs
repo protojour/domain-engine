@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use indexmap::IndexMap;
 use ontol_runtime::{
+    DefId, DomainIndex, MapDefFlags, MapKey, PropId,
     interface::{
         http_json::{
             Endpoint, HttpDefResource, HttpJson, HttpKeyedResource, HttpMapGetResource,
@@ -14,12 +15,11 @@ use ontol_runtime::{
         domain::{DataRelationshipKind, DataTreeRepr, DefKind},
         ontol::TextConstant,
     },
-    DefId, DomainIndex, MapDefFlags, MapKey, PropId,
 };
 
 use crate::{codegen::task::CodeCtx, repr::repr_model::ReprKind};
 
-use super::serde::{serde_generator::SerdeGenerator, SerdeKey};
+use super::serde::{SerdeKey, serde_generator::SerdeGenerator};
 
 pub fn generate_httpjson_interface(
     domain_index: DomainIndex,

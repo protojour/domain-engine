@@ -1,5 +1,6 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    PropId,
     attr::Attr,
     interface::serde::processor::ProcessorMode,
     ontology::{
@@ -8,10 +9,9 @@ use ontol_runtime::{
         ontol::ValueGenerator,
     },
     value::{OctetSequence, Value, ValueTag},
-    PropId,
 };
 
-use crate::{system::SystemAPI, DomainResult};
+use crate::{DomainResult, system::SystemAPI};
 
 /// A converter/finalizer for ONTOL values that processeses the values before stored to a data store.
 pub struct MakeStorable<'e> {

@@ -1,4 +1,4 @@
-use tracing::{debug_span, Instrument};
+use tracing::{Instrument, debug_span};
 
 use crate::{
     domain::{context::SchemaType, macros::impl_graphql_value, registry_ctx::RegistryCtx},

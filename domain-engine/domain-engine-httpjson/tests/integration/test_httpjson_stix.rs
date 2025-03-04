@@ -3,20 +3,20 @@ use domain_engine_test_utils::{
     unimock::Unimock,
 };
 use http::{
-    header::{self, CONTENT_TYPE},
     Request, StatusCode,
+    header::{self, CONTENT_TYPE},
 };
 use ontol_examples::stix::stix_bundle;
 use ontol_macros::datastore_test;
-use ontol_test_utils::{expect_eq, TestCompile};
+use ontol_test_utils::{TestCompile, expect_eq};
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use tower::ServiceExt;
 use tracing::info;
 
 use crate::{
-    fetch_body_assert_status, json_body, jsonlines_stream, make_domain_engine, streaming_axum_body,
-    MakeTestRouter,
+    MakeTestRouter, fetch_body_assert_status, json_body, jsonlines_stream, make_domain_engine,
+    streaming_axum_body,
 };
 
 fn mock_system_time() -> Box<Unimock> {
@@ -160,13 +160,15 @@ async fn test_httpjson_post_url(ds: &str) {
         .await
         .unwrap();
 
-    assert!(post_json_response
-        .headers()
-        .get(header::LOCATION)
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .starts_with("/url/id/url--"));
+    assert!(
+        post_json_response
+            .headers()
+            .get(header::LOCATION)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("/url/id/url--")
+    );
 
     expect_eq!(
         actual = fetch_body_assert_status::<String>(post_json_response, StatusCode::CREATED)
@@ -212,7 +214,7 @@ async fn test_httpjson_stix_jsonlines_unresolved_foreign_key(ds: &str) {
 }
 
 mod util {
-    use crate::{fetch_body_assert_status, FromBytes};
+    use crate::{FromBytes, fetch_body_assert_status};
 
     use super::*;
 

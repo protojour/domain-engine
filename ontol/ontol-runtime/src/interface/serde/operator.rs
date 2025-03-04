@@ -9,19 +9,18 @@ use ontol_macros::OntolDebug;
 use thin_vec::ThinVec;
 
 use crate::{
-    impl_ontol_debug,
+    DefId, PropId, impl_ontol_debug,
     interface::discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
     ontology::{
-        ontol::{TextConstant, ValueGenerator},
         OntologyInit,
+        ontol::{TextConstant, ValueGenerator},
     },
     phf::{PhfIndexMap, PhfKey},
-    DefId, PropId,
 };
 
 use super::{
-    processor::{ProcessorLevel, ProcessorMode, ProcessorProfileFlags},
     SerdeDef,
+    processor::{ProcessorLevel, ProcessorMode, ProcessorProfileFlags},
 };
 
 /// SerdeOperatorAddr is an index into a vector of SerdeOperators.

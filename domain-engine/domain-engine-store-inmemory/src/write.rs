@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use fnv::{FnvHashMap, FnvHashSet};
 use itertools::Itertools;
 use ontol_runtime::{
+    DefId, PropId,
     attr::Attr,
     interface::serde::operator::SerdeOperatorAddr,
     ontology::{
@@ -16,20 +17,19 @@ use ontol_runtime::{
     query::{filter::Filter, select::Select},
     tuple::{CardinalIdx, EndoTuple},
     value::{Serial, Value, ValueDebug},
-    DefId, PropId,
 };
 use tracing::{debug, debug_span};
 
 use domain_engine_core::{
-    domain_error::DomainErrorKind,
-    entity_id_utils::{find_inherent_entity_id, try_generate_entity_id, GeneratedId},
-    transact::DataOperation,
     DomainError, DomainResult,
+    domain_error::DomainErrorKind,
+    entity_id_utils::{GeneratedId, find_inherent_entity_id, try_generate_entity_id},
+    transact::DataOperation,
 };
 
 use crate::{
     core::{
-        find_data_relationship, DbContext, EdgeColumnMatch, EdgeData, EdgeVectorData, VertexKey,
+        DbContext, EdgeColumnMatch, EdgeData, EdgeVectorData, VertexKey, find_data_relationship,
     },
     query::{Cursor, IncludeTotalLen},
 };
@@ -702,7 +702,9 @@ fn endo_tuple_to_edge_input(
     tuple: EndoTuple<Value>,
     common_write_mode: EdgeWriteMode,
 ) -> BTreeMap<CardinalIdx, (EdgeWriteMode, EdgeData<VertexKey>)> {
-    debug!("endo tuple to edge input: {projection:?}, subject_key = {subject_key:?}, tuple = {tuple:?}");
+    debug!(
+        "endo tuple to edge input: {projection:?}, subject_key = {subject_key:?}, tuple = {tuple:?}"
+    );
 
     let mut edge_input: BTreeMap<CardinalIdx, (EdgeWriteMode, EdgeData<VertexKey>)> =
         Default::default();

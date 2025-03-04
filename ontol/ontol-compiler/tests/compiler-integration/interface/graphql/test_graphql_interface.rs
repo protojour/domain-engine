@@ -12,12 +12,11 @@ use ontol_runtime::{
     },
 };
 use ontol_test_utils::{
-    default_file_url, default_short_name, expect_eq, file_url,
+    TestCompile, TestPackages, default_file_url, default_short_name, expect_eq, file_url,
     test_extensions::{
         graphql::{ObjectDataExt, TypeDataExt, UnitTypeRefExt},
         serde::SerdeOperatorExt,
     },
-    TestCompile, TestPackages,
 };
 
 use super::schema_test;
@@ -348,10 +347,12 @@ fn incompatible_edge_types_are_distinct() {
                     .addr(),
             );
             assert_eq!(&ontology[targets_query_edge.typename], "targetEdge");
-            assert!(!targets_query_edge
-                .fields()
-                .unwrap()
-                .contains_key("edge_field"));
+            assert!(
+                !targets_query_edge
+                    .fields()
+                    .unwrap()
+                    .contains_key("edge_field")
+            );
         }
 
         {

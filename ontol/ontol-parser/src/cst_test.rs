@@ -6,7 +6,7 @@ fn parser(src: &str) -> CstParser {
 }
 
 mod test_pattern_lookahead {
-    use crate::cst::grammar::{lookahead_detect_pattern, DetectedPattern};
+    use crate::cst::grammar::{DetectedPattern, lookahead_detect_pattern};
 
     use super::parser;
 

@@ -1,19 +1,20 @@
 use fnv::FnvHashMap;
 use itertools::Itertools;
 use ontol_hir::{
-    arena::NodeRef, find_value_node, import::arena_import, Binder, Binding, EvalCondTerm, Kind,
-    Label, MatrixRow, Node, Nodes, PropFlags, PropVariant, StructFlags,
+    Binder, Binding, EvalCondTerm, Kind, Label, MatrixRow, Node, Nodes, PropFlags, PropVariant,
+    StructFlags, arena::NodeRef, find_value_node, import::arena_import,
 };
 use ontol_runtime::{
+    MapDirection, MapFlags, OntolDefTag, PropId,
     query::condition::{Clause, ClausePair, SetOperator},
     var::{Var, VarAllocator, VarSet},
-    MapDirection, MapFlags, OntolDefTag, PropId,
 };
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use thin_vec::thin_vec;
 use tracing::{debug, info, trace};
 
 use crate::{
+    CompileError, CompileErrors, Compiler, NO_SPAN, SourceSpan,
     def::{DefKind, Defs},
     hir_unify::{regex_interpolation::RegexStringInterpolator, ssa_util::NodesExt},
     mem::Intern,
@@ -25,15 +26,14 @@ use crate::{
     },
     typed_hir::{Meta, TypedHir, TypedHirData, TypedNodeRef},
     types::{Type, TypeCtx, TypeRef, UNIT_TYPE},
-    CompileError, CompileErrors, Compiler, SourceSpan, NO_SPAN,
 };
 
 use super::{
+    UnifiedNode, UnifierError, UnifierResult,
     regex_interpolation::StringInterpolationComponent,
     ssa_util::{
-        scan_all_vars_and_labels, ExprMode, ExtendedScope, ScopeTracker, Scoped, TypeMapping,
+        ExprMode, ExtendedScope, ScopeTracker, Scoped, TypeMapping, scan_all_vars_and_labels,
     },
-    UnifiedNode, UnifierError, UnifierResult,
 };
 
 /// Unifier that strives to produce Static Single-Assignment form flat hir blocks
@@ -241,28 +241,30 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             .map(|idx| node_ref.meta().ty.matrix_column_type(idx, self.types))
                             .collect_vec();
 
-                        smallvec![self.write_node(
-                            make_seq,
-                            Kind::MakeMatrix(
-                                out_columns
-                                    .into_iter()
-                                    .enumerate()
-                                    .map(|(column_idx, var)| {
-                                        let column_type = column_seq_types[column_idx];
+                        smallvec![
+                            self.write_node(
+                                make_seq,
+                                Kind::MakeMatrix(
+                                    out_columns
+                                        .into_iter()
+                                        .enumerate()
+                                        .map(|(column_idx, var)| {
+                                            let column_type = column_seq_types[column_idx];
 
-                                        TypedHirData(
-                                            var.into(),
-                                            Meta {
-                                                ty: column_type,
-                                                span: node_ref.meta().span,
-                                            },
-                                        )
-                                    })
-                                    .collect(),
-                                seq_body
-                            ),
-                            *node_ref.meta(),
-                        )]
+                                            TypedHirData(
+                                                var.into(),
+                                                Meta {
+                                                    ty: column_type,
+                                                    span: node_ref.meta().span,
+                                                },
+                                            )
+                                        })
+                                        .collect(),
+                                    seq_body
+                                ),
+                                *node_ref.meta(),
+                            )
+                        ]
                     }
                     ExprMode::MatchStruct { .. } => {
                         debug!("TODO");

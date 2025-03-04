@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use datafusion::prelude::{SessionConfig, SessionContext};
-use domain_engine_core::{transact::ReqMessage, DomainEngine, Session};
+use domain_engine_core::{DomainEngine, Session, transact::ReqMessage};
 use domain_engine_test_utils::{
     mock_datastore::{LinearDataStoreAdapter, LinearTransactMock},
-    unimock::{self, matching, MockFn, Unimock},
+    unimock::{self, MockFn, Unimock, matching},
 };
 use indoc::indoc;
 use ontol_examples::{artist_and_instrument, conduit};

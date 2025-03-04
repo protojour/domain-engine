@@ -23,9 +23,9 @@ use automerge::ActorId;
 pub use domain_engine::DomainEngine;
 pub use domain_error::{DomainError, DomainResult};
 use ontol_runtime::{
+    DefId,
     query::{condition::Condition, select::EntitySelect},
     var::Var,
-    DefId,
 };
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;

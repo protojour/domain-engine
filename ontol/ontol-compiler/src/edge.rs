@@ -6,12 +6,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::{
-    ontology::ontol::TextConstant, tuple::CardinalIdx, DefId, OntolDefTag, PropId,
+    DefId, OntolDefTag, PropId, ontology::ontol::TextConstant, tuple::CardinalIdx,
 };
 use tracing::{debug, error};
 
 use crate::{
-    relation::rel_def_meta, repr::repr_model::ReprKind, CompileError, Compiler, SourceSpan,
+    CompileError, Compiler, SourceSpan, relation::rel_def_meta, repr::repr_model::ReprKind,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

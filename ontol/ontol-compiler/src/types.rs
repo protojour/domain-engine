@@ -3,8 +3,8 @@ use std::{collections::HashSet, fmt::Display};
 use fnv::{FnvHashMap, FnvHashSet};
 use itertools::{Itertools, Position};
 use ontol_runtime::{
-    ontology::{map::Extern, ontol::TextLikeType},
     DefId, OntolDefTag,
+    ontology::{map::Extern, ontol::TextLikeType},
 };
 use ordered_float::NotNan;
 

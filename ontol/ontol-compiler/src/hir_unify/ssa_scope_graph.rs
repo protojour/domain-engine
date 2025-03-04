@@ -1,20 +1,20 @@
 use ontol_hir::{
-    import::arena_import, Binder, Binding, CaptureGroup, Kind, Node, Nodes, OverloadFunc, Pack,
+    Binder, Binding, CaptureGroup, Kind, Node, Nodes, OverloadFunc, Pack, import::arena_import,
 };
 use ontol_runtime::{
-    var::{Var, VarSet},
     DefId, PropId,
+    var::{Var, VarSet},
 };
 use thin_vec::ThinVec;
 use tracing::{debug, warn};
 
 use crate::{
-    hir_unify::{ssa_util::scan_all_vars_and_labels, UnifierError},
-    typed_hir::{TypedHir, TypedHirData},
     CompileError, SourceSpan,
+    hir_unify::{UnifierError, ssa_util::scan_all_vars_and_labels},
+    typed_hir::{TypedHir, TypedHirData},
 };
 
-use super::{ssa_unifier::SsaUnifier, UnifierResult};
+use super::{UnifierResult, ssa_unifier::SsaUnifier};
 
 #[derive(Clone)]
 pub enum Let<'m> {

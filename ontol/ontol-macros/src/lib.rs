@@ -3,8 +3,8 @@
 use std::collections::HashSet;
 
 use proc_macro::TokenStream;
-use quote::{format_ident, quote, ToTokens, TokenStreamExt};
-use syn::{parenthesized, parse_macro_input, Token};
+use quote::{ToTokens, TokenStreamExt, format_ident, quote};
+use syn::{Token, parenthesized, parse_macro_input};
 
 mod ontol_debug;
 mod rustdoc;

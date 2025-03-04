@@ -1,20 +1,20 @@
-use std::collections::{hash_map::Entry, BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, hash_map::Entry};
 
 use fnv::FnvHashMap;
 use ontol_parser::{
+    U32Span,
     cst::{
         inspect as insp,
         view::{NodeView, TokenView},
     },
-    U32Span,
 };
-use ontol_runtime::{tuple::CardinalIdx, DefId, OntolDefTag};
+use ontol_runtime::{DefId, OntolDefTag, tuple::CardinalIdx};
 
 use crate::{
+    CompileError,
     def::DefKind,
     edge::{CardinalKind, EdgeId, Slot, SymbolicEdge, SymbolicEdgeCardinal},
     namespace::Space,
-    CompileError,
 };
 
 use super::context::{Coinage, CstLowering, RootDefs};

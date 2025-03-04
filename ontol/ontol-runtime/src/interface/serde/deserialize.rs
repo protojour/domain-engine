@@ -1,10 +1,10 @@
 use std::{ops::ControlFlow, slice};
 
 use serde::{
-    de::{DeserializeSeed, Error, MapAccess, SeqAccess, Unexpected, Visitor},
     Deserializer,
+    de::{DeserializeSeed, Error, MapAccess, SeqAccess, Unexpected, Visitor},
 };
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use tracing::{trace, trace_span, warn};
 
 use crate::{
@@ -22,6 +22,7 @@ use crate::{
 use super::{
     deserialize_patch::GraphqlPatchVisitor,
     matcher::{
+        ExpectingMatching, ValueMatcher,
         octets_matcher::OctetsMatcher,
         primitive_matchers::{BooleanMatcher, NumberMatcher, UnitMatcher},
         sequence_matcher::{SequenceKind, SequenceRangesMatcher},
@@ -29,7 +30,6 @@ use super::{
             CapturingTextPatternMatcher, ConstantStringMatcher, StringMatcher, TextPatternMatcher,
         },
         union_matcher::UnionMatcher,
-        ExpectingMatching, ValueMatcher,
     },
     operator::{AppliedVariants, SerdeOperator},
     processor::{ProcessorMode, ScalarFormat, SerdeProcessor},

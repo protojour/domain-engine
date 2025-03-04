@@ -5,15 +5,15 @@ use document::IndexingContext;
 use domain_engine_core::domain_error::DomainErrorKind;
 use domain_engine_core::search::{VertexSearchParams, VertexSearchResults};
 use domain_engine_core::{
+    DomainResult, Session,
     data_store::{DataStoreAPI, DataStoreParams},
     transact::{ReqMessage, RespMessage, TransactionMode},
-    DomainResult, Session,
 };
-use futures_util::{stream::BoxStream, StreamExt};
+use futures_util::{StreamExt, stream::BoxStream};
 use indexer::WorkTracker;
-use indexer::{synchronizer_async_task, writer_blocking_task, SyncQueue, Synrchonizer};
+use indexer::{SyncQueue, Synrchonizer, synchronizer_async_task, writer_blocking_task};
 use ontol_runtime::ontology::Ontology;
-use schema::{make_schema, SchemaWithMeta};
+use schema::{SchemaWithMeta, make_schema};
 use tantivy::directory::MmapDirectory;
 use tantivy::tokenizer::{Language, LowerCaser, SimpleTokenizer, Stemmer, TextAnalyzer};
 use tantivy::{Index, IndexReader, ReloadPolicy};

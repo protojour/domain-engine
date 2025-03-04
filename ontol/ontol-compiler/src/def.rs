@@ -6,15 +6,16 @@ use std::{
 use fnv::FnvHashMap;
 use ontol_macros::RustDoc;
 use ontol_runtime::{
+    DefId, DomainIndex, OntolDefTag,
     ontology::{
         domain::{self, BasicDef},
         ontol::TextLikeType,
     },
     var::VarAllocator,
-    DefId, DomainIndex, OntolDefTag,
 };
 
 use crate::{
+    Compiler, NO_SPAN, SpannedBorrow,
     mem::Intern,
     namespace::Space,
     pattern::PatId,
@@ -25,7 +26,6 @@ use crate::{
     source::SourceSpan,
     strings::StringCtx,
     types::Type,
-    Compiler, SpannedBorrow, NO_SPAN,
 };
 use ontol_parser::U32Span;
 
@@ -332,7 +332,10 @@ impl<'m> Defs<'m> {
         self.def_id_allocators.keys().copied()
     }
 
-    pub fn iter_domain_def_ids(&self, domain_index: DomainIndex) -> impl Iterator<Item = DefId> {
+    pub fn iter_domain_def_ids(
+        &self,
+        domain_index: DomainIndex,
+    ) -> impl Iterator<Item = DefId> + use<> {
         let max_idx = self
             .def_id_allocators
             .get(&domain_index)

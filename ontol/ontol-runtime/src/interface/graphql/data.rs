@@ -4,11 +4,11 @@ use serde::{Deserialize, Serialize};
 use thin_vec::ThinVec;
 
 use crate::{
+    DefId, MapKey, PropId,
     interface::serde::operator::SerdeOperatorAddr,
-    ontology::{ontol::TextConstant, Ontology, OntologyInit},
+    ontology::{Ontology, OntologyInit, ontol::TextConstant},
     phf::PhfIndexMap,
     var::Var,
-    DefId, MapKey, PropId,
 };
 
 use super::argument::{self};

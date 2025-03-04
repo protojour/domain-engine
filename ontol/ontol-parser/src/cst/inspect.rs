@@ -2,9 +2,9 @@
 
 use super::view::{NodeView, NodeViewExt, TokenViewExt};
 use crate::{
+    K,
     cst::view::TokenView,
     lexer::{kind::Kind, unescape::UnescapeTextResult},
-    K,
 };
 
 /// Does two things:

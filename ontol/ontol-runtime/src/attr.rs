@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use tracing::debug;
 
 use crate::{

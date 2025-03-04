@@ -1,8 +1,9 @@
-use std::collections::{btree_map::Entry, BTreeMap};
+use std::collections::{BTreeMap, btree_map::Entry};
 
 use fnv::{FnvHashMap, FnvHashSet};
 use juniper::{FieldError, LookAheadChildren};
 use ontol_runtime::{
+    DefId, DefPropTag, MapKey, OntolDefTag, PropId,
     interface::{
         graphql::{
             argument::{AfterArg, FieldArg, FirstArg, MapInputArg},
@@ -19,13 +20,12 @@ use ontol_runtime::{
     },
     value::Value,
     var::Var,
-    DefId, DefPropTag, MapKey, OntolDefTag, PropId,
 };
 use tracing::{debug, error, trace};
 
 use crate::{
     cursor_util::GraphQLCursor,
-    domain::{context::SchemaCtx, look_ahead_utils::ArgsWrapper, ServiceCtx},
+    domain::{ServiceCtx, context::SchemaCtx, look_ahead_utils::ArgsWrapper},
     gql_scalar::GqlScalar,
 };
 
@@ -608,7 +608,7 @@ impl<'a> SelectAnalyzer<'a> {
                         limit: Some(limit),
                         after_cursor,
                         include_total_len,
-                    }))
+                    }));
                 }
                 Select::Entity(_) | Select::EntityId => panic!("Select in select"),
                 Select::Unit if !empty_handled => {

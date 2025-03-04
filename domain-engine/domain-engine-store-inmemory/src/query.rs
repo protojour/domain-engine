@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    DefId, OntolDefTag, PropId,
     attr::{Attr, AttrMatrix},
     ontology::domain::{DataRelationshipKind, Def, EdgeCardinalProjection},
     property::ValueCardinality,
@@ -11,11 +12,10 @@ use ontol_runtime::{
     },
     sequence::{Sequence, SubSequence},
     value::{OctetSequence, Value},
-    DefId, OntolDefTag, PropId,
 };
 use tracing::{debug, debug_span, error};
 
-use domain_engine_core::{domain_error::DomainErrorKind, DomainError, DomainResult};
+use domain_engine_core::{DomainError, DomainResult, domain_error::DomainErrorKind};
 
 use crate::{
     core::{DbContext, DynamicKey, EdgeData, EdgeVectorData},

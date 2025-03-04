@@ -5,6 +5,7 @@ use bit_vec::BitVec;
 use ontol_macros::OntolDebug;
 
 use crate::{
+    DefId, PropId,
     debug::OntolDebug,
     impl_ontol_debug,
     ontology::ontol::TextConstant,
@@ -12,7 +13,6 @@ use crate::{
     query::{condition::ClausePair, filter::Filter},
     value::Value,
     var::Var,
-    DefId, PropId,
 };
 
 /// A complete ONTOL code library consisting of procedures.

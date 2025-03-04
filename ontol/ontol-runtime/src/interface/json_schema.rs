@@ -3,7 +3,7 @@ use std::fmt::Display;
 
 use fnv::FnvHashSet;
 use serde::Serialize;
-use serde::{ser::SerializeMap, ser::SerializeSeq, Serializer};
+use serde::{Serializer, ser::SerializeMap, ser::SerializeSeq};
 use urlencoding::encode;
 
 use crate::interface::serde::operator::{
@@ -11,11 +11,11 @@ use crate::interface::serde::operator::{
 };
 use crate::interface::serde::processor::ProcessorMode;
 use crate::{
-    ontology::{
-        domain::{Def, Domain},
-        Ontology,
-    },
     DefId, DomainIndex,
+    ontology::{
+        Ontology,
+        domain::{Def, Domain},
+    },
 };
 
 use super::serde::operator::SerdePropertyKind;

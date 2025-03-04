@@ -9,17 +9,18 @@ use arcstr::ArcStr;
 use fnv::FnvHashMap;
 use indexmap::map::Entry;
 use ontol_parser::{
-    cst::view::{NodeView, TokenView},
     ParserError, U32Span,
+    cst::view::{NodeView, TokenView},
 };
 use ontol_runtime::{
+    DefId, DomainIndex, OntolDefTag,
     property::{PropertyCardinality, ValueCardinality},
     var::{Var, VarAllocator},
-    DefId, DomainIndex, OntolDefTag,
 };
 use tracing::debug;
 
 use crate::{
+    CompileError, Compiler, SourceId, SourceSpan,
     def::{Def, DefKind, TypeDef, TypeDefFlags},
     fmt::FmtChain,
     namespace::Space,
@@ -27,7 +28,6 @@ use crate::{
     pattern::{Pattern, PatternKind},
     relation::{DefRelTag, RelId, RelParams, Relationship},
     topology::{DomainUrl, DomainUrlParser},
-    CompileError, Compiler, SourceId, SourceSpan,
 };
 
 pub struct LoweringCtx<'c, 'm> {

@@ -1,8 +1,8 @@
 use smallvec::SmallVec;
 
 use crate::{
-    arena::{Arena, NodeRef},
     Lang, MatrixRow, Node, Nodes, PropVariant,
+    arena::{Arena, NodeRef},
 };
 
 /// Import from one arena into another

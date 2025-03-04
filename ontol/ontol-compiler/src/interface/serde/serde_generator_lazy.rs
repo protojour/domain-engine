@@ -3,21 +3,21 @@ use std::{borrow::Cow, ops::Deref};
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
 use ontol_runtime::{
+    DefId, DefPropTag, OntolDefTag, PropId,
     debug::OntolDebug,
     interface::{
         discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
         serde::{
+            SerdeDef, SerdeModifier,
             operator::{
                 SerdeDefAddr, SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdePropertyFlags,
                 SerdePropertyKind, SerdeStructFlags, SerdeUnionVariant, StructOperator,
                 UnionOperator,
             },
-            SerdeDef, SerdeModifier,
         },
     },
     ontology::ontol::{TextConstant, ValueGenerator},
     phf::PhfKey,
-    DefId, DefPropTag, OntolDefTag, PropId,
 };
 use tracing::{debug, debug_span, warn};
 
@@ -25,14 +25,14 @@ use crate::{
     edge::EdgeId,
     misc::UnionDiscriminatorRole,
     phf_build::build_phf_index_map,
-    properties::{identifies_any, Properties, Property},
-    relation::{rel_def_meta, rel_repr_meta, RelReprMeta},
+    properties::{Properties, Property, identifies_any},
+    relation::{RelReprMeta, rel_def_meta, rel_repr_meta},
     repr::repr_model::{ReprKind, ReprScalarKind, UnionBound},
 };
 
 use super::{
-    serde_generator::{insert_property, operator_to_leaf_discriminant, SerdeGenerator},
-    SerdeIntersection, SerdeKey, EDGE_PROPERTY,
+    EDGE_PROPERTY, SerdeIntersection, SerdeKey,
+    serde_generator::{SerdeGenerator, insert_property, operator_to_leaf_discriminant},
 };
 
 impl<'c> SerdeGenerator<'c, '_> {
@@ -210,7 +210,9 @@ impl<'c> SerdeGenerator<'c, '_> {
         {
             flags |= SerdePropertyFlags::READ_ONLY | SerdePropertyFlags::GENERATOR;
             if value_generator.is_some() {
-                panic!("BUG: Cannot have both a default value and a generator. Solve this in type check.");
+                panic!(
+                    "BUG: Cannot have both a default value and a generator. Solve this in type check."
+                );
             }
             value_generator = Some(*explicit_value_generator);
         }
@@ -632,11 +634,7 @@ fn find_unambiguous_struct_operator(
                 }
             }
 
-            if map_count > 1 {
-                Err(operator)
-            } else {
-                result
-            }
+            if map_count > 1 { Err(operator) } else { result }
         }
         SerdeOperator::Alias(value_op) => {
             find_unambiguous_struct_operator(value_op.inner_addr, operators_by_addr)

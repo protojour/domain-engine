@@ -4,27 +4,27 @@ use ontol_hir::{
     Binder, Binding, Kind, Label, MatrixRow, Node, Nodes, Pack, PropFlags, PropVariant,
 };
 use ontol_runtime::{
-    var::{Var, VarSet},
     MapDirection, OntolDefTag, PropId,
+    var::{Var, VarSet},
 };
 use smallvec::smallvec;
-use thin_vec::{thin_vec, ThinVec};
+use thin_vec::{ThinVec, thin_vec};
 use tracing::{debug, trace};
 
 use crate::{
-    hir_unify::{ssa_util::scan_all_vars_and_labels, UnifierError},
+    NO_SPAN, SourceSpan,
+    hir_unify::{UnifierError, ssa_util::scan_all_vars_and_labels},
     mem::Intern,
     primitive::PrimitiveKind,
     typed_hir::{Meta, TypedHir, TypedHirData},
     types::{Type, UNIT_TYPE},
-    SourceSpan, NO_SPAN,
 };
 
 use super::{
+    UnifierResult,
     ssa_scope_graph::{ComplexExpr, Let, SpannedLet},
     ssa_unifier::SsaUnifier,
     ssa_util::{Catcher, ExtendedScope, Scoped},
-    UnifierResult,
 };
 
 impl<'c, 'm> SsaUnifier<'c, 'm> {
@@ -688,7 +688,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     _ => {
                         return Err(UnifierError::Unimplemented(
                             "unhandled try let variant".to_string(),
-                        ))
+                        ));
                     }
                 };
                 output.push(self.mk_node(kind, Meta::new(&UNIT_TYPE, *span)));

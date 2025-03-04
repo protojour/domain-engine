@@ -8,16 +8,16 @@ use regex_syntax::{
 };
 
 use crate::{
+    SourceId, SourceSpan,
     def::RegexMeta,
     lowering::context::MapVarTable,
     pattern::{Patterns, RegexPattern, RegexPatternCaptureNode},
-    SourceId, SourceSpan,
 };
 
 pub mod well_known {
     use regex_syntax::{
-        hir::{Class, ClassUnicode, ClassUnicodeRange, Hir, Look, Repetition},
         Parser,
+        hir::{Class, ClassUnicode, ClassUnicodeRange, Hir, Look, Repetition},
     };
 
     pub fn empty_string() -> Hir {
@@ -175,7 +175,7 @@ pub fn parse_literal_regex(
             return Err((
                 format!("{}", err.kind()),
                 project_regex_span(pattern, pattern_span, err.span()),
-            ))
+            ));
         }
     };
 
@@ -186,7 +186,7 @@ pub fn parse_literal_regex(
             return Err((
                 format!("{}", err.kind()),
                 project_regex_span(pattern, pattern_span, err.span()),
-            ))
+            ));
         }
     };
 

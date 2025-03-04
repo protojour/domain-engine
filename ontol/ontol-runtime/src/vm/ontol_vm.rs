@@ -3,12 +3,13 @@ use std::array;
 use bit_vec::BitVec;
 use compact_str::CompactString;
 use fnv::FnvHashMap;
-use regex_automata::{util::captures::Captures, Input};
+use regex_automata::{Input, util::captures::Captures};
 use smallvec::SmallVec;
 use thin_vec::ThinVec;
-use tracing::{error, trace, Level};
+use tracing::{Level, error, trace};
 
 use crate::{
+    DefId, OntolDefTag, PropId,
     attr::{Attr, AttrMatrix},
     cast::Cast,
     debug::OntolDebug,
@@ -26,16 +27,15 @@ use crate::{
     value::{Value, ValueDebug, ValueTag},
     var::Var,
     vm::{
+        VmError,
         abstract_vm::{AbstractVm, Processor, VmDebug},
         proc::{BuiltinProc, Local, Procedure},
-        VmError,
     },
-    DefId, OntolDefTag, PropId,
 };
 
 use super::{
-    proc::{GetAttrFlags, OpCodeCondTerm, Predicate, Yield},
     VmResult, VmState,
+    proc::{GetAttrFlags, OpCodeCondTerm, Predicate, Yield},
 };
 
 /// Virtual machine for executing ONTOL procedures
@@ -675,10 +675,10 @@ mod tests {
     use ontol_macros::test;
 
     use crate::{
+        DefId, DomainIndex,
         ontology::Ontology,
         value::Value,
         vm::proc::{AddressOffset, Lib, NParams, OpCode},
-        DefId, DomainIndex,
     };
 
     use super::*;

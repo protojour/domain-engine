@@ -1,10 +1,10 @@
 use ontol_runtime::{
+    DefId,
     ontology::{
         aspects::DefsAspect,
         domain::{DataRelationshipKind, DataRelationshipTarget, Def, DefRepr},
     },
     query::select::{Select, StructSelect},
-    DefId,
 };
 
 /// Produce a Select matching a domain def

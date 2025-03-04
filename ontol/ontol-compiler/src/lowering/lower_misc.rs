@@ -1,24 +1,24 @@
 use std::{
-    collections::{hash_map::Entry, BTreeSet},
+    collections::{BTreeSet, hash_map::Entry},
     ops::Range,
 };
 
 use ontol_parser::{
+    U32Span,
     cst::{
         inspect as insp,
         view::{NodeView, NodeViewExt, TokenView, TokenViewExt},
     },
     lexer::{kind::Kind, unescape::unescape_regex},
-    U32Span,
 };
-use ontol_runtime::{property::ValueCardinality, DefId, DomainIndex, OntolDefTag};
+use ontol_runtime::{DefId, DomainIndex, OntolDefTag, property::ValueCardinality};
 use tracing::debug;
 
 use crate::{
+    CompileError,
     def::{DefKind, TypeDef, TypeDefFlags},
     namespace::DocId,
     ontol_syntax::extract_documentation,
-    CompileError,
 };
 
 use super::context::{BlockContext, CstLowering, Res, RootDefs};

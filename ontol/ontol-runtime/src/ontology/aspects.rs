@@ -5,22 +5,22 @@ use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    DefId, DefIdSet, DomainIndex, MapKey, PropId,
     debug::OntolFormatter,
     interface::{
-        serde::operator::{SerdeOperator, SerdeOperatorAddr},
         DomainInterface,
+        serde::operator::{SerdeOperator, SerdeOperatorAddr},
     },
     query::condition::Condition,
     vec_map::VecMap,
     vm::proc::{Lib, Procedure},
-    DefId, DefIdSet, DomainIndex, MapKey, PropId,
 };
 
 use super::{
     config::DomainConfig,
     domain::{Def, Domain, EdgeInfo, ExtendedEntityInfo},
     map::{Extern, MapMeta, PropertyFlow},
-    ontol::{text_pattern::TextPattern, OntolDomainMeta, TextConstant, TextLikeType},
+    ontol::{OntolDomainMeta, TextConstant, TextLikeType, text_pattern::TextPattern},
 };
 
 /// fetch aspect, turbofish style

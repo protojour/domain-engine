@@ -2,11 +2,12 @@ use std::str::FromStr;
 
 use ontol_hir::{Label, StructFlags};
 use ontol_runtime::DefId;
-use smallvec::{smallvec, SmallVec};
-use thin_vec::{thin_vec, ThinVec};
+use smallvec::{SmallVec, smallvec};
+use thin_vec::{ThinVec, thin_vec};
 use tracing::debug;
 
 use crate::{
+    NO_SPAN, SourceSpan, SpannedCompileError,
     def::{Def, DefKind},
     error::CompileError,
     mem::Intern,
@@ -22,13 +23,12 @@ use crate::{
         hir_build_props::UnpackerInfo,
     },
     typed_hir::{IntoTypedHirData, Meta, TypedHir, TypedHirData, TypedRootNode},
-    types::{Type, TypeRef, ERROR_TYPE, UNIT_TYPE},
-    SourceSpan, SpannedCompileError, NO_SPAN,
+    types::{ERROR_TYPE, Type, TypeRef, UNIT_TYPE},
 };
 
 use super::{
-    ena_inference::KnownType, hir_build_ctx::HirBuildCtx, MapArmsKind, TypeCheck, TypeEquation,
-    TypeError,
+    MapArmsKind, TypeCheck, TypeEquation, TypeError, ena_inference::KnownType,
+    hir_build_ctx::HirBuildCtx,
 };
 
 pub(super) struct NodeInfo<'m> {
@@ -196,13 +196,14 @@ impl<'m> TypeCheck<'_, 'm> {
             (
                 PatternKind::Compound {
                     type_path,
-                    mut modifier,
+                    modifier,
                     is_unit_binding,
                     attributes,
                     spread_label: _,
                 },
                 expected_ty,
             ) => {
+                let mut modifier = *modifier;
                 let (struct_ty, path_def_id) = match type_path {
                     TypePath::Specified {
                         def_id: path_def_id,
@@ -215,7 +216,7 @@ impl<'m> TypeCheck<'_, 'm> {
                             }
                             _ => {
                                 return self
-                                    .error_node(CompileError::DomainTypeExpected.span(*span), ctx)
+                                    .error_node(CompileError::DomainTypeExpected.span(*span), ctx);
                             }
                         };
                         (struct_ty, *path_def_id)

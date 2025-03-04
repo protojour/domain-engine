@@ -4,9 +4,9 @@ use std::fmt::{Debug, Display};
 
 use arena::{Arena, NodeRef};
 use ontol_runtime::{
+    DefId, PropId,
     query::condition::{ClausePair, SetOperator},
     var::Var,
-    DefId, PropId,
 };
 use smallvec::SmallVec;
 use thin_vec::ThinVec;

@@ -6,9 +6,9 @@ use ontol_runtime::property::ValueCardinality;
 use tracing::{debug, debug_span};
 
 use crate::{
+    CompileError,
     fmt::{FmtChain, FmtTransition},
     lowering::lower_misc::ReportError,
-    CompileError,
 };
 
 use super::context::{BlockContext, CstLowering, RootDefs};

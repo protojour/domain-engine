@@ -5,20 +5,20 @@ use std::{collections::HashMap, sync::Arc};
 use def_binding::DefBinding;
 use diagnostics::AnnotatedCompileError;
 use ontol_compiler::{
+    SourceCodeRegistry, Sources,
     error::UnifiedCompileError,
     mem::Mem,
     ontol_syntax::{ArcString, OntolTreeSyntax},
     topology::{DepGraphBuilder, DomainTopology, DomainUrl, GraphState, ParsedDomain},
-    SourceCodeRegistry, Sources,
 };
 use ontol_parser::cst_parse;
 use ontol_runtime::{
-    interface::{graphql::schema::GraphqlSchema, DomainInterface},
-    ontology::{
-        config::{DataStoreConfig, DomainConfig},
-        Ontology,
-    },
     DomainIndex, PropId,
+    interface::{DomainInterface, graphql::schema::GraphqlSchema},
+    ontology::{
+        Ontology,
+        config::{DataStoreConfig, DomainConfig},
+    },
 };
 use tracing::info;
 

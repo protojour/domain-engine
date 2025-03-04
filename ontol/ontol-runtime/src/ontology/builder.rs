@@ -4,16 +4,17 @@ use arcstr::ArcStr;
 use fnv::FnvHashMap;
 
 use crate::{
+    DefId, DefIdSet, DomainIndex, MapKey, PropId,
     interface::{
-        serde::operator::{SerdeOperator, SerdeOperatorAddr},
         DomainInterface,
+        serde::operator::{SerdeOperator, SerdeOperatorAddr},
     },
     query::condition::Condition,
     vm::proc::{Lib, Procedure},
-    DefId, DefIdSet, DomainIndex, MapKey, PropId,
 };
 
 use super::{
+    Data, Ontology,
     aspects::{
         ConfigAspect, DefsAspect, DocumentationAspect, ExecutionAspect, InterfaceAspect,
         SerdeAspect,
@@ -21,8 +22,7 @@ use super::{
     config::DomainConfig,
     domain::{Domain, ExtendedEntityInfo},
     map::{Extern, MapMeta, PropertyFlow},
-    ontol::{text_pattern::TextPattern, OntolDomainMeta, TextConstant, TextLikeType},
-    Data, Ontology,
+    ontol::{OntolDomainMeta, TextConstant, TextLikeType, text_pattern::TextPattern},
 };
 
 pub struct OntologyBuilder {

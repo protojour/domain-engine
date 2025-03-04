@@ -1,9 +1,10 @@
 use std::fmt::Debug;
 
 use fnv::{FnvHashMap, FnvHashSet};
-use indexmap::{map::Entry, IndexMap};
+use indexmap::{IndexMap, map::Entry};
 use ontol_hir::StructFlags;
 use ontol_runtime::{
+    DefId, DomainIndex, MapDef, MapDirection, MapFlags, MapKey,
     format_utils::DebugViaDisplay,
     ontology::{
         map::{MapLossiness, PropertyFlow},
@@ -12,29 +13,28 @@ use ontol_runtime::{
     query::condition::Condition,
     var::VarAllocator,
     vm::proc::{Address, Lib, NParams, OpCode, Procedure},
-    DefId, DomainIndex, MapDef, MapDirection, MapFlags, MapKey,
 };
 use tracing::{debug, debug_span, warn};
 
 use crate::{
+    CompileError, CompileErrors, Compiler, Note, SourceSpan, SpannedCompileError,
     codegen::{
         code_generator::map_codegen, static_condition::generate_static_condition_from_scope,
     },
     def::{DefKind, Defs},
-    hir_unify::{unify_to_function, UnifierError, UnifierResult},
+    hir_unify::{UnifierError, UnifierResult, unify_to_function},
     map::UndirectedMapKey,
     pattern::PatId,
     type_check::MapArmsKind,
     typed_hir::TypedRootNode,
     types::Type,
-    CompileError, CompileErrors, Compiler, Note, SourceSpan, SpannedCompileError,
 };
 
 use super::{
     auto_map::autogenerate_mapping,
     code_generator::const_codegen,
     ir::Terminator,
-    link::{link, LinkResult},
+    link::{LinkResult, link},
     proc_builder::{Delta, ProcBuilder},
     union_map_generator::generate_union_maps,
 };

@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
-use ontol_runtime::{property::Cardinality, DefId, DefPropTag, PropId};
+use ontol_runtime::{DefId, DefPropTag, PropId, property::Cardinality};
 use tracing::warn;
 
 use crate::{

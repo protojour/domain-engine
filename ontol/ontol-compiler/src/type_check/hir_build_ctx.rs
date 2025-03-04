@@ -2,10 +2,10 @@ use fnv::FnvHashMap;
 use ontol_runtime::var::{Var, VarAllocator};
 
 use crate::{
+    SourceSpan,
     pattern::PatId,
     typed_hir::{self, TypedHir, TypedHirData},
     types::TypeRef,
-    SourceSpan,
 };
 
 use super::{ena_inference::Inference, hir_build_props::MatchAttributeKey};

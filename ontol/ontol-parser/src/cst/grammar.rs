@@ -1,4 +1,4 @@
-use crate::{cst::parser::StartNode, lexer::kind::Kind, K};
+use crate::{K, cst::parser::StartNode, lexer::kind::Kind};
 
 use super::parser::{CstParser, SyntaxCursor};
 

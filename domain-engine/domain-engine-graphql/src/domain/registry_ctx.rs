@@ -2,10 +2,11 @@ use std::{cmp::Ordering, ops::ControlFlow, sync::Arc};
 
 use juniper::{GraphQLValue, ID};
 use ontol_runtime::{
+    PropId,
     debug::OntolDebug,
     interface::{
         discriminator::{
-            leaf_discriminant_scalar_union_for_has_attribute, LeafDiscriminantScalarUnion,
+            LeafDiscriminantScalarUnion, leaf_discriminant_scalar_union_for_has_attribute,
         },
         graphql::{
             argument::{ArgKind, DefaultArg, DomainFieldArg, FieldArg},
@@ -25,7 +26,6 @@ use ontol_runtime::{
     },
     ontology::domain::{DataRelationshipKind, Def},
     tuple::CardinalIdx,
-    PropId,
 };
 use tracing::{debug, trace, trace_span};
 

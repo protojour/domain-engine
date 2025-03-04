@@ -1,6 +1,7 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
+    DefId, DomainIndex, MapKey,
     interface::graphql::{
         data::{
             EntityData, FieldData, NodeData, ObjectData, ObjectKind, TypeAddr, TypeData, TypeKind,
@@ -11,7 +12,6 @@ use ontol_runtime::{
     ontology::aspects::DefsAspect,
     phf::PhfKey,
     resolve_path::ResolverGraph,
-    DefId, DomainIndex, MapKey,
 };
 use tracing::{debug_span, trace};
 

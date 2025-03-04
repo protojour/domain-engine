@@ -1,11 +1,11 @@
 use domain_engine_core::{
-    domain_error::DomainErrorKind, entity_id_utils::find_inherent_entity_id, DomainError,
-    DomainResult,
+    DomainError, DomainResult, domain_error::DomainErrorKind,
+    entity_id_utils::find_inherent_entity_id,
 };
 use futures_util::{Stream, StreamExt, TryFutureExt, TryStreamExt};
 use ontol_runtime::{
-    attr::Attr, ontology::domain::DataRelationshipKind, query::select::Select, tuple::EndoTuple,
-    value::Value, PropId,
+    PropId, attr::Attr, ontology::domain::DataRelationshipKind, query::select::Select,
+    tuple::EndoTuple, value::Value,
 };
 use postgres_types::ToSql;
 use tracing::{debug, trace, warn};
@@ -19,12 +19,12 @@ use crate::{
 };
 
 use super::{
+    MutationMode, TransactCtx,
     data::{Data, RowValue},
     edge_patch::{EdgeEndoTuplePatch, EdgePatches},
     mut_ctx::PgMutCtx,
     query::Query,
     query_select::QuerySelect,
-    MutationMode, TransactCtx,
 };
 
 pub enum UpdateCondition {

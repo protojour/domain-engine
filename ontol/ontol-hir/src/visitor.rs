@@ -1,8 +1,8 @@
 use ontol_runtime::PropId;
 
 use crate::{
-    arena::{Arena, NodeRef},
     Binding, Kind, Label, Lang, MatrixRow, Node, Pack, PropFlags, PropVariant, Var,
+    arena::{Arena, NodeRef},
 };
 
 pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {

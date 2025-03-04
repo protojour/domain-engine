@@ -1,4 +1,4 @@
-use ontol_test_utils::{expect_eq, TestCompile};
+use ontol_test_utils::{TestCompile, expect_eq};
 
 #[test]
 fn error_spans_are_correct_projected_from_regex_syntax_errors() {

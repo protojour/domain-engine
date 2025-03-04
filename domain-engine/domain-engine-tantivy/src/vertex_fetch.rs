@@ -1,14 +1,15 @@
 use std::collections::{BTreeMap, HashMap};
 
 use domain_engine_core::{
+    DomainError, DomainResult, Session, VertexAddr,
     domain_error::DomainErrorKind,
     domain_select::domain_select_no_edges,
     search::{VertexSearchResult, VertexSearchResults},
     transact::{AccumulateSequences, ReqMessage, TransactionMode},
-    DomainError, DomainResult, Session, VertexAddr,
 };
-use futures_util::{stream::FuturesUnordered, StreamExt};
+use futures_util::{StreamExt, stream::FuturesUnordered};
 use ontol_runtime::{
+    DefId, OntolDefTag,
     attr::Attr,
     query::{
         condition::{Clause, CondTerm, SetOperator},
@@ -16,12 +17,11 @@ use ontol_runtime::{
         select::{EntitySelect, Select, StructOrUnionSelect},
     },
     value::{OctetSequence, Value},
-    DefId, OntolDefTag,
 };
-use thin_vec::{thin_vec, ThinVec};
+use thin_vec::{ThinVec, thin_vec};
 use tracing::warn;
 
-use crate::{search::RawSearchResults, TantivyDataStoreLayer};
+use crate::{TantivyDataStoreLayer, search::RawSearchResults};
 
 #[derive(displaydoc::Display, Debug)]
 enum FetchError {

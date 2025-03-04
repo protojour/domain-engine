@@ -1,17 +1,17 @@
 use ontol_runtime::{
+    DefId, OntolDefTag, PropId,
     ontology::domain::{FieldPath, VertexOrder},
     query::order::Direction,
-    DefId, OntolDefTag, PropId,
 };
 use tracing::{debug, info};
 
 use crate::{
+    CompileError, CompileErrors, Compiler, SourceSpan,
     def::DefKind,
     properties::Constructor,
-    relation::{rel_def_meta, RelId, RelParams},
+    relation::{RelId, RelParams, rel_def_meta},
     repr::repr_model::{ReprKind, ReprScalarKind},
     thesaurus::TypeRelation,
-    CompileError, CompileErrors, Compiler, SourceSpan,
 };
 
 impl Compiler<'_> {

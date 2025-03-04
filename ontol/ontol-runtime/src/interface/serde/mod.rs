@@ -3,9 +3,8 @@ use std::fmt::Debug;
 use ::serde::{Deserialize, Serialize};
 
 use crate::{
-    impl_ontol_debug,
+    DefId, impl_ontol_debug,
     ontology::aspects::{DefsAspect, ExecutionAspect, SerdeAspect},
-    DefId,
 };
 
 use self::operator::StructOperator;

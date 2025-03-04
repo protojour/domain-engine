@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use domain_engine_core::{
-    transact::{AccumulateSequences, ReqMessage, RespMessage, TransactionMode},
     DomainEngine, DomainResult, Session,
+    transact::{AccumulateSequences, ReqMessage, RespMessage, TransactionMode},
 };
 use futures_util::{StreamExt, TryStreamExt};
 use ontol_runtime::{

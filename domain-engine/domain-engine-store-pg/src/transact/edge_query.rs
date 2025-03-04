@@ -9,7 +9,7 @@ use crate::{
     transact::query_select::{QuerySelect, QuerySelectRef},
 };
 
-use super::{mut_ctx::PgMutCtx, query::QueryBuildCtx, query_select::CardinalSelect, TransactCtx};
+use super::{TransactCtx, mut_ctx::PgMutCtx, query::QueryBuildCtx, query_select::CardinalSelect};
 
 pub struct PgEdgeProjection<'a> {
     pub id: EdgeId,

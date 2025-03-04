@@ -3,7 +3,7 @@
 use ::serde::{Deserialize, Serialize};
 use ontol_macros::OntolDebug;
 
-use crate::{ontology::ontol::TextConstant, DefId, PropId};
+use crate::{DefId, PropId, ontology::ontol::TextConstant};
 
 #[derive(Clone, Serialize, Deserialize, OntolDebug, Debug)]
 pub struct VariantDiscriminator {

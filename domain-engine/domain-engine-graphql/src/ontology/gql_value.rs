@@ -2,17 +2,17 @@ use std::fmt::Display;
 
 use base64::Engine;
 use ontol_runtime::{
+    OntolDefTag, PropId,
     attr::{Attr, AttrRef},
     format_utils::format_value,
     interface::serde::processor::ProcessorMode,
     ontology::domain::DefRepr,
     value::{Value, ValueFormatRaw},
-    OntolDefTag, PropId,
 };
 
 use crate::{field_error, gql_scalar::GqlScalar};
 
-use super::{gql_id, OntologyCtx};
+use super::{OntologyCtx, gql_id};
 
 #[derive(Clone, Copy)]
 pub struct ValueScalarCfg {

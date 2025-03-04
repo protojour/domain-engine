@@ -1,17 +1,17 @@
-use domain_engine_core::{domain_error::DomainErrorKind, DomainResult};
+use domain_engine_core::{DomainResult, domain_error::DomainErrorKind};
 
 use ontol_runtime::{
     attr::AttrRef,
     interface::serde::{operator::SerdeOperatorAddr, processor::ProcessorMode},
     ontology::{
-        domain::{DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget},
         Ontology,
+        domain::{DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget},
     },
     value::Value,
 };
 use tracing::debug;
 
-use super::{aql::*, data_store::serialize, AqlQuery, ArangoDatabase};
+use super::{AqlQuery, ArangoDatabase, aql::*, data_store::serialize};
 
 impl AqlQuery {
     /// Build prequery AqlQuery for inherent ids
@@ -114,7 +114,7 @@ impl MetaQuery<'_> {
                             }
                         }
                     },
-                    Value::Filter(ref filter, tag) => {
+                    Value::Filter(filter, tag) => {
                         self.add_filter(tag.def_id(), filter)?;
                     }
                     _ => {

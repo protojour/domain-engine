@@ -1,6 +1,6 @@
 use axum::body::Body;
 use axum::response::IntoResponse;
-use http::{header::CONTENT_TYPE, StatusCode};
+use http::{StatusCode, header::CONTENT_TYPE};
 
 #[derive(Clone, Copy, Debug)]
 pub enum JsonContentType {

@@ -1,8 +1,8 @@
 use std::{collections::BTreeMap, fmt::Display};
 
 use ontol_compiler::{
-    error::{CompileError, Note, UnifiedCompileError},
     SourceCodeRegistry, SourceId, SourceSpan, Sources,
+    error::{CompileError, Note, UnifiedCompileError},
 };
 
 #[derive(Default)]

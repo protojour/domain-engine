@@ -4,9 +4,8 @@ use ontol_runtime::{sequence::Sequence, value::Value};
 use crate::{cursor_util::serialize_cursor, gql_scalar::GqlScalar, juniper};
 
 use super::{
-    gql_id,
-    gql_value::{self, write_ontol_scalar, OntolValue, ValueScalarCfg},
-    OntologyCtx,
+    OntologyCtx, gql_id,
+    gql_value::{self, OntolValue, ValueScalarCfg, write_ontol_scalar},
 };
 
 #[derive(GraphQLObject)]

@@ -4,11 +4,11 @@ use arrow_array::RecordBatch;
 use arrow_schema::SchemaRef;
 use batch_builder::RecordBatchBuilder;
 use domain_engine_core::{
-    transact::{ReqMessage, TransactionMode},
     DomainEngine, DomainResult, Session,
+    transact::{ReqMessage, TransactionMode},
 };
-use futures_util::{stream::BoxStream, StreamExt};
-use ontol_runtime::{query::select::EntitySelect, PropId};
+use futures_util::{StreamExt, stream::BoxStream};
+use ontol_runtime::{PropId, query::select::EntitySelect};
 use schema::FieldType;
 use serde::{Deserialize, Serialize};
 

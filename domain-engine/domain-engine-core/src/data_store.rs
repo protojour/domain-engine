@@ -2,16 +2,16 @@ use std::{collections::BTreeSet, sync::Arc};
 
 use futures_util::stream::BoxStream;
 use ontol_runtime::{
-    ontology::{config::DataStoreConfig, Ontology},
     DomainIndex, PropId,
+    ontology::{Ontology, config::DataStoreConfig},
 };
 
 use crate::{
+    Session,
     domain_error::{DomainErrorKind, DomainResult},
     search::{VertexSearchParams, VertexSearchResults},
     system::ArcSystemApi,
     transact::{ReqMessage, RespMessage, TransactionMode},
-    Session,
 };
 
 #[async_trait::async_trait]

@@ -3,15 +3,15 @@ use std::fmt::{Debug, Display};
 use ontol_macros::OntolDebug;
 
 use crate::{
+    DefId, PropId,
     debug::OntolDebug,
     format_utils::{Backticks, CommaSeparated, DoubleQuote},
-    ontology::aspects::{aspect, DefsAspect, ExecutionAspect, SerdeAspect},
-    DefId, PropId,
+    ontology::aspects::{DefsAspect, ExecutionAspect, SerdeAspect, aspect},
 };
 
 use super::{
-    operator::{AppliedVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags},
     OntologyCtx,
+    operator::{AppliedVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags},
 };
 
 /// SerdeProcessor handles serializing and deserializing domain types in an optimized way.

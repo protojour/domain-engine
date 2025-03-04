@@ -328,9 +328,9 @@ mod tests {
     use tracing::debug;
 
     use crate::{
+        DefId, DefPropTag, DomainIndex, PropId,
         attr::Attr,
         value::{Value, ValueTag},
-        DefId, DefPropTag, DomainIndex, PropId,
     };
 
     use super::*;
@@ -399,12 +399,16 @@ mod tests {
         let mut builder: IndexSetBuilder<Attr> = Default::default();
 
         // structs with different insertion order
-        assert!(builder
-            .try_push(struct_value([(0, text("a")), (1, text("b"))]).into())
-            .is_ok());
-        assert!(builder
-            .try_push(struct_value([(1, text("b")), (0, text("a"))]).into())
-            .is_err());
+        assert!(
+            builder
+                .try_push(struct_value([(0, text("a")), (1, text("b"))]).into())
+                .is_ok()
+        );
+        assert!(
+            builder
+                .try_push(struct_value([(1, text("b")), (0, text("a"))]).into())
+                .is_err()
+        );
 
         let (struct0, struct1) = gen_equal_structs_with_different_iteration_order();
         assert!(struct0.ontol_equals(&struct1));

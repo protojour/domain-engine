@@ -3,6 +3,7 @@ use std::sync::Arc;
 use fnv::FnvHashMap;
 use juniper::graphql_value;
 use ontol_runtime::{
+    PropId,
     attr::{Attr, AttrMatrixRef, AttrRef},
     interface::{
         graphql::{
@@ -20,18 +21,17 @@ use ontol_runtime::{
     },
     sequence::{Sequence, SubSequence},
     value::{Value, ValueTag},
-    PropId,
 };
 use serde::Serialize;
 use tracing::{trace, trace_span, warn};
 
 use crate::{
     domain::{
+        ServiceCtx,
         context::{SchemaCtx, SchemaType},
         registry_ctx::RegistryCtx,
         templates::{page_info_type::PageInfoType, resolve_schema_type_field},
         value_serializer::JuniperValueSerializer,
-        ServiceCtx,
     },
     field_error,
     gql_scalar::GqlScalar,

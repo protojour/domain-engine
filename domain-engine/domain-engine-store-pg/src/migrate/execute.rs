@@ -1,10 +1,10 @@
 //! ontology migration
 
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use indoc::{formatdoc, indoc};
 use itertools::Itertools;
 use tokio_postgres::Transaction;
-use tracing::{info, info_span, Instrument};
+use tracing::{Instrument, info, info_span};
 
 use crate::{
     pg_model::{

@@ -1,19 +1,19 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    DefId, PropId,
     interface::serde::operator::{AliasOperator, SerdeOperator, SerdeOperatorAddr},
     ontology::{
         aspects::{DefsAspect, SerdeAspect},
         ontol::{
-            text_pattern::{TextPattern, TextPatternConstantPart, TextPatternProperty},
             TextLikeType, ValueGenerator,
+            text_pattern::{TextPattern, TextPatternConstantPart, TextPatternProperty},
         },
     },
     value::{OctetSequence, Value},
-    DefId, PropId,
 };
 use ulid::Ulid;
 
-use crate::{domain_error::DomainErrorKind, system::SystemAPI, DomainError, DomainResult};
+use crate::{DomainError, DomainResult, domain_error::DomainErrorKind, system::SystemAPI};
 
 pub fn find_inherent_entity_id(
     entity_val: &Value,

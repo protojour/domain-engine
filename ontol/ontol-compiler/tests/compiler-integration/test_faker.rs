@@ -1,7 +1,7 @@
-use ontol_examples::{geojson, guitar_synth_union, wgs, AsAtlas};
+use ontol_examples::{AsAtlas, geojson, guitar_synth_union, wgs};
 use ontol_macros::test;
 use ontol_runtime::{attr::AttrRef, interface::serde::processor::ProcessorMode};
-use ontol_test_utils::{expect_eq, serde_helper::*, TestCompile, TestPackages};
+use ontol_test_utils::{TestCompile, TestPackages, expect_eq, serde_helper::*};
 use serde_json::json;
 
 #[test]

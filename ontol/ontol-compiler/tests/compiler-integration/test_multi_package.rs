@@ -1,7 +1,7 @@
 use ontol_macros::test;
 use ontol_test_utils::{
-    assert_json_io_matches, expect_eq, file_url, serde_helper::serde_create, TestCompile,
-    TestPackages,
+    TestCompile, TestPackages, assert_json_io_matches, expect_eq, file_url,
+    serde_helper::serde_create,
 };
 
 #[test]

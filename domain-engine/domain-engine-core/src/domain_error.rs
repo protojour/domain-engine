@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use ontol_runtime::{vm::VmError, DefId};
+use ontol_runtime::{DefId, vm::VmError};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

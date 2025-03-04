@@ -1,13 +1,13 @@
 use tracing::debug;
 
 use crate::{
+    DefId,
     interface::serde::operator::{SerdeOperator, SerdeOperatorAddr},
     ontology::{
         aspects::{DefsAspect, SerdeAspect},
         domain::DefRepr,
     },
     value::Value,
-    DefId,
 };
 
 pub fn try_produce_constant(

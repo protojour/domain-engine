@@ -3,7 +3,7 @@ use ontol_runtime::{
     debug::OntolDebug,
     ontology::domain::{DefRepr, DefReprUnionBound},
 };
-use ontol_test_utils::{file_url, TestCompile, TestPackages};
+use ontol_test_utils::{TestCompile, TestPackages, file_url};
 use tracing::info;
 
 #[test]

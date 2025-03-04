@@ -1,11 +1,11 @@
 use domain_engine_core::DomainResult;
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    DefId, OntolDefTag, PropId,
     attr::Attr,
     constant::try_produce_constant,
     ontology::domain::{DataRelationshipInfo, DataRelationshipTarget, Def},
     value::Value,
-    DefId, OntolDefTag, PropId,
 };
 use tracing::debug;
 
@@ -17,7 +17,7 @@ use crate::{
     sql_value::{PgTimestamp, SqlScalar},
 };
 
-use super::{query_select::VertexSelect, TransactCtx};
+use super::{TransactCtx, query_select::VertexSelect};
 
 pub enum AbstractKind<'a> {
     VertexUnion(&'a [DefId]),

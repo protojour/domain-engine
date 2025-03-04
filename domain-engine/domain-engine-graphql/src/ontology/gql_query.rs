@@ -4,7 +4,7 @@ use std::str::FromStr;
 use crate::cursor_util::GraphQLCursor;
 use crate::field_error;
 use crate::gql_scalar::GqlScalar;
-use crate::juniper::{self, graphql_object, FieldResult};
+use crate::juniper::{self, FieldResult, graphql_object};
 
 use ::juniper::FieldError;
 use base64::Engine;
@@ -24,16 +24,16 @@ use ontol_runtime::query::select::StructSelect;
 use ontol_runtime::query::select::{EntitySelect, Select};
 use ontol_runtime::value::{OctetSequence, Value};
 use ontol_runtime::{OntolDefTag, PropId};
-use serde::de::value::StringDeserializer;
 use serde::Deserialize;
+use serde::de::value::StringDeserializer;
 use ulid::Ulid;
 
+use super::OntologyCtx;
 use super::gql_dictionary;
 use super::gql_dictionary::DefDictionaryEntry;
 use super::gql_domain;
-use super::gql_value::{write_ontol_scalar, OntolValue, ValueScalarCfg};
+use super::gql_value::{OntolValue, ValueScalarCfg, write_ontol_scalar};
 use super::gql_vertex::{self, VertexOrderDirection};
-use super::OntologyCtx;
 use super::{gql_def, gql_id};
 
 #[derive(Default)]

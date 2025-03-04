@@ -8,13 +8,13 @@
 
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::{
+    DefId, MapDef, MapDefFlags, MapDirection, MapFlags, MapKey,
     ontology::map::MapLossiness,
     vm::proc::{Local, NParams, OpCode, Predicate, Procedure},
-    DefId, MapDef, MapDefFlags, MapDirection, MapFlags, MapKey,
 };
 use tracing::debug;
 
-use crate::{repr::repr_model::ReprKind, Compiler, NO_SPAN};
+use crate::{Compiler, NO_SPAN, repr::repr_model::ReprKind};
 
 use super::{
     ir::{Ir, Terminator},

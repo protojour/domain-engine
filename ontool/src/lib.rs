@@ -3,8 +3,8 @@
 use ariadne::{ColorGenerator, Label, Report, ReportKind, Source};
 use axum::{
     extract::{
-        ws::{Message, WebSocket},
         WebSocketUpgrade,
+        ws::{Message, WebSocket},
     },
     response::Response,
     routing::get,
@@ -14,24 +14,24 @@ use domain_engine_core::{DomainEngine, Session};
 use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use notify_debouncer_full::{new_debouncer, notify::RecursiveMode};
 use ontol_compiler::{
+    SourceCodeRegistry, SourceId, Sources,
     error::UnifiedCompileError,
     mem::Mem,
     ontol_syntax::ArcString,
     topology::{DomainUrl, DomainUrlParser, DomainUrlResolver},
-    SourceCodeRegistry, SourceId, Sources,
 };
 use ontol_examples::FakeAtlasServer;
 use ontol_lsp::Backend;
 use ontol_runtime::{
     interface::json_schema::build_openapi_schemas,
-    ontology::{config::DataStoreConfig, Ontology},
+    ontology::{Ontology, config::DataStoreConfig},
 };
 use service::{domains_router, ontology_router};
 use std::{
     collections::HashMap,
     fmt::Display,
-    fs::{self, read_dir, File},
-    io::{stdout, Stdout},
+    fs::{self, File, read_dir},
+    io::{Stdout, stdout},
     net::SocketAddr,
     path::PathBuf,
     sync::{Arc, Mutex},

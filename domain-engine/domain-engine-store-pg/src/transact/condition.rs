@@ -1,10 +1,10 @@
-use domain_engine_core::{filter::walker::ConditionWalker, DomainResult};
+use domain_engine_core::{DomainResult, filter::walker::ConditionWalker};
 use ontol_runtime::{
+    DefId, PropId,
     ontology::domain::{DataRelationshipInfo, DataRelationshipKind, Def, EdgeCardinalProjection},
     query::condition::{Clause, CondTerm, SetOperator, SetPredicate},
     tuple::CardinalIdx,
     var::Var,
-    DefId, PropId,
 };
 use tracing::{debug, error};
 
@@ -17,7 +17,7 @@ use crate::{
     transact::{data::Data, edge_query::edge_join_condition},
 };
 
-use super::{fields::AbstractKind, query::QueryBuildCtx, TransactCtx};
+use super::{TransactCtx, fields::AbstractKind, query::QueryBuildCtx};
 
 struct ConditionCtx<'a, 's> {
     root_def_id: DefId,
@@ -146,7 +146,7 @@ impl<'a> TransactCtx<'a> {
                     )?;
                 }
                 Clause::Member(..) | Clause::SetPredicate(..) => {
-                    return Err(PgError::Condition("weird member term").into())
+                    return Err(PgError::Condition("weird member term").into());
                 }
             }
         }
@@ -368,7 +368,7 @@ impl<'a> TransactCtx<'a> {
                     _ => {
                         return Err(
                             PgError::Condition("unhandled set operator in edge matcher").into()
-                        )
+                        );
                     }
                 }
             }
@@ -424,7 +424,7 @@ impl<'a> TransactCtx<'a> {
                             return Err(PgError::Condition(
                                 "leaf condition expected a member clause",
                             )
-                            .into())
+                            .into());
                         }
                     }
                 }

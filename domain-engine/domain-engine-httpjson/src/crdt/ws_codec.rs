@@ -1,4 +1,4 @@
-use domain_engine_core::{domain_error::DomainErrorKind, DomainError};
+use domain_engine_core::{DomainError, domain_error::DomainErrorKind};
 
 /// A very scaled down version of automerge sync protocol,
 /// since here there is one endpoint per document, and lots of fields can be skipped

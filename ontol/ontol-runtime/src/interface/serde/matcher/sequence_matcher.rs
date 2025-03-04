@@ -1,9 +1,9 @@
 use crate::{
+    DefId,
     interface::serde::{
         operator::{SequenceRange, SerdeOperatorAddr},
         processor::SubProcessorContext,
     },
-    DefId,
 };
 
 use super::ValueMatcher;

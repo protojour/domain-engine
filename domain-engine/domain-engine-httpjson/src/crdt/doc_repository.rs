@@ -2,12 +2,13 @@ use std::sync::Arc;
 
 use automerge::Automerge;
 use domain_engine_core::{
+    DomainEngine, DomainError, DomainResult, Session, VertexAddr,
     domain_error::DomainErrorKind,
     transact::{ReqMessage, RespMessage, TransactionMode},
-    DomainEngine, DomainError, DomainResult, Session, VertexAddr,
 };
 use futures_util::{StreamExt, TryStreamExt};
 use ontol_runtime::{
+    DefId, OntolDefTag,
     attr::Attr,
     query::{
         condition::{Clause, CondTerm, SetOperator},
@@ -15,7 +16,6 @@ use ontol_runtime::{
         select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     },
     value::Value,
-    DefId, OntolDefTag,
 };
 use tracing::error;
 

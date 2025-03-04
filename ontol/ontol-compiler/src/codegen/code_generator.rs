@@ -4,6 +4,7 @@ use bit_set::BitSet;
 use fnv::FnvHashMap;
 use ontol_hir::{Binding, EvalCondTerm, Node, OverloadFunc, Pack, PropVariant, StructFlags};
 use ontol_runtime::{
+    DefId, MapDirection, MapFlags, MapKey, PropId,
     ontology::map::MapLossiness,
     property::{Cardinality, PropertyCardinality, ValueCardinality},
     query::condition::{Clause, ClausePair},
@@ -11,12 +12,12 @@ use ontol_runtime::{
     vm::proc::{
         BuiltinProc, GetAttrFlags, Local, NParams, OpCode, OpCodeCondTerm, Predicate, Procedure,
     },
-    DefId, MapDirection, MapFlags, MapKey, PropId,
 };
 use thin_vec::ThinVec;
 use tracing::debug;
 
 use crate::{
+    CompileErrors, Compiler, SourceSpan,
     codegen::{
         data_flow_analyzer::DataFlowAnalyzer,
         ir::{BlockLabel, BlockOffset, Terminator},
@@ -25,7 +26,7 @@ use crate::{
     def::Defs,
     error::CompileError,
     properties::PropCtx,
-    relation::{rel_def_meta, RelCtx},
+    relation::{RelCtx, rel_def_meta},
     repr::{
         repr_ctx::ReprCtx,
         repr_model::{ReprKind, ReprScalarKind},
@@ -33,7 +34,6 @@ use crate::{
     strings::StringCtx,
     typed_hir::{HirFunc, TypedArena, TypedHir, TypedNodeRef},
     types::{Type, UNIT_TYPE},
-    CompileErrors, Compiler, SourceSpan,
 };
 
 use super::{

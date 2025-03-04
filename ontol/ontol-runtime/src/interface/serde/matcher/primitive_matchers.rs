@@ -1,9 +1,9 @@
 use std::ops::RangeInclusive;
 
 use crate::{
+    DefId,
     interface::serde::matcher::OptWithinRangeDisplay,
     value::{Serial, Value, ValueTag},
-    DefId,
 };
 
 use super::ValueMatcher;

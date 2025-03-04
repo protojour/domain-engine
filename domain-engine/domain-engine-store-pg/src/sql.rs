@@ -2,7 +2,7 @@ use std::{fmt::Display, sync::Arc};
 
 use itertools::Itertools;
 use ontol_runtime::query::order::Direction;
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 
 pub struct Ident<T>(pub T);
 

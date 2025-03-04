@@ -1,11 +1,11 @@
 use ontol_runtime::{
-    ontology::domain::{self, DefKind},
     DomainIndex,
+    ontology::domain::{self, DefKind},
 };
 
 use crate::{gql_scalar::GqlScalar, juniper};
 
-use super::{gql_def, OntologyCtx};
+use super::{OntologyCtx, gql_def};
 
 pub struct Domain {
     pub domain_index: DomainIndex,

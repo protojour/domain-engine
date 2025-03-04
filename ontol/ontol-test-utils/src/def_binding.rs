@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use ontol_faker::new_constant_fake;
 use ontol_runtime::{
+    DefId, DomainIndex, PropId,
     attr::Attr,
     debug::OntolDebug,
     interface::{
@@ -12,16 +13,15 @@ use ontol_runtime::{
             processor::{ProcessorLevel, ProcessorMode},
         },
     },
-    ontology::{domain::Def, Ontology},
+    ontology::{Ontology, domain::Def},
     query::select::{Select, StructSelect},
     tuple::EndoTuple,
     value::Value,
-    DefId, DomainIndex, PropId,
 };
 use serde::de::DeserializeSeed;
 use tracing::{trace, warn};
 
-use crate::{serde_helper::serde_create, OntolTest};
+use crate::{OntolTest, serde_helper::serde_create};
 
 pub struct DefBinding<'on> {
     pub def: &'on Def,

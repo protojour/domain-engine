@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_parser::U32Span;
 use ontol_runtime::{
-    ontology::map::MapLossiness, resolve_path::ResolverGraph, DefId, DomainIndex, MapDirection,
+    DefId, DomainIndex, MapDirection, ontology::map::MapLossiness, resolve_path::ResolverGraph,
 };
 
 use crate::{CompileError, Compiler, SourceSpan};

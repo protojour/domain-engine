@@ -4,6 +4,7 @@ use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use ontol_runtime::{
+    DefId, OntolDefTag, PropId,
     attr::Attr,
     crdt::CrdtStruct,
     interface::serde::processor::ProcessorMode,
@@ -14,7 +15,6 @@ use ontol_runtime::{
     query::select::Select,
     tuple::CardinalIdx,
     value::{Serial, Value},
-    DefId, OntolDefTag, PropId,
 };
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
@@ -22,8 +22,8 @@ use thin_vec::ThinVec;
 use tracing::{debug, warn};
 
 use domain_engine_core::{
-    domain_error::DomainErrorKind, make_storable::MakeStorable, system::SystemAPI,
-    transact::WriteStatsBuilder, DomainError, DomainResult, VertexAddr,
+    DomainError, DomainResult, VertexAddr, domain_error::DomainErrorKind,
+    make_storable::MakeStorable, system::SystemAPI, transact::WriteStatsBuilder,
 };
 
 use crate::constraint::ConstraintCheck;

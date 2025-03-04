@@ -1,22 +1,22 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    DefId, DefPropTag, DomainIndex, OntolDefTag,
     ontology::{aspects::DefsAspect, domain::DefKind},
     tuple::CardinalIdx,
-    DefId, DefPropTag, DomainIndex, OntolDefTag,
 };
 use read_registry::read_registry;
 use tokio_postgres::{Client, Transaction};
-use tracing::{debug_span, info, Instrument};
+use tracing::{Instrument, debug_span, info};
 
 use crate::{
+    PgModel,
     pg_model::{
         DomainUid, PgDomain, PgEdgeCardinalKind, PgIndexType, PgPropertyData, PgTableIdUnion,
         PgType, RegVersion,
     },
-    PgModel,
 };
 
 mod registry {

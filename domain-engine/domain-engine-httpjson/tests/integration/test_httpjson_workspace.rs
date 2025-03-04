@@ -1,7 +1,7 @@
 use crate::ResponseExt;
-use automerge::{transaction::Transactable, ReadDoc};
+use automerge::{ReadDoc, transaction::Transactable};
 use domain_engine_core::Session;
-use domain_engine_httpjson::crdt::{doc_repository::DocRepository, DocAddr};
+use domain_engine_httpjson::crdt::{DocAddr, doc_repository::DocRepository};
 use domain_engine_test_utils::{
     dynamic_data_store::DynamicDataStoreFactory, system::MonotonicClockSystemApi,
 };
@@ -9,15 +9,15 @@ use http::header::{self};
 use ontol_examples::workspaces;
 use ontol_macros::datastore_test;
 use ontol_runtime::value::Value;
-use ontol_test_utils::{expect_eq, TestCompile};
+use ontol_test_utils::{TestCompile, expect_eq};
 use reqwest_websocket::CloseCode;
 use serde_json::json;
 use test_sync_client::Dir;
 use tokio_util::task::AbortOnDropHandle;
-use tracing::{info, info_span, Instrument};
+use tracing::{Instrument, info, info_span};
 use ulid::Ulid;
 
-use crate::{make_domain_engine, MakeTestRouter, TestHttpError};
+use crate::{MakeTestRouter, TestHttpError, make_domain_engine};
 
 /// id of the workspaces domain under test
 const DOMAIN_ID: &str = "01JAP41VG1STK1VZPWXV26SPNM";
@@ -187,7 +187,9 @@ async fn test_workspaces_rest_api_with_edit(ds: &str) {
         .await
         .unwrap();
 
-    info!("assert that the new JSON encoding of the workspace reflects the previous change transaction");
+    info!(
+        "assert that the new JSON encoding of the workspace reflects the previous change transaction"
+    );
 
     expect_eq!(
         actual = http_get_workspace_entity(port, &workspace_id)
@@ -432,8 +434,8 @@ mod test_sync_client {
     use std::time::Duration;
 
     use automerge::{
-        sync::{Message as SyncMessage, State, SyncDoc},
         Automerge,
+        sync::{Message as SyncMessage, State, SyncDoc},
     };
     use domain_engine_httpjson::crdt::ws_codec::Message;
     use futures_util::{SinkExt, StreamExt};

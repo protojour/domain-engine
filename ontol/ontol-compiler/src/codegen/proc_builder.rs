@@ -4,10 +4,10 @@ use ontol_runtime::{
     var::Var,
     vm::proc::{AddressOffset, Local, NParams, OpCode},
 };
-use smallvec::{smallvec, SmallVec};
-use tracing::{debug, trace, Level};
+use smallvec::{SmallVec, smallvec};
+use tracing::{Level, debug, trace};
 
-use crate::{codegen::optimize::optimize, SourceSpan};
+use crate::{SourceSpan, codegen::optimize::optimize};
 
 use super::ir::{BlockLabel, BlockOffset, Ir, Terminator};
 

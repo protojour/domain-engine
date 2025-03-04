@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, ops::Deref};
 use domain_engine_core::{DomainResult, VertexAddr};
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    DefId, DefPropTag, DomainIndex, OntolDefTag, PropId,
     debug::OntolDebug,
     ontology::{
         aspects::DefsAspect,
@@ -14,7 +15,6 @@ use ontol_runtime::{
     },
     tuple::CardinalIdx,
     value::Value,
-    DefId, DefPropTag, DomainIndex, OntolDefTag, PropId,
 };
 use postgres_types::ToSql;
 use tokio_postgres::types::FromSql;
@@ -36,7 +36,7 @@ pub struct EdgeId(pub DefId);
 impl EdgeId {
     #[inline]
     pub fn domain_index(&self) -> DomainIndex {
-        self.0 .0
+        self.0.0
     }
 
     #[inline]

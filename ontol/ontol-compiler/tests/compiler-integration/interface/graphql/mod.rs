@@ -2,7 +2,7 @@ use ontol_runtime::interface::graphql::{
     data::{ObjectData, ObjectInterface, TypeData, TypeKind},
     schema::{GraphqlSchema, QueryLevel},
 };
-use ontol_test_utils::{test_extensions::graphql::TypeDataExt, OntolTest};
+use ontol_test_utils::{OntolTest, test_extensions::graphql::TypeDataExt};
 
 mod test_graphql_interface;
 

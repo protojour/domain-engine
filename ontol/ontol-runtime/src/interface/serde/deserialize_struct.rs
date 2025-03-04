@@ -10,6 +10,7 @@ use serde::de::{DeserializeSeed, MapAccess, Visitor};
 use tracing::{debug, trace, trace_span};
 
 use crate::{
+    DefId, PropId,
     attr::Attr,
     debug::OntolDebug,
     format_utils::{DoubleQuote, LogicOp, LogicalConcat},
@@ -21,12 +22,11 @@ use crate::{
         ontol_vm::OntolVm,
         proc::{NParams, Procedure},
     },
-    DefId, PropId,
 };
 
 use super::{
     deserialize_property::{PropKind, PropertyMapVisitor},
-    matcher::{union_matcher::UnionMatcher, ExpectingMatching, ValueMatcher},
+    matcher::{ExpectingMatching, ValueMatcher, union_matcher::UnionMatcher},
     operator::{
         PossibleVariants, SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdeStructFlags,
         StructOperator,
@@ -419,7 +419,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                                     "property \"{key}\": invalid value, expected {expected}",
                                     key = buffer[0].0,
                                     expected = ExpectingMatching(&union_matcher)
-                                )))
+                                )));
                             }
                         },
                     };

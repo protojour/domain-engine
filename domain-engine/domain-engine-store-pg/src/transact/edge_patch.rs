@@ -4,23 +4,24 @@ use std::{
 };
 
 use arcstr::ArcStr;
-use domain_engine_core::{domain_error::DomainErrorKind, DomainError, DomainResult};
+use domain_engine_core::{DomainError, DomainResult, domain_error::DomainErrorKind};
 use futures_util::{TryFutureExt, TryStreamExt};
 use ontol_runtime::{
+    DefId, OntolDefTag, PropId,
     attr::Attr,
     format_utils::format_value,
     ontology::domain::{DataRelationshipKind, DataRelationshipTarget},
     query::select::Select,
     tuple::CardinalIdx,
     value::Value,
-    DefId, OntolDefTag, PropId,
 };
 use postgres_types::ToSql;
 use tracing::{debug, trace};
 
 use crate::{
+    CountRows,
     address::deserialize_ontol_vertex_address,
-    pg_error::{ds_bad_req, map_row_error, PgError, PgInputError, PgModelError},
+    pg_error::{PgError, PgInputError, PgModelError, ds_bad_req, map_row_error},
     pg_model::{
         EdgeId, InDomain, PgColumnRef, PgDataKey, PgDomainTable, PgDomainTableType, PgEdgeCardinal,
         PgEdgeCardinalKind, PgIndexType, PgRegKey, PgTable,
@@ -28,11 +29,10 @@ use crate::{
     sql::{self, WhereExt},
     sql_value::{PgTimestamp, SqlScalar},
     statement::{Prepare, PreparedStatement, ToArcStr},
-    transact::{data::Data, edge_query::edge_join_condition, InsertMode},
-    CountRows,
+    transact::{InsertMode, data::Data, edge_query::edge_join_condition},
 };
 
-use super::{mut_ctx::PgMutCtx, MutationMode, TransactCtx};
+use super::{MutationMode, TransactCtx, mut_ctx::PgMutCtx};
 
 #[derive(Default, Debug)]
 pub struct EdgePatches {
@@ -379,7 +379,7 @@ impl<'a> TransactCtx<'a> {
                     PgEdgeCardinalKind::Parameters(_) => {
                         return Err(DomainError::data_store_bad_request(
                             "cannot delete edge based on parameters (yet)",
-                        ))
+                        ));
                     }
                 };
 
@@ -465,7 +465,7 @@ impl<'a> TransactCtx<'a> {
                         let data = match map.remove(prop_id) {
                             Some(Attr::Unit(value)) => self.data_from_value(value)?,
                             Some(_) => {
-                                return Err(ds_bad_req("non-scalar attribute in edge parameter"))
+                                return Err(ds_bad_req("non-scalar attribute in edge parameter"));
                             }
                             None => Data::Sql(SqlScalar::Null),
                         };
@@ -591,7 +591,7 @@ impl<'a> TransactCtx<'a> {
                         let data = match map.remove(prop_id) {
                             Some(Attr::Unit(value)) => self.data_from_value(value)?,
                             Some(_) => {
-                                return Err(ds_bad_req("non-scalar attribute in edge parameter"))
+                                return Err(ds_bad_req("non-scalar attribute in edge parameter"));
                             }
                             None => Data::Sql(SqlScalar::Null),
                         };
@@ -848,8 +848,7 @@ impl<'a> TransactCtx<'a> {
 
                 trace!(
                     "register tentative foreign key: {id_param:?}: ({}, {})",
-                    pg.table.key,
-                    data_key
+                    pg.table.key, data_key
                 );
 
                 mut_ctx

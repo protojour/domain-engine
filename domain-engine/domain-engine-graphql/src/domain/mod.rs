@@ -5,25 +5,25 @@ use std::sync::Arc;
 use crate::gql_scalar::GqlScalar;
 use context::{SchemaCtx, SchemaType, ServiceCtx};
 use domain_engine_core::{
+    DomainResult,
     domain_error::DomainErrorKind,
     transact::{AccumulateSequences, ReqMessage, TransactionMode},
-    DomainResult,
 };
 use futures_util::{StreamExt, TryStreamExt};
 use look_ahead_utils::ArgsWrapper;
 use ontol_runtime::{
+    DomainIndex,
     attr::{AttrMatrixRef, AttrRef},
     interface::{
+        DomainInterface,
         graphql::{
             data::{EntityMutationField, FieldData, FieldKind, Optionality, TypeModifier, TypeRef},
             schema::TypingPurpose,
         },
-        DomainInterface,
     },
     ontology::Ontology,
     sequence::Sequence,
     value::ValueDebug,
-    DomainIndex,
 };
 use templates::matrix_type::MatrixType;
 use thiserror::Error;

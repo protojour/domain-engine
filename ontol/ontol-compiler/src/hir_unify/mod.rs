@@ -2,13 +2,13 @@ use std::fmt::Debug;
 
 use ontol_hir::visitor::HirVisitor;
 use ontol_runtime::{
-    var::{Var, VarAllocator},
     MapDirection, MapFlags,
+    var::{Var, VarAllocator},
 };
 
 use crate::{
-    typed_hir::{HirFunc, IntoTypedHirData, TypedHir, TypedHirData},
     Compiler, SourceSpan,
+    typed_hir::{HirFunc, IntoTypedHirData, TypedHir, TypedHirData},
 };
 
 use self::ssa_unifier::SsaUnifier;

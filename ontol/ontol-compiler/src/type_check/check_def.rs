@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use ontol_runtime::{var::VarAllocator, DefId};
+use ontol_runtime::{DefId, var::VarAllocator};
 use ordered_float::NotNan;
 
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
     types::{Type, TypeRef},
 };
 
-use super::{ena_inference::Strength, hir_build::NodeInfo, TypeCheck};
+use super::{TypeCheck, ena_inference::Strength, hir_build::NodeInfo};
 
 impl<'m> TypeCheck<'_, 'm> {
     /// Compute the immediate type of a definition.

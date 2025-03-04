@@ -1,12 +1,12 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    DefId, PropId,
     attr::{Attr, AttrRef},
     interface::serde::processor::{
         ProcessorLevel, ProcessorMode, ProcessorProfile, ProcessorProfileApi,
         ProcessorProfileFlags, SpecialProperty,
     },
     value::Value,
-    DefId, PropId,
 };
 use serde::de::DeserializeSeed;
 

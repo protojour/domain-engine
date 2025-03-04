@@ -3,10 +3,10 @@
 use ontol_parser::cst::inspect as insp;
 use ontol_parser::cst::view::{NodeView, NodeViewExt, TokenView};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use state::{
-    build_uri, get_domain_name, get_path_and_name, get_range, get_span_range, read_file, Document,
-    State,
+    Document, State, build_uri, get_domain_name, get_path_and_name, get_range, get_span_range,
+    read_file,
 };
 use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;

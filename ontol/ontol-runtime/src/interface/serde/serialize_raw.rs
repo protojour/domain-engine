@@ -1,10 +1,10 @@
 use serde::{
-    ser::{Error, SerializeMap, SerializeSeq},
     Serializer,
+    ser::{Error, SerializeMap, SerializeSeq},
 };
 use tracing::error;
 
-use crate::{value::Value, OntolDefTag};
+use crate::{OntolDefTag, value::Value};
 
 use super::processor::{ProcessorLevel, RecursionLimitError};
 

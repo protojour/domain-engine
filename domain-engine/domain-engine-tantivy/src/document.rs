@@ -1,16 +1,16 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use domain_engine_core::{data_store::DataStoreAPI, VertexAddr};
+use domain_engine_core::{VertexAddr, data_store::DataStoreAPI};
 use ontol_runtime::{
+    OntolDefTag,
     attr::Attr,
-    ontology::{domain::DataRelationshipKind, Ontology},
+    ontology::{Ontology, domain::DataRelationshipKind},
     tuple::EndoTuple,
     value::Value,
-    OntolDefTag,
 };
 use tantivy::{
-    schema::{Facet, OwnedValue},
     DateTime, TantivyDocument,
+    schema::{Facet, OwnedValue},
 };
 use tracing::{debug, warn};
 

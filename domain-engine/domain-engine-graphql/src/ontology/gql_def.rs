@@ -1,17 +1,17 @@
 //! GraphQL types related to a single ONTOL domain definition
 
 use ontol_runtime::{
+    DefId, DefPropTag, MapKey, PropId,
     ontology::{
         domain::{self, DataRelationshipKind},
         map::MapMeta,
         ontol::TextConstant,
     },
-    DefId, DefPropTag, MapKey, PropId,
 };
 
 use crate::gql_scalar::GqlScalar;
 
-use super::{gql_domain, gql_id, gql_rel, OntologyCtx};
+use super::{OntologyCtx, gql_domain, gql_id, gql_rel};
 
 #[derive(Clone)]
 pub struct Def {

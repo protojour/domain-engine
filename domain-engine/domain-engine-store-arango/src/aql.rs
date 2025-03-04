@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, hash_map::Entry},
     fmt::{Display, Formatter, Result},
     ops::Range,
 };
@@ -8,7 +8,7 @@ use indexmap::IndexSet;
 use indoc::writedoc;
 use ontol_runtime::ontology::Ontology;
 
-use crate::{data_store::EdgeWriteMode, ArangoDatabase};
+use crate::{ArangoDatabase, data_store::EdgeWriteMode};
 
 /// Helper struct to build AqlQuery
 pub struct MetaQuery<'a> {

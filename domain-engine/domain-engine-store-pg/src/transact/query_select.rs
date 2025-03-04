@@ -2,16 +2,16 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use domain_engine_core::DomainResult;
 use ontol_runtime::{
+    DefId, OntolDefTag, PropId,
     ontology::domain::{DataRelationshipKind, DataTreeRepr, Def},
     query::select::{Select, StructOrUnionSelect, StructSelect},
     tuple::CardinalIdx,
-    DefId, OntolDefTag, PropId,
 };
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 
 use crate::pg_model::{EdgeId, PgEdgeCardinalKind, PgRegKey, PgTable};
 
-use super::{fields::AbstractKind, TransactCtx};
+use super::{TransactCtx, fields::AbstractKind};
 
 #[derive(Debug)]
 pub enum QuerySelect {

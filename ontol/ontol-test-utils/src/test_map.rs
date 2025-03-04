@@ -1,4 +1,5 @@
 use ontol_runtime::{
+    MapDef, MapDefFlags, MapFlags, MapKey,
     attr::AttrRef,
     interface::serde::processor::ProcessorMode,
     ontology::map::Extern,
@@ -6,19 +7,18 @@ use ontol_runtime::{
     query::filter::Filter,
     value::Value,
     vm::{
-        proc::{Procedure, Yield},
         VmResult, VmState,
+        proc::{Procedure, Yield},
     },
-    MapDef, MapDefFlags, MapFlags, MapKey,
 };
 use serde::de::DeserializeSeed;
-use unimock::{unimock, Unimock};
+use unimock::{Unimock, unimock};
 
 use crate::{
+    OntolTest,
     def_binding::DefBinding,
     expect_eq,
-    serde_helper::{serde_raw, SerdeHelper},
-    OntolTest,
+    serde_helper::{SerdeHelper, serde_raw},
 };
 
 pub trait AsKey: Sized + Clone {

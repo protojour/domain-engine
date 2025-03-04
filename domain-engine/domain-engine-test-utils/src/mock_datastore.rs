@@ -1,13 +1,13 @@
 use std::{collections::BTreeSet, sync::Arc};
 
 use domain_engine_core::{
+    DomainResult, Session,
     data_store::{DataStoreAPI, DataStoreFactorySync, DataStoreParams},
     transact::{DataOperation, ReqMessage, RespMessage, TransactionMode},
-    DomainResult, Session,
 };
-use futures_util::{stream::BoxStream, StreamExt};
+use futures_util::{StreamExt, stream::BoxStream};
 use ontol_runtime::value::Value;
-use unimock::{matching, MockFn, Unimock};
+use unimock::{MockFn, Unimock, matching};
 
 /// API that helps to linearize transaction values for use with the mock object
 #[unimock::unimock(api = LinearTransactMock)]

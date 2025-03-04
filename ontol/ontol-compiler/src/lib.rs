@@ -13,26 +13,26 @@ use std::{
     ops::{Deref, Index},
 };
 
-use codegen::task::{execute_codegen_tasks, CodeCtx};
+use codegen::task::{CodeCtx, execute_codegen_tasks};
 use def::Defs;
 use mem::Mem;
 use namespace::Namespaces;
 use ontol_runtime::{
+    DefId, DomainIndex,
     ontology::{
+        Ontology,
         config::{DataStoreConfig, DomainConfig},
         domain::{DomainId, TopologyGeneration},
         ontol::TextConstant,
-        Ontology,
     },
     resolve_path::ResolverGraph,
-    DefId, DomainIndex,
 };
 use pattern::Patterns;
 use relation::RelCtx;
 use repr::repr_ctx::ReprCtx;
 pub use source::*;
 use strings::StringCtx;
-use text_patterns::{compile_all_text_patterns, TextPatterns};
+use text_patterns::{TextPatterns, compile_all_text_patterns};
 use thesaurus::Thesaurus;
 use topology::{DomainTopology, DomainUrl, LoadedDomains};
 use tracing::debug;
@@ -315,7 +315,7 @@ mod tests {
 
     use ontol_runtime::{MapDirection, MapFlags};
 
-    use crate::{hir_unify::unify_to_function, mem::Mem, typed_hir::TypedHir, Compiler};
+    use crate::{Compiler, hir_unify::unify_to_function, mem::Mem, typed_hir::TypedHir};
 
     pub fn hir_parse<'m>(src: &str) -> (ontol_hir::RootNode<'m, TypedHir>, &str) {
         ontol_hir::parse::Parser::new(TypedHir)

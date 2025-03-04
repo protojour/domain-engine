@@ -2,18 +2,18 @@ use std::{fmt::Display, ops::Deref};
 
 use ::serde::{Deserialize, Serialize};
 use fnv::FnvHashMap;
-use serde::de::{value::StrDeserializer, DeserializeSeed};
+use serde::de::{DeserializeSeed, value::StrDeserializer};
 use tracing::{error, trace};
 
 use crate::{
+    DefId, DefPropTag, OntolDefTag, PropId,
     attr::Attr,
     interface::serde::processor::{ProcessorMode, SerdeProcessor},
-    ontology::aspects::{aspect, DefsAspect, ExecutionAspect, SerdeAspect},
+    ontology::aspects::{DefsAspect, ExecutionAspect, SerdeAspect, aspect},
     value::{Value, ValueFormatRaw},
-    DefId, DefPropTag, OntolDefTag, PropId,
 };
 
-use super::{text_like_types::ParseError, TextConstant};
+use super::{TextConstant, text_like_types::ParseError};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TextPattern {

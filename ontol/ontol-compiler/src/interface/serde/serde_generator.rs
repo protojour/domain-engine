@@ -5,37 +5,38 @@ use std::{
 
 use indexmap::IndexMap;
 use ontol_runtime::{
+    DefId, OntolDefTag,
     debug::OntolDebug,
     interface::{
         discriminator::LeafDiscriminant,
         serde::{
+            SerdeDef, SerdeModifier,
             operator::{
                 AliasOperator, ConstructorSequenceOperator, OctetsOperator,
                 RelationSequenceOperator, SequenceRange, SerdeOperator, SerdeOperatorAddr,
                 SerdeProperty, SerdeStructFlags, StructOperator,
             },
-            SerdeDef, SerdeModifier,
         },
     },
     ontology::ontol::TextConstant,
     phf::PhfKey,
     property::{Cardinality, PropertyCardinality, ValueCardinality},
-    DefId, OntolDefTag,
 };
 use tracing::{debug, debug_span, error, trace, warn};
 
-use super::{sequence_range_builder::SequenceRangeBuilder, SerdeIntersection, SerdeKey};
+use super::{SerdeIntersection, SerdeKey, sequence_range_builder::SequenceRangeBuilder};
 
 use crate::{
+    SourceSpan,
     codegen::task::CodeCtx,
     compiler_queries::GetDefType,
     def::{DefKind, Defs, TypeDef, TypeDefFlags},
     edge::EdgeCtx,
-    interface::graphql::graphql_namespace::{adapt_graphql_identifier, GqlAdaptedIdent},
+    interface::graphql::graphql_namespace::{GqlAdaptedIdent, adapt_graphql_identifier},
     misc::MiscCtx,
     primitive::PrimitiveKind,
     properties::{Constructor, PropCtx, Properties},
-    relation::{rel_def_meta, RelCtx, UnionMemberCache},
+    relation::{RelCtx, UnionMemberCache, rel_def_meta},
     repr::{
         repr_ctx::ReprCtx,
         repr_model::{ReprFormat, ReprKind, ReprScalarKind},
@@ -43,7 +44,6 @@ use crate::{
     strings::StringCtx,
     text_patterns::{TextPatternSegment, TextPatterns},
     types::{DefTypeCtx, Type, TypeRef},
-    SourceSpan,
 };
 
 pub struct SerdeGenerator<'c, 'm> {

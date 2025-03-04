@@ -1,13 +1,14 @@
 use base64::Engine;
 use fnv::FnvHashMap;
 use serde::{
-    ser::{Error, SerializeMap, SerializeSeq},
     Serializer,
+    ser::{Error, SerializeMap, SerializeSeq},
 };
 use std::{fmt::Write, slice};
 use tracing::{trace, warn};
 
 use crate::{
+    DefId, PropId,
     attr::{Attr, AttrMatrixRef, AttrRef, AttrTupleRef},
     cast::Cast,
     debug::OntolDebug,
@@ -17,15 +18,14 @@ use crate::{
     },
     ontology::ontol::text_pattern::{FormatPattern, TextPatternConstantPart},
     value::{Value, ValueFormatRaw},
-    DefId, PropId,
 };
 
 use super::{
+    StructOperator,
     matcher::octets_matcher::OctetsFormat,
     operator::{SequenceRange, SerdeOperator, SerdePropertyKind, SerdeStructFlags},
     processor::{ProcessorProfileFlags, SerdeProcessor, SpecialProperty, SubProcessorContext},
     serialize_raw::RawProxy,
-    StructOperator,
 };
 
 type Res<S> = Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Error>;
@@ -550,7 +550,9 @@ impl SerdeProcessor<'_, '_> {
                                 _ => {
                                     panic!(
                                         "While serializing value {:?} with `{}`, property `{}` was not found.",
-                                        value, &self.ontology.defs[struct_op.typename], phf_key.arc_str()
+                                        value,
+                                        &self.ontology.defs[struct_op.typename],
+                                        phf_key.arc_str()
                                     )
                                 }
                             }
@@ -612,7 +614,7 @@ impl SerdeProcessor<'_, '_> {
                             _ => {
                                 return Err(serde::ser::Error::custom(
                                     "flattened union variant not found",
-                                ))
+                                ));
                             }
                         };
 
@@ -630,7 +632,7 @@ impl SerdeProcessor<'_, '_> {
                             _ => {
                                 return Err(serde::ser::Error::custom(
                                     "invalid flattened sub-operator",
-                                ))
+                                ));
                             }
                         }
                     }
@@ -665,7 +667,9 @@ impl SerdeProcessor<'_, '_> {
                 panic!("Must serialize edge params, but was not present in attribute")
             }
             (Some(rel_params), None) => {
-                panic!("Attribute had rel params {rel_params:#?}, but no serializer operator available: {self:#?}")
+                panic!(
+                    "Attribute had rel params {rel_params:#?}, but no serializer operator available: {self:#?}"
+                )
             }
         }
 

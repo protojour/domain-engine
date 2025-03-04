@@ -2,7 +2,7 @@ use ontol_runtime::{attr::AttrMatrixRef, sequence::SubSequence};
 
 use crate::{
     cursor_util::serialize_cursor,
-    domain::{context::SchemaType, ServiceCtx},
+    domain::{ServiceCtx, context::SchemaType},
     gql_scalar::GqlScalar,
 };
 

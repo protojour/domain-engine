@@ -1,8 +1,8 @@
 use ontol_examples::stix::stix_bundle;
 use ontol_macros::test;
-use ontol_runtime::{debug::OntolDebug, ontology::domain::DefRepr, tuple::CardinalIdx, DefIdSet};
+use ontol_runtime::{DefIdSet, debug::OntolDebug, ontology::domain::DefRepr, tuple::CardinalIdx};
 use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches, serde_helper::*, OntolTest, TestCompile,
+    OntolTest, TestCompile, assert_error_msg, assert_json_io_matches, serde_helper::*,
 };
 use serde_json::json;
 

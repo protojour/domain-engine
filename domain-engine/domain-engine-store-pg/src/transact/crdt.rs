@@ -1,5 +1,5 @@
 use domain_engine_core::{DomainResult, VertexAddr};
-use ontol_runtime::{crdt::Automerge, value::Value, DomainIndex, PropId};
+use ontol_runtime::{DomainIndex, PropId, crdt::Automerge, value::Value};
 use thin_vec::ThinVec;
 use tracing::debug;
 
@@ -9,7 +9,7 @@ use crate::{
     sql::{self, Expr},
 };
 
-use super::{data::ParentProp, mut_ctx::PgMutCtx, update::UpdateCondition, TransactCtx};
+use super::{TransactCtx, data::ParentProp, mut_ctx::PgMutCtx, update::UpdateCondition};
 
 impl TransactCtx<'_> {
     pub async fn insert_initial_automerge_crdt(

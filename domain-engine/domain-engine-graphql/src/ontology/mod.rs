@@ -7,7 +7,7 @@ use crate::{
     juniper::{self, EmptyMutation, EmptySubscription, RootNode},
 };
 
-use domain_engine_core::{data_store::DataStore, DomainEngine, DomainResult, Session};
+use domain_engine_core::{DomainEngine, DomainResult, Session, data_store::DataStore};
 use ontol_runtime::ontology::Ontology;
 
 use self::gql_query::Query;

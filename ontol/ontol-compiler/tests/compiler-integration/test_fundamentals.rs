@@ -1,8 +1,8 @@
 use ontol_macros::test;
-use ontol_runtime::{interface::serde::operator::SerdeOperator, DomainIndex, PropId};
+use ontol_runtime::{DomainIndex, PropId, interface::serde::operator::SerdeOperator};
 use ontol_test_utils::{
-    assert_json_io_matches, def_binding::DefBinding, expect_eq, file_url,
-    serde_helper::serde_create, OntolTest, TestCompile, TestPackages,
+    OntolTest, TestCompile, TestPackages, assert_json_io_matches, def_binding::DefBinding,
+    expect_eq, file_url, serde_helper::serde_create,
 };
 
 #[test]

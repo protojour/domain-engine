@@ -1,8 +1,9 @@
 use domain_engine_core::{
-    filter::walker::{ConditionWalker, MemberPredicate, Members},
     DomainError, DomainResult,
+    filter::walker::{ConditionWalker, MemberPredicate, Members},
 };
 use ontol_runtime::{
+    DefId,
     ontology::domain::{DataRelationshipKind, DataRelationshipTarget},
     query::{
         condition::{Clause, CondTerm, SetOperator},
@@ -12,7 +13,6 @@ use ontol_runtime::{
     },
     value::{Value, ValueFormatRaw},
     var::Var,
-    DefId,
 };
 use tracing::{debug, error};
 

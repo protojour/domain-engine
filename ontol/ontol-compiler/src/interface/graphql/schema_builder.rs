@@ -1,6 +1,7 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
+    DefId, DomainIndex, MapDefFlags, MapKey, OntolDefTag, PropId,
     interface::{
         graphql::{
             argument::{self, DefaultArg, MapInputArg},
@@ -13,8 +14,8 @@ use ontol_runtime::{
             schema::{GraphqlSchema, QueryLevel},
         },
         serde::{
-            operator::{SerdeOperator, SerdeOperatorAddr},
             SerdeDef, SerdeModifier,
+            operator::{SerdeOperator, SerdeOperatorAddr},
         },
     },
     ontology::{
@@ -24,13 +25,12 @@ use ontol_runtime::{
     },
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolverGraph},
     var::Var,
-    DefId, DomainIndex, MapDefFlags, MapKey, OntolDefTag, PropId,
 };
 use thin_vec::thin_vec;
 
 use crate::{
     def::{DefKind, Defs},
-    interface::serde::{serde_generator::SerdeGenerator, SerdeKey},
+    interface::serde::{SerdeKey, serde_generator::SerdeGenerator},
     misc::MiscCtx,
     phf_build::build_phf_index_map,
     properties::PropCtx,

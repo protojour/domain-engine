@@ -3,41 +3,42 @@
 use std::{convert::Infallible, sync::Arc};
 
 use axum::{
+    Extension,
     body::Body,
     extract::{FromRequest, FromRequestParts, OriginalUri},
     handler::Handler,
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, post, MethodFilter, MethodRouter},
-    Extension,
+    routing::{MethodFilter, MethodRouter, get, post},
 };
 use axum_extra::extract::JsonLines;
 use bytes::{BufMut, Bytes, BytesMut};
 use content_type::JsonContentType;
 use crdt::{
-    broker::{load_broker, BrokerManagerHandle},
+    ActorExt, DocAddr,
+    broker::{BrokerManagerHandle, load_broker},
     doc_repository::DocRepository,
     sync_session::SyncSession,
-    ActorExt, DocAddr,
 };
 use domain_engine_core::{
+    CrdtActor, DomainEngine, DomainError, FindEntitySelect, SelectMode, Session,
     domain_error::DomainErrorKind,
     domain_select::domain_select_no_edges,
     transact::{AccumulateSequences, ReqMessage, TransactionMode},
-    CrdtActor, DomainEngine, DomainError, FindEntitySelect, SelectMode, Session,
 };
-use futures_util::{stream::StreamExt, TryStreamExt};
-use http::{header, HeaderValue, Uri};
-use http_error::{json_error, HttpJsonError};
+use futures_util::{TryStreamExt, stream::StreamExt};
+use http::{HeaderValue, Uri, header};
+use http_error::{HttpJsonError, json_error};
 use ontol_runtime::{
+    DefId, DomainIndex, MapKey, PropId,
     attr::{Attr, AttrMatrix, AttrRef},
     interface::{
+        DomainInterface,
         http_json::{HttpDefResource, HttpMapGetResource, HttpResource},
         serde::{
             operator::SerdeOperatorAddr,
             processor::{ProcessorMode, SerdeProcessor},
         },
-        DomainInterface,
     },
     ontology::ontol::TextConstant,
     query::{
@@ -47,13 +48,12 @@ use ontol_runtime::{
     },
     sequence::Sequence,
     value::Value,
-    DefId, DomainIndex, MapKey, PropId,
 };
 use serde::{
-    de::{value::StringDeserializer, DeserializeSeed},
     Deserialize, Deserializer,
+    de::{DeserializeSeed, value::StringDeserializer},
 };
-use tracing::{debug, error, info, info_span, Instrument};
+use tracing::{Instrument, debug, error, info, info_span};
 use uuid::Uuid;
 
 pub mod crdt;
@@ -786,7 +786,7 @@ fn deserialize_ontol_value<'d>(
                     DomainErrorKind::BadInputData(format!("{error}")).into_error()
                 }
                 _ => DomainErrorKind::BadInputFormat(format!("{error}")).into_error(),
-            })
+            });
         }
     };
     let ontol_value = match ontol_attr {

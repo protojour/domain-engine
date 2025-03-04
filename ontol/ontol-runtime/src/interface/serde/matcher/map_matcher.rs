@@ -8,6 +8,7 @@ use crate::{
     interface::{
         discriminator::{Discriminant, LeafDiscriminant, VariantPurpose},
         serde::{
+            OntologyCtx,
             operator::{
                 AppliedVariants, PossibleVariants, SerdeOperator, SerdeOperatorAddr,
                 SerdeUnionVariant, StructOperator,
@@ -16,7 +17,6 @@ use crate::{
                 ProcessorLevel, ProcessorMode, ProcessorProfile, ScalarFormat, SpecialProperty,
                 SubProcessorContext,
             },
-            OntologyCtx,
         },
     },
 };

@@ -7,8 +7,8 @@ use ulid::Ulid;
 use uuid::Uuid;
 
 use crate::{
-    value::{OctetSequence, Value, ValueTagError},
     DefId,
+    value::{OctetSequence, Value, ValueTagError},
 };
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize, RustDoc)]

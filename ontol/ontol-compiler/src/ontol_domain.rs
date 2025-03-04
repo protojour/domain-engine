@@ -6,22 +6,22 @@ use indexmap::IndexMap;
 use ontol_hir::OverloadFunc;
 use ontol_macros::RustDoc;
 use ontol_runtime::{
-    ontology::{domain::DomainId, ontol::TextLikeType},
     DefId, DomainIndex, OntolDefTag,
+    ontology::{domain::DomainId, ontol::TextLikeType},
 };
 use ulid::Ulid;
 
 use crate::{
+    Compiler, NO_SPAN,
     def::{BuiltinRelationKind, DefKind, TypeDef, TypeDefFlags},
     mem::Intern,
     misc::{RelObjectConstraint, RelTypeConstraints, TypeParam},
     namespace::Space,
     properties::Constructor,
     regex_util,
-    text_patterns::{store_text_pattern_segment, TextPatternSegment},
+    text_patterns::{TextPatternSegment, store_text_pattern_segment},
     thesaurus::TypeRelation,
     types::{FunctionType, Type, TypeRef},
-    Compiler, NO_SPAN,
 };
 
 /// `ontol` is the original domain.

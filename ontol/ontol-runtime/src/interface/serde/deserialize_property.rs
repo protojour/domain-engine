@@ -1,10 +1,10 @@
 use compact_str::CompactString;
 use serde::{
-    de::{DeserializeSeed, Error, Visitor},
     Deserializer,
+    de::{DeserializeSeed, Error, Visitor},
 };
 
-use crate::{ontology::domain::DefKind, phf::PhfIndexMap, PropId};
+use crate::{PropId, ontology::domain::DefKind, phf::PhfIndexMap};
 
 use super::{
     deserialize_struct::StructDeserializer,

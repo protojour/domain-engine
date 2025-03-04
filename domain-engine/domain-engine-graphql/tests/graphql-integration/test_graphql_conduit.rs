@@ -2,11 +2,11 @@ use core::str;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use domain_engine_core::{system::SystemApiMock, DomainEngine, Session};
+use domain_engine_core::{DomainEngine, Session, system::SystemApiMock};
 use domain_engine_graphql::{
-    domain::{context::ServiceCtx, DomainSchema},
+    domain::{DomainSchema, context::ServiceCtx},
     gql_scalar::GqlScalar,
-    juniper::{graphql_value, InputValue, ScalarValue, Value},
+    juniper::{InputValue, ScalarValue, Value, graphql_value},
 };
 use domain_engine_test_utils::{
     dynamic_data_store::DynamicDataStoreFactory,
@@ -16,12 +16,12 @@ use domain_engine_test_utils::{
     unimock::MockFn,
 };
 use ontol_examples::{
-    conduit::{blog_post_public, conduit_db, feed_public},
     AsAtlas,
+    conduit::{blog_post_public, conduit_db, feed_public},
 };
 use ontol_macros::datastore_test;
 use ontol_runtime::ontology::Ontology;
-use ontol_test_utils::{expect_eq, TestPackages};
+use ontol_test_utils::{TestPackages, expect_eq};
 use tracing::info;
 
 fn conduit_db_only() -> TestPackages {

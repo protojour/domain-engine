@@ -2,20 +2,20 @@ use bit_vec::BitVec;
 use tracing::trace;
 
 use super::{
-    proc::{GetAttrFlags, Lib, OpCodeCondTerm},
     VmResult,
+    proc::{GetAttrFlags, Lib, OpCodeCondTerm},
 };
 use crate::{
+    DefId, PropId,
     debug::OntolDebug,
     ontology::{
-        aspects::{aspect, DefsAspect, ExecutionAspect},
+        aspects::{DefsAspect, ExecutionAspect, aspect},
         ontol::TextConstant,
     },
     property::ValueCardinality,
     query::condition::ClausePair,
     var::Var,
     vm::proc::{BuiltinProc, Local, OpCode, Predicate, Procedure},
-    DefId, PropId,
 };
 
 /// Abstract virtual machine for executing ONTOL procedures.

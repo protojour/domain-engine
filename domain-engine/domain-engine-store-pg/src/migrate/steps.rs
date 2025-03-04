@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use itertools::Itertools;
 use ontol_runtime::{
+    DefId, DefPropTag, DomainIndex,
     debug::OntolDebug,
     ontology::{
         aspects::DefsAspect,
@@ -11,9 +12,8 @@ use ontol_runtime::{
     },
     property::ValueCardinality,
     tuple::CardinalIdx,
-    DefId, DefPropTag, DomainIndex,
 };
-use tracing::{error, trace_span, Instrument};
+use tracing::{Instrument, error, trace_span};
 
 use crate::{
     migrate::{MigrationStep, PgDomain},

@@ -3,13 +3,13 @@
 use std::collections::HashSet;
 
 use fnv::FnvHashMap;
-use indexmap::{map::Entry, IndexMap};
+use indexmap::{IndexMap, map::Entry};
 use ontol_runtime::{DefId, OntolDefTag};
-use thin_vec::{thin_vec, ThinVec};
+use thin_vec::{ThinVec, thin_vec};
 
 use crate::{
+    NO_SPAN, SourceSpan,
     def::{DefKind, Defs},
-    SourceSpan, NO_SPAN,
 };
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]

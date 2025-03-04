@@ -4,7 +4,7 @@ use ontol_parser::cst::{
 };
 use ontol_runtime::DefId;
 
-use crate::{def::DefKind, namespace::Space, pattern::PatId, CompileError};
+use crate::{CompileError, def::DefKind, namespace::Space, pattern::PatId};
 
 use super::context::{BlockContext, Coinage, CstLowering, MapVarTable};
 

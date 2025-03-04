@@ -5,26 +5,26 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use domain_engine_core::{
+    DomainError, Session,
     data_store::{DataStoreFactory, DataStoreFactorySync, DataStoreParams},
     make_interfacable::MakeInterfacable,
     make_storable::MakeStorable,
     system::ArcSystemApi,
     transact::{DataOperation, OpSequence, ReqMessage, RespMessage, TransactionMode, WriteStats},
-    DomainError, Session,
 };
 use fnv::{FnvHashMap, FnvHashSet};
-use futures_util::stream::BoxStream;
 use futures_util::StreamExt;
+use futures_util::stream::BoxStream;
 use ontol_runtime::interface::serde::processor::ProcessorMode;
-use ontol_runtime::ontology::domain::EdgeCardinalFlags;
 use ontol_runtime::ontology::Ontology;
+use ontol_runtime::ontology::domain::EdgeCardinalFlags;
 use ontol_runtime::query::select::Select;
 use ontol_runtime::value::Value;
 use ontol_runtime::{DefId, DomainIndex};
 use tokio::sync::RwLock;
 
 use constraint::ConstraintCheck;
-use domain_engine_core::{data_store::DataStoreAPI, DomainResult};
+use domain_engine_core::{DomainResult, data_store::DataStoreAPI};
 use tracing::debug;
 
 use crate::core::{DynamicKey, HyperEdgeTable, InMemoryStore, VertexTable};

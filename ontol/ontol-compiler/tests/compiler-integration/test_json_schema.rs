@@ -3,7 +3,7 @@ use ontol_macros::test;
 use ontol_runtime::interface::{
     json_schema::build_openapi_schemas, serde::processor::ProcessorMode::*,
 };
-use ontol_test_utils::{expect_eq, TestCompile};
+use ontol_test_utils::{TestCompile, expect_eq};
 use serde_json::json;
 
 #[test]

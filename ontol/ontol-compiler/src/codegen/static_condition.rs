@@ -1,16 +1,16 @@
 use ontol_hir::{Kind, Node, PropVariant};
 use ontol_runtime::{
+    OntolDefTag,
     interface::discriminator::{Discriminant, LeafDiscriminant},
     query::condition::{Clause, CondTerm, Condition, SetOperator},
     value::Value,
     var::Var,
-    OntolDefTag,
 };
 use tracing::debug;
 
 use crate::{
-    typed_hir::{TypedArena, TypedRootNode},
     CompileError, CompileErrors, Compiler,
+    typed_hir::{TypedArena, TypedRootNode},
 };
 
 pub fn generate_static_condition_from_scope<'m>(

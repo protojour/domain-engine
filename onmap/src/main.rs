@@ -2,15 +2,15 @@
 
 use std::{fs::File, io::Read, path::PathBuf, sync::Arc};
 
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use clap::{Parser, ValueEnum};
 use clap_stdin::FileOrStdin;
 use ontol_runtime::{
+    DomainIndex, MapDef, MapDefFlags, MapFlags, MapKey,
     attr::{Attr, AttrRef},
     interface::serde::processor::ProcessorMode,
     ontology::Ontology,
     vm::VmState,
-    DomainIndex, MapDef, MapDefFlags, MapFlags, MapKey,
 };
 use serde::de::DeserializeSeed;
 

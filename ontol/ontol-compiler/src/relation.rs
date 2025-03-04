@@ -8,19 +8,19 @@ use std::{
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    DefId, DomainIndex,
     ontology::domain::EdgeCardinalProjection,
     property::{Cardinality, ValueCardinality},
-    DefId, DomainIndex,
 };
 use tracing::trace;
 
 use crate::{
+    NO_SPAN, OwnedOrRef, SourceSpan, SpannedBorrow,
     def::{DefKind, Defs},
     repr::{
         repr_ctx::ReprCtx,
         repr_model::{ReprKind, ReprScalarKind},
     },
-    OwnedOrRef, SourceSpan, SpannedBorrow, NO_SPAN,
 };
 
 /// Context that tracks relation and relationship information
@@ -63,7 +63,7 @@ impl RelCtx {
         self.table.get_mut(&rel_id).map(|(rel, _)| rel)
     }
 
-    pub fn iter_rel_ids(&self, def_id: DefId) -> impl Iterator<Item = RelId> {
+    pub fn iter_rel_ids(&self, def_id: DefId) -> impl Iterator<Item = RelId> + use<> {
         let max_tag = self
             .allocators
             .get(&def_id)
@@ -109,13 +109,13 @@ impl RelId {
 /// This forces single-line output even when pretty-printed
 impl ::std::fmt::Debug for RelId {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "rel@{}:{}:{}", self.0 .0.index(), self.0 .1, self.1 .0)
+        write!(f, "rel@{}:{}:{}", self.0.0.index(), self.0.1, self.1.0)
     }
 }
 
 impl ::std::fmt::Display for RelId {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "rel@{}:{}:{}", self.0 .0.index(), self.0 .1, self.1 .0)
+        write!(f, "rel@{}:{}:{}", self.0.0.index(), self.0.1, self.1.0)
     }
 }
 

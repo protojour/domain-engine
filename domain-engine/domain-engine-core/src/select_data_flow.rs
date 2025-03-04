@@ -2,14 +2,14 @@ use std::{cmp::Ordering, collections::BTreeMap};
 
 use itertools::Itertools;
 use ontol_runtime::{
+    DefId, DomainIndex, MapKey, PropId,
     debug::OntolDebug,
     ontology::{
-        map::{PropertyFlow, PropertyFlowData},
         Ontology,
+        map::{PropertyFlow, PropertyFlowData},
     },
     property::{PropertyCardinality, ValueCardinality},
     query::select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
-    DefId, DomainIndex, MapKey, PropId,
 };
 use tracing::{debug, trace};
 

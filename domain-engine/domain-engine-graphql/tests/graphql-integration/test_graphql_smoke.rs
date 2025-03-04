@@ -11,7 +11,7 @@ use domain_engine_test_utils::{
 };
 use ontol_examples::demo;
 use ontol_macros::test;
-use ontol_test_utils::{file_url, TestPackages};
+use ontol_test_utils::{TestPackages, file_url};
 use unimock::Unimock;
 
 #[test]

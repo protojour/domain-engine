@@ -9,18 +9,17 @@ use thin_vec::ThinVec;
 use ulid::Ulid;
 
 use crate::{
-    impl_ontol_debug,
+    DefId, DefIdSet, FnvIndexMap, PropId, impl_ontol_debug,
     interface::serde::operator::SerdeOperatorAddr,
     property::Cardinality,
     query::order::Direction,
     tuple::CardinalIdx,
     vec_map::{VecMap, VecMapKey},
-    DefId, DefIdSet, FnvIndexMap, PropId,
 };
 
 use super::{
-    ontol::{TextConstant, ValueGenerator},
     Ontology,
+    ontol::{TextConstant, ValueGenerator},
 };
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -424,7 +423,7 @@ impl Debug for EdgeCardinalProjection {
         write!(
             f,
             "{}:{}:{}<-{}",
-            self.edge_id.0 .0, self.edge_id.1, self.object, self.subject,
+            self.edge_id.0.0, self.edge_id.1, self.object, self.subject,
         )
     }
 }

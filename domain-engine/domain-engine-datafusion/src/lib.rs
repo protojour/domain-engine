@@ -7,22 +7,22 @@ use datafusion_execution::{SendableRecordBatchStream, TaskContext};
 use datafusion_expr::{Expr, TableProviderFilterPushDown, TableType};
 use datafusion_physical_expr::EquivalenceProperties;
 use datafusion_physical_plan::{
+    DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning, PlanProperties,
     execution_plan::{Boundedness, EmissionType},
     stream::RecordBatchStreamAdapter,
-    DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning, PlanProperties,
 };
 use domain_engine_arrow::{
-    schema::ArrowSchemaBuilder, ArrowConfig, ArrowQuery, ArrowReqMessage, ArrowRespMessage,
+    ArrowConfig, ArrowQuery, ArrowReqMessage, ArrowRespMessage, schema::ArrowSchemaBuilder,
 };
 use domain_engine_core::{DomainEngine, Session};
 use filter::{ConditionBuilder, DatafusionFilter};
 use futures_util::StreamExt;
 use ontol_runtime::{
+    DefId, DomainIndex,
     ontology::{
         aspects::DefsAspect,
         domain::{Def, Domain, Entity},
     },
-    DefId, DomainIndex,
 };
 
 pub use domain_engine_arrow::ArrowTransactAPI;
@@ -360,7 +360,7 @@ impl ExecutionPlan for EntityScan {
 
 pub mod error {
     use datafusion_common::DataFusionError;
-    use domain_engine_core::{domain_error::DomainErrorKind, DomainError};
+    use domain_engine_core::{DomainError, domain_error::DomainErrorKind};
 
     pub fn domain_to_datafusion(err: DomainError) -> DataFusionError {
         DataFusionError::External(Box::new(err))

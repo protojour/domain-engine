@@ -4,15 +4,15 @@ use ontol_parser::cst::{
     inspect::{self as insp},
     view::{NodeView, TokenView},
 };
-use ontol_runtime::{tuple::CardinalIdx, DefId};
+use ontol_runtime::{DefId, tuple::CardinalIdx};
 use tracing::debug_span;
 
 use crate::{
+    CompileError, Compiler, Src,
     edge::{CardinalKind, EdgeId},
     namespace::{DocId, Space},
-    ontol_syntax::{extract_domain_headerdata, OntolHeaderData, WithDocs},
+    ontol_syntax::{OntolHeaderData, WithDocs, extract_domain_headerdata},
     topology::DomainUrl,
-    CompileError, Compiler, Src,
 };
 
 use super::{

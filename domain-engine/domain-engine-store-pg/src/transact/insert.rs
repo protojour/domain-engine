@@ -1,14 +1,15 @@
 use std::{borrow::Cow, collections::hash_map::Entry, ops::Deref};
 
 use domain_engine_core::{
-    domain_error::DomainErrorKind,
-    entity_id_utils::{try_generate_entity_id, GeneratedId},
-    transact::DataOperation,
     DomainResult,
+    domain_error::DomainErrorKind,
+    entity_id_utils::{GeneratedId, try_generate_entity_id},
+    transact::DataOperation,
 };
 use fnv::FnvHashMap;
-use futures_util::{future::BoxFuture, TryStreamExt};
+use futures_util::{TryStreamExt, future::BoxFuture};
 use ontol_runtime::{
+    DefId, DomainIndex, PropId,
     attr::Attr,
     crdt::Automerge,
     ontology::{
@@ -17,14 +18,13 @@ use ontol_runtime::{
     },
     query::select::Select,
     value::Value,
-    DefId, DomainIndex, PropId,
 };
 use pin_utils::pin_mut;
 use tokio_postgres::{Row, ToStatement};
 use tracing::{debug, trace, warn};
 
 use crate::{
-    pg_error::{map_row_error, PgError, PgInputError},
+    pg_error::{PgError, PgInputError, map_row_error},
     pg_model::{
         EdgeId, InDomain, PgColumnRef, PgDataKey, PgDomainTable, PgDomainTableType, PgRepr,
     },
@@ -37,12 +37,12 @@ use crate::{
 };
 
 use super::{
+    InsertMode, MutationMode, TransactCtx,
     data::{Data, ParentProp, RowValue},
     edge_patch::{EdgeEndoTuplePatch, EdgePatches},
     mut_ctx::PgMutCtx,
     query::{DefAliasKey, QueryBuildCtx},
     query_select::{QuerySelect, QuerySelectRef},
-    InsertMode, MutationMode, TransactCtx,
 };
 
 #[derive(Clone)]
@@ -471,7 +471,7 @@ impl<'a> TransactCtx<'a> {
                         }
                     }
                     InsertMode::Upsert => {
-                        return Err(DomainErrorKind::InherentIdNotFound.into_error())
+                        return Err(DomainErrorKind::InherentIdNotFound.into_error());
                     }
                 }
             }

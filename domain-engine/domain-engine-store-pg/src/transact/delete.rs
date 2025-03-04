@@ -1,5 +1,5 @@
-use domain_engine_core::{domain_error::DomainErrorKind, DomainResult};
-use ontol_runtime::{value::Value, DefId};
+use domain_engine_core::{DomainResult, domain_error::DomainErrorKind};
+use ontol_runtime::{DefId, value::Value};
 use tracing::{debug, warn};
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
     transact::data::Data,
 };
 
-use super::{mut_ctx::PgMutCtx, TransactCtx};
+use super::{TransactCtx, mut_ctx::PgMutCtx};
 
 impl TransactCtx<'_> {
     /// TODO: prepare statement(s)?

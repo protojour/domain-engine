@@ -11,6 +11,7 @@ use itertools::{Itertools, Position};
 use thin_vec::ThinVec;
 
 use crate::{
+    DefId, DomainIndex, OntolDefTag, PropId,
     attr::{Attr, AttrMatrix},
     cast::Cast,
     crdt::CrdtStruct,
@@ -18,7 +19,6 @@ use crate::{
     query::filter::Filter,
     sequence::Sequence,
     tuple::EndoTupleElements,
-    DefId, DomainIndex, OntolDefTag, PropId,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -170,11 +170,7 @@ impl Value {
     }
 
     pub fn filter_non_unit(&self) -> Option<&Self> {
-        if self.is_unit() {
-            None
-        } else {
-            Some(self)
-        }
+        if self.is_unit() { None } else { Some(self) }
     }
 
     pub fn get_attribute(&self, prop_id: PropId) -> Option<&Attr> {

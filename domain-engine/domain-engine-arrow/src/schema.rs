@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use arrow_schema::{DataType, Field, Fields, Schema, TimeUnit};
 use ontol_runtime::{
+    DefId, PropId,
     ontology::{
         aspects::DefsAspect,
         domain::{DataRelationshipTarget, Def, DefRepr},
     },
     property::{PropertyCardinality, ValueCardinality},
-    DefId, PropId,
 };
 use serde::{Deserialize, Serialize};
 

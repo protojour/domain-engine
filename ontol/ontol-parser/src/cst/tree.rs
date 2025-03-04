@@ -1,10 +1,10 @@
 use std::{fmt::Display, ops::Range};
 
-use thin_vec::{thin_vec, ThinVec};
+use thin_vec::{ThinVec, thin_vec};
 
 use crate::{
-    lexer::{kind::Kind, Lex},
     ToUsizeRange, U32Span,
+    lexer::{Lex, kind::Kind},
 };
 
 use super::view::{Item, NodeView, TokenView};

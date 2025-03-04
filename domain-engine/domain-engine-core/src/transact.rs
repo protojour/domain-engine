@@ -1,7 +1,8 @@
 use std::{collections::BTreeSet, future::Future, sync::Arc};
 
-use futures_util::{stream::BoxStream, Stream, StreamExt, TryStreamExt};
+use futures_util::{Stream, StreamExt, TryStreamExt, stream::BoxStream};
 use ontol_runtime::{
+    DefId, PropId,
     query::{
         filter::Filter,
         select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
@@ -9,17 +10,16 @@ use ontol_runtime::{
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolvePath},
     sequence::{Sequence, SubSequence},
     value::Value,
-    DefId, PropId,
 };
 use serde::{Deserialize, Serialize};
 use tracing::trace;
 
 use crate::{
+    DomainEngine, DomainError, DomainResult, Session, VertexAddr,
     domain_error::DomainErrorKind,
     select_data_flow::{translate_entity_select, translate_select},
     system::SystemAPI,
     update::sanitize_update,
-    DomainEngine, DomainError, DomainResult, Session, VertexAddr,
 };
 
 /// The kind of data store transaction

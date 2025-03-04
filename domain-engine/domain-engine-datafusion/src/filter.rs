@@ -2,9 +2,10 @@ use std::collections::BTreeMap;
 
 use datafusion_common::ScalarValue;
 use datafusion_expr::{BinaryExpr, Expr, Operator};
-use domain_engine_arrow::schema::{iter_arrow_fields, FieldType};
+use domain_engine_arrow::schema::{FieldType, iter_arrow_fields};
 use domain_engine_core::domain_select;
 use ontol_runtime::{
+    DefId, PropId,
     ontology::{aspects::DefsAspect, domain::Def},
     query::{
         condition::{Clause, CondTerm, Condition, SetOperator, SetPredicate},
@@ -13,7 +14,6 @@ use ontol_runtime::{
     },
     value::Value,
     var::Var,
-    DefId, PropId,
 };
 use tracing::trace;
 

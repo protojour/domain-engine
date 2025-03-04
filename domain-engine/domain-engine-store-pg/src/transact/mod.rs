@@ -1,30 +1,30 @@
 use std::sync::Arc;
 
 use domain_engine_core::{
+    DomainError, DomainResult,
     make_interfacable::MakeInterfacable,
     make_storable::MakeStorable,
     system::SystemAPI,
     transact::{DataOperation, OpSequence, ReqMessage, RespMessage, TransactionMode},
-    DomainError, DomainResult,
 };
-use futures_util::{stream::BoxStream, StreamExt};
+use futures_util::{StreamExt, stream::BoxStream};
 use mut_ctx::PgMutCtx;
 use ontol_runtime::{
+    DefId,
     interface::serde::processor::ProcessorMode,
     ontology::aspects::{DefsAspect, SerdeAspect},
     query::select::Select,
     value::Value,
-    DefId,
 };
 use query::QueryFrame;
 use tokio_postgres::IsolationLevel;
 use tracing::trace;
 
 use crate::{
+    PgModel, PostgresDataStore,
     compaction::CompactionCtx,
     pg_error::{PgError, PgModelError},
     pg_model::PgDef,
-    PgModel, PostgresDataStore,
 };
 
 mod condition;

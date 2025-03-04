@@ -3,17 +3,17 @@
 use std::{collections::BTreeSet, sync::Arc};
 
 use anyhow::anyhow;
-use compaction::{compaction_task, CompactionCtx};
+use compaction::{CompactionCtx, compaction_task};
 use domain_engine_core::{
+    DomainResult, Session,
     data_store::DataStoreAPI,
     system::ArcSystemApi,
     transact::{ReqMessage, RespMessage, TransactionMode},
-    DomainResult, Session,
 };
 use futures_util::stream::BoxStream;
 use ontol_runtime::{
-    ontology::{aspects::DefsAspect, Ontology},
     DomainIndex, PropId,
+    ontology::{Ontology, aspects::DefsAspect},
 };
 use tokio_postgres::NoTls;
 
@@ -35,7 +35,7 @@ mod transact;
 pub use deadpool_postgres;
 pub use tokio_postgres;
 use tokio_util::task::AbortOnDropHandle;
-use tracing::{error, info, info_span, Instrument};
+use tracing::{Instrument, error, info, info_span};
 
 pub type PgResult<T> = Result<T, tokio_postgres::Error>;
 

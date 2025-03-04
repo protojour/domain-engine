@@ -1,17 +1,17 @@
 use indoc::indoc;
 use ontol_examples::{
+    AsAtlas,
     conduit::{
         blog_post_public, conduit_contrived_signup, conduit_db, conduit_public, feed_public,
     },
-    AsAtlas,
 };
 use ontol_macros::test;
 use ontol_runtime::{
-    format_utils::Literal, property::ValueCardinality, tuple::CardinalIdx, value::Value, DefIdSet,
+    DefIdSet, format_utils::Literal, property::ValueCardinality, tuple::CardinalIdx, value::Value,
 };
-use ontol_test_utils::{test_map::YielderMock, TestCompile, TestPackages};
+use ontol_test_utils::{TestCompile, TestPackages, test_map::YielderMock};
 use serde_json::json;
-use unimock::{matching, MockFn};
+use unimock::{MockFn, matching};
 
 #[test]
 fn test_compile_conduit_public() {

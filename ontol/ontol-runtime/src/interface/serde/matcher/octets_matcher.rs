@@ -1,8 +1,8 @@
 use base64::Engine;
 
 use crate::{
-    value::{OctetSequence, Value},
     DefId, OntolDefTag,
+    value::{OctetSequence, Value},
 };
 
 use super::ValueMatcher;

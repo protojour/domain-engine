@@ -3,14 +3,15 @@ use std::collections::HashSet;
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::{IndexMap, IndexSet};
 use ontol_runtime::{
+    DefId, PropId,
     interface::discriminator::{Discriminant, LeafDiscriminant},
     ontology::ontol::TextConstant,
-    DefId, PropId,
 };
 use patricia_tree::PatriciaMap;
 use tracing::{debug, debug_span};
 
 use crate::{
+    SourceSpan, SpannedCompileError,
     def::{Def, DefKind},
     error::CompileError,
     misc::{UnionDiscriminator, UnionDiscriminatorRole, UnionDiscriminatorVariant},
@@ -22,7 +23,6 @@ use crate::{
     strings::StringCtx,
     text_patterns::TextPatternSegment,
     types::{FormatType, Type},
-    SourceSpan, SpannedCompileError,
 };
 
 use super::TypeCheck;
@@ -299,10 +299,10 @@ impl<'m> TypeCheck<'_, 'm> {
                     }
                 }
                 Constructor::Sequence(sequence) => {
-                    return Ok(DomainTypeMatchData::Sequence(sequence))
+                    return Ok(DomainTypeMatchData::Sequence(sequence));
                 }
                 Constructor::TextFmt(segment) => {
-                    return Ok(DomainTypeMatchData::ConstructorStringPattern(segment))
+                    return Ok(DomainTypeMatchData::ConstructorStringPattern(segment));
                 }
             }
         }

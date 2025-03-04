@@ -1,5 +1,5 @@
 use axum::{body::Body, response::IntoResponse};
-use domain_engine_core::{domain_error::DomainErrorKind, DomainError};
+use domain_engine_core::{DomainError, domain_error::DomainErrorKind};
 use http::StatusCode;
 use serde::Serialize;
 use tracing::info;

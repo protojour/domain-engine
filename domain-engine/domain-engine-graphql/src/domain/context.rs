@@ -7,6 +7,7 @@ use std::sync::Arc;
 use arcstr::ArcStr;
 use domain_engine_core::DomainEngine;
 use ontol_runtime::{
+    DefId,
     interface::{
         graphql::{
             data::{NativeScalarRef, TypeAddr, TypeData, TypeKind, UnitTypeRef},
@@ -16,7 +17,6 @@ use ontol_runtime::{
     },
     ontology::Ontology,
     value::Value,
-    DefId,
 };
 use tracing::debug;
 

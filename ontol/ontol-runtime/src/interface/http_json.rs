@@ -1,6 +1,6 @@
 use ::serde::{Deserialize, Serialize};
 
-use crate::{ontology::ontol::TextConstant, DefId, MapKey, PropId};
+use crate::{DefId, MapKey, PropId, ontology::ontol::TextConstant};
 
 use super::serde::operator::SerdeOperatorAddr;
 

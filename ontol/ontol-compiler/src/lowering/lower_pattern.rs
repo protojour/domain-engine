@@ -1,21 +1,21 @@
 use ontol_parser::{
+    U32Span,
     cst::{
         inspect as insp,
         view::{NodeView, NodeViewExt, TokenView, TokenViewExt},
     },
     lexer::{kind::Kind, unescape::unescape_regex},
-    U32Span,
 };
-use ontol_runtime::{property::ValueCardinality, DefId};
+use ontol_runtime::{DefId, property::ValueCardinality};
 
 use crate::{
+    CompileError, SourceSpan,
     def::{TypeDef, TypeDefFlags},
     pattern::{
         CompoundPatternAttr, CompoundPatternAttrKind, CompoundPatternModifier, Pattern,
         PatternKind, SetBinaryOperator, SetPatternElement, SpreadLabel, TypePath,
     },
     regex_util::RegexToPatternLowerer,
-    CompileError, SourceSpan,
 };
 
 use super::{

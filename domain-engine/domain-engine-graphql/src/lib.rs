@@ -2,7 +2,7 @@
 
 use std::fmt::Display;
 
-use ::juniper::{graphql_value, FieldError};
+use ::juniper::{FieldError, graphql_value};
 
 pub mod cursor_util;
 pub mod domain;

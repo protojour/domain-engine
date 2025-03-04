@@ -1,6 +1,6 @@
 use ontol_examples::workspaces;
 use ontol_runtime::{debug::OntolDebug, ontology::domain::DefRepr};
-use ontol_test_utils::{assert_json_io_matches, serde_helper::serde_create, TestCompile};
+use ontol_test_utils::{TestCompile, assert_json_io_matches, serde_helper::serde_create};
 use serde_json::json;
 
 #[test]

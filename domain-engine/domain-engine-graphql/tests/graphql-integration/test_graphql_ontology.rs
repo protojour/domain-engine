@@ -5,10 +5,10 @@ use domain_engine_graphql::{
     ontology::{OntologyCtx, OntologySchema},
 };
 use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema, ValueExt};
-use juniper::{graphql_value, ScalarValue};
+use juniper::{ScalarValue, graphql_value};
 use ontol_examples::stix::stix_bundle;
 use ontol_macros::datastore_test;
-use ontol_test_utils::{expect_eq, TestCompile};
+use ontol_test_utils::{TestCompile, expect_eq};
 use tracing::info;
 
 use crate::{mk_engine_default, mk_engine_with_mock};

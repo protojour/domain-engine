@@ -1,8 +1,8 @@
 use std::fmt::{Debug, Display};
 
 use crate::{
-    types::{TypeRef, ERROR_TYPE, UNIT_TYPE},
-    SourceSpan, NO_SPAN,
+    NO_SPAN, SourceSpan,
+    types::{ERROR_TYPE, TypeRef, UNIT_TYPE},
 };
 
 /// An ontol_hir language "dialect" with type information and source spans.

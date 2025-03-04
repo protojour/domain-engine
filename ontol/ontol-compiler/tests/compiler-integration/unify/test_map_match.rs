@@ -2,10 +2,10 @@ use indoc::indoc;
 use ontol_macros::test;
 use ontol_runtime::{format_utils::Literal, property::ValueCardinality, value::Value};
 use ontol_test_utils::{
-    assert_error_msg, serde_helper::serde_create, test_map::YielderMock, TestCompile,
+    TestCompile, assert_error_msg, serde_helper::serde_create, test_map::YielderMock,
 };
 use serde_json::json;
-use unimock::{matching, MockFn};
+use unimock::{MockFn, matching};
 
 #[test]
 fn test_map_match_scalar_key() {

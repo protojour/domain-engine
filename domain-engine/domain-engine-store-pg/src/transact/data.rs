@@ -1,16 +1,16 @@
 use std::collections::BTreeMap;
 
 use compact_str::CompactString;
-use domain_engine_core::{transact::DataOperation, DomainResult};
+use domain_engine_core::{DomainResult, transact::DataOperation};
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    DefId, PropId,
     attr::Attr,
     crdt::CrdtStruct,
     ontology::domain::{DefKind, DefRepr},
     query::filter::Filter,
     sequence::Sequence,
     value::{Serial, Value, ValueTag},
-    DefId, PropId,
 };
 
 use crate::{

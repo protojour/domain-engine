@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::HashMap};
 
 use heck::{AsLowerCamelCase, AsSnakeCase};
 use itertools::Itertools;
-use ontol_runtime::{ontology::aspects::DefsAspect, DefId, DomainIndex};
+use ontol_runtime::{DefId, DomainIndex, ontology::aspects::DefsAspect};
 
 use crate::{
     def::{DefKind, Defs},

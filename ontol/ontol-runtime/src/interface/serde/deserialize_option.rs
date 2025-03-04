@@ -1,6 +1,6 @@
 use serde::{
-    de::{DeserializeSeed, Error, Visitor},
     Deserializer,
+    de::{DeserializeSeed, Error, Visitor},
 };
 
 use crate::attr::Attr;

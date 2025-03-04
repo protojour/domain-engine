@@ -2,8 +2,8 @@
 
 use assert_matches::assert_matches;
 use ontol_macros::test;
-use ontol_runtime::{value::Value, PropId};
-use ontol_test_utils::{assert_error_msg, serde_helper::*, TestCompile};
+use ontol_runtime::{PropId, value::Value};
+use ontol_test_utils::{TestCompile, assert_error_msg, serde_helper::*};
 use serde_json::json;
 
 #[test]

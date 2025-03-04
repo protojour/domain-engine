@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use ontol_examples::{geojson, wgs, AsAtlas};
+use ontol_examples::{AsAtlas, geojson, wgs};
 use ontol_macros::test;
 use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches, file_url, serde_helper::*, TestCompile, TestPackages,
+    TestCompile, TestPackages, assert_error_msg, assert_json_io_matches, file_url, serde_helper::*,
 };
 use serde_json::json;
 

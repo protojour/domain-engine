@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use domain_engine_core::{DomainEngine, Session};
 use domain_engine_graphql::domain::context::ServiceCtx;
 use domain_engine_store_inmemory::InMemoryDataStoreFactory;
@@ -8,13 +8,13 @@ use domain_engine_test_utils::graphql_test_utils::Exec;
 use indoc::indoc;
 use ontol_compiler::topology::DomainUrl;
 use ontol_examples::{
-    conduit::{blog_post_public, conduit_db, feed_public},
     AsAtlas,
+    conduit::{blog_post_public, conduit_db, feed_public},
 };
 use ontol_runtime::{
     attr::AttrRef, interface::serde::operator::SerdeOperatorAddr, ontology::Ontology,
 };
-use ontol_test_utils::{file_url, TestCompile, TestPackages};
+use ontol_test_utils::{TestCompile, TestPackages, file_url};
 use ontool::System;
 use serde::de::DeserializeSeed;
 use tokio::runtime::Runtime;

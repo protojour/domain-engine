@@ -1,14 +1,14 @@
 use domain_engine_core::Session;
 use domain_engine_graphql::{
-    domain::{context::ServiceCtx, DomainSchema},
+    domain::{DomainSchema, context::ServiceCtx},
     gql_scalar::GqlScalar,
     ontology::{OntologyCtx, OntologySchema},
 };
 use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema, ValueExt};
-use juniper::{graphql_value, InputValue};
+use juniper::{InputValue, graphql_value};
 use ontol_examples::{findings, guitar_synth_union};
 use ontol_macros::datastore_test;
-use ontol_test_utils::{expect_eq, TestPackages};
+use ontol_test_utils::{TestPackages, expect_eq};
 use tracing::info;
 
 use crate::{mk_engine_default, test_graphql_ontology::OntologyParams};

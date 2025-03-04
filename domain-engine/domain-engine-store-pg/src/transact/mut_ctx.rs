@@ -14,7 +14,7 @@ use crate::{
     statement::PreparedStatement,
 };
 
-use super::{insert::PreparedInsert, InsertMode};
+use super::{InsertMode, insert::PreparedInsert};
 
 /// A context type with mutability across one entire transaction
 pub struct PgMutCtx {

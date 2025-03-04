@@ -4,13 +4,13 @@ use arcstr::ArcStr;
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
-    interface::discriminator::Discriminant, ontology::ontol::ValueGenerator, DefId, DomainIndex,
-    PropId,
+    DefId, DomainIndex, PropId, interface::discriminator::Discriminant,
+    ontology::ontol::ValueGenerator,
 };
 
 use crate::{
-    relation::{RelId, Relationship},
     SourceSpan,
+    relation::{RelId, Relationship},
 };
 
 #[derive(Default)]

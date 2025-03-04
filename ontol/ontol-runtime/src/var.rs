@@ -7,7 +7,7 @@ use bit_set::BitSet;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    format_utils::{try_alpha_to_u32, AsAlpha, DebugViaDisplay},
+    format_utils::{AsAlpha, DebugViaDisplay, try_alpha_to_u32},
     impl_ontol_debug,
 };
 

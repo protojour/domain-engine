@@ -1,25 +1,25 @@
 use std::sync::Arc;
 
 use arrow_array::{
+    RecordBatch, RecordBatchOptions,
     builder::{
         ArrayBuilder, BinaryBuilder, BooleanBuilder, Float64Builder, Int64Builder, ListBuilder,
         PrimitiveBuilder, StringBuilder, StructBuilder,
     },
     types::TimestampMicrosecondType,
-    RecordBatch, RecordBatchOptions,
 };
 use arrow_schema::{Fields, SchemaRef};
 use domain_engine_core::transact::RespMessage;
 use ontol_runtime::{
+    PropId,
     attr::Attr,
     format_utils::format_value,
-    ontology::{aspects::DefsAspect, Ontology},
+    ontology::{Ontology, aspects::DefsAspect},
     value::Value,
-    PropId,
 };
 use tracing::error;
 
-use crate::schema::{iter_arrow_fields, ArrowSchemaBuilder, FieldType, StructFieldType};
+use crate::schema::{ArrowSchemaBuilder, FieldType, StructFieldType, iter_arrow_fields};
 
 const INITIAL_CAPACITY: usize = 128;
 

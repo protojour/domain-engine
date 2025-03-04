@@ -1,6 +1,6 @@
 #![allow(clippy::disallowed_names)]
 
-use ontol_test_utils::{file_url, TestCompile, TestPackages};
+use ontol_test_utils::{TestCompile, TestPackages, file_url};
 use std::{fs, path::PathBuf};
 
 mod interface;

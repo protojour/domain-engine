@@ -6,12 +6,12 @@ use ontol_runtime::var::Var;
 use tracing::debug;
 
 use crate::{
+    CompileError, CompileErrors, SourceSpan,
     pattern::{
         CompoundPatternAttrKind, CompoundPatternModifier, Pattern, PatternKind,
         RegexPatternCaptureNode, SetPatternElement,
     },
-    types::{TypeRef, ERROR_TYPE},
-    CompileError, CompileErrors, SourceSpan,
+    types::{ERROR_TYPE, TypeRef},
 };
 
 use super::{

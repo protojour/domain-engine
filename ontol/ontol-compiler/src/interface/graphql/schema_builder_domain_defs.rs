@@ -3,11 +3,12 @@ use std::ops::Deref;
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
+    DefId, OntolDefTag, PropId,
     debug::OntolDebug,
     interface::{
         discriminator::{
-            leaf_discriminant_scalar_union_for_has_attribute, Discriminant,
-            LeafDiscriminantScalarUnion,
+            Discriminant, LeafDiscriminantScalarUnion,
+            leaf_discriminant_scalar_union_for_has_attribute,
         },
         graphql::{
             argument,
@@ -20,25 +21,24 @@ use ontol_runtime::{
             schema::InterfaceImplementor,
         },
         serde::{
-            operator::{SerdeOperator, SerdeStructFlags},
             SerdeDef, SerdeModifier,
+            operator::{SerdeOperator, SerdeStructFlags},
         },
     },
     ontology::ontol::TextConstant,
     phf::PhfIndexMap,
     property::{PropertyCardinality, ValueCardinality},
-    DefId, OntolDefTag, PropId,
 };
 use thin_vec::thin_vec;
 use tracing::{trace, trace_span, warn};
 
 use crate::{
     def::{DefKind, TypeDefFlags},
-    interface::serde::{serde_generator::SerdeGenerator, SerdeKey},
+    interface::serde::{SerdeKey, serde_generator::SerdeGenerator},
     misc::UnionDiscriminatorVariant,
     phf_build::build_phf_index_map,
-    properties::{identifies_any, Property},
-    relation::{rel_def_meta, rel_repr_meta, RelParams, RelReprMeta},
+    properties::{Property, identifies_any},
+    relation::{RelParams, RelReprMeta, rel_def_meta, rel_repr_meta},
     repr::repr_model::{ReprKind, ReprScalarKind, UnionBound},
 };
 
@@ -853,7 +853,9 @@ impl<'c> SchemaBuilder<'_, '_, 'c, '_> {
     ) {
         let (_, (prop_cardinality, value_cardinality), _) = meta.relationship.subject();
         let (value_def_id, ..) = meta.relationship.object();
-        trace!("    harvest data struct field `{prop_key}`: {prop_id} ({value_def_id:?}) ({prop_cardinality:?}, {value_cardinality:?})");
+        trace!(
+            "    harvest data struct field `{prop_key}`: {prop_id} ({value_def_id:?}) ({prop_cardinality:?}, {value_cardinality:?})"
+        );
 
         let value_properties = self.prop_ctx.properties_by_def_id(value_def_id);
 

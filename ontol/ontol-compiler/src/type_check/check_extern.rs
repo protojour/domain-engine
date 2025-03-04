@@ -1,10 +1,11 @@
 use ontol_runtime::{
-    ontology::{map::Extern, ontol::TextConstant},
     DefId,
+    ontology::{map::Extern, ontol::TextConstant},
 };
 use tracing::warn;
 
 use crate::{
+    CompileError, SourceSpan,
     codegen::{
         task::{ExternMap, MapCodegenRequest},
         type_mapper::TypeMapper,
@@ -14,7 +15,6 @@ use crate::{
     pattern::{PatId, PatternKind, TypePath},
     relation::rel_def_meta,
     types::{Type, TypeRef},
-    CompileError, SourceSpan,
 };
 
 use super::TypeCheck;

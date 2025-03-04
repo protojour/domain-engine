@@ -2,6 +2,7 @@ use fnv::FnvHashMap;
 use ontol_runtime::DefId;
 
 use crate::{
+    CompileErrors, Compiler, SourceSpan, SpannedCompileError,
     codegen::task::CodeCtx,
     def::Defs,
     edge::EdgeCtx,
@@ -14,8 +15,7 @@ use crate::{
     repr::{repr_check::ReprCheck, repr_ctx::ReprCtx},
     strings::StringCtx,
     thesaurus::Thesaurus,
-    types::{DefTypeCtx, FormatType, TypeCtx, TypeRef, ERROR_TYPE},
-    CompileErrors, Compiler, SourceSpan, SpannedCompileError,
+    types::{DefTypeCtx, ERROR_TYPE, FormatType, TypeCtx, TypeRef},
 };
 
 use self::ena_inference::KnownType;

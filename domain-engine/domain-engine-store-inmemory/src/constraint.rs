@@ -1,13 +1,13 @@
-use domain_engine_core::{domain_error::DomainErrorKind, DomainResult};
+use domain_engine_core::{DomainResult, domain_error::DomainErrorKind};
 use indexmap::IndexMap;
 use ontol_runtime::{
+    DefId,
     format_utils::format_value,
     ontology::{
-        aspects::{DefsAspect, SerdeAspect},
         Ontology,
+        aspects::{DefsAspect, SerdeAspect},
     },
     value::Value,
-    DefId,
 };
 
 use crate::core::{DynamicKey, InMemoryStore};

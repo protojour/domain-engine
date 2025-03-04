@@ -1,11 +1,11 @@
 use std::ops::Range;
 
 use crate::{
-    lexer::{
-        kind::{Kind, KindFilter},
-        Lex,
-    },
     ToUsizeRange, U32Span,
+    lexer::{
+        Lex,
+        kind::{Kind, KindFilter},
+    },
 };
 
 use super::tree::{FlatSyntaxTree, SyntaxMarker};

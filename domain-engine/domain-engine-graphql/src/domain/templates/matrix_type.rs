@@ -1,7 +1,7 @@
 use ontol_runtime::attr::{AttrMatrixRef, AttrRef, AttrTupleRef};
 
 use crate::{
-    domain::{context::SchemaType, ServiceCtx},
+    domain::{ServiceCtx, context::SchemaType},
     gql_scalar::GqlScalar,
 };
 

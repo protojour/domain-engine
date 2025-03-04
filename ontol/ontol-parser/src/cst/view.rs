@@ -1,11 +1,11 @@
 use std::fmt::Display;
 
 use crate::{
+    U32Span,
     lexer::{
         kind::{Kind, KindFilter},
-        unescape::{unescape_text_literal, UnescapeTextResult},
+        unescape::{UnescapeTextResult, unescape_text_literal},
     },
-    U32Span,
 };
 
 use super::inspect::Node;

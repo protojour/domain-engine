@@ -110,7 +110,7 @@ pub struct OntolRelations {
     pub min: DefId,
     pub max: DefId,
     pub default: DefId,
-    pub gen: DefId,
+    pub gen_: DefId,
     pub order: DefId,
     pub direction: DefId,
 }

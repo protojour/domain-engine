@@ -2,6 +2,7 @@ use std::{panic::UnwindSafe, str::FromStr, sync::Arc};
 
 use ontol_macros::test;
 use ontol_parser::{
+    ParserError, U32Span,
     cst::{
         inspect::{
             self as insp, DomainStatement, Statement, TypeQuant, TypeQuantOrPattern, TypeRef,
@@ -10,17 +11,15 @@ use ontol_parser::{
         view::{NodeView, NodeViewExt, TokenView, TokenViewExt},
     },
     lexer::kind::Kind,
-    ParserError, U32Span,
 };
-use ontol_runtime::{ontology::domain::DomainId, DefId};
+use ontol_runtime::{DefId, ontology::domain::DomainId};
 use tracing::info;
 use ulid::Ulid;
 
 use crate::{
-    lower_ontol_syntax,
+    CompileError, Session, Src, lower_ontol_syntax,
     lowering::context::LoweringOutcome,
     topology::{DomainUrl, DomainUrlParser},
-    CompileError, Session, Src,
 };
 
 /// A generalization of an ONTOL source file.

@@ -1,12 +1,12 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    DefId, MapDef, MapKey,
     debug::OntolDebug,
     vm::proc::{Address, Lib, OpCode, Procedure},
-    DefId, MapDef, MapKey,
 };
 use tracing::{debug, debug_span};
 
-use crate::{error::CompileError, types::FormatType, Compiler, SourceSpan};
+use crate::{Compiler, SourceSpan, error::CompileError, types::FormatType};
 
 use super::task::{ProcTable, ProcedureCall};
 

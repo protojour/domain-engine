@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
-use futures_util::{stream::BoxStream, StreamExt, TryStreamExt};
+use futures_util::{StreamExt, TryStreamExt, stream::BoxStream};
 use ontol_runtime::{
+    MapKey,
     attr::AttrRef,
     interface::serde::processor::ProcessorMode,
-    ontology::{config::persisted_domains, domain::DataRelationshipKind, map::Extern, Ontology},
+    ontology::{Ontology, config::persisted_domains, domain::DataRelationshipKind, map::Extern},
     property::ValueCardinality,
     query::{
         condition::Condition,
@@ -13,19 +14,18 @@ use ontol_runtime::{
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolverGraph},
     sequence::Sequence,
     value::{Value, ValueTag},
-    vm::{ontol_vm::OntolVm, proc::Yield, VmState},
-    MapKey,
+    vm::{VmState, ontol_vm::OntolVm, proc::Yield},
 };
 use serde::de::DeserializeSeed;
 use tracing::{debug, error};
 
 use crate::{
+    DomainError, FindEntitySelect, SelectMode, Session,
     data_store::{DataStore, DataStoreFactory, DataStoreFactorySync, DataStoreParams},
     domain_error::{DomainErrorContext, DomainErrorKind, DomainResult},
     select_data_flow::translate_entity_select,
     system::{ArcSystemApi, SystemAPI},
     transact::{AccumulateSequences, ReqMessage, RespMessage, TransactionMode, UpMap},
-    DomainError, FindEntitySelect, SelectMode, Session,
 };
 
 pub struct DomainEngine {
@@ -265,7 +265,10 @@ impl DomainEngine {
                     .root_def_id()
                     .expect("Root entity DefId not found in condition clauses");
 
-                debug!("exec_map_query: inner entity def id: {inner_entity_def_id:?}. struct_select.def_id: {:?}", struct_select.def_id);
+                debug!(
+                    "exec_map_query: inner entity def id: {inner_entity_def_id:?}. struct_select.def_id: {:?}",
+                    struct_select.def_id
+                );
 
                 // TODO: The probe algorithm here needs to work differently.
                 // The map statement (currently) knows about the data store type

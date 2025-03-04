@@ -4,20 +4,20 @@ use arrow::{array::RecordBatch, util::pretty::pretty_format_batches};
 use bytes::Bytes;
 use datafusion::prelude::{SessionConfig, SessionContext};
 use domain_engine_arrow::{
-    arrow_http::{http_stream_to_resp_msg_stream, resp_msg_to_http_stream},
     ArrowConfig, ArrowReqMessage, ArrowRespMessage, ArrowTransactAPI,
+    arrow_http::{http_stream_to_resp_msg_stream, resp_msg_to_http_stream},
 };
 use domain_engine_core::{DomainEngine, DomainResult, Session};
 use domain_engine_test_utils::{
     data_store_util, dynamic_data_store::DynamicDataStoreFactory,
     system::mock_current_time_monotonic, unimock,
 };
-use futures_util::{stream::BoxStream, StreamExt};
+use futures_util::{StreamExt, stream::BoxStream};
 use indoc::indoc;
 use ontol_examples::artist_and_instrument;
 use ontol_macros::datastore_test;
 use ontol_runtime::ontology::Ontology;
-use ontol_test_utils::{file_url, serde_helper::serde_create, TestCompile, TestPackages};
+use ontol_test_utils::{TestCompile, TestPackages, file_url, serde_helper::serde_create};
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use tracing::info;

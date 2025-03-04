@@ -1,5 +1,5 @@
 use fnv::FnvHashMap;
-use ontol_runtime::{ontology::domain::ExtendedEntityInfo, DefId};
+use ontol_runtime::{DefId, ontology::domain::ExtendedEntityInfo};
 
 use crate::{
     properties::PropCtx,

@@ -1,13 +1,13 @@
 use std::{collections::BTreeSet, sync::Arc};
 
 use domain_engine_core::{
+    DomainResult,
     data_store::{DataStoreAPI, DataStoreFactory, DataStoreFactorySync, DataStoreParams},
     domain_error::DomainErrorKind,
-    DomainResult,
 };
 use domain_engine_store_inmemory::InMemoryDataStoreFactory;
-use domain_engine_tantivy::{make_tantivy_layer, TantivyConfig, TantivyIndexSource};
-use ontol_runtime::{ontology::aspects::OntologyAspects, DomainIndex};
+use domain_engine_tantivy::{TantivyConfig, TantivyIndexSource, make_tantivy_layer};
+use ontol_runtime::{DomainIndex, ontology::aspects::OntologyAspects};
 use tracing::error;
 
 #[derive(Clone)]
@@ -131,7 +131,7 @@ impl DataStoreFactorySync for DynamicDataStoreFactory {
 mod arango {
     use std::{collections::BTreeSet, env, sync::Arc};
 
-    use domain_engine_core::{data_store::DataStoreParams, DomainResult};
+    use domain_engine_core::{DomainResult, data_store::DataStoreParams};
     use domain_engine_store_arango::ArangoDatabaseHandle;
 
     #[derive(Default)]
@@ -180,8 +180,8 @@ mod pg {
     use domain_engine_core::domain_error::DomainErrorContext;
     use domain_engine_core::transact::{ReqMessage, RespMessage, TransactionMode};
     use domain_engine_core::{DomainError, DomainResult, Session};
-    use domain_engine_store_pg::{connect_and_migrate, recreate_database, PostgresHandle};
-    use domain_engine_store_pg::{deadpool_postgres, tokio_postgres, PostgresDataStore};
+    use domain_engine_store_pg::{PostgresDataStore, deadpool_postgres, tokio_postgres};
+    use domain_engine_store_pg::{PostgresHandle, connect_and_migrate, recreate_database};
     use futures_util::stream::BoxStream;
     use ontol_runtime::PropId;
     use tokio::sync::{OwnedSemaphorePermit, Semaphore};

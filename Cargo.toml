@@ -31,10 +31,10 @@ resolver = "2"
 [workspace.package]
 version = "0.1.0"
 authors = ["Protojour dev team <devs@protojour.com>"]
-edition = "2021"
+edition = "2024"
 license = "AGPL-3.0"
 repository = "https://github.com/protojour/domain-engine"
-rust-version = "1.83"
+rust-version = "1.85"
 
 [workspace.dependencies]
 automerge = "0.6"

@@ -1,9 +1,9 @@
 use std::collections::VecDeque;
 
-use ontol_runtime::interface::serde::{operator::SerdeOperator, SerdeDef};
+use ontol_runtime::interface::serde::{SerdeDef, operator::SerdeOperator};
 use serde_generator::SerdeGenerator;
 
-use crate::{relation::UnionMemberCache, strings::StringCtx, Compiler};
+use crate::{Compiler, relation::UnionMemberCache, strings::StringCtx};
 
 use self::serde_generator::DebugTaskState;
 

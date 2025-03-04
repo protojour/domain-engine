@@ -1,18 +1,18 @@
 use std::{
-    collections::{btree_map::Entry, BTreeMap},
+    collections::{BTreeMap, btree_map::Entry},
     sync::Arc,
 };
 
 use automerge::{
-    sync::{Message as AmMessage, State, SyncDoc},
     ActorId, Automerge,
+    sync::{Message as AmMessage, State, SyncDoc},
 };
-use domain_engine_core::{domain_error::DomainErrorKind, DomainError, DomainResult, Session};
+use domain_engine_core::{DomainError, DomainResult, Session, domain_error::DomainErrorKind};
 use ontol_runtime::DefId;
 use tokio::sync::{Mutex, MutexGuard};
 use tracing::info;
 
-use super::{doc_repository::DocRepository, DocAddr};
+use super::{DocAddr, doc_repository::DocRepository};
 
 #[derive(Clone, Default)]
 pub struct BrokerManagerHandle {

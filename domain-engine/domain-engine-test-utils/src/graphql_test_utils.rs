@@ -4,16 +4,16 @@ use std::{
     sync::Arc,
 };
 
-use domain_engine_core::{data_store::DataStore, DomainEngine, Session};
+use domain_engine_core::{DomainEngine, Session, data_store::DataStore};
 use domain_engine_graphql::{
-    domain::{context::ServiceCtx, create_graphql_schema, DomainSchema},
+    domain::{DomainSchema, context::ServiceCtx, create_graphql_schema},
     gql_scalar::GqlScalar,
     juniper,
 };
 use domain_engine_store_inmemory::InMemoryDataStoreFactory;
 use juniper::ScalarValue;
 use ontol_test_utils::{
-    default_file_url, default_short_name, OntolTest, TestCompile, TestPackages,
+    OntolTest, TestCompile, TestPackages, default_file_url, default_short_name,
 };
 use ordered_float::NotNan;
 use tracing::info;

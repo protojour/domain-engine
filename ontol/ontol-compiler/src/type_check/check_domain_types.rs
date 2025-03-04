@@ -1,21 +1,21 @@
 use fnv::FnvHashSet;
 use ontol_runtime::{
+    DefId, OntolDefTag, PropId,
     ontology::ontol::{TextLikeType, ValueGenerator},
     property::{PropertyCardinality, ValueCardinality},
-    DefId, OntolDefTag, PropId,
 };
 use tracing::{debug, instrument, trace};
 
 use crate::{
+    SourceSpan,
     def::{Def, DefKind},
     error::CompileError,
     primitive::PrimitiveKind,
     properties::{Constructor, Property},
-    relation::{rel_def_meta, RelId},
+    relation::{RelId, rel_def_meta},
     repr::repr_model::{ReprKind, ReprScalarKind, UnionBound},
     text_patterns::TextPatternSegment,
     types::{FormatType, Type},
-    SourceSpan,
 };
 
 use super::TypeCheck;

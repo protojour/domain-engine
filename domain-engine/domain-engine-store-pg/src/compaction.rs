@@ -1,17 +1,17 @@
 use std::sync::Arc;
 
 use automerge::Automerge;
-use domain_engine_core::{transact::TransactionMode, DomainResult};
+use domain_engine_core::{DomainResult, transact::TransactionMode};
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::DomainIndex;
 use tracing::{debug, error, info};
 
 use crate::{
+    PostgresDataStore,
     pg_error::PgError,
     pg_model::{PgDataKey, PgRegKey},
     sql,
     transact::{ConnectionState, TransactCtx},
-    PostgresDataStore,
 };
 
 const DEFAULT_CRDT_COMPACTION_THRESHOLD: u32 = 64;

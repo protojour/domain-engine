@@ -5,10 +5,10 @@ use std::{collections::BTreeSet, fmt::Debug};
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_hir::{Pack, PropVariant, StructFlags};
 use ontol_runtime::{
+    DefId, DefPropTag, PropId,
     ontology::map::{PropertyFlow, PropertyFlowData},
     property::Cardinality,
     var::{Var, VarSet},
-    DefId, DefPropTag, PropId,
 };
 use tracing::warn;
 

@@ -1,11 +1,11 @@
 use ontol_runtime::{DefId, DefPropTag, PropId};
 
 use crate::{
+    CompileError, Compiler, SourceSpan,
     def::DefKind,
     primitive::PrimitiveKind,
     properties::{Constructor, Properties},
     text_patterns::TextPatternSegment,
-    CompileError, Compiler, SourceSpan,
 };
 
 #[derive(Debug)]

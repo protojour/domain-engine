@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use ::serde::{Deserialize, Serialize};
 
-use crate::{ontology::Ontology, DomainIndex};
+use crate::{DomainIndex, ontology::Ontology};
 
 #[derive(Clone, Default, Serialize, Deserialize, Debug)]
 pub struct DomainConfig {

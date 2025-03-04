@@ -3,13 +3,14 @@ use std::ops::Deref;
 use arcstr::ArcStr;
 use fnv::FnvHashSet;
 use ontol_runtime::{
+    DefId, DomainIndex,
     ontology::ontol::TextConstant,
     property::{PropertyCardinality, ValueCardinality},
-    DefId, DomainIndex,
 };
 use tracing::{debug, debug_span};
 
 use crate::{
+    CompileError, Compiler, Session, SourceSpan, Src, UnifiedCompileError,
     def::{BuiltinRelationKind, DefKind},
     edge::{EdgeCtx, EdgeId},
     entity::entity_ctx::def_implies_entity,
@@ -17,13 +18,12 @@ use crate::{
     misc::{MacroExpand, MacroItem, MiscCtx},
     namespace::DocId,
     ontol_syntax::OntolHeaderData,
-    relation::{rel_def_meta, RelId, RelParams, Relationship},
+    relation::{RelId, RelParams, Relationship, rel_def_meta},
     repr::repr_model::ReprKind,
     thesaurus::{Thesaurus, TypeRelation},
     topology::ParsedDomain,
     type_check::MapArmsKind,
     types::Type,
-    CompileError, Compiler, Session, SourceSpan, Src, UnifiedCompileError,
 };
 
 impl Compiler<'_> {

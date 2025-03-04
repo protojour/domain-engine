@@ -1,25 +1,25 @@
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use deunicode::AsciiChars;
 use domain_engine_core::system::ArcSystemApi;
 use ontol_runtime::{
+    DefId, DomainIndex,
     interface::serde::{
         operator::SerdeOperatorAddr,
         processor::{ProcessorProfile, ProcessorProfileFlags, ScalarFormat},
     },
     ontology::{
+        Ontology,
         domain::{DataRelationshipKind, Def, DefKind, EdgeInfo},
         ontol::TextConstant,
-        Ontology,
     },
-    DefId, DomainIndex,
 };
 use reqwest::Url;
 use reqwest_middleware::ClientWithMiddleware;
 use serde::{
-    de::{DeserializeOwned, DeserializeSeed},
     Deserialize,
+    de::{DeserializeOwned, DeserializeSeed},
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::{
     collections::{BTreeSet, HashMap},

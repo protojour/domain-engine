@@ -10,11 +10,7 @@ pub struct UndirectedMapKey([MapDef; 2]);
 
 impl UndirectedMapKey {
     pub fn new([a, b]: [MapDef; 2]) -> Self {
-        if a < b {
-            Self([a, b])
-        } else {
-            Self([b, a])
-        }
+        if a < b { Self([a, b]) } else { Self([b, a]) }
     }
 
     pub fn first(&self) -> MapDef {

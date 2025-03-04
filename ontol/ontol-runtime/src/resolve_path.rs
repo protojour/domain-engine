@@ -1,7 +1,7 @@
 use crate::{
-    ontology::{aspects::DefsAspect, domain::DefKind, map::MapLossiness, Ontology},
-    query::select::{EntitySelect, Select, StructOrUnionSelect},
     DefId, MapDef, MapDefFlags, MapDirection, MapFlags, MapKey,
+    ontology::{Ontology, aspects::DefsAspect, domain::DefKind, map::MapLossiness},
+    query::select::{EntitySelect, Select, StructOrUnionSelect},
 };
 use fnv::{FnvHashMap, FnvHashSet};
 use tracing::trace;
@@ -91,9 +91,7 @@ impl ResolverGraph {
 
             trace!(
                 "Add map pair {:?} {:?} {:?}",
-                key.input.def_id,
-                key.output.def_id,
-                key.flags
+                key.input.def_id, key.output.def_id, key.flags
             );
 
             match direction {
@@ -252,8 +250,7 @@ impl Probe<'_, '_> {
     fn probe_rec(&mut self, def_id: DefId) -> bool {
         trace!(
             "probe {def_id:?} path={:?} dir={:?}",
-            self.path,
-            self.options.direction
+            self.path, self.options.direction
         );
 
         if !self.visited.insert(def_id) {

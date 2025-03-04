@@ -1,8 +1,8 @@
 use fnv::FnvHashMap;
-use ontol_hir::{visitor::HirVisitor, Node, PropFlags, PropVariant};
+use ontol_hir::{Node, PropFlags, PropVariant, visitor::HirVisitor};
 use ontol_runtime::{
-    var::{Var, VarAllocator, VarSet},
     MapFlags, PropId,
+    var::{Var, VarAllocator, VarSet},
 };
 use thin_vec::ThinVec;
 

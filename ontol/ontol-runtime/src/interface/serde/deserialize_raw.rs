@@ -1,14 +1,14 @@
 use std::collections::BTreeMap;
 
 use serde::{
-    de::{DeserializeSeed, Error, MapAccess, SeqAccess, Visitor},
     Deserializer,
+    de::{DeserializeSeed, Error, MapAccess, SeqAccess, Visitor},
 };
 
 use crate::{
+    OntolDefTag,
     sequence::Sequence,
     value::{Value, ValueTag},
-    OntolDefTag,
 };
 
 use super::processor::{ProcessorLevel, RecursionLimitError};

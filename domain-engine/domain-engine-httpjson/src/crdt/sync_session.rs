@@ -1,13 +1,13 @@
-use automerge::{sync::Message as AmMessage, ActorId};
+use automerge::{ActorId, sync::Message as AmMessage};
 use axum::extract::ws::{Message as WsMessage, WebSocket};
 use domain_engine_core::{DomainError, DomainResult, Session};
 use ontol_runtime::DefId;
 use tracing::{debug, error, info, warn};
 
+use super::DocAddr;
 use super::broker::BrokerHandle;
 use super::doc_repository::DocRepository;
 use super::ws_codec::Message;
-use super::DocAddr;
 
 pub struct SyncSession {
     pub resource_def_id: DefId,

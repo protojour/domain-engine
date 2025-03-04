@@ -1,15 +1,16 @@
 use indexmap::IndexMap;
 use ontol_hir::{PropFlags, PropVariant, StructFlags};
 use ontol_runtime::{
+    DefId, OntolDefTag, PropId,
     property::{Cardinality, PropertyCardinality, ValueCardinality},
     query::condition::SetOperator,
     var::Var,
-    DefId, OntolDefTag, PropId,
 };
 use smallvec::smallvec;
 use tracing::{debug, info};
 
 use crate::{
+    CompileError, NO_SPAN, SourceSpan,
     def::DefKind,
     mem::Intern,
     pattern::{
@@ -18,16 +19,15 @@ use crate::{
     },
     primitive::PrimitiveKind,
     properties::Property,
-    relation::{rel_def_meta, DefRelTag, RelId, RelParams},
+    relation::{DefRelTag, RelId, RelParams, rel_def_meta},
     repr::repr_model::{ReprKind, ReprScalarKind},
     thesaurus::TypeRelation,
-    type_check::{ena_inference::Strength, hir_build::NodeInfo, TypeError},
+    type_check::{TypeError, ena_inference::Strength, hir_build::NodeInfo},
     typed_hir::{Meta, TypedHirData},
     types::{Type, TypeRef, UNIT_TYPE},
-    CompileError, SourceSpan, NO_SPAN,
 };
 
-use super::{hir_build_ctx::HirBuildCtx, TypeCheck};
+use super::{TypeCheck, hir_build_ctx::HirBuildCtx};
 
 pub(super) struct UnpackerInfo<'m> {
     pub type_def_id: DefId,

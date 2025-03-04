@@ -8,20 +8,20 @@ use std::{
 
 use fake::{Fake, Faker};
 use ontol_runtime::{
+    DefId,
     attr::{Attr, AttrMatrix},
     interface::serde::{
         operator::{AppliedVariants, SerdeOperator},
         processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
     },
     ontology::{
-        domain::DataRelationshipKind,
-        ontol::{text_pattern::TextPattern, TextLikeType},
         Ontology,
+        domain::DataRelationshipKind,
+        ontol::{TextLikeType, text_pattern::TextPattern},
     },
     sequence::Sequence,
     tuple::EndoTuple,
     value::{OctetSequence, Serial, Value, ValueTag},
-    DefId,
 };
 use regex_generate::Generator;
 use smallvec::smallvec;
@@ -258,7 +258,7 @@ impl<R8: rand_08::Rng, R9: rand::Rng> FakeGenerator<'_, R8, R9> {
 
                         self.fake_attribute(processor.narrow(variant.deserialize.addr))
                     }
-                }
+                };
             }
             SerdeOperator::Struct(struct_op) => {
                 let mut attrs = HashMap::default();
@@ -283,7 +283,7 @@ impl<R8: rand_08::Rng, R9: rand::Rng> FakeGenerator<'_, R8, R9> {
                 Value::Struct(Box::new(attrs), struct_op.def.def_id.into())
             }
             SerdeOperator::IdSingletonStruct(_entity_id, _name, inner_addr) => {
-                return self.fake_attribute(processor.narrow(*inner_addr))
+                return self.fake_attribute(processor.narrow(*inner_addr));
             }
         };
 
@@ -305,8 +305,8 @@ impl<R8: rand_08::Rng, R9: rand::Rng> FakeGenerator<'_, R8, R9> {
 }
 
 fn rand_text_matching_pattern(text_pattern: &TextPattern, rng: &mut impl rand_08::Rng) -> String {
-    let mut gen = Generator::new(text_pattern.regex.as_str(), rng, MAX_REPEAT).unwrap();
+    let mut generator = Generator::new(text_pattern.regex.as_str(), rng, MAX_REPEAT).unwrap();
     let mut bytes = vec![];
-    gen.generate(&mut bytes).unwrap();
+    generator.generate(&mut bytes).unwrap();
     String::from_utf8(bytes).unwrap()
 }

@@ -10,7 +10,7 @@ use ontol_runtime::{
     value::{OctetSequence, Value},
 };
 use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches, expect_eq, serde_helper::*, TestCompile,
+    TestCompile, assert_error_msg, assert_json_io_matches, expect_eq, serde_helper::*,
 };
 use serde::de::DeserializeSeed;
 use serde_json::json;

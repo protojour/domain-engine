@@ -2,13 +2,13 @@ use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    DefId, DomainIndex, PropId,
     interface::serde::{
         operator::SerdeOperatorAddr,
         processor::{ProcessorLevel, ProcessorMode},
     },
     ontology::OntologyInit,
     phf::PhfMap,
-    DefId, DomainIndex, PropId,
 };
 
 use super::data::{TypeAddr, TypeData};

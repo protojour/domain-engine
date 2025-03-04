@@ -4,13 +4,14 @@ use std::{
 };
 
 use domain_engine_core::{
+    Session, VertexAddr,
     data_store::DataStoreAPI,
     domain_select::domain_select_no_edges,
     transact::{ReqMessage, RespMessage, TransactionMode, WriteStats},
-    Session, VertexAddr,
 };
 use futures_util::StreamExt;
 use ontol_runtime::{
+    DefId, OntolDefTag,
     ontology::Ontology,
     query::{
         condition::{Clause, CondTerm, SetOperator, SetPredicate},
@@ -18,9 +19,8 @@ use ontol_runtime::{
         select::{EntitySelect, Select, StructOrUnionSelect},
     },
     value::Value,
-    DefId, OntolDefTag,
 };
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use tantivy::{IndexReader, IndexWriter, Term};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, trace};

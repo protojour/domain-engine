@@ -2,12 +2,13 @@ use std::collections::HashMap;
 
 use fnv::FnvHashSet;
 use ontol_runtime::{
-    var::{Var, VarAllocator},
     DefId, DomainIndex,
+    var::{Var, VarAllocator},
 };
 use tracing::debug;
 
 use crate::{
+    Compiler, NO_SPAN,
     def::DefKind,
     map::UndirectedMapKey,
     properties::Constructor,
@@ -15,7 +16,6 @@ use crate::{
     text_patterns::TextPatternSegment,
     thesaurus::TypeRelation,
     typed_hir::{IntoTypedHirData, Meta, TypedArena, TypedHir, TypedHirData, TypedRootNode},
-    Compiler, NO_SPAN,
 };
 
 use super::task::{

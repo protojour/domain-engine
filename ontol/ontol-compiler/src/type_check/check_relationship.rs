@@ -1,9 +1,10 @@
 use ontol_runtime::{
-    property::PropertyCardinality, tuple::CardinalIdx, DefId, DomainIndex, PropId,
+    DefId, DomainIndex, PropId, property::PropertyCardinality, tuple::CardinalIdx,
 };
 use tracing::debug;
 
 use crate::{
+    Note, SourceSpan,
     def::{BuiltinRelationKind, DefKind},
     edge::{CardinalKind, EdgeId, SymbolicEdge},
     error::CompileError,
@@ -13,8 +14,7 @@ use crate::{
     relation::{RelId, Relationship},
     sequence::Sequence,
     thesaurus::TypeRelation,
-    types::{FormatType, Type, TypeRef, ERROR_TYPE},
-    Note, SourceSpan,
+    types::{ERROR_TYPE, FormatType, Type, TypeRef},
 };
 
 use super::TypeCheck;

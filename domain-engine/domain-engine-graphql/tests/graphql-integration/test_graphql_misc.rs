@@ -6,8 +6,8 @@ use domain_engine_test_utils::{
 };
 use ontol_examples::{edge_entity_simple, edge_entity_union, entity_subtype, guitar_synth_union};
 use ontol_macros::datastore_test;
+use ontol_test_utils::{TestPackages, expect_eq};
 use ontol_test_utils::{default_file_url, default_short_name};
-use ontol_test_utils::{expect_eq, TestPackages};
 use tracing::info;
 
 use crate::mk_engine_default;

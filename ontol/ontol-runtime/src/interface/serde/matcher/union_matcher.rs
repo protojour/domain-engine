@@ -3,29 +3,29 @@ use std::slice;
 use itertools::Itertools;
 
 use crate::{
+    DefId,
     format_utils::{Backticks, LogicOp, LogicalConcat},
     interface::{
         discriminator::{Discriminant, LeafDiscriminant},
         serde::{
+            OntologyCtx,
             operator::{PossibleVariants, SerdeOperator},
             processor::{
                 ProcessorLevel, ProcessorMode, ProcessorProfile, SerdeProcessor,
                 SubProcessorContext,
             },
-            OntologyCtx,
         },
     },
     ontology::ontol::TextConstant,
     value::Value,
-    DefId,
 };
 
 use super::{
+    ValueMatcher,
     map_matcher::MapMatcher,
     primitive_matchers::u64_to_i64,
     sequence_matcher::{SequenceKind, SequenceRangesMatcher},
     text_matchers::try_deserialize_custom_string,
-    ValueMatcher,
 };
 
 pub struct UnionMatcher<'on, 'p> {
@@ -99,7 +99,7 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
                         variant.deserialize.def_id,
                         self.ontology,
                     )
-                    .map_err(|_| ())
+                    .map_err(|_| ());
                 }
                 LeafDiscriminant::IsTextLiteral(constant) => {
                     if str == &self.ontology.defs[*constant] {
@@ -141,7 +141,7 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
                             SequenceKind::AttrMatrixList,
                             seq_op.def.def_id,
                             self.ctx,
-                        ))
+                        ));
                     }
                     SerdeOperator::ConstructorSequence(seq_op) => {
                         return Ok(SequenceRangesMatcher::new(
@@ -149,7 +149,7 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
                             SequenceKind::ValueList,
                             seq_op.def.def_id,
                             self.ctx,
-                        ))
+                        ));
                     }
                     _ => panic!("not a sequence"),
                 }

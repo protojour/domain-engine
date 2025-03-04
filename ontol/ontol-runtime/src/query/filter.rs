@@ -3,10 +3,10 @@ use std::fmt::{Debug, Display};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    OntolDefTag,
     format_utils::Literal,
     ontology::domain::VertexOrder,
     value::{Value, ValueDebug},
-    OntolDefTag,
 };
 
 use super::{condition::Condition, order::Direction};

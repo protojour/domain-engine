@@ -1,16 +1,16 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    DefId, PropId,
     attr::{Attr, AttrMatrix},
     ontology::domain::{DataRelationshipKind, EdgeCardinalProjection},
     query::condition::{Clause, CondTerm, Condition, SetOperator},
     value::Value,
     var::Var,
-    DefId, PropId,
 };
 
 use domain_engine_core::{
-    filter::walker::{ConditionWalker, MemberPredicate, Members},
     DomainError, DomainResult,
+    filter::walker::{ConditionWalker, MemberPredicate, Members},
 };
 use tracing::{error, warn};
 

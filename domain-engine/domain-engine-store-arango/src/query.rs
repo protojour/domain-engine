@@ -1,22 +1,22 @@
 use std::collections::HashMap;
 
-use domain_engine_core::{domain_error::DomainErrorKind, DomainError, DomainResult};
+use domain_engine_core::{DomainError, DomainResult, domain_error::DomainErrorKind};
 use ontol_runtime::{
+    DefId, PropId,
     attr::Attr,
     format_utils::format_value,
     ontology::{
-        domain::{DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget},
         Ontology,
+        domain::{DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget},
     },
     property::ValueCardinality,
     query::select::{Select, StructOrUnionSelect},
     sequence::Sequence,
     value::{OctetSequence, Value},
-    DefId, PropId,
 };
 use tracing::debug;
 
-use super::{aql::*, data_store::Cursor, AqlQuery, ArangoDatabase};
+use super::{AqlQuery, ArangoDatabase, aql::*, data_store::Cursor};
 
 impl AqlQuery {
     /// Build an AqlQuery from a Select
@@ -31,7 +31,7 @@ impl AqlQuery {
                 _ => {
                     return Err(DomainError::data_store_bad_request(
                         "Query entity union at root level not supported",
-                    ))
+                    ));
                 }
             },
             Select::Struct(struct_select) => ontology.def(struct_select.def_id),
@@ -270,7 +270,7 @@ impl MetaQuery<'_> {
                         proj => {
                             return Err(DomainError::data_store(format!(
                                 "unsupported edge projection {proj:?}"
-                            )))
+                            )));
                         }
                     },
                     object: self.var.clone(),
@@ -331,7 +331,7 @@ pub fn apply_select(attr: AttrMut, select: &Select, db: &ArangoDatabase) -> Doma
         }
         (AttrMut::Unit(val), Select::EntityId | Select::Unit) => {
             let def_id = val.type_def_id();
-            if let Value::Struct(ref mut attr_map, _) = val {
+            if let Value::Struct(attr_map, _) = val {
                 let def = db.ontology.def(def_id);
                 let entity_info = def
                     .entity()
@@ -346,7 +346,7 @@ pub fn apply_select(attr: AttrMut, select: &Select, db: &ArangoDatabase) -> Doma
             }
         }
         (AttrMut::Unit(val), Select::VertexAddress) => {
-            if let Value::Struct(ref mut attr_map, _) = val {
+            if let Value::Struct(attr_map, _) = val {
                 if let Some(Attr::Unit(address)) = attr_map.remove(&PropId::data_store_address()) {
                     *val = address;
                 } else {
@@ -397,7 +397,7 @@ pub fn apply_select(attr: AttrMut, select: &Select, db: &ArangoDatabase) -> Doma
                         },
                     };
                     match &select {
-                        Select::StructUnion(_, ref selects) => {
+                        Select::StructUnion(_, selects) => {
                             if selects.iter().any(|s| s.def_id == def_id) {
                                 if let Some(attr) = attr_map.get_mut(prop_id) {
                                     if !apply_select(AttrMut::from_attr(attr), select, db)? {

@@ -1,19 +1,19 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::{
+    DefId, DefPropTag, OntolDefTag, PropId,
     ontology::ontol::text_pattern::{
         Regex, TextPattern, TextPatternConstantPart, TextPatternProperty,
     },
-    DefId, DefPropTag, OntolDefTag, PropId,
 };
 use regex_syntax::hir::{Capture, Hir, Look};
 use std::fmt::Write;
 use tracing::debug;
 
 use crate::{
+    Compiler,
     properties::Constructor,
     regex_util::{self, unsigned_integer_with_radix},
     strings::StringCtx,
-    Compiler,
 };
 
 #[derive(Default)]

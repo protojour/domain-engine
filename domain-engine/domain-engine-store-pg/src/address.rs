@@ -1,7 +1,7 @@
 use domain_engine_core::{DomainResult, VertexAddr};
 use ontol_runtime::{
-    value::{OctetSequence, Value},
     OntolDefTag,
+    value::{OctetSequence, Value},
 };
 use serde::{Deserialize, Serialize};
 

@@ -2,11 +2,13 @@ use fnv::FnvHashMap;
 use indoc::indoc;
 use itertools::Itertools;
 use ontol_runtime::{
+    DefId, DefIdSet, DomainIndex, FnvIndexMap, OntolDefTag, PropId,
     interface::{
-        serde::{SerdeDef, SerdeModifier},
         DomainInterface,
+        serde::{SerdeDef, SerdeModifier},
     },
     ontology::{
+        Ontology,
         domain::{
             self, BasicDef, DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource,
             DataRelationshipTarget, DataTreeRepr, Def, DefRepr, DefReprUnionBound, Domain,
@@ -15,10 +17,8 @@ use ontol_runtime::{
         },
         map::MapMeta,
         ontol::{OntolDomainMeta, TextConstant, TextLikeType},
-        Ontology,
     },
     rustdoc::RustDoc,
-    DefId, DefIdSet, DomainIndex, FnvIndexMap, OntolDefTag, PropId,
 };
 use std::{
     collections::{BTreeSet, HashMap},
@@ -27,21 +27,21 @@ use std::{
 };
 
 use crate::{
+    Compiler,
     def::{BuiltinRelationKind, DefKind, TypeDef, TypeDefFlags},
     edge::{CardinalKind, EdgeId},
     interface::{
         graphql::generate_schema::generate_graphql_schema,
         httpjson::generate_httpjson_interface,
-        serde::{serde_generator::SerdeGenerator, SerdeKey, EDGE_PROPERTY},
+        serde::{EDGE_PROPERTY, SerdeKey, serde_generator::SerdeGenerator},
     },
     namespace::{DocId, Space},
     ontol_domain::Ontol,
     primitive::PrimitiveKind,
     properties::Properties,
-    relation::{rel_def_meta, rel_repr_meta, RelDefMeta, RelId, Relationship, UnionMemberCache},
+    relation::{RelDefMeta, RelId, Relationship, UnionMemberCache, rel_def_meta, rel_repr_meta},
     repr::repr_model::{ReprKind, ReprScalarKind, UnionBound},
     strings::StringCtx,
-    Compiler,
 };
 
 impl<'m> Compiler<'m> {

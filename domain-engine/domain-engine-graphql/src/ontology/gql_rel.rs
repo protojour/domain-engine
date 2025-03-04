@@ -3,11 +3,12 @@
 use crate::{gql_scalar::GqlScalar, juniper};
 
 use ontol_runtime::{
+    DefId, PropId,
     ontology::domain::{self, EdgeCardinalProjection},
-    property, DefId, PropId,
+    property,
 };
 
-use super::{gql_def, OntologyCtx};
+use super::{OntologyCtx, gql_def};
 
 pub struct DataRelationshipInfo {
     pub def_id: DefId,

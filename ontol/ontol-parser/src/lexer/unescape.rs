@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use crate::{lexer::kind::Kind, ParserError};
+use crate::{ParserError, lexer::kind::Kind};
 
 pub type UnescapeTextResult = Result<String, Vec<ParserError>>;
 

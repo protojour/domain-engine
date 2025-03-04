@@ -104,7 +104,7 @@ impl DefId {
 
 impl Debug for DefId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "def@{}:{}", self.0 .0, self.1)
+        write!(f, "def@{}:{}", self.0.0, self.1)
     }
 }
 
@@ -304,13 +304,13 @@ impl PropId {
 /// This forces single-line output even when pretty-printed
 impl ::std::fmt::Debug for PropId {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "p@{}:{}:{}", self.0 .0 .0, self.0 .1, self.1 .0)
+        write!(f, "p@{}:{}:{}", self.0.0.0, self.0.1, self.1.0)
     }
 }
 
 impl ::std::fmt::Display for PropId {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "p@{}:{}:{}", self.0 .0 .0, self.0 .1, self.1 .0)
+        write!(f, "p@{}:{}:{}", self.0.0.0, self.0.1, self.1.0)
     }
 }
 

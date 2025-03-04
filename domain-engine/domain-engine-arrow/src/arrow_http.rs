@@ -3,7 +3,7 @@
 use std::io::Read;
 
 use arrow_array::RecordBatch;
-use arrow_ipc::{reader::StreamReader, writer::StreamWriter, MessageHeader};
+use arrow_ipc::{MessageHeader, reader::StreamReader, writer::StreamWriter};
 use bytes::{BufMut, Bytes, BytesMut};
 use bytes_deque::BytesDeque;
 use domain_engine_core::{DomainError, DomainResult};
@@ -203,7 +203,7 @@ impl StreamDecoder {
         loop {
             match Self::try_read_message(&mut peekable)? {
                 ReadAttempt::Complete(MessageHeader::RecordBatch) => {
-                    return Ok(ReadAttempt::Complete(()))
+                    return Ok(ReadAttempt::Complete(()));
                 }
                 ReadAttempt::Complete(_) => {
                     // any other message type is to be interpreted as an "argument" to a RecordBatch,
@@ -350,8 +350,10 @@ mod msg_header_reader {
         type Inner = MsgHeaderReader<'a>;
         #[inline]
         unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-            Self {
-                _tab: flatbuffers::Table::new(buf, loc),
+            unsafe {
+                Self {
+                    _tab: flatbuffers::Table::new(buf, loc),
+                }
             }
         }
     }

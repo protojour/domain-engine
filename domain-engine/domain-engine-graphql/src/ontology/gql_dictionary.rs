@@ -1,6 +1,6 @@
 use crate::{gql_scalar::GqlScalar, juniper};
 
-use super::{gql_def::Def, OntologyCtx};
+use super::{OntologyCtx, gql_def::Def};
 
 pub struct DefDictionaryEntry {
     pub name: String,

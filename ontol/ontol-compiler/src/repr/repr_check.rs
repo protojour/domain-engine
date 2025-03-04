@@ -5,25 +5,25 @@
 //! So the responsibility of this code is just to record the facts,
 //! and those facts are used in later compilation stages.
 
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{HashMap, hash_map::Entry};
 
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
-use ontol_runtime::{ontology::ontol::TextLikeType, DefId, DomainIndex, OntolDefTag};
+use ontol_runtime::{DefId, DomainIndex, OntolDefTag, ontology::ontol::TextLikeType};
 use ordered_float::NotNan;
 use tracing::{debug, debug_span, trace};
 
 use crate::{
+    CompileErrors, NATIVE_SOURCE, NO_SPAN, Note, SourceId, SourceSpan, SpannedNote,
     def::{Def, DefKind, Defs, TypeDefFlags},
     error::CompileError,
     misc::MiscCtx,
     primitive::PrimitiveKind,
     properties::{Constructor, PropCtx, Properties},
-    relation::{rel_def_meta, RelCtx, RelId, RelParams},
+    relation::{RelCtx, RelId, RelParams, rel_def_meta},
     repr::repr_model::UnionBound,
     thesaurus::{Is, Thesaurus, TypeRelation},
     types::{DefTypeCtx, Type},
-    CompileErrors, Note, SourceId, SourceSpan, SpannedNote, NATIVE_SOURCE, NO_SPAN,
 };
 
 use super::{
@@ -596,9 +596,7 @@ impl ReprCheck<'_, '_> {
         if self.state.do_trace {
             trace!(
                 "    {:?} merge repr {:?}=>{:?} {next:?}",
-                self.root_def_id,
-                data.rel,
-                next_def_id,
+                self.root_def_id, data.rel, next_def_id,
             );
         }
 

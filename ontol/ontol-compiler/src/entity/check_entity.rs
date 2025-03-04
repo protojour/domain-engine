@@ -1,9 +1,9 @@
-use ontol_runtime::{ontology::domain::ExtendedEntityInfo, DefId};
+use ontol_runtime::{DefId, ontology::domain::ExtendedEntityInfo};
 
 use crate::{
+    CompileError, Compiler,
     def::{DefKind, TypeDef, TypeDefFlags},
     relation::rel_def_meta,
-    CompileError, Compiler,
 };
 
 impl Compiler<'_> {

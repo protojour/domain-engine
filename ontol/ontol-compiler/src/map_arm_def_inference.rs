@@ -1,19 +1,19 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
+    DefId, OntolDefTag, PropId,
     property::{PropertyCardinality, ValueCardinality},
     var::Var,
-    DefId, OntolDefTag, PropId,
 };
 use tracing::{debug, info};
 
 use crate::{
+    CompileError, CompileErrors, Compiler, SourceSpan,
     def::{DefKind, Defs},
     entity::entity_ctx::EntityCtx,
     pattern::{CompoundPatternAttrKind, PatId, Pattern, PatternKind, Patterns, TypePath},
     properties::{PropCtx, Property},
-    relation::{rel_def_meta, RelCtx, RelId, RelParams, Relationship},
-    CompileError, CompileErrors, Compiler, SourceSpan,
+    relation::{RelCtx, RelId, RelParams, Relationship, rel_def_meta},
 };
 
 #[derive(Clone, Copy)]
@@ -460,18 +460,20 @@ impl<'m> Compiler<'m> {
                     .report(self);
                 None
             }
-            [InfStatus::Infer(target_def_id), InfStatus::Source(source_def_id)] => {
-                Some(MapArmTypeInferred {
-                    target: (arms[0], target_def_id),
-                    source: (arms[1], source_def_id),
-                })
-            }
-            [InfStatus::Source(source_def_id), InfStatus::Infer(target_def_id)] => {
-                Some(MapArmTypeInferred {
-                    target: (arms[1], target_def_id),
-                    source: (arms[0], source_def_id),
-                })
-            }
+            [
+                InfStatus::Infer(target_def_id),
+                InfStatus::Source(source_def_id),
+            ] => Some(MapArmTypeInferred {
+                target: (arms[0], target_def_id),
+                source: (arms[1], source_def_id),
+            }),
+            [
+                InfStatus::Source(source_def_id),
+                InfStatus::Infer(target_def_id),
+            ] => Some(MapArmTypeInferred {
+                target: (arms[1], target_def_id),
+                source: (arms[0], source_def_id),
+            }),
             _ => None,
         }
     }

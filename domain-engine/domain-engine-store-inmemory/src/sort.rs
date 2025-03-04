@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use domain_engine_core::{DomainError, DomainResult};
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    attr::Attr, ontology::domain::VertexOrder, query::filter::Filter, value::Value, DefId, PropId,
+    DefId, PropId, attr::Attr, ontology::domain::VertexOrder, query::filter::Filter, value::Value,
 };
 
 use crate::core::{DbContext, DynamicKey};

@@ -1,37 +1,37 @@
 use std::vec;
 
 use domain_engine_core::{
-    domain_error::DomainErrorKind,
-    entity_id_utils::{find_inherent_entity_id, try_generate_entity_id, GeneratedId},
-    system::SystemAPI,
     DomainError, DomainResult,
+    domain_error::DomainErrorKind,
+    entity_id_utils::{GeneratedId, find_inherent_entity_id, try_generate_entity_id},
+    system::SystemAPI,
 };
 use ontol_runtime::{
+    DefId,
     attr::Attr,
     interface::serde::{
         operator::SerdePropertyFlags,
         processor::{ProcessorMode, SubProcessorContext},
     },
     ontology::{
+        Ontology,
         domain::{
             DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource,
             DataRelationshipTarget,
         },
-        Ontology,
     },
     property::ValueCardinality,
     query::select::Select,
     value::{Value, ValueDebug, ValueTag},
-    DefId,
 };
 use serde_json::json;
 use substring::Substring;
 use tracing::debug;
 
 use super::{
-    aql::*,
-    data_store::{serialize, EdgeWriteMode, WriteMode},
     AqlQuery, ArangoDatabase,
+    aql::*,
+    data_store::{EdgeWriteMode, WriteMode, serialize},
 };
 
 impl AqlQuery {
@@ -416,7 +416,7 @@ fn generate_id(
     };
 
     match &mut entity {
-        Value::Struct(ref mut struct_map, _) => {
+        Value::Struct(struct_map, _) => {
             if let Some(id) = &id {
                 struct_map.insert(entity_info.id_prop, id.clone().into());
             }
@@ -941,7 +941,7 @@ impl MetaQuery<'_> {
             Select::Unit => {
                 self.return_var = Expr::complex(format!("{{ _key: {}._key }}", self.var));
             }
-            Select::Struct(ref struct_select) => {
+            Select::Struct(struct_select) => {
                 let def = self.ontology.def(struct_select.def_id);
                 let selection = struct_select.properties.clone();
 

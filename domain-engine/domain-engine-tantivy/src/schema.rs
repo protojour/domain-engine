@@ -1,6 +1,6 @@
 use tantivy::schema::{
-    FacetOptions, Field, IndexRecordOption, JsonObjectOptions, Schema, TextFieldIndexing,
-    TextOptions, FAST,
+    FAST, FacetOptions, Field, IndexRecordOption, JsonObjectOptions, Schema, TextFieldIndexing,
+    TextOptions,
 };
 
 pub mod fieldname {

@@ -1,6 +1,6 @@
 use ontol_macros::test;
 use ontol_test_utils::{
-    file_url, serde_helper::serde_raw, test_map::AsKey, TestCompile, TestPackages,
+    TestCompile, TestPackages, file_url, serde_helper::serde_raw, test_map::AsKey,
 };
 use serde_json::json;
 

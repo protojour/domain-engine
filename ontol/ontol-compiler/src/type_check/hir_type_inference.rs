@@ -2,16 +2,16 @@ use fnv::FnvHashMap;
 use ontol_runtime::var::Var;
 
 use crate::{
+    CompileErrors,
     error::CompileError,
     typed_hir::{Meta, TypedArena, TypedHir, TypedHirData},
     types::TypeCtx,
-    CompileErrors,
 };
 
 use super::{
+    TypeError,
     ena_inference::{Infer, TypeVar},
     hir_build_ctx::{Arm, VariableMapping},
-    TypeError,
 };
 
 /// Perform type inference limited to within one "map arm"

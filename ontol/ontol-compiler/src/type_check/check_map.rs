@@ -1,8 +1,8 @@
 use ontol_hir::Label;
-use ontol_runtime::{var::VarAllocator, DefId};
+use ontol_runtime::{DefId, var::VarAllocator};
 
 use crate::{
-    arm_span,
+    MissingProperties, Note, SourceSpan, arm_span,
     codegen::{
         task::{AbstractTemplate, MapCodegenRequest, OntolMap, OntolMapArms},
         type_mapper::TypeMapper,
@@ -16,16 +16,15 @@ use crate::{
     type_check::hir_build_ctx::{Arm, VariableMapping},
     typed_hir::TypedRootNode,
     types::{Type, TypeRef},
-    MissingProperties, Note, SourceSpan,
 };
 
 use super::{
+    MapArmsKind, TypeCheck, TypeEquation, TypeError,
     ena_inference::{KnownType, Strength},
-    hir_build_ctx::{HirBuildCtx, ARMS},
+    hir_build_ctx::{ARMS, HirBuildCtx},
     hir_build_props::MatchAttributeKey,
     hir_type_inference::{HirArmTypeInference, HirVariableMapper},
     map_arm_analyze::PreAnalyzer,
-    MapArmsKind, TypeCheck, TypeEquation, TypeError,
 };
 
 pub enum MapOutputClass {

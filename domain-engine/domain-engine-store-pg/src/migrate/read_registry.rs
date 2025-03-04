@@ -2,7 +2,7 @@ use anyhow::Context;
 use fnv::FnvHashMap;
 use indoc::indoc;
 use ontol_runtime::{
-    ontology::aspects::DefsAspect, tuple::CardinalIdx, DefId, DefPropTag, DomainIndex,
+    DefId, DefPropTag, DomainIndex, ontology::aspects::DefsAspect, tuple::CardinalIdx,
 };
 use tokio_postgres::Transaction;
 use tracing::debug;

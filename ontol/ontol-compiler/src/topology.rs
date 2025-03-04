@@ -1,28 +1,28 @@
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::collections::hash_map::Entry;
 use std::fmt::Display;
 use std::sync::Arc;
 
 use ontol_parser::cst_parse;
+use ontol_runtime::DefId;
+use ontol_runtime::DomainIndex;
 use ontol_runtime::ontology::config::DomainConfig;
 use ontol_runtime::ontology::domain::TopologyGeneration;
 use ontol_runtime::vec_map::VecMap;
-use ontol_runtime::DefId;
-use ontol_runtime::DomainIndex;
 use url::Url;
 
+use crate::NO_SPAN;
+use crate::SourceCodeRegistry;
+use crate::SourceSpan;
+use crate::Sources;
+use crate::Src;
 use crate::error::CompileError;
 use crate::error::UnifiedCompileError;
 use crate::ontol_syntax::ArcString;
 use crate::ontol_syntax::OntolSyntax;
 use crate::ontol_syntax::OntolTreeSyntax;
 use crate::ontol_syntax::WithDocs;
-use crate::SourceCodeRegistry;
-use crate::SourceSpan;
-use crate::Sources;
-use crate::Src;
-use crate::NO_SPAN;
 
 /// The compiler's loaded domains, by reference,
 /// to be able to compile `use` statements

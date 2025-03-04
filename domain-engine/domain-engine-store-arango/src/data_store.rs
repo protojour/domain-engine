@@ -1,14 +1,15 @@
 use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
 
 use domain_engine_core::{
+    DomainError, DomainResult, Session,
     data_store::DataStoreAPI,
     domain_error::DomainErrorKind,
     make_storable::MakeStorable,
     transact::{DataOperation, OpSequence, ReqMessage, RespMessage, TransactionMode},
-    DomainError, DomainResult, Session,
 };
-use futures_util::{stream::BoxStream, StreamExt};
+use futures_util::{StreamExt, stream::BoxStream};
 use ontol_runtime::{
+    DefId,
     attr::{Attr, AttrRef},
     interface::serde::processor::{
         ProcessorMode, ProcessorProfileApi, SerdeProcessor, SpecialProperty,
@@ -16,7 +17,6 @@ use ontol_runtime::{
     query::select::{EntitySelect, Select},
     sequence::{Sequence, SubSequence},
     value::Value,
-    DefId,
 };
 use serde_json::Serializer;
 use tracing::debug;
@@ -458,7 +458,7 @@ mod tests {
     use super::*;
     use domain_engine_test_utils::unimock::Unimock;
     use indoc::indoc;
-    use ontol_test_utils::{expect_eq, serde_helper::serde_raw, TestCompile, TestPackages};
+    use ontol_test_utils::{TestCompile, TestPackages, expect_eq, serde_helper::serde_raw};
     use reqwest::Client;
     use reqwest_middleware::ClientWithMiddleware;
     use serde_json::json;
