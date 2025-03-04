@@ -94,7 +94,7 @@
     "@types/node": "^20",
     "@types/vscode": "^1.94",
     "@vscode/vsce": "^3",
-    "esbuild": "^0.24",
+    "esbuild": "^0.25",
     "typescript": "^5"
   }
 }
