@@ -16,9 +16,9 @@ domain-engine-core.path = "../domain-engine-core"
 chrono.workspace = true
 serde.workspace = true
 tracing.workspace = true
-arrow-array = "53"
-arrow-ipc = "53"
-arrow-schema = { version = "53", features = ["serde"] }
+arrow-array = "54"
+arrow-ipc = "54"
+arrow-schema = { version = "54", features = ["serde"] }
 async-stream = "0.3"
 bytes = "1"
 flatbuffers = "24"

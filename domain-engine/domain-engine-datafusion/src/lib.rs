@@ -7,8 +7,9 @@ use datafusion_execution::{SendableRecordBatchStream, TaskContext};
 use datafusion_expr::{Expr, TableProviderFilterPushDown, TableType};
 use datafusion_physical_expr::EquivalenceProperties;
 use datafusion_physical_plan::{
-    stream::RecordBatchStreamAdapter, DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan,
-    Partitioning, PlanProperties,
+    execution_plan::{Boundedness, EmissionType},
+    stream::RecordBatchStreamAdapter,
+    DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning, PlanProperties,
 };
 use domain_engine_arrow::{
     schema::ArrowSchemaBuilder, ArrowConfig, ArrowQuery, ArrowReqMessage, ArrowRespMessage,
@@ -242,7 +243,10 @@ impl TableProvider for EntityTableProvider {
                 properties: PlanProperties::new(
                     EquivalenceProperties::new(arrow_schema),
                     Partitioning::UnknownPartitioning(1),
-                    ExecutionMode::Unbounded,
+                    EmissionType::Both,
+                    Boundedness::Unbounded {
+                        requires_infinite_memory: false,
+                    },
                 ),
             }),
             children: vec![],
