@@ -16,8 +16,8 @@ use crate::{
 
 use super::{MigrationCtx, MigrationStep, PgDomainIds};
 
-pub async fn execute_domain_migration<'t>(
-    txn: &Transaction<'t>,
+pub async fn execute_domain_migration(
+    txn: &Transaction<'_>,
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
     let staged_steps = std::mem::take(&mut ctx.steps).into_inner();
@@ -33,10 +33,10 @@ pub async fn execute_domain_migration<'t>(
     Ok(())
 }
 
-async fn execute_migration_step<'t>(
+async fn execute_migration_step(
     domain_ids: PgDomainIds,
     step: MigrationStep,
-    txn: &Transaction<'t>,
+    txn: &Transaction<'_>,
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
     info!("{step:?}");

@@ -12,7 +12,7 @@ use crate::{
 
 use super::{mut_ctx::PgMutCtx, TransactCtx};
 
-impl<'a> TransactCtx<'a> {
+impl TransactCtx<'_> {
     /// TODO: prepare statement(s)?
     pub async fn delete_vertex(
         &self,

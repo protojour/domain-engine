@@ -258,14 +258,14 @@ impl<F: Fn(Kind) -> bool> KindFilter for F {
 fn lex_double_quote_text(lexer: &mut Lexer<Kind>) -> Option<()> {
     let remainder: &str = lexer.remainder();
     let len = terminate::<'"'>(remainder.chars())?;
-    lexer.bump(remainder[0..len].as_bytes().len());
+    lexer.bump(remainder[0..len].len());
     Some(())
 }
 
 fn lex_single_quote_text(lexer: &mut Lexer<Kind>) -> Option<()> {
     let remainder: &str = lexer.remainder();
     let len = terminate::<'\''>(remainder.chars())?;
-    lexer.bump(remainder[0..len].as_bytes().len());
+    lexer.bump(remainder[0..len].len());
     Some(())
 }
 
@@ -274,7 +274,7 @@ fn lex_regex(lexer: &mut Lexer<Kind>) -> Option<()> {
     let remainder: &str = lexer.remainder();
 
     let len = terminate::<'/'>(lexer.slice().chars().skip(1).chain(remainder.chars()))?;
-    lexer.bump(remainder[0..len - 1].as_bytes().len());
+    lexer.bump(remainder[0..len - 1].len());
     Some(())
 }
 

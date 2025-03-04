@@ -842,7 +842,7 @@ impl MetaQuery<'_> {
 
             // dirty...
             let raw_string = rel_data.to_string();
-            let raw_props = raw_string.substring(1, raw_string.as_bytes().len() - 1);
+            let raw_props = raw_string.substring(1, raw_string.len() - 1);
             let raw_spacer = if raw_props.is_empty() { "" } else { ", " };
 
             let data = match (edge_write_mode, edge_projection.proj()) {
@@ -922,7 +922,7 @@ impl MetaQuery<'_> {
         entry.mode = edge_write_mode;
         entry.direction = dir;
         entry.filter_key = id
-            .substring(1, id.as_bytes().len() - 1)
+            .substring(1, id.len() - 1)
             .split_once('/')
             .map(|parts| format!(r#""{}""#, parts.1));
 

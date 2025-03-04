@@ -32,7 +32,7 @@ pub enum UpdateCondition {
     PgKey(PgDataKey),
 }
 
-impl<'a> TransactCtx<'a> {
+impl TransactCtx<'_> {
     /// Note: updates are not cached statements currently.
     /// Unsure if it's possible to cache a generic update statement, since every update
     /// can touch different fields.
@@ -95,8 +95,8 @@ impl<'a> TransactCtx<'a> {
         Ok(row.value)
     }
 
-    pub async fn update_datatable<'s>(
-        &'s self,
+    pub async fn update_datatable(
+        &self,
         value: InDomain<Value>,
         update_condition: UpdateCondition,
         timestamp: PgTimestamp,

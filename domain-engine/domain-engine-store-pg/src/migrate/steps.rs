@@ -25,7 +25,7 @@ use crate::{
 
 use super::{MigrationCtx, PgDomainIds, Stage};
 
-pub async fn migrate_domain_steps<'t>(
+pub async fn migrate_domain_steps(
     domain_index: DomainIndex,
     domain: &Domain,
     ontology_defs: &DefsAspect,
@@ -141,7 +141,7 @@ pub async fn migrate_domain_steps<'t>(
     Ok(())
 }
 
-async fn migrate_vertex_steps<'t>(
+async fn migrate_vertex_steps(
     domain_ids: PgDomainIds,
     vertex_def_id: DefId,
     def: &Def,
@@ -212,7 +212,7 @@ async fn migrate_vertex_steps<'t>(
     Ok(())
 }
 
-async fn migrate_domain_edges_steps<'t>(
+async fn migrate_domain_edges_steps(
     domain_index: DomainIndex,
     domain: &Domain,
     domain_ids: PgDomainIds,

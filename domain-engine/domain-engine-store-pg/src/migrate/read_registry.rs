@@ -21,10 +21,10 @@ enum TableRef {
 }
 
 /// Read the entire database registry into PgModel
-pub async fn read_registry<'t>(
+pub async fn read_registry(
     ontology_defs: &DefsAspect,
     ctx: &mut MigrationCtx,
-    txn: &Transaction<'t>,
+    txn: &Transaction<'_>,
 ) -> anyhow::Result<()> {
     let domain_index_by_ulid: FnvHashMap<Ulid, DomainIndex> = ontology_defs
         .domains()

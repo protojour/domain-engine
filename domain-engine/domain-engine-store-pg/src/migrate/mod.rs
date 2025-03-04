@@ -258,7 +258,7 @@ async fn migrate_registry(pg_client: &mut Client) -> anyhow::Result<RegVersion> 
         .map_err(|ver| anyhow!("applied version not representable: {ver}"))
 }
 
-async fn query_domain_migration_version<'t>(txn: &Transaction<'t>) -> anyhow::Result<RegVersion> {
+async fn query_domain_migration_version(txn: &Transaction<'_>) -> anyhow::Result<RegVersion> {
     let version = txn
         .query_one("SELECT version FROM m6mreg.domain_migration", &[])
         .await?

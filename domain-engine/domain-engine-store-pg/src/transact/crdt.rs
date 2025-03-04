@@ -11,7 +11,7 @@ use crate::{
 
 use super::{data::ParentProp, mut_ctx::PgMutCtx, update::UpdateCondition, TransactCtx};
 
-impl<'a> TransactCtx<'a> {
+impl TransactCtx<'_> {
     pub async fn insert_initial_automerge_crdt(
         &self,
         parent: ParentProp,

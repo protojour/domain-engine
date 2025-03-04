@@ -8,8 +8,8 @@ use crate::pg_model::RegVersion;
 
 use super::MigrationCtx;
 
-pub async fn migrate_domain_schemas<'t>(
-    txn: &Transaction<'t>,
+pub async fn migrate_domain_schemas(
+    txn: &Transaction<'_>,
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
     while ctx.deployed_domain_schema_version != ctx.current_version {
