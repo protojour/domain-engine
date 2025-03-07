@@ -5,7 +5,7 @@ use bytes::Bytes;
 use domain_engine_core::{DomainEngine, Session, system::SystemAPI};
 use domain_engine_httpjson::DomainRouterBuilder;
 use domain_engine_test_utils::{
-    dummy_session::DummySession, dynamic_data_store::DynamicDataStoreFactory,
+    dummy_session::DummySession, dynamic_data_store::DynamicDataStoreClient,
 };
 use futures_util::{Stream, StreamExt};
 use http::StatusCode;
@@ -143,13 +143,13 @@ impl ResponseExt for reqwest::Response {
 
 async fn make_domain_engine(
     ontology: Arc<Ontology>,
-    ds_factory: DynamicDataStoreFactory,
+    ds_factory: DynamicDataStoreClient,
     system: Box<dyn SystemAPI + Send + Sync>,
 ) -> Arc<DomainEngine> {
     Arc::new(
         DomainEngine::builder(ontology)
             .system(system)
-            .build(ds_factory, Session::default())
+            .build(ds_factory.connect().await.unwrap(), Session::default())
             .await
             .unwrap(),
     )

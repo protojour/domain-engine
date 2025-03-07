@@ -9,7 +9,7 @@ use domain_engine_graphql::{
     juniper::{InputValue, ScalarValue, Value, graphql_value},
 };
 use domain_engine_test_utils::{
-    dynamic_data_store::DynamicDataStoreFactory,
+    dynamic_data_store::DynamicDataStoreClient,
     graphql_test_utils::{Exec, GraphQLPageDebug, TestCompileSchema, ValueExt},
     system::mock_current_time_monotonic,
     unimock,
@@ -35,7 +35,10 @@ async fn make_domain_engine(
 ) -> DomainEngine {
     DomainEngine::builder(ontology)
         .system(Box::new(unimock::Unimock::new(mock_clause)))
-        .build(DynamicDataStoreFactory::new(ds), Session::default())
+        .build(
+            DynamicDataStoreClient::new(ds).connect().await.unwrap(),
+            Session::default(),
+        )
         .await
         .unwrap()
 }

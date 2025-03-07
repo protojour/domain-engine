@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use domain_engine_core::{DomainEngine, Session};
 use domain_engine_test_utils::{
-    dynamic_data_store::DynamicDataStoreFactory, system::mock_current_time_monotonic,
+    dynamic_data_store::DynamicDataStoreClient, system::mock_current_time_monotonic,
 };
 use ontol_runtime::ontology::Ontology;
 
@@ -31,7 +31,10 @@ async fn mk_engine_with_mock(
     Arc::new(
         DomainEngine::builder(ontology)
             .system(Box::new(unimock::Unimock::new(system_mock)))
-            .build(DynamicDataStoreFactory::new(ds), Session::default())
+            .build(
+                DynamicDataStoreClient::new(ds).connect().await.unwrap(),
+                Session::default(),
+            )
             .await
             .unwrap(),
     )

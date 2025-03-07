@@ -9,7 +9,7 @@ use domain_engine_arrow::{
 };
 use domain_engine_core::{DomainEngine, DomainResult, Session};
 use domain_engine_test_utils::{
-    data_store_util, dynamic_data_store::DynamicDataStoreFactory,
+    data_store_util, dynamic_data_store::DynamicDataStoreClient,
     system::mock_current_time_monotonic, unimock,
 };
 use futures_util::{StreamExt, stream::BoxStream};
@@ -202,7 +202,13 @@ async fn make_domain_engine(ontology: Arc<Ontology>, datastore: &str) -> Arc<Dom
             .system(Box::new(unimock::Unimock::new(
                 mock_current_time_monotonic(),
             )))
-            .build(DynamicDataStoreFactory::new(datastore), Session::default())
+            .build(
+                DynamicDataStoreClient::new(datastore)
+                    .connect()
+                    .await
+                    .unwrap(),
+                Session::default(),
+            )
             .await
             .unwrap(),
     )

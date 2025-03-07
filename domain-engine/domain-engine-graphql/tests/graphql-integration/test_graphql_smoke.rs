@@ -4,7 +4,7 @@
 
 use domain_engine_core::{DomainEngine, Session};
 use domain_engine_graphql::domain::context::ServiceCtx;
-use domain_engine_store_inmemory::InMemoryDataStoreFactory;
+use domain_engine_store_inmemory::InMemoryConnection;
 use domain_engine_test_utils::{
     graphql_test_utils::{Exec, TestCompileSchema, TestCompileSingletonSchema},
     system::mock_current_time_monotonic,
@@ -65,7 +65,7 @@ async fn test_default_mapping_error() {
 
     let ctx: ServiceCtx = DomainEngine::builder(test.ontology_owned())
         .system(Box::new(Unimock::new(mock_current_time_monotonic())))
-        .build_sync(InMemoryDataStoreFactory, Session::default())
+        .build_sync(InMemoryConnection, Session::default())
         .unwrap()
         .into();
 

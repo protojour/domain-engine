@@ -2,35 +2,29 @@ use std::{collections::BTreeSet, sync::Arc};
 
 use domain_engine_core::{
     DomainResult,
-    data_store::{DataStoreAPI, DataStoreFactory, DataStoreFactorySync, DataStoreParams},
+    data_store::{DataStoreAPI, DataStoreConnection, DataStoreConnectionSync, DataStoreParams},
     domain_error::DomainErrorKind,
 };
-use domain_engine_store_inmemory::InMemoryDataStoreFactory;
+use domain_engine_store_inmemory::InMemoryConnection;
 use domain_engine_tantivy::{TantivyConfig, TantivyIndexSource, make_tantivy_layer};
 use ontol_runtime::{DomainIndex, ontology::aspects::OntologyAspects};
-use tracing::error;
+use pg::PgTestDatastoreConnection;
 
 #[derive(Clone)]
-pub struct DynamicDataStoreFactory {
-    name: String,
-    recreate_db: bool,
+pub struct DynamicDataStoreClient {
+    impl_name: String,
     tantivy_index: bool,
     crdt_compaction_threshold: Option<u32>,
 }
 
-impl DynamicDataStoreFactory {
-    pub fn new(name: impl Into<String>) -> Self {
+impl DynamicDataStoreClient {
+    /// Create a data store builder using the provided name of an implementation
+    pub fn new(impl_name: impl Into<String>) -> Self {
         Self {
-            name: name.into(),
-            recreate_db: true,
+            impl_name: impl_name.into(),
             tantivy_index: false,
             crdt_compaction_threshold: None,
         }
-    }
-
-    pub fn reuse_db(mut self) -> Self {
-        self.recreate_db = false;
-        self
     }
 
     pub fn tantivy_index(mut self) -> Self {
@@ -41,6 +35,20 @@ impl DynamicDataStoreFactory {
     pub fn crdt_compaction_threshold(mut self, threshold: u32) -> Self {
         self.crdt_compaction_threshold = Some(threshold);
         self
+    }
+
+    /// Connect to a data store implementation
+    pub async fn connect(self) -> DomainResult<DynamicDataStoreConnection> {
+        let backend = match self.impl_name.as_str() {
+            "inmemory" => DynamicDataStoreConnectionBackend::InMemory,
+            "pg" => DynamicDataStoreConnectionBackend::Pg(pg::create_pg_connection().await?),
+            other => return Err(DomainErrorKind::UnknownDataStore(other.to_string()).into_error()),
+        };
+
+        Ok(DynamicDataStoreConnection {
+            builder: self,
+            backend,
+        })
     }
 
     fn add_layers(
@@ -64,9 +72,22 @@ impl DynamicDataStoreFactory {
     }
 }
 
+#[derive(Clone)]
+pub struct DynamicDataStoreConnection {
+    builder: DynamicDataStoreClient,
+    backend: DynamicDataStoreConnectionBackend,
+}
+
+#[derive(Clone)]
+enum DynamicDataStoreConnectionBackend {
+    InMemory,
+    #[cfg(feature = "store-pg")]
+    Pg(PgTestDatastoreConnection),
+}
+
 #[async_trait::async_trait]
-impl DataStoreFactory for DynamicDataStoreFactory {
-    async fn new_api(
+impl DataStoreConnection for DynamicDataStoreConnection {
+    async fn migrate(
         &self,
         persisted: &BTreeSet<DomainIndex>,
         mut params: DataStoreParams,
@@ -78,95 +99,33 @@ impl DataStoreFactory for DynamicDataStoreFactory {
                 .aspect_subset(OntologyAspects::DEFS | OntologyAspects::SERDE),
         );
 
-        let api = match self.name.as_str() {
-            #[cfg(feature = "store-arango")]
-            "arango" => {
-                arango::ArangoTestDatastoreFactory {
-                    recreate_db: self.recreate_db,
-                }
-                .new_api(persisted, params.clone())
-                .await
+        let api = match &self.backend {
+            DynamicDataStoreConnectionBackend::InMemory => {
+                InMemoryConnection
+                    .migrate(persisted, params.clone())
+                    .await?
             }
-            "inmemory" => {
-                InMemoryDataStoreFactory
-                    .new_api(persisted, params.clone())
-                    .await
+            DynamicDataStoreConnectionBackend::Pg(connection) => {
+                connection.migrate(persisted, params.clone()).await?
             }
-            #[cfg(feature = "store-pg")]
-            "pg" => {
-                pg::PgTestDatastoreFactory {
-                    recreate_db: self.recreate_db,
-                    crdt_compaction_threshold: self.crdt_compaction_threshold,
-                }
-                .new_api(persisted, params.clone())
-                .await
-            }
-            other => Err(DomainErrorKind::UnknownDataStore(other.to_string()).into_error()),
-        }
-        .map_err(|err| {
-            error!("datastore not created: {err:?}");
-            err
-        })?;
+        };
 
-        self.add_layers(api, params)
+        self.builder.add_layers(api, params)
     }
 }
 
-impl DataStoreFactorySync for DynamicDataStoreFactory {
-    fn new_api_sync(
+impl DataStoreConnectionSync for DynamicDataStoreClient {
+    fn migrate_sync(
         &self,
         persisted: &BTreeSet<DomainIndex>,
         params: DataStoreParams,
     ) -> DomainResult<Arc<dyn DataStoreAPI + Send + Sync>> {
-        let api = match self.name.as_str() {
-            "inmemory" => InMemoryDataStoreFactory.new_api_sync(persisted, params.clone()),
+        let api = match self.impl_name.as_str() {
+            "inmemory" => InMemoryConnection.migrate_sync(persisted, params.clone()),
             other => panic!("cannot synchronously create `{other}` factory"),
         }?;
 
         self.add_layers(api, params)
-    }
-}
-
-#[cfg(feature = "store-arango")]
-mod arango {
-    use std::{collections::BTreeSet, env, sync::Arc};
-
-    use domain_engine_core::{DomainResult, data_store::DataStoreParams};
-    use domain_engine_store_arango::ArangoDatabaseHandle;
-
-    #[derive(Default)]
-    pub struct ArangoTestDatastoreFactory {
-        pub recreate_db: bool,
-    }
-
-    #[async_trait::async_trait]
-    impl domain_engine_core::data_store::DataStoreFactory for ArangoTestDatastoreFactory {
-        async fn new_api(
-            &self,
-            persisted: &BTreeSet<ontol_runtime::DomainIndex>,
-            params: DataStoreParams,
-        ) -> DomainResult<Arc<dyn domain_engine_core::data_store::DataStoreAPI + Send + Sync>>
-        {
-            let host = match env::var("DOMAIN_ENGINE_TEST_ARANGO_HOST") {
-                Ok(host) => host,
-                Err(_) => "localhost".to_string(),
-            };
-            let client = domain_engine_store_arango::ArangoClient::new(
-                &format!("http://{host}:8529"),
-                reqwest_middleware::ClientWithMiddleware::new(reqwest::Client::new(), vec![]),
-            );
-            let test_name = super::detect_test_name("::ds_arango");
-            let mut db_name = &test_name[..];
-            if db_name.len() >= 64 {
-                db_name = &db_name[0..63];
-            }
-            if self.recreate_db {
-                let _ = client.drop_database(db_name).await;
-            }
-            let mut db = client.db(db_name, params.ontology, params.system);
-            db.init(persisted, true).await.unwrap();
-            Ok(Arc::new(ArangoDatabaseHandle::from(db)))
-        }
     }
 }
 
@@ -180,8 +139,11 @@ mod pg {
     use domain_engine_core::domain_error::DomainErrorContext;
     use domain_engine_core::transact::{ReqMessage, RespMessage, TransactionMode};
     use domain_engine_core::{DomainError, DomainResult, Session};
-    use domain_engine_store_pg::{PostgresDataStore, deadpool_postgres, tokio_postgres};
-    use domain_engine_store_pg::{PostgresHandle, connect_and_migrate, recreate_database};
+    use domain_engine_store_pg::{
+        PostgresDataStore, RegVersion, deadpool_postgres, migrate_ontology, migrate_registry,
+        tokio_postgres,
+    };
+    use domain_engine_store_pg::{PostgresHandle, recreate_database};
     use futures_util::stream::BoxStream;
     use ontol_runtime::PropId;
     use tokio::sync::{OwnedSemaphorePermit, Semaphore};
@@ -195,28 +157,46 @@ mod pg {
     /// this global semaphore limits the number of PgTestDatastores that can exist at the same time.
     static PG_TEST_SEMAPHORE: OnceLock<Arc<Semaphore>> = OnceLock::new();
 
-    #[derive(Default)]
-    pub struct PgTestDatastoreFactory {
-        pub recreate_db: bool,
-        pub crdt_compaction_threshold: Option<u32>,
+    #[derive(Clone)]
+    pub struct PgTestDatastoreConnection {
+        pool: deadpool_postgres::Pool,
+        reg_version: RegVersion,
+        #[expect(unused)]
+        permit: Arc<OwnedSemaphorePermit>,
     }
 
     struct PgTestDatastore {
         handle: PostgresHandle,
-        /// As long as this datastore still lives, it will hold this permit
-        #[expect(unused)]
-        permit: OwnedSemaphorePermit,
     }
 
     #[async_trait::async_trait]
-    impl domain_engine_core::data_store::DataStoreFactory for PgTestDatastoreFactory {
-        async fn new_api(
+    impl domain_engine_core::data_store::DataStoreConnection for PgTestDatastoreConnection {
+        async fn migrate(
             &self,
             persisted: &BTreeSet<ontol_runtime::DomainIndex>,
             params: DataStoreParams,
         ) -> DomainResult<Arc<dyn domain_engine_core::data_store::DataStoreAPI + Send + Sync>>
         {
-            test_pg_api(self, persisted, params).await
+            let pg_model = migrate_ontology(
+                persisted,
+                params.ontology.as_ref().as_ref(),
+                self.reg_version,
+                self.pool.clone(),
+            )
+            .await
+            .map_err(|err| DomainError::data_store(format!("{err:?}")))?;
+
+            let data_store = PostgresDataStore::new(
+                pg_model,
+                params.ontology,
+                self.pool.clone(),
+                params.system,
+                params.datastore_mutated,
+            );
+
+            Ok(Arc::new(PgTestDatastore {
+                handle: data_store.into(),
+            }))
         }
     }
 
@@ -236,11 +216,7 @@ mod pg {
         }
     }
 
-    async fn test_pg_api(
-        factory: &PgTestDatastoreFactory,
-        persisted: &BTreeSet<ontol_runtime::DomainIndex>,
-        params: DataStoreParams,
-    ) -> DomainResult<Arc<dyn domain_engine_core::data_store::DataStoreAPI + Send + Sync>> {
+    pub async fn create_pg_connection() -> DomainResult<PgTestDatastoreConnection> {
         let semaphore = PG_TEST_SEMAPHORE
             .get_or_init(|| Arc::new(Semaphore::new(MAX_CONCURRENT_PG_TESTS)))
             .clone();
@@ -252,7 +228,7 @@ mod pg {
 
         let test_name = format!("testdb_{}", super::detect_test_name("::ds_pg"));
 
-        if factory.recreate_db {
+        {
             let master_config = test_pg_config("domainengine");
             recreate_database(&test_name, &master_config)
                 .await
@@ -261,12 +237,7 @@ mod pg {
         }
 
         let test_config = test_pg_config(&test_name);
-
-        let pg_model =
-            connect_and_migrate(persisted, params.ontology.as_ref().as_ref(), &test_config)
-                .await
-                .map_err(DomainError::data_store_from_anyhow)
-                .with_context(|| "connect and migrate")?;
+        let db_name = test_config.get_dbname().unwrap().to_string();
 
         let deadpool_manager = deadpool_postgres::Manager::from_config(
             test_config,
@@ -276,25 +247,20 @@ mod pg {
             },
         );
 
-        let mut data_store = PostgresDataStore::new(
-            pg_model,
-            params.ontology,
-            deadpool_postgres::Pool::builder(deadpool_manager)
-                .max_size(4)
-                .build()
-                .map_err(|err| DomainError::data_store(format!("deadpool: {err}")))?,
-            params.system,
-            params.datastore_mutated,
-        );
+        let pool = deadpool_postgres::Pool::builder(deadpool_manager)
+            .max_size(4)
+            .build()
+            .map_err(|err| DomainError::data_store(format!("deadpool: {err}")))?;
 
-        if let Some(threshold) = factory.crdt_compaction_threshold {
-            data_store = data_store.with_crdt_compaction_threshold(threshold);
-        }
+        let reg_version = migrate_registry(pool.clone(), &db_name)
+            .await
+            .map_err(|err| DomainError::data_store(format!("{err:?}")))?;
 
-        Ok(Arc::new(PgTestDatastore {
-            handle: data_store.into(),
-            permit,
-        }))
+        Ok(PgTestDatastoreConnection {
+            pool,
+            reg_version,
+            permit: Arc::new(permit),
+        })
     }
 
     fn test_pg_config(dbname: &str) -> tokio_postgres::Config {

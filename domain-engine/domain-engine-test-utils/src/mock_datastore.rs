@@ -2,7 +2,7 @@ use std::{collections::BTreeSet, sync::Arc};
 
 use domain_engine_core::{
     DomainResult, Session,
-    data_store::{DataStoreAPI, DataStoreFactorySync, DataStoreParams},
+    data_store::{DataStoreAPI, DataStoreConnectionSync, DataStoreParams},
     transact::{DataOperation, ReqMessage, RespMessage, TransactionMode},
 };
 use futures_util::{StreamExt, stream::BoxStream};
@@ -66,16 +66,6 @@ impl LinearDataStoreAdapter {
     }
 }
 
-impl DataStoreFactorySync for LinearDataStoreAdapter {
-    fn new_api_sync(
-        &self,
-        _persisted: &BTreeSet<ontol_runtime::DomainIndex>,
-        _params: DataStoreParams,
-    ) -> DomainResult<Arc<dyn DataStoreAPI + Send + Sync>> {
-        Ok(Arc::new(LinearDataStoreAdapter(self.0.clone())))
-    }
-}
-
 #[async_trait::async_trait]
 impl DataStoreAPI for LinearDataStoreAdapter {
     async fn transact(
@@ -89,5 +79,15 @@ impl DataStoreAPI for LinearDataStoreAdapter {
             <Unimock as LinearTransact>::transact(&self.0, mode, messages, session).await?;
 
         Ok(futures_util::stream::iter(responses).boxed())
+    }
+}
+
+impl DataStoreConnectionSync for LinearDataStoreAdapter {
+    fn migrate_sync(
+        &self,
+        _persisted: &BTreeSet<ontol_runtime::DomainIndex>,
+        _params: DataStoreParams,
+    ) -> DomainResult<Arc<dyn DataStoreAPI + Send + Sync>> {
+        Ok(Arc::new(LinearDataStoreAdapter(self.0.clone())))
     }
 }

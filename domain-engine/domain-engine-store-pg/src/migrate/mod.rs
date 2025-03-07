@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{Context, anyhow};
+use deadpool_postgres::Object;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     DefId, DefPropTag, DomainIndex, OntolDefTag,
@@ -8,8 +9,9 @@ use ontol_runtime::{
     tuple::CardinalIdx,
 };
 use read_registry::read_registry;
-use tokio_postgres::{Client, Transaction};
+use tokio_postgres::Transaction;
 use tracing::{Instrument, debug_span, info};
+use txn_wrapper::TxnWrapper;
 
 use crate::{
     PgModel,
@@ -22,6 +24,8 @@ use crate::{
 mod registry {
     refinery::embed_migrations!("./m6mreg_migrations");
 }
+
+pub mod txn_wrapper;
 
 mod domain_schemas;
 mod execute;
@@ -137,18 +141,39 @@ enum MigrationStep {
     },
 }
 
-pub async fn migrate(
+pub async fn migrate_registry(
+    txn_wrapper: &mut TxnWrapper,
+    db_name: &str,
+) -> anyhow::Result<RegVersion> {
+    info!(%db_name, "migrating registry");
+
+    let mut runner = registry::migrations::runner();
+    runner.set_migration_table_name(MIGRATIONS_TABLE_NAME);
+
+    let mut migrations = runner
+        .get_migrations()
+        .iter()
+        .filter(|mig| format!("{}", mig.prefix()) == "V")
+        .collect::<Vec<_>>();
+    migrations.sort();
+
+    runner.run_async(txn_wrapper).await?;
+
+    let reg_version = RegVersion::try_from(migrations.last().unwrap().version())
+        .map_err(|ver| anyhow!("applied version not representable: {ver}"))?;
+
+    assert_eq!(RegVersion::current(), reg_version);
+
+    Ok(reg_version)
+}
+
+/// precondition: registry must be migrated first
+pub async fn migrate_ontology(
     persistent_domains: &BTreeSet<DomainIndex>,
     ontology_defs: &DefsAspect,
-    db_name: &str,
-    pg_client: &mut Client,
+    current_version: RegVersion,
+    mut conn: Object,
 ) -> anyhow::Result<PgModel> {
-    info!(%db_name, "migrating database");
-
-    // migrate the registry itself
-    let current_version = migrate_registry(pg_client).await?;
-    assert_eq!(RegVersion::current(), current_version);
-
     // initialize domain migration context
     let mut ctx = MigrationCtx {
         current_version,
@@ -161,7 +186,7 @@ pub async fn migrate(
     };
 
     // Migrate all the domains in a single transaction
-    let txn = pg_client
+    let txn = conn
         .build_transaction()
         .deferrable(false)
         .isolation_level(tokio_postgres::IsolationLevel::Serializable)
@@ -239,23 +264,6 @@ pub async fn migrate(
     );
 
     Ok(PgModel::new(ctx.domains, entity_id_to_entity))
-}
-
-async fn migrate_registry(pg_client: &mut Client) -> anyhow::Result<RegVersion> {
-    let mut runner = registry::migrations::runner();
-    runner.set_migration_table_name(MIGRATIONS_TABLE_NAME);
-
-    let mut migrations = runner
-        .get_migrations()
-        .iter()
-        .filter(|mig| format!("{}", mig.prefix()) == "V")
-        .collect::<Vec<_>>();
-    migrations.sort();
-
-    runner.run_async(pg_client).await?;
-
-    RegVersion::try_from(migrations.last().unwrap().version())
-        .map_err(|ver| anyhow!("applied version not representable: {ver}"))
 }
 
 async fn query_domain_migration_version(txn: &Transaction<'_>) -> anyhow::Result<RegVersion> {

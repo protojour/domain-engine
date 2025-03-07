@@ -7,7 +7,7 @@ use domain_engine_graphql::{
 };
 use domain_engine_test_utils::{
     await_search_indexer_queue_empty,
-    dynamic_data_store::DynamicDataStoreFactory,
+    dynamic_data_store::DynamicDataStoreClient,
     graphql_test_utils::{Exec, TestCompileSingletonSchema},
     system::MonotonicClockSystemApi,
 };
@@ -25,7 +25,11 @@ async fn test_conduit_search(ds: &str) {
         DomainEngine::builder(test.ontology_owned())
             .system(Box::new(MonotonicClockSystemApi::default()))
             .build(
-                DynamicDataStoreFactory::new(ds).tantivy_index(),
+                DynamicDataStoreClient::new(ds)
+                    .tantivy_index()
+                    .connect()
+                    .await
+                    .unwrap(),
                 Session::default(),
             )
             .await
@@ -293,7 +297,11 @@ async fn test_search_octets_fmt(ds: &str) {
         DomainEngine::builder(test.ontology_owned())
             .system(Box::new(MonotonicClockSystemApi::default()))
             .build(
-                DynamicDataStoreFactory::new(ds).tantivy_index(),
+                DynamicDataStoreClient::new(ds)
+                    .tantivy_index()
+                    .connect()
+                    .await
+                    .unwrap(),
                 Session::default(),
             )
             .await

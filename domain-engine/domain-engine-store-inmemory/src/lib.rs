@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use domain_engine_core::{
     DomainError, Session,
-    data_store::{DataStoreFactory, DataStoreFactorySync, DataStoreParams},
+    data_store::{DataStoreConnection, DataStoreConnectionSync, DataStoreParams},
     make_interfacable::MakeInterfacable,
     make_storable::MakeStorable,
     system::ArcSystemApi,
@@ -304,21 +304,21 @@ impl InMemoryDb {
 }
 
 #[derive(Clone, Copy, Default)]
-pub struct InMemoryDataStoreFactory;
+pub struct InMemoryConnection;
 
 #[async_trait::async_trait]
-impl DataStoreFactory for InMemoryDataStoreFactory {
-    async fn new_api(
+impl DataStoreConnection for InMemoryConnection {
+    async fn migrate(
         &self,
         persisted: &BTreeSet<DomainIndex>,
         params: DataStoreParams,
     ) -> DomainResult<Arc<dyn DataStoreAPI + Send + Sync>> {
-        self.new_api_sync(persisted, params)
+        self.migrate_sync(persisted, params)
     }
 }
 
-impl DataStoreFactorySync for InMemoryDataStoreFactory {
-    fn new_api_sync(
+impl DataStoreConnectionSync for InMemoryConnection {
+    fn migrate_sync(
         &self,
         persisted: &BTreeSet<DomainIndex>,
         params: DataStoreParams,

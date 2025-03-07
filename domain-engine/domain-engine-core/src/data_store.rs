@@ -98,23 +98,27 @@ pub struct DataStoreParams {
     pub index_mutated: tokio::sync::watch::Sender<()>,
 }
 
-/// Trait for creating data store APIs
+/// Trait that represents a connection to a specific data store _implementation_.
+/// The connection itself has no concept of specific domains,
+/// but acts as the API for migrating that data store into being able to represent the domains.
+///
+/// This trait is used to create specific a specific data store for a specific ontology.
 #[async_trait::async_trait]
-pub trait DataStoreFactory {
+pub trait DataStoreConnection {
     /// Create a new data store, potentially migrating it.
     ///
     /// The set of persisted packages is sorted, so passed in the order compiled by the compiler.
     /// This means that the database can be migrated in that order, with upstream domains
     /// being migrated before downstream domains.
-    async fn new_api(
+    async fn migrate(
         &self,
         persisted: &BTreeSet<DomainIndex>,
         params: DataStoreParams,
     ) -> DomainResult<Arc<dyn DataStoreAPI + Send + Sync>>;
 }
 
-pub trait DataStoreFactorySync {
-    fn new_api_sync(
+pub trait DataStoreConnectionSync {
+    fn migrate_sync(
         &self,
         persisted: &BTreeSet<DomainIndex>,
         params: DataStoreParams,

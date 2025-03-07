@@ -3,7 +3,7 @@ use automerge::{ReadDoc, transaction::Transactable};
 use domain_engine_core::Session;
 use domain_engine_httpjson::crdt::{DocAddr, doc_repository::DocRepository};
 use domain_engine_test_utils::{
-    dynamic_data_store::DynamicDataStoreFactory, system::MonotonicClockSystemApi,
+    dynamic_data_store::DynamicDataStoreClient, system::MonotonicClockSystemApi,
 };
 use http::header::{self};
 use ontol_examples::workspaces;
@@ -28,7 +28,7 @@ async fn test_workspaces_rest_api_with_edit(ds: &str) {
     let [workspace] = test.bind(["Workspace"]);
     let engine = make_domain_engine(
         test.ontology_owned(),
-        DynamicDataStoreFactory::new(ds),
+        DynamicDataStoreClient::new(ds),
         Box::new(MonotonicClockSystemApi::default()),
     )
     .await;
@@ -233,7 +233,7 @@ async fn test_workspace_sync(ds: &str) {
     let test = vec![workspaces()].compile();
     let engine = make_domain_engine(
         test.ontology_owned(),
-        DynamicDataStoreFactory::new(ds).crdt_compaction_threshold(3),
+        DynamicDataStoreClient::new(ds).crdt_compaction_threshold(3),
         Box::new(MonotonicClockSystemApi::default()),
     )
     .await;

@@ -11,7 +11,7 @@ use axum::{
 };
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use domain_engine_core::{DomainEngine, Session};
-use domain_engine_store_inmemory::InMemoryDataStoreFactory;
+use domain_engine_store_inmemory::InMemoryConnection;
 use notify_debouncer_full::{new_debouncer, notify::RecursiveMode};
 use ontol_compiler::{
     SourceCodeRegistry, SourceId, Sources,
@@ -571,7 +571,7 @@ async fn reload_routes(ontology: Ontology, dyn_routers: &DynamicRouters, base_ur
     let domain_engine = Arc::new(
         DomainEngine::builder(ontology.clone())
             .system(Box::<System>::default())
-            .build(InMemoryDataStoreFactory, Session::default())
+            .build(InMemoryConnection, Session::default())
             .await
             .unwrap(),
     );

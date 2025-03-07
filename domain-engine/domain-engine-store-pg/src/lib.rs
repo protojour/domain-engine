@@ -2,7 +2,9 @@
 
 use std::{collections::BTreeSet, sync::Arc};
 
-use anyhow::anyhow;
+pub use pg_model::PgModel;
+pub use pg_model::RegVersion;
+
 use compaction::{CompactionCtx, compaction_task};
 use domain_engine_core::{
     DomainResult, Session,
@@ -11,13 +13,12 @@ use domain_engine_core::{
     transact::{ReqMessage, RespMessage, TransactionMode},
 };
 use futures_util::stream::BoxStream;
+use migrate::txn_wrapper::TxnWrapper;
 use ontol_runtime::{
     DomainIndex, PropId,
     ontology::{Ontology, aspects::DefsAspect},
 };
 use tokio_postgres::NoTls;
-
-pub use pg_model::PgModel;
 
 mod address;
 mod compaction;
@@ -94,29 +95,27 @@ impl From<PostgresDataStore> for PostgresHandle {
     }
 }
 
-pub async fn connect_and_migrate(
+pub async fn migrate_registry(
+    pool: deadpool_postgres::Pool,
+    db_name: &str,
+) -> anyhow::Result<RegVersion> {
+    let mut txn_wrapper = TxnWrapper {
+        conn: pool.get().await?,
+    };
+
+    migrate::migrate_registry(&mut txn_wrapper, db_name).await
+}
+
+pub async fn migrate_ontology(
     persistent_domains: &BTreeSet<DomainIndex>,
     ontology_defs: &DefsAspect,
-    pg_config: &tokio_postgres::Config,
+    reg_version: RegVersion,
+    pool: deadpool_postgres::Pool,
 ) -> anyhow::Result<PgModel> {
-    let db_name = pg_config
-        .get_dbname()
-        .ok_or_else(|| anyhow!("missing db name"))?;
-    let (mut client, connection) = pg_config.connect(NoTls).await?;
-
-    // The connection object performs the actual communication with the database,
-    // so spawn it off to run on its own.
-    let join_handle = tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("connection error: {}", e);
-        }
-    });
+    let conn = pool.get().await?;
 
     let pg_model =
-        migrate::migrate(persistent_domains, ontology_defs, db_name, &mut client).await?;
-    drop(client);
-
-    join_handle.await?;
+        migrate::migrate_ontology(persistent_domains, ontology_defs, reg_version, conn).await?;
 
     Ok(pg_model)
 }

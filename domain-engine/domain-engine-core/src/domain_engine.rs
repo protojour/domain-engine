@@ -21,7 +21,7 @@ use tracing::{debug, error};
 
 use crate::{
     DomainError, FindEntitySelect, SelectMode, Session,
-    data_store::{DataStore, DataStoreFactory, DataStoreFactorySync, DataStoreParams},
+    data_store::{DataStore, DataStoreConnection, DataStoreConnectionSync, DataStoreParams},
     domain_error::{DomainErrorContext, DomainErrorKind, DomainResult},
     select_data_flow::translate_entity_select,
     system::{ArcSystemApi, SystemAPI},
@@ -364,9 +364,9 @@ impl Builder {
         self
     }
 
-    pub async fn build<F: DataStoreFactory>(
+    pub async fn build<C: DataStoreConnection>(
         self,
-        factory: F,
+        connection: C,
         session: Session,
     ) -> DomainResult<DomainEngine> {
         let system = self.system.expect("No system API provided!");
@@ -380,8 +380,8 @@ impl Builder {
                 let mut data_store: Option<DataStore> = None;
 
                 for (config, persisted_set) in persisted_domains(&self.ontology) {
-                    let api = factory
-                        .new_api(
+                    let api = connection
+                        .migrate(
                             &persisted_set,
                             DataStoreParams {
                                 config: config.clone(),
@@ -413,9 +413,9 @@ impl Builder {
         })
     }
 
-    pub fn build_sync<F: DataStoreFactorySync>(
+    pub fn build_sync<C: DataStoreConnectionSync>(
         self,
-        factory: F,
+        connection: C,
         session: Session,
     ) -> DomainResult<DomainEngine> {
         let system = self.system.expect("No system API provided!");
@@ -429,8 +429,8 @@ impl Builder {
                 let mut data_store: Option<DataStore> = None;
 
                 for (config, persisted_set) in persisted_domains(&self.ontology) {
-                    let api = factory
-                        .new_api_sync(
+                    let api = connection
+                        .migrate_sync(
                             &persisted_set,
                             DataStoreParams {
                                 config: config.clone(),

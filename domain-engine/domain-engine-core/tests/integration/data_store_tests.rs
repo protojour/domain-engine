@@ -1,7 +1,7 @@
 use domain_engine_core::{DomainEngine, Session};
 use domain_engine_test_utils::{
     DomainEngineTestExt, TestFindQuery, data_store_util,
-    dynamic_data_store::DynamicDataStoreFactory, system::mock_current_time_monotonic, unimock,
+    dynamic_data_store::DynamicDataStoreClient, system::mock_current_time_monotonic, unimock,
 };
 use ontol_examples as examples;
 use ontol_runtime::{
@@ -38,15 +38,22 @@ async fn make_domain_engine(
     Arc::new(
         DomainEngine::builder(ontology)
             .system(Box::new(unimock::Unimock::new(mock_clause)))
-            .build(DynamicDataStoreFactory::new(data_store), Session::default())
+            .build(
+                DynamicDataStoreClient::new(data_store)
+                    .connect()
+                    .await
+                    .unwrap(),
+                Session::default(),
+            )
             .await
             .unwrap(),
     )
 }
 
-/// An orphaned domain was previously in the ontlogy, but has disappeared.
+/// An orphaned domain was previously in the ontology, but has disappeared.
 /// This test utility migrates different OntolTests in sequence.
 async fn orphan_test(ds: &str, test_sequence: Vec<&OntolTest>) {
+    let ds_connection = DynamicDataStoreClient::new(ds).connect().await.unwrap();
     let mut iterator = test_sequence.into_iter();
 
     let Some(init) = iterator.next() else {
@@ -55,17 +62,16 @@ async fn orphan_test(ds: &str, test_sequence: Vec<&OntolTest>) {
 
     let domain_engine = DomainEngine::builder(init.ontology_owned())
         .system(Box::new(unimock::Unimock::new(())))
-        .build(DynamicDataStoreFactory::new(ds), Session::default())
+        .build(ds_connection.clone(), Session::default())
         .await
         .unwrap();
 
     drop(domain_engine);
 
-    let reuse_factory = DynamicDataStoreFactory::new(ds).reuse_db();
     for next in iterator {
         let domain_engine = DomainEngine::builder(next.ontology_owned())
             .system(Box::new(unimock::Unimock::new(())))
-            .build(reuse_factory.clone(), Session::default())
+            .build(ds_connection.clone(), Session::default())
             .await
             .unwrap();
 
@@ -76,9 +82,10 @@ async fn orphan_test(ds: &str, test_sequence: Vec<&OntolTest>) {
 #[ontol_macros::datastore_test(tokio::test)]
 async fn test_db_remigrate_noop_stix(ds: &str) {
     let test = examples::stix::stix_bundle().compile();
+    let ds_connection = DynamicDataStoreClient::new(ds).connect().await.unwrap();
     let domain_engine = DomainEngine::builder(test.ontology_owned())
         .system(Box::new(unimock::Unimock::new(())))
-        .build(DynamicDataStoreFactory::new(ds), Session::default())
+        .build(ds_connection.clone(), Session::default())
         .await
         .unwrap();
 
@@ -86,10 +93,7 @@ async fn test_db_remigrate_noop_stix(ds: &str) {
 
     let domain_engine = DomainEngine::builder(test.ontology_owned())
         .system(Box::new(unimock::Unimock::new(())))
-        .build(
-            DynamicDataStoreFactory::new(ds).reuse_db(),
-            Session::default(),
-        )
+        .build(ds_connection, Session::default())
         .await
         .unwrap();
 
@@ -99,9 +103,10 @@ async fn test_db_remigrate_noop_stix(ds: &str) {
 #[ontol_macros::datastore_test(tokio::test)]
 async fn test_db_remigrate_noop_workspaces(ds: &str) {
     let test = vec![examples::workspaces()].compile();
+    let ds_connection = DynamicDataStoreClient::new(ds).connect().await.unwrap();
     let domain_engine = DomainEngine::builder(test.ontology_owned())
         .system(Box::new(unimock::Unimock::new(())))
-        .build(DynamicDataStoreFactory::new(ds), Session::default())
+        .build(ds_connection.clone(), Session::default())
         .await
         .unwrap();
 
@@ -109,10 +114,7 @@ async fn test_db_remigrate_noop_workspaces(ds: &str) {
 
     let domain_engine = DomainEngine::builder(test.ontology_owned())
         .system(Box::new(unimock::Unimock::new(())))
-        .build(
-            DynamicDataStoreFactory::new(ds).reuse_db(),
-            Session::default(),
-        )
+        .build(ds_connection, Session::default())
         .await
         .unwrap();
 
@@ -137,10 +139,11 @@ async fn test_db_remove_one_domain(ds: &str) {
         examples::artist_and_instrument().0,
     ])
     .compile();
+    let ds_connection = DynamicDataStoreClient::new(ds).connect().await.unwrap();
 
     let domain_engine = DomainEngine::builder(test1.ontology_owned())
         .system(Box::new(unimock::Unimock::new(())))
-        .build(DynamicDataStoreFactory::new(ds), Session::default())
+        .build(ds_connection.clone(), Session::default())
         .await
         .unwrap();
 
@@ -154,8 +157,8 @@ async fn test_db_remove_one_domain(ds: &str) {
     let domain_engine = DomainEngine::builder(test2.ontology_owned())
         .system(Box::new(unimock::Unimock::new(())))
         .build(
-            // important: reuse DB
-            DynamicDataStoreFactory::new(ds).reuse_db(),
+            // important: reuse same connection
+            ds_connection,
             Session::default(),
         )
         .await

@@ -1,5 +1,5 @@
 use domain_engine_test_utils::{
-    dynamic_data_store::DynamicDataStoreFactory, system::mock_current_time_monotonic,
+    dynamic_data_store::DynamicDataStoreClient, system::mock_current_time_monotonic,
     unimock::Unimock,
 };
 use http::{
@@ -28,7 +28,7 @@ async fn test_put_post_get_httpjson_stix_object(ds: &str) {
     let test = stix_bundle().compile();
     let engine = make_domain_engine(
         test.ontology_owned(),
-        DynamicDataStoreFactory::new(ds),
+        DynamicDataStoreClient::new(ds),
         mock_system_time(),
     )
     .await;
@@ -87,7 +87,7 @@ async fn test_get_httpjson_no_data(ds: &str) {
     let test = stix_bundle().compile();
     let engine = make_domain_engine(
         test.ontology_owned(),
-        DynamicDataStoreFactory::new(ds),
+        DynamicDataStoreClient::new(ds),
         Box::new(Unimock::new(())),
     )
     .await;
@@ -138,7 +138,7 @@ async fn test_httpjson_post_url(ds: &str) {
     let test = stix_bundle().compile();
     let engine = make_domain_engine(
         test.ontology_owned(),
-        DynamicDataStoreFactory::new(ds),
+        DynamicDataStoreClient::new(ds),
         mock_system_time(),
     )
     .await;
@@ -183,7 +183,7 @@ async fn test_httpjson_stix_jsonlines_unresolved_foreign_key(ds: &str) {
     let test = stix_bundle().compile();
     let engine = make_domain_engine(
         test.ontology_owned(),
-        DynamicDataStoreFactory::new(ds),
+        DynamicDataStoreClient::new(ds),
         mock_system_time(),
     )
     .await;

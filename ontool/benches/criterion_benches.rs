@@ -3,7 +3,7 @@ use std::sync::Arc;
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use domain_engine_core::{DomainEngine, Session};
 use domain_engine_graphql::domain::context::ServiceCtx;
-use domain_engine_store_inmemory::InMemoryDataStoreFactory;
+use domain_engine_store_inmemory::InMemoryConnection;
 use domain_engine_test_utils::graphql_test_utils::Exec;
 use indoc::indoc;
 use ontol_compiler::topology::DomainUrl;
@@ -165,7 +165,7 @@ pub fn compile_benchmark(c: &mut Criterion) {
             Arc::new(
                 DomainEngine::builder(test.ontology_owned())
                     .system(Box::<System>::default())
-                    .build(InMemoryDataStoreFactory, Session::default())
+                    .build(InMemoryConnection, Session::default())
                     .await
                     .unwrap(),
             )

@@ -10,7 +10,7 @@ use domain_engine_graphql::{
     gql_scalar::GqlScalar,
     juniper,
 };
-use domain_engine_store_inmemory::InMemoryDataStoreFactory;
+use domain_engine_store_inmemory::InMemoryConnection;
 use juniper::ScalarValue;
 use ontol_test_utils::{
     OntolTest, TestCompile, TestPackages, default_file_url, default_short_name,
@@ -130,7 +130,7 @@ pub fn gql_ctx_mock_data_store(
             Arc::new(LinearDataStoreAdapter::new(unimock.clone())),
         ))
         .system(Box::new(unimock))
-        .build_sync(InMemoryDataStoreFactory, Session::default())
+        .build_sync(InMemoryConnection, Session::default())
         .unwrap();
 
     ServiceCtx::from(Arc::new(domain_engine))
