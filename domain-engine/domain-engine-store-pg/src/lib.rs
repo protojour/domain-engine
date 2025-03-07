@@ -3,7 +3,6 @@
 use std::{collections::BTreeSet, sync::Arc};
 
 pub use pg_model::PgModel;
-pub use pg_model::RegVersion;
 
 use compaction::{CompactionCtx, compaction_task};
 use domain_engine_core::{
@@ -18,6 +17,7 @@ use ontol_runtime::{
     DomainIndex, PropId,
     ontology::{Ontology, aspects::DefsAspect},
 };
+use pg_model::RegVersion;
 use tokio_postgres::NoTls;
 
 mod address;
@@ -40,6 +40,12 @@ use tracing::{Instrument, error, info, info_span};
 
 pub type PgResult<T> = Result<T, tokio_postgres::Error>;
 
+#[derive(Clone)]
+pub struct PostgresConnection {
+    pool: deadpool_postgres::Pool,
+    reg_version: RegVersion,
+}
+
 pub struct PostgresDataStore {
     pg_model: PgModel,
     ontology: Arc<Ontology>,
@@ -53,14 +59,14 @@ impl PostgresDataStore {
     pub fn new(
         pg_model: PgModel,
         ontology: Arc<Ontology>,
-        pool: deadpool_postgres::Pool,
+        connection: PostgresConnection,
         system: ArcSystemApi,
         datastore_mutated: tokio::sync::watch::Sender<()>,
     ) -> Self {
         Self {
             pg_model,
             ontology,
-            pool,
+            pool: connection.pool,
             system,
             datastore_mutated,
             compaction_ctx: CompactionCtx::default(),
@@ -95,27 +101,34 @@ impl From<PostgresDataStore> for PostgresHandle {
     }
 }
 
-pub async fn migrate_registry(
+/// Connect to Postgres and migrate ontology-independent core structures
+pub async fn connect(
     pool: deadpool_postgres::Pool,
     db_name: &str,
-) -> anyhow::Result<RegVersion> {
+) -> anyhow::Result<PostgresConnection> {
     let mut txn_wrapper = TxnWrapper {
         conn: pool.get().await?,
     };
 
-    migrate::migrate_registry(&mut txn_wrapper, db_name).await
+    let reg_version = migrate::migrate_registry(&mut txn_wrapper, db_name).await?;
+
+    Ok(PostgresConnection { pool, reg_version })
 }
 
 pub async fn migrate_ontology(
     persistent_domains: &BTreeSet<DomainIndex>,
     ontology_defs: &DefsAspect,
-    reg_version: RegVersion,
-    pool: deadpool_postgres::Pool,
+    connection: PostgresConnection,
 ) -> anyhow::Result<PgModel> {
-    let conn = pool.get().await?;
+    let conn = connection.pool.get().await?;
 
-    let pg_model =
-        migrate::migrate_ontology(persistent_domains, ontology_defs, reg_version, conn).await?;
+    let pg_model = migrate::migrate_ontology(
+        persistent_domains,
+        ontology_defs,
+        connection.reg_version,
+        conn,
+    )
+    .await?;
 
     Ok(pg_model)
 }

@@ -140,8 +140,7 @@ mod pg {
     use domain_engine_core::transact::{ReqMessage, RespMessage, TransactionMode};
     use domain_engine_core::{DomainError, DomainResult, Session};
     use domain_engine_store_pg::{
-        PostgresDataStore, RegVersion, deadpool_postgres, migrate_ontology, migrate_registry,
-        tokio_postgres,
+        PostgresConnection, PostgresDataStore, deadpool_postgres, migrate_ontology, tokio_postgres,
     };
     use domain_engine_store_pg::{PostgresHandle, recreate_database};
     use futures_util::stream::BoxStream;
@@ -159,8 +158,7 @@ mod pg {
 
     #[derive(Clone)]
     pub struct PgTestDatastoreConnection {
-        pool: deadpool_postgres::Pool,
-        reg_version: RegVersion,
+        connection: PostgresConnection,
         #[expect(unused)]
         permit: Arc<OwnedSemaphorePermit>,
     }
@@ -180,8 +178,7 @@ mod pg {
             let pg_model = migrate_ontology(
                 persisted,
                 params.ontology.as_ref().as_ref(),
-                self.reg_version,
-                self.pool.clone(),
+                self.connection.clone(),
             )
             .await
             .map_err(|err| DomainError::data_store(format!("{err:?}")))?;
@@ -189,7 +186,7 @@ mod pg {
             let data_store = PostgresDataStore::new(
                 pg_model,
                 params.ontology,
-                self.pool.clone(),
+                self.connection.clone(),
                 params.system,
                 params.datastore_mutated,
             );
@@ -252,13 +249,12 @@ mod pg {
             .build()
             .map_err(|err| DomainError::data_store(format!("deadpool: {err}")))?;
 
-        let reg_version = migrate_registry(pool.clone(), &db_name)
+        let connection = domain_engine_store_pg::connect(pool, &db_name)
             .await
             .map_err(|err| DomainError::data_store(format!("{err:?}")))?;
 
         Ok(PgTestDatastoreConnection {
-            pool,
-            reg_version,
+            connection,
             permit: Arc::new(permit),
         })
     }
