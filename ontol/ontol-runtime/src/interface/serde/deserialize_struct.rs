@@ -6,13 +6,13 @@ use std::{
 use bit_set::BitSet;
 use compact_str::CompactString;
 use fnv::FnvHashMap;
+use ontol_core::debug::OntolDebug;
 use serde::de::{DeserializeSeed, MapAccess, Visitor};
 use tracing::{debug, trace, trace_span};
 
 use crate::{
     DefId, PropId,
     attr::Attr,
-    debug::OntolDebug,
     format_utils::{DoubleQuote, LogicOp, LogicalConcat},
     interface::serde::deserialize_raw::RawVisitor,
     ontology::{domain::DefKind, ontol::ValueGenerator},

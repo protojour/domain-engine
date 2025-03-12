@@ -12,6 +12,7 @@ members = [
     "domain-engine/domain-engine-tantivy",
     "domain-engine/domain-engine-test-utils",
     "ontol/ontol-compiler",
+    "ontol/ontol-core",
     "ontol/ontol-examples",
     "ontol/ontol-faker",
     "ontol/ontol-hir",

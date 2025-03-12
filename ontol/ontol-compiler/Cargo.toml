@@ -11,6 +11,7 @@ rust-version.workspace = true
 doctest = false
 
 [dependencies]
+ontol-core.path = "../ontol-core"
 ontol-macros.path = "../ontol-macros"
 ontol-hir.path = "../ontol-hir"
 ontol-runtime.path = "../ontol-runtime"

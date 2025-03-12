@@ -121,10 +121,10 @@ impl Index<TextConstant> for StringCtx<'_> {
 impl OntolFormatter for StringCtx<'_> {
     fn fmt_text_constant(
         &self,
-        constant: TextConstant,
+        constant: u32,
         f: &mut std::fmt::Formatter<'_>,
     ) -> std::fmt::Result {
-        if let Some(str) = self.constants.get(constant.0 as usize) {
+        if let Some(str) = self.constants.get(constant as usize) {
             write!(f, "\"{str}\"")
         } else {
             write!(f, "{constant:?}")

@@ -8,13 +8,13 @@ use aspects::{
     OntologyAspects, SerdeAspect,
 };
 use domain::EdgeInfo;
+use ontol_core::debug::OntolFormatter;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 use ulid::Ulid;
 
 use crate::{
     DefId, DomainIndex, MapKey, PropId,
-    debug::OntolFormatter,
     interface::{
         DomainInterface,
         serde::{
@@ -350,9 +350,9 @@ impl Index<SerdeOperatorAddr> for Ontology {
 impl OntolFormatter for Ontology {
     fn fmt_text_constant(
         &self,
-        constant: TextConstant,
+        constant: u32,
         f: &mut std::fmt::Formatter<'_>,
     ) -> std::fmt::Result {
-        write!(f, "{str:?}", str = &self[constant])
+        write!(f, "{str:?}", str = &self[TextConstant(constant)])
     }
 }

@@ -1,0 +1,22 @@
+[package]
+name = "ontol-core"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+doctest = false
+
+[dependencies]
+ontol-macros.path = "../ontol-macros"
+arcstr.workspace = true
+bit-vec = { version = "0.8", features = ["serde"] }
+compact_str = { version = "0.8", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+thin-vec.workspace = true
+
+[dev-dependencies]
+pretty_assertions = "1"

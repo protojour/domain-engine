@@ -2,11 +2,11 @@ use std::ops::Index;
 
 use arcstr::ArcStr;
 use fnv::FnvHashMap;
+use ontol_core::debug::OntolFormatter;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     DefId, DefIdSet, DomainIndex, MapKey, PropId,
-    debug::OntolFormatter,
     interface::{
         DomainInterface,
         serde::operator::{SerdeOperator, SerdeOperatorAddr},
@@ -130,10 +130,10 @@ impl Index<TextConstant> for DefsAspect {
 impl OntolFormatter for DefsAspect {
     fn fmt_text_constant(
         &self,
-        constant: TextConstant,
+        constant: u32,
         f: &mut std::fmt::Formatter<'_>,
     ) -> std::fmt::Result {
-        write!(f, "{str:?}", str = &self[constant])
+        write!(f, "{str:?}", str = &self[TextConstant(constant)])
     }
 }
 

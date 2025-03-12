@@ -35,8 +35,8 @@ pub fn derive(item: syn::DeriveInput) -> proc_macro2::TokenStream {
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     quote! {
-        impl #impl_generics ::ontol_runtime::debug::OntolDebug for #ident #ty_generics #where_clause {
-            fn fmt(&self, __ofmt: &dyn ::ontol_runtime::debug::OntolFormatter, __fmt: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+        impl #impl_generics ::ontol_core::debug::OntolDebug for #ident #ty_generics #where_clause {
+            fn fmt(&self, __ofmt: &dyn ::ontol_core::debug::OntolFormatter, __fmt: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
                 #body
             }
         }
@@ -82,7 +82,7 @@ fn fields_debug_body(ident: &syn::Ident, fields: &syn::Fields) -> proc_macro2::T
                 let ident = named.ident.as_ref().unwrap();
                 let lit = ident_lit(ident);
                 quote! {
-                    .field(#lit, &::ontol_runtime::debug::OntolDebug::debug(#ident, __ofmt))
+                    .field(#lit, &::ontol_core::debug::OntolDebug::debug(#ident, __ofmt))
                 }
             });
 
@@ -94,7 +94,7 @@ fn fields_debug_body(ident: &syn::Ident, fields: &syn::Fields) -> proc_macro2::T
             let fields = unnamed.unnamed.iter().enumerate().map(|(index, _)| {
                 let ident = quote::format_ident!("f{index}");
                 quote! {
-                    .field(&::ontol_runtime::debug::OntolDebug::debug(#ident, __ofmt))
+                    .field(&::ontol_core::debug::OntolDebug::debug(#ident, __ofmt))
                 }
             });
 

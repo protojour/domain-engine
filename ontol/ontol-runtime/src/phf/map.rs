@@ -1,12 +1,10 @@
 use std::fmt::Debug;
 
 use arcstr::ArcStr;
+use ontol_core::debug::{OntolDebug, OntolFormatter};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    debug::{OntolDebug, OntolFormatter},
-    ontology::{Ontology, OntologyInit},
-};
+use crate::ontology::{Ontology, OntologyInit};
 
 use super::key::PhfKey;
 

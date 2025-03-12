@@ -58,7 +58,7 @@ fn impl_rustdoc(
     arms: impl Iterator<Item = TokenStream>,
 ) -> TokenStream {
     quote! {
-        impl ontol_runtime::rustdoc::RustDoc for #item_ident {
+        impl ontol_core::rustdoc::RustDoc for #item_ident {
             type Key = #key_type;
 
             fn get_field_rustdoc(key: &Self::Key) -> Option<arcstr::ArcStr> {

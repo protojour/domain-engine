@@ -6,10 +6,13 @@ use ::serde::{Deserialize, Serialize};
 use fnv::FnvBuildHasher;
 use indexmap::IndexMap;
 use num_enum::TryFromPrimitive;
+use ontol_core::impl_ontol_debug;
 use ontol_macros::OntolDebug;
 use smallvec::SmallVec;
 use value::{TagFlags, ValueTagError};
 use vec_map::VecMapKey;
+
+pub use ontol_core::property;
 
 pub mod attr;
 pub mod cast;
@@ -20,10 +23,8 @@ pub mod format_utils;
 pub mod interface;
 pub mod ontology;
 pub mod phf;
-pub mod property;
 pub mod query;
 pub mod resolve_path;
-pub mod rustdoc;
 pub mod sequence;
 pub mod tuple;
 pub mod value;
