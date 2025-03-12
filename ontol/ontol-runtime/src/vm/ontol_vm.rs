@@ -3,6 +3,7 @@ use std::array;
 use bit_vec::BitVec;
 use compact_str::CompactString;
 use fnv::FnvHashMap;
+use ontol_core::debug::OntolDebug;
 use regex_automata::{Input, util::captures::Captures};
 use smallvec::SmallVec;
 use thin_vec::ThinVec;
@@ -12,7 +13,6 @@ use crate::{
     DefId, OntolDefTag, PropId,
     attr::{Attr, AttrMatrix},
     cast::Cast,
-    debug::OntolDebug,
     ontology::{
         aspects::{DefsAspect, ExecutionAspect},
         ontol::TextConstant,

@@ -2,12 +2,11 @@ use std::fmt::{Debug, Display};
 
 use ::serde::{Deserialize, Serialize};
 use bit_vec::BitVec;
+use ontol_core::debug::OntolDebug;
 use ontol_macros::OntolDebug;
 
 use crate::{
-    DefId, PropId,
-    debug::OntolDebug,
-    impl_ontol_debug,
+    DefId, PropId, impl_ontol_debug,
     ontology::ontol::TextConstant,
     property::ValueCardinality,
     query::{condition::ClausePair, filter::Filter},

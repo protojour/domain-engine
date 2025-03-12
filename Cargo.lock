@@ -3798,6 +3798,7 @@ dependencies = [
  "indexmap",
  "indoc",
  "itertools 0.14.0",
+ "ontol-core",
  "ontol-examples",
  "ontol-hir",
  "ontol-macros",
@@ -3822,6 +3823,19 @@ dependencies = [
  "ulid",
  "unimock",
  "url",
+]
+
+[[package]]
+name = "ontol-core"
+version = "0.1.0"
+dependencies = [
+ "arcstr",
+ "bit-vec",
+ "compact_str",
+ "ontol-macros",
+ "pretty_assertions",
+ "serde",
+ "thin-vec",
 ]
 
 [[package]]
@@ -3947,6 +3961,7 @@ dependencies = [
  "itertools 0.14.0",
  "num",
  "num_enum",
+ "ontol-core",
  "ontol-macros",
  "ordered-float 5.0.0",
  "phf_shared",

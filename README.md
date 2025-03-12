@@ -35,8 +35,10 @@ The _domain service_ encapsulates the domain engine, turning it into an internet
 ### Workspace crate dependency graph (crude)
 ```mermaid
 graph TD
-   ontol-runtime-->ontol-macros
+   ontol-core-->ontol-macros
+   ontol-runtime-->ontol-core
 
+   ontol-compiler-->ontol-core
    ontol-compiler-->ontol-runtime
    ontol-compiler-->ontol-parser
    ontol-compiler-->ontol-macros

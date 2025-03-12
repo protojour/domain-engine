@@ -1,13 +1,12 @@
 use std::fmt::{Debug, Display};
 
 use fnv::FnvHashMap;
+use ontol_core::debug::{OntolDebug, OntolFormatter};
 use serde::{Deserialize, Serialize};
 use thin_vec::ThinVec;
 
 use crate::{
-    DefId, PropId,
-    debug::OntolDebug,
-    impl_ontol_debug,
+    DefId, PropId, impl_ontol_debug,
     value::{Value, ValueDebug},
     var::Var,
 };
@@ -309,11 +308,7 @@ where
     V: Display,
     Term: Display,
 {
-    fn fmt(
-        &self,
-        _ctx: &dyn crate::debug::OntolFormatter,
-        f: &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
+    fn fmt(&self, _ctx: &dyn OntolFormatter, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self}")
     }
 }

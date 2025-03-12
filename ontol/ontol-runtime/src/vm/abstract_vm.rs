@@ -1,4 +1,5 @@
 use bit_vec::BitVec;
+use ontol_core::debug::OntolDebug;
 use tracing::trace;
 
 use super::{
@@ -7,7 +8,6 @@ use super::{
 };
 use crate::{
     DefId, PropId,
-    debug::OntolDebug,
     ontology::{
         aspects::{DefsAspect, ExecutionAspect, aspect},
         ontol::TextConstant,

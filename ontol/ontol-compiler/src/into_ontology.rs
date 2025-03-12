@@ -1,6 +1,7 @@
 use fnv::FnvHashMap;
 use indoc::indoc;
 use itertools::Itertools;
+use ontol_core::rustdoc::RustDoc;
 use ontol_runtime::{
     DefId, DefIdSet, DomainIndex, FnvIndexMap, OntolDefTag, PropId,
     interface::{
@@ -18,7 +19,6 @@ use ontol_runtime::{
         map::MapMeta,
         ontol::{OntolDomainMeta, TextConstant, TextLikeType},
     },
-    rustdoc::RustDoc,
 };
 use std::{
     collections::{BTreeSet, HashMap},

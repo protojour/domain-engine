@@ -153,8 +153,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         if let Some(body) = stmt.body() {
             let _entered = debug_span!("def", id = ?def_id).entered();
 
-            // The inherent relation block on the type uses the just defined
-            // type as its context
+            // The inherent relation block on the type uses the parent def as its context
             let context_fn = move || def_id;
 
             for statement in body.statements() {
