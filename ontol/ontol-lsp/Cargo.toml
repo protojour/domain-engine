@@ -17,6 +17,7 @@ wasm = []
 [dependencies]
 ontol-runtime.path = "../ontol-runtime"
 ontol-compiler.path = "../ontol-compiler"
+ontol-core.path = "../ontol-core"
 ontol-parser.path = "../ontol-parser"
 serde.workspace = true
 serde_json.workspace = true

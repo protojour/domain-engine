@@ -1,8 +1,9 @@
 use std::fmt::Debug;
 
+use ontol_core::url::DomainUrl;
 use ontol_runtime::format_utils::CommaSeparated;
 
-use crate::{source::SourceSpan, topology::DomainUrl};
+use crate::source::SourceSpan;
 
 pub struct UnifiedCompileError {
     pub errors: Vec<SpannedCompileError>,

@@ -15,6 +15,7 @@ validate-jsonschema = ["dep:jsonschema"]
 
 [dependencies]
 ontol-compiler.path = "../ontol-compiler"
+ontol-core.path = "../ontol-core"
 ontol-parser.path = "../ontol-parser"
 ontol-runtime.path = "../ontol-runtime"
 ontol-faker.path = "../ontol-faker"

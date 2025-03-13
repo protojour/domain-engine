@@ -1,10 +1,9 @@
 use std::{fmt::Debug, ops::Deref, sync::Arc};
 
 use fnv::FnvHashMap;
+use ontol_core::url::DomainUrl;
 use ontol_parser::U32Span;
 use ontol_runtime::DomainIndex;
-
-use crate::topology::DomainUrl;
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 pub struct SourceId(pub u32);

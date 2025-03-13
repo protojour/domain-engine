@@ -14,12 +14,10 @@ use domain_engine_core::{DomainEngine, Session};
 use domain_engine_store_inmemory::InMemoryConnection;
 use notify_debouncer_full::{new_debouncer, notify::RecursiveMode};
 use ontol_compiler::{
-    SourceCodeRegistry, SourceId, Sources,
-    error::UnifiedCompileError,
-    mem::Mem,
+    SourceCodeRegistry, SourceId, Sources, error::UnifiedCompileError, mem::Mem,
     ontol_syntax::ArcString,
-    topology::{DomainUrl, DomainUrlParser, DomainUrlResolver},
 };
+use ontol_core::url::{DomainUrl, DomainUrlParser, DomainUrlResolver};
 use ontol_examples::FakeAtlasServer;
 use ontol_lsp::Backend;
 use ontol_runtime::{

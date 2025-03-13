@@ -9,8 +9,9 @@ use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
     ontol_syntax::{ArcString, OntolTreeSyntax},
-    topology::{DepGraphBuilder, DomainTopology, DomainUrl, GraphState, ParsedDomain},
+    topology::{DepGraphBuilder, DomainTopology, GraphState, ParsedDomain},
 };
+use ontol_core::url::DomainUrl;
 use ontol_parser::cst_parse;
 use ontol_runtime::{
     DomainIndex, PropId,

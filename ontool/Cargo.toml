@@ -15,6 +15,7 @@ jemalloc = ["dep:tikv-jemallocator"]
 domain-engine-graphql.path = "../domain-engine/domain-engine-graphql"
 domain-engine-httpjson.path = "../domain-engine/domain-engine-httpjson"
 ontol-compiler.path = "../ontol/ontol-compiler"
+ontol-core.path = "../ontol/ontol-core"
 ontol-parser.path = "../ontol/ontol-parser"
 ontol-runtime.path = "../ontol/ontol-runtime"
 ontol-lsp.path = "../ontol/ontol-lsp"

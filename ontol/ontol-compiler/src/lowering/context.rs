@@ -8,6 +8,7 @@ use std::{
 use arcstr::ArcStr;
 use fnv::FnvHashMap;
 use indexmap::map::Entry;
+use ontol_core::url::{DomainUrl, DomainUrlParser};
 use ontol_parser::{
     ParserError, U32Span,
     cst::view::{NodeView, TokenView},
@@ -27,7 +28,6 @@ use crate::{
     ontol_syntax::OntolHeaderData,
     pattern::{Pattern, PatternKind},
     relation::{DefRelTag, RelId, RelParams, Relationship},
-    topology::{DomainUrl, DomainUrlParser},
 };
 
 pub struct LoweringCtx<'c, 'm> {
