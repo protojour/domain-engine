@@ -1,5 +1,6 @@
 use std::{panic::UnwindSafe, str::FromStr, sync::Arc};
 
+use ontol_core::url::{DomainUrl, DomainUrlParser};
 use ontol_macros::test;
 use ontol_parser::{
     ParserError, U32Span,
@@ -16,11 +17,7 @@ use ontol_runtime::{DefId, ontology::domain::DomainId};
 use tracing::info;
 use ulid::Ulid;
 
-use crate::{
-    CompileError, Session, Src, lower_ontol_syntax,
-    lowering::context::LoweringOutcome,
-    topology::{DomainUrl, DomainUrlParser},
-};
+use crate::{CompileError, Session, Src, lower_ontol_syntax, lowering::context::LoweringOutcome};
 
 /// A generalization of an ONTOL source file.
 ///

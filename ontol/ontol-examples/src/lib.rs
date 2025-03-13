@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use conduit::{blog_post_public, conduit_db};
-use ontol_compiler::topology::{DomainUrl, DomainUrlResolver};
+use ontol_core::url::{DomainUrl, DomainUrlResolver};
 use stix::stix_bundle;
 use url::Url;
 

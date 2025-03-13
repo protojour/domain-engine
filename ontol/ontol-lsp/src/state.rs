@@ -2,13 +2,13 @@ use crate::docs::get_core_completions;
 use indoc::formatdoc;
 use lazy_regex::regex_replace_all;
 use ontol_compiler::ontol_syntax::{ArcString, OntolTreeSyntax};
-use ontol_compiler::topology::DomainUrl;
 use ontol_compiler::{
     CompileError, NO_SPAN, SourceId, SourceSpan, Sources,
     error::UnifiedCompileError,
     mem::Mem,
     topology::{DepGraphBuilder, GraphState, ParsedDomain},
 };
+use ontol_core::url::DomainUrl;
 use ontol_parser::ToUsizeRange;
 use ontol_parser::cst::inspect::{self as insp};
 use ontol_parser::cst::tree::{SyntaxNode, TreeNodeView, TreeTokenView};

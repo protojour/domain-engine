@@ -1,16 +1,15 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::hash_map::Entry;
-use std::fmt::Display;
-use std::sync::Arc;
 
+use ontol_core::url::DomainUrl;
+use ontol_core::url::DomainUrlResolver;
 use ontol_parser::cst_parse;
 use ontol_runtime::DefId;
 use ontol_runtime::DomainIndex;
 use ontol_runtime::ontology::config::DomainConfig;
 use ontol_runtime::ontology::domain::TopologyGeneration;
 use ontol_runtime::vec_map::VecMap;
-use url::Url;
 
 use crate::NO_SPAN;
 use crate::SourceCodeRegistry;
@@ -45,117 +44,6 @@ pub struct DomainRequest {
     pub domain_index: DomainIndex,
     pub url: DomainUrl,
     generation: TopologyGeneration,
-}
-
-pub struct DomainUrlParser {
-    base_url: url::Url,
-}
-
-impl Default for DomainUrlParser {
-    fn default() -> Self {
-        Self {
-            base_url: url::Url::parse("file://").unwrap(),
-        }
-    }
-}
-
-impl DomainUrlParser {
-    pub fn parse(&self, uri: &str) -> Result<DomainUrl, CompileError> {
-        let url = url::Url::options()
-            .base_url(Some(&self.base_url))
-            .parse(uri)
-            .map_err(|_| CompileError::InvalidDomainReference)?;
-
-        Ok(DomainUrl(url))
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub struct DomainUrl(Url);
-
-impl DomainUrl {
-    pub fn new(url: Url) -> Self {
-        Self(url)
-    }
-
-    pub fn parse(name: &str) -> Self {
-        DomainUrlParser::default()
-            .parse(name)
-            .unwrap_or_else(|_| panic!())
-    }
-
-    pub fn short_name(&self) -> &str {
-        if let Some(segments) = self.0.path_segments() {
-            if let Some(last) = segments.last() {
-                return last;
-            }
-        }
-
-        "<none>"
-    }
-
-    pub fn url(&self) -> &Url {
-        &self.0
-    }
-
-    pub fn join(&self, other: &DomainUrl) -> Self {
-        match other.0.scheme() {
-            "file" => {
-                let mut next_url = self.0.clone();
-
-                {
-                    let mut segments = next_url.path_segments_mut().unwrap();
-
-                    segments.pop();
-
-                    if let Some(orig_segments) = other.0.path_segments() {
-                        if let Some(yo) = orig_segments.last() {
-                            segments.push(yo);
-                        }
-                    }
-                }
-
-                Self(next_url)
-            }
-            _ => other.clone(),
-        }
-    }
-}
-
-impl From<Url> for DomainUrl {
-    fn from(value: Url) -> Self {
-        Self(value)
-    }
-}
-
-impl From<DomainUrl> for Url {
-    fn from(value: DomainUrl) -> Self {
-        value.0
-    }
-}
-
-impl Display for DomainUrl {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-#[async_trait::async_trait]
-pub trait DomainUrlResolver: Send + Sync {
-    async fn resolve_domain_url(&self, url: &DomainUrl) -> Option<Arc<String>>;
-}
-
-#[async_trait::async_trait]
-impl DomainUrlResolver for Vec<Box<dyn DomainUrlResolver>> {
-    async fn resolve_domain_url(&self, url: &DomainUrl) -> Option<Arc<String>> {
-        for resolver in self.iter() {
-            if let Some(source) = resolver.resolve_domain_url(url).await {
-                return Some(source);
-            }
-        }
-
-        None
-    }
 }
 
 pub async fn resolve_topology_async(

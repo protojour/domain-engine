@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, marker::PhantomData};
 
+use ontol_core::url::DomainUrl;
 use ontol_parser::cst::{
     inspect::{self as insp},
     view::{NodeView, TokenView},
@@ -12,7 +13,6 @@ use crate::{
     edge::{CardinalKind, EdgeId},
     namespace::{DocId, Space},
     ontol_syntax::{OntolHeaderData, WithDocs, extract_domain_headerdata},
-    topology::DomainUrl,
 };
 
 use super::{

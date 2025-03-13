@@ -3830,12 +3830,14 @@ name = "ontol-core"
 version = "0.1.0"
 dependencies = [
  "arcstr",
+ "async-trait",
  "bit-vec",
  "compact_str",
  "ontol-macros",
  "pretty_assertions",
  "serde",
  "thin-vec",
+ "url",
 ]
 
 [[package]]
@@ -3857,7 +3859,7 @@ name = "ontol-examples"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "ontol-compiler",
+ "ontol-core",
  "url",
 ]
 
@@ -3898,6 +3900,7 @@ dependencies = [
  "indoc",
  "lazy-regex",
  "ontol-compiler",
+ "ontol-core",
  "ontol-parser",
  "ontol-runtime",
  "serde",
@@ -3997,6 +4000,7 @@ dependencies = [
  "fnv",
  "jsonschema",
  "ontol-compiler",
+ "ontol-core",
  "ontol-faker",
  "ontol-parser",
  "ontol-runtime",
@@ -4034,6 +4038,7 @@ dependencies = [
  "juniper_axum",
  "notify-debouncer-full",
  "ontol-compiler",
+ "ontol-core",
  "ontol-examples",
  "ontol-lsp",
  "ontol-parser",

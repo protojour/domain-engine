@@ -6,6 +6,7 @@ pub use error::*;
 use fnv::{FnvHashMap, FnvHashSet};
 use lowering::context::LoweringOutcome;
 use misc::MiscCtx;
+use ontol_core::url::DomainUrl;
 use primitive::init_ontol_primitives;
 use properties::PropCtx;
 use std::{
@@ -34,7 +35,7 @@ pub use source::*;
 use strings::StringCtx;
 use text_patterns::{TextPatterns, compile_all_text_patterns};
 use thesaurus::Thesaurus;
-use topology::{DomainTopology, DomainUrl, LoadedDomains};
+use topology::{DomainTopology, LoadedDomains};
 use tracing::debug;
 use type_check::seal::SealCtx;
 use types::{DefTypeCtx, TypeCtx};

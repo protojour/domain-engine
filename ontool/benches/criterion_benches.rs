@@ -6,7 +6,7 @@ use domain_engine_graphql::domain::context::ServiceCtx;
 use domain_engine_store_inmemory::InMemoryConnection;
 use domain_engine_test_utils::graphql_test_utils::Exec;
 use indoc::indoc;
-use ontol_compiler::topology::DomainUrl;
+use ontol_core::url::DomainUrl;
 use ontol_examples::{
     AsAtlas,
     conduit::{blog_post_public, conduit_db, feed_public},
