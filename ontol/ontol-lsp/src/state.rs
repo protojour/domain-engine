@@ -12,7 +12,7 @@ use ontol_core::url::DomainUrl;
 use ontol_parser::ToUsizeRange;
 use ontol_parser::cst::inspect::{self as insp};
 use ontol_parser::cst::tree::{SyntaxNode, TreeNodeView, TreeTokenView};
-use ontol_parser::cst::view::{self, NodeView, NodeViewExt, TokenView};
+use ontol_parser::cst::view::{self, NodeView, NodeViewExt, TokenView, TypedView};
 use ontol_parser::lexer::Lex;
 use ontol_parser::lexer::kind::Kind;
 use ontol_runtime::DomainIndex;

@@ -37,6 +37,13 @@ impl U32Span {
     pub fn contains_usize(&self, pos: usize) -> bool {
         self.start as usize <= pos && self.end as usize > pos
     }
+
+    pub fn join(self, other: Self) -> Self {
+        Self {
+            start: std::cmp::min(self.start, other.start),
+            end: std::cmp::max(self.end, other.end),
+        }
+    }
 }
 
 impl Debug for U32Span {

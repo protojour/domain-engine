@@ -1,6 +1,6 @@
 //! AST-like APIs on top of the CST
 
-use super::view::{NodeView, NodeViewExt, TokenViewExt};
+use super::view::{NodeView, NodeViewExt, TokenViewExt, TypedView};
 use crate::{
     K,
     cst::view::TokenView,
@@ -29,12 +29,16 @@ macro_rules! nodes {
             #[derive(Clone, Copy)]
             pub struct $kind<V>(pub V);
 
-            impl<V: NodeView> $kind<V> {
-                pub fn view(&self) -> &V {
+            impl<V: NodeView> TypedView<V> for $kind<V> {
+                fn view(&self) -> &V {
                     &self.0
                 }
 
-                pub fn from_view(view: V) -> Option<Self> {
+                fn into_view(self) -> V {
+                    self.0
+                }
+
+                fn from_view(view: V) -> Option<Self> {
                     if view.kind() == Kind::$kind {
                         Some(Self(view))
                     } else {
@@ -63,18 +67,6 @@ macro_rules! node_union {
             $($kind($kind<V>)),*
         }
 
-        impl<V: NodeView> $ident<V> {
-            pub fn view(&self) -> &V {
-                match self {
-                    $(
-                        Self::$kind($kind(view)) => {
-                            view
-                        }
-                    )*
-                }
-            }
-        }
-
         $(
             impl<V> From<$kind<V>> for $ident<V> {
                 fn from(value: $kind<V>) -> Self {
@@ -83,9 +75,28 @@ macro_rules! node_union {
             }
         )*
 
-        impl<V: NodeView> $ident<V> {
-            #[allow(unused)]
-            pub(crate) fn from_view(view: V) -> Option<Self> {
+        impl<V: NodeView> TypedView<V> for $ident<V> {
+            fn view(&self) -> &V {
+                match self {
+                    $(
+                        Self::$kind($kind(view)) => {
+                            view
+                        }
+                    )*
+                }
+            }
+
+            fn into_view(self) -> V {
+                match self {
+                    $(
+                        Self::$kind($kind(view)) => {
+                            view
+                        }
+                    )*
+                }
+            }
+
+            fn from_view(view: V) -> Option<Self> {
                 match view.kind() {
                     $(
                         Kind::$kind => Some(Self::$kind($kind(view)))

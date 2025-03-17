@@ -126,3 +126,9 @@ impl<V: NodeView> Display for NodeDisplay<'_, V> {
         Ok(())
     }
 }
+
+pub trait TypedView<V>: Sized {
+    fn view(&self) -> &V;
+    fn into_view(self) -> V;
+    fn from_view(view: V) -> Option<Self>;
+}

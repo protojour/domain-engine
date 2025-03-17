@@ -4,6 +4,9 @@ use ontol_parser::{
     cst::{parser::CstParser, tree::SyntaxMarker},
     lexer::kind::Kind,
 };
+use rowan::{GreenNodeBuilder, NodeCache};
+
+pub use rowan;
 
 pub mod view;
 
@@ -23,15 +26,27 @@ impl rowan::Language for OntolLang {
     }
 }
 
-pub fn parse_syntax(ontol_src: &str, grammar: fn(&mut CstParser)) -> rowan::SyntaxNode<OntolLang> {
-    let green_root = parse_green(ontol_src, grammar);
+pub fn parse_syntax(
+    ontol_src: &str,
+    grammar: fn(&mut CstParser),
+    cache: Option<&mut NodeCache>,
+) -> rowan::SyntaxNode<OntolLang> {
+    let green_root = parse_green(ontol_src, grammar, cache);
     rowan::SyntaxNode::<OntolLang>::new_root(green_root)
 }
 
-pub fn parse_green(ontol_src: &str, grammar: fn(&mut CstParser)) -> rowan::GreenNode {
+pub fn parse_green(
+    ontol_src: &str,
+    grammar: fn(&mut CstParser),
+    cache: Option<&mut NodeCache>,
+) -> rowan::GreenNode {
     let (flat_tree, _errors) = ontol_parser::cst_parse_grammar(ontol_src, grammar);
 
-    let mut builder = rowan::GreenNodeBuilder::new();
+    let mut builder = match cache {
+        Some(cache) => GreenNodeBuilder::with_cache(cache),
+        None => GreenNodeBuilder::new(),
+    };
+
     let (markers, lex) = flat_tree.into_markers_and_lex();
 
     for marker in markers {
@@ -59,16 +74,35 @@ mod tests {
     use ontol_parser::cst::{
         grammar,
         inspect::{Node, Statement},
-        view::NodeViewExt,
+        view::{NodeViewExt, TypedView},
     };
     use pretty_assertions::assert_eq;
+    use rowan::NodeCache;
 
     use crate::{parse_green, parse_syntax, view::View};
 
     #[test]
+    fn syntax_reparse() {
+        let mut cache = NodeCache::default();
+        let src = "def foo()";
+
+        let root1 = parse_green(src, grammar::ontol, Some(&mut cache));
+
+        dbg!(&cache);
+        dbg!(&root1);
+
+        let root2 = parse_green(src, grammar::ontol, Some(&mut cache));
+
+        dbg!(&cache);
+        dbg!(&root2);
+
+        assert!(root1 == root2);
+    }
+
+    #[test]
     fn syntax_view() {
         let src = "def foo()";
-        let root = parse_syntax(src, grammar::ontol);
+        let root = parse_syntax(src, grammar::ontol, None);
 
         assert_eq!(root.children().count(), 1);
         assert_eq!(src, root.green().to_string());
@@ -83,7 +117,7 @@ mod tests {
     #[test]
     fn syntax_edit() {
         let src = "def foo()";
-        let root = parse_syntax(src, grammar::ontol);
+        let root = parse_syntax(src, grammar::ontol, None);
 
         let Node::Ontol(ontol) = root.view().node() else {
             panic!()
@@ -96,7 +130,7 @@ mod tests {
         let new = ident_path
             .view()
             .0
-            .replace_with(parse_green("bar", grammar::ident_path));
+            .replace_with(parse_green("bar", grammar::ident_path, None));
 
         assert_eq!("def bar()", new.to_string());
     }

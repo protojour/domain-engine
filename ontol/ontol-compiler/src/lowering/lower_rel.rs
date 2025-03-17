@@ -4,7 +4,7 @@ use ontol_parser::{
     U32Span,
     cst::{
         inspect as insp,
-        view::{NodeView, NodeViewExt},
+        view::{NodeView, NodeViewExt, TypedView},
     },
 };
 use ontol_runtime::{

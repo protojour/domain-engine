@@ -9,7 +9,7 @@ use ontol_parser::{
             self as insp, DomainStatement, Statement, TypeQuant, TypeQuantOrPattern, TypeRef,
         },
         tree::SyntaxTree,
-        view::{NodeView, NodeViewExt, TokenView, TokenViewExt},
+        view::{NodeView, NodeViewExt, TokenView, TokenViewExt, TypedView},
     },
     lexer::kind::Kind,
 };

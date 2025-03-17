@@ -5,12 +5,22 @@ use ontol_parser::{
     cst::view::{Item, NodeView, TokenView},
     lexer::kind::Kind,
 };
-use rowan::TextRange;
+use rowan::{GreenNode, TextRange};
 
 use crate::OntolLang;
 
 #[derive(Clone)]
 pub struct RowanNodeView(pub rowan::SyntaxNode<OntolLang>);
+
+impl RowanNodeView {
+    pub fn new_root(green: GreenNode) -> Self {
+        Self(rowan::SyntaxNode::new_root(green))
+    }
+
+    pub fn syntax(&self) -> &rowan::SyntaxNode<OntolLang> {
+        &self.0
+    }
+}
 
 #[derive(Clone)]
 pub struct RowanTokenView(pub rowan::SyntaxToken<OntolLang>);

@@ -7,7 +7,7 @@ use ontol_parser::{
     U32Span,
     cst::{
         inspect as insp,
-        view::{NodeView, NodeViewExt, TokenView, TokenViewExt},
+        view::{NodeView, NodeViewExt, TokenView, TokenViewExt, TypedView},
     },
     lexer::{kind::Kind, unescape::unescape_regex},
 };

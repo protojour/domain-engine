@@ -1,6 +1,6 @@
 use ontol_parser::cst::{
     inspect::{self as insp},
-    view::NodeView,
+    view::{NodeView, TypedView},
 };
 use ontol_runtime::property::ValueCardinality;
 use tracing::{debug, debug_span};

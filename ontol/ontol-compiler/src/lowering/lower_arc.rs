@@ -5,7 +5,7 @@ use ontol_parser::{
     U32Span,
     cst::{
         inspect as insp,
-        view::{NodeView, TokenView},
+        view::{NodeView, TokenView, TypedView},
     },
 };
 use ontol_runtime::{DefId, OntolDefTag, tuple::CardinalIdx};
