@@ -28,26 +28,26 @@ pub trait NodeViewExt: NodeView {
         Node::from_view(self.clone()).unwrap()
     }
 
-    fn sub_nodes(self) -> impl Iterator<Item = Self> {
+    fn sub_nodes(&self) -> impl Iterator<Item = Self> {
         self.children().filter_map(|item| match item {
             Item::Node(node) => Some(node),
             Item::Token(_) => None,
         })
     }
 
-    fn local_tokens(self) -> impl Iterator<Item = Self::Token> {
+    fn local_tokens(&self) -> impl Iterator<Item = Self::Token> {
         self.children().filter_map(|item| match item {
             Item::Token(token) => Some(token),
             Item::Node(_) => None,
         })
     }
 
-    fn local_tokens_filter(self, filter: impl KindFilter) -> impl Iterator<Item = Self::Token> {
+    fn local_tokens_filter(&self, filter: impl KindFilter) -> impl Iterator<Item = Self::Token> {
         self.local_tokens()
             .filter(move |token| filter.filter(token.kind()))
     }
 
-    fn display(self) -> NodeDisplay<Self> {
+    fn display(&self) -> NodeDisplay<Self> {
         NodeDisplay(self)
     }
 
@@ -102,9 +102,9 @@ pub enum Item<N: NodeView> {
     Token(N::Token),
 }
 
-pub struct NodeDisplay<V>(V);
+pub struct NodeDisplay<'a, V>(&'a V);
 
-impl<V: NodeView> Display for NodeDisplay<V> {
+impl<V: NodeView> Display for NodeDisplay<'_, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for child in self.0.children() {
             match child {

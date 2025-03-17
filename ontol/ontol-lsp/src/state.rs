@@ -558,7 +558,7 @@ impl State {
             }
 
             if hover.docs.is_empty() {
-                hover.docs = get_doc_comments(parent).unwrap_or_default();
+                hover.docs = get_doc_comments(&parent).unwrap_or_default();
             }
         }
 
@@ -765,7 +765,7 @@ fn locate_token(pos: u32, parent: TreeNodeView) -> Option<(Vec<TreeNodeView>, Tr
 }
 
 /// Get doc comment of a node, if any (no slashes)
-fn get_doc_comments(parent: impl NodeViewExt) -> Option<String> {
+fn get_doc_comments(parent: &impl NodeViewExt) -> Option<String> {
     let mut doc_comments = parent.local_tokens_filter(Kind::DocComment).peekable();
 
     if doc_comments.peek().is_some() {

@@ -30,8 +30,8 @@ macro_rules! nodes {
             pub struct $kind<V>(pub V);
 
             impl<V: NodeView> $kind<V> {
-                pub fn view(&self) -> V {
-                    self.0.clone()
+                pub fn view(&self) -> &V {
+                    &self.0
                 }
 
                 pub fn from_view(view: V) -> Option<Self> {
@@ -64,11 +64,11 @@ macro_rules! node_union {
         }
 
         impl<V: NodeView> $ident<V> {
-            pub fn view(&self) -> V {
+            pub fn view(&self) -> &V {
                 match self {
                     $(
                         Self::$kind($kind(view)) => {
-                            view.clone()
+                            view
                         }
                     )*
                 }
@@ -193,6 +193,7 @@ node_union!(StructParam {
     StructParamAttrUnit,
 });
 
+#[derive(Clone)]
 pub enum TypeQuantOrPattern<V> {
     TypeQuant(TypeQuant<V>),
     Pattern(Pattern<V>),
