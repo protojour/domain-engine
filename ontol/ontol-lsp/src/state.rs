@@ -493,7 +493,8 @@ impl State {
                                 insp::Pattern::PatStruct(pat) => {
                                     let mut modifiers = pat
                                         .modifiers()
-                                        .map(|m| m.slice().to_string())
+                                        .filter_map(|m| m.token())
+                                        .map(|t| t.slice().to_string())
                                         .collect::<Vec<_>>()
                                         .join(" ");
                                     if !modifiers.is_empty() {
@@ -516,8 +517,8 @@ impl State {
                                     format!("{}{}({})", modifiers, path, ellipsis)
                                 }
                                 insp::Pattern::PatSet(pat) => {
-                                    let modifiers = match pat.modifier() {
-                                        Some(m) => format!("{} ", m.slice()),
+                                    let modifiers = match pat.modifier().and_then(|m| m.token()) {
+                                        Some(t) => format!("{} ", t.slice()),
                                         None => "".to_string(),
                                     };
                                     let path = match pat.ident_path() {

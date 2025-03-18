@@ -2,7 +2,8 @@
 
 //@ grammar=pattern
 PatStruct
-    Modifier `@match`
+    PatStructModifier
+        Modifier `@match`
     Whitespace
     IdentPath
         Symbol `bar`
@@ -14,7 +15,8 @@ PatStruct
         Colon `:`
         Whitespace
         PatSet
-            Modifier `@in`
+            PatSetModifier
+                Modifier `@in`
             Whitespace
             CurlyOpen `{`
             Whitespace

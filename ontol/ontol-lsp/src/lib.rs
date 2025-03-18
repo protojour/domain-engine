@@ -336,7 +336,8 @@ impl LanguageServer for Backend {
                 insp::Statement::DefStatement(stmt) => {
                     let modifiers = stmt
                         .modifiers()
-                        .map(|m| m.slice().to_string())
+                        .filter_map(|m| m.token())
+                        .map(|t| t.slice().to_string())
                         .collect::<Vec<_>>()
                         .join(" ");
                     let detail = (!modifiers.is_empty()).then_some(modifiers);
@@ -376,7 +377,8 @@ impl LanguageServer for Backend {
                 insp::Statement::MapStatement(stmt) => {
                     let modifiers = stmt
                         .modifiers()
-                        .map(|m| m.slice().to_string())
+                        .filter_map(|m| m.token())
+                        .map(|t| t.slice().to_string())
                         .collect::<Vec<_>>()
                         .join(" ");
                     let detail = (!modifiers.is_empty()).then_some(modifiers);

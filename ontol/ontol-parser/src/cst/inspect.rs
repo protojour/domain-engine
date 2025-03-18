@@ -204,6 +204,9 @@ node_union!(StructParam {
     StructParamAttrUnit,
 });
 
+#[derive(Clone, Copy)]
+pub struct Modifier<V>(pub V);
+
 #[derive(Clone)]
 pub enum TypeQuantOrPattern<V> {
     TypeQuant(TypeQuant<V>),
@@ -237,8 +240,8 @@ impl<V: NodeView> UseStatement<V> {
 }
 
 impl<V: NodeView> DefStatement<V> {
-    pub fn modifiers(&self) -> impl Iterator<Item = V::Token> {
-        self.view().local_tokens_filter(Kind::Modifier)
+    pub fn modifiers(&self) -> impl Iterator<Item = Modifier<V>> {
+        self.view().sub_nodes().filter_map(Modifier::from_view)
     }
 
     pub fn ident_path(&self) -> Option<IdentPath<V>> {
@@ -379,8 +382,8 @@ impl<V: NodeView> FmtStatement<V> {
 }
 
 impl<V: NodeView> MapStatement<V> {
-    pub fn modifiers(&self) -> impl Iterator<Item = V::Token> {
-        self.view().local_tokens_filter(Kind::Modifier)
+    pub fn modifiers(&self) -> impl Iterator<Item = Modifier<V>> {
+        self.view().sub_nodes().filter_map(Modifier::from_view)
     }
 
     pub fn ident_path(&self) -> Option<IdentPath<V>> {
@@ -433,8 +436,8 @@ impl<V: NodeView> TypeUnion<V> {
 }
 
 impl<V: NodeView> PatStruct<V> {
-    pub fn modifiers(&self) -> impl Iterator<Item = V::Token> {
-        self.view().local_tokens_filter(Kind::Modifier)
+    pub fn modifiers(&self) -> impl Iterator<Item = Modifier<V>> {
+        self.view().sub_nodes().filter_map(Modifier::from_view)
     }
 
     pub fn ident_path(&self) -> Option<IdentPath<V>> {
@@ -477,8 +480,8 @@ impl<V: NodeView> StructParamAttrUnit<V> {
 }
 
 impl<V: NodeView> PatSet<V> {
-    pub fn modifier(&self) -> Option<V::Token> {
-        self.view().local_tokens_filter(Kind::Modifier).next()
+    pub fn modifier(&self) -> Option<Modifier<V>> {
+        self.view().sub_nodes().find_map(Modifier::from_view)
     }
 
     pub fn ident_path(&self) -> Option<IdentPath<V>> {
@@ -577,6 +580,32 @@ impl<V: NodeView> NumberRange<V> {
 impl<V: NodeView> Spread<V> {
     pub fn symbol(&self) -> Option<V::Token> {
         self.view().local_tokens_filter(Kind::Symbol).next()
+    }
+}
+
+impl<V: NodeView> Modifier<V> {
+    pub fn token(&self) -> Option<V::Token> {
+        self.view().local_tokens_filter(Kind::Modifier).next()
+    }
+}
+
+impl<V: NodeView> TypedView<V> for Modifier<V> {
+    fn view(&self) -> &V {
+        &self.0
+    }
+
+    fn into_view(self) -> V {
+        self.0
+    }
+
+    fn from_view(view: V) -> Option<Self> {
+        match view.kind() {
+            Kind::DefModifier
+            | Kind::MapModifier
+            | Kind::PatSetModifier
+            | Kind::PatStructModifier => Some(Self(view)),
+            _ => None,
+        }
     }
 }
 

@@ -185,9 +185,12 @@ impl<'a> CstParser<'a> {
         }
     }
 
-    pub fn eat_modifiers(&mut self) {
+    pub fn eat_modifiers(&mut self, kind: Kind) {
         while self.at() == Kind::Modifier {
+            self.eat_space();
+            let node = self.start(kind);
             self.eat(Kind::Modifier);
+            self.end(node);
         }
     }
 
