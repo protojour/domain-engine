@@ -168,19 +168,9 @@ mod rel {
         rel_type_reference(p, TypeAccept::all());
         p.end(subject);
 
-        let relation_set = p.start(Kind::RelationSet);
-        loop {
-            let relation = p.start(Kind::Relation);
-            forward_relation(p);
-            p.end(relation);
-
-            if matches!(p.at(), K![|]) {
-                p.eat(K![|]);
-            } else {
-                break;
-            }
-        }
-        p.end(relation_set);
+        let relation = p.start(Kind::Relation);
+        forward_relation(p);
+        p.end(relation);
 
         p.eat(K![:]);
 

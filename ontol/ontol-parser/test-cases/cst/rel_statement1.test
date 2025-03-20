@@ -1,5 +1,5 @@
 /// comment
-rel {.} 'id'[rel* gen: auto]?|id: text
+rel {.} 'id'[rel* gen: auto]?: text
 
 //@ grammar=ontol
 Ontol
@@ -15,41 +15,33 @@ Ontol
                     Dot `.`
                 CurlyClose `}`
         Whitespace
-        RelationSet
-            Relation
-                TypeQuantUnit
-                    Literal
-                        SingleQuoteText `'id'`
-                RelParams
-                    SquareOpen `[`
-                    RelStatement
-                        KwRel `rel`
-                        RelSubject
-                            TypeQuantUnit
-                                ThisSet
-                                    Star `*`
-                        Whitespace
-                        RelationSet
-                            Relation
-                                TypeQuantUnit
-                                    IdentPath
-                                        Symbol `gen`
-                                PropCardinality
-                        Colon `:`
-                        Whitespace
-                        RelObject
-                            TypeQuantUnit
-                                IdentPath
-                                    Symbol `auto`
-                    SquareClose `]`
-                PropCardinality
-                    Question `?`
-            Pipe `|`
-            Relation
-                TypeQuantUnit
-                    IdentPath
-                        Symbol `id`
-                PropCardinality
+        Relation
+            TypeQuantUnit
+                Literal
+                    SingleQuoteText `'id'`
+            RelParams
+                SquareOpen `[`
+                RelStatement
+                    KwRel `rel`
+                    RelSubject
+                        TypeQuantUnit
+                            ThisSet
+                                Star `*`
+                    Whitespace
+                    Relation
+                        TypeQuantUnit
+                            IdentPath
+                                Symbol `gen`
+                        PropCardinality
+                    Colon `:`
+                    Whitespace
+                    RelObject
+                        TypeQuantUnit
+                            IdentPath
+                                Symbol `auto`
+                SquareClose `]`
+            PropCardinality
+                Question `?`
         Colon `:`
         Whitespace
         RelObject

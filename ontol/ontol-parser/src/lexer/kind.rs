@@ -164,7 +164,6 @@ pub enum Kind {
 
     /// rel statement
     RelStatement,
-    RelationSet,
     Relation,
     RelSubject,
     RelObject,
@@ -367,7 +366,6 @@ impl Display for Kind {
             Kind::ArcVar => write!(f, "arc variable"),
             Kind::ArcTypeParam => write!(f, "edge type parameter"),
             Kind::RelStatement => write!(f, "rel statement"),
-            Kind::RelationSet => write!(f, "relation set"),
             Kind::Relation => write!(f, "relation"),
             Kind::RelSubject => write!(f, "subject"),
             Kind::RelObject => write!(f, "object"),

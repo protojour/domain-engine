@@ -1,4 +1,4 @@
-rel a|b c|d: {e|f}
+rel a|b c: {d|e}
 
 //@ grammar=ontol
 Ontol
@@ -14,18 +14,11 @@ Ontol
                     IdentPath
                         Symbol `b`
         Whitespace
-        RelationSet
-            Relation
-                TypeQuantUnit
-                    IdentPath
-                        Symbol `c`
-                PropCardinality
-            Pipe `|`
-            Relation
-                TypeQuantUnit
-                    IdentPath
-                        Symbol `d`
-                PropCardinality
+        Relation
+            TypeQuantUnit
+                IdentPath
+                    Symbol `c`
+            PropCardinality
         Colon `:`
         Whitespace
         RelObject
@@ -33,9 +26,9 @@ Ontol
                 CurlyOpen `{`
                 TypeUnion
                     IdentPath
-                        Symbol `e`
+                        Symbol `d`
                     Pipe `|`
                     IdentPath
-                        Symbol `f`
+                        Symbol `e`
                 CurlyClose `}`
     Whitespace

@@ -34,7 +34,7 @@ impl<V: NodeView> CstLowering<'_, '_, V> {
         mut block: BlockContext,
     ) -> Option<RootDefs> {
         let rel_subject = stmt.subject()?;
-        let relation_set = stmt.relation_set()?;
+        let relation = stmt.relation()?;
         let rel_object = stmt.object()?;
 
         let mut root_defs = RootDefs::default();
@@ -69,12 +69,10 @@ impl<V: NodeView> CstLowering<'_, '_, V> {
             }
         };
 
-        for relation in relation_set.relations() {
-            if let Some(mut defs) =
-                self.lower_relationship(subject_ty, relation, object_ty, stmt.clone(), &mut block)
-            {
-                root_defs.append(&mut defs);
-            }
+        if let Some(mut defs) =
+            self.lower_relationship(subject_ty, relation, object_ty, stmt.clone(), &mut block)
+        {
+            root_defs.append(&mut defs);
         }
 
         if subject_ty.cardinality == ValueCardinality::Unit
@@ -420,29 +418,27 @@ impl<V: NodeView> CstLowering<'_, '_, V> {
 
         for statement in rp.statements() {
             if let insp::Statement::RelStatement(rel_statement) = statement {
-                if let Some(set) = rel_statement.relation_set() {
-                    for relation in set.relations() {
-                        if let Some(type_quant) = relation.relation_type() {
-                            if let Some(resolved_type) = self.resolve_quant_type_reference(
-                                type_quant,
-                                &BlockContext::NoContext,
-                                Some(&mut vec![]),
-                                ReportError::No,
-                            ) {
-                                if let DefKind::BuiltinRelType(kind, _) =
-                                    self.ctx.compiler.defs.def_kind(resolved_type.def_id)
-                                {
-                                    match kind.context() {
-                                        RelationContext::Def => {
-                                            has_def_receiver = true;
-                                        }
-                                        RelationContext::Rel => {
-                                            has_rel_receiver = true;
-                                        }
+                if let Some(relation) = rel_statement.relation() {
+                    if let Some(type_quant) = relation.relation_type() {
+                        if let Some(resolved_type) = self.resolve_quant_type_reference(
+                            type_quant,
+                            &BlockContext::NoContext,
+                            Some(&mut vec![]),
+                            ReportError::No,
+                        ) {
+                            if let DefKind::BuiltinRelType(kind, _) =
+                                self.ctx.compiler.defs.def_kind(resolved_type.def_id)
+                            {
+                                match kind.context() {
+                                    RelationContext::Def => {
+                                        has_def_receiver = true;
                                     }
-                                } else {
-                                    has_def_receiver = true;
+                                    RelationContext::Rel => {
+                                        has_rel_receiver = true;
+                                    }
                                 }
+                            } else {
+                                has_def_receiver = true;
                             }
                         }
                     }

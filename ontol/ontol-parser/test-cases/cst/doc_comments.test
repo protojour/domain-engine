@@ -30,12 +30,11 @@ Ontol
                         ThisSet
                             Star `*`
                 Whitespace
-                RelationSet
-                    Relation
-                        TypeQuantUnit
-                            Literal
-                                SingleQuoteText `'a'`
-                        PropCardinality
+                Relation
+                    TypeQuantUnit
+                        Literal
+                            SingleQuoteText `'a'`
+                    PropCardinality
                 Colon `:`
                 Whitespace
                 RelObject
@@ -52,12 +51,11 @@ Ontol
                         ThisSet
                             Star `*`
                 Whitespace
-                RelationSet
-                    Relation
-                        TypeQuantUnit
-                            Literal
-                                SingleQuoteText `'b'`
-                        PropCardinality
+                Relation
+                    TypeQuantUnit
+                        Literal
+                            SingleQuoteText `'b'`
+                    PropCardinality
                 Colon `:`
                 Whitespace
                 RelObject

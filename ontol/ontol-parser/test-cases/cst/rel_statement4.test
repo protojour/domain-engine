@@ -9,16 +9,15 @@ Ontol
                 ThisSet
                     Star `*`
         Whitespace
-        RelationSet
-            Relation
-                TypeQuantUnit
-                    NumberRange
-                        RangeStart
-                            Number `0`
-                        DotDot `..`
-                        RangeEnd
-                            Number `42`
-                PropCardinality
+        Relation
+            TypeQuantUnit
+                NumberRange
+                    RangeStart
+                        Number `0`
+                    DotDot `..`
+                    RangeEnd
+                        Number `42`
+            PropCardinality
         Colon `:`
         Whitespace
         RelObject

@@ -1,4 +1,4 @@
-rel* a|b: c|d
+rel* a: b|c
 
 //@ grammar=ontol
 Ontol
@@ -9,26 +9,19 @@ Ontol
                 ThisSet
                     Star `*`
         Whitespace
-        RelationSet
-            Relation
-                TypeQuantUnit
-                    IdentPath
-                        Symbol `a`
-                PropCardinality
-            Pipe `|`
-            Relation
-                TypeQuantUnit
-                    IdentPath
-                        Symbol `b`
-                PropCardinality
+        Relation
+            TypeQuantUnit
+                IdentPath
+                    Symbol `a`
+            PropCardinality
         Colon `:`
         Whitespace
         RelObject
             TypeQuantUnit
                 TypeUnion
                     IdentPath
-                        Symbol `c`
+                        Symbol `b`
                     Pipe `|`
                     IdentPath
-                        Symbol `d`
+                        Symbol `c`
     Whitespace

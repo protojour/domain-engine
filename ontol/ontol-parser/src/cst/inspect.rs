@@ -124,7 +124,6 @@ nodes!(Node {
     ArcVar,
     ArcTypeParam,
     RelStatement,
-    RelationSet,
     Relation,
     RelSubject,
     RelObject,
@@ -316,8 +315,8 @@ impl<V: NodeView> RelStatement<V> {
         self.view().sub_nodes().find_map(RelSubject::from_view)
     }
 
-    pub fn relation_set(&self) -> Option<RelationSet<V>> {
-        self.view().sub_nodes().find_map(RelationSet::from_view)
+    pub fn relation(&self) -> Option<Relation<V>> {
+        self.view().sub_nodes().find_map(Relation::from_view)
     }
 
     pub fn object(&self) -> Option<RelObject<V>> {
@@ -340,12 +339,6 @@ impl<V: NodeView> RelObject<V> {
                 Pattern::from_view(view).map(TypeQuantOrPattern::Pattern)
             }
         })
-    }
-}
-
-impl<V: NodeView> RelationSet<V> {
-    pub fn relations(&self) -> impl Iterator<Item = Relation<V>> {
-        self.view().sub_nodes().filter_map(Relation::from_view)
     }
 }
 

@@ -202,11 +202,9 @@ impl State {
                         }
                         insp::Statement::MapStatement(_) => {}
                         insp::Statement::RelStatement(stmt) => {
-                            if let Some(set) = stmt.relation_set() {
-                                for relation in set.relations() {
-                                    if let Some(params) = relation.rel_params() {
-                                        cst_explore(params.statements(), aliases, defs);
-                                    }
+                            if let Some(relation) = stmt.relation() {
+                                if let Some(params) = relation.rel_params() {
+                                    cst_explore(params.statements(), aliases, defs);
                                 }
                             }
                         }

@@ -543,22 +543,6 @@ fn test_string_default() {
 }
 
 #[test]
-fn test_prop_union() {
-    "
-    def vec3(
-        /// A vector component
-        rel* 'x'|'y'|'z': (
-            rel* is: i64
-        )
-    )
-    "
-    .compile_then(|test| {
-        let [vec3] = test.bind(["vec3"]);
-        assert_json_io_matches!(serde_create(&vec3), { "x": 1, "y": 2, "z": 3 });
-    });
-}
-
-#[test]
 fn union_integers() {
     "
     def level (

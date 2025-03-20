@@ -1,4 +1,4 @@
-rel. 'id'|id: (rel* is: text)
+rel. 'id': (rel* is: text)
 
 //@ grammar=ontol
 Ontol
@@ -9,18 +9,11 @@ Ontol
                 ThisUnit
                     Dot `.`
         Whitespace
-        RelationSet
-            Relation
-                TypeQuantUnit
-                    Literal
-                        SingleQuoteText `'id'`
-                PropCardinality
-            Pipe `|`
-            Relation
-                TypeQuantUnit
-                    IdentPath
-                        Symbol `id`
-                PropCardinality
+        Relation
+            TypeQuantUnit
+                Literal
+                    SingleQuoteText `'id'`
+            PropCardinality
         Colon `:`
         Whitespace
         RelObject
@@ -34,12 +27,11 @@ Ontol
                                 ThisSet
                                     Star `*`
                         Whitespace
-                        RelationSet
-                            Relation
-                                TypeQuantUnit
-                                    IdentPath
-                                        Symbol `is`
-                                PropCardinality
+                        Relation
+                            TypeQuantUnit
+                                IdentPath
+                                    Symbol `is`
+                            PropCardinality
                         Colon `:`
                         Whitespace
                         RelObject
