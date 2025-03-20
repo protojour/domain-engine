@@ -341,29 +341,33 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
     pub(super) fn read_def_modifiers(
         &mut self,
-        modifiers: impl Iterator<Item = V::Token>,
+        modifiers: impl Iterator<Item = insp::Modifier<V>>,
     ) -> DefModifiers {
         let mut m = DefModifiers::default();
 
         for modifier in modifiers {
-            match modifier.slice() {
+            let Some(token) = modifier.token() else {
+                continue;
+            };
+
+            match token.slice() {
                 "@private" => {
-                    m.private = Some(modifier.span());
+                    m.private = Some(token.span());
                 }
                 "@open" => {
-                    m.open = Some(modifier.span());
+                    m.open = Some(token.span());
                 }
                 "@extern" => {
-                    m.r#extern = Some(modifier.span());
+                    m.r#extern = Some(token.span());
                 }
                 "@macro" => {
-                    m.r#macro = Some(modifier.span());
+                    m.r#macro = Some(token.span());
                 }
                 "@crdt" => {
-                    m.crdt = Some(modifier.span());
+                    m.crdt = Some(token.span());
                 }
                 _ => {
-                    CompileError::InvalidModifier.span_report(modifier.span(), &mut self.ctx);
+                    CompileError::InvalidModifier.span_report(token.span(), &mut self.ctx);
                 }
             }
         }

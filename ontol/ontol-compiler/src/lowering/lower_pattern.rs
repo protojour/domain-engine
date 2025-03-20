@@ -89,10 +89,13 @@ impl<V: NodeView> CstLowering<'_, '_, V> {
             } => {
                 let mut modifier = None;
                 for m in pat_struct.modifiers() {
-                    if m.slice() == "@match" {
+                    let Some(token) = m.token() else {
+                        continue;
+                    };
+                    if token.slice() == "@match" {
                         modifier = Some(CompoundPatternModifier::Match);
                     } else {
-                        CompileError::InvalidModifier.span_report(m.span(), &mut self.ctx);
+                        CompileError::InvalidModifier.span_report(token.span(), &mut self.ctx);
                     }
                 }
 
@@ -110,7 +113,7 @@ impl<V: NodeView> CstLowering<'_, '_, V> {
             LoweredStructPatternParams::Unit(unit_pattern) => {
                 if let Some(modifier) = pat_struct.modifiers().next() {
                     CompileError::TODO("modifier not supported here")
-                        .span_report(modifier.span(), &mut self.ctx);
+                        .span_report(modifier.view().span(), &mut self.ctx);
                 }
 
                 let key = (DefId::unit(), self.ctx.source_span(span));
@@ -564,12 +567,13 @@ impl<V: NodeView> CstLowering<'_, '_, V> {
 
     fn get_set_binary_operator(
         &mut self,
-        modifier: Option<V::Token>,
+        modifier: Option<insp::Modifier<V>>,
     ) -> Option<(SetBinaryOperator, SourceSpan)> {
         let modifier = modifier?;
-        let span = self.ctx.source_span(modifier.span());
+        let token = modifier.token()?;
+        let span = self.ctx.source_span(token.span());
 
-        match modifier.slice() {
+        match token.slice() {
             "@in" => Some((SetBinaryOperator::ElementIn, span)),
             "@all_in" => Some((SetBinaryOperator::AllIn, span)),
             "@contains_all" => Some((SetBinaryOperator::ContainsAll, span)),
@@ -577,7 +581,7 @@ impl<V: NodeView> CstLowering<'_, '_, V> {
             "@equals" => Some((SetBinaryOperator::SetEquals, span)),
             _ => {
                 CompileError::TODO("invalid set binary operator")
-                    .span_report(modifier.span(), &mut self.ctx);
+                    .span_report(token.span(), &mut self.ctx);
                 None
             }
         }

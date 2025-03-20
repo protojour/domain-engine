@@ -12,12 +12,11 @@ Ontol
                 ThisSet
                     Star `*`
         Whitespace
-        RelationSet
-            Relation
-                TypeQuantUnit
-                    Literal
-                        SingleQuoteText `'a'`
-                PropCardinality
+        Relation
+            TypeQuantUnit
+                Literal
+                    SingleQuoteText `'a'`
+            PropCardinality
         Colon `:`
         RelObject
             TypeQuantUnit

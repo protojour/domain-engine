@@ -65,7 +65,7 @@ fn statement(p: &mut CstParser) {
 
     let kind = match p.at() {
         K![domain] => {
-            def_like_statement(K![domain], p, |p| {
+            def_like_statement(K![domain], Kind::DefModifier, p, |p| {
                 let ident = p.start(Kind::Ulid);
                 p.eat_while(|kind| matches!(kind, Kind::Number | Kind::Symbol));
                 p.end(ident);
@@ -77,7 +77,7 @@ fn statement(p: &mut CstParser) {
             Kind::UseStatement
         }
         K![def] => {
-            def_like_statement(K![def], p, |p| {
+            def_like_statement(K![def], Kind::DefModifier, p, |p| {
                 let ident = p.start(Kind::IdentPath);
                 p.eat(Kind::Symbol);
                 p.end(ident);
@@ -130,10 +130,15 @@ fn use_statement(p: &mut CstParser) {
     p.end(path);
 }
 
-fn def_like_statement(keyword: Kind, p: &mut CstParser, parse_ident: fn(&mut CstParser)) {
+fn def_like_statement(
+    keyword: Kind,
+    modifier: Kind,
+    p: &mut CstParser,
+    parse_ident: fn(&mut CstParser),
+) {
     p.eat(keyword);
 
-    p.eat_modifiers();
+    p.eat_modifiers(modifier);
     p.eat_trivia();
 
     parse_ident(p);
@@ -163,19 +168,9 @@ mod rel {
         rel_type_reference(p, TypeAccept::all());
         p.end(subject);
 
-        let relation_set = p.start(Kind::RelationSet);
-        loop {
-            let relation = p.start(Kind::Relation);
-            forward_relation(p);
-            p.end(relation);
-
-            if matches!(p.at(), K![|]) {
-                p.eat(K![|]);
-            } else {
-                break;
-            }
-        }
-        p.end(relation_set);
+        let relation = p.start(Kind::Relation);
+        forward_relation(p);
+        p.end(relation);
 
         p.eat(K![:]);
 
@@ -451,7 +446,7 @@ mod map {
     pub fn statement(p: &mut CstParser) {
         p.eat(K![map]);
 
-        p.eat_modifiers();
+        p.eat_modifiers(Kind::MapModifier);
 
         if p.at() == Kind::Symbol {
             let ident = p.start(Kind::IdentPath);
@@ -558,7 +553,7 @@ mod struct_pattern {
     pub fn entry(p: &mut CstParser) {
         let pat = p.start(Kind::PatStruct);
 
-        p.eat_modifiers();
+        p.eat_modifiers(Kind::PatStructModifier);
 
         if p.at() == Kind::Symbol {
             ident_path(p);
@@ -636,7 +631,7 @@ mod set_pattern {
     pub fn entry(p: &mut CstParser) {
         let pat = p.start(Kind::PatSet);
 
-        p.eat_modifiers();
+        p.eat_modifiers(Kind::PatSetModifier);
 
         if p.at() == Kind::Symbol {
             ident_path(p);

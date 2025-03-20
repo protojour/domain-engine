@@ -23,15 +23,16 @@ impl<V: NodeView> CstLowering<'_, '_, V> {
         let mut is_abstract = false;
 
         for modifier in stmt.modifiers() {
-            if modifier.slice() == "@abstract" {
+            let token = modifier.token()?;
+            if token.slice() == "@abstract" {
                 if matches!(block_context, BlockContext::SubDef(_)) {
                     CompileError::TODO("extern map cannot be abstract")
-                        .span_report(modifier.span(), &mut self.ctx);
+                        .span_report(token.span(), &mut self.ctx);
                 }
 
                 is_abstract = true;
             } else {
-                CompileError::InvalidModifier.span_report(modifier.span(), &mut self.ctx);
+                CompileError::InvalidModifier.span_report(token.span(), &mut self.ctx);
             }
         }
 

@@ -203,7 +203,7 @@ def Book (
 
 def author_id (rel* is: serial)
 def Author (
-    rel. 'id'[rel* gen: auto]|id: author_id
+    rel. 'id'[rel* gen: auto]: author_id
     rel* 'name': text
     rel* 'books_written'?: {Book}
 )

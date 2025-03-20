@@ -22,7 +22,8 @@ Ontol
                     Spread
                         DotDot `..`
                     PatStruct
-                        Modifier `@match`
+                        PatStructModifier
+                            Modifier `@match`
                         Whitespace
                         IdentPath
                             Symbol `foo`

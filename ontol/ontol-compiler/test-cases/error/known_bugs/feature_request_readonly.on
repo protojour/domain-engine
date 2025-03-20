@@ -2,5 +2,5 @@ def foo (
     rel. 'id': (rel* is: text)
 
     // this is just a suggestion, but I think the `|` operator makes sense here
-    rel* 'readonly'|readonly: text // ERROR definition not found in this scope
+    rel* 'readonly'|readonly: text // ERROR parse error: expected `:`, found `|`
 )

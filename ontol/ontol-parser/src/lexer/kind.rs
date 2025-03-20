@@ -143,6 +143,7 @@ pub enum Kind {
 
     /// def statement
     DefStatement,
+    DefModifier,
     DefBody,
 
     /// sym statement
@@ -163,7 +164,6 @@ pub enum Kind {
 
     /// rel statement
     RelStatement,
-    RelationSet,
     Relation,
     RelSubject,
     RelObject,
@@ -175,6 +175,7 @@ pub enum Kind {
 
     /// map statement
     MapStatement,
+    MapModifier,
     MapArm,
 
     // types
@@ -210,8 +211,10 @@ pub enum Kind {
     // patterns
     /// `struct(..)`
     PatStruct,
+    PatStructModifier,
     /// `set { }`
     PatSet,
+    PatSetModifier,
     /// `variable`, `42`, `'text'`, `/regex/`
     PatAtom,
     /// `a + b`
@@ -237,6 +240,12 @@ pub enum Kind {
 
     /// The root node. This should be the last entry in the enum.
     Ontol,
+}
+
+impl Kind {
+    pub fn is_trivia(&self) -> bool {
+        matches!(self, Self::Whitespace | Self::Comment)
+    }
 }
 
 pub trait KindFilter {
@@ -346,6 +355,7 @@ impl Display for Kind {
             Kind::DomainStatement => write!(f, "domain statement"),
             Kind::UseStatement => write!(f, "use statement"),
             Kind::DefStatement => write!(f, "def statement"),
+            Kind::DefModifier => write!(f, "def modifier"),
             Kind::DefBody => write!(f, "def body"),
             Kind::SymStatement => write!(f, "sym statement"),
             Kind::SymRelation => write!(f, "sym relation"),
@@ -356,7 +366,6 @@ impl Display for Kind {
             Kind::ArcVar => write!(f, "arc variable"),
             Kind::ArcTypeParam => write!(f, "edge type parameter"),
             Kind::RelStatement => write!(f, "rel statement"),
-            Kind::RelationSet => write!(f, "relation set"),
             Kind::Relation => write!(f, "relation"),
             Kind::RelSubject => write!(f, "subject"),
             Kind::RelObject => write!(f, "object"),
@@ -364,6 +373,7 @@ impl Display for Kind {
             Kind::PropCardinality => write!(f, "property cardinality"),
             Kind::FmtStatement => write!(f, "fmt statement"),
             Kind::MapStatement => write!(f, "map statement"),
+            Kind::MapModifier => write!(f, "map modifier"),
             Kind::MapArm => write!(f, "map arm"),
             Kind::TypeQuantUnit => write!(f, "unit type quantifier"),
             Kind::TypeQuantSet => write!(f, "set type quantifier"),
@@ -380,7 +390,9 @@ impl Display for Kind {
             Kind::IdentPath => write!(f, "ident path"),
             Kind::Ulid => write!(f, "unique identifier"),
             Kind::PatStruct => write!(f, "struct pattern"),
+            Kind::PatStructModifier => write!(f, "struct modifier"),
             Kind::PatSet => write!(f, "set pattern"),
+            Kind::PatSetModifier => write!(f, "set modifier"),
             Kind::PatAtom => write!(f, "atom patterm"),
             Kind::PatBinary => write!(f, "binary pattern"),
             Kind::StructParamAttrProp => write!(f, "property attribute"),

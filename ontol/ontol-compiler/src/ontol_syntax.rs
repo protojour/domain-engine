@@ -218,22 +218,13 @@ pub(crate) fn extract_domain_headerdata<V: NodeView>(
                         // TODO: check the subject
                         continue;
                     };
-                    let Some(relation_set) = rel_stmt.relation_set() else {
+                    let Some(relation) = rel_stmt.relation() else {
                         continue;
                     };
                     let Some(object) = rel_stmt.object() else {
                         continue;
                     };
 
-                    let relations: Vec<_> = relation_set.relations().collect();
-                    if relations.len() != 1 {
-                        errors.push((
-                            CompileError::TODO("one relation expected"),
-                            rel_stmt.view().span(),
-                        ));
-                        continue;
-                    }
-                    let relation = relations.into_iter().next().unwrap();
                     let Some(rel_q) = relation.relation_type() else {
                         continue;
                     };
