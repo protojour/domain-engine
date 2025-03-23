@@ -1,6 +1,6 @@
 use domain_engine_core::{DomainResult, VertexAddr};
 use ontol_runtime::{
-    OntolDefTag,
+    OntolDefTag, OntolDefTagExt,
     value::{OctetSequence, Value},
 };
 use serde::{Deserialize, Serialize};

@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use fnv::FnvHashMap;
 use indexmap::{IndexMap, map::Entry};
-use ontol_runtime::{DefId, OntolDefTag};
+use ontol_runtime::{DefId, OntolDefTag, OntolDefTagExt};
 use thin_vec::{ThinVec, thin_vec};
 
 use crate::{

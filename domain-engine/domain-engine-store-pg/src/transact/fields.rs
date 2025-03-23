@@ -1,7 +1,7 @@
 use domain_engine_core::DomainResult;
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    DefId, OntolDefTag, PropId,
+    DefId, OntolDefTag, OntolDefTagExt, PropId,
     attr::Attr,
     constant::try_produce_constant,
     ontology::domain::{DataRelationshipInfo, DataRelationshipTarget, Def},

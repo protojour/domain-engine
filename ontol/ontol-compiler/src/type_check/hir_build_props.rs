@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 use ontol_hir::{PropFlags, PropVariant, StructFlags};
 use ontol_runtime::{
-    DefId, OntolDefTag, PropId,
+    DefId, OntolDefTag, OntolDefTagExt, PropId,
     property::{Cardinality, PropertyCardinality, ValueCardinality},
     query::condition::SetOperator,
     var::Var,

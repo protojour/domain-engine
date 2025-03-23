@@ -1,6 +1,6 @@
 use domain_engine_core::DomainResult;
 use ontol_runtime::{
-    DefId, OntolDefTag, PropId,
+    DefId, OntolDefTag, OntolDefTagExt, PropId,
     ontology::domain::{DataRelationshipTarget, Def, FieldPath, VertexOrder},
 };
 use tracing::{debug, error};

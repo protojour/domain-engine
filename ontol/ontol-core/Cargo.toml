@@ -16,6 +16,7 @@ arcstr.workspace = true
 async-trait = "0.1"
 bit-vec = { version = "0.8", features = ["serde"] }
 compact_str = { version = "0.8", features = ["serde"] }
+num_enum = { version = "0.7", default-features = false }
 serde = { version = "1", features = ["derive"] }
 thin-vec.workspace = true
 url = "2"

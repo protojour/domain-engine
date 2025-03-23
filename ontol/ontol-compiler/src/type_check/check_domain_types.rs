@@ -1,6 +1,6 @@
 use fnv::FnvHashSet;
 use ontol_runtime::{
-    DefId, OntolDefTag, PropId,
+    DefId, OntolDefTag, OntolDefTagExt, PropId,
     ontology::ontol::{TextLikeType, ValueGenerator},
     property::{PropertyCardinality, ValueCardinality},
 };

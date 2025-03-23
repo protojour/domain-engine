@@ -5,7 +5,7 @@ use std::{
 
 use indexmap::IndexMap;
 use ontol_runtime::{
-    DefId, OntolDefTag,
+    DefId, OntolDefTag, OntolDefTagExt,
     debug::OntolDebug,
     interface::{
         discriminator::LeafDiscriminant,

@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::{
-    DefId, OntolDefTag, PropId, ontology::ontol::TextConstant, tuple::CardinalIdx,
+    DefId, OntolDefTag, OntolDefTagExt, PropId, ontology::ontol::TextConstant, tuple::CardinalIdx,
 };
 use tracing::{debug, error};
 

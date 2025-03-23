@@ -11,7 +11,7 @@ use ontol_parser::{
     },
     lexer::{kind::Kind, unescape::unescape_regex},
 };
-use ontol_runtime::{DefId, DomainIndex, OntolDefTag, property::ValueCardinality};
+use ontol_runtime::{DefId, DomainIndex, OntolDefTag, OntolDefTagExt, property::ValueCardinality};
 use tracing::debug;
 
 use crate::{

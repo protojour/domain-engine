@@ -9,7 +9,9 @@ use std::collections::{HashMap, hash_map::Entry};
 
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
-use ontol_runtime::{DefId, DomainIndex, OntolDefTag, ontology::ontol::TextLikeType};
+use ontol_runtime::{
+    DefId, DomainIndex, OntolDefTag, OntolDefTagExt, ontology::ontol::TextLikeType,
+};
 use ordered_float::NotNan;
 use tracing::{debug, debug_span, trace};
 

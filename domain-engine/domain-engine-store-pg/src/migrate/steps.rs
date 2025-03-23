@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use itertools::Itertools;
 use ontol_runtime::{
-    DefId, DefPropTag, DomainIndex,
+    DefId, DefPropTag, DomainIndex, OntolDefTagExt,
     debug::OntolDebug,
     ontology::{
         aspects::DefsAspect,

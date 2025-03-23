@@ -14,7 +14,7 @@ use ontol_parser::{
     cst::view::{NodeView, TokenView},
 };
 use ontol_runtime::{
-    DefId, DomainIndex, OntolDefTag,
+    DefId, DomainIndex, OntolDefTag, OntolDefTagExt,
     property::{PropertyCardinality, ValueCardinality},
     var::{Var, VarAllocator},
 };

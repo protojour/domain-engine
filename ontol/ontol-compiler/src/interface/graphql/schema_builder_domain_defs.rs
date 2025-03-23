@@ -3,7 +3,7 @@ use std::ops::Deref;
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
-    DefId, OntolDefTag, PropId,
+    DefId, OntolDefTag, OntolDefTagExt, PropId,
     debug::OntolDebug,
     interface::{
         discriminator::{

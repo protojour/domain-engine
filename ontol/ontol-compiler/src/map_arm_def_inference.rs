@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    DefId, OntolDefTag, PropId,
+    DefId, OntolDefTag, OntolDefTagExt, PropId,
     property::{PropertyCardinality, ValueCardinality},
     var::Var,
 };

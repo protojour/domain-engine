@@ -3,7 +3,7 @@ use indoc::indoc;
 use itertools::Itertools;
 use ontol_core::rustdoc::RustDoc;
 use ontol_runtime::{
-    DefId, DefIdSet, DomainIndex, FnvIndexMap, OntolDefTag, PropId,
+    DefId, DefIdSet, DomainIndex, FnvIndexMap, OntolDefTag, OntolDefTagExt, PropId,
     interface::{
         DomainInterface,
         serde::{SerdeDef, SerdeModifier},

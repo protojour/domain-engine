@@ -6,7 +6,7 @@ use std::{
 use fnv::FnvHashMap;
 use ontol_macros::RustDoc;
 use ontol_runtime::{
-    DefId, DomainIndex, OntolDefTag,
+    DefId, DomainIndex, OntolDefTag, OntolDefTagExt,
     ontology::{
         domain::{self, BasicDef},
         ontol::TextLikeType,

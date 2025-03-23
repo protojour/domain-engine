@@ -5,7 +5,6 @@ use std::{collections::BTreeSet, fmt::Debug, str::FromStr};
 use ::serde::{Deserialize, Serialize};
 use fnv::FnvBuildHasher;
 use indexmap::IndexMap;
-use num_enum::TryFromPrimitive;
 use ontol_core::impl_ontol_debug;
 use ontol_macros::OntolDebug;
 use smallvec::SmallVec;
@@ -135,79 +134,20 @@ impl DefId {
     }
 }
 
-/// NB: The numbers here get serialized and persisted.
-/// Think twice before changing number values.
-#[repr(u16)]
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, TryFromPrimitive)]
-pub enum OntolDefTag {
-    /// The ONTOL domain itself
-    Ontol = 0,
-    Unit = 1,
-    False = 2,
-    True = 3,
-    Boolean = 4,
-    EmptySequence = 5,
-    EmptyText = 6,
-    Number = 7,
-    Integer = 8,
-    I64 = 9,
-    Float = 10,
-    F32 = 11,
-    F64 = 12,
-    Serial = 13,
-    Text = 14,
-    Octets = 15,
-    Vertex = 16,
-    Uuid = 17,
-    Ulid = 18,
-    DateTime = 19,
-    /// An open, domainless relationship between some value and arbitrary, quasi-structured data
-    RelationOpenData = 20,
-    RelationEdge = 21,
-    RelationFlatUnion = 22,
-    RelationIs = 23,
-    RelationIdentifies = 24,
-    RelationId = 25,
-    RelationIndexed = 26,
-    RelationStoreKey = 27,
-    RelationMin = 28,
-    RelationMax = 29,
-    RelationDefault = 30,
-    RelationGen = 31,
-    RelationOrder = 32,
-    RelationDirection = 33,
-    RelationExample = 34,
-    RelationDataStoreAddress = 35,
-    /// Union of `ascending` and `descending`
-    /// TODO: RelationDirection and this union can be the same def, which would be cleaner:
-    UnionDirection = 36,
-    SymAscending = 37,
-    SymDescending = 38,
-    /// The `auto` value generator mode
-    Auto = 39,
-    /// Create time for generators, can also be used as a domain-independent property
-    CreateTime = 40,
-    /// Update time for generators, can also be used as a domain-independent property
-    UpdateTime = 41,
-    Format = 42,
-    FormatHex = 43,
-    FormatBase64 = 44,
+pub use ontol_core::tag::OntolDefTag;
 
-    RelationRepr = 45,
-    /// The `crdt` symbol
-    Crdt = 46,
-    /// This must be the last entry. Update the value accordingly.
-    _LastEntry = 47,
+pub trait OntolDefTagExt {
+    fn def_id(self) -> DefId;
+
+    fn prop_id_0(self) -> PropId;
 }
 
-impl_ontol_debug!(OntolDefTag);
-
-impl OntolDefTag {
-    pub const fn def_id(self) -> DefId {
+impl OntolDefTagExt for OntolDefTag {
+    fn def_id(self) -> DefId {
         DefId(DomainIndex(0), self as u16)
     }
 
-    pub const fn prop_id_0(self) -> PropId {
+    fn prop_id_0(self) -> PropId {
         PropId(self.def_id(), DefPropTag(0))
     }
 }
@@ -286,11 +226,11 @@ impl ::std::fmt::Debug for DefPropTag {
 pub struct PropId(pub DefId, pub DefPropTag);
 
 impl PropId {
-    pub const fn open_data() -> Self {
+    pub fn open_data() -> Self {
         Self(OntolDefTag::RelationOpenData.def_id(), DefPropTag(0))
     }
 
-    pub const fn data_store_address() -> Self {
+    pub fn data_store_address() -> Self {
         Self(
             OntolDefTag::RelationDataStoreAddress.def_id(),
             DefPropTag(0),

@@ -3,7 +3,7 @@ use std::{borrow::Cow, ops::Deref};
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    DefId, DefPropTag, OntolDefTag, PropId,
+    DefId, DefPropTag, OntolDefTag, OntolDefTagExt, PropId,
     debug::OntolDebug,
     interface::{
         discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},

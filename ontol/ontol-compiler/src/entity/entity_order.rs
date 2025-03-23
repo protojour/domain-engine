@@ -1,5 +1,5 @@
 use ontol_runtime::{
-    DefId, OntolDefTag, PropId,
+    DefId, OntolDefTag, OntolDefTagExt, PropId,
     ontology::domain::{FieldPath, VertexOrder},
     query::order::Direction,
 };

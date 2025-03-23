@@ -8,7 +8,7 @@ use ontol_parser::{
         view::{NodeView, TokenView, TypedView},
     },
 };
-use ontol_runtime::{DefId, OntolDefTag, tuple::CardinalIdx};
+use ontol_runtime::{DefId, OntolDefTag, OntolDefTagExt, tuple::CardinalIdx};
 
 use crate::{
     CompileError,

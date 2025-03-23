@@ -11,7 +11,7 @@ use itertools::{Itertools, Position};
 use thin_vec::ThinVec;
 
 use crate::{
-    DefId, DomainIndex, OntolDefTag, PropId,
+    DefId, DomainIndex, OntolDefTag, OntolDefTagExt, PropId,
     attr::{Attr, AttrMatrix},
     cast::Cast,
     crdt::CrdtStruct,

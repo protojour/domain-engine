@@ -9,7 +9,7 @@ use domain_engine_core::{
 };
 use futures_util::{StreamExt, stream::FuturesUnordered};
 use ontol_runtime::{
-    DefId, OntolDefTag,
+    DefId, OntolDefTag, OntolDefTagExt,
     attr::Attr,
     query::{
         condition::{Clause, CondTerm, SetOperator},

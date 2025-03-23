@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, ops::Deref};
 use domain_engine_core::{DomainResult, VertexAddr};
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    DefId, DefPropTag, DomainIndex, OntolDefTag, PropId,
+    DefId, DefPropTag, DomainIndex, OntolDefTag, OntolDefTagExt, PropId,
     debug::OntolDebug,
     ontology::{
         aspects::DefsAspect,

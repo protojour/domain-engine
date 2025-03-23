@@ -2,7 +2,7 @@ use std::ops::RangeInclusive;
 
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
-use ontol_runtime::{DefId, OntolDefTag, PropId};
+use ontol_runtime::{DefId, OntolDefTag, OntolDefTagExt, PropId};
 use ordered_float::NotNan;
 use smallvec::SmallVec;
 

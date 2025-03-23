@@ -4,7 +4,7 @@ use ontol_hir::{
     Binder, Binding, Kind, Label, MatrixRow, Node, Nodes, Pack, PropFlags, PropVariant,
 };
 use ontol_runtime::{
-    MapDirection, OntolDefTag, PropId,
+    MapDirection, OntolDefTag, OntolDefTagExt, PropId,
     var::{Var, VarSet},
 };
 use smallvec::smallvec;

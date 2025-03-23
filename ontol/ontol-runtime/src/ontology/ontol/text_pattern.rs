@@ -6,7 +6,7 @@ use serde::de::{DeserializeSeed, value::StrDeserializer};
 use tracing::{error, trace};
 
 use crate::{
-    DefId, DefPropTag, OntolDefTag, PropId,
+    DefId, DefPropTag, OntolDefTag, OntolDefTagExt, PropId,
     attr::Attr,
     interface::serde::processor::{ProcessorMode, SerdeProcessor},
     ontology::aspects::{DefsAspect, ExecutionAspect, SerdeAspect, aspect},

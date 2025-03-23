@@ -8,7 +8,7 @@ use ontol_parser::{
     },
 };
 use ontol_runtime::{
-    DefId, OntolDefTag,
+    DefId, OntolDefTag, OntolDefTagExt,
     ontology::domain::EdgeCardinalProjection,
     property::{PropertyCardinality, ValueCardinality},
 };

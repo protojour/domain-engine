@@ -10,7 +10,7 @@ use thin_vec::ThinVec;
 use tracing::{Level, error, trace};
 
 use crate::{
-    DefId, OntolDefTag, PropId,
+    DefId, OntolDefTag, OntolDefTagExt, PropId,
     attr::{Attr, AttrMatrix},
     cast::Cast,
     ontology::{

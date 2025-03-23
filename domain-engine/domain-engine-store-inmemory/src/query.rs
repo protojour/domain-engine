@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    DefId, OntolDefTag, PropId,
+    DefId, OntolDefTag, OntolDefTagExt, PropId,
     attr::{Attr, AttrMatrix},
     ontology::domain::{DataRelationshipKind, Def, EdgeCardinalProjection},
     property::ValueCardinality,

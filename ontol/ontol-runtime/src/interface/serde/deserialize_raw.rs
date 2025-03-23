@@ -6,7 +6,7 @@ use serde::{
 };
 
 use crate::{
-    OntolDefTag,
+    OntolDefTag, OntolDefTagExt,
     sequence::Sequence,
     value::{Value, ValueTag},
 };

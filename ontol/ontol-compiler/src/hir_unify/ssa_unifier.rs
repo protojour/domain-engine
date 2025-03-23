@@ -5,7 +5,7 @@ use ontol_hir::{
     StructFlags, arena::NodeRef, find_value_node, import::arena_import,
 };
 use ontol_runtime::{
-    MapDirection, MapFlags, OntolDefTag, PropId,
+    MapDirection, MapFlags, OntolDefTag, OntolDefTagExt, PropId,
     query::condition::{Clause, ClausePair, SetOperator},
     var::{Var, VarAllocator, VarSet},
 };

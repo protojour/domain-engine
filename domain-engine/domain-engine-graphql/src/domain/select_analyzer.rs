@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, btree_map::Entry};
 use fnv::{FnvHashMap, FnvHashSet};
 use juniper::{FieldError, LookAheadChildren};
 use ontol_runtime::{
-    DefId, DefPropTag, MapKey, OntolDefTag, PropId,
+    DefId, DefPropTag, MapKey, OntolDefTag, OntolDefTagExt, PropId,
     interface::{
         graphql::{
             argument::{AfterArg, FieldArg, FirstArg, MapInputArg},
