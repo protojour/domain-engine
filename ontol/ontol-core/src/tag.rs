@@ -1,13 +1,27 @@
 use std::fmt::Debug;
 
 use num_enum::TryFromPrimitive;
+use serde::{Deserialize, Serialize};
 
 use crate::impl_ontol_debug;
 
 /// NB: The numbers here get serialized and persisted.
 /// Think twice before changing number values.
 #[repr(u16)]
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, TryFromPrimitive)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Debug,
+    Serialize,
+    Deserialize,
+    TryFromPrimitive,
+)]
+#[serde(rename_all = "kebab-case")]
 pub enum OntolDefTag {
     /// The ONTOL domain itself
     Ontol = 0,

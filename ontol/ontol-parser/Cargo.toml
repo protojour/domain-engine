@@ -13,6 +13,7 @@ doctest = false
 [dependencies]
 logos = "0.15"
 unindent = "0.2"
+serde = { version = "1", features = ["derive"] }
 thin-vec.workspace = true
 bitflags.workspace = true
 

@@ -4,14 +4,18 @@ use std::fmt::Display;
 
 use crate::K;
 use logos::{Lexer, Logos};
+use serde::{Deserialize, Serialize};
 
 /// The Kind of token the lexer can produce.
 ///
 /// The lexer will slice the full document into tokens.
 /// The produced Spans will need some post-processing
 /// for extracting useful data (such as escape codes, etc)
-#[derive(Logos, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(
+    Logos, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Debug,
+)]
 #[repr(u16)]
+#[serde(rename_all = "kebab-case")]
 pub enum Kind {
     #[regex(r"([ \t\n\r])+")]
     Whitespace = 0,
