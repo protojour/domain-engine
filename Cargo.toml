@@ -16,6 +16,7 @@ members = [
     "ontol/ontol-examples",
     "ontol/ontol-faker",
     "ontol/ontol-hir",
+    "ontol/ontol-log",
     "ontol/ontol-lsp",
     "ontol/ontol-lsp-wasm",
     "ontol/ontol-macros",

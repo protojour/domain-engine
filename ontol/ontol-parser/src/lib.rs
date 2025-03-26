@@ -13,6 +13,7 @@ pub mod lexer;
 pub mod source;
 pub mod topology;
 
+#[derive(Debug)]
 pub enum ParserError {
     Lex(SpannedMsgError),
     Parse(SpannedMsgError),
