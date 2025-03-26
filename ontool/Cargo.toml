@@ -37,7 +37,7 @@ domain-engine-core.path = "../domain-engine/domain-engine-core"
 domain-engine-store-inmemory.path = "../domain-engine/domain-engine-store-inmemory"
 chrono.workspace = true
 async-trait.workspace = true
-axum = { version = "0.7", features = ["ws"] }
+axum = { version = "0.8", features = ["ws"] }
 http-body = "1"
 bytes = "1"
 anyhow = "1"
