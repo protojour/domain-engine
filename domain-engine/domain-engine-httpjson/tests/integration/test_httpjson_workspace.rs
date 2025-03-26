@@ -516,7 +516,7 @@ mod test_sync_client {
         async fn sync_outgoing_once(&mut self) {
             debug!("outgoing");
             if let Some(outgoing) = self.automerge.generate_sync_message(&mut self.sync_state) {
-                self.send(Message::Sync(outgoing.encode())).await;
+                self.send(Message::Sync(outgoing.encode().into())).await;
             }
         }
 
@@ -533,7 +533,7 @@ mod test_sync_client {
 
         async fn send(&mut self, message: Message) {
             self.ws
-                .send(WsMessage::Binary(message.encode_cbor()))
+                .send(WsMessage::Binary(message.encode_cbor().into()))
                 .await
                 .unwrap();
         }

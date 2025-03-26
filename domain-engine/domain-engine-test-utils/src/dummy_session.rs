@@ -5,7 +5,6 @@ use domain_engine_core::Session;
 
 pub struct DummySession;
 
-#[async_trait::async_trait]
 impl FromRequestParts<()> for DummySession {
     type Rejection = Infallible;
 

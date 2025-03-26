@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use domain_engine_core::{DomainError, domain_error::DomainErrorKind};
 
 /// A very scaled down version of automerge sync protocol,
@@ -5,7 +6,7 @@ use domain_engine_core::{DomainError, domain_error::DomainErrorKind};
 pub enum Message {
     Join,
     Peer,
-    Sync(Vec<u8>),
+    Sync(Bytes),
 }
 
 #[derive(Debug)]
@@ -22,7 +23,7 @@ impl Message {
         let mut decoder = minicbor::Decoder::new(buf);
 
         let mut r#type: Option<&str> = None;
-        let mut message: Option<Vec<u8>> = None;
+        let mut message: Option<Bytes> = None;
 
         for _ in 0..decoder.map()?.ok_or(DecodeError::MissingLen)? {
             let k = decoder.str()?;
@@ -31,7 +32,7 @@ impl Message {
                 "message" => {
                     message = {
                         decoder.tag()?;
-                        Some(decoder.bytes()?.to_vec())
+                        Some(Bytes::copy_from_slice(decoder.bytes()?))
                     }
                 }
                 _ => decoder.skip()?,
@@ -49,7 +50,7 @@ impl Message {
         }
     }
 
-    pub fn encode_cbor(&self) -> Vec<u8> {
+    pub fn encode_cbor(&self) -> Bytes {
         let mut out: Vec<u8> = Vec::new();
         let mut encoder = minicbor::Encoder::new(&mut out);
         match self {
@@ -93,11 +94,11 @@ impl Message {
                 encoder
                     .tag(minicbor::data::IanaTag::TypedArrayU8.tag())
                     .unwrap();
-                encoder.bytes(msg.as_slice()).unwrap();
+                encoder.bytes(msg).unwrap();
             }
         }
 
-        out
+        out.into()
     }
 }
 

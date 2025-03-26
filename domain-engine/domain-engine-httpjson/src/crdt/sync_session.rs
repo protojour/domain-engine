@@ -51,7 +51,7 @@ impl SyncSession {
 
                             if let Some(outgoing) = outgoing {
                                 debug!("session(join): will send sync message");
-                                let ws_response = Message::Sync(outgoing.encode()).encode_cbor();
+                                let ws_response = Message::Sync(outgoing.encode().into()).encode_cbor();
 
                                 self.socket.send(WsMessage::Binary(ws_response)).await
                                     .map_err(|err| DomainError::protocol(format!("ws: {err:?}")))?;
@@ -75,7 +75,7 @@ impl SyncSession {
                         return Ok(());
                     };
 
-                    let ws_message = Message::Sync(message.encode()).encode_cbor();
+                    let ws_message = Message::Sync(message.encode().into()).encode_cbor();
 
                     self.socket.send(WsMessage::Binary(ws_message)).await
                         .map_err(|err| DomainError::protocol(format!("ws: {err:?}")))?;
@@ -112,7 +112,7 @@ impl SyncSession {
         }
 
         if let Some(message) = dispatch.response {
-            let ws_message = Message::Sync(message.encode()).encode_cbor();
+            let ws_message = Message::Sync(message.encode().into()).encode_cbor();
 
             self.socket
                 .send(WsMessage::Binary(ws_message))

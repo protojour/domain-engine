@@ -18,8 +18,8 @@ serde.workspace = true
 serde_json.workspace = true
 async-stream = "0.3"
 automerge.workspace = true
-axum = { version = "0.7", features = ["ws"] }
-axum-extra = { version = "0.9", features = ["json-lines"] }
+axum = { version = "0.8", features = ["ws"] }
+axum-extra = { version = "0.10", features = ["json-lines"] }
 bytes = "1"
 futures-util = "0.3"
 hex = "0.4"

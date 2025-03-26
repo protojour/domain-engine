@@ -258,7 +258,6 @@ where
 
 struct DummyAuth;
 
-#[async_trait::async_trait]
 impl FromRequestParts<()> for DummyAuth {
     type Rejection = Infallible;
 

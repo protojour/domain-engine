@@ -200,7 +200,7 @@ impl DomainRouterBuilder {
                     method_router.on(MethodFilter::GET, get_resource_keyed::<State, Auth>);
             }
 
-            let route_name = format!("/{resource_name}/{key_name}/:{key_name}");
+            let route_name = format!("/{resource_name}/{key_name}/{{{key_name}}}");
 
             debug!("add route `{route_name}`");
 
@@ -219,7 +219,7 @@ impl DomainRouterBuilder {
                 let prop_name = &ontology[*prop_name];
 
                 let sync_route_name =
-                    format!("/{resource_name}/{key_name}/:{key_name}/{prop_name}");
+                    format!("/{resource_name}/{key_name}/{{{key_name}}}/{prop_name}");
                 debug!("add route `{sync_route_name}`");
                 domain_router = domain_router.route(
                     &sync_route_name,
@@ -233,7 +233,7 @@ impl DomainRouterBuilder {
                 );
 
                 let actor_route_name =
-                    format!("/{resource_name}/{key_name}/:{key_name}/{prop_name}/actor");
+                    format!("/{resource_name}/{key_name}/{{{key_name}}}/{prop_name}/actor");
                 debug!("add route `{actor_route_name}`");
                 domain_router = domain_router.route(
                     &actor_route_name,
