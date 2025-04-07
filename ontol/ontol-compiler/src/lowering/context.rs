@@ -8,24 +8,29 @@ use std::{
 use arcstr::ArcStr;
 use fnv::FnvHashMap;
 use indexmap::map::Entry;
-use ontol_core::url::{DomainUrl, DomainUrlParser};
+use ontol_core::{
+    error::SpannedMsgError,
+    span::U32Span,
+    tag::DomainIndex,
+    url::{DomainUrl, DomainUrlParser},
+};
 use ontol_parser::{
-    ParserError, U32Span,
     cst::view::{NodeView, TokenView},
+    source::{SourceId, SourceSpan},
+    topology::OntolHeaderData,
 };
 use ontol_runtime::{
-    DefId, DomainIndex, OntolDefTag, OntolDefTagExt,
+    DefId, OntolDefTag, OntolDefTagExt,
     property::{PropertyCardinality, ValueCardinality},
     var::{Var, VarAllocator},
 };
 use tracing::debug;
 
 use crate::{
-    CompileError, Compiler, SourceId, SourceSpan,
+    CompileError, Compiler,
     def::{Def, DefKind, TypeDef, TypeDefFlags},
     fmt::FmtChain,
     namespace::Space,
-    ontol_syntax::OntolHeaderData,
     pattern::{Pattern, PatternKind},
     relation::{DefRelTag, RelId, RelParams, Relationship},
 };
@@ -405,7 +410,10 @@ impl<'m> LoweringCtx<'_, 'm> {
         }
     }
 
-    pub(super) fn unescape(&mut self, result: Result<String, Vec<ParserError>>) -> Option<String> {
+    pub(super) fn unescape(
+        &mut self,
+        result: Result<String, Vec<SpannedMsgError>>,
+    ) -> Option<String> {
         match result {
             Ok(string) => Some(string),
             Err(unescape_errors) => {

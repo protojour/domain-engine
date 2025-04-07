@@ -4,13 +4,11 @@ use std::collections::HashSet;
 
 use fnv::FnvHashMap;
 use indexmap::{IndexMap, map::Entry};
+use ontol_parser::source::{NO_SPAN, SourceSpan};
 use ontol_runtime::{DefId, OntolDefTag, OntolDefTagExt};
 use thin_vec::{ThinVec, thin_vec};
 
-use crate::{
-    NO_SPAN, SourceSpan,
-    def::{DefKind, Defs},
-};
+use crate::def::{DefKind, Defs};
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct Is {

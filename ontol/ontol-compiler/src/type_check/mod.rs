@@ -1,8 +1,9 @@
 use fnv::FnvHashMap;
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::DefId;
 
 use crate::{
-    CompileErrors, Compiler, SourceSpan, SpannedCompileError,
+    CompileErrors, Compiler, SpannedCompileError,
     codegen::task::CodeCtx,
     def::Defs,
     edge::EdgeCtx,

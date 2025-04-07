@@ -1,8 +1,9 @@
 use std::collections::BTreeMap;
 
+use ontol_core::tag::DomainIndex;
 use ontol_faker::new_constant_fake;
 use ontol_runtime::{
-    DefId, DomainIndex, PropId,
+    DefId, PropId,
     attr::Attr,
     debug::OntolDebug,
     interface::{

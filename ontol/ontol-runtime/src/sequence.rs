@@ -325,10 +325,11 @@ impl IndexChain {
 
 #[cfg(test)]
 mod tests {
+    use ontol_core::tag::{DomainIndex, TagFlags};
     use tracing::debug;
 
     use crate::{
-        DefId, DefPropTag, DomainIndex, PropId,
+        DefId, DefPropTag, PropId,
         attr::Attr,
         value::{Value, ValueTag},
     };
@@ -419,7 +420,7 @@ mod tests {
     }
 
     fn def(id: u16) -> ValueTag {
-        DefId(crate::DomainIndex(1337), id).into()
+        DefId(DomainIndex::from_u16_and_mask(1337, TagFlags::PKG_MASK), id).into()
     }
 
     fn text(t: &str) -> Value {
@@ -429,7 +430,10 @@ mod tests {
     fn struct_value(iter: impl IntoIterator<Item = (u16, Value)>) -> Value {
         let attrs = iter.into_iter().map(|(tag, val)| {
             (
-                PropId(DefId(DomainIndex(42), 42), DefPropTag(tag)),
+                PropId(
+                    DefId(DomainIndex::from_u16_and_mask(42, TagFlags::PKG_MASK), 42),
+                    DefPropTag(tag),
+                ),
                 Attr::Unit(val),
             )
         });
@@ -447,7 +451,10 @@ mod tests {
                     let value = Value::I64(i as i64, def(42));
 
                     (
-                        PropId(DefId(DomainIndex(42), 42), DefPropTag(tag)),
+                        PropId(
+                            DefId(DomainIndex::from_u16_and_mask(42, TagFlags::PKG_MASK), 42),
+                            DefPropTag(tag),
+                        ),
                         Attr::Unit(value),
                     )
                 })

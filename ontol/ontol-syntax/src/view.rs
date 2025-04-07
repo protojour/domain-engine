@@ -1,7 +1,7 @@
 //! Rowan integration with the NodeView that works with ontol-compiler
 
+use ontol_core::span::U32Span;
 use ontol_parser::{
-    U32Span,
     cst::view::{Item, NodeView, TokenView},
     lexer::kind::Kind,
 };

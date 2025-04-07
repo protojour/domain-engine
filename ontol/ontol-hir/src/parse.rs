@@ -1,4 +1,4 @@
-use ontol_runtime::DomainIndex;
+use ontol_core::tag::DomainIndex;
 use thin_vec::thin_vec;
 
 use crate::*;

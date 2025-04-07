@@ -1,7 +1,8 @@
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::{DefId, DefPropTag, PropId};
 
 use crate::{
-    CompileError, Compiler, SourceSpan,
+    CompileError, Compiler,
     def::DefKind,
     primitive::PrimitiveKind,
     properties::{Constructor, Properties},

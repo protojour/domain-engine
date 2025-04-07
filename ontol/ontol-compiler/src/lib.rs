@@ -1,12 +1,15 @@
 #![forbid(unsafe_code)]
 
+use compile_domain::LoadedDomains;
 use edge::EdgeCtx;
 use entity::entity_ctx::EntityCtx;
 pub use error::*;
 use fnv::{FnvHashMap, FnvHashSet};
 use lowering::context::LoweringOutcome;
 use misc::MiscCtx;
-use ontol_core::url::DomainUrl;
+use ontol_core::{DomainId, TopologyGeneration, tag::DomainIndex, url::DomainUrl};
+use ontol_parser::source::SourceId;
+use ontol_syntax::OntolSyntax;
 use primitive::init_ontol_primitives;
 use properties::PropCtx;
 use std::{
@@ -19,11 +22,10 @@ use def::Defs;
 use mem::Mem;
 use namespace::Namespaces;
 use ontol_runtime::{
-    DefId, DomainIndex,
+    DefId,
     ontology::{
         Ontology,
         config::{DataStoreConfig, DomainConfig},
-        domain::{DomainId, TopologyGeneration},
         ontol::TextConstant,
     },
     resolve_path::ResolverGraph,
@@ -31,11 +33,10 @@ use ontol_runtime::{
 use pattern::Patterns;
 use relation::RelCtx;
 use repr::repr_ctx::ReprCtx;
-pub use source::*;
+pub use spanned_borrow::*;
 use strings::StringCtx;
 use text_patterns::{TextPatterns, compile_all_text_patterns};
 use thesaurus::Thesaurus;
-use topology::{DomainTopology, LoadedDomains};
 use tracing::debug;
 use type_check::seal::SealCtx;
 use types::{DefTypeCtx, TypeCtx};
@@ -46,8 +47,7 @@ pub mod error;
 pub mod mem;
 pub mod ontol_syntax;
 pub mod primitive;
-pub mod source;
-pub mod topology;
+pub mod spanned_borrow;
 
 mod codegen;
 mod compile_domain;
@@ -85,12 +85,11 @@ mod types;
 /// The compilation either completely succeeds or returns a [UnifiedCompileError].
 ///
 /// The errors produces by the compiler mark places in source files according to the [Sources] that is passed in.
-pub fn compile(
-    topology: DomainTopology,
-    sources: Sources,
+pub fn compile<S: OntolSyntax>(
+    topology: ontol_parser::topology::DomainTopology<S>,
     mem: &Mem,
 ) -> Result<Compiled, UnifiedCompileError> {
-    let mut compiler = Compiler::new(mem, sources);
+    let mut compiler = Compiler::new(mem);
     compiler.register_ontol_domain();
 
     // There could be errors in the ontol domain, this is useful for development:
@@ -99,18 +98,9 @@ pub fn compile(
     for parsed_package in topology.parsed_domains {
         debug!(
             "lower {:?}: {}",
-            parsed_package.domain_index, parsed_package.url
+            parsed_package.source_id, parsed_package.url
         );
-        let source_id = compiler
-            .sources
-            .source_id_for_domain(parsed_package.domain_index)
-            .expect("no source id available for package");
-        let src = compiler
-            .sources
-            .get_source(source_id)
-            .expect("no compiled source available");
-
-        compiler.lower_and_check_next_domain(parsed_package, src)?;
+        compiler.lower_and_check_next_domain(parsed_package)?;
     }
 
     compiler.check_symbolic_edges();
@@ -141,6 +131,13 @@ pub struct Compiled<'m> {
 }
 
 impl Compiled<'_> {
+    pub fn source_id_to_domain_index(&self, source_id: SourceId) -> Option<DomainIndex> {
+        self.compiler
+            .source_id_to_domain_index
+            .get(&source_id)
+            .copied()
+    }
+
     /// Convert the compiled code into an ontol_runtime Ontology.
     pub fn into_ontology(self) -> Ontology {
         self.compiler.into_ontology_inner()
@@ -163,7 +160,7 @@ pub struct Session<'c, 'm>(&'c mut Compiler<'m>);
 ///
 /// It consists of various data types used throughout the compilation session.
 struct Compiler<'m> {
-    sources: Sources,
+    source_id_to_domain_index: FnvHashMap<SourceId, DomainIndex>,
 
     loaded: LoadedDomains,
     domain_names: Vec<(DomainIndex, TextConstant)>,
@@ -199,12 +196,12 @@ struct Compiler<'m> {
 }
 
 impl<'m> Compiler<'m> {
-    fn new(mem: &'m Mem, sources: Sources) -> Self {
+    fn new(mem: &'m Mem) -> Self {
         let mut defs = Defs::default();
         init_ontol_primitives(&mut defs);
 
         Self {
-            sources,
+            source_id_to_domain_index: Default::default(),
             loaded: Default::default(),
             domain_names: Default::default(),
             domain_dep_graph: Default::default(),
@@ -277,12 +274,13 @@ pub fn lower_ontol_syntax<V: ontol_parser::cst::view::NodeView>(
     ontol_view: V,
     url: DomainUrl,
     domain_def_id: DefId,
-    src: Src,
+    source_id: SourceId,
+    domain_index: DomainIndex,
     session: Session,
 ) -> LoweringOutcome {
     use ontol_parser::cst::view::NodeViewExt;
 
-    CstLowering::new(url, domain_def_id, src, session.0)
+    CstLowering::new(url, domain_def_id, source_id, domain_index, session.0)
         .lower_ontol(ontol_view.node())
         .finish()
 }
@@ -355,7 +353,7 @@ mod tests {
         let expected = next.trim();
 
         let output = {
-            let mut compiler = Compiler::new(&mem, Default::default());
+            let mut compiler = Compiler::new(&mem);
             let func =
                 unify_to_function(&scope, &expr, direction, MapFlags::empty(), &mut compiler)
                     .unwrap();

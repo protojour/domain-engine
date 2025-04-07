@@ -13,13 +13,14 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use domain_engine_core::{DomainEngine, Session};
 use domain_engine_store_inmemory::InMemoryConnection;
 use notify_debouncer_full::{new_debouncer, notify::RecursiveMode};
-use ontol_compiler::{
-    SourceCodeRegistry, SourceId, Sources, error::UnifiedCompileError, mem::Mem,
-    ontol_syntax::ArcString,
+use ontol_compiler::{error::UnifiedCompileError, mem::Mem};
+use ontol_core::{
+    ArcString,
+    url::{DomainUrl, DomainUrlParser, DomainUrlResolver},
 };
-use ontol_core::url::{DomainUrl, DomainUrlParser, DomainUrlResolver};
 use ontol_examples::FakeAtlasServer;
 use ontol_lsp::Backend;
+use ontol_parser::source::{SourceCodeRegistry, SourceId};
 use ontol_runtime::{
     interface::json_schema::build_openapi_schemas,
     ontology::{Ontology, config::DataStoreConfig},
@@ -277,7 +278,6 @@ async fn compile(
         return Err(OntoolError::NoInputFiles);
     }
 
-    let mut ontol_sources = Sources::default();
     let mut sources_by_url: HashMap<DomainUrl, Arc<String>> = Default::default();
     let mut paths_by_url: HashMap<DomainUrl, PathBuf> = Default::default();
 
@@ -311,20 +311,19 @@ async fn compile(
 
     let mut source_code_registry = SourceCodeRegistry::default();
 
-    let topology = ontol_compiler::topology::resolve_topology_async(
+    let topology = ontol_parser::topology::resolve_tree_syntax_topology_async(
         roots,
-        &mut ontol_sources,
         &mut source_code_registry,
         &url_resolvers,
     )
     .await
     .map_err(|err| {
-        print_unified_compile_error(err, &ontol_sources, &source_code_registry).unwrap();
+        print_unified_compile_error(UnifiedCompileError::from(err), &source_code_registry).unwrap();
         OntoolError::Compile
     })?;
 
     let mem = Mem::default();
-    ontol_compiler::compile(topology, ontol_sources.clone(), &mem)
+    ontol_compiler::compile(topology, &mem)
         .map(|mut compiled| {
             if let Some(backend) = backend {
                 compiled.override_data_store(DataStoreConfig::ByName(backend));
@@ -333,7 +332,7 @@ async fn compile(
             compiled.into_ontology()
         })
         .or_else(|err| {
-            print_unified_compile_error(err, &ontol_sources, &source_code_registry)?;
+            print_unified_compile_error(err, &source_code_registry)?;
             Err(OntoolError::Compile)
         })
 }
@@ -365,7 +364,6 @@ fn get_source_url(uri: &str) -> Result<DomainUrl, OntoolError> {
 
 fn print_unified_compile_error(
     unified_error: UnifiedCompileError,
-    ontol_sources: &Sources,
     source_code_registry: &SourceCodeRegistry,
 ) -> Result<(), OntoolError> {
     let mut colors = ColorGenerator::new();
@@ -374,8 +372,7 @@ fn print_unified_compile_error(
         let span = err_span.span.start as usize..err_span.span.end as usize;
         let message = error.error.to_string();
 
-        let (origin, literal_source) =
-            report_source_name(err_span.source_id, ontol_sources, source_code_registry);
+        let (origin, literal_source) = report_source_name(err_span.source_id, source_code_registry);
 
         Report::build(ReportKind::Error, (&origin, span.clone()))
             .with_label(
@@ -392,7 +389,7 @@ fn print_unified_compile_error(
             let message = note.into_note().to_string();
 
             let (origin, literal_source) =
-                report_source_name(note_span.source_id, ontol_sources, source_code_registry);
+                report_source_name(note_span.source_id, source_code_registry);
 
             Report::build(ReportKind::Advice, (&origin, span.clone()))
                 .with_label(
@@ -425,21 +422,13 @@ impl Display for DomainUrlOrigin {
 
 fn report_source_name(
     source_id: SourceId,
-    ontol_sources: &Sources,
     registry: &SourceCodeRegistry,
 ) -> (DomainUrlOrigin, Arc<String>) {
     // FIXME: If the error can't be mapped to a source file,
     // things will look quite strange. Fix later..
-    match ontol_sources.get_source(source_id) {
-        Some(ontol_source) => {
-            let literal_source = registry.registry.get(&source_id);
-
-            (
-                DomainUrlOrigin::Domain(ontol_source.url.clone()),
-                literal_source
-                    .cloned()
-                    .unwrap_or_else(|| Arc::new("<ontol>".to_string())),
-            )
+    match registry.get(source_id) {
+        Some((url, literal_source)) => {
+            (DomainUrlOrigin::Domain(url.clone()), literal_source.clone())
         }
         None => {
             let ontol = "<arg>";

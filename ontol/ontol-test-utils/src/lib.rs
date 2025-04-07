@@ -4,24 +4,23 @@ use std::{collections::HashMap, sync::Arc};
 
 use def_binding::DefBinding;
 use diagnostics::AnnotatedCompileError;
-use ontol_compiler::{
-    SourceCodeRegistry, Sources,
-    error::UnifiedCompileError,
-    mem::Mem,
-    ontol_syntax::{ArcString, OntolTreeSyntax},
+use ontol_compiler::{error::UnifiedCompileError, mem::Mem};
+use ontol_core::{ArcString, tag::DomainIndex, url::DomainUrl};
+use ontol_parser::{
+    basic_syntax::OntolTreeSyntax,
+    cst_parse,
+    source::{SourceCodeRegistry, SourceId},
     topology::{DepGraphBuilder, DomainTopology, GraphState, ParsedDomain},
 };
-use ontol_core::url::DomainUrl;
-use ontol_parser::cst_parse;
 use ontol_runtime::{
-    DomainIndex, PropId,
+    PropId,
     interface::{DomainInterface, graphql::schema::GraphqlSchema},
     ontology::{
         Ontology,
         config::{DataStoreConfig, DomainConfig},
     },
 };
-use tracing::info;
+use tracing::{error, info};
 
 pub mod def_binding;
 pub mod diagnostics;
@@ -206,10 +205,9 @@ pub fn default_short_name() -> &'static str {
 pub struct TestPackages {
     sources_by_url: HashMap<DomainUrl, Arc<String>>,
     entrypoint_urls: Vec<DomainUrl>,
-    sources: Sources,
     source_code_registry: SourceCodeRegistry,
     data_store: Option<(DomainUrl, DataStoreConfig)>,
-    domains_by_url: HashMap<DomainUrl, DomainIndex>,
+    domains_by_url: HashMap<DomainUrl, SourceId>,
     disable_ontology_serde: bool,
 }
 
@@ -269,7 +267,6 @@ impl TestPackages {
                 .map(|(url, text)| (url.clone(), text))
                 .collect(),
             entrypoint_urls: default_entrypoint.into_iter().collect(),
-            sources: Default::default(),
             source_code_registry: Default::default(),
             data_store: None,
             domains_by_url: Default::default(),
@@ -297,7 +294,9 @@ impl TestPackages {
         self
     }
 
-    fn load_topology(&mut self) -> Result<(DomainTopology, DomainIndex), UnifiedCompileError> {
+    fn load_topology(
+        &mut self,
+    ) -> Result<(DomainTopology<OntolTreeSyntax<ArcString>>, SourceId), UnifiedCompileError> {
         let mut package_graph_builder =
             DepGraphBuilder::with_entrypoints(self.entrypoint_urls.iter().cloned());
         let mut entrypoint = None;
@@ -309,11 +308,11 @@ impl TestPackages {
 
                     for request in requests {
                         self.domains_by_url
-                            .insert(request.url.clone(), request.domain_index);
+                            .insert(request.url.clone(), request.source_id);
 
                         if let Some(first_entrypoint) = self.entrypoint_urls.first() {
                             if &request.url == first_entrypoint {
-                                entrypoint = Some(request.domain_index);
+                                entrypoint = Some(request.source_id);
                             }
                         }
 
@@ -331,17 +330,17 @@ impl TestPackages {
 
                             let parsed = ParsedDomain::new(
                                 request,
-                                Box::new(OntolTreeSyntax {
+                                OntolTreeSyntax {
                                     tree,
                                     source_text: ArcString(source_text.clone()),
-                                }),
+                                },
                                 errors,
-                                package_config,
-                                &mut self.sources,
                             );
-                            self.source_code_registry
-                                .registry
-                                .insert(parsed.src.id, source_text);
+                            self.source_code_registry.register(
+                                parsed.source_id,
+                                parsed.url.clone(),
+                                source_text,
+                            );
 
                             package_graph_builder.provide_domain(parsed);
                         }
@@ -356,8 +355,18 @@ impl TestPackages {
         let mem = Mem::default();
         let (package_topology, entrypoint) = self.load_topology()?;
 
-        let mut ontology =
-            ontol_compiler::compile(package_topology, self.sources.clone(), &mem)?.into_ontology();
+        let compiled = ontol_compiler::compile(package_topology, &mem)?;
+        let mut domains_by_url = HashMap::default();
+
+        for (url, source_id) in &self.domains_by_url {
+            domains_by_url.insert(
+                url.clone(),
+                compiled.source_id_to_domain_index(*source_id).unwrap(),
+            );
+        }
+        let entrypoint = compiled.source_id_to_domain_index(entrypoint).unwrap();
+
+        let mut ontology = compiled.into_ontology();
 
         if !self.disable_ontology_serde {
             let mut binary_ontology: Vec<u8> = Vec::new();
@@ -372,7 +381,7 @@ impl TestPackages {
             entrypoint,
             // NOTE: waiting on https://github.com/Stranger6667/jsonschema-rs/issues/420
             compile_json_schema: false,
-            domains_by_url: self.domains_by_url.clone(),
+            domains_by_url,
         })
     }
 
@@ -383,7 +392,7 @@ impl TestPackages {
             Err(error) => {
                 // Show the error diff, a diff makes the test fail.
                 // This makes it possible to debug the test to make it compile.
-                diagnostics::diff_errors(error, &self.sources, &self.source_code_registry);
+                diagnostics::diff_errors(error, &self.domains_by_url, &self.source_code_registry);
 
                 // If there is no diff, then compile_ok() is likely the wrong thing to use
                 panic!("Compile failed, but the test used compile_ok(), so it should not fail.");
@@ -431,7 +440,8 @@ impl TestCompile for TestPackages {
                 panic!("Scripts did not fail to compile");
             }
             Err(error) => {
-                diagnostics::diff_errors(error, &self.sources, &self.source_code_registry)
+                error!("errors");
+                diagnostics::diff_errors(error, &self.domains_by_url, &self.source_code_registry)
             }
         }
     }
@@ -442,8 +452,11 @@ impl TestCompile for TestPackages {
                 panic!("Scripts did not fail to compile");
             }
             Err(error) => {
-                let annotated_errors =
-                    diagnostics::diff_errors(error, &self.sources, &self.source_code_registry);
+                let annotated_errors = diagnostics::diff_errors(
+                    error,
+                    &self.domains_by_url,
+                    &self.source_code_registry,
+                );
                 validator(annotated_errors);
             }
         }

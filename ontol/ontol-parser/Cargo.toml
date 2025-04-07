@@ -11,11 +11,15 @@ rust-version.workspace = true
 doctest = false
 
 [dependencies]
+ontol-core.path = "../ontol-core"
+bitflags.workspace = true
+fnv.workspace = true
 logos = "0.15"
-unindent = "0.2"
 serde = { version = "1", features = ["derive"] }
 thin-vec.workspace = true
-bitflags.workspace = true
+tracing = "0.1"
+ulid.workspace = true
+unindent = "0.2"
 
 [dev-dependencies]
 assert_matches = "1"

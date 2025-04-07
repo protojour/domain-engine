@@ -5,8 +5,9 @@ use std::{
 
 use fnv::FnvHashMap;
 use ontol_macros::RustDoc;
+use ontol_parser::source::{NO_SPAN, SourceSpan};
 use ontol_runtime::{
-    DefId, DomainIndex, OntolDefTag, OntolDefTagExt,
+    DefId, OntolDefTag, OntolDefTagExt,
     ontology::{
         domain::{self, BasicDef},
         ontol::TextLikeType,
@@ -15,7 +16,7 @@ use ontol_runtime::{
 };
 
 use crate::{
-    Compiler, NO_SPAN, SpannedBorrow,
+    Compiler, SpannedBorrow,
     mem::Intern,
     namespace::Space,
     pattern::PatId,
@@ -23,11 +24,10 @@ use crate::{
     regex_util::parse_literal_regex,
     relation::RelId,
     repr::repr_model::{Repr, ReprKind, ReprScalarKind},
-    source::SourceSpan,
     strings::StringCtx,
     types::Type,
 };
-use ontol_parser::U32Span;
+use ontol_core::{span::U32Span, tag::DomainIndex};
 
 /// A definition in some package
 #[derive(Debug)]

@@ -52,7 +52,7 @@ impl GraphqlSchema {
 
     pub(crate) fn empty() -> Self {
         Self {
-            domain_index: DomainIndex(0),
+            domain_index: DomainIndex::ontol(),
             query: TypeAddr(0),
             mutation: TypeAddr(0),
             page_info: TypeAddr(0),

@@ -1,4 +1,5 @@
 use fnv::FnvHashSet;
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::{
     DefId, OntolDefTag, OntolDefTagExt, PropId,
     ontology::ontol::{TextLikeType, ValueGenerator},
@@ -7,7 +8,6 @@ use ontol_runtime::{
 use tracing::{debug, instrument, trace};
 
 use crate::{
-    SourceSpan,
     def::{Def, DefKind},
     error::CompileError,
     primitive::PrimitiveKind,

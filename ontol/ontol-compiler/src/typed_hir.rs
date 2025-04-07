@@ -1,9 +1,8 @@
 use std::fmt::{Debug, Display};
 
-use crate::{
-    NO_SPAN, SourceSpan,
-    types::{ERROR_TYPE, TypeRef, UNIT_TYPE},
-};
+use ontol_parser::source::{NO_SPAN, SourceSpan};
+
+use crate::types::{ERROR_TYPE, TypeRef, UNIT_TYPE};
 
 /// An ontol_hir language "dialect" with type information and source spans.
 #[derive(Clone, Copy)]

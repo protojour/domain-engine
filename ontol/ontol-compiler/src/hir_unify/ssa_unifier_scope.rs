@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use ontol_hir::{
     Binder, Binding, Kind, Label, MatrixRow, Node, Nodes, Pack, PropFlags, PropVariant,
 };
+use ontol_parser::source::{NO_SPAN, SourceSpan};
 use ontol_runtime::{
     MapDirection, OntolDefTag, OntolDefTagExt, PropId,
     var::{Var, VarSet},
@@ -12,7 +13,6 @@ use thin_vec::{ThinVec, thin_vec};
 use tracing::{debug, trace};
 
 use crate::{
-    NO_SPAN, SourceSpan,
     hir_unify::{UnifierError, ssa_util::scan_all_vars_and_labels},
     mem::Intern,
     primitive::PrimitiveKind,

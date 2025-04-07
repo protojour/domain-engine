@@ -7,6 +7,7 @@
 //!    for each element of the domain.
 
 use fnv::{FnvHashMap, FnvHashSet};
+use ontol_parser::source::NO_SPAN;
 use ontol_runtime::{
     DefId, MapDef, MapDefFlags, MapDirection, MapFlags, MapKey,
     ontology::map::MapLossiness,
@@ -14,7 +15,7 @@ use ontol_runtime::{
 };
 use tracing::debug;
 
-use crate::{Compiler, NO_SPAN, repr::repr_model::ReprKind};
+use crate::{Compiler, repr::repr_model::ReprKind};
 
 use super::{
     ir::{Ir, Terminator},

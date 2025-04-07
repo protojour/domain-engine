@@ -3,16 +3,15 @@
 use std::{ops::Range, str::FromStr};
 
 use indexmap::IndexMap;
+use ontol_core::{DomainId, tag::DomainIndex};
 use ontol_hir::OverloadFunc;
 use ontol_macros::RustDoc;
-use ontol_runtime::{
-    DefId, DomainIndex, OntolDefTag, OntolDefTagExt,
-    ontology::{domain::DomainId, ontol::TextLikeType},
-};
+use ontol_parser::source::NO_SPAN;
+use ontol_runtime::{DefId, OntolDefTag, OntolDefTagExt, ontology::ontol::TextLikeType};
 use ulid::Ulid;
 
 use crate::{
-    Compiler, NO_SPAN,
+    Compiler,
     def::{BuiltinRelationKind, DefKind, TypeDef, TypeDefFlags},
     mem::Intern,
     misc::{RelObjectConstraint, RelTypeConstraints, TypeParam},

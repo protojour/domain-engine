@@ -392,7 +392,7 @@ impl Display for FormatType<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Compiler, Sources};
+    use crate::Compiler;
 
     fn type_ptr(ty: TypeRef) -> usize {
         ty as *const _ as usize
@@ -401,7 +401,7 @@ mod tests {
     #[test]
     fn dedup_types() {
         let mem = Mem::default();
-        let mut compiler = Compiler::new(&mem, Sources::default());
+        let mut compiler = Compiler::new(&mem);
 
         let c0 = compiler.ty_ctx.intern(Type::IntConstant(42));
         let c1 = compiler.ty_ctx.intern(Type::IntConstant(42));

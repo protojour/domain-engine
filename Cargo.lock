@@ -3803,12 +3803,14 @@ dependencies = [
  "arcstr",
  "async-trait",
  "bit-vec",
+ "bitflags 2.9.0",
  "compact_str",
  "num_enum",
  "ontol-macros",
  "pretty_assertions",
  "serde",
  "thin-vec",
+ "ulid",
  "url",
 ]
 
@@ -3820,6 +3822,7 @@ dependencies = [
  "clap",
  "mdbook",
  "ontol-compiler",
+ "ontol-parser",
  "ontol-runtime",
  "semver",
  "serde",
@@ -3858,6 +3861,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags 2.9.0",
  "indoc",
+ "ontol-core",
  "ontol-runtime",
  "pretty_assertions",
  "smallvec 2.0.0-alpha.10",
@@ -3909,12 +3913,16 @@ version = "0.1.0"
 dependencies = [
  "assert_matches",
  "bitflags 2.9.0",
+ "fnv",
  "indoc",
  "logos",
+ "ontol-core",
  "pretty_assertions",
  "rstest",
  "serde",
  "thin-vec",
+ "tracing",
+ "ulid",
  "unindent",
 ]
 
@@ -3960,6 +3968,7 @@ dependencies = [
 name = "ontol-syntax"
 version = "0.1.0"
 dependencies = [
+ "ontol-core",
  "ontol-parser",
  "pretty_assertions",
  "rowan",

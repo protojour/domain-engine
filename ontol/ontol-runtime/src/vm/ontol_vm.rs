@@ -684,7 +684,7 @@ mod tests {
     use super::*;
 
     fn def_id(n: u16) -> DefId {
-        DefId(DomainIndex(0), n)
+        DefId(DomainIndex::ontol(), n)
     }
 
     #[test]

@@ -1,13 +1,14 @@
 use std::str::FromStr;
 
 use ontol_hir::{Label, StructFlags};
+use ontol_parser::source::{NO_SPAN, SourceSpan};
 use ontol_runtime::DefId;
 use smallvec::{SmallVec, smallvec};
 use thin_vec::{ThinVec, thin_vec};
 use tracing::debug;
 
 use crate::{
-    NO_SPAN, SourceSpan, SpannedCompileError,
+    SpannedCompileError,
     def::{Def, DefKind},
     error::CompileError,
     mem::Intern,

@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
 
-use crate::impl_ontol_debug;
+use crate::{impl_ontol_debug, vec_map::VecMapKey};
 
 /// NB: The numbers here get serialized and persisted.
 /// Think twice before changing number values.
@@ -198,5 +198,78 @@ impl OntolDefTag {
             OntolDefTag::Crdt => Some(OntolDefKind::Primitive),
             OntolDefTag::_LastEntry => None,
         }
+    }
+}
+
+bitflags::bitflags! {
+    /// This is both compiler, runtime and parser related, and thus lives in core, for now.
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
+    pub struct TagFlags: u16 {
+        const PKG_MASK = 0b0011111111111111;
+        const DELETE   = 0b1000000000000000;
+        const UPDATE   = 0b0100000000000000;
+    }
+}
+
+pub struct ValueTagError;
+
+/// Identifies one domain of ONTOL code within one ontology or compiler session.
+#[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct DomainIndex(u16);
+
+impl DomainIndex {
+    /// The ontol domain is always the first domain in an ontology
+    pub const fn ontol() -> Self {
+        Self(0)
+    }
+
+    pub const fn second() -> Self {
+        Self(1)
+    }
+
+    pub const fn from_u16(value: u16) -> Result<Self, ValueTagError> {
+        if value <= TagFlags::PKG_MASK.bits() {
+            Ok(Self(value))
+        } else {
+            Err(ValueTagError)
+        }
+    }
+
+    pub const fn from_u16_and_mask(value: u16, mask: TagFlags) -> Self {
+        Self(value & mask.bits())
+    }
+
+    pub fn increase(&mut self) -> Result<(), ValueTagError> {
+        if self.0 < TagFlags::PKG_MASK.bits() {
+            self.0 += 1;
+            Ok(())
+        } else {
+            Err(ValueTagError)
+        }
+    }
+
+    pub const fn index(self) -> u16 {
+        self.0
+    }
+}
+
+impl VecMapKey for DomainIndex {
+    fn index(&self) -> usize {
+        self.0 as usize
+    }
+}
+
+impl TryFrom<u16> for DomainIndex {
+    type Error = ValueTagError;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        Self::from_u16(value)
+    }
+}
+
+/// This forces single-line output even when pretty-printed
+impl ::std::fmt::Debug for DomainIndex {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "DomainIndex({:?})", self.0)
     }
 }

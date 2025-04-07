@@ -1,3 +1,4 @@
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::{
     DefId, OntolDefTag, OntolDefTagExt, PropId,
     ontology::domain::{FieldPath, VertexOrder},
@@ -6,7 +7,7 @@ use ontol_runtime::{
 use tracing::{debug, info};
 
 use crate::{
-    CompileError, CompileErrors, Compiler, SourceSpan,
+    CompileError, CompileErrors, Compiler,
     def::DefKind,
     properties::Constructor,
     relation::{RelId, RelParams, rel_def_meta},

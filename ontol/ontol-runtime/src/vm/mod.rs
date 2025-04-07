@@ -1,9 +1,8 @@
+use ontol_core::tag::ValueTagError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use proc::Local;
-
-use crate::value::ValueTagError;
 
 pub mod ontol_vm;
 pub mod proc;

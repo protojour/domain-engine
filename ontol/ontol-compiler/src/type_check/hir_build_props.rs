@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 use ontol_hir::{PropFlags, PropVariant, StructFlags};
+use ontol_parser::source::{NO_SPAN, SourceSpan};
 use ontol_runtime::{
     DefId, OntolDefTag, OntolDefTagExt, PropId,
     property::{Cardinality, PropertyCardinality, ValueCardinality},
@@ -10,7 +11,7 @@ use smallvec::smallvec;
 use tracing::{debug, info};
 
 use crate::{
-    CompileError, NO_SPAN, SourceSpan,
+    CompileError,
     def::DefKind,
     mem::Intern,
     pattern::{

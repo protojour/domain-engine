@@ -1,22 +1,20 @@
 use crate::docs::get_core_completions;
 use indoc::formatdoc;
 use lazy_regex::regex_replace_all;
-use ontol_compiler::ontol_syntax::{ArcString, OntolTreeSyntax};
-use ontol_compiler::{
-    CompileError, NO_SPAN, SourceId, SourceSpan, Sources,
-    error::UnifiedCompileError,
-    mem::Mem,
-    topology::{DepGraphBuilder, GraphState, ParsedDomain},
-};
+use ontol_compiler::{CompileError, error::UnifiedCompileError, mem::Mem};
+use ontol_core::ArcString;
+use ontol_core::tag::DomainIndex;
 use ontol_core::url::DomainUrl;
 use ontol_parser::ToUsizeRange;
+use ontol_parser::basic_syntax::OntolTreeSyntax;
 use ontol_parser::cst::inspect::{self as insp};
 use ontol_parser::cst::tree::{SyntaxNode, TreeNodeView, TreeTokenView};
 use ontol_parser::cst::view::{self, NodeView, NodeViewExt, TokenView, TypedView};
 use ontol_parser::lexer::Lex;
 use ontol_parser::lexer::kind::Kind;
-use ontol_runtime::DomainIndex;
-use ontol_runtime::ontology::{Ontology, config::DomainConfig, domain::Def};
+use ontol_parser::source::{NO_SPAN, SourceId, SourceSpan};
+use ontol_parser::topology::{DepGraphBuilder, GraphState, ParsedDomain};
+use ontol_runtime::ontology::{Ontology, domain::Def};
 use std::fmt::Debug;
 use std::{
     collections::{HashMap, HashSet},
@@ -112,7 +110,7 @@ impl State {
     /// Compile ontology for docs, prepare data, and return a new State
     pub fn new() -> Self {
         let mem = Mem::default();
-        let ontology = ontol_compiler::compile(Default::default(), Default::default(), &mem)
+        let ontology = ontol_compiler::compile::<OntolTreeSyntax<String>>(Default::default(), &mem)
             .unwrap()
             .into_ontology();
 
@@ -232,7 +230,6 @@ impl State {
         let (root_path, filename) = get_path_and_name(root_uri);
         let root_name = get_domain_name(filename);
 
-        let mut ontol_sources = Sources::default();
         let mut package_graph_builder =
             DepGraphBuilder::with_entrypoints([DomainUrl::parse(root_name)]);
 
@@ -243,7 +240,6 @@ impl State {
 
                     for request in requests {
                         let source_name = request.url.short_name();
-                        let package_config = DomainConfig::default();
                         let request_uri = build_uri(root_path, source_name);
 
                         debug!("missing file {request_uri}");
@@ -255,15 +251,15 @@ impl State {
 
                             let package = ParsedDomain::new(
                                 request,
-                                Box::new(OntolTreeSyntax {
+                                OntolTreeSyntax {
                                     tree: flat_tree.unflatten(),
                                     source_text: ArcString(doc.text.clone()),
-                                }),
+                                },
                                 errors,
-                                package_config,
-                                &mut ontol_sources,
+                                // package_config,
+                                // &mut ontol_sources,
                             );
-                            self.srcref.insert(package.src.id, request_uri);
+                            self.srcref.insert(package.source_id, request_uri);
                             package_graph_builder.provide_domain(package);
                         }
                     }
@@ -274,7 +270,7 @@ impl State {
 
         panic::catch_unwind(|| {
             let mem = Mem::default();
-            ontol_compiler::compile(topology, ontol_sources.clone(), &mem).map(|_| ())
+            ontol_compiler::compile(topology, &mem).map(|_| ())
         })
         .unwrap_or_else(|err| {
             let message = if let Some(message) = err.downcast_ref::<&str>() {

@@ -7,15 +7,17 @@ use std::{
 };
 
 use fnv::FnvHashMap;
+use ontol_core::tag::DomainIndex;
+use ontol_parser::source::{NO_SPAN, SourceSpan};
 use ontol_runtime::{
-    DefId, DomainIndex,
+    DefId,
     ontology::domain::EdgeCardinalProjection,
     property::{Cardinality, ValueCardinality},
 };
 use tracing::trace;
 
 use crate::{
-    NO_SPAN, OwnedOrRef, SourceSpan, SpannedBorrow,
+    OwnedOrRef, SpannedBorrow,
     def::{DefKind, Defs},
     repr::{
         repr_ctx::ReprCtx,

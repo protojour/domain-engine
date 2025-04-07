@@ -1,18 +1,22 @@
 use std::{collections::BTreeMap, marker::PhantomData};
 
-use ontol_core::url::DomainUrl;
-use ontol_parser::cst::{
-    inspect::{self as insp},
-    view::{NodeView, TokenView, TypedView},
+use ontol_core::{tag::DomainIndex, url::DomainUrl};
+use ontol_parser::{
+    basic_syntax::extract_domain_headerdata,
+    cst::{
+        inspect::{self as insp},
+        view::{NodeView, TokenView, TypedView},
+    },
+    source::SourceId,
+    topology::{OntolHeaderData, WithDocs},
 };
 use ontol_runtime::{DefId, tuple::CardinalIdx};
 use tracing::debug_span;
 
 use crate::{
-    CompileError, Compiler, Src,
+    CompileError, Compiler,
     edge::{CardinalKind, EdgeId},
     namespace::{DocId, Space},
-    ontol_syntax::{OntolHeaderData, WithDocs, extract_domain_headerdata},
 };
 
 use super::{
@@ -46,7 +50,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     pub fn new(
         url: DomainUrl,
         domain_def_id: DefId,
-        src: Src,
+        source_id: SourceId,
+        domain_index: DomainIndex,
         compiler: &'c mut Compiler<'m>,
     ) -> Self {
         Self {
@@ -54,8 +59,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 compiler,
                 url,
                 domain_def_id,
-                domain_index: src.domain_index,
-                source_id: src.id,
+                domain_index: domain_index,
+                source_id: source_id,
                 anonymous_unions: Default::default(),
                 outcome: Default::default(),
                 domain_url_parser: Default::default(),
@@ -107,7 +112,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     extract_domain_headerdata(stmt.clone(), WithDocs(true), &mut errors);
 
                 for (error, span) in errors {
-                    error.span_report(span, &mut self.ctx);
+                    CompileError::from(error).span_report(span, &mut self.ctx);
                 }
 
                 self.ctx.outcome.header_data = Some(header_data);

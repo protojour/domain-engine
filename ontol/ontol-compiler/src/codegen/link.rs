@@ -1,4 +1,5 @@
 use fnv::FnvHashMap;
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::{
     DefId, MapDef, MapKey,
     debug::OntolDebug,
@@ -6,7 +7,7 @@ use ontol_runtime::{
 };
 use tracing::{debug, debug_span};
 
-use crate::{Compiler, SourceSpan, error::CompileError, types::FormatType};
+use crate::{Compiler, error::CompileError, types::FormatType};
 
 use super::task::{ProcTable, ProcedureCall};
 

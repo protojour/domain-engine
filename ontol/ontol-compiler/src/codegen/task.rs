@@ -2,9 +2,11 @@ use std::fmt::Debug;
 
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::{IndexMap, map::Entry};
+use ontol_core::tag::DomainIndex;
 use ontol_hir::StructFlags;
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::{
-    DefId, DomainIndex, MapDef, MapDirection, MapFlags, MapKey,
+    DefId, MapDef, MapDirection, MapFlags, MapKey,
     format_utils::DebugViaDisplay,
     ontology::{
         map::{MapLossiness, PropertyFlow},
@@ -17,7 +19,7 @@ use ontol_runtime::{
 use tracing::{debug, debug_span, warn};
 
 use crate::{
-    CompileError, CompileErrors, Compiler, Note, SourceSpan, SpannedCompileError,
+    CompileError, CompileErrors, Compiler, Note, SpannedCompileError,
     codegen::{
         code_generator::map_codegen, static_condition::generate_static_condition_from_scope,
     },
@@ -58,10 +60,22 @@ pub struct CodeCtx<'m> {
 }
 
 pub struct AbstractTemplate {
+    pub directed_def_ids: [DefId; 2],
     pub pat_ids: [PatId; 2],
     pub var_allocator: VarAllocator,
 }
 
+impl AbstractTemplate {
+    pub fn invert_direction(self) -> AbstractTemplate {
+        Self {
+            directed_def_ids: [self.directed_def_ids[1], self.directed_def_ids[0]],
+            pat_ids: [self.pat_ids[1], self.pat_ids[0]],
+            var_allocator: self.var_allocator,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct AbstractTemplateApplication {
     pub pat_ids: [PatId; 2],
     pub def_ids: [DefId; 2],

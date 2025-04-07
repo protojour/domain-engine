@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt::Display;
 
 use fnv::FnvHashSet;
+use ontol_core::tag::TagFlags;
 use serde::Serialize;
 use serde::{Serializer, ser::SerializeMap, ser::SerializeSeq};
 use urlencoding::encode;
@@ -75,7 +76,8 @@ pub struct OpenApiSchemas<'e> {
 impl Serialize for OpenApiSchemas<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let domain_index = self.domain_index;
-        let next_domain_index = DomainIndex(self.domain_index.0 + 1);
+        let next_domain_index =
+            DomainIndex::from_u16_and_mask(self.domain_index.index() + 1, TagFlags::PKG_MASK);
         let mut map = serializer.serialize_map(None)?;
 
         let ctx = SchemaCtx {
@@ -229,7 +231,7 @@ impl<'e> SchemaCtx<'e> {
     fn format_key(&self, serde_def: SerdeDef) -> String {
         let domain_index = serde_def.def_id.domain_index();
         match self.type_name(serde_def) {
-            Some(name) => format!("{}_{}", domain_index.0, encode(&name)),
+            Some(name) => format!("{}_{}", domain_index.index(), encode(&name)),
             None => format!("{}", Key(serde_def)),
         }
     }
@@ -237,7 +239,12 @@ impl<'e> SchemaCtx<'e> {
     fn format_ref_link(&self, serde_def: SerdeDef) -> String {
         let domain_index = serde_def.def_id.domain_index();
         match self.type_name(serde_def) {
-            Some(name) => format!("{}{}_{}", self.link_anchor, domain_index.0, encode(&name)),
+            Some(name) => format!(
+                "{}{}_{}",
+                self.link_anchor,
+                domain_index.index(),
+                encode(&name)
+            ),
             None => format!("{}{}", self.link_anchor, Key(serde_def)),
         }
     }
@@ -271,7 +278,7 @@ impl Display for Key {
         let variant = &self.0;
         let domain_index = self.0.def_id.domain_index();
 
-        write!(f, "{}_{}", domain_index.0, self.0.def_id.1)?;
+        write!(f, "{}_{}", domain_index.index(), self.0.def_id.1)?;
 
         if variant.modifier.contains(SerdeModifier::PRIMARY_ID) {
             write!(f, "_id")?;

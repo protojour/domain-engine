@@ -1,7 +1,6 @@
 use fnv::FnvHashMap;
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::{DefId, var::Var};
-
-use crate::source::SourceSpan;
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct PatId(pub u32);

@@ -1,6 +1,7 @@
 use std::{collections::HashMap, str::Chars};
 
-use ontol_parser::U32Span;
+use ontol_core::span::U32Span;
+use ontol_parser::source::{SourceId, SourceSpan};
 use ontol_runtime::DefId;
 use regex_syntax::{
     ast::{Ast, GroupKind},
@@ -8,7 +9,6 @@ use regex_syntax::{
 };
 
 use crate::{
-    SourceId, SourceSpan,
     def::RegexMeta,
     lowering::context::MapVarTable,
     pattern::{Patterns, RegexPattern, RegexPatternCaptureNode},

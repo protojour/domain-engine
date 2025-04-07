@@ -1,4 +1,5 @@
 use fnv::FnvHashMap;
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::{
     debug::OntolDebug,
     var::Var,
@@ -7,7 +8,7 @@ use ontol_runtime::{
 use smallvec::{SmallVec, smallvec};
 use tracing::{Level, debug, trace};
 
-use crate::{SourceSpan, codegen::optimize::optimize};
+use crate::codegen::optimize::optimize;
 
 use super::ir::{BlockLabel, BlockOffset, Ir, Terminator};
 

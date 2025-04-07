@@ -11,6 +11,7 @@ rust-version.workspace = true
 doctest = false
 
 [dependencies]
+ontol-core.path = "../ontol-core"
 ontol-parser.path = "../ontol-parser"
 rowan = "0.16"
 
