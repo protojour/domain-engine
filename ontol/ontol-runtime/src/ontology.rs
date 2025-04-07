@@ -8,13 +8,13 @@ use aspects::{
     OntologyAspects, SerdeAspect,
 };
 use domain::EdgeInfo;
-use ontol_core::debug::OntolFormatter;
+use ontol_core::{debug::OntolFormatter, tag::DomainIndex};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 use ulid::Ulid;
 
 use crate::{
-    DefId, DomainIndex, MapKey, PropId,
+    DefId, MapKey, PropId,
     interface::{
         DomainInterface,
         serde::{

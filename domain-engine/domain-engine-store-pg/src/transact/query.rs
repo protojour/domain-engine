@@ -7,7 +7,7 @@ use domain_engine_core::{
 use fnv::FnvHashMap;
 use futures_util::Stream;
 use ontol_runtime::{
-    DefId, DomainIndex, PropId,
+    DefId, DomainIndex, OntolDefTagExt, PropId,
     attr::{Attr, AttrMatrix},
     crdt::{Automerge, CrdtStruct},
     ontology::domain::{DataRelationshipKind, Def},

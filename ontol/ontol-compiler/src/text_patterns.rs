@@ -1,6 +1,6 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::{
-    DefId, DefPropTag, OntolDefTag, PropId,
+    DefId, DefPropTag, OntolDefTag, OntolDefTagExt, PropId,
     ontology::ontol::text_pattern::{
         Regex, TextPattern, TextPatternConstantPart, TextPatternProperty,
     },

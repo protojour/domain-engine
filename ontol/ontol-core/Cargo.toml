@@ -15,9 +15,12 @@ ontol-macros.path = "../ontol-macros"
 arcstr.workspace = true
 async-trait = "0.1"
 bit-vec = { version = "0.8", features = ["serde"] }
+bitflags.workspace = true
 compact_str = { version = "0.8", features = ["serde"] }
+num_enum = { version = "0.7", default-features = false }
 serde = { version = "1", features = ["derive"] }
 thin-vec.workspace = true
+ulid = { workspace = true, features = ["serde"] }
 url = "2"
 
 [dev-dependencies]

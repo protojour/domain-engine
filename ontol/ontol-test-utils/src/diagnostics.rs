@@ -1,9 +1,11 @@
-use std::{collections::BTreeMap, fmt::Display};
-
-use ontol_compiler::{
-    SourceCodeRegistry, SourceId, SourceSpan, Sources,
-    error::{CompileError, Note, UnifiedCompileError},
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt::Display,
 };
+
+use ontol_compiler::error::{CompileError, Note, UnifiedCompileError};
+use ontol_core::url::DomainUrl;
+use ontol_parser::source::{SourceCodeRegistry, SourceId, SourceSpan};
 
 #[derive(Default)]
 struct DiagnosticBuilder {
@@ -42,16 +44,15 @@ pub struct AnnotatedCompileError {
     pub span_text: String,
 }
 
-#[track_caller]
+// #[track_caller]
 pub fn diff_errors(
     errors: UnifiedCompileError,
-    sources: &Sources,
+    domains_by_url: &HashMap<DomainUrl, SourceId>,
     source_code_registry: &SourceCodeRegistry,
 ) -> Vec<AnnotatedCompileError> {
     let mut builders: BTreeMap<SourceId, DiagnosticBuilder> = source_code_registry
-        .registry
         .iter()
-        .map(|(source_id, text)| {
+        .map(|(source_id, _url, text)| {
             let mut builder =
                 text.lines()
                     .fold(DiagnosticBuilder::default(), |mut builder, line| {
@@ -79,7 +80,7 @@ pub fn diff_errors(
             // .lines() does not record the final newline
             builder.ends_with_newline = matches!(text.as_bytes().last(), Some(b'\n'));
 
-            (*source_id, builder)
+            (source_id, builder)
         })
         .collect();
 
@@ -141,10 +142,14 @@ pub fn diff_errors(
     let mut annotated = String::new();
 
     for (source_id, builder) in builders.iter().rev() {
-        let source = sources.get_source(*source_id).unwrap();
-        let source_text = source_code_registry.registry.get(source_id).unwrap();
+        let url = &domains_by_url
+            .iter()
+            .find(|(_url, id)| *id == source_id)
+            .unwrap()
+            .0;
+        let (_, source_text) = source_code_registry.get(*source_id).unwrap();
 
-        let source_header = format!("\n// source '{}':\n", source.url.short_name());
+        let source_header = format!("\n// source '{}':\n", url.short_name());
 
         original.push_str(&source_header);
         original += source_text;
@@ -185,9 +190,8 @@ pub fn diff_errors(
     for (source_id, builder) in builders {
         for line in builder.lines {
             for spanned_message in line.messages {
-                let text = source_code_registry
-                    .registry
-                    .get(&source_id)
+                let (_, text) = source_code_registry
+                    .get(source_id)
                     .expect("no source text available");
 
                 let span_text = &text[spanned_message.span.span.start as usize

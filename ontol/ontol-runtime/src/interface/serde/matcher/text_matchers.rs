@@ -3,7 +3,7 @@ use serde::de::{DeserializeSeed, value::StrDeserializer};
 use tracing::error;
 
 use crate::{
-    DefId, DefPropTag, OntolDefTag, PropId,
+    DefId, DefPropTag, OntolDefTag, OntolDefTagExt, PropId,
     attr::Attr,
     interface::serde::{
         OntologyCtx,

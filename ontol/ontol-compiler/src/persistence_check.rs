@@ -1,12 +1,13 @@
 use std::collections::BTreeSet;
 
 use fnv::{FnvHashMap, FnvHashSet};
-use ontol_parser::U32Span;
+use ontol_core::{span::U32Span, tag::DomainIndex};
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::{
-    DefId, DomainIndex, MapDirection, ontology::map::MapLossiness, resolve_path::ResolverGraph,
+    DefId, MapDirection, ontology::map::MapLossiness, resolve_path::ResolverGraph,
 };
 
-use crate::{CompileError, Compiler, SourceSpan};
+use crate::{CompileError, Compiler};
 
 impl Compiler<'_> {
     pub(super) fn persistence_check(&mut self) {
@@ -74,7 +75,12 @@ impl Compiler<'_> {
 
             if !domain_id.stable {
                 let span = SourceSpan {
-                    source_id: self.sources.source_id_for_domain(domain_index).unwrap(),
+                    source_id: *self
+                        .source_id_to_domain_index
+                        .iter()
+                        .find(|pred| pred.1 == &domain_index)
+                        .unwrap()
+                        .0,
                     span: U32Span { start: 0, end: 0 },
                 };
 

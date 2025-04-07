@@ -6,13 +6,14 @@ pub mod kind;
 pub mod unescape;
 
 use kind::Kind;
+use ontol_core::error::SpannedMsgError;
 
-use crate::{ParserError, ToUsizeRange, U32Span};
+use crate::{ToUsizeRange, U32Span};
 
 const DEFAULT_TOKEN_CAPACITY: usize = 64;
 
 /// The new lexer for CST
-pub fn cst_lex(source: &str) -> (Lex, Vec<ParserError>) {
+pub fn cst_lex(source: &str) -> (Lex, Vec<SpannedMsgError>) {
     if source.len() > u32::MAX as usize {
         panic!("ONTOL file too large");
     }
@@ -83,14 +84,14 @@ impl Lex {
     }
 }
 
-pub fn format_lex_error(span: U32Span, source: &str) -> ParserError {
+pub fn format_lex_error(span: U32Span, source: &str) -> SpannedMsgError {
     let msg = if span.len() > 1 {
         format!("illegal characters `{}`", &source[span.to_usize_range()])
     } else {
         format!("illegal character `{}`", &source[span.to_usize_range()])
     };
 
-    ParserError { msg, span }
+    SpannedMsgError { msg, span }
 }
 
 pub fn extend_contiguous_ranges(ranges: &mut Vec<U32Span>, span: Range<usize>) {

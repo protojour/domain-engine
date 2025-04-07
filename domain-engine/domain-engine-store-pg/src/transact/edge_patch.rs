@@ -7,7 +7,7 @@ use arcstr::ArcStr;
 use domain_engine_core::{DomainError, DomainResult, domain_error::DomainErrorKind};
 use futures_util::{TryFutureExt, TryStreamExt};
 use ontol_runtime::{
-    DefId, OntolDefTag, PropId,
+    DefId, OntolDefTag, OntolDefTagExt, PropId,
     attr::Attr,
     format_utils::format_value,
     ontology::domain::{DataRelationshipKind, DataRelationshipTarget},

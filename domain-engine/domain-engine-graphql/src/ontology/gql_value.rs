@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use base64::Engine;
 use ontol_runtime::{
-    OntolDefTag, PropId,
+    OntolDefTag, OntolDefTagExt, PropId,
     attr::{Attr, AttrRef},
     format_utils::format_value,
     interface::serde::processor::ProcessorMode,

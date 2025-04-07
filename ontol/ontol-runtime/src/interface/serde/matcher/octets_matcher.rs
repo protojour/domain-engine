@@ -1,7 +1,7 @@
 use base64::Engine;
 
 use crate::{
-    DefId, OntolDefTag,
+    DefId, OntolDefTag, OntolDefTagExt,
     value::{OctetSequence, Value},
 };
 

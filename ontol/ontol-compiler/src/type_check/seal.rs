@@ -1,5 +1,6 @@
 use fnv::FnvHashSet;
-use ontol_runtime::{DefId, DomainIndex};
+use ontol_core::tag::DomainIndex;
+use ontol_runtime::DefId;
 
 #[derive(Default)]
 pub struct SealCtx {

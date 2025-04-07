@@ -11,7 +11,7 @@ use domain_engine_core::{
 };
 use futures_util::StreamExt;
 use ontol_runtime::{
-    DefId, OntolDefTag,
+    DefId, OntolDefTag, OntolDefTagExt,
     ontology::Ontology,
     query::{
         condition::{Clause, CondTerm, SetOperator, SetPredicate},

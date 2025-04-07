@@ -2,7 +2,7 @@ use std::ops::Index;
 
 use arcstr::ArcStr;
 use fnv::FnvHashMap;
-use ontol_core::debug::OntolFormatter;
+use ontol_core::{debug::OntolFormatter, tag::TagFlags, vec_map::VecMap};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -12,7 +12,6 @@ use crate::{
         serde::operator::{SerdeOperator, SerdeOperatorAddr},
     },
     query::condition::Condition,
-    vec_map::VecMap,
     vm::proc::{Lib, Procedure},
 };
 
@@ -63,9 +62,12 @@ impl DefsAspect {
     }
 
     pub fn domains(&self) -> impl Iterator<Item = (DomainIndex, &Domain)> {
-        self.domains
-            .iter()
-            .map(|(idx, domain)| (DomainIndex(idx as u16), domain))
+        self.domains.iter().map(|(idx, domain)| {
+            (
+                DomainIndex::from_u16_and_mask(u16::try_from(idx).unwrap(), TagFlags::PKG_MASK),
+                domain,
+            )
+        })
     }
 
     pub fn def(&self, def_id: DefId) -> &Def {

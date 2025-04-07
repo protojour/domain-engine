@@ -1,8 +1,9 @@
 use std::collections::BTreeMap;
 
 use indexmap::IndexMap;
+use ontol_core::tag::DomainIndex;
 use ontol_runtime::{
-    DefId, DomainIndex, MapDefFlags, MapKey, PropId,
+    DefId, MapDefFlags, MapKey, PropId,
     interface::{
         http_json::{
             Endpoint, HttpDefResource, HttpJson, HttpKeyedResource, HttpMapGetResource,

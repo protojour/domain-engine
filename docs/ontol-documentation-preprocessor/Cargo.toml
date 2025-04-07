@@ -15,3 +15,4 @@ semver = "1.0.17"
 
 ontol-compiler = { path = "../../ontol/ontol-compiler" }
 ontol-runtime = { path = "../../ontol/ontol-runtime" }
+ontol-parser = { path = "../../ontol/ontol-parser" }

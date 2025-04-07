@@ -10,7 +10,7 @@ use thin_vec::ThinVec;
 use tracing::{Level, error, trace};
 
 use crate::{
-    DefId, OntolDefTag, PropId,
+    DefId, OntolDefTag, OntolDefTagExt, PropId,
     attr::{Attr, AttrMatrix},
     cast::Cast,
     ontology::{
@@ -684,7 +684,7 @@ mod tests {
     use super::*;
 
     fn def_id(n: u16) -> DefId {
-        DefId(DomainIndex(0), n)
+        DefId(DomainIndex::ontol(), n)
     }
 
     #[test]

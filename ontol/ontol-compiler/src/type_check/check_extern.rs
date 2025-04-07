@@ -1,3 +1,4 @@
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::{
     DefId,
     ontology::{map::Extern, ontol::TextConstant},
@@ -5,7 +6,7 @@ use ontol_runtime::{
 use tracing::warn;
 
 use crate::{
-    CompileError, SourceSpan,
+    CompileError,
     codegen::{
         task::{ExternMap, MapCodegenRequest},
         type_mapper::TypeMapper,

@@ -1,9 +1,11 @@
 use std::fmt::Debug;
 
 use ontol_core::url::DomainUrl;
+use ontol_parser::{
+    source::SourceSpan,
+    topology::{TopologyError, TopologyErrors},
+};
 use ontol_runtime::format_utils::CommaSeparated;
-
-use crate::source::SourceSpan;
 
 pub struct UnifiedCompileError {
     pub errors: Vec<SpannedCompileError>,
@@ -12,6 +14,22 @@ pub struct UnifiedCompileError {
 impl Debug for UnifiedCompileError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("UnifiedCompileError").finish()
+    }
+}
+
+impl From<TopologyErrors> for UnifiedCompileError {
+    fn from(value: TopologyErrors) -> Self {
+        Self {
+            errors: value
+                .errors
+                .into_iter()
+                .map(|(error, span)| SpannedCompileError {
+                    error: CompileError::from(error),
+                    notes: vec![],
+                    span,
+                })
+                .collect(),
+        }
     }
 }
 
@@ -247,6 +265,15 @@ pub enum CompileError {
     /// An TODO message is an "immature" compile error, probably requires better UX design
     /// for presenting to the user
     Todo(String),
+}
+
+impl From<TopologyError> for CompileError {
+    fn from(value: TopologyError) -> Self {
+        match value {
+            TopologyError::DomainNotFound(url) => Self::DomainNotFound(url),
+            TopologyError::Todo(msg) => Self::Todo(msg),
+        }
+    }
 }
 
 impl CompileError {

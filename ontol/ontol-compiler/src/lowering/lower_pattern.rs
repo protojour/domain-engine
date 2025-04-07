@@ -1,15 +1,16 @@
+use ontol_core::span::U32Span;
 use ontol_parser::{
-    U32Span,
     cst::{
         inspect as insp,
         view::{NodeView, NodeViewExt, TokenView, TokenViewExt, TypedView},
     },
     lexer::{kind::Kind, unescape::unescape_regex},
+    source::SourceSpan,
 };
 use ontol_runtime::{DefId, property::ValueCardinality};
 
 use crate::{
-    CompileError, SourceSpan,
+    CompileError,
     def::{TypeDef, TypeDefFlags},
     pattern::{
         CompoundPatternAttr, CompoundPatternAttrKind, CompoundPatternModifier, Pattern,

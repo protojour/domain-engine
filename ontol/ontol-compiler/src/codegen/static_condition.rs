@@ -1,6 +1,6 @@
 use ontol_hir::{Kind, Node, PropVariant};
 use ontol_runtime::{
-    OntolDefTag,
+    OntolDefTag, OntolDefTagExt,
     interface::discriminator::{Discriminant, LeafDiscriminant},
     query::condition::{Clause, CondTerm, Condition, SetOperator},
     value::Value,

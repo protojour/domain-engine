@@ -1,14 +1,16 @@
 use std::collections::HashMap;
 
 use fnv::FnvHashSet;
+use ontol_core::tag::DomainIndex;
+use ontol_parser::source::NO_SPAN;
 use ontol_runtime::{
-    DefId, DomainIndex,
+    DefId,
     var::{Var, VarAllocator},
 };
 use tracing::debug;
 
 use crate::{
-    Compiler, NO_SPAN,
+    Compiler,
     def::DefKind,
     map::UndirectedMapKey,
     properties::Constructor,
@@ -110,12 +112,20 @@ pub fn autogenerate_mapping<'m>(
                         if let Some(template) =
                             compiler.code_ctx.abstract_templates.get(&undirected_key)
                         {
-                            applicable_templates.push(AbstractTemplate {
+                            let mut template_clone = AbstractTemplate {
+                                directed_def_ids: template.directed_def_ids,
                                 pat_ids: template.pat_ids,
                                 var_allocator: VarAllocator::from(
                                     *template.var_allocator.peek_next(),
                                 ),
-                            });
+                            };
+
+                            // See if the template needs to be inverted (up/down)
+                            if template.directed_def_ids[0] != first.def_id {
+                                template_clone = template_clone.invert_direction();
+                            }
+
+                            applicable_templates.push(template_clone);
                         }
                     }
                 }

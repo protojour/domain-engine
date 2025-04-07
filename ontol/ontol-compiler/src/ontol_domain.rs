@@ -3,16 +3,15 @@
 use std::{ops::Range, str::FromStr};
 
 use indexmap::IndexMap;
+use ontol_core::{DomainId, tag::DomainIndex};
 use ontol_hir::OverloadFunc;
 use ontol_macros::RustDoc;
-use ontol_runtime::{
-    DefId, DomainIndex, OntolDefTag,
-    ontology::{domain::DomainId, ontol::TextLikeType},
-};
+use ontol_parser::source::NO_SPAN;
+use ontol_runtime::{DefId, OntolDefTag, OntolDefTagExt, ontology::ontol::TextLikeType};
 use ulid::Ulid;
 
 use crate::{
-    Compiler, NO_SPAN,
+    Compiler,
     def::{BuiltinRelationKind, DefKind, TypeDef, TypeDefFlags},
     mem::Intern,
     misc::{RelObjectConstraint, RelTypeConstraints, TypeParam},
@@ -181,24 +180,24 @@ impl<'m> Compiler<'m> {
         root_path_node.insert(self.def_datetime());
 
         root_path_node.insert(DefPath(
-            &["auto"],
+            OntolDefTag::Auto.ontol_path(),
             self.register_def_type(OntolDefTag::Auto.def_id(), Type::ValueGenerator)
                 .0,
         ));
         root_path_node.insert(DefPath(
-            &["create_time"],
+            OntolDefTag::CreateTime.ontol_path(),
             self.register_def_type(OntolDefTag::CreateTime.def_id(), Type::ValueGenerator)
                 .0,
         ));
 
         root_path_node.insert(DefPath(
-            &["update_time"],
+            OntolDefTag::UpdateTime.ontol_path(),
             self.register_def_type(OntolDefTag::UpdateTime.def_id(), Type::ValueGenerator)
                 .0,
         ));
 
         root_path_node.insert(DefPath(
-            &["crdt"],
+            OntolDefTag::Crdt.ontol_path(),
             self.register_def_type(OntolDefTag::Crdt.def_id(), Type::ObjectRepr)
                 .0,
         ));
@@ -295,35 +294,33 @@ impl<'m> Compiler<'m> {
     }
 
     fn def_uuid(&mut self) -> DefPath<'static, 'static> {
-        let path = &["uuid"];
-        let (uuid, _) = self.define_concrete_ontol_type(OntolDefTag::Uuid, path, |def_id| {
-            Type::TextLike(def_id, TextLikeType::Uuid)
-        });
+        let tag = OntolDefTag::Uuid;
+        let (uuid, _) = self
+            .define_concrete_ontol_type(tag, |def_id| Type::TextLike(def_id, TextLikeType::Uuid));
         let segment = TextPatternSegment::Regex(regex_util::well_known::uuid());
         store_text_pattern_segment(uuid, &segment, &mut self.text_patterns, &mut self.str_ctx);
         self.prop_ctx.properties_by_def_id_mut(uuid).constructor = Constructor::TextFmt(segment);
         self.defs.text_like_types.insert(uuid, TextLikeType::Uuid);
-        DefPath(path, uuid)
+        DefPath(tag.ontol_path(), uuid)
     }
 
     fn def_ulid(&mut self) -> DefPath<'static, 'static> {
-        let path = &["ulid"];
-        let (ulid, _) = self.define_concrete_ontol_type(OntolDefTag::Ulid, path, |def_id| {
+        let tag = OntolDefTag::Ulid;
+        let (ulid, _) = self.define_concrete_ontol_type(OntolDefTag::Ulid, |def_id| {
             Type::TextLike(def_id, TextLikeType::Ulid)
         });
         let segment = TextPatternSegment::Regex(regex_util::well_known::ulid());
         store_text_pattern_segment(ulid, &segment, &mut self.text_patterns, &mut self.str_ctx);
         self.prop_ctx.properties_by_def_id_mut(ulid).constructor = Constructor::TextFmt(segment);
         self.defs.text_like_types.insert(ulid, TextLikeType::Ulid);
-        DefPath(path, ulid)
+        DefPath(tag.ontol_path(), ulid)
     }
 
     fn def_datetime(&mut self) -> DefPath<'static, 'static> {
-        let path = &["datetime"];
-        let (datetime, _) =
-            self.define_concrete_ontol_type(OntolDefTag::DateTime, path, |def_id| {
-                Type::TextLike(def_id, TextLikeType::DateTime)
-            });
+        let tag = OntolDefTag::DateTime;
+        let (datetime, _) = self.define_concrete_ontol_type(tag, |def_id| {
+            Type::TextLike(def_id, TextLikeType::DateTime)
+        });
         let segment = TextPatternSegment::Regex(regex_util::well_known::datetime_rfc3339());
         store_text_pattern_segment(
             datetime,
@@ -336,20 +333,19 @@ impl<'m> Compiler<'m> {
         self.defs
             .text_like_types
             .insert(datetime, TextLikeType::DateTime);
-        DefPath(path, datetime)
+        DefPath(tag.ontol_path(), datetime)
     }
 
     /// Define an ontol _domain_ type, i.e. not a primitive
     fn define_concrete_ontol_type(
         &mut self,
         tag: OntolDefTag,
-        path: &[&'static str],
         ty_fn: impl Fn(DefId) -> Type<'m>,
     ) -> (DefId, TypeRef<'m>) {
         let def_id = self.defs.add_ontol(
             tag,
             DefKind::Type(TypeDef {
-                ident: path.last().copied(),
+                ident: tag.ontol_path().last().copied(),
                 rel_type_for: None,
                 flags: TypeDefFlags::PUBLIC | TypeDefFlags::CONCRETE,
             }),

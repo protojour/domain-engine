@@ -2,11 +2,12 @@ use std::ops::RangeInclusive;
 
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
-use ontol_runtime::{DefId, OntolDefTag, PropId};
+use ontol_parser::source::SourceSpan;
+use ontol_runtime::{DefId, OntolDefTag, OntolDefTagExt, PropId};
 use ordered_float::NotNan;
 use smallvec::SmallVec;
 
-use crate::{SourceSpan, misc::TypeParam};
+use crate::misc::TypeParam;
 
 #[derive(Debug)]
 pub struct Repr {

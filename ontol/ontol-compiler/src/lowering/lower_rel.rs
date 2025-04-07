@@ -1,24 +1,25 @@
 use std::ops::Range;
 
+use ontol_core::span::U32Span;
 use ontol_parser::{
-    U32Span,
+    basic_syntax::extract_documentation,
     cst::{
         inspect as insp,
         view::{NodeView, NodeViewExt, TypedView},
     },
+    source::SourceSpan,
 };
 use ontol_runtime::{
-    DefId, OntolDefTag,
+    DefId, OntolDefTag, OntolDefTagExt,
     ontology::domain::EdgeCardinalProjection,
     property::{PropertyCardinality, ValueCardinality},
 };
 use tracing::debug_span;
 
 use crate::{
-    CompileError, SourceSpan,
+    CompileError,
     def::{DefKind, RelationContext, TypeDef, TypeDefFlags},
     edge::EdgeId,
-    ontol_syntax::extract_documentation,
     relation::{DefRelTag, RelId, RelParams, Relationship},
 };
 

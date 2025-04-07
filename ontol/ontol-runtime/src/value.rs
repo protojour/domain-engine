@@ -8,10 +8,11 @@ use ::serde::{Deserialize, Serialize};
 use compact_str::CompactString;
 use fnv::FnvHashMap;
 use itertools::{Itertools, Position};
+use ontol_core::tag::{DomainIndex, TagFlags};
 use thin_vec::ThinVec;
 
 use crate::{
-    DefId, DomainIndex, OntolDefTag, PropId,
+    DefId, OntolDefTag, OntolDefTagExt, PropId,
     attr::{Attr, AttrMatrix},
     cast::Cast,
     crdt::CrdtStruct,
@@ -330,7 +331,7 @@ impl ValueTag {
 
     pub const fn def_id(&self) -> DefId {
         DefId(
-            DomainIndex(self.first & TagFlags::PKG_MASk.bits()),
+            DomainIndex::from_u16_and_mask(self.first, TagFlags::PKG_MASK),
             self.second,
         )
     }
@@ -344,7 +345,7 @@ impl ValueTag {
 
     pub fn set_def_id(&mut self, def_id: DefId) {
         self.first =
-            def_id.domain_index().0 | (self.first & TagFlags::PKG_MASk.complement().bits());
+            def_id.domain_index().index() | (self.first & TagFlags::PKG_MASK.complement().bits());
         self.second = def_id.1;
     }
 
@@ -369,7 +370,7 @@ impl ValueTag {
 
 impl Debug for ValueTag {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let flags = TagFlags::from_bits(self.first & TagFlags::PKG_MASk.complement().bits());
+        let flags = TagFlags::from_bits(self.first & TagFlags::PKG_MASK.complement().bits());
         write!(f, "tag({:?}, {:?})", self.def_id(), flags)
     }
 }
@@ -383,20 +384,9 @@ impl From<ValueTag> for DefId {
 impl From<DefId> for ValueTag {
     fn from(value: DefId) -> Self {
         Self {
-            first: value.domain_index().0,
+            first: value.domain_index().index(),
             second: value.1,
         }
-    }
-}
-
-pub struct ValueTagError;
-
-bitflags::bitflags! {
-    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
-    pub(crate) struct TagFlags: u16 {
-        const PKG_MASk = 0b0011111111111111;
-        const DELETE   = 0b1000000000000000;
-        const UPDATE   = 0b0100000000000000;
     }
 }
 

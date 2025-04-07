@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
-use ontol_runtime::{DefId, OntolDefTag};
+use ontol_runtime::{DefId, OntolDefTag, OntolDefTagExt};
 use ordered_float::NotNan;
 
 use crate::{

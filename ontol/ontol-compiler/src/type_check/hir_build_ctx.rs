@@ -1,8 +1,8 @@
 use fnv::FnvHashMap;
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::var::{Var, VarAllocator};
 
 use crate::{
-    SourceSpan,
     pattern::PatId,
     typed_hir::{self, TypedHir, TypedHirData},
     types::TypeRef,

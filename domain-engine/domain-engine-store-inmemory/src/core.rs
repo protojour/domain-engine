@@ -4,7 +4,7 @@ use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use ontol_runtime::{
-    DefId, OntolDefTag, PropId,
+    DefId, OntolDefTag, OntolDefTagExt, PropId,
     attr::Attr,
     crdt::CrdtStruct,
     interface::serde::processor::ProcessorMode,

@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use bit_set::BitSet;
 use fnv::FnvHashMap;
 use ontol_hir::{Binding, EvalCondTerm, Node, OverloadFunc, Pack, PropVariant, StructFlags};
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::{
     DefId, MapDirection, MapFlags, MapKey, PropId,
     ontology::map::MapLossiness,
@@ -17,7 +18,7 @@ use thin_vec::ThinVec;
 use tracing::debug;
 
 use crate::{
-    CompileErrors, Compiler, SourceSpan,
+    CompileErrors, Compiler,
     codegen::{
         data_flow_analyzer::DataFlowAnalyzer,
         ir::{BlockLabel, BlockOffset, Terminator},

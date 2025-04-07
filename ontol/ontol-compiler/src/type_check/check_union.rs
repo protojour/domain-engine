@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::{IndexMap, IndexSet};
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::{
     DefId, PropId,
     interface::discriminator::{Discriminant, LeafDiscriminant},
@@ -11,7 +12,7 @@ use patricia_tree::PatriciaMap;
 use tracing::{debug, debug_span};
 
 use crate::{
-    SourceSpan, SpannedCompileError,
+    SpannedCompileError,
     def::{Def, DefKind},
     error::CompileError,
     misc::{UnionDiscriminator, UnionDiscriminatorRole, UnionDiscriminatorVariant},

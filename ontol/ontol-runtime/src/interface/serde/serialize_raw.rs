@@ -4,7 +4,7 @@ use serde::{
 };
 use tracing::error;
 
-use crate::{OntolDefTag, value::Value};
+use crate::{OntolDefTag, OntolDefTagExt, value::Value};
 
 use super::processor::{ProcessorLevel, RecursionLimitError};
 

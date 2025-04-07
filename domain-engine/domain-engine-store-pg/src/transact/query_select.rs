@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use domain_engine_core::DomainResult;
 use ontol_runtime::{
-    DefId, OntolDefTag, PropId,
+    DefId, OntolDefTag, OntolDefTagExt, PropId,
     ontology::domain::{DataRelationshipKind, DataTreeRepr, Def},
     query::select::{Select, StructOrUnionSelect, StructSelect},
     tuple::CardinalIdx,

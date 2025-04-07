@@ -1,8 +1,9 @@
 use ontol_hir::Label;
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::{DefId, var::VarAllocator};
 
 use crate::{
-    MissingProperties, Note, SourceSpan, arm_span,
+    MissingProperties, Note, arm_span,
     codegen::{
         task::{AbstractTemplate, MapCodegenRequest, OntolMap, OntolMapArms},
         type_mapper::TypeMapper,
@@ -77,6 +78,7 @@ impl<'m> TypeCheck<'_, 'm> {
                 self.code_ctx.abstract_templates.insert(
                     key_pair,
                     AbstractTemplate {
+                        directed_def_ids: [upper, lower],
                         pat_ids,
                         var_allocator: VarAllocator::from(*var_allocator.peek_next()),
                     },

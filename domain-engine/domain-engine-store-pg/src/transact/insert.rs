@@ -9,7 +9,7 @@ use domain_engine_core::{
 use fnv::FnvHashMap;
 use futures_util::{TryStreamExt, future::BoxFuture};
 use ontol_runtime::{
-    DefId, DomainIndex, PropId,
+    DefId, DomainIndex, OntolDefTagExt, PropId,
     attr::Attr,
     crdt::Automerge,
     ontology::{

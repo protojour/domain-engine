@@ -1,70 +1,83 @@
-use std::ops::Deref;
+use std::{collections::HashMap, ops::Deref};
 
 use arcstr::ArcStr;
 use fnv::FnvHashSet;
+use ontol_core::{tag::DomainIndex, url::DomainUrl};
+use ontol_parser::{ParserError, source::SourceSpan, topology::OntolHeaderData};
 use ontol_runtime::{
-    DefId, DomainIndex,
+    DefId,
     ontology::ontol::TextConstant,
     property::{PropertyCardinality, ValueCardinality},
 };
 use tracing::{debug, debug_span};
 
 use crate::{
-    CompileError, Compiler, Session, SourceSpan, Src, UnifiedCompileError,
+    CompileError, Compiler, Session, UnifiedCompileError,
     def::{BuiltinRelationKind, DefKind},
     edge::{EdgeCtx, EdgeId},
     entity::entity_ctx::def_implies_entity,
     lowering::context::LoweringOutcome,
     misc::{MacroExpand, MacroItem, MiscCtx},
     namespace::DocId,
-    ontol_syntax::OntolHeaderData,
+    ontol_syntax::OntolSyntax,
     relation::{RelId, RelParams, Relationship, rel_def_meta},
     repr::repr_model::ReprKind,
     thesaurus::{Thesaurus, TypeRelation},
-    topology::ParsedDomain,
     type_check::MapArmsKind,
     types::Type,
 };
+
+/// The compiler's loaded domains, by reference,
+/// to be able to compile `use` statements
+#[derive(Default)]
+pub(crate) struct LoadedDomains {
+    pub by_url: HashMap<DomainUrl, DefId>,
+}
 
 impl Compiler<'_> {
     /// Lower statements from the next domain,
     /// perform type check against its dependent domains,
     /// and seal the types at the end.
-    pub(super) fn lower_and_check_next_domain(
+    pub(super) fn lower_and_check_next_domain<S: OntolSyntax>(
         &mut self,
-        parsed: ParsedDomain,
-        src: Src,
+        parsed: ontol_parser::topology::ParsedDomain<S>,
     ) -> Result<(), UnifiedCompileError> {
-        let _entered = debug_span!("domain", idx = ?parsed.domain_index.index()).entered();
+        let domain_index = parsed.domain_index;
+
+        self.source_id_to_domain_index
+            .insert(parsed.source_id, domain_index);
+
+        let _entered = debug_span!("domain", idx = ?domain_index.index()).entered();
 
         for error in parsed.parse_errors {
             match error {
-                ontol_parser::Error::Lex(lex_error) => {
+                ParserError::Lex(lex_error) => {
                     let span = lex_error.span;
-                    CompileError::Lex(lex_error.msg).span(src.span(span))
+                    CompileError::Lex(lex_error.msg).span(parsed.source_id.span(span))
                 }
-                ontol_parser::Error::Parse(parse_error) => {
+                ParserError::Parse(parse_error) => {
                     let span = parse_error.span;
-                    CompileError::Parse(parse_error.msg).span(src.span(span))
+                    CompileError::Parse(parse_error.msg).span(parsed.source_id.span(span))
                 }
             }
             .report(self);
         }
 
-        let domain_def_id = self.defs.alloc_def_id(parsed.domain_index);
+        let domain_def_id = self.defs.alloc_def_id(domain_index);
         self.define_domain(domain_def_id);
 
         self.loaded.by_url.insert(parsed.url.clone(), domain_def_id);
 
         self.domain_config_table
-            .insert(parsed.domain_index, parsed.config);
+            .insert(domain_index, Default::default());
         self.topology_generation
-            .insert(parsed.domain_index, parsed.generation);
+            .insert(domain_index, parsed.generation);
 
         let mut outcome = parsed.syntax.lower(
             parsed.url.clone(),
             domain_def_id,
-            src.clone(),
+            parsed.source_id,
+            domain_index,
             Session(self),
         );
 
@@ -88,23 +101,23 @@ impl Compiler<'_> {
             {
                 CompileError::TODO("domain has already been compiled")
                     .span(SourceSpan {
-                        source_id: src.id,
+                        source_id: parsed.source_id,
                         span: header_data.domain_id.1,
                     })
                     .report(self);
             }
 
             self.domain_ids
-                .insert(parsed.domain_index, header_data.domain_id.0);
+                .insert(domain_index, header_data.domain_id.0);
 
             self.domain_names.push((
-                parsed.domain_index,
+                domain_index,
                 self.str_ctx.intern_constant(&header_data.name.0),
             ));
         }
 
         self.handle_lowering_outcome(outcome);
-        self.seal_domain(parsed.domain_index);
+        self.seal_domain(domain_index);
 
         self.check_error()
     }

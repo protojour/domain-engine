@@ -1,7 +1,8 @@
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::var::Var;
 use regex_syntax::hir::{Class, Hir, HirKind, Literal};
 
-use crate::{SourceSpan, typed_hir::TypedHir};
+use crate::typed_hir::TypedHir;
 
 #[derive(Debug)]
 pub enum StringInterpolationComponent {

@@ -3,7 +3,7 @@ use std::{collections::HashSet, fmt::Display};
 use fnv::{FnvHashMap, FnvHashSet};
 use itertools::{Itertools, Position};
 use ontol_runtime::{
-    DefId, OntolDefTag,
+    DefId, OntolDefTag, OntolDefTagExt,
     ontology::{map::Extern, ontol::TextLikeType},
 };
 use ordered_float::NotNan;
@@ -392,7 +392,7 @@ impl Display for FormatType<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Compiler, Sources};
+    use crate::Compiler;
 
     fn type_ptr(ty: TypeRef) -> usize {
         ty as *const _ as usize
@@ -401,7 +401,7 @@ mod tests {
     #[test]
     fn dedup_types() {
         let mem = Mem::default();
-        let mut compiler = Compiler::new(&mem, Sources::default());
+        let mut compiler = Compiler::new(&mem);
 
         let c0 = compiler.ty_ctx.intern(Type::IntConstant(42));
         let c1 = compiler.ty_ctx.intern(Type::IntConstant(42));

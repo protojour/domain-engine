@@ -1,8 +1,10 @@
 use std::ops::Range;
 
-use crate::{ParserError, lexer::kind::Kind};
+use ontol_core::error::SpannedMsgError;
 
-pub type UnescapeTextResult = Result<String, Vec<ParserError>>;
+use crate::lexer::kind::Kind;
+
+pub type UnescapeTextResult = Result<String, Vec<SpannedMsgError>>;
 
 pub fn unescape_text_literal(kind: Kind, slice: &str, span: Range<usize>) -> UnescapeTextResult {
     let slice = &slice[1..slice.len() - 1];
@@ -90,11 +92,11 @@ pub fn unescape_regex(slice: &str) -> String {
     out
 }
 
-fn invalid_escape_code(span_start: usize, offset: usize) -> ParserError {
+fn invalid_escape_code(span_start: usize, offset: usize) -> SpannedMsgError {
     let start = span_start + offset;
     let end = start + 1;
 
-    ParserError {
+    SpannedMsgError {
         span: (start..end).into(),
         msg: "invalid escape code".into(),
     }

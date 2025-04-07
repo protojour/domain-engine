@@ -3,30 +3,24 @@
 use std::fmt::Debug;
 
 use fnv::FnvHashMap;
+use ontol_core::{
+    DomainId, TopologyGeneration,
+    vec_map::{VecMap, VecMapKey},
+};
 use ontol_macros::OntolDebug;
 use serde::{Deserialize, Serialize};
 use thin_vec::ThinVec;
-use ulid::Ulid;
 
 use crate::{
     DefId, DefIdSet, FnvIndexMap, PropId, impl_ontol_debug,
-    interface::serde::operator::SerdeOperatorAddr,
-    property::Cardinality,
-    query::order::Direction,
+    interface::serde::operator::SerdeOperatorAddr, property::Cardinality, query::order::Direction,
     tuple::CardinalIdx,
-    vec_map::{VecMap, VecMapKey},
 };
 
 use super::{
     Ontology,
     ontol::{TextConstant, ValueGenerator},
 };
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct DomainId {
-    pub ulid: Ulid,
-    pub stable: bool,
-}
 
 /// A domain in the ONTOL ontology.
 #[derive(Serialize, Deserialize)]
@@ -40,10 +34,6 @@ pub struct Domain {
     /// Types by def tag (the type's index within the domain)
     defs: VecMap<DefTag, Def>,
 }
-
-/// An ordinal representing a domain's topological sort in the dependency graph for the ontology
-#[derive(Clone, Copy, Serialize, Deserialize)]
-pub struct TopologyGeneration(pub u32);
 
 struct DefTag(pub u16);
 
@@ -423,7 +413,10 @@ impl Debug for EdgeCardinalProjection {
         write!(
             f,
             "{}:{}:{}<-{}",
-            self.edge_id.0.0, self.edge_id.1, self.object, self.subject,
+            self.edge_id.0.index(),
+            self.edge_id.1,
+            self.object,
+            self.subject,
         )
     }
 }

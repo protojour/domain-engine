@@ -1,9 +1,9 @@
 use fnv::FnvHashMap;
 use indoc::indoc;
 use itertools::Itertools;
-use ontol_core::rustdoc::RustDoc;
+use ontol_core::{TopologyGeneration, rustdoc::RustDoc, tag::DomainIndex};
 use ontol_runtime::{
-    DefId, DefIdSet, DomainIndex, FnvIndexMap, OntolDefTag, PropId,
+    DefId, DefIdSet, FnvIndexMap, OntolDefTag, OntolDefTagExt, PropId,
     interface::{
         DomainInterface,
         serde::{SerdeDef, SerdeModifier},
@@ -14,7 +14,6 @@ use ontol_runtime::{
             self, BasicDef, DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource,
             DataRelationshipTarget, DataTreeRepr, Def, DefRepr, DefReprUnionBound, Domain,
             EdgeCardinal, EdgeCardinalFlags, EdgeCardinalProjection, EdgeInfo, Entity,
-            TopologyGeneration,
         },
         map::MapMeta,
         ontol::{OntolDomainMeta, TextConstant, TextLikeType},

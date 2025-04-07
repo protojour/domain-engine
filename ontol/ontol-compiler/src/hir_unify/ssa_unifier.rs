@@ -4,8 +4,9 @@ use ontol_hir::{
     Binder, Binding, EvalCondTerm, Kind, Label, MatrixRow, Node, Nodes, PropFlags, PropVariant,
     StructFlags, arena::NodeRef, find_value_node, import::arena_import,
 };
+use ontol_parser::source::{NO_SPAN, SourceSpan};
 use ontol_runtime::{
-    MapDirection, MapFlags, OntolDefTag, PropId,
+    MapDirection, MapFlags, OntolDefTag, OntolDefTagExt, PropId,
     query::condition::{Clause, ClausePair, SetOperator},
     var::{Var, VarAllocator, VarSet},
 };
@@ -14,7 +15,7 @@ use thin_vec::thin_vec;
 use tracing::{debug, info, trace};
 
 use crate::{
-    CompileError, CompileErrors, Compiler, NO_SPAN, SourceSpan,
+    CompileError, CompileErrors, Compiler,
     def::{DefKind, Defs},
     hir_unify::{regex_interpolation::RegexStringInterpolator, ssa_util::NodesExt},
     mem::Intern,

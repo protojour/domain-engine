@@ -1,14 +1,12 @@
 use std::collections::{BTreeMap, HashMap, hash_map::Entry};
 
 use fnv::FnvHashMap;
-use ontol_parser::{
-    U32Span,
-    cst::{
-        inspect as insp,
-        view::{NodeView, TokenView, TypedView},
-    },
+use ontol_core::span::U32Span;
+use ontol_parser::cst::{
+    inspect as insp,
+    view::{NodeView, TokenView, TypedView},
 };
-use ontol_runtime::{DefId, OntolDefTag, tuple::CardinalIdx};
+use ontol_runtime::{DefId, OntolDefTag, OntolDefTagExt, tuple::CardinalIdx};
 
 use crate::{
     CompileError,

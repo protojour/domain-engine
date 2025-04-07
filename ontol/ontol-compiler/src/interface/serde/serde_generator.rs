@@ -4,8 +4,9 @@ use std::{
 };
 
 use indexmap::IndexMap;
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::{
-    DefId, OntolDefTag,
+    DefId, OntolDefTag, OntolDefTagExt,
     debug::OntolDebug,
     interface::{
         discriminator::LeafDiscriminant,
@@ -27,7 +28,6 @@ use tracing::{debug, debug_span, error, trace, warn};
 use super::{SerdeIntersection, SerdeKey, sequence_range_builder::SequenceRangeBuilder};
 
 use crate::{
-    SourceSpan,
     codegen::task::CodeCtx,
     compiler_queries::GetDefType,
     def::{DefKind, Defs, TypeDef, TypeDefFlags},

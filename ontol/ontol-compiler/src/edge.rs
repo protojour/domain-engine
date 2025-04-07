@@ -5,14 +5,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use fnv::{FnvHashMap, FnvHashSet};
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::{
-    DefId, OntolDefTag, PropId, ontology::ontol::TextConstant, tuple::CardinalIdx,
+    DefId, OntolDefTag, OntolDefTagExt, PropId, ontology::ontol::TextConstant, tuple::CardinalIdx,
 };
 use tracing::{debug, error};
 
-use crate::{
-    CompileError, Compiler, SourceSpan, relation::rel_def_meta, repr::repr_model::ReprKind,
-};
+use crate::{CompileError, Compiler, relation::rel_def_meta, repr::repr_model::ReprKind};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct EdgeId(pub DefId);

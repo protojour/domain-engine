@@ -1,10 +1,10 @@
-use ontol_runtime::{
-    DefId, DomainIndex, PropId, property::PropertyCardinality, tuple::CardinalIdx,
-};
+use ontol_core::tag::DomainIndex;
+use ontol_parser::source::SourceSpan;
+use ontol_runtime::{DefId, PropId, property::PropertyCardinality, tuple::CardinalIdx};
 use tracing::debug;
 
 use crate::{
-    Note, SourceSpan,
+    Note,
     def::{BuiltinRelationKind, DefKind},
     edge::{CardinalKind, EdgeId, SymbolicEdge},
     error::CompileError,

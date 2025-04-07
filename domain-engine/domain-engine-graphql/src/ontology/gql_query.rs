@@ -23,7 +23,7 @@ use ontol_runtime::query::select::StructOrUnionSelect;
 use ontol_runtime::query::select::StructSelect;
 use ontol_runtime::query::select::{EntitySelect, Select};
 use ontol_runtime::value::{OctetSequence, Value};
-use ontol_runtime::{OntolDefTag, PropId};
+use ontol_runtime::{OntolDefTag, OntolDefTagExt, PropId};
 use serde::Deserialize;
 use serde::de::value::StringDeserializer;
 use ulid::Ulid;

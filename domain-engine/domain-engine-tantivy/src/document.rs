@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use domain_engine_core::{VertexAddr, data_store::DataStoreAPI};
 use ontol_runtime::{
-    OntolDefTag,
+    OntolDefTag, OntolDefTagExt,
     attr::Attr,
     ontology::{Ontology, domain::DataRelationshipKind},
     tuple::EndoTuple,

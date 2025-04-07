@@ -2,81 +2,27 @@
 
 use cst::{grammar, parser::CstParser, tree::FlatSyntaxTree};
 use lexer::cst_lex;
+use ontol_core::{error::SpannedMsgError, span::U32Span};
 use unindent::unindent;
 
-use std::{fmt::Debug, ops::Range};
+use std::ops::Range;
 
+pub mod basic_syntax;
 pub mod cst;
 pub mod lexer;
+pub mod source;
+pub mod topology;
+
+pub enum ParserError {
+    Lex(SpannedMsgError),
+    Parse(SpannedMsgError),
+}
 
 #[cfg(test)]
 mod tests;
 
 #[cfg(test)]
 mod cst_test;
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct U32Span {
-    pub start: u32,
-    pub end: u32,
-}
-
-impl U32Span {
-    pub fn len(&self) -> usize {
-        self.end as usize - self.start as usize
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    pub fn contains(&self, pos: u32) -> bool {
-        self.start <= pos && self.end > pos
-    }
-
-    pub fn contains_usize(&self, pos: usize) -> bool {
-        self.start as usize <= pos && self.end as usize > pos
-    }
-
-    pub fn join(self, other: Self) -> Self {
-        Self {
-            start: std::cmp::min(self.start, other.start),
-            end: std::cmp::max(self.end, other.end),
-        }
-    }
-}
-
-impl Debug for U32Span {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}..{}", self.start, self.end)
-    }
-}
-
-impl From<Range<usize>> for U32Span {
-    fn from(value: Range<usize>) -> Self {
-        Self {
-            start: value.start as u32,
-            end: value.end as u32,
-        }
-    }
-}
-
-impl From<U32Span> for Range<usize> {
-    fn from(value: U32Span) -> Self {
-        value.start as usize..value.end as usize
-    }
-}
-
-pub enum Error {
-    Lex(ParserError),
-    Parse(ParserError),
-}
-
-#[derive(Debug)]
-pub struct ParserError {
-    pub msg: String,
-    pub span: U32Span,
-}
 
 pub trait ToUsizeRange {
     fn to_usize_range(&self) -> Range<usize>;
@@ -88,19 +34,19 @@ impl ToUsizeRange for U32Span {
     }
 }
 
-pub fn cst_parse(source: &str) -> (FlatSyntaxTree, Vec<Error>) {
+pub fn cst_parse(source: &str) -> (FlatSyntaxTree, Vec<ParserError>) {
     cst_parse_grammar(source, grammar::ontol)
 }
 
 pub fn cst_parse_grammar(
     source: &str,
     grammar: fn(&mut CstParser),
-) -> (FlatSyntaxTree, Vec<Error>) {
+) -> (FlatSyntaxTree, Vec<ParserError>) {
     let (lexed, lex_errors) = cst_lex(source);
 
     let mut errors = vec![];
     for lex_error in lex_errors {
-        errors.push(Error::Lex(lex_error));
+        errors.push(ParserError::Lex(lex_error));
     }
 
     let mut cst_parser = CstParser::from_lexed_source(source, lexed);
@@ -110,7 +56,7 @@ pub fn cst_parse_grammar(
     let (tree, parse_errors) = cst_parser.finish();
 
     for (span, msg) in parse_errors {
-        errors.push(Error::Parse(ParserError { msg, span }));
+        errors.push(ParserError::Parse(SpannedMsgError { msg, span }));
     }
 
     (tree, errors)

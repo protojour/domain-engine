@@ -3,15 +3,13 @@ use std::collections::BTreeSet;
 use arcstr::ArcStr;
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
+use ontol_core::tag::DomainIndex;
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::{
-    DefId, DomainIndex, PropId, interface::discriminator::Discriminant,
-    ontology::ontol::ValueGenerator,
+    DefId, PropId, interface::discriminator::Discriminant, ontology::ontol::ValueGenerator,
 };
 
-use crate::{
-    SourceSpan,
-    relation::{RelId, Relationship},
-};
+use crate::relation::{RelId, Relationship};
 
 #[derive(Default)]
 pub struct MiscCtx {

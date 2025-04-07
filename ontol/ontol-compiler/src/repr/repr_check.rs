@@ -9,12 +9,14 @@ use std::collections::{HashMap, hash_map::Entry};
 
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
-use ontol_runtime::{DefId, DomainIndex, OntolDefTag, ontology::ontol::TextLikeType};
+use ontol_core::tag::DomainIndex;
+use ontol_parser::source::{NATIVE_SOURCE, NO_SPAN, SourceId, SourceSpan};
+use ontol_runtime::{DefId, OntolDefTag, OntolDefTagExt, ontology::ontol::TextLikeType};
 use ordered_float::NotNan;
 use tracing::{debug, debug_span, trace};
 
 use crate::{
-    CompileErrors, NATIVE_SOURCE, NO_SPAN, Note, SourceId, SourceSpan, SpannedNote,
+    CompileErrors, Note, SpannedNote,
     def::{Def, DefKind, Defs, TypeDefFlags},
     error::CompileError,
     misc::MiscCtx,

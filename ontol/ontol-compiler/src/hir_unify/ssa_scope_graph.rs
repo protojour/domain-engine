@@ -1,6 +1,7 @@
 use ontol_hir::{
     Binder, Binding, CaptureGroup, Kind, Node, Nodes, OverloadFunc, Pack, import::arena_import,
 };
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::{
     DefId, PropId,
     var::{Var, VarSet},
@@ -9,7 +10,7 @@ use thin_vec::ThinVec;
 use tracing::{debug, warn};
 
 use crate::{
-    CompileError, SourceSpan,
+    CompileError,
     hir_unify::{UnifierError, ssa_util::scan_all_vars_and_labels},
     typed_hir::{TypedHir, TypedHirData},
 };

@@ -2,11 +2,12 @@ use std::collections::hash_map::Entry;
 
 use fnv::FnvHashSet;
 use ontol_hir::Label;
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::var::Var;
 use tracing::debug;
 
 use crate::{
-    CompileError, CompileErrors, SourceSpan,
+    CompileError, CompileErrors,
     pattern::{
         CompoundPatternAttrKind, CompoundPatternModifier, Pattern, PatternKind,
         RegexPatternCaptureNode, SetPatternElement,

@@ -1,7 +1,8 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
+use ontol_core::tag::DomainIndex;
 use ontol_runtime::{
-    DefId, DomainIndex, MapKey,
+    DefId, MapKey,
     interface::graphql::{
         data::{
             EntityData, FieldData, NodeData, ObjectData, ObjectKind, TypeAddr, TypeData, TypeKind,

@@ -1,14 +1,15 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::{
-    DefId, OntolDefTag, PropId,
+    DefId, OntolDefTag, OntolDefTagExt, PropId,
     property::{PropertyCardinality, ValueCardinality},
     var::Var,
 };
 use tracing::{debug, info};
 
 use crate::{
-    CompileError, CompileErrors, Compiler, SourceSpan,
+    CompileError, CompileErrors, Compiler,
     def::{DefKind, Defs},
     entity::entity_ctx::EntityCtx,
     pattern::{CompoundPatternAttrKind, PatId, Pattern, PatternKind, Patterns, TypePath},

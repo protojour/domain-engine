@@ -1,13 +1,14 @@
 use std::fmt::Debug;
 
 use ontol_hir::visitor::HirVisitor;
+use ontol_parser::source::SourceSpan;
 use ontol_runtime::{
     MapDirection, MapFlags,
     var::{Var, VarAllocator},
 };
 
 use crate::{
-    Compiler, SourceSpan,
+    Compiler,
     typed_hir::{HirFunc, IntoTypedHirData, TypedHir, TypedHirData},
 };
 

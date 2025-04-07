@@ -3,7 +3,7 @@ use std::fmt::{Debug, Display};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    OntolDefTag,
+    OntolDefTag, OntolDefTagExt,
     format_utils::Literal,
     ontology::domain::VertexOrder,
     value::{Value, ValueDebug},

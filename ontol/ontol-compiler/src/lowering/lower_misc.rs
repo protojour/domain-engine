@@ -3,22 +3,22 @@ use std::{
     ops::Range,
 };
 
+use ontol_core::{span::U32Span, tag::DomainIndex};
 use ontol_parser::{
-    U32Span,
+    basic_syntax::extract_documentation,
     cst::{
         inspect as insp,
         view::{NodeView, NodeViewExt, TokenView, TokenViewExt, TypedView},
     },
     lexer::{kind::Kind, unescape::unescape_regex},
 };
-use ontol_runtime::{DefId, DomainIndex, OntolDefTag, property::ValueCardinality};
+use ontol_runtime::{DefId, OntolDefTag, OntolDefTagExt, property::ValueCardinality};
 use tracing::debug;
 
 use crate::{
     CompileError,
     def::{DefKind, TypeDef, TypeDefFlags},
     namespace::DocId,
-    ontol_syntax::extract_documentation,
 };
 
 use super::context::{BlockContext, CstLowering, Res, RootDefs};

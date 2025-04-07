@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use ::serde::{Deserialize, Serialize};
+use ontol_core::tag::ValueTagError;
 use ontol_macros::RustDoc;
 use tracing::error;
 use ulid::Ulid;
@@ -8,7 +9,7 @@ use uuid::Uuid;
 
 use crate::{
     DefId,
-    value::{OctetSequence, Value, ValueTagError},
+    value::{OctetSequence, Value},
 };
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize, RustDoc)]

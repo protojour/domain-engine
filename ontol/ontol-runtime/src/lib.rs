@@ -5,12 +5,10 @@ use std::{collections::BTreeSet, fmt::Debug, str::FromStr};
 use ::serde::{Deserialize, Serialize};
 use fnv::FnvBuildHasher;
 use indexmap::IndexMap;
-use num_enum::TryFromPrimitive;
 use ontol_core::impl_ontol_debug;
+pub use ontol_core::tag::{DomainIndex, TagFlags};
 use ontol_macros::OntolDebug;
 use smallvec::SmallVec;
-use value::{TagFlags, ValueTagError};
-use vec_map::VecMapKey;
 
 pub use ontol_core::property;
 
@@ -29,69 +27,11 @@ pub mod sequence;
 pub mod tuple;
 pub mod value;
 pub mod var;
-pub mod vec_map;
 pub mod vm;
 
 mod equality;
 
 extern crate self as ontol_runtime;
-
-/// Identifies one domain of ONTOL code within one ontology or or compiler session.
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub struct DomainIndex(u16);
-
-impl DomainIndex {
-    /// The ontol domain is always the first domain in an ontology
-    pub const fn ontol() -> Self {
-        Self(0)
-    }
-
-    pub const fn second() -> Self {
-        Self(1)
-    }
-
-    pub const fn from_u16(value: u16) -> Result<Self, ValueTagError> {
-        if value <= TagFlags::PKG_MASk.bits() {
-            Ok(Self(value))
-        } else {
-            Err(ValueTagError)
-        }
-    }
-
-    pub fn increase(&mut self) -> Result<(), ValueTagError> {
-        if self.0 < TagFlags::PKG_MASk.bits() {
-            self.0 += 1;
-            Ok(())
-        } else {
-            Err(ValueTagError)
-        }
-    }
-
-    pub const fn index(self) -> u16 {
-        self.0
-    }
-}
-
-impl VecMapKey for DomainIndex {
-    fn index(&self) -> usize {
-        self.0 as usize
-    }
-}
-
-impl TryFrom<u16> for DomainIndex {
-    type Error = ValueTagError;
-
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
-        Self::from_u16(value)
-    }
-}
-
-/// This forces single-line output even when pretty-printed
-impl ::std::fmt::Debug for DomainIndex {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "DomainIndex({:?})", self.0)
-    }
-}
 
 /// One definition inside some ONTOL domain.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
@@ -105,7 +45,7 @@ impl DefId {
 
 impl Debug for DefId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "def@{}:{}", self.0.0, self.1)
+        write!(f, "def@{}:{}", self.0.index(), self.1)
     }
 }
 
@@ -122,7 +62,10 @@ impl FromStr for DefId {
             .ok_or(ParseDefIdError)?;
         let domain_idx = domain_idx.parse::<u16>().map_err(|_| ParseDefIdError)?;
         let def_tag = def_tag.parse::<u16>().map_err(|_| ParseDefIdError)?;
-        Ok(DefId(DomainIndex(domain_idx), def_tag))
+        Ok(DefId(
+            DomainIndex::from_u16_and_mask(domain_idx, TagFlags::PKG_MASK),
+            def_tag,
+        ))
     }
 }
 
@@ -131,83 +74,24 @@ impl_ontol_debug!(DefId);
 impl DefId {
     #[inline]
     pub const fn unit() -> Self {
-        DefId(DomainIndex(0), OntolDefTag::Unit as u16)
+        DefId(DomainIndex::ontol(), OntolDefTag::Unit as u16)
     }
 }
 
-/// NB: The numbers here get serialized and persisted.
-/// Think twice before changing number values.
-#[repr(u16)]
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, TryFromPrimitive)]
-pub enum OntolDefTag {
-    /// The ONTOL domain itself
-    Ontol = 0,
-    Unit = 1,
-    False = 2,
-    True = 3,
-    Boolean = 4,
-    EmptySequence = 5,
-    EmptyText = 6,
-    Number = 7,
-    Integer = 8,
-    I64 = 9,
-    Float = 10,
-    F32 = 11,
-    F64 = 12,
-    Serial = 13,
-    Text = 14,
-    Octets = 15,
-    Vertex = 16,
-    Uuid = 17,
-    Ulid = 18,
-    DateTime = 19,
-    /// An open, domainless relationship between some value and arbitrary, quasi-structured data
-    RelationOpenData = 20,
-    RelationEdge = 21,
-    RelationFlatUnion = 22,
-    RelationIs = 23,
-    RelationIdentifies = 24,
-    RelationId = 25,
-    RelationIndexed = 26,
-    RelationStoreKey = 27,
-    RelationMin = 28,
-    RelationMax = 29,
-    RelationDefault = 30,
-    RelationGen = 31,
-    RelationOrder = 32,
-    RelationDirection = 33,
-    RelationExample = 34,
-    RelationDataStoreAddress = 35,
-    /// Union of `ascending` and `descending`
-    /// TODO: RelationDirection and this union can be the same def, which would be cleaner:
-    UnionDirection = 36,
-    SymAscending = 37,
-    SymDescending = 38,
-    /// The `auto` value generator mode
-    Auto = 39,
-    /// Create time for generators, can also be used as a domain-independent property
-    CreateTime = 40,
-    /// Update time for generators, can also be used as a domain-independent property
-    UpdateTime = 41,
-    Format = 42,
-    FormatHex = 43,
-    FormatBase64 = 44,
+pub use ontol_core::tag::OntolDefTag;
 
-    RelationRepr = 45,
-    /// The `crdt` symbol
-    Crdt = 46,
-    /// This must be the last entry. Update the value accordingly.
-    _LastEntry = 47,
+pub trait OntolDefTagExt {
+    fn def_id(self) -> DefId;
+
+    fn prop_id_0(self) -> PropId;
 }
 
-impl_ontol_debug!(OntolDefTag);
-
-impl OntolDefTag {
-    pub const fn def_id(self) -> DefId {
-        DefId(DomainIndex(0), self as u16)
+impl OntolDefTagExt for OntolDefTag {
+    fn def_id(self) -> DefId {
+        DefId(DomainIndex::ontol(), self as u16)
     }
 
-    pub const fn prop_id_0(self) -> PropId {
+    fn prop_id_0(self) -> PropId {
         PropId(self.def_id(), DefPropTag(0))
     }
 }
@@ -286,11 +170,11 @@ impl ::std::fmt::Debug for DefPropTag {
 pub struct PropId(pub DefId, pub DefPropTag);
 
 impl PropId {
-    pub const fn open_data() -> Self {
+    pub fn open_data() -> Self {
         Self(OntolDefTag::RelationOpenData.def_id(), DefPropTag(0))
     }
 
-    pub const fn data_store_address() -> Self {
+    pub fn data_store_address() -> Self {
         Self(
             OntolDefTag::RelationDataStoreAddress.def_id(),
             DefPropTag(0),
@@ -305,13 +189,13 @@ impl PropId {
 /// This forces single-line output even when pretty-printed
 impl ::std::fmt::Debug for PropId {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "p@{}:{}:{}", self.0.0.0, self.0.1, self.1.0)
+        write!(f, "p@{}:{}:{}", self.0.0.index(), self.0.1, self.1.0)
     }
 }
 
 impl ::std::fmt::Display for PropId {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "p@{}:{}:{}", self.0.0.0, self.0.1, self.1.0)
+        write!(f, "p@{}:{}:{}", self.0.0.index(), self.0.1, self.1.0)
     }
 }
 
@@ -324,7 +208,10 @@ impl FromStr for PropId {
         s = s.strip_prefix("p@").ok_or(())?;
 
         let mut iterator = s.split(':');
-        let domain_idx = DomainIndex(iterator.next().ok_or(())?.parse().map_err(|_| ())?);
+        let domain_idx = DomainIndex::from_u16_and_mask(
+            iterator.next().ok_or(())?.parse().map_err(|_| ())?,
+            TagFlags::PKG_MASK,
+        );
         let def_idx: u16 = iterator.next().ok_or(())?.parse().map_err(|_| ())?;
         let def_rel_tag: u16 = iterator.next().ok_or(())?.parse().map_err(|_| ())?;
 
