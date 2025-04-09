@@ -122,7 +122,7 @@ impl<V: NodeView> CstLowering<'_, '_, V> {
                 match token.kind() {
                     Kind::Number => {
                         let lit = self.ctx.compiler.str_ctx.intern(token.slice());
-                        let def_id = self.ctx.compiler.defs.add_def(
+                        let def_id = self.ctx.compiler.defs.add_transient_def(
                             DefKind::NumberLiteral(lit),
                             DomainIndex::ontol(),
                             self.ctx.source_span(token.span()),
@@ -212,7 +212,11 @@ impl<V: NodeView> CstLowering<'_, '_, V> {
                 if let Some(union_def_id) = self.ctx.anonymous_unions.get(&members) {
                     Some(*union_def_id)
                 } else {
-                    let union_def_id = self.ctx.compiler.defs.alloc_def_id(self.ctx.domain_index);
+                    let union_def_id = self
+                        .ctx
+                        .compiler
+                        .defs
+                        .alloc_persistent_def_id(self.ctx.domain_index);
                     self.ctx.set_def_kind(
                         union_def_id,
                         DefKind::InlineUnion(members.clone()),

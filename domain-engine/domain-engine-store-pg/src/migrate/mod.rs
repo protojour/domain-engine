@@ -245,7 +245,7 @@ pub async fn migrate_ontology(
                     .count();
 
                 if unique_count > 1 {
-                    let edge_id = DefId(*domain_index, *edge_tag);
+                    let edge_id = DefId::new_persistent(*domain_index, *edge_tag);
                     return Err(anyhow!(
                         "edge {edge_id:?} has more than one unique cardinal, which doesn't work yet"
                     ));

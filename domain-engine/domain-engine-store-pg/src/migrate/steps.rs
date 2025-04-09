@@ -222,7 +222,7 @@ async fn migrate_domain_edges_steps(
     let pg_domain = ctx.domains.get_mut(&domain_index).unwrap();
     let mut param_def_ids: Vec<(EdgeId, DefId)> = vec![];
     for (edge_id, edge_info) in domain.edges() {
-        let edge_tag = edge_id.1;
+        let edge_tag = edge_id.tag();
         let ident = &ontology_defs[edge_info.ident];
         let table_name = format!("e_{ident}").into_boxed_str();
 

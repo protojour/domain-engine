@@ -242,12 +242,18 @@ pub enum RelationContext {
 }
 
 pub struct Defs<'m> {
-    def_id_allocators: FnvHashMap<DomainIndex, u16>,
+    def_id_allocators: FnvHashMap<DomainIndex, DefIdAlloc>,
     pub(crate) table: FnvHashMap<DefId, Def<'m>>,
     pub(crate) text_literals: HashMap<&'m str, DefId>,
     pub(crate) regex_strings: HashMap<&'m str, DefId>,
     pub(crate) literal_regex_meta_table: FnvHashMap<DefId, RegexMeta<'m>>,
     pub(crate) text_like_types: FnvHashMap<DefId, TextLikeType>,
+}
+
+#[derive(Clone, Default)]
+struct DefIdAlloc {
+    persistent: u16,
+    transient: u16,
 }
 
 impl Default for Defs<'_> {
@@ -265,8 +271,14 @@ pub struct RegexMeta<'m> {
 
 impl<'m> Defs<'m> {
     fn new() -> Self {
-        let mut def_id_allocators: FnvHashMap<DomainIndex, u16> = Default::default();
-        def_id_allocators.insert(DomainIndex::ontol(), OntolDefTag::_LastEntry as u16);
+        let mut def_id_allocators: FnvHashMap<DomainIndex, DefIdAlloc> = Default::default();
+        def_id_allocators.insert(
+            DomainIndex::ontol(),
+            DefIdAlloc {
+                persistent: OntolDefTag::_LastEntry as u16,
+                transient: 0,
+            },
+        );
 
         Self {
             def_id_allocators,
@@ -311,47 +323,84 @@ impl<'m> Defs<'m> {
         })
     }
 
-    pub fn alloc_def_id(&mut self, domain_index: DomainIndex) -> DefId {
-        let idx = self.def_id_allocators.entry(domain_index).or_default();
-        let def_id = DefId(domain_index, *idx);
-        *idx += 1;
+    pub fn alloc_persistent_def_id(&mut self, domain_index: DomainIndex) -> DefId {
+        if domain_index == DomainIndex::ontol() {
+            panic!("ontol domain should not dynamically allocate persistent DefIds");
+        }
+
+        let alloc = self.def_id_allocators.entry(domain_index).or_default();
+        let def_id = DefId::new_persistent(domain_index, alloc.persistent);
+
+        alloc.persistent += 1;
 
         def_id
     }
 
-    pub fn peek_next_def_id(&self, domain_index: DomainIndex) -> DefId {
-        let idx = self
-            .def_id_allocators
-            .get(&domain_index)
-            .copied()
-            .unwrap_or(0);
-        DefId(domain_index, idx)
+    pub fn register_persistent_def_id(&mut self, domain_index: DomainIndex, tag: u16) -> DefId {
+        let alloc = self.def_id_allocators.entry(domain_index).or_default();
+        let def_id = DefId::new_persistent(domain_index, tag);
+        if tag >= alloc.persistent {
+            alloc.persistent = tag + 1;
+        }
+
+        def_id
     }
 
-    pub fn iter_domain_indices(&self) -> impl Iterator<Item = DomainIndex> + use<'_> {
-        self.def_id_allocators.keys().copied()
+    pub fn alloc_transient_def_id(&mut self, domain_index: DomainIndex) -> DefId {
+        let alloc = self.def_id_allocators.entry(domain_index).or_default();
+        let def_id = DefId::new_transient(domain_index, alloc.transient);
+        alloc.transient += 1;
+
+        def_id
     }
 
     pub fn iter_domain_def_ids(
         &self,
         domain_index: DomainIndex,
     ) -> impl Iterator<Item = DefId> + use<> {
-        let max_idx = self
+        let alloc = self
             .def_id_allocators
             .get(&domain_index)
             .cloned()
-            .unwrap_or(0);
+            .unwrap_or_default();
 
-        (0..max_idx).map(move |idx| DefId(domain_index, idx))
+        (0..alloc.persistent)
+            .map(move |idx| DefId::new_persistent(domain_index, idx))
+            .chain((0..alloc.transient).map(move |idx| DefId::new_transient(domain_index, idx)))
     }
 
-    pub fn add_def(&mut self, kind: DefKind<'m>, package: DomainIndex, span: SourceSpan) -> DefId {
-        let def_id = self.alloc_def_id(package);
+    pub fn add_persistent_def(
+        &mut self,
+        kind: DefKind<'m>,
+        domain_index: DomainIndex,
+        span: SourceSpan,
+    ) -> DefId {
+        let def_id = self.alloc_persistent_def_id(domain_index);
         self.table.insert(
             def_id,
             Def {
                 id: def_id,
-                domain_index: package,
+                domain_index,
+                span,
+                kind,
+            },
+        );
+
+        def_id
+    }
+
+    pub fn add_transient_def(
+        &mut self,
+        kind: DefKind<'m>,
+        domain_index: DomainIndex,
+        span: SourceSpan,
+    ) -> DefId {
+        let def_id = self.alloc_transient_def_id(domain_index);
+        self.table.insert(
+            def_id,
+            Def {
+                id: def_id,
+                domain_index,
                 span,
                 kind,
             },
@@ -365,7 +414,11 @@ impl<'m> Defs<'m> {
             Some(def_id) => *def_id,
             None => {
                 let lit = strings.intern(lit);
-                let def_id = self.add_def(DefKind::TextLiteral(lit), DomainIndex::ontol(), NO_SPAN);
+                let def_id = self.add_transient_def(
+                    DefKind::TextLiteral(lit),
+                    DomainIndex::ontol(),
+                    NO_SPAN,
+                );
                 self.text_literals.insert(lit, def_id);
                 def_id
             }
@@ -381,7 +434,7 @@ impl<'m> Defs<'m> {
     }
 
     pub fn add_ontol(&mut self, tag: OntolDefTag, kind: DefKind<'m>) -> DefId {
-        let def_id = DefId(DomainIndex::ontol(), tag as u16);
+        let def_id = DefId::new_persistent(DomainIndex::ontol(), tag as u16);
         self.table.insert(
             def_id,
             Def {
@@ -425,7 +478,7 @@ impl<'m> Defs<'m> {
 }
 
 impl<'m> Compiler<'m> {
-    pub fn add_named_def(
+    pub fn add_named_transient_def(
         &mut self,
         name: &'m str,
         space: Space,
@@ -433,7 +486,7 @@ impl<'m> Compiler<'m> {
         parent: DefId,
         span: SourceSpan,
     ) -> DefId {
-        let def_id = self.defs.alloc_def_id(parent.domain_index());
+        let def_id = self.defs.alloc_transient_def_id(parent.domain_index());
         self.namespaces
             .get_namespace_mut(parent, space)
             .insert(name, def_id);
@@ -480,9 +533,9 @@ impl<'m> Compiler<'m> {
             None => {
                 let lit = self.str_ctx.intern(lit);
                 let hir = parse_literal_regex(lit, span)?;
-                let def_id = self
-                    .defs
-                    .add_def(DefKind::Regex(lit), DomainIndex::ontol(), NO_SPAN);
+                let def_id =
+                    self.defs
+                        .add_transient_def(DefKind::Regex(lit), DomainIndex::ontol(), NO_SPAN);
                 self.defs.regex_strings.insert(lit, def_id);
                 self.defs.literal_regex_meta_table.insert(def_id, hir);
 

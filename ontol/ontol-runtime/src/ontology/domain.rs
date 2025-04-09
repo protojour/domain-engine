@@ -3,16 +3,13 @@
 use std::fmt::Debug;
 
 use fnv::FnvHashMap;
-use ontol_core::{
-    OntologyDomainId, TopologyGeneration,
-    vec_map::{VecMap, VecMapKey},
-};
+use ontol_core::{OntologyDomainId, TopologyGeneration, vec_map::VecMap};
 use ontol_macros::OntolDebug;
 use serde::{Deserialize, Serialize};
 use thin_vec::ThinVec;
 
 use crate::{
-    DefId, DefIdSet, FnvIndexMap, PropId, impl_ontol_debug,
+    DefId, DefIdSet, DefTag, FnvIndexMap, PropId, impl_ontol_debug,
     interface::serde::operator::SerdeOperatorAddr, property::Cardinality, query::order::Direction,
     tuple::CardinalIdx,
 };
@@ -31,16 +28,9 @@ pub struct Domain {
     unique_name: TextConstant,
     generation: TopologyGeneration,
 
-    /// Types by def tag (the type's index within the domain)
-    defs: VecMap<DefTag, Def>,
-}
-
-struct DefTag(pub u16);
-
-impl VecMapKey for DefTag {
-    fn index(&self) -> usize {
-        self.0 as usize
-    }
+    /// defs by tag (the type's index within the domain)
+    persistent_defs: VecMap<DefTag, Def>,
+    transient_defs: VecMap<DefTag, Def>,
 }
 
 impl Domain {
@@ -55,7 +45,8 @@ impl Domain {
             def_id,
             unique_name,
             generation,
-            defs: Default::default(),
+            persistent_defs: Default::default(),
+            transient_defs: Default::default(),
         }
     }
 
@@ -77,22 +68,29 @@ impl Domain {
     }
 
     pub fn def_count(&self) -> usize {
-        self.defs.len()
+        self.persistent_defs.len()
     }
 
+    #[inline]
     pub fn def(&self, def_id: DefId) -> &Def {
-        match self.defs.get(&DefTag(def_id.1)) {
-            Some(def) => def,
-            None => panic!("{def_id:?} is not in the ontology"),
+        self.def_option(def_id)
+            .unwrap_or_else(|| panic!("{def_id:?} is not in the ontology"))
+    }
+
+    #[inline]
+    pub fn def_option(&self, def_id: DefId) -> Option<&Def> {
+        if def_id.is_persistent() {
+            self.persistent_defs.get(&DefTag(def_id.tag()))
+        } else {
+            self.transient_defs.get(&DefTag(def_id.tag()))
         }
     }
 
-    pub fn def_option(&self, def_id: DefId) -> Option<&Def> {
-        self.defs.get(&DefTag(def_id.1))
-    }
-
     pub fn defs(&self) -> impl Iterator<Item = &Def> {
-        self.defs.iter().map(|(_idx, def)| def)
+        self.persistent_defs
+            .iter()
+            .map(|(_idx, def)| def)
+            .chain(self.transient_defs.iter().map(|(_idx, def)| def))
     }
 
     pub fn edges(&self) -> impl Iterator<Item = (&DefId, &EdgeInfo)> {
@@ -123,7 +121,11 @@ impl Domain {
     }
 
     fn register_def(&mut self, def: Def) {
-        self.defs.insert(DefTag(def.id.1), def);
+        if def.id.is_persistent() {
+            self.persistent_defs.insert(DefTag(def.id.tag()), def);
+        } else {
+            self.transient_defs.insert(DefTag(def.id.tag()), def);
+        }
     }
 }
 
@@ -413,8 +415,8 @@ impl Debug for EdgeCardinalProjection {
         write!(
             f,
             "{}:{}:{}<-{}",
-            self.edge_id.0.index(),
-            self.edge_id.1,
+            self.edge_id.domain_index().index(),
+            self.edge_id.tag(),
             self.object,
             self.subject,
         )

@@ -36,11 +36,16 @@ fn expected_defs() -> juniper::Value<GqlScalar> {
     }
 
     impl Builder {
-        fn add(&mut self, ident: &str, kind: &str) {
+        fn add(&mut self, ident: &str, kind: &str, persistent: bool) {
             let mut obj = juniper::Object::with_capacity(2);
             obj.add_field(
                 "id",
-                format!("01GNYFZP30ED0EZ1579TH0D55P§0:{}", self.next_tag).into(),
+                format!(
+                    "{}01GNYFZP30ED0EZ1579TH0D55P§0:{}",
+                    if persistent { "" } else { "~" },
+                    self.next_tag
+                )
+                .into(),
             );
             obj.add_field("ident", ident.into());
             obj.add_field("kind", kind.into());
@@ -49,59 +54,73 @@ fn expected_defs() -> juniper::Value<GqlScalar> {
             self.list.push(juniper::Value::Object(obj));
         }
 
+        fn add_persistent(&mut self, ident: &str, kind: &str) {
+            self.add(ident, kind, true);
+        }
+
+        fn add_transient(&mut self, ident: &str, kind: &str) {
+            self.add(ident, kind, false);
+        }
+
         fn skip(&mut self, n: usize) {
             self.next_tag += n;
+        }
+
+        fn reset(&mut self) {
+            self.next_tag = 0;
         }
     }
 
     let mut b = Builder::default();
 
-    b.add("ontol", "DOMAIN");
+    b.add_persistent("ontol", "DOMAIN");
     b.skip(1);
-    b.add("false", "DATA");
-    b.add("true", "DATA");
-    b.add("boolean", "DATA");
+    b.add_persistent("false", "DATA");
+    b.add_persistent("true", "DATA");
+    b.add_persistent("boolean", "DATA");
     b.skip(2);
-    b.add("number", "DATA");
-    b.add("integer", "DATA");
-    b.add("i64", "DATA");
-    b.add("float", "DATA");
-    b.add("f32", "DATA");
-    b.add("f64", "DATA");
-    b.add("serial", "DATA");
-    b.add("text", "DATA");
-    b.add("octets", "DATA");
-    b.add("vertex", "DATA");
-    b.add("uuid", "DATA");
-    b.add("ulid", "DATA");
-    b.add("datetime", "DATA");
+    b.add_persistent("number", "DATA");
+    b.add_persistent("integer", "DATA");
+    b.add_persistent("i64", "DATA");
+    b.add_persistent("float", "DATA");
+    b.add_persistent("f32", "DATA");
+    b.add_persistent("f64", "DATA");
+    b.add_persistent("serial", "DATA");
+    b.add_persistent("text", "DATA");
+    b.add_persistent("octets", "DATA");
+    b.add_persistent("vertex", "DATA");
+    b.add_persistent("uuid", "DATA");
+    b.add_persistent("ulid", "DATA");
+    b.add_persistent("datetime", "DATA");
     b.skip(3);
-    b.add("is", "RELATION");
+    b.add_persistent("is", "RELATION");
     b.skip(3);
-    b.add("store_key", "RELATION");
-    b.add("min", "RELATION");
-    b.add("max", "RELATION");
-    b.add("default", "RELATION");
-    b.add("gen", "RELATION");
-    b.add("order", "RELATION");
-    b.add("direction", "RELATION");
-    b.add("example", "RELATION");
+    b.add_persistent("store_key", "RELATION");
+    b.add_persistent("min", "RELATION");
+    b.add_persistent("max", "RELATION");
+    b.add_persistent("default", "RELATION");
+    b.add_persistent("gen", "RELATION");
+    b.add_persistent("order", "RELATION");
+    b.add_persistent("direction", "RELATION");
+    b.add_persistent("example", "RELATION");
     b.skip(2);
-    b.add("ascending", "DATA");
-    b.add("descending", "DATA");
-    b.add("auto", "GENERATOR");
-    b.add("create_time", "GENERATOR");
-    b.add("update_time", "GENERATOR");
-    b.add("format", "DATA");
+    b.add_persistent("ascending", "DATA");
+    b.add_persistent("descending", "DATA");
+    b.add_persistent("auto", "GENERATOR");
+    b.add_persistent("create_time", "GENERATOR");
+    b.add_persistent("update_time", "GENERATOR");
+    b.add_persistent("format", "DATA");
     b.skip(2);
-    b.add("repr", "RELATION");
-    b.add("crdt", "GENERATOR");
+    b.add_persistent("repr", "RELATION");
+    b.add_persistent("crdt", "GENERATOR");
+
+    b.reset();
     b.skip(6);
-    b.add("+", "FUNCTION");
-    b.add("-", "FUNCTION");
-    b.add("*", "FUNCTION");
-    b.add("/", "FUNCTION");
-    b.add("append", "FUNCTION");
+    b.add_transient("+", "FUNCTION");
+    b.add_transient("-", "FUNCTION");
+    b.add_transient("*", "FUNCTION");
+    b.add_transient("/", "FUNCTION");
+    b.add_transient("append", "FUNCTION");
 
     juniper::Value::List(b.list)
 }

@@ -30,8 +30,8 @@ impl DomainUrl {
     }
 
     pub fn short_name(&self) -> &str {
-        if let Some(segments) = self.0.path_segments() {
-            if let Some(last) = segments.last() {
+        if let Some(mut segments) = self.0.path_segments() {
+            if let Some(last) = segments.next_back() {
                 return last;
             }
         }
@@ -53,8 +53,8 @@ impl DomainUrl {
 
                     segments.pop();
 
-                    if let Some(orig_segments) = other.0.path_segments() {
-                        if let Some(yo) = orig_segments.last() {
+                    if let Some(mut orig_segments) = other.0.path_segments() {
+                        if let Some(yo) = orig_segments.next_back() {
                             segments.push(yo);
                         }
                     }

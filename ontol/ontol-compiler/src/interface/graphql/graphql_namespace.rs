@@ -119,7 +119,7 @@ impl<'o> GraphqlNamespace<'o> {
 
         if let Some(domain_disambiguation) = &self.domain_disambiguation {
             if let Some(def_id) = elements.iter().find_map(|elem| elem.def_id()) {
-                let domain_index = def_id.0;
+                let domain_index = def_id.domain_index();
                 if domain_index != domain_disambiguation.root_domain {
                     output.push('_');
                     if let Some(domain) = domain_disambiguation
@@ -225,7 +225,11 @@ impl ProcessName for Typename<'_, '_> {
 fn format_name_pre_rewrite<'k>(def_id: DefId, kind: &'k DefKind) -> Cow<'k, str> {
     match kind.opt_identifier() {
         Some(name) => name,
-        None => Cow::Owned(format!("_anon{}_{}", def_id.0.index(), def_id.1)),
+        None => Cow::Owned(format!(
+            "_anon{}_{}",
+            def_id.domain_index().index(),
+            def_id.tag()
+        )),
     }
 }
 

@@ -10,6 +10,7 @@ use fnv::FnvHashMap;
 use itertools::{Itertools, Position};
 use ontol_core::tag::{DomainIndex, TagFlags};
 use thin_vec::ThinVec;
+use tracing::info;
 
 use crate::{
     DefId, OntolDefTag, OntolDefTagExt, PropId,
@@ -133,7 +134,7 @@ impl Value {
         }
     }
 
-    pub const fn type_def_id(&self) -> DefId {
+    pub fn type_def_id(&self) -> DefId {
         self.tag().def_id()
     }
 
@@ -324,16 +325,22 @@ pub struct ValueTag {
 impl ValueTag {
     pub const fn unit() -> Self {
         Self {
-            first: 0,
+            first: DomainIndex::ontol()
+                .into_persistent()
+                .index_with_persistent_flag(),
             second: OntolDefTag::Unit as u16,
         }
     }
 
     pub const fn def_id(&self) -> DefId {
-        DefId(
-            DomainIndex::from_u16_and_mask(self.first, TagFlags::PKG_MASK),
-            self.second,
-        )
+        DefId {
+            domain_index: DomainIndex::from_u16_and_mask(
+                self.first,
+                TagFlags::PKG_MASK.union(TagFlags::PERSISTENT),
+            )
+            .index_with_tag_flags(),
+            tag: self.second,
+        }
     }
 
     pub fn with_is_update(mut self, is_update: bool) -> Self {
@@ -344,9 +351,15 @@ impl ValueTag {
     }
 
     pub fn set_def_id(&mut self, def_id: DefId) {
-        self.first =
-            def_id.domain_index().index() | (self.first & TagFlags::PKG_MASK.complement().bits());
-        self.second = def_id.1;
+        self.first = def_id
+            .domain_index_with_persistent_flag()
+            .index_with_persistent_flag()
+            | (self.first
+                & (TagFlags::PKG_MASK
+                    .union(TagFlags::PERSISTENT)
+                    .complement()
+                    .bits()));
+        self.second = def_id.tag();
     }
 
     pub fn set_is_update(&mut self) {
@@ -375,18 +388,21 @@ impl Debug for ValueTag {
     }
 }
 
-impl From<ValueTag> for DefId {
-    fn from(value: ValueTag) -> Self {
-        value.def_id()
-    }
-}
-
 impl From<DefId> for ValueTag {
     fn from(value: DefId) -> Self {
-        Self {
-            first: value.domain_index().index(),
-            second: value.1,
-        }
+        let ret = Self {
+            first: value
+                .domain_index_with_persistent_flag()
+                .index_with_persistent_flag(),
+            second: value.tag(),
+        };
+
+        info!(
+            "from DefId for ValueTag {value:?} => {:?} {:?}",
+            ret.first, ret.second
+        );
+
+        ret
     }
 }
 

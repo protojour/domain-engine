@@ -81,7 +81,13 @@ async fn execute_migration_step(
             vertex_def_id,
             table_name,
         } => {
-            let vertex_def_tag = vertex_def_id.1 as i32;
+            if !vertex_def_id.is_persistent() {
+                return Err(anyhow!(
+                    "{vertex_def_id:?} is not persistent; cannot be migrated"
+                ));
+            }
+
+            let vertex_def_tag = vertex_def_id.tag() as i32;
             let def_domain_key = ctx
                 .domains
                 .get(&vertex_def_id.domain_index())
@@ -214,7 +220,9 @@ async fn execute_migration_step(
             let pg_domain = ctx.domains.get_mut(&domain_index).unwrap();
             let pg_table = match table_id {
                 PgTableIdUnion::Def(def_id) => pg_domain.datatables.get_mut(&def_id),
-                PgTableIdUnion::Edge(edge_id) => pg_domain.edgetables.get_mut(&edge_id.def_id().1),
+                PgTableIdUnion::Edge(edge_id) => {
+                    pg_domain.edgetables.get_mut(&edge_id.def_id().tag())
+                }
             }
             .unwrap();
 
@@ -348,7 +356,7 @@ async fn execute_migration_step(
                 &[
                     &pg_table.key,
                     &pg_domain.key,
-                    &(index_def_id.1 as i32),
+                    &(index_def_id.tag() as i32),
                     &index_type,
                     &column_tuple
                         .iter()
@@ -655,7 +663,7 @@ async fn execute_migration_step(
 
             txn.execute(
                 "UPDATE m6mreg.domaintable SET(table_name = $1) WHERE domain_key = $2 AND def_tag = $3",
-                &[&new_table, &domain_key, &(def_id.1 as i32)],
+                &[&new_table, &domain_key, &(def_id.tag() as i32)],
             )
             .await?;
 

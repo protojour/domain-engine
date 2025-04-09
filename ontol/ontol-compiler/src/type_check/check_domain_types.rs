@@ -5,7 +5,7 @@ use ontol_runtime::{
     ontology::ontol::{TextLikeType, ValueGenerator},
     property::{PropertyCardinality, ValueCardinality},
 };
-use tracing::{debug, instrument, trace};
+use tracing::{debug, error, instrument, trace};
 
 use crate::{
     def::{Def, DefKind},
@@ -137,7 +137,9 @@ impl TypeCheck<'_, '_> {
                 let relation_repr_kind = self
                     .repr_ctx
                     .get_repr_kind(&meta.relationship.relation_def_id)
-                    .unwrap();
+                    .unwrap_or_else(|| {
+                        panic!("no relation at {:?}", meta.relationship.relation_def_id)
+                    });
 
                 match relation_repr_kind {
                     ReprKind::Unit => {
@@ -145,6 +147,11 @@ impl TypeCheck<'_, '_> {
                         let object_repr_kind = self.repr_ctx.get_repr_kind(&object.0).unwrap();
 
                         if !matches!(object_repr_kind, ReprKind::Union(_, UnionBound::Struct)) {
+                            error!(
+                                "must be struct union: {object_repr_kind:?} relation_def_id={:?}",
+                                meta.relationship.relation_def_id
+                            );
+
                             CompileError::FlattenedRelationshipObjectMustBeStructUnion
                                 .span(object.1)
                                 .report(&mut self.errors);

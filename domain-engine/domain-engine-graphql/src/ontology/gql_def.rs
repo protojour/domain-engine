@@ -60,16 +60,12 @@ impl Def {
     /// The identifier of this def.
     /// The ID is unique only within this particular ontology.
     fn id(&self, ctx: &OntologyCtx) -> gql_id::DefId {
-        let domain = ctx.domain_by_index(self.id.domain_index()).unwrap();
-        gql_id::DefId {
-            domain_id: domain.domain_id().id,
-            def_tag: self.id.1,
-        }
+        super::gql_id::DefId::new(self.id, ctx)
     }
 
     /// The tag of this def, unique within its domain.
     fn tag(&self) -> i32 {
-        self.id.1.into()
+        self.id.tag().into()
     }
 
     /// The domain of this Def

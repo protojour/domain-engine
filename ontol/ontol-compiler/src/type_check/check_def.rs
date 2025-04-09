@@ -31,7 +31,7 @@ impl<'m> TypeCheck<'_, 'm> {
             .defs
             .table
             .get(&def_id)
-            .expect("BUG: definition not found");
+            .unwrap_or_else(|| panic!("BUG: definition {def_id:?} not found"));
 
         match &def.kind {
             DefKind::Type(TypeDef {

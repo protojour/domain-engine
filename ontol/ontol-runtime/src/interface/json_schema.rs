@@ -90,14 +90,17 @@ impl Serialize for OpenApiSchemas<'_> {
 
         // serialize schema definitions belonging to the domain first
         for (def_id, operator_addr) in self.schema_graph.range(
-            SerdeDef::new(DefId(domain_index, 0), SerdeModifier::NONE)
-                ..SerdeDef::new(DefId(next_domain_index, 0), SerdeModifier::NONE),
+            SerdeDef::new(DefId::new_persistent(domain_index, 0), SerdeModifier::NONE)
+                ..SerdeDef::new(
+                    DefId::new_persistent(next_domain_index, 0),
+                    SerdeModifier::NONE,
+                ),
         ) {
             map.serialize_entry(&ctx.format_key(*def_id), &ctx.definition(*operator_addr))?;
         }
 
         for (serde_def, operator_addr) in &self.schema_graph {
-            if serde_def.def_id.0 != self.domain_index {
+            if serde_def.def_id.domain_index() != self.domain_index {
                 map.serialize_entry(&ctx.format_key(*serde_def), &ctx.definition(*operator_addr))?;
             }
         }
@@ -222,7 +225,7 @@ impl<'e> SchemaCtx<'e> {
 
         let def_id = serde_def.def_id;
         self.ontology
-            .domain_by_index(def_id.0)
+            .domain_by_index(def_id.domain_index())
             .and_then(|domain| domain.def(def_id).ident())
             .map(|constant| &self.ontology[constant])
             .map(|type_name| format!("{type_name}{modifier}"))
@@ -278,7 +281,7 @@ impl Display for Key {
         let variant = &self.0;
         let domain_index = self.0.def_id.domain_index();
 
-        write!(f, "{}_{}", domain_index.index(), self.0.def_id.1)?;
+        write!(f, "{}_{}", domain_index.index(), self.0.def_id.tag())?;
 
         if variant.modifier.contains(SerdeModifier::PRIMARY_ID) {
             write!(f, "_id")?;

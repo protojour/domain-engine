@@ -277,7 +277,7 @@ impl<'m> Compiler<'m> {
         param: DefId,
         literal: &'static str,
     ) {
-        let literal = self.defs.add_def(
+        let literal = self.defs.add_transient_def(
             DefKind::NumberLiteral(literal),
             DomainIndex::ontol(),
             NO_SPAN,
@@ -373,7 +373,7 @@ impl<'m> Compiler<'m> {
     }
 
     fn def_proc(&mut self, ident: &'static str, def_kind: DefKind<'m>, ty: TypeRef<'m>) -> DefId {
-        let def_id = self.add_named_def(
+        let def_id = self.add_named_transient_def(
             ident,
             Space::Def,
             def_kind,

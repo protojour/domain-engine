@@ -203,11 +203,15 @@ impl OntolDefTag {
 
 bitflags::bitflags! {
     /// This is both compiler, runtime and parser related, and thus lives in core, for now.
+    /// The Tag flags uses bits from the "domain index" component of a DefId.
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
     pub struct TagFlags: u16 {
-        const PKG_MASK = 0b0011111111111111;
-        const DELETE   = 0b1000000000000000;
-        const UPDATE   = 0b0100000000000000;
+        /// The mask for DomainIndex
+        const PKG_MASK   = 0b0001111111111111;
+        /// Indicates a fixed definition that is constant across domain versions
+        const PERSISTENT = 0b1000000000000000;
+        const DELETE     = 0b0100000000000000;
+        const UPDATE     = 0b0010000000000000;
     }
 }
 
@@ -235,6 +239,7 @@ impl DomainIndex {
         }
     }
 
+    #[inline]
     pub const fn from_u16_and_mask(value: u16, mask: TagFlags) -> Self {
         Self(value & mask.bits())
     }
@@ -249,7 +254,19 @@ impl DomainIndex {
     }
 
     pub const fn index(self) -> u16 {
+        self.0 & TagFlags::PKG_MASK.bits()
+    }
+
+    pub const fn index_with_persistent_flag(self) -> u16 {
+        self.0 & TagFlags::PKG_MASK.union(TagFlags::PERSISTENT).bits()
+    }
+
+    pub const fn index_with_tag_flags(self) -> u16 {
         self.0
+    }
+
+    pub const fn into_persistent(self) -> Self {
+        Self(self.0 | TagFlags::PERSISTENT.bits())
     }
 }
 

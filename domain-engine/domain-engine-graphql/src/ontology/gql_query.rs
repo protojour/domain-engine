@@ -379,6 +379,7 @@ impl Query {
                         def_id: gql_id::DefId {
                             domain_id: f.facet.domain_id,
                             def_tag: f.facet.def_tag.unwrap(),
+                            persistent: true,
                         },
                         count: f.count.try_into().unwrap_or(i32::MAX),
                     })
