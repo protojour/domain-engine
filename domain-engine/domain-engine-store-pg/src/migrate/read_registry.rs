@@ -2,11 +2,10 @@ use anyhow::Context;
 use fnv::FnvHashMap;
 use indoc::indoc;
 use ontol_runtime::{
-    DefId, DefPropTag, DomainIndex, ontology::aspects::DefsAspect, tuple::CardinalIdx,
+    DefId, DefPropTag, DomainId, DomainIndex, ontology::aspects::DefsAspect, tuple::CardinalIdx,
 };
 use tokio_postgres::Transaction;
 use tracing::debug;
-use ulid::Ulid;
 
 use crate::pg_model::{
     EdgeId, PgColumn, PgDomain, PgDomainTableType, PgEdgeCardinal, PgEdgeCardinalKind, PgIndexData,
@@ -26,9 +25,9 @@ pub async fn read_registry(
     ctx: &mut MigrationCtx,
     txn: &Transaction<'_>,
 ) -> anyhow::Result<()> {
-    let domain_index_by_ulid: FnvHashMap<Ulid, DomainIndex> = ontology_defs
+    let domain_index_by_id: FnvHashMap<DomainId, DomainIndex> = ontology_defs
         .domains()
-        .map(|(domain_index, domain)| (domain.domain_id().ulid, domain_index))
+        .map(|(domain_index, domain)| (domain.domain_id().id, domain_index))
         .collect();
     let mut domain_index_by_key: FnvHashMap<PgRegKey, DomainIndex> = Default::default();
     let mut table_by_key: FnvHashMap<PgRegKey, TableRef> = Default::default();
@@ -37,20 +36,23 @@ pub async fn read_registry(
     // domains
     for row in txn
         .query(
-            "SELECT key, uid, schema_name, has_crdt FROM m6mreg.domain",
+            "SELECT key, uid, subdomain, schema_name, has_crdt FROM m6mreg.domain",
             &[],
         )
         .await
         .context("read domains")?
     {
         let key: PgRegKey = row.get(0);
-        let uid: Ulid = row.get(1);
-        let schema_name = row.get(2);
-        let has_crdt = row.get(3);
+        let domain_id = DomainId {
+            ulid: row.get(1),
+            subdomain: u32::try_from(row.get::<_, i32>(2))?,
+        };
+        let schema_name = row.get(3);
+        let has_crdt = row.get(4);
 
         next_schema_disambiguator = i32::max(next_schema_disambiguator, key);
 
-        if let Some(domain_index) = domain_index_by_ulid.get(&uid) {
+        if let Some(domain_index) = domain_index_by_id.get(&domain_id) {
             let pg_domain = PgDomain {
                 key: Some(key),
                 schema_name,

@@ -5,6 +5,7 @@ use std::{collections::BTreeSet, fmt::Debug, str::FromStr};
 use ::serde::{Deserialize, Serialize};
 use fnv::FnvBuildHasher;
 use indexmap::IndexMap;
+pub use ontol_core::DomainId;
 use ontol_core::impl_ontol_debug;
 pub use ontol_core::tag::{DomainIndex, TagFlags};
 use ontol_macros::OntolDebug;

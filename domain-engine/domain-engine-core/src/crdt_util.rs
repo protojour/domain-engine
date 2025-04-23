@@ -7,7 +7,7 @@ use automerge::{
 };
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    DefId, DefPropTag, PropId,
+    DefId, DefPropTag, DomainId, PropId,
     attr::{Attr, AttrMatrix},
     crdt::CrdtStruct,
     ontology::{
@@ -19,7 +19,6 @@ use ontol_runtime::{
 };
 use smallvec::smallvec;
 use tracing::error;
-use ulid::Ulid;
 
 use crate::{
     DomainResult, domain_error::DomainErrorKind, make_interfacable::MakeInterfacable,
@@ -191,11 +190,11 @@ impl<'e> MakeStorable<'e> {
         let def_id = prop_id.0;
 
         let domain = self.defs.domain_by_index(def_id.domain_index()).unwrap();
-        let ulid = domain.domain_id().ulid;
+        let domain_id = domain.domain_id().id;
         let def_tag = def_id.1;
         let prop_tag = prop_id.1.0;
 
-        format!("{ulid}_{def_tag}_{prop_tag}")
+        format!("{domain_id}_{def_tag}_{prop_tag}")
     }
 }
 
@@ -360,8 +359,8 @@ impl<'a> AutomergeDeserializer<'a> {
 
     fn parse_am_property_name(&self, prop_name: &str) -> Result<PropId, FromCrdtError> {
         let mut split = prop_name.split('_');
-        let Some(domain_ulid) = split.next() else {
-            return Err(FromCrdtError::Datastore("missing prop ulid"));
+        let Some(domain_id) = split.next() else {
+            return Err(FromCrdtError::Datastore("missing prop domain id"));
         };
         let Some(def_tag) = split.next() else {
             return Err(FromCrdtError::Datastore("missing prop def tag"));
@@ -370,8 +369,7 @@ impl<'a> AutomergeDeserializer<'a> {
             return Err(FromCrdtError::Datastore("missing prop tag"));
         };
 
-        let domain_ulid = Ulid::from_str(domain_ulid)
-            .map_err(|_| FromCrdtError::Datastore("invalid domain ulid"))?;
+        let domain_id = DomainId::from_str(domain_id).map_err(FromCrdtError::Datastore)?;
 
         let def_tag = u16::from_str(def_tag)
             .map_err(|_err| FromCrdtError::Datastore("invalid def tag format"))?;
@@ -379,7 +377,7 @@ impl<'a> AutomergeDeserializer<'a> {
             .map_err(|_err| FromCrdtError::Datastore("invalid prop tag format"))?;
 
         let Some(domain_index) = self.defs.domains().find_map(|(domain_index, domain)| {
-            if domain.domain_id().ulid == domain_ulid {
+            if domain.domain_id().id == domain_id {
                 Some(domain_index)
             } else {
                 None

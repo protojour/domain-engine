@@ -3,7 +3,7 @@
 use std::{ops::Range, str::FromStr};
 
 use indexmap::IndexMap;
-use ontol_core::{DomainId, tag::DomainIndex};
+use ontol_core::{DomainId, OntologyDomainId, tag::DomainIndex};
 use ontol_hir::OverloadFunc;
 use ontol_macros::RustDoc;
 use ontol_parser::source::NO_SPAN;
@@ -69,8 +69,11 @@ impl<'m> Compiler<'m> {
         assert_eq!(ontol_def_id.domain_index(), DomainIndex::ontol());
         self.domain_ids.insert(
             ontol_def_id.domain_index(),
-            DomainId {
-                ulid: Ulid::from_str(ONTOL_DOMAIN_ID).unwrap(),
+            OntologyDomainId {
+                id: DomainId {
+                    ulid: Ulid::from_str(ONTOL_DOMAIN_ID).unwrap(),
+                    subdomain: 0,
+                },
                 stable: true,
             },
         );

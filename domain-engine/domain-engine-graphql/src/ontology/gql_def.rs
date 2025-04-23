@@ -62,7 +62,7 @@ impl Def {
     fn id(&self, ctx: &OntologyCtx) -> gql_id::DefId {
         let domain = ctx.domain_by_index(self.id.domain_index()).unwrap();
         gql_id::DefId {
-            domain_id: domain.domain_id().ulid,
+            domain_id: domain.domain_id().id,
             def_tag: self.id.1,
         }
     }

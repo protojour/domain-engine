@@ -1,6 +1,8 @@
 use std::{panic::UnwindSafe, str::FromStr};
 
-use ontol_core::{DomainId, error::SpannedMsgError, span::U32Span, url::DomainUrlParser};
+use ontol_core::{
+    DomainId, OntologyDomainId, error::SpannedMsgError, span::U32Span, url::DomainUrlParser,
+};
 use ulid::Ulid;
 
 use crate::{
@@ -35,8 +37,11 @@ fn extract_ontol_header_data<V: NodeView>(
     let mut data = OntolHeaderData {
         domain_docs: None,
         domain_id: (
-            DomainId {
-                ulid: Default::default(),
+            OntologyDomainId {
+                id: DomainId {
+                    ulid: Default::default(),
+                    subdomain: 0,
+                },
                 stable: false,
             },
             U32Span::default(),
@@ -206,7 +211,13 @@ pub fn extract_domain_headerdata<V: NodeView>(
     if let Some((ulid, ulid_span)) = domain_ulid {
         OntolHeaderData {
             domain_docs,
-            domain_id: (DomainId { ulid, stable: true }, ulid_span),
+            domain_id: (
+                OntologyDomainId {
+                    id: DomainId { ulid, subdomain: 0 },
+                    stable: true,
+                },
+                ulid_span,
+            ),
             name: name.unwrap_or_else(|| (format!("{}", ulid), ulid_span)),
             deps: vec![],
         }
@@ -244,8 +255,8 @@ fn test_extract_header_data() {
 
     assert_eq!("docs1\ndocs2", header_data.domain_docs.unwrap());
     assert_eq!(
-        "7ZZZZZZZZZZTESTZZZZZZZZZZZ",
-        header_data.domain_id.0.ulid.to_string()
+        "7ZZZZZZZZZZTESTZZZZZZZZZZZ§0",
+        header_data.domain_id.0.id.to_string()
     );
     assert_eq!(1, header_data.deps.len());
 }

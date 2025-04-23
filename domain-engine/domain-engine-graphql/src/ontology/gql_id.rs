@@ -1,8 +1,8 @@
-use std::fmt::Display;
+use std::{fmt::Display, str::FromStr};
 
 use ::juniper::FieldResult;
 use compact_str::CompactString;
-use ulid::Ulid;
+use ontol_runtime::DomainId;
 
 use crate::{gql_scalar::GqlScalar, juniper};
 
@@ -16,7 +16,7 @@ use super::OntologyCtx;
     parse_token_with = DefId::parse_token,
 )]
 pub struct DefId {
-    pub domain_id: Ulid,
+    pub domain_id: DomainId,
     pub def_tag: u16,
 }
 
@@ -50,13 +50,10 @@ impl DefId {
         };
 
         let (domain_id, tag) = string.split_once(":").ok_or(DefIdParseError::BadFormat)?;
-        let ulid = Ulid::from_string(domain_id).map_err(|_| DefIdParseError::BadFormat)?;
+        let domain_id = DomainId::from_str(domain_id).map_err(|_| DefIdParseError::BadFormat)?;
         let def_tag: u16 = tag.parse().map_err(|_| DefIdParseError::BadFormat)?;
 
-        Ok(DefId {
-            domain_id: ulid,
-            def_tag,
-        })
+        Ok(DefId { domain_id, def_tag })
     }
 
     fn parse_token(token: juniper::ScalarToken<'_>) -> juniper::ParseScalarResult<GqlScalar> {

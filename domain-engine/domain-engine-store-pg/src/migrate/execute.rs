@@ -25,7 +25,7 @@ pub async fn execute_domain_migration(
     for (_stage, steps) in staged_steps {
         for (ids, step) in steps {
             execute_migration_step(ids, step, txn, ctx)
-                .instrument(info_span!("migrate", uid = %ids.uid))
+                .instrument(info_span!("migrate", uid = %ids.id))
                 .await?;
         }
     }
@@ -42,7 +42,7 @@ async fn execute_migration_step(
     info!("{step:?}");
 
     let domain_index = domain_ids.index;
-    let domain_uid = domain_ids.uid;
+    let domain_id = domain_ids.id;
 
     match step {
         MigrationStep::DeployDomain { name, schema_name } => {
@@ -58,13 +58,20 @@ async fn execute_migration_step(
                     indoc! {"
                         INSERT INTO m6mreg.domain (
                             uid,
+                            subdomain,
                             name,
                             schema_name,
                             has_crdt
-                        ) VALUES($1, $2, $3, $4)
+                        ) VALUES($1, $2, $3, $4, $5)
                         RETURNING key
                     "},
-                    &[&domain_uid, &name, &schema_name, &pg_domain.has_crdt],
+                    &[
+                        &domain_id.ulid,
+                        &i32::try_from(domain_id.subdomain).unwrap(),
+                        &name,
+                        &schema_name,
+                        &pg_domain.has_crdt,
+                    ],
                 )
                 .await?;
 

@@ -40,7 +40,7 @@ fn expected_defs() -> juniper::Value<GqlScalar> {
             let mut obj = juniper::Object::with_capacity(2);
             obj.add_field(
                 "id",
-                format!("01GNYFZP30ED0EZ1579TH0D55P:{}", self.next_tag).into(),
+                format!("01GNYFZP30ED0EZ1579TH0D55P§0:{}", self.next_tag).into(),
             );
             obj.add_field("ident", ident.into());
             obj.add_field("kind", kind.into());
@@ -129,11 +129,11 @@ async fn test_ontology_ontol(ds: &str) {
         expected = Ok(graphql_value!({
             "domains": [
                 {
-                    "id": "01GNYFZP30ED0EZ1579TH0D55P",
+                    "id": "01GNYFZP30ED0EZ1579TH0D55P§0",
                     "name": "ontol",
                 },
                 {
-                    "id": "7ZZZZZZZZZZTESTZZZZZZZZZZZ",
+                    "id": "7ZZZZZZZZZZTESTZZZZZZZZZZZ§0",
                     "name": "test"
                 }
             ]
@@ -143,7 +143,7 @@ async fn test_ontology_ontol(ds: &str) {
     expect_eq!(
         actual = r#"
             {
-                domain(id: "01GNYFZP30ED0EZ1579TH0D55P") {
+                domain(id: "01GNYFZP30ED0EZ1579TH0D55P§0") {
                     defs {
                         id
                         ident
@@ -238,31 +238,31 @@ async fn test_ontology_stix(ds: &str) {
         expected = Ok(graphql_value!({
             "domains": [
                 {
-                    "id": "01GNYFZP30ED0EZ1579TH0D55P",
+                    "id": "01GNYFZP30ED0EZ1579TH0D55P§0",
                     "name": "ontol",
                 },
                 {
-                    "id": "01GZ13EAM0RY693MSJ75XZARHY",
+                    "id": "01GZ13EAM0RY693MSJ75XZARHY§0",
                     "name": "stix",
                 },
                 {
-                    "id": "01J5C5GB45Q3C0E4YYRPP8SN4R",
+                    "id": "01J5C5GB45Q3C0E4YYRPP8SN4R§0",
                     "name": "stix_common",
                 },
                 {
-                    "id": "01J6SACJ2A3P8FNEQ2S20M3DV7",
+                    "id": "01J6SACJ2A3P8FNEQ2S20M3DV7§0",
                     "name": "stix_edges",
                 },
                 {
-                    "id": "01H7ZN6PJ0NHEFMHW2PBN4FEPZ",
+                    "id": "01H7ZN6PJ0NHEFMHW2PBN4FEPZ§0",
                     "name": "stix_interface",
                 },
                 {
-                    "id": "01J5C5JJKM7XWR56TTYH9B7VRN",
+                    "id": "01J5C5JJKM7XWR56TTYH9B7VRN§0",
                     "name": "stix_open_vocab",
                 },
                 {
-                    "id": "01H7ZZ5KMG538CXJMNJQVTMP9K",
+                    "id": "01H7ZZ5KMG538CXJMNJQVTMP9K§0",
                     "name": "SI",
                 },
             ]
@@ -292,7 +292,7 @@ async fn test_ontology_stix(ds: &str) {
         .await,
         expected = Ok(graphql_value!({
             "def": {
-                "id": "01GZ13EAM0RY693MSJ75XZARHY:54",
+                "id": "01GZ13EAM0RY693MSJ75XZARHY§0:54",
                 "kind": "ENTITY",
                 "dataRelationships": [
                     { "propId": "p@1:54:0", "name": "type" },
@@ -477,7 +477,7 @@ async fn test_ontology_stix(ds: &str) {
         let update_time_prop_id = {
             let ontol_update_time = r#"
             {
-                domain(id: "01GNYFZP30ED0EZ1579TH0D55P") {
+                domain(id: "01GNYFZP30ED0EZ1579TH0D55P§0") {
                     defs(ident: "update_time") {
                         propId
                     }

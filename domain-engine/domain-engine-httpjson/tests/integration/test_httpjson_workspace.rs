@@ -20,7 +20,7 @@ use ulid::Ulid;
 use crate::{MakeTestRouter, TestHttpError, make_domain_engine};
 
 /// id of the workspaces domain under test
-const DOMAIN_ID: &str = "01JAP41VG1STK1VZPWXV26SPNM";
+const DOMAIN_ID: &str = "01JAP41VG1STK1VZPWXV26SPNM§0";
 
 #[datastore_test(tokio::test)]
 async fn test_workspaces_rest_api_with_edit(ds: &str) {

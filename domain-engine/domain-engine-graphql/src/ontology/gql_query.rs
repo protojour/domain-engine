@@ -23,10 +23,9 @@ use ontol_runtime::query::select::StructOrUnionSelect;
 use ontol_runtime::query::select::StructSelect;
 use ontol_runtime::query::select::{EntitySelect, Select};
 use ontol_runtime::value::{OctetSequence, Value};
-use ontol_runtime::{OntolDefTag, OntolDefTagExt, PropId};
+use ontol_runtime::{DomainId, OntolDefTag, OntolDefTagExt, PropId};
 use serde::Deserialize;
 use serde::de::value::StringDeserializer;
-use ulid::Ulid;
 
 use super::OntologyCtx;
 use super::gql_dictionary;
@@ -52,8 +51,8 @@ impl Query {
         ctx: &OntologyCtx,
     ) -> FieldResult<gql_domain::Domain> {
         let domain = if let Some(id) = id {
-            let id = Ulid::from_string(&id)?;
-            ctx.domains().find(|(_, d)| d.domain_id().ulid == id)
+            let domain_id = DomainId::from_str(&id)?;
+            ctx.domains().find(|(_, d)| d.domain_id().id == domain_id)
         } else if let Some(name) = name {
             ctx.domains()
                 .find(|(_, d)| ctx.get_text_constant(d.unique_name()).to_string() == name)

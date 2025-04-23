@@ -25,7 +25,6 @@ serde_json.workspace = true
 thiserror.workspace = true
 tokio = { version = "1", features = ["sync"] }
 tracing.workspace = true
-ulid = "1"
 
 
 [dev-dependencies]
