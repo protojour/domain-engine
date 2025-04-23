@@ -270,7 +270,7 @@ impl<V: NodeView> CstLowering<'_, '_, V> {
             RelParams::Unit
         };
 
-        let mut relationship0 = {
+        let relationship = {
             let subject_cardinality = (
                 property_cardinality(relation.prop_cardinality())
                     .unwrap_or(PropertyCardinality::Mandatory),
@@ -292,22 +292,6 @@ impl<V: NodeView> CstLowering<'_, '_, V> {
             }
         };
 
-        // HACK(for now): invert id relationship
-        if relation_def_id == OntolDefTag::RelationId.def_id() {
-            relationship0 = Relationship {
-                relation_def_id: OntolDefTag::RelationIdentifies.def_id(),
-                edge_projection: None,
-                relation_span: relationship0.relation_span,
-                subject: relationship0.object,
-                subject_cardinality: relationship0.object_cardinality,
-                object: relationship0.subject,
-                object_cardinality: relationship0.subject_cardinality,
-                rel_params: relationship0.rel_params,
-                macro_source: None,
-                modifiers: relationship0.modifiers,
-            };
-        }
-
         let rel_context = match self.ctx.compiler.defs.def_kind(relation_def_id) {
             DefKind::BuiltinRelType(kind, _) => kind.context(),
             _ => RelationContext::Def,
@@ -317,7 +301,7 @@ impl<V: NodeView> CstLowering<'_, '_, V> {
             RelationContext::Def => {
                 self.ctx.outcome.predefine_rel(
                     rel_id,
-                    relationship0,
+                    relationship,
                     self.ctx.source_span(rel_stmt.0.non_trivia_span()),
                     docs.map(Into::into),
                 );
@@ -327,7 +311,7 @@ impl<V: NodeView> CstLowering<'_, '_, V> {
                     relation_modifiers, ..
                 } => {
                     relation_modifiers
-                        .push((relationship0, self.ctx.source_span(rel_stmt.0.span())));
+                        .push((relationship, self.ctx.source_span(rel_stmt.0.span())));
                 }
                 _ => {
                     todo!("report error");
