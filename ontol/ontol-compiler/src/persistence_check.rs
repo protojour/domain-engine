@@ -70,15 +70,15 @@ impl Compiler<'_> {
             }
         }
 
-        for domain_index in persistent_domains.iter().copied() {
-            let domain_id = self.domain_ids.get(&domain_index).unwrap();
+        for domain_index in persistent_domains.iter() {
+            let domain_id = self.domain_ids.get(domain_index).unwrap();
 
             if !domain_id.stable {
                 let span = SourceSpan {
                     source_id: *self
                         .source_id_to_domain_index
                         .iter()
-                        .find(|pred| pred.1 == &domain_index)
+                        .find(|pred| pred.1 == domain_index)
                         .unwrap()
                         .0,
                     span: U32Span { start: 0, end: 0 },
