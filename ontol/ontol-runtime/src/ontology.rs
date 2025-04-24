@@ -8,10 +8,9 @@ use aspects::{
     OntologyAspects, SerdeAspect,
 };
 use domain::EdgeInfo;
-use ontol_core::{debug::OntolFormatter, tag::DomainIndex};
+use ontol_core::{DomainId, debug::OntolFormatter, tag::DomainIndex};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
-use ulid::Ulid;
 
 use crate::{
     DefId, MapKey, PropId,
@@ -121,12 +120,12 @@ impl Ontology {
         self.data.defs.domain_by_index(index)
     }
 
-    pub fn domain_by_id(&self, domain_id: Ulid) -> Option<&Domain> {
+    pub fn domain_by_id(&self, id: DomainId) -> Option<&Domain> {
         self.data
             .defs
             .domains
             .iter()
-            .find(|(_, domain)| domain.domain_id().ulid == domain_id)
+            .find(|(_, domain)| domain.domain_id().id == id)
             .map(|(_, domain)| domain)
     }
 

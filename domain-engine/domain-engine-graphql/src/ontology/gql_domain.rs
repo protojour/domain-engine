@@ -15,7 +15,7 @@ pub struct Domain {
 #[graphql(context = OntologyCtx, scalar = GqlScalar)]
 impl Domain {
     fn id(&self, ctx: &OntologyCtx) -> juniper::ID {
-        self.data(ctx).domain_id().ulid.to_string().into()
+        self.data(ctx).domain_id().id.to_string().into()
     }
 
     fn id_stable(&self, ctx: &OntologyCtx) -> bool {

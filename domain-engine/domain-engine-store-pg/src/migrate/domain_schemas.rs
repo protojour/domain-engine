@@ -40,6 +40,9 @@ async fn migrate(_ctx: &mut MigrationCtx, version: RegVersion) -> anyhow::Result
         RegVersion::Crdt => {
             // nothing to do in domain schemas, the "crdt" table is created on demand.
         }
+        RegVersion::Subdomain => {
+            // nothing to do in domain schemas
+        }
     }
 
     Ok(())

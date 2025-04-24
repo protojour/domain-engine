@@ -106,14 +106,13 @@ impl IndexingContext {
         doc.add_field_value(
             self.schema.facet,
             OwnedValue::Facet(
-                Facet::from_text(&format!("/def/{}:{}", domain.domain_id().ulid, def_id.1))
-                    .unwrap(),
+                Facet::from_text(&format!("/def/{}:{}", domain.domain_id().id, def_id.1)).unwrap(),
             ),
         );
         doc.add_field_value(
             self.schema.facet,
             OwnedValue::Facet(
-                Facet::from_text(&format!("/domain/{}", domain.domain_id().ulid)).unwrap(),
+                Facet::from_text(&format!("/domain/{}", domain.domain_id().id)).unwrap(),
             ),
         );
 

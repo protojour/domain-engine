@@ -116,7 +116,7 @@ async fn test_conduit_search(ds: &str) {
                 "results": [
                     {
                         "vertex": {
-                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES:5",
+                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES§0:5",
                             "type": "struct",
                             "update_time": "1976-01-01T00:00:00Z"
                         },
@@ -124,7 +124,7 @@ async fn test_conduit_search(ds: &str) {
                     },
                     {
                         "vertex": {
-                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES:5",
+                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES§0:5",
                             "type": "struct",
                             "update_time": "1975-01-01T00:00:00Z"
                         },
@@ -132,7 +132,7 @@ async fn test_conduit_search(ds: &str) {
                     },
                     {
                         "vertex": {
-                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES:4",
+                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES§0:4",
                             "type": "struct",
                             "update_time": "1972-01-01T00:00:00Z"
                         },
@@ -140,7 +140,7 @@ async fn test_conduit_search(ds: &str) {
                     },
                     {
                         "vertex": {
-                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES:4",
+                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES§0:4",
                             "type": "struct",
                             "update_time": "1971-01-01T00:00:00Z"
                         },
@@ -156,7 +156,7 @@ async fn test_conduit_search(ds: &str) {
         actual = r#"{
             vertexSearch(
                 limit: 10
-                defFilters: ["01GZQ1ZRW0WJR72GHM6VWRMFES:5"]
+                defFilters: ["01GZQ1ZRW0WJR72GHM6VWRMFES§0:5"]
                 withAddress: false
                 withDefId: true
                 withAttrs: false
@@ -174,7 +174,7 @@ async fn test_conduit_search(ds: &str) {
                 "results": [
                     {
                         "vertex": {
-                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES:5",
+                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES§0:5",
                             "type": "struct",
                             "update_time": "1976-01-01T00:00:00Z"
                         },
@@ -182,7 +182,7 @@ async fn test_conduit_search(ds: &str) {
                     },
                     {
                         "vertex": {
-                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES:5",
+                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES§0:5",
                             "type": "struct",
                             "update_time": "1975-01-01T00:00:00Z"
                         },
@@ -220,7 +220,7 @@ async fn test_conduit_search(ds: &str) {
                 "results": [
                     {
                         "vertex": {
-                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES:5",
+                            "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES§0:5",
                             "type": "struct",
                             "update_time": "1976-01-01T00:00:00Z"
                         },
@@ -229,10 +229,10 @@ async fn test_conduit_search(ds: &str) {
                 ],
                 "facets": {
                     "domains": [
-                        { "domainId": "01GZQ1ZRW0WJR72GHM6VWRMFES", "count": 1 }
+                        { "domainId": "01GZQ1ZRW0WJR72GHM6VWRMFES§0", "count": 1 }
                     ],
                     "defs": [
-                        { "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES:5", "count": 1 }
+                        { "defId": "01GZQ1ZRW0WJR72GHM6VWRMFES§0:5", "count": 1 }
                     ]
                 },
             }
@@ -245,7 +245,7 @@ async fn test_conduit_search(ds: &str) {
             vertexSearch(
                 query: "DISASTERS"
                 limit: 10
-                defFilters: ["01GZQ1ZRW0WJR72GHM6VWRMFES:4"]
+                defFilters: ["01GZQ1ZRW0WJR72GHM6VWRMFES§0:4"]
                 withAddress: false
                 withDefId: true
                 withAttrs: false

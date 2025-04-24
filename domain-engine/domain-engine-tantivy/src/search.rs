@@ -8,7 +8,7 @@ use domain_engine_core::{
         VertexSearchResults,
     },
 };
-use ontol_runtime::DefId;
+use ontol_runtime::{DefId, DomainId};
 use tantivy::{
     DateTime, DocAddress, Order, Searcher, TantivyError, Term,
     collector::{FacetCollector, FacetCounts, TopDocs},
@@ -18,7 +18,6 @@ use tantivy::{
 };
 use tokio::task::JoinError;
 use tracing::{debug, error, info};
-use ulid::Ulid;
 
 use crate::{TantivyDataStoreLayer, schema::fieldname};
 
@@ -37,8 +36,8 @@ pub struct RawVertexHit {
 }
 
 enum ParsedFacet {
-    Domain(Ulid),
-    Def(Ulid, u16),
+    Domain(DomainId),
+    Def(DomainId, u16),
 }
 
 #[derive(displaydoc::Display, Debug)]

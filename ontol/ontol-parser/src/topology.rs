@@ -6,7 +6,7 @@ use std::{
 };
 
 use ontol_core::{
-    ArcString, DomainId, TopologyGeneration,
+    ArcString, DomainId, OntologyDomainId, TopologyGeneration,
     span::U32Span,
     tag::DomainIndex,
     url::{DomainUrl, DomainUrlResolver},
@@ -90,7 +90,7 @@ pub struct WithDocs(pub bool);
 /// Metadata extracted from the header section of a domain
 pub struct OntolHeaderData {
     pub domain_docs: Option<String>,
-    pub domain_id: (DomainId, U32Span),
+    pub domain_id: (OntologyDomainId, U32Span),
     pub name: (String, U32Span),
     pub deps: Vec<(DomainUrl, U32Span)>,
 }
@@ -110,8 +110,8 @@ impl OntolHeaderData {
         Self {
             domain_docs: None,
             domain_id: (
-                DomainId {
-                    ulid,
+                OntologyDomainId {
+                    id: DomainId { ulid, subdomain: 0 },
                     stable: false,
                 },
                 U32Span::default(),

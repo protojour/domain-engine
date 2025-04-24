@@ -1,6 +1,5 @@
-use ontol_runtime::value::Value;
+use ontol_runtime::{DomainId, value::Value};
 use serde::{Deserialize, Serialize};
-use ulid::Ulid;
 
 #[derive(Serialize, Deserialize)]
 pub struct VertexSearchParams {
@@ -26,7 +25,7 @@ impl SearchFilters {
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct SearchDomainOrDef {
-    pub domain_id: Ulid,
+    pub domain_id: DomainId,
     pub def_tag: Option<u16>,
 }
 

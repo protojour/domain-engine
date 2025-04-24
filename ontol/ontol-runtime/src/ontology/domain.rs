@@ -4,7 +4,7 @@ use std::fmt::Debug;
 
 use fnv::FnvHashMap;
 use ontol_core::{
-    DomainId, TopologyGeneration,
+    OntologyDomainId, TopologyGeneration,
     vec_map::{VecMap, VecMapKey},
 };
 use ontol_macros::OntolDebug;
@@ -25,7 +25,7 @@ use super::{
 /// A domain in the ONTOL ontology.
 #[derive(Serialize, Deserialize)]
 pub struct Domain {
-    domain_id: DomainId,
+    domain_id: OntologyDomainId,
     def_id: DefId,
 
     unique_name: TextConstant,
@@ -45,7 +45,7 @@ impl VecMapKey for DefTag {
 
 impl Domain {
     pub fn new(
-        domain_id: DomainId,
+        domain_id: OntologyDomainId,
         def_id: DefId,
         unique_name: TextConstant,
         generation: TopologyGeneration,
@@ -59,7 +59,7 @@ impl Domain {
         }
     }
 
-    pub fn domain_id(&self) -> &DomainId {
+    pub fn domain_id(&self) -> &OntologyDomainId {
         &self.domain_id
     }
 

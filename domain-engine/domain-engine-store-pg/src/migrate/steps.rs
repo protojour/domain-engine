@@ -31,10 +31,10 @@ pub async fn migrate_domain_steps(
     ontology_defs: &DefsAspect,
     ctx: &mut MigrationCtx,
 ) -> anyhow::Result<()> {
-    let domain_uid = domain.domain_id().ulid;
+    let domain_id = domain.domain_id().id;
     let domain_ids = PgDomainIds {
         index: domain_index,
-        uid: domain_uid,
+        id: domain_id,
     };
     let unique_name = &ontology_defs[domain.unique_name()];
     let pg_domain = ctx.domains.get_mut(&domain_index);

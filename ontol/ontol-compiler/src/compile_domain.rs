@@ -97,7 +97,7 @@ impl Compiler<'_> {
             if self
                 .domain_ids
                 .values()
-                .any(|existing_domain_id| existing_domain_id.ulid == header_data.domain_id.0.ulid)
+                .any(|existing_domain_id| existing_domain_id.id == header_data.domain_id.0.id)
             {
                 CompileError::TODO("domain has already been compiled")
                     .span(SourceSpan {

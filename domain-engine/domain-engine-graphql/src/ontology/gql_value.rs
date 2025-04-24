@@ -97,7 +97,7 @@ pub fn write_ontol_scalar(
     if cfg.with_def_id {
         if let Some(domain) = ctx.domain_by_index(def_id.0) {
             let gql_def_id = gql_id::DefId {
-                domain_id: domain.domain_id().ulid,
+                domain_id: domain.domain_id().id,
                 def_tag: def_id.1,
             };
 

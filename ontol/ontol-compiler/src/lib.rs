@@ -7,7 +7,7 @@ pub use error::*;
 use fnv::{FnvHashMap, FnvHashSet};
 use lowering::context::LoweringOutcome;
 use misc::MiscCtx;
-use ontol_core::{DomainId, TopologyGeneration, tag::DomainIndex, url::DomainUrl};
+use ontol_core::{OntologyDomainId, TopologyGeneration, tag::DomainIndex, url::DomainUrl};
 use ontol_parser::source::SourceId;
 use ontol_syntax::OntolSyntax;
 use primitive::init_ontol_primitives;
@@ -169,7 +169,7 @@ struct Compiler<'m> {
     namespaces: Namespaces<'m>,
     defs: Defs<'m>,
     domain_def_ids: FnvHashMap<DomainIndex, DefId>,
-    domain_ids: BTreeMap<DomainIndex, DomainId>,
+    domain_ids: BTreeMap<DomainIndex, OntologyDomainId>,
     domain_config_table: FnvHashMap<DomainIndex, DomainConfig>,
     topology_generation: FnvHashMap<DomainIndex, TopologyGeneration>,
     patterns: Patterns,

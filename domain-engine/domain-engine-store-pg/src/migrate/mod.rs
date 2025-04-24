@@ -4,7 +4,7 @@ use anyhow::{Context, anyhow};
 use deadpool_postgres::Object;
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    DefId, DefPropTag, DomainIndex, OntolDefTag,
+    DefId, DefPropTag, DomainId, DomainIndex, OntolDefTag,
     ontology::{aspects::DefsAspect, domain::DefKind},
     tuple::CardinalIdx,
 };
@@ -16,8 +16,8 @@ use txn_wrapper::TxnWrapper;
 use crate::{
     PgModel,
     pg_model::{
-        DomainUid, PgDomain, PgEdgeCardinalKind, PgIndexType, PgPropertyData, PgTableIdUnion,
-        PgType, RegVersion,
+        PgDomain, PgEdgeCardinalKind, PgIndexType, PgPropertyData, PgTableIdUnion, PgType,
+        RegVersion,
     },
 };
 
@@ -38,7 +38,7 @@ const MIGRATIONS_TABLE_NAME: &str = "public.m6mreg_schema_history";
 #[derive(Clone, Copy)]
 struct PgDomainIds {
     index: DomainIndex,
-    uid: DomainUid,
+    id: DomainId,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
@@ -211,7 +211,7 @@ pub async fn migrate_ontology(
             .ok_or_else(|| anyhow!("domain does not exist"))?;
 
         steps::migrate_domain_steps(*domain_index, domain, ontology_defs, &mut ctx)
-            .instrument(debug_span!("migrate", uid = %domain.domain_id().ulid))
+            .instrument(debug_span!("migrate", uid = %domain.domain_id().id))
             .await
             .context("domain migration steps")?;
 

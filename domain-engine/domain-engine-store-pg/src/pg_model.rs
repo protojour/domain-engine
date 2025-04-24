@@ -28,8 +28,6 @@ pub type PgRegKey = i32;
 /// The key type used for data in the domains
 pub type PgDataKey = i64;
 
-pub type DomainUid = ulid::Ulid;
-
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct EdgeId(pub DefId);
 
@@ -213,11 +211,12 @@ impl From<Value> for InDomain<Value> {
 pub enum RegVersion {
     Init = 1,
     Crdt = 2,
+    Subdomain = 3,
 }
 
 impl RegVersion {
     pub const fn current() -> Self {
-        Self::Crdt
+        Self::Subdomain
     }
 }
 
@@ -228,6 +227,7 @@ impl TryFrom<u32> for RegVersion {
         match value {
             1 => Ok(Self::Init),
             2 => Ok(Self::Crdt),
+            3 => Ok(Self::Subdomain),
             other => Err(other),
         }
     }
