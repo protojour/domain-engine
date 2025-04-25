@@ -32,6 +32,7 @@ lsp:
     cp ontol.tmLanguage.json ontol.tmSnippet.json \
        ontol-vscode/
     cd ontol-vscode
+    npm install && \
     npm run build && \
     npm run package
     cd ../../..
