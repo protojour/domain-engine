@@ -3816,6 +3816,7 @@ dependencies = [
  "bitflags 2.9.0",
  "bumpalo",
  "displaydoc",
+ "either",
  "ena",
  "fnv",
  "heck",
@@ -3825,6 +3826,7 @@ dependencies = [
  "ontol-core",
  "ontol-examples",
  "ontol-hir",
+ "ontol-log",
  "ontol-macros",
  "ontol-parser",
  "ontol-runtime",
@@ -3920,6 +3922,42 @@ dependencies = [
  "smallvec 2.0.0-alpha.11",
  "thin-vec",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "ontol-log"
+version = "0.1.0"
+dependencies = [
+ "arcstr",
+ "assert_matches",
+ "async-trait",
+ "bit-set",
+ "bitflags 2.9.0",
+ "displaydoc",
+ "either",
+ "fnv",
+ "hex",
+ "indexmap",
+ "indoc",
+ "itertools 0.14.0",
+ "ontol-core",
+ "ontol-examples",
+ "ontol-macros",
+ "ontol-parser",
+ "ontol-syntax",
+ "pest",
+ "pest_derive",
+ "pretty_assertions",
+ "rustc-hash 2.1.1",
+ "serde",
+ "smallvec 2.0.0-alpha.11",
+ "thin-vec",
+ "thiserror 2.0.12",
+ "tracing",
+ "tracing-subscriber",
+ "ulid",
+ "unsigned-varint",
+ "url",
 ]
 
 [[package]]
@@ -4036,8 +4074,10 @@ dependencies = [
  "ontol-compiler",
  "ontol-core",
  "ontol-faker",
+ "ontol-log",
  "ontol-parser",
  "ontol-runtime",
+ "ontol-syntax",
  "pretty_assertions",
  "serde",
  "serde-value",
@@ -6121,6 +6161,12 @@ name = "unindent"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7264e107f553ccae879d21fbea1d6724ac785e8c3bfc762137959b5802826ef3"
+
+[[package]]
+name = "unsigned-varint"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb066959b24b5196ae73cb057f45598450d2c5f71460e98c49b738086eff9c06"
 
 [[package]]
 name = "untrusted"

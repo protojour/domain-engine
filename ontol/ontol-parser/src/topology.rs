@@ -7,6 +7,7 @@ use std::{
 
 use ontol_core::{
     ArcString, DomainId, OntologyDomainId, TopologyGeneration,
+    error::SpannedMsgError,
     span::U32Span,
     tag::DomainIndex,
     url::{DomainUrl, DomainUrlResolver},
@@ -44,7 +45,7 @@ pub async fn resolve_tree_syntax_topology_async(
     entrypoints: Vec<DomainUrl>,
     source_code_registry: &mut SourceCodeRegistry,
     url_resolver: &dyn DomainUrlResolver,
-) -> Result<DomainTopology<OntolTreeSyntax<ArcString>>, TopologyErrors> {
+) -> Result<DomainTopology<OntolTreeSyntax<ArcString>, ParserError>, TopologyErrors> {
     let mut graph_builder = DepGraphBuilder::with_entrypoints(entrypoints);
 
     let topology = loop {
@@ -100,7 +101,21 @@ pub struct OntolHeaderData {
 /// It's whatever that can produce syntax nodes to fulfill
 /// the methods of the trait.
 pub trait ExtractHeaderData: UnwindSafe {
-    fn header_data(&self, with_docs: WithDocs, errors: &mut Vec<ParserError>) -> OntolHeaderData;
+    fn header_data(
+        &self,
+        with_docs: WithDocs,
+        errors: &mut Vec<impl MakeParseError>,
+    ) -> OntolHeaderData;
+}
+
+pub trait MakeParseError {
+    fn make_parse_error(msg: String, span: U32Span) -> Self;
+}
+
+impl MakeParseError for ParserError {
+    fn make_parse_error(msg: String, span: U32Span) -> Self {
+        ParserError::Parse(SpannedMsgError { msg, span })
+    }
 }
 
 impl OntolHeaderData {
@@ -132,11 +147,11 @@ pub struct DomainRequest {
 }
 
 /// Topological sort of the built package graph
-pub struct DomainTopology<S> {
-    pub parsed_domains: Vec<ParsedDomain<S>>,
+pub struct DomainTopology<S, E> {
+    pub parsed_domains: Vec<ParsedDomain<S, E>>,
 }
 
-impl<S> Default for DomainTopology<S> {
+impl<S, E> Default for DomainTopology<S, E> {
     fn default() -> Self {
         Self {
             parsed_domains: vec![],
@@ -144,7 +159,7 @@ impl<S> Default for DomainTopology<S> {
     }
 }
 
-impl<S> DomainTopology<S> {
+impl<S, E> DomainTopology<S, E> {
     pub fn source_to_url_map(&self) -> BTreeMap<SourceId, DomainUrl> {
         self.parsed_domains
             .iter()
@@ -155,19 +170,17 @@ impl<S> DomainTopology<S> {
 
 /// A domain in its parsed form.
 /// The parsed form is needed to know which dependencies to request.
-pub struct ParsedDomain<S> {
+pub struct ParsedDomain<S, E> {
     pub domain_index: DomainIndex,
     pub source_id: SourceId,
     pub url: DomainUrl,
     pub generation: TopologyGeneration,
-    // pub config: DomainConfig,
-    // pub src: Src,
-    pub syntax: S,
-    pub parse_errors: Vec<ParserError>,
+    pub semantics: S,
+    pub errors: Vec<E>,
 }
 
-impl<S> ParsedDomain<S> {
-    pub fn new(request: DomainRequest, syntax: S, parse_errors: Vec<ParserError>) -> Self {
+impl<S, E> ParsedDomain<S, E> {
+    pub fn new(request: DomainRequest, semantics: S, errors: Vec<E>) -> Self {
         let source_id = request.source_id;
 
         // TODO: Resolve local url
@@ -178,29 +191,29 @@ impl<S> ParsedDomain<S> {
             source_id,
             url,
             generation: request.generation,
-            syntax,
-            parse_errors,
+            semantics,
+            errors,
         }
     }
 }
 
-pub enum GraphState<S> {
+pub enum GraphState<S, E> {
     RequestPackages {
-        builder: DepGraphBuilder<S>,
+        builder: DepGraphBuilder<S, E>,
         requests: Vec<DomainRequest>,
     },
-    Built(DomainTopology<S>),
+    Built(DomainTopology<S, E>),
 }
 
-pub struct DepGraphBuilder<S> {
+pub struct DepGraphBuilder<S, E> {
     next_source_id: SourceId,
     next_domain_index: DomainIndex,
     generation: TopologyGeneration,
-    parsed_packages: VecMap<SourceId, ParsedDomain<S>>,
+    parsed_packages: VecMap<SourceId, ParsedDomain<S, E>>,
     request_graph: HashMap<DomainUrl, RequestedDomain>,
 }
 
-impl<S: ExtractHeaderData> DepGraphBuilder<S> {
+impl<S: ExtractHeaderData, E: MakeParseError> DepGraphBuilder<S, E> {
     /// Create an empty builder, seeded with the given root package names,
     /// which will the builder will attempt to resolve in the next transition.
     pub fn with_entrypoints(root_references: impl IntoIterator<Item = DomainUrl>) -> Self {
@@ -242,12 +255,12 @@ impl<S: ExtractHeaderData> DepGraphBuilder<S> {
     }
 
     /// Provide a package
-    pub fn provide_domain(&mut self, mut domain: ParsedDomain<S>) {
+    pub fn provide_domain(&mut self, mut domain: ParsedDomain<S, E>) {
         let mut children: HashSet<DomainUrl> = HashSet::default();
 
         let header_data = domain
-            .syntax
-            .header_data(WithDocs(false), &mut domain.parse_errors);
+            .semantics
+            .header_data(WithDocs(false), &mut domain.errors);
 
         for (reference, span) in header_data.deps {
             let url = domain.url.join(&reference);
@@ -274,7 +287,7 @@ impl<S: ExtractHeaderData> DepGraphBuilder<S> {
 
     /// Try to transition the builder into a PackageTopology.
     /// Before it is able to do that, it may request more packages.
-    pub fn transition(mut self) -> Result<GraphState<S>, TopologyErrors> {
+    pub fn transition(mut self) -> Result<GraphState<S, E>, TopologyErrors> {
         let mut requests = vec![];
         let mut load_errors = vec![];
 
@@ -315,16 +328,16 @@ impl<S: ExtractHeaderData> DepGraphBuilder<S> {
     }
 
     /// Finish the package graph with a topological sort of packages
-    fn topo_sort(mut self) -> DomainTopology<S> {
+    fn topo_sort(mut self) -> DomainTopology<S, E> {
         let mut visited: HashSet<SourceId> = Default::default();
-        let mut topological_sort: Vec<ParsedDomain<S>> = vec![];
+        let mut topological_sort: Vec<ParsedDomain<S, E>> = vec![];
 
-        fn traverse_graph<S>(
+        fn traverse_graph<S, E>(
             url: &DomainUrl,
             package_graph: &HashMap<DomainUrl, RequestedDomain>,
-            parsed_packages: &mut VecMap<SourceId, ParsedDomain<S>>,
+            parsed_packages: &mut VecMap<SourceId, ParsedDomain<S, E>>,
             visited: &mut HashSet<SourceId>,
-            topological_sort: &mut Vec<ParsedDomain<S>>,
+            topological_sort: &mut Vec<ParsedDomain<S, E>>,
         ) {
             let node = package_graph.get(url).unwrap();
             if visited.contains(&node.source_id) {

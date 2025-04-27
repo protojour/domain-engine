@@ -1,0 +1,49 @@
+logfile = { (!EOI ~ sexpr)* ~ EOI }
+
+line_comment = _ { ";" ~ (!NEWLINE ~ ANY)* ~ NEWLINE? }
+
+sexpr = _{ list_outer | constant }
+
+list_outer = _{ "(" ~ list ~ ")" }
+
+list = ${
+    WHITESPACE* ~ (sexpr ~ (!pair_right ~ WHITESPACE+ ~ sexpr)* ~ pair_right?)? ~ WHITESPACE*
+}
+
+pair_right = ${ WHITESPACE+ ~ "." ~ WHITESPACE+ ~ sexpr }
+
+symbol = @{ (!(keyword | WHITESPACE | "\"" | "\'" | "`" | "," | ",@" | "(" | ")" | "[" | "]" | "{" | "}") ~ ANY)+ }
+
+// -------------------------------------------------------
+
+constant = _{ string_lit | int_lit | uint_lit | bool_lit | nil_lit | bytes_lit | symbol }
+
+int_lit = _{ signed_number ~ !("u" | "f") ~ "i"? }
+uint_lit = _{ number ~ "u" }
+
+signed_number = ${ ("+" | "-")? ~ number }
+
+number = ${ number_hex | number_oct | number_bin | number_dec }
+
+number_dec = _{ ASCII_DIGIT+ }
+number_oct = _{ "0o" ~ ASCII_OCT_DIGIT+ }
+number_hex = _{ "0x" ~ ASCII_HEX_DIGIT+ }
+number_bin = _{ "0b" ~ ASCII_BIN_DIGIT+ }
+
+bytes_lit = { "#" ~ ASCII_HEX_DIGIT+ }
+
+keyword = @{ bool_lit | nil_lit }
+
+bool_lit = @{ kw_false | kw_true }
+nil_lit = _ { "nil" }
+
+kw_false = _ { "false" }
+kw_true = _ { "true" }
+
+string_lit = @{ "\"" ~ (escape | (!("\\" | "\"") ~ ANY)+)* ~ "\""}
+
+escape = _{ "\\\\" | "\\\"" | "\\'" | "\\n" | "\\r" | "\\t" }
+
+COMMENT = _ { line_comment }
+
+WHITESPACE = _{ " " | "\t" | WHITE_SPACE | NEWLINE }

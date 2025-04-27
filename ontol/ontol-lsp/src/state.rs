@@ -5,7 +5,6 @@ use ontol_compiler::{CompileError, error::UnifiedCompileError, mem::Mem};
 use ontol_core::ArcString;
 use ontol_core::tag::DomainIndex;
 use ontol_core::url::DomainUrl;
-use ontol_parser::ToUsizeRange;
 use ontol_parser::basic_syntax::OntolTreeSyntax;
 use ontol_parser::cst::inspect::{self as insp};
 use ontol_parser::cst::tree::{SyntaxNode, TreeNodeView, TreeTokenView};
@@ -14,6 +13,7 @@ use ontol_parser::lexer::Lex;
 use ontol_parser::lexer::kind::Kind;
 use ontol_parser::source::{NO_SPAN, SourceId, SourceSpan};
 use ontol_parser::topology::{DepGraphBuilder, GraphState, ParsedDomain};
+use ontol_parser::{ParserError, ToUsizeRange};
 use ontol_runtime::ontology::{Ontology, domain::Def};
 use std::fmt::Debug;
 use std::{
@@ -110,9 +110,12 @@ impl State {
     /// Compile ontology for docs, prepare data, and return a new State
     pub fn new() -> Self {
         let mem = Mem::default();
-        let ontology = ontol_compiler::compile::<OntolTreeSyntax<String>>(Default::default(), &mem)
-            .unwrap()
-            .into_ontology();
+        let ontology = ontol_compiler::compile::<OntolTreeSyntax<String>, ParserError>(
+            Default::default(),
+            &mem,
+        )
+        .unwrap()
+        .into_ontology();
 
         let ontol_domain = ontology.domain_by_index(DomainIndex::ontol()).unwrap();
         let mut ontol_def = HashMap::new();

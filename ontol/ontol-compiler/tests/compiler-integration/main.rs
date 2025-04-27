@@ -14,6 +14,7 @@ mod test_faker;
 mod test_fundamentals;
 mod test_geojson;
 mod test_json_schema;
+mod test_log;
 mod test_multi_package;
 mod test_repr;
 mod test_stix_lite;

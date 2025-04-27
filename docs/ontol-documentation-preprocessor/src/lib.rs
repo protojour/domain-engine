@@ -8,6 +8,7 @@ use mdbook::{
 use ontol_compiler::mem::Mem;
 
 use ontol_parser::basic_syntax::OntolTreeSyntax;
+use ontol_parser::ParserError;
 use ontol_runtime::ontology::{
     domain::{Def, DefKind},
     Ontology,
@@ -36,7 +37,7 @@ impl Default for OntolDocumentationPreprocessor {
 
 fn compile() -> Ontology {
     let mem = Mem::default();
-    ontol_compiler::compile::<OntolTreeSyntax<String>>(Default::default(), &mem)
+    ontol_compiler::compile::<OntolTreeSyntax<String>, ParserError>(Default::default(), &mem)
         .unwrap()
         .into_ontology()
 }

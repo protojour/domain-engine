@@ -1,4 +1,8 @@
-use std::{fmt::Display, str::FromStr, sync::Arc};
+use std::{
+    fmt::{Debug, Display},
+    str::FromStr,
+    sync::Arc,
+};
 
 use serde::{Deserialize, Serialize};
 use ulid::Ulid;
@@ -62,5 +66,17 @@ impl FromStr for DomainId {
 impl AsRef<str> for ArcString {
     fn as_ref(&self) -> &str {
         &self.0
+    }
+}
+
+/// A reference to an ontol log in memory.
+///
+/// This should never be serialized or persisted in any way, it's only used in code analysis and compilation.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct LogRef(pub u16);
+
+impl Debug for LogRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "l{}", self.0)
     }
 }

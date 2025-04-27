@@ -1,8 +1,10 @@
 use std::fmt::Debug;
 
 use ontol_core::url::DomainUrl;
+use ontol_log::error::SemError;
 use ontol_parser::{
-    source::SourceSpan,
+    ParserError,
+    source::{NO_SPAN, SourceId, SourceSpan},
     topology::{TopologyError, TopologyErrors},
 };
 use ontol_runtime::format_utils::CommaSeparated;
@@ -57,6 +59,10 @@ impl SpannedCompileError {
     pub fn span(&self) -> SourceSpan {
         self.span
     }
+}
+
+pub trait CollectCompileErrors {
+    fn collect_compile_errors(self, source_id: SourceId, ctx: &mut impl AsMut<CompileErrors>);
 }
 
 /// Compile error
@@ -358,6 +364,10 @@ pub struct CompileErrors {
 }
 
 impl CompileErrors {
+    pub fn push(&mut self, error: SpannedCompileError) {
+        self.errors.push(error);
+    }
+
     pub fn extend(&mut self, errors: CompileErrors) {
         self.errors.extend(errors.errors);
     }
@@ -388,5 +398,60 @@ impl std::fmt::Display for MissingProperties {
             },
             props = CommaSeparated(&self.0)
         )
+    }
+}
+
+impl CollectCompileErrors for ParserError {
+    fn collect_compile_errors(self, source_id: SourceId, ctx: &mut impl AsMut<CompileErrors>) {
+        match self {
+            Self::Lex(lex_error) => {
+                let span = lex_error.span;
+                ctx.as_mut()
+                    .push(CompileError::Lex(lex_error.msg).span(source_id.span(span)));
+            }
+            Self::Parse(parse_error) => {
+                let span = parse_error.span;
+                ctx.as_mut()
+                    .push(CompileError::Parse(parse_error.msg).span(source_id.span(span)));
+            }
+        }
+    }
+}
+
+impl CollectCompileErrors for SemError {
+    fn collect_compile_errors(self, source_id: SourceId, ctx: &mut impl AsMut<CompileErrors>) {
+        match self {
+            SemError::Ontol => todo!(),
+            SemError::ArcSyntax(span) => {
+                ctx.as_mut()
+                    .push(CompileError::TODO("arc syntax").span(source_id.span(span)));
+            }
+            SemError::Syntax(_backtrace) => {
+                ctx.as_mut()
+                    .push(CompileError::TODO("unhandled syntax error").span(NO_SPAN));
+            }
+            SemError::SymbolAlreadyDefined => todo!(),
+            SemError::Lookup(token, span) => todo!("lookup {token:?} {span:?}"),
+            SemError::MissingContext(_span) => todo!(),
+            SemError::UnionInUnion => todo!(),
+            SemError::SubScoping(_span) => todo!(),
+            SemError::Apply(_apply_error) => todo!(),
+            SemError::Lex(err) => {
+                ctx.as_mut()
+                    .push(CompileError::Lex(err.msg).span(source_id.span(err.span)));
+            }
+            SemError::Parse(err) => {
+                ctx.as_mut()
+                    .push(CompileError::Parse(err.msg).span(source_id.span(err.span)));
+            }
+            SemError::ParseMulti(vec) => {
+                for err in vec {
+                    ctx.as_mut()
+                        .push(CompileError::Parse(err.msg).span(source_id.span(err.span)));
+                }
+            }
+            SemError::ArcSlotRemoval => todo!(),
+            SemError::Todo(_) => todo!(),
+        }
     }
 }

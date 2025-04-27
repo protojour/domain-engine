@@ -65,6 +65,34 @@ impl DomainUrl {
             _ => other.clone(),
         }
     }
+
+    /// Ontol Log url of this URL ("./ontol.log")
+    pub fn log_url(&self) -> Option<Url> {
+        let mut segments = self.0.path_segments()?.peekable();
+        let mut log_path = vec![];
+
+        while let Some(segment) = segments.next() {
+            if segments.peek().is_none() {
+                break;
+            }
+            log_path.push(segment);
+        }
+
+        log_path.push("ontol.log");
+
+        let mut log_url = self.0.clone();
+        log_url.set_path(&log_path.join("/"));
+
+        Some(log_url)
+    }
+
+    pub fn is_log_url(&self) -> bool {
+        self.0
+            .path_segments()
+            .and_then(Iterator::last)
+            .map(|last_segment| last_segment == "ontol.log")
+            .unwrap_or(false)
+    }
 }
 
 impl From<Url> for DomainUrl {

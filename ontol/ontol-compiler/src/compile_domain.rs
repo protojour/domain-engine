@@ -3,7 +3,7 @@ use std::{collections::HashMap, ops::Deref};
 use arcstr::ArcStr;
 use fnv::FnvHashSet;
 use ontol_core::{tag::DomainIndex, url::DomainUrl};
-use ontol_parser::{ParserError, source::SourceSpan, topology::OntolHeaderData};
+use ontol_parser::{source::SourceSpan, topology::OntolHeaderData};
 use ontol_runtime::{
     DefId,
     ontology::ontol::TextConstant,
@@ -12,14 +12,14 @@ use ontol_runtime::{
 use tracing::{debug, debug_span};
 
 use crate::{
-    CompileError, Compiler, Session, UnifiedCompileError,
+    CollectCompileErrors, CompileError, Compiler, Session, UnifiedCompileError,
     def::{BuiltinRelationKind, DefKind},
     edge::{EdgeCtx, EdgeId},
     entity::entity_ctx::def_implies_entity,
     lowering::context::LoweringOutcome,
     misc::{MacroExpand, MacroItem, MiscCtx},
     namespace::DocId,
-    ontol_syntax::OntolSyntax,
+    ontol_semantics::OntolSemantics,
     relation::{RelId, RelParams, Relationship, rel_def_meta},
     repr::repr_model::ReprKind,
     thesaurus::{Thesaurus, TypeRelation},
@@ -38,9 +38,9 @@ impl Compiler<'_> {
     /// Lower statements from the next domain,
     /// perform type check against its dependent domains,
     /// and seal the types at the end.
-    pub(super) fn lower_and_check_next_domain<S: OntolSyntax>(
+    pub(super) fn lower_and_check_next_domain<S: OntolSemantics, E: CollectCompileErrors>(
         &mut self,
-        parsed: ontol_parser::topology::ParsedDomain<S>,
+        parsed: ontol_parser::topology::ParsedDomain<S, E>,
     ) -> Result<(), UnifiedCompileError> {
         let domain_index = parsed.domain_index;
 
@@ -49,18 +49,8 @@ impl Compiler<'_> {
 
         let _entered = debug_span!("domain", idx = ?domain_index.index()).entered();
 
-        for error in parsed.parse_errors {
-            match error {
-                ParserError::Lex(lex_error) => {
-                    let span = lex_error.span;
-                    CompileError::Lex(lex_error.msg).span(parsed.source_id.span(span))
-                }
-                ParserError::Parse(parse_error) => {
-                    let span = parse_error.span;
-                    CompileError::Parse(parse_error.msg).span(parsed.source_id.span(span))
-                }
-            }
-            .report(self);
+        for error in parsed.errors {
+            E::collect_compile_errors(error, parsed.source_id, self);
         }
 
         let domain_def_id = self.defs.alloc_persistent_def_id(domain_index);
@@ -73,7 +63,7 @@ impl Compiler<'_> {
         self.topology_generation
             .insert(domain_index, parsed.generation);
 
-        let mut outcome = parsed.syntax.lower(
+        let mut outcome = parsed.semantics.lower(
             parsed.url.clone(),
             domain_def_id,
             parsed.source_id,

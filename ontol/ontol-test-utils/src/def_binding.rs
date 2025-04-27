@@ -50,7 +50,7 @@ impl<'on> DefBinding<'on> {
                 Some(name) => name == type_name,
                 None => false,
             })
-            .unwrap_or_else(|| panic!("type not found: `{type_name}`"));
+            .unwrap_or_else(|| panic!("type not found: `{type_name}` di={}", domain_index.index()));
 
         if !def.public {
             warn!("`{:?}` is not public!", def.ident().debug(ontology));

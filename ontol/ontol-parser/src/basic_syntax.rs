@@ -1,12 +1,9 @@
 use std::{panic::UnwindSafe, str::FromStr};
 
-use ontol_core::{
-    DomainId, OntologyDomainId, error::SpannedMsgError, span::U32Span, url::DomainUrlParser,
-};
+use ontol_core::{DomainId, OntologyDomainId, span::U32Span, url::DomainUrlParser};
 use ulid::Ulid;
 
 use crate::{
-    ParserError,
     cst::{
         inspect as insp,
         tree::SyntaxTree,
@@ -14,7 +11,7 @@ use crate::{
     },
     join_doc_lines,
     lexer::kind::Kind,
-    topology::{ExtractHeaderData, OntolHeaderData, TopologyError, WithDocs},
+    topology::{ExtractHeaderData, MakeParseError, OntolHeaderData, TopologyError, WithDocs},
 };
 
 /// An ontol_parser native syntax tree.
@@ -24,15 +21,19 @@ pub struct OntolTreeSyntax<S> {
 }
 
 impl<S: AsRef<str> + UnwindSafe> ExtractHeaderData for OntolTreeSyntax<S> {
-    fn header_data(&self, with_docs: WithDocs, errors: &mut Vec<ParserError>) -> OntolHeaderData {
+    fn header_data(
+        &self,
+        with_docs: WithDocs,
+        errors: &mut Vec<impl MakeParseError>,
+    ) -> OntolHeaderData {
         extract_ontol_header_data(self.tree.view(self.source_text.as_ref()), with_docs, errors)
     }
 }
 
-fn extract_ontol_header_data<V: NodeView>(
+pub fn extract_ontol_header_data<V: NodeView>(
     ontol_view: V,
     with_docs: WithDocs,
-    parse_errors: &mut Vec<ParserError>,
+    parse_errors: &mut Vec<impl MakeParseError>,
 ) -> OntolHeaderData {
     let mut data = OntolHeaderData {
         domain_docs: None,
@@ -82,10 +83,10 @@ fn extract_ontol_header_data<V: NodeView>(
                             data.deps.push((reference, uri.0.span()));
                         }
                         Err(_error) => {
-                            parse_errors.push(ParserError::Parse(SpannedMsgError {
-                                msg: "invalid reference".to_string(),
-                                span: uri.0.span(),
-                            }));
+                            parse_errors.push(MakeParseError::make_parse_error(
+                                "invalid reference".to_string(),
+                                uri.0.span(),
+                            ));
                         }
                     }
                 }
@@ -250,8 +251,9 @@ fn test_extract_header_data() {
     assert!(errors.is_empty());
     let syntax_tree = tree.unflatten();
 
+    let mut errors: Vec<crate::ParserError> = vec![];
     let header_data =
-        extract_ontol_header_data(syntax_tree.view(ontol), WithDocs(true), &mut vec![]);
+        extract_ontol_header_data(syntax_tree.view(ontol), WithDocs(true), &mut errors);
 
     assert_eq!("docs1\ndocs2", header_data.domain_docs.unwrap());
     assert_eq!(

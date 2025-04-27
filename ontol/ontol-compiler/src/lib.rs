@@ -9,7 +9,7 @@ use lowering::context::LoweringOutcome;
 use misc::MiscCtx;
 use ontol_core::{OntologyDomainId, TopologyGeneration, tag::DomainIndex, url::DomainUrl};
 use ontol_parser::source::SourceId;
-use ontol_syntax::OntolSyntax;
+use ontol_semantics::OntolSemantics;
 use primitive::init_ontol_primitives;
 use properties::PropCtx;
 use std::{
@@ -45,7 +45,7 @@ use crate::lowering::context::CstLowering;
 
 pub mod error;
 pub mod mem;
-pub mod ontol_syntax;
+pub mod ontol_semantics;
 pub mod primitive;
 pub mod spanned_borrow;
 
@@ -59,6 +59,7 @@ mod fmt;
 mod hir_unify;
 mod interface;
 mod into_ontology;
+mod log_lowering;
 mod lowering;
 mod map;
 mod map_arm_def_inference;
@@ -85,8 +86,8 @@ mod types;
 /// The compilation either completely succeeds or returns a [UnifiedCompileError].
 ///
 /// The errors produces by the compiler mark places in source files according to the [Sources] that is passed in.
-pub fn compile<S: OntolSyntax>(
-    topology: ontol_parser::topology::DomainTopology<S>,
+pub fn compile<S: OntolSemantics, E: CollectCompileErrors>(
+    topology: ontol_parser::topology::DomainTopology<S, E>,
     mem: &Mem,
 ) -> Result<Compiled, UnifiedCompileError> {
     let mut compiler = Compiler::new(mem);
