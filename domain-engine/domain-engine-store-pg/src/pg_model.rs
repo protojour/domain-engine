@@ -34,7 +34,7 @@ pub struct EdgeId(pub DefId);
 impl EdgeId {
     #[inline]
     pub fn domain_index(&self) -> DomainIndex {
-        self.0.0
+        self.0.domain_index()
     }
 
     #[inline]
@@ -86,7 +86,7 @@ impl PgModel {
 
     pub fn stable_property_index(&self, prop_id: PropId) -> Option<u32> {
         let def_id = prop_id.0;
-        let pg_domain = self.domains.get(&def_id.0)?;
+        let pg_domain = self.domains.get(&def_id.domain_index())?;
         let pg_table = pg_domain.datatables.get(&def_id)?;
         let pg_property = pg_table.properties.get(&prop_id.1)?;
 
@@ -141,7 +141,7 @@ impl PgModel {
     pub fn find_edgetable(&self, edge_id: &EdgeId) -> Option<&PgTable> {
         self.domains
             .get(&edge_id.domain_index())
-            .and_then(|pg_domain| pg_domain.edgetables.get(&edge_id.def_id().1))
+            .and_then(|pg_domain| pg_domain.edgetables.get(&edge_id.def_id().tag()))
     }
 
     pub fn edgetable(&self, edge_id: &EdgeId) -> DomainResult<&PgTable> {
@@ -262,7 +262,7 @@ impl PgDomain {
     pub fn get_table(&self, id: &PgTableIdUnion) -> Option<&PgTable> {
         match id {
             PgTableIdUnion::Def(def_id) => self.datatables.get(def_id),
-            PgTableIdUnion::Edge(edge_id) => self.edgetables.get(&edge_id.def_id().1),
+            PgTableIdUnion::Edge(edge_id) => self.edgetables.get(&edge_id.def_id().tag()),
         }
     }
 }

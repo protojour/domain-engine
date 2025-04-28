@@ -121,7 +121,7 @@ pub async fn read_registry(
         match table_type {
             PgDomainTableType::Vertex => {
                 let def_domain_index = domain_index_by_key.get(&def_domain_key).unwrap();
-                let def_id = DefId(*def_domain_index, def_tag);
+                let def_id = DefId::new_persistent(*def_domain_index, def_tag);
                 owner_pg_domain.datatables.insert(def_id, pg_table);
                 table_by_key.insert(key, TableRef::Vertex(owner_domain_index, def_id));
             }
@@ -129,7 +129,7 @@ pub async fn read_registry(
                 owner_pg_domain.edgetables.insert(def_tag, pg_table);
                 table_by_key.insert(
                     key,
-                    TableRef::Edge(EdgeId(DefId(owner_domain_index, def_tag))),
+                    TableRef::Edge(EdgeId(DefId::new_persistent(owner_domain_index, def_tag))),
                 );
             }
         }
@@ -178,7 +178,7 @@ pub async fn read_registry(
             }
             Some(TableRef::Edge(edge_id)) => {
                 let pg_domain = ctx.domains.get_mut(&edge_id.domain_index()).unwrap();
-                let pg_table = pg_domain.edgetables.get_mut(&edge_id.def_id().1).unwrap();
+                let pg_table = pg_domain.edgetables.get_mut(&edge_id.def_id().tag()).unwrap();
 
                 pg_table.properties.insert(prop_tag, pg_property);
             }
@@ -204,7 +204,7 @@ pub async fn read_registry(
         let Some(domain_index) = domain_index_by_key.get(&def_domain_key).copied() else {
             continue;
         };
-        let index_def_id = DefId(domain_index, def_tag);
+        let index_def_id = DefId::new_persistent(domain_index, def_tag);
 
         match table_by_key.get(&domaintable_key) {
             Some(TableRef::Vertex(owner_domain_index, def_id)) => {
@@ -265,7 +265,10 @@ pub async fn read_registry(
         };
 
         let pg_domain = ctx.domains.get_mut(&edge_id.domain_index()).unwrap();
-        let pg_table = pg_domain.edgetables.get_mut(&edge_id.def_id().1).unwrap();
+        let pg_table = pg_domain
+            .edgetables
+            .get_mut(&edge_id.def_id().tag())
+            .unwrap();
 
         pg_table.edge_cardinals.insert(
             CardinalIdx(ordinal.try_into()?),

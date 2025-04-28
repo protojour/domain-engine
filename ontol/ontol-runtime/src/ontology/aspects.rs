@@ -71,23 +71,23 @@ impl DefsAspect {
     }
 
     pub fn def(&self, def_id: DefId) -> &Def {
-        match self.domain_by_index(def_id.0) {
+        match self.domain_by_index(def_id.domain_index()) {
             Some(domain) => domain.def(def_id),
             None => {
-                panic!("No domain for {:?}", def_id.0)
+                panic!("No domain for {:?}", def_id.domain_index())
             }
         }
     }
 
     pub fn get_def(&self, def_id: DefId) -> Option<&Def> {
-        match self.domain_by_index(def_id.0) {
+        match self.domain_by_index(def_id.domain_index()) {
             Some(domain) => domain.def_option(def_id),
             None => None,
         }
     }
 
     pub fn find_edge(&self, id: DefId) -> Option<&EdgeInfo> {
-        let domain = self.domain_by_index(id.0)?;
+        let domain = self.domain_by_index(id.domain_index())?;
         domain.find_edge(id)
     }
 

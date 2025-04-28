@@ -16,22 +16,39 @@ use super::OntologyCtx;
     parse_token_with = DefId::parse_token,
 )]
 pub struct DefId {
-    pub domain_id: DomainId,
-    pub def_tag: u16,
+    pub(crate) domain_id: DomainId,
+    pub(crate) def_tag: u16,
+    pub(crate) persistent: bool,
 }
 
 impl Display for DefId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}", self.domain_id, self.def_tag)
+        write!(
+            f,
+            "{}{}:{}",
+            if self.persistent { "" } else { "~" },
+            self.domain_id,
+            self.def_tag,
+        )
     }
 }
 
 impl DefId {
+    pub fn new(def_id: ontol_runtime::DefId, ctx: &OntologyCtx) -> Self {
+        let domain = ctx.domain_by_index(def_id.domain_index()).unwrap();
+
+        Self {
+            domain_id: domain.domain_id().id,
+            def_tag: def_id.tag(),
+            persistent: def_id.is_persistent(),
+        }
+    }
+
     pub fn as_runtime_def_id(&self, ctx: &OntologyCtx) -> FieldResult<ontol_runtime::DefId> {
         let domain = ctx
             .domain_by_id(self.domain_id)
             .ok_or("def domain not found")?;
-        Ok(ontol_runtime::DefId(
+        Ok(ontol_runtime::DefId::new_persistent(
             domain.def_id().domain_index(),
             self.def_tag,
         ))
@@ -49,11 +66,23 @@ impl DefId {
             return Err(DefIdParseError::MustBeAString.into());
         };
 
+        let mut string = string.as_str();
+
+        let mut persistent = true;
+        if let Some(p) = string.strip_prefix("~") {
+            string = p;
+            persistent = false;
+        }
+
         let (domain_id, tag) = string.split_once(":").ok_or(DefIdParseError::BadFormat)?;
         let domain_id = DomainId::from_str(domain_id).map_err(|_| DefIdParseError::BadFormat)?;
         let def_tag: u16 = tag.parse().map_err(|_| DefIdParseError::BadFormat)?;
 
-        Ok(DefId { domain_id, def_tag })
+        Ok(DefId {
+            domain_id,
+            def_tag,
+            persistent,
+        })
     }
 
     fn parse_token(token: juniper::ScalarToken<'_>) -> juniper::ParseScalarResult<GqlScalar> {

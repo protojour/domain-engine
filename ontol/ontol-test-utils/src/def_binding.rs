@@ -125,7 +125,16 @@ impl<'on> DefBinding<'on> {
             .domain_by_index(self.def.id.domain_index())
             .unwrap();
 
-        format!("{}:{}", domain.domain_id().id, self.def.id.1)
+        format!(
+            "{}{}:{}",
+            if self.def_id().is_persistent() {
+                ""
+            } else {
+                "~"
+            },
+            domain.domain_id().id,
+            self.def.id.tag()
+        )
     }
 
     #[track_caller]

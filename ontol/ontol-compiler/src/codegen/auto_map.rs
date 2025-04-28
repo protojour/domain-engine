@@ -48,9 +48,11 @@ pub fn autogenerate_mapping<'m>(
 
             Some(ExplicitMapCodegenTask {
                 ontol_map: Some(OntolMap {
-                    map_def_id: compiler
-                        .defs
-                        .add_def(DefKind::AutoMapping, domain_index, NO_SPAN),
+                    map_def_id: compiler.defs.add_persistent_def(
+                        DefKind::AutoMapping,
+                        domain_index,
+                        NO_SPAN,
+                    ),
                     arms: OntolMapArms::Patterns(arms),
                     span: NO_SPAN,
                 }),
@@ -64,9 +66,11 @@ pub fn autogenerate_mapping<'m>(
 
             Some(ExplicitMapCodegenTask {
                 ontol_map: Some(OntolMap {
-                    map_def_id: compiler
-                        .defs
-                        .add_def(DefKind::AutoMapping, domain_index, NO_SPAN),
+                    map_def_id: compiler.defs.add_persistent_def(
+                        DefKind::AutoMapping,
+                        domain_index,
+                        NO_SPAN,
+                    ),
                     arms: OntolMapArms::Patterns([fmt_node, transparent_node]),
                     span: NO_SPAN,
                 }),
@@ -80,9 +84,11 @@ pub fn autogenerate_mapping<'m>(
 
             Some(ExplicitMapCodegenTask {
                 ontol_map: Some(OntolMap {
-                    map_def_id: compiler
-                        .defs
-                        .add_def(DefKind::AutoMapping, domain_index, NO_SPAN),
+                    map_def_id: compiler.defs.add_persistent_def(
+                        DefKind::AutoMapping,
+                        domain_index,
+                        NO_SPAN,
+                    ),
                     arms: OntolMapArms::Patterns([transparent_node, fmt_node]),
                     span: NO_SPAN,
                 }),
@@ -164,7 +170,7 @@ pub fn autogenerate_mapping<'m>(
 
                 return Some(ExplicitMapCodegenTask {
                     ontol_map: Some(OntolMap {
-                        map_def_id: compiler.defs.add_def(
+                        map_def_id: compiler.defs.add_persistent_def(
                             DefKind::AutoMapping,
                             domain_index,
                             NO_SPAN,
@@ -195,7 +201,7 @@ pub fn autogenerate_mapping<'m>(
 
                     Some(ExplicitMapCodegenTask {
                         ontol_map: Some(OntolMap {
-                            map_def_id: compiler.defs.add_def(
+                            map_def_id: compiler.defs.add_persistent_def(
                                 DefKind::AutoMapping,
                                 domain_index,
                                 NO_SPAN,

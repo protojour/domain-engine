@@ -540,7 +540,7 @@ fn parse_def_id(next: &str) -> ParseResult<DefId> {
         panic!("invalid domain index");
     };
 
-    Ok((DefId(domain_index, tag as u16), next_outer))
+    Ok((DefId::new_persistent(domain_index, tag as u16), next_outer))
 }
 
 fn parse_i64(next: &str) -> ParseResult<i64> {

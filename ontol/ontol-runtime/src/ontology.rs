@@ -86,7 +86,7 @@ impl Ontology {
     }
 
     pub fn get_def(&self, def_id: DefId) -> Option<&Def> {
-        match self.domain_by_index(def_id.0) {
+        match self.domain_by_index(def_id.domain_index()) {
             Some(domain) => domain.def_option(def_id),
             None => None,
         }

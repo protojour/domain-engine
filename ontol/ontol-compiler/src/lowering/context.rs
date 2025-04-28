@@ -71,12 +71,12 @@ impl LoweringOutcome {
         span: SourceSpan,
         docs: Option<ArcStr>,
     ) {
-        let RelId(DefId(domain_index, def_tag), rel_tag) = rel_id;
+        let RelId(def_id, rel_tag) = rel_id;
 
         self.rels
-            .entry(domain_index)
+            .entry(def_id.domain_index())
             .or_default()
-            .entry(def_tag)
+            .entry(def_id.tag())
             .or_default()
             .push((rel_tag, relationship, span, docs));
     }
@@ -370,7 +370,10 @@ impl<'m> LoweringCtx<'_, 'm> {
                 }
             }
             Entry::Vacant(vacant) => {
-                let def_id = self.compiler.defs.alloc_def_id(self.domain_index);
+                let def_id = self
+                    .compiler
+                    .defs
+                    .alloc_persistent_def_id(self.domain_index);
                 vacant.insert(def_id);
                 Ok((def_id, Coinage::New, ident))
             }
@@ -378,14 +381,20 @@ impl<'m> LoweringCtx<'_, 'm> {
     }
 
     pub fn define_anonymous_type(&mut self, type_def: TypeDef<'m>, span: U32Span) -> DefId {
-        let anonymous_def_id = self.compiler.defs.alloc_def_id(self.domain_index);
+        let anonymous_def_id = self
+            .compiler
+            .defs
+            .alloc_persistent_def_id(self.domain_index);
         self.set_def_kind(anonymous_def_id, DefKind::Type(type_def), span);
         debug!("{anonymous_def_id:?}: <anonymous>");
         anonymous_def_id
     }
 
     pub fn define_anonymous(&mut self, kind: DefKind<'m>, span: U32Span) -> DefId {
-        let def_id = self.compiler.defs.alloc_def_id(self.domain_index);
+        let def_id = self
+            .compiler
+            .defs
+            .alloc_persistent_def_id(self.domain_index);
         self.set_def_kind(def_id, kind, span);
         def_id
     }

@@ -30,7 +30,7 @@ impl Compiler<'_> {
                 }
             } else {
                 let entity_span = self.defs.def_span(def_id);
-                let order_union = self.defs.add_def(
+                let order_union = self.defs.add_persistent_def(
                     DefKind::Type(TypeDef {
                         ident: None,
                         rel_type_for: None,

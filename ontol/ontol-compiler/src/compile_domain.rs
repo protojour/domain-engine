@@ -63,7 +63,7 @@ impl Compiler<'_> {
             .report(self);
         }
 
-        let domain_def_id = self.defs.alloc_def_id(domain_index);
+        let domain_def_id = self.defs.alloc_persistent_def_id(domain_index);
         self.define_domain(domain_def_id);
 
         self.loaded.by_url.insert(parsed.url.clone(), domain_def_id);
@@ -141,8 +141,8 @@ impl Compiler<'_> {
 
         // handle relationships in macros first, they have to be ready before other relationships
         for macro_def_id in macro_defs {
-            if let Some(pkg_rels) = outcome.rels.get_mut(&macro_def_id.0) {
-                if let Some(macro_rels) = pkg_rels.remove(&macro_def_id.1) {
+            if let Some(pkg_rels) = outcome.rels.get_mut(&macro_def_id.domain_index()) {
+                if let Some(macro_rels) = pkg_rels.remove(&macro_def_id.tag()) {
                     let mut macro_items: Vec<MacroItem> = vec![];
 
                     for (rel_tag, relationship, span, docs) in macro_rels {
@@ -197,7 +197,7 @@ impl Compiler<'_> {
             for (domain_index, rel_map) in outcome.rels {
                 for (def_tag, rels) in rel_map {
                     for (rel_tag, relationship, span, docs) in rels {
-                        let rel_id = RelId(DefId(domain_index, def_tag), rel_tag);
+                        let rel_id = RelId(DefId::new_persistent(domain_index, def_tag), rel_tag);
                         self.rel_ctx.commit_rel(rel_id, relationship, span);
 
                         if let Some(docs) = docs {

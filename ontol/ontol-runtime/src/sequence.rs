@@ -420,7 +420,7 @@ mod tests {
     }
 
     fn def(id: u16) -> ValueTag {
-        DefId(DomainIndex::from_u16_and_mask(1337, TagFlags::PKG_MASK), id).into()
+        DefId::new_persistent(DomainIndex::from_u16_and_mask(1337, TagFlags::PKG_MASK), id).into()
     }
 
     fn text(t: &str) -> Value {
@@ -431,7 +431,10 @@ mod tests {
         let attrs = iter.into_iter().map(|(tag, val)| {
             (
                 PropId(
-                    DefId(DomainIndex::from_u16_and_mask(42, TagFlags::PKG_MASK), 42),
+                    DefId::new_persistent(
+                        DomainIndex::from_u16_and_mask(42, TagFlags::PKG_MASK),
+                        42,
+                    ),
                     DefPropTag(tag),
                 ),
                 Attr::Unit(val),
@@ -452,7 +455,10 @@ mod tests {
 
                     (
                         PropId(
-                            DefId(DomainIndex::from_u16_and_mask(42, TagFlags::PKG_MASK), 42),
+                            DefId::new_persistent(
+                                DomainIndex::from_u16_and_mask(42, TagFlags::PKG_MASK),
+                                42,
+                            ),
                             DefPropTag(tag),
                         ),
                         Attr::Unit(value),

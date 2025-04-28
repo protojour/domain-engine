@@ -224,8 +224,8 @@ impl AsAtlas for DomainUrl {
         if self.url().scheme() == "atlas" {
             self.clone()
         } else {
-            let path_segments = self.url().path_segments().unwrap();
-            let file_name = path_segments.last().unwrap();
+            let mut path_segments = self.url().path_segments().unwrap();
+            let file_name = path_segments.next_back().unwrap();
 
             DomainUrl::new(
                 Url::parse(&format!("atlas:/protojour/{bundle_name}/{file_name}")).unwrap(),

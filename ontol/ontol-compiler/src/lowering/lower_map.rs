@@ -55,7 +55,10 @@ impl<V: NodeView> CstLowering<'_, '_, V> {
                 (def_id, Some(ident))
             }
             None => (
-                self.ctx.compiler.defs.alloc_def_id(self.ctx.domain_index),
+                self.ctx
+                    .compiler
+                    .defs
+                    .alloc_persistent_def_id(self.ctx.domain_index),
                 None,
             ),
         };

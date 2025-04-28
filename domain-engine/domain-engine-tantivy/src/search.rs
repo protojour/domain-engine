@@ -300,7 +300,10 @@ impl TantivyDataStoreLayer {
                 .parse()
                 .map_err(|_| SearchError::DocInvalidDomainDefId)?;
 
-            return Ok(Some(DefId(domain.def_id().domain_index(), def_tag)));
+            return Ok(Some(DefId::new_persistent(
+                domain.def_id().domain_index(),
+                def_tag,
+            )));
         }
 
         Err(SearchError::DocMissingDomainDefId.into())

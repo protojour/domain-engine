@@ -376,7 +376,7 @@ impl<'a> TransactCtx<'a> {
 
             Ok(())
         } else {
-            let domain_index = value_def_id.0;
+            let domain_index = value_def_id.domain_index();
             let def_id = value_def_id;
 
             let cache_key = (InsertMode::Insert, domain_index, def_id);

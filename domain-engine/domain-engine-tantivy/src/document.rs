@@ -50,7 +50,10 @@ impl std::error::Error for DocError {}
 impl IndexingContext {
     pub fn make_vertex_doc(&self, vertex: Value) -> Result<Doc, DocError> {
         let def_id = vertex.type_def_id();
-        let domain = self.ontology.domain_by_index(def_id.0).unwrap();
+        let domain = self
+            .ontology
+            .domain_by_index(def_id.domain_index())
+            .unwrap();
 
         if !domain.domain_id().stable {
             return Err(DocError::UnstableDomain);
@@ -106,7 +109,8 @@ impl IndexingContext {
         doc.add_field_value(
             self.schema.facet,
             OwnedValue::Facet(
-                Facet::from_text(&format!("/def/{}:{}", domain.domain_id().id, def_id.1)).unwrap(),
+                Facet::from_text(&format!("/def/{}:{}", domain.domain_id().id, def_id.tag()))
+                    .unwrap(),
             ),
         );
         doc.add_field_value(

@@ -95,11 +95,8 @@ pub fn write_ontol_scalar(
 ) -> juniper::FieldResult<()> {
     let def_id = value.type_def_id();
     if cfg.with_def_id {
-        if let Some(domain) = ctx.domain_by_index(def_id.0) {
-            let gql_def_id = gql_id::DefId {
-                domain_id: domain.domain_id().id,
-                def_tag: def_id.1,
-            };
+        if let Some(_domain) = ctx.domain_by_index(def_id.domain_index()) {
+            let gql_def_id = gql_id::DefId::new(def_id, ctx);
 
             put_string(gobj, DEF_ID, format!("{gql_def_id}"));
         }

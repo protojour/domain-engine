@@ -191,7 +191,7 @@ impl<'e> MakeStorable<'e> {
 
         let domain = self.defs.domain_by_index(def_id.domain_index()).unwrap();
         let domain_id = domain.domain_id().id;
-        let def_tag = def_id.1;
+        let def_tag = def_id.tag();
         let prop_tag = prop_id.1.0;
 
         format!("{domain_id}_{def_tag}_{prop_tag}")
@@ -386,6 +386,9 @@ impl<'a> AutomergeDeserializer<'a> {
             return Err(FromCrdtError::Datastore("domain not in the ontology"));
         };
 
-        Ok(PropId(DefId(domain_index, def_tag), DefPropTag(prop_tag)))
+        Ok(PropId(
+            DefId::new_persistent(domain_index, def_tag),
+            DefPropTag(prop_tag),
+        ))
     }
 }

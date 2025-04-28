@@ -111,21 +111,45 @@ impl RelId {
 /// This forces single-line output even when pretty-printed
 impl ::std::fmt::Debug for RelId {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "rel@{}:{}:{}", self.0.0.index(), self.0.1, self.1.0)
+        write!(
+            f,
+            "rel{}{}:{}:{}",
+            self.0.fmt_sep_char(),
+            self.0.domain_index().index(),
+            self.0.tag(),
+            self.1.0
+        )
     }
 }
 
 impl ::std::fmt::Display for RelId {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "rel@{}:{}:{}", self.0.0.index(), self.0.1, self.1.0)
+        write!(
+            f,
+            "rel{}{}:{}:{}",
+            self.0.fmt_sep_char(),
+            self.0.domain_index().index(),
+            self.0.tag(),
+            self.1.0
+        )
     }
 }
 
 impl FromStr for RelId {
     type Err = ();
 
-    fn from_str(mut s: &str) -> Result<Self, Self::Err> {
-        s = s.strip_prefix("rel@").ok_or(())?;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.strip_prefix("rel").ok_or(())?;
+        let mut persistent = false;
+
+        let s = if let Some(s) = s.strip_prefix("@") {
+            persistent = true;
+            s
+        } else if let Some(s) = s.strip_prefix("~") {
+            s
+        } else {
+            return Err(());
+        };
 
         let mut iterator = s.split(':');
         let Ok(domain_index) =
@@ -133,14 +157,21 @@ impl FromStr for RelId {
         else {
             panic!();
         };
-        let def_idx: u16 = iterator.next().ok_or(())?.parse().map_err(|_| ())?;
+        let def_tag: u16 = iterator.next().ok_or(())?.parse().map_err(|_| ())?;
         let def_rel_tag: u16 = iterator.next().ok_or(())?.parse().map_err(|_| ())?;
 
         if iterator.next().is_some() {
             return Err(());
         }
 
-        Ok(RelId(DefId(domain_index, def_idx), DefRelTag(def_rel_tag)))
+        Ok(RelId(
+            if persistent {
+                DefId::new_persistent(domain_index, def_tag)
+            } else {
+                DefId::new_transient(domain_index, def_tag)
+            },
+            DefRelTag(def_rel_tag),
+        ))
     }
 }
 
