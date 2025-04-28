@@ -10,7 +10,6 @@ use fnv::FnvHashMap;
 use itertools::{Itertools, Position};
 use ontol_core::tag::{DomainIndex, TagFlags};
 use thin_vec::ThinVec;
-use tracing::info;
 
 use crate::{
     DefId, OntolDefTag, OntolDefTagExt, PropId,
@@ -390,19 +389,12 @@ impl Debug for ValueTag {
 
 impl From<DefId> for ValueTag {
     fn from(value: DefId) -> Self {
-        let ret = Self {
+        Self {
             first: value
                 .domain_index_with_persistent_flag()
                 .index_with_persistent_flag(),
             second: value.tag(),
-        };
-
-        info!(
-            "from DefId for ValueTag {value:?} => {:?} {:?}",
-            ret.first, ret.second
-        );
-
-        ret
+        }
     }
 }
 
