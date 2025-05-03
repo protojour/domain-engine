@@ -195,7 +195,7 @@ pub async fn run_command(command: Command) -> Result<(), OntoolError> {
             Ok(())
         }
         Command::Generate(args) => {
-            let first_domain = get_source_url(
+            let first_domain = get_source_name_from_url(
                 args.domains
                     .as_slice()
                     .iter()
@@ -284,22 +284,23 @@ async fn compile(
     for entry in read_dir(root_dir)? {
         let entry = entry?;
         let path = entry.path();
+
         if path.is_dir() {
             continue;
         }
+
         // TODO: only insert needed ontol files
         if matches!(path.extension(), Some(ext) if ext == "on") {
             let source = fs::read_to_string(&path)?;
-            let source_url = get_source_url(path.to_str().unwrap())?;
+            let source_url = get_source_name_from_url(path.to_str().unwrap())?;
 
             sources_by_url.insert(source_url.clone(), Arc::new(source));
             paths_by_url.insert(source_url, path);
         }
     }
-
     let mut roots = vec![];
     for domain_ref in domains {
-        roots.push(get_source_url(&domain_ref)?);
+        roots.push(get_source_name_from_url(&domain_ref)?);
     }
 
     let url_resolvers: Vec<Box<dyn DomainUrlResolver>> = vec![
@@ -339,19 +340,16 @@ async fn compile(
 
 /// Get a source name from a path.
 /// Strips away the path and removes the `.on` suffix (if present)
-fn get_source_url(uri: &str) -> Result<DomainUrl, OntoolError> {
+fn get_source_name_from_url(uri: &str) -> Result<DomainUrl, OntoolError> {
     let parser = DomainUrlParser::default();
     let Ok(domain_url) = parser.parse(uri) else {
         return Err(OntoolError::InvalidDomainReference);
     };
     match domain_url.url().scheme() {
         "file" => {
-            let mut path_segments = domain_url.url().path_segments().expect("invalid URI");
-            if path_segments.clone().count() != 1 {
-                return Err(OntoolError::InvalidDomainReference);
-            }
-
-            let file_name = path_segments.next_back().unwrap();
+            let path_segments = domain_url.url().path_segments().expect("invalid URI");
+            let path_segments = path_segments.clone().collect::<Vec<_>>();
+            let file_name: &str = path_segments[path_segments.len() - 1];
 
             match file_name.strip_suffix(".on") {
                 Some(stripped) => Ok(DomainUrl::parse(stripped)),
