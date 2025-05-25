@@ -1,3 +1,4 @@
+use arcstr::ArcStr;
 use tracing::{Instrument, debug_span};
 
 use crate::{
@@ -10,17 +11,14 @@ pub struct QueryType;
 impl_graphql_value!(QueryType);
 
 impl juniper::GraphQLType<GqlScalar> for QueryType {
-    fn name(info: &SchemaType) -> Option<&str> {
+    fn name(info: &SchemaType) -> Option<ArcStr> {
         Some(info.typename())
     }
 
-    fn meta<'r>(
+    fn meta(
         info: &SchemaType,
-        registry: &mut juniper::Registry<'r, GqlScalar>,
-    ) -> juniper::meta::MetaType<'r, GqlScalar>
-    where
-        GqlScalar: 'r,
-    {
+        registry: &mut juniper::Registry<GqlScalar>,
+    ) -> juniper::meta::MetaType<GqlScalar> {
         // Hack to avoid some juniper errors.
         // The Int type needs to exist unconditionally, even if our generated schema does not request it.
         registry.get_type::<i32>(&());

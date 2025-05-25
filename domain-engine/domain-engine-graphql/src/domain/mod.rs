@@ -45,7 +45,6 @@ mod templates;
 mod value_serializer;
 
 pub type DomainSchema = juniper::RootNode<
-    'static,
     templates::query_type::QueryType,
     templates::mutation_type::MutationType,
     juniper::EmptySubscription<ServiceCtx>,

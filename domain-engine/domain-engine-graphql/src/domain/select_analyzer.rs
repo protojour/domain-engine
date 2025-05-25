@@ -386,10 +386,10 @@ impl<'a> SelectAnalyzer<'a> {
         let args_wrapper = ArgsWrapper::new(look_ahead);
 
         let limit = args_wrapper
-            .deserialize_optional::<usize>(first_arg.name(&self.schema_ctx.ontology))?
+            .deserialize_optional::<usize>(&first_arg.name(&self.schema_ctx.ontology))?
             .unwrap_or(self.default_query_limit());
         let after_cursor = args_wrapper
-            .deserialize_optional::<GraphQLCursor>(after_arg.name(&self.schema_ctx.ontology))?;
+            .deserialize_optional::<GraphQLCursor>(&after_arg.name(&self.schema_ctx.ontology))?;
 
         let mut inner_select = Select::Unit;
         let mut include_total_len = false;

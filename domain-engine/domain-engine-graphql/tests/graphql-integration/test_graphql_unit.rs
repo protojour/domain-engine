@@ -878,7 +878,7 @@ async fn unified_mutation_error_on_unrecognized_arg() {
             .exec([], &schema, &gql_ctx_mock_data_store(&test, &[root()], ()))
             .await
             .unwrap_first_graphql_error_msg(),
-        expected = "Unknown argument \"bogus\" on field \"artist\" of type \"Mutation\". At 0:18\n"
+        expected = "Unknown argument \"bogus\" on field \"artist\" of type \"Mutation\". At 0:18"
     );
 }
 

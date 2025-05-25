@@ -1,3 +1,4 @@
+use arcstr::{ArcStr, literal};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -20,7 +21,7 @@ pub enum ArgKind {
 }
 
 pub trait FieldArg {
-    fn name<'on>(&self, ontology: &'on Ontology) -> &'on str;
+    fn name(&self, ontology: &Ontology) -> ArcStr;
 }
 
 pub trait DomainFieldArg: FieldArg {
@@ -51,10 +52,10 @@ pub struct MapInputArg {
 }
 
 impl FieldArg for MapInputArg {
-    fn name<'on>(&self, ontology: &'on Ontology) -> &'on str {
+    fn name(&self, ontology: &Ontology) -> ArcStr {
         match &self.scalar_input_name {
-            Some(name) => &ontology[*name],
-            None => "input",
+            Some(name) => ontology.clone_text_constant(*name),
+            None => literal!("input"),
         }
     }
 }
@@ -89,8 +90,8 @@ pub struct InputArg {
 }
 
 impl FieldArg for InputArg {
-    fn name<'on>(&self, _: &'on Ontology) -> &'on str {
-        "input"
+    fn name(&self, _: &Ontology) -> ArcStr {
+        literal!("input")
     }
 }
 
@@ -120,8 +121,8 @@ pub struct EntityCreateInputsArg {
 }
 
 impl FieldArg for EntityCreateInputsArg {
-    fn name<'on>(&self, _: &'on Ontology) -> &'on str {
-        "create"
+    fn name(&self, _: &Ontology) -> ArcStr {
+        literal!("create")
     }
 }
 
@@ -157,8 +158,8 @@ pub struct EntityUpdateInputsArg {
 }
 
 impl FieldArg for EntityUpdateInputsArg {
-    fn name<'on>(&self, _: &'on Ontology) -> &'on str {
-        "update"
+    fn name(&self, _: &Ontology) -> ArcStr {
+        literal!("update")
     }
 }
 
@@ -193,8 +194,8 @@ pub struct EntityDeleteInputsArg {
 }
 
 impl FieldArg for EntityDeleteInputsArg {
-    fn name<'on>(&self, _: &'on Ontology) -> &'on str {
-        "delete"
+    fn name(&self, _: &Ontology) -> ArcStr {
+        literal!("delete")
     }
 }
 
@@ -220,8 +221,8 @@ impl DomainFieldArg for EntityDeleteInputsArg {
 pub struct FirstArg;
 
 impl FieldArg for FirstArg {
-    fn name<'on>(&self, _: &'on Ontology) -> &'on str {
-        "first"
+    fn name(&self, _: &Ontology) -> ArcStr {
+        literal!("first")
     }
 }
 
@@ -229,7 +230,7 @@ impl FieldArg for FirstArg {
 pub struct AfterArg;
 
 impl FieldArg for AfterArg {
-    fn name<'on>(&self, _: &'on Ontology) -> &'on str {
-        "after"
+    fn name(&self, _: &Ontology) -> ArcStr {
+        literal!("after")
     }
 }

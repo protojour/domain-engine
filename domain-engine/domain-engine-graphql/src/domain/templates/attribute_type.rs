@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use arcstr::ArcStr;
 use fnv::FnvHashMap;
 use juniper::graphql_value;
 use ontol_runtime::{
@@ -56,7 +57,7 @@ impl ::juniper::GraphQLValue<GqlScalar> for AttributeType<'_> {
     type Context = ServiceCtx;
     type TypeInfo = SchemaType;
 
-    fn type_name<'i>(&self, info: &'i SchemaType) -> Option<&'i str> {
+    fn type_name(&self, info: &SchemaType) -> Option<ArcStr> {
         Some(info.typename())
     }
 
@@ -102,17 +103,14 @@ impl ::juniper::GraphQLValue<GqlScalar> for AttributeType<'_> {
 }
 
 impl juniper::GraphQLType<GqlScalar> for AttributeType<'_> {
-    fn name(info: &SchemaType) -> Option<&str> {
+    fn name(info: &SchemaType) -> Option<ArcStr> {
         Some(info.typename())
     }
 
-    fn meta<'r>(
+    fn meta(
         info: &SchemaType,
-        registry: &mut juniper::Registry<'r, GqlScalar>,
-    ) -> juniper::meta::MetaType<'r, GqlScalar>
-    where
-        GqlScalar: 'r,
-    {
+        registry: &mut juniper::Registry<GqlScalar>,
+    ) -> juniper::meta::MetaType<GqlScalar> {
         let mut reg = RegistryCtx::new(&info.schema_ctx, registry);
         match &info.type_data().kind {
             TypeKind::Object(object_data) => {

@@ -60,4 +60,4 @@ impl Deref for OntologyCtx {
 impl juniper::Context for OntologyCtx {}
 
 pub type OntologySchema =
-    RootNode<'static, Query, EmptyMutation<OntologyCtx>, EmptySubscription<OntologyCtx>, GqlScalar>;
+    RootNode<Query, EmptyMutation<OntologyCtx>, EmptySubscription<OntologyCtx>, GqlScalar>;

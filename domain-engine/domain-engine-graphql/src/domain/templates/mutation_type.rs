@@ -1,3 +1,4 @@
+use arcstr::{ArcStr, literal};
 use ontol_runtime::interface::graphql::data::TypeKind;
 use tracing::{Instrument, debug_span};
 
@@ -11,7 +12,7 @@ pub struct MutationType;
 impl_graphql_value!(MutationType);
 
 impl juniper::GraphQLType<GqlScalar> for MutationType {
-    fn name(info: &SchemaType) -> Option<&str> {
+    fn name(info: &SchemaType) -> Option<ArcStr> {
         let is_empty = match &info.type_data().kind {
             TypeKind::Object(object_data) => object_data.fields.is_empty(),
             _ => true,
@@ -20,19 +21,16 @@ impl juniper::GraphQLType<GqlScalar> for MutationType {
         if is_empty {
             // This is a magic string that juniper recognizes in order
             // to make a schema without a mutation type
-            Some("_EmptyMutation")
+            Some(literal!("_EmptyMutation"))
         } else {
             Some(info.typename())
         }
     }
 
-    fn meta<'r>(
+    fn meta(
         info: &SchemaType,
-        registry: &mut juniper::Registry<'r, GqlScalar>,
-    ) -> juniper::meta::MetaType<'r, GqlScalar>
-    where
-        GqlScalar: 'r,
-    {
+        registry: &mut juniper::Registry<GqlScalar>,
+    ) -> juniper::meta::MetaType<GqlScalar> {
         let mut reg = RegistryCtx::new(&info.schema_ctx, registry);
         let fields = reg.get_fields(info.type_addr);
 

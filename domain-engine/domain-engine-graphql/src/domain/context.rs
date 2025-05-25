@@ -193,17 +193,17 @@ impl SchemaType {
         self.schema_ctx.schema.type_data(self.type_addr)
     }
 
-    pub(crate) fn typename(&self) -> &str {
+    pub(crate) fn typename(&self) -> ArcStr {
         let ontology = &self.schema_ctx.ontology;
         let type_data = &self.type_data();
         match (&type_data.kind, self.typing_purpose) {
-            (TypeKind::CustomScalar(_), _) => &ontology[type_data.typename],
+            (TypeKind::CustomScalar(_), _) => ontology.clone_text_constant(type_data.typename),
             (_, TypingPurpose::Selection | TypingPurpose::EntityId) => {
-                &ontology[type_data.typename]
+                ontology.clone_text_constant(type_data.typename)
             }
             (_, TypingPurpose::Input | TypingPurpose::InputOrReference) => type_data
                 .input_typename
-                .map(|constant| &ontology[constant])
+                .map(|constant| ontology.clone_text_constant(constant))
                 .unwrap_or_else(|| {
                     panic!(
                         "No input typename available for `{}`",
@@ -212,7 +212,7 @@ impl SchemaType {
                 }),
             (_, TypingPurpose::PartialInput) => type_data
                 .partial_input_typename
-                .map(|constant| &ontology[constant])
+                .map(|constant| ontology.clone_text_constant(constant))
                 .expect("No partial input typename available"),
         }
     }

@@ -274,6 +274,10 @@ impl Ontology {
 
         Self { data }
     }
+
+    pub fn clone_text_constant(&self, text_constant: TextConstant) -> ArcStr {
+        self.data.defs.text_constants[text_constant.0 as usize].clone()
+    }
 }
 
 impl From<Data> for Ontology {
