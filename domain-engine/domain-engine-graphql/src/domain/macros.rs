@@ -4,7 +4,7 @@ macro_rules! impl_graphql_value {
             type Context = crate::domain::context::ServiceCtx;
             type TypeInfo = crate::domain::context::SchemaType;
 
-            fn type_name<'i>(&self, info: &'i Self::TypeInfo) -> Option<&'i str> {
+            fn type_name(&self, info: &Self::TypeInfo) -> Option<::arcstr::ArcStr> {
                 Some(info.typename())
             }
 

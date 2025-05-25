@@ -1,3 +1,4 @@
+use arcstr::ArcStr;
 use ontol_runtime::{attr::AttrMatrixRef, sequence::SubSequence};
 
 use crate::{
@@ -20,7 +21,7 @@ impl juniper::GraphQLValue<GqlScalar> for PageInfoType<'_> {
     type Context = ServiceCtx;
     type TypeInfo = SchemaType;
 
-    fn type_name<'i>(&self, info: &'i Self::TypeInfo) -> Option<&'i str> {
+    fn type_name(&self, info: &Self::TypeInfo) -> Option<ArcStr> {
         Some(info.typename())
     }
 
@@ -60,17 +61,14 @@ impl juniper::GraphQLValue<GqlScalar> for PageInfoType<'_> {
 }
 
 impl juniper::GraphQLType<GqlScalar> for PageInfoType<'_> {
-    fn name(_info: &Self::TypeInfo) -> Option<&str> {
+    fn name(_info: &Self::TypeInfo) -> Option<ArcStr> {
         None
     }
 
-    fn meta<'r>(
+    fn meta(
         _info: &Self::TypeInfo,
-        _registry: &mut juniper::Registry<'r, GqlScalar>,
-    ) -> juniper::meta::MetaType<'r, GqlScalar>
-    where
-        GqlScalar: 'r,
-    {
+        _registry: &mut juniper::Registry<GqlScalar>,
+    ) -> juniper::meta::MetaType<GqlScalar> {
         panic!("This type is only used during resolving");
     }
 }

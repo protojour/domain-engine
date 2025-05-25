@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use arcstr::{ArcStr, literal};
 use juniper::{ParseError, ScalarToken};
 use ontol_runtime::interface::graphql::{
     data::{
@@ -28,17 +29,14 @@ pub struct InputType;
 impl_graphql_value!(InputType);
 
 impl juniper::GraphQLType<GqlScalar> for InputType {
-    fn name(info: &SchemaType) -> Option<&str> {
+    fn name(info: &SchemaType) -> Option<ArcStr> {
         Some(info.typename())
     }
 
-    fn meta<'r>(
+    fn meta(
         info: &SchemaType,
-        registry: &mut juniper::Registry<'r, GqlScalar>,
-    ) -> juniper::meta::MetaType<'r, GqlScalar>
-    where
-        GqlScalar: 'r,
-    {
+        registry: &mut juniper::Registry<GqlScalar>,
+    ) -> juniper::meta::MetaType<GqlScalar> {
         let _entered = trace_span!("input", name = ?info.typename()).entered();
 
         let mut reg = RegistryCtx::new(&info.schema_ctx, registry);
@@ -79,7 +77,7 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
 
                 if let Some(rel_ref) = rel_ref {
                     arguments.push(juniper::meta::Argument::new(
-                        "_edge",
+                        literal!("_edge"),
                         reg.get_type::<InputType>(
                             TypeRef::mandatory(*rel_ref),
                             info.typing_purpose,
@@ -95,7 +93,7 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
             }) => {
                 let arguments = vec![
                     reg.get_arg::<InputType>(
-                        "add",
+                        literal!("add"),
                         TypeRef {
                             modifier: TypeModifier::Array {
                                 array: Optionality::Optional,
@@ -106,7 +104,7 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
                         TypingPurpose::InputOrReference,
                     ),
                     reg.get_arg::<InputType>(
-                        "update",
+                        literal!("update"),
                         TypeRef {
                             modifier: TypeModifier::Array {
                                 array: Optionality::Optional,
@@ -117,7 +115,7 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
                         TypingPurpose::PartialInput,
                     ),
                     reg.get_arg::<InputType>(
-                        "remove",
+                        literal!("remove"),
                         TypeRef {
                             modifier: TypeModifier::Array {
                                 array: Optionality::Optional,

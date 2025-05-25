@@ -71,7 +71,7 @@ impl<'a> ArgsWrapper<'a> {
             .with_level(level)
             .with_profile(&processor_profile);
 
-        let result = match self.find_argument(arg_name) {
+        let result = match self.find_argument(&arg_name) {
             Some(look_ahead_arg) => {
                 serde_processor.deserialize(LookAheadValueDeserializer::from(look_ahead_arg))
             }

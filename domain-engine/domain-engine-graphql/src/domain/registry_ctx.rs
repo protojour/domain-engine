@@ -1,5 +1,6 @@
 use std::{cmp::Ordering, ops::ControlFlow, sync::Arc};
 
+use arcstr::{ArcStr, literal};
 use juniper::{GraphQLValue, ID};
 use ontol_runtime::{
     PropId,
@@ -36,9 +37,9 @@ use crate::domain::{
 use crate::gql_scalar::GqlScalar;
 
 /// SchemaCtx and juniper Registry combined together to provide more ergonimic API
-pub(crate) struct RegistryCtx<'a, 'r> {
+pub(crate) struct RegistryCtx<'a> {
     pub schema_ctx: &'a Arc<SchemaCtx>,
-    pub registry: &'a mut juniper::Registry<'r, GqlScalar>,
+    pub registry: &'a mut juniper::Registry<GqlScalar>,
 }
 
 #[derive(Debug)]
@@ -46,10 +47,10 @@ pub enum CollectOperatorError {
     Scalar,
 }
 
-impl<'a, 'r> RegistryCtx<'a, 'r> {
+impl<'a> RegistryCtx<'a> {
     pub fn new(
         schema_ctx: &'a Arc<SchemaCtx>,
-        registry: &'a mut juniper::Registry<'r, GqlScalar>,
+        registry: &'a mut juniper::Registry<GqlScalar>,
     ) -> Self {
         Self {
             schema_ctx,
@@ -60,8 +61,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
     pub fn build_input_object_meta_type(
         &mut self,
         info: &SchemaType,
-        arguments: &[juniper::meta::Argument<'r, GqlScalar>],
-    ) -> juniper::meta::MetaType<'r, GqlScalar> {
+        arguments: &[juniper::meta::Argument<GqlScalar>],
+    ) -> juniper::meta::MetaType<GqlScalar> {
         let mut builder = if arguments.is_empty() {
             // Hack for empty input types
             let json_scalar = self.schema_ctx.get_schema_type(
@@ -72,8 +73,9 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 .registry
                 .arg::<Option<InputType>>("_", &json_scalar)
                 .description(
-                "This argument is not a real argument; it acts as a marker for an input type without fields.",
-            )];
+                    literal!("This argument is not a real argument; it acts as a marker for an input type without fields."),
+                )
+            ];
 
             self.registry
                 .build_input_object_type::<InputType>(info, &arguments)
@@ -89,7 +91,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         builder.into_meta()
     }
 
-    pub fn get_fields(&mut self, type_addr: TypeAddr) -> Vec<juniper::meta::Field<'r, GqlScalar>> {
+    pub fn get_fields(&mut self, type_addr: TypeAddr) -> Vec<juniper::meta::Field<GqlScalar>> {
         let type_data = self.schema_ctx.schema.type_data(type_addr);
 
         if let TypeKind::Object(object) = &type_data.kind {
@@ -100,11 +102,9 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 let field = juniper::meta::Field {
                     name: name.string.as_str().into(),
                     description: match &field_data.kind {
-                        FieldKind::Property { id, .. } => self
-                            .schema_ctx
-                            .ontology
-                            .get_prop_docs(*id)
-                            .map(|d| d.to_string()),
+                        FieldKind::Property { id, .. } => {
+                            self.schema_ctx.ontology.get_prop_docs(*id).cloned()
+                        }
                         _ => None,
                     },
                     arguments: self.get_arguments_to_field(&field_data.kind),
@@ -125,7 +125,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
     pub fn collect_operator_arguments(
         &mut self,
         operator_addr: SerdeOperatorAddr,
-        output: &mut Vec<juniper::meta::Argument<'r, GqlScalar>>,
+        output: &mut Vec<juniper::meta::Argument<GqlScalar>>,
         typing_purpose: TypingPurpose,
         filter: ArgumentFilter,
     ) -> Result<ControlFlow<(), CardinalIdx>, CollectOperatorError> {
@@ -179,7 +179,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     let mut argument = match &property.kind {
                         SerdePropertyKind::Plain { .. } | SerdePropertyKind::FlatUnionData => self
                             .get_operator_argument(
-                                key.arc_str(),
+                                key.arc_str().clone(),
                                 property.value_addr,
                                 match &property.kind {
                                     SerdePropertyKind::Plain { rel_params_addr } => {
@@ -203,7 +203,11 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                             );
 
                             if scalar_union == LeafDiscriminantScalarUnion::TEXT {
-                                self.modified_arg::<String>(key.arc_str(), type_modifier, &())
+                                self.modified_arg::<String>(
+                                    key.arc_str().clone(),
+                                    type_modifier,
+                                    &(),
+                                )
                             } else if scalar_union == LeafDiscriminantScalarUnion::INT {
                                 let i64_schema_type = self.schema_ctx.get_schema_type(
                                     self.schema_ctx.schema.i64_custom_scalar.unwrap(),
@@ -211,7 +215,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                                 );
 
                                 self.modified_arg::<InputType>(
-                                    key.arc_str(),
+                                    key.arc_str().clone(),
                                     type_modifier,
                                     &i64_schema_type,
                                 )
@@ -294,10 +298,10 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             }
             SerdeOperator::IdSingletonStruct(entity_id, property_name, id_operator_addr) => {
                 let entity = self.schema_ctx.ontology.def(*entity_id);
-                let property_name = &self.schema_ctx.ontology[*property_name];
+                let property_name = self.schema_ctx.ontology.clone_text_constant(*property_name);
                 if self.filter_argument_property(
                     entity,
-                    property_name,
+                    &property_name,
                     None,
                     &filter,
                     &mut ControlFlow::Break(()),
@@ -360,16 +364,16 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
     fn get_operator_argument(
         &mut self,
-        name: &str,
+        name: ArcStr,
         operator_addr: SerdeOperatorAddr,
         rel_params: Option<SerdeOperatorAddr>,
         property_flags: SerdePropertyFlags,
         modifier: TypeModifier,
         typing_purpose: TypingPurpose,
-    ) -> juniper::meta::Argument<'r, GqlScalar> {
+    ) -> juniper::meta::Argument<GqlScalar> {
         let operator = &self.schema_ctx.ontology[operator_addr];
 
-        let _entered = trace_span!("arg", name).entered();
+        let _entered = trace_span!("arg", %name).entered();
         trace!(
             "register argument: {:?}",
             operator.debug(self.schema_ctx.ontology()),
@@ -560,7 +564,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
     fn get_arguments_to_field(
         &mut self,
         field_kind: &FieldKind,
-    ) -> Option<Vec<juniper::meta::Argument<'r, GqlScalar>>> {
+    ) -> Option<Vec<juniper::meta::Argument<GqlScalar>>> {
         let ontology = &self.schema_ctx.ontology;
         let mut arguments = vec![];
 
@@ -621,7 +625,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
     fn get_domain_field_arg(
         &mut self,
         field_arg: &dyn DomainFieldArg,
-    ) -> Option<juniper::meta::Argument<'r, GqlScalar>> {
+    ) -> Option<juniper::meta::Argument<GqlScalar>> {
         let ontology = &self.schema_ctx.ontology;
         let arg = match field_arg.kind() {
             ArgKind::Addr(type_addr, modifier) => {
@@ -652,11 +656,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
     }
 
     #[inline]
-    pub fn get_type<I>(
-        &mut self,
-        type_ref: TypeRef,
-        typing_purpose: TypingPurpose,
-    ) -> juniper::Type<'r>
+    pub fn get_type<I>(&mut self, type_ref: TypeRef, typing_purpose: TypingPurpose) -> juniper::Type
     where
         I: juniper::GraphQLType<GqlScalar> + juniper::GraphQLType<GqlScalar, TypeInfo = SchemaType>,
     {
@@ -687,10 +687,10 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
     #[inline]
     pub fn get_arg<T>(
         &mut self,
-        name: &str,
+        name: ArcStr,
         type_ref: TypeRef,
         typing_purpose: TypingPurpose,
-    ) -> juniper::meta::Argument<'r, GqlScalar>
+    ) -> juniper::meta::Argument<GqlScalar>
     where
         T: juniper::GraphQLType<GqlScalar>
             + juniper::FromInputValue<GqlScalar>
@@ -732,7 +732,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         &mut self,
         def: &<T as GraphQLValue<GqlScalar>>::TypeInfo,
         modifier: TypeModifier,
-    ) -> juniper::Type<'r>
+    ) -> juniper::Type
     where
         T: juniper::GraphQLType<GqlScalar>,
     {
@@ -758,10 +758,10 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
     pub fn modified_arg<T>(
         &mut self,
-        name: &str,
+        name: ArcStr,
         modifier: TypeModifier,
         def: &<T as GraphQLValue<GqlScalar>>::TypeInfo,
-    ) -> juniper::meta::Argument<'r, GqlScalar>
+    ) -> juniper::meta::Argument<GqlScalar>
     where
         T: juniper::GraphQLType<GqlScalar>
             + juniper::FromInputValue<GqlScalar>

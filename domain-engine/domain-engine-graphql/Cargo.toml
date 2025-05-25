@@ -16,7 +16,7 @@ domain-engine-core.path = "../domain-engine-core"
 arcstr.workspace = true
 base64 = "0.22"
 chrono = "0.4"
-compact_str = { version = "0.8", features = ["serde"] }
+compact_str = { version = "0.9", features = ["serde"] }
 futures-util = "0.3"
 fnv.workspace = true
 juniper.workspace = true
