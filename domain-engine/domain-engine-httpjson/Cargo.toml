@@ -49,5 +49,5 @@ reqwest = { version = "0.12", default-features = false, features = [
     "json",
     "stream",
 ] }
-reqwest-websocket = "0.4"
+reqwest-websocket = "0.5"
 ulid = "1"

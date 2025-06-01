@@ -238,7 +238,7 @@ impl<'a> RegistryCtx<'a> {
                 let (mode, level) = typing_purpose.mode_and_level();
                 match union_op.applied_deserialize_variants(mode, level) {
                     AppliedVariants::Unambiguous(operator_addr) => {
-                        self.collect_operator_arguments(
+                        let _ = self.collect_operator_arguments(
                             operator_addr,
                             output,
                             typing_purpose,
@@ -287,7 +287,7 @@ impl<'a> RegistryCtx<'a> {
                 Ok(ControlFlow::Break(()))
             }
             SerdeOperator::Alias(alias_op) => {
-                self.collect_operator_arguments(
+                let _ = self.collect_operator_arguments(
                     alias_op.inner_addr,
                     output,
                     typing_purpose,

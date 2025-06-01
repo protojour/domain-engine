@@ -1,6 +1,6 @@
-use std::sync::Arc;
+use std::{hint::black_box, sync::Arc};
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use domain_engine_core::{DomainEngine, Session};
 use domain_engine_graphql::domain::context::ServiceCtx;
 use domain_engine_store_inmemory::InMemoryConnection;

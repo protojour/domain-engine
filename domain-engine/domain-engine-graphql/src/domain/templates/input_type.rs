@@ -47,13 +47,14 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
             }) => {
                 let mut arguments = vec![];
 
-                reg.collect_operator_arguments(
-                    node_data.operator_addr,
-                    &mut arguments,
-                    info.typing_purpose,
-                    ArgumentFilter::default(),
-                )
-                .unwrap();
+                let _ = reg
+                    .collect_operator_arguments(
+                        node_data.operator_addr,
+                        &mut arguments,
+                        info.typing_purpose,
+                        ArgumentFilter::default(),
+                    )
+                    .unwrap();
 
                 reg.build_input_object_meta_type(info, &arguments)
             }
@@ -67,13 +68,14 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
                 ..
             }) => {
                 let mut arguments = vec![];
-                reg.collect_operator_arguments(
-                    *node_operator_addr,
-                    &mut arguments,
-                    info.typing_purpose,
-                    ArgumentFilter::default(),
-                )
-                .unwrap();
+                let _ = reg
+                    .collect_operator_arguments(
+                        *node_operator_addr,
+                        &mut arguments,
+                        info.typing_purpose,
+                        ArgumentFilter::default(),
+                    )
+                    .unwrap();
 
                 if let Some(rel_ref) = rel_ref {
                     arguments.push(juniper::meta::Argument::new(
@@ -131,13 +133,14 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
             }
             TypeKind::Union(union_data) => {
                 let mut arguments = vec![];
-                reg.collect_operator_arguments(
-                    union_data.operator_addr,
-                    &mut arguments,
-                    info.typing_purpose,
-                    ArgumentFilter::default(),
-                )
-                .unwrap();
+                let _ = reg
+                    .collect_operator_arguments(
+                        union_data.operator_addr,
+                        &mut arguments,
+                        info.typing_purpose,
+                        ArgumentFilter::default(),
+                    )
+                    .unwrap();
 
                 reg.build_input_object_meta_type(info, &arguments)
             }
