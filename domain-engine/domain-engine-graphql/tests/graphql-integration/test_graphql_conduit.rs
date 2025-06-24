@@ -309,7 +309,7 @@ impl ConduitBundle {
             .scalar()
             .clone();
 
-        article_id.as_string().unwrap()
+        article_id.try_into_string().unwrap()
     }
 
     async fn create_db_article_with_tag_for_teh_user(&self) {

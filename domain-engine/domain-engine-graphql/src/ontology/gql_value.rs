@@ -37,27 +37,8 @@ impl OntolValue {
         v.0.clone()
     }
 
-    fn from_input(input: &juniper::InputValue<GqlScalar>) -> Result<Self, String> {
-        match input {
-            juniper::InputValue::Null => Ok(Self(juniper::Value::null())),
-            juniper::InputValue::Scalar(scalar) => Ok(Self(juniper::Value::Scalar(scalar.clone()))),
-            juniper::InputValue::Enum(_) => Err("enum input not suported".to_string()),
-            juniper::InputValue::Variable(_) => Err("variable input not supported".to_string()),
-            juniper::InputValue::List(list) => Ok(Self(juniper::Value::List(
-                list.iter()
-                    .map(|spanning| Self::from_input(&spanning.item).map(|value| value.0))
-                    .collect::<Result<_, _>>()?,
-            ))),
-            juniper::InputValue::Object(attributes) => {
-                let mut gobj = juniper::Object::with_capacity(attributes.len());
-                for (key, value) in attributes {
-                    let value = Self::from_input(&value.item)?;
-                    gobj.add_field(&key.item, value.0);
-                }
-
-                Ok(Self(juniper::Value::object(gobj)))
-            }
-        }
+    fn from_input(scalar: &GqlScalar) -> Result<Self, String> {
+        Ok(Self(juniper::Value::Scalar(scalar.clone())))
     }
 
     fn parse_token(token: juniper::ScalarToken<'_>) -> juniper::ParseScalarResult<GqlScalar> {

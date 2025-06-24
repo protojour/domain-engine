@@ -235,7 +235,7 @@ impl<'o> ConditionBuilder<'o> {
                     Err(ConditionError::Column)
                 }
             }
-            Expr::Literal(scalar_value) => match scalar_value {
+            Expr::Literal(scalar_value, _) => match scalar_value {
                 ScalarValue::Boolean(b) => Ok(ScalarExpr::Literal(Value::boolean(*lit(b)?))),
                 ScalarValue::Float16(f) => Ok(ScalarExpr::Literal(Value::f64((*lit(f)?).into()))),
                 ScalarValue::Float32(f) => Ok(ScalarExpr::Literal(Value::f64((*lit(f)?).into()))),

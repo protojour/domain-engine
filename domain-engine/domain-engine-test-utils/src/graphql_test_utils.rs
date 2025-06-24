@@ -244,7 +244,7 @@ impl ValueExt for juniper::Value<GqlScalar> {
     }
 
     fn scalar(&self) -> &GqlScalar {
-        self.as_scalar_value().unwrap()
+        self.as_scalar().unwrap()
     }
 
     fn unordered(&self) -> UnorderedValue {
@@ -309,13 +309,16 @@ impl GraphQLPageDebug {
 
         info!("page_info: {page_info:?}");
 
-        let has_next_page = page_info.field("hasNextPage").as_scalar()?.as_bool()?;
-        let end_cursor = page_info.opt_field("endCursor")?.as_scalar()?.as_string();
+        let has_next_page = page_info.field("hasNextPage").as_scalar()?.try_to_bool()?;
+        let end_cursor = page_info
+            .opt_field("endCursor")?
+            .as_scalar()?
+            .try_to_string();
 
         Some(Self {
             total_count: total_count
                 .and_then(|count| count.as_scalar())
-                .and_then(|scalar| scalar.as_int()),
+                .and_then(|scalar| scalar.try_to_int()),
             has_next_page,
             end_cursor,
         })

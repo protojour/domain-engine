@@ -61,8 +61,8 @@ impl DefId {
         juniper::Value::Scalar(GqlScalar::String(s))
     }
 
-    fn from_input(input: &juniper::InputValue<GqlScalar>) -> Result<Self, String> {
-        let juniper::InputValue::Scalar(GqlScalar::String(string)) = input else {
+    fn from_input(input: &GqlScalar) -> Result<Self, String> {
+        let GqlScalar::String(string) = input else {
             return Err(DefIdParseError::MustBeAString.into());
         };
 

@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
 use domain_engine_core::{VertexAddr, data_store::DataStoreAPI};
 use ontol_runtime::{
@@ -74,10 +74,7 @@ impl IndexingContext {
             vertex_addr.0.iter().copied().collect()
         };
 
-        doc.add_field_value(
-            self.schema.vertex_addr,
-            OwnedValue::Bytes(vertex_addr.iter().copied().collect()),
-        );
+        doc.add_field_value(self.schema.vertex_addr, vertex_addr.as_slice());
 
         let create_time = {
             let Some(Attr::Unit(Value::ChronoDateTime(create_time, _))) =
@@ -108,28 +105,23 @@ impl IndexingContext {
 
         doc.add_field_value(
             self.schema.facet,
-            OwnedValue::Facet(
-                Facet::from_text(&format!("/def/{}:{}", domain.domain_id().id, def_id.tag()))
-                    .unwrap(),
-            ),
+            &Facet::from_text(&format!("/def/{}:{}", domain.domain_id().id, def_id.tag())).unwrap(),
         );
         doc.add_field_value(
             self.schema.facet,
-            OwnedValue::Facet(
-                Facet::from_text(&format!("/domain/{}", domain.domain_id().id)).unwrap(),
-            ),
+            &Facet::from_text(&format!("/domain/{}", domain.domain_id().id)).unwrap(),
         );
 
         if true {
             let mut concat = String::new();
             self.concat_vertex(&vertex, &mut concat);
 
-            doc.add_field_value(self.schema.text, OwnedValue::Str(concat));
+            doc.add_field_value(self.schema.text, &concat);
         }
 
         if let Some(tantivy_value) = self.value_to_tantivy(vertex) {
             debug!("data: {tantivy_value:#?}");
-            doc.add_field_value(self.schema.data, tantivy_value);
+            doc.add_field_value(self.schema.data, &tantivy_value);
         }
 
         Ok(Doc {
@@ -166,7 +158,7 @@ impl IndexingContext {
                 None
             }
             Value::Struct(attrs, _) => {
-                let mut tantivy_map: BTreeMap<String, OwnedValue> = BTreeMap::new();
+                let mut tantivy_map: Vec<(String, OwnedValue)> = vec![];
 
                 for (prop_id, attr) in attrs.into_iter() {
                     let Some(stable_index) = self.indexing_datastore.stable_property_index(prop_id)
@@ -179,7 +171,7 @@ impl IndexingContext {
                         continue;
                     };
 
-                    tantivy_map.insert(stable_index.to_string(), tantivy_value);
+                    tantivy_map.push((stable_index.to_string(), tantivy_value));
                 }
 
                 Some(OwnedValue::Object(tantivy_map))

@@ -1,7 +1,10 @@
 use std::fmt::Display;
 
 use compact_str::CompactString;
-use juniper::ScalarValue;
+use juniper::{
+    AnyExt, FieldError, FromScalarValue, InputValue, IntoFieldError, IntoValue, ScalarValue,
+    TryToPrimitive,
+};
 use serde::{de, ser};
 
 #[derive(Clone, PartialEq, Debug)]
@@ -69,48 +72,127 @@ impl Display for GqlScalar {
     }
 }
 
+impl TryFrom<GqlScalar> for String {
+    type Error = ();
+
+    fn try_from(value: GqlScalar) -> Result<Self, Self::Error> {
+        match value {
+            GqlScalar::String(s) => Ok(s.into()),
+            _ => Err(()),
+        }
+    }
+}
+
 impl ScalarValue for GqlScalar {
-    fn as_int(&self) -> Option<i32> {
+    fn is_type<T: std::any::Any + ?Sized>(&self) -> bool {
         match self {
-            Self::I32(i) => Some(*i),
-            _ => None,
+            GqlScalar::I32(i) => AnyExt::is::<T>(i),
+            GqlScalar::I64(i) => AnyExt::is::<T>(i),
+            GqlScalar::F64(f) => AnyExt::is::<T>(f),
+            GqlScalar::Boolean(b) => AnyExt::is::<T>(b),
+            GqlScalar::String(s) => AnyExt::is::<T>(s),
         }
     }
 
-    fn as_bool(&self) -> Option<bool> {
+    fn downcast_type<T: std::any::Any>(&self) -> Option<&T> {
         match self {
-            Self::Boolean(b) => Some(*b),
-            _ => None,
+            GqlScalar::I32(i) => AnyExt::downcast_ref(i),
+            GqlScalar::I64(i) => AnyExt::downcast_ref(i),
+            GqlScalar::F64(f) => AnyExt::downcast_ref(f),
+            GqlScalar::Boolean(b) => AnyExt::downcast_ref(b),
+            GqlScalar::String(s) => AnyExt::downcast_ref(s),
         }
     }
+}
 
-    fn as_float(&self) -> Option<f64> {
+impl IntoValue<GqlScalar> for GqlScalar {
+    fn into_value(self) -> juniper::Value<GqlScalar> {
+        juniper::Value::Scalar(self)
+    }
+}
+
+pub struct ToPrimitiveError;
+
+impl IntoFieldError<GqlScalar> for ToPrimitiveError {
+    fn into_field_error(self) -> FieldError<GqlScalar> {
+        FieldError::new("prmitive conversion failed", juniper::Value::Null)
+    }
+}
+
+impl Display for ToPrimitiveError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "failed to convert to primitive")
+    }
+}
+
+impl<'a> TryToPrimitive<'a, bool> for GqlScalar {
+    type Error = ToPrimitiveError;
+
+    fn try_to_primitive(&'a self) -> Result<bool, Self::Error> {
         match self {
-            Self::I32(i) => Some(*i as f64),
-            Self::F64(f) => Some(*f),
-            _ => None,
+            Self::Boolean(b) => Ok(*b),
+            _ => Err(ToPrimitiveError),
         }
     }
+}
 
-    fn as_str(&self) -> Option<&str> {
+impl<'a> TryToPrimitive<'a, i32> for GqlScalar {
+    type Error = ToPrimitiveError;
+
+    fn try_to_primitive(&'a self) -> Result<i32, Self::Error> {
         match self {
-            Self::String(s) => Some(s),
-            _ => None,
+            Self::I32(i) => Ok(*i),
+            _ => Err(ToPrimitiveError),
         }
     }
+}
 
-    fn as_string(&self) -> Option<std::string::String> {
+impl<'a> TryToPrimitive<'a, f64> for GqlScalar {
+    type Error = ToPrimitiveError;
+
+    fn try_to_primitive(&'a self) -> Result<f64, Self::Error> {
         match self {
-            Self::String(s) => Some(s.as_str().into()),
-            _ => None,
+            Self::F64(f) => Ok(*f),
+            _ => Err(ToPrimitiveError),
         }
     }
+}
 
-    fn into_string(self) -> Option<std::string::String> {
+impl<'a> TryToPrimitive<'a, String> for GqlScalar {
+    type Error = ToPrimitiveError;
+
+    fn try_to_primitive(&'a self) -> Result<String, Self::Error> {
         match self {
-            Self::String(s) => Some(s.into()),
-            _ => None,
+            Self::String(s) => Ok(String::from(s.as_str())),
+            _ => Err(ToPrimitiveError),
         }
+    }
+}
+
+impl<'a> TryToPrimitive<'a, &'a str> for GqlScalar {
+    type Error = ToPrimitiveError;
+
+    fn try_to_primitive(&'a self) -> Result<&'a str, Self::Error> {
+        match self {
+            Self::String(s) => Ok(s),
+            _ => Err(ToPrimitiveError),
+        }
+    }
+}
+
+pub struct FromScalarValueError;
+
+impl<'a> FromScalarValue<'a, GqlScalar> for InputValue<GqlScalar> {
+    type Error = FromScalarValueError;
+
+    fn from_scalar_value(v: &'a GqlScalar) -> Result<Self, Self::Error> {
+        Ok(InputValue::Scalar(v.clone()))
+    }
+}
+
+impl IntoFieldError<GqlScalar> for FromScalarValueError {
+    fn into_field_error(self) -> FieldError<GqlScalar> {
+        FieldError::new("scalar value error", juniper::Value::Null)
     }
 }
 

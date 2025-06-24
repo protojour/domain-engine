@@ -276,6 +276,6 @@ impl ser::SerializeMap for JuniperObjectSerializer {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        Ok(self.object.into())
+        Ok(juniper::Value::Object(self.object))
     }
 }

@@ -1,3 +1,4 @@
+use compact_str::ToCompactString;
 use domain_engine_core::Session;
 use domain_engine_graphql::{
     domain::context::ServiceCtx,
@@ -22,7 +23,10 @@ impl From<OntologyParams> for juniper::Variables<GqlScalar> {
     fn from(value: OntologyParams) -> Self {
         let mut variables = juniper::Variables::default();
         if let Some(def_id) = value.def_id {
-            variables.insert("defId".to_string(), def_id.to_string().into());
+            variables.insert(
+                "defId".to_string(),
+                juniper::InputValue::Scalar(GqlScalar::String(def_id.to_compact_string())),
+            );
         }
         variables
     }
@@ -40,15 +44,18 @@ fn expected_defs() -> juniper::Value<GqlScalar> {
             let mut obj = juniper::Object::with_capacity(2);
             obj.add_field(
                 "id",
-                format!(
-                    "{}01GNYFZP30ED0EZ1579TH0D55P§0:{}",
-                    if persistent { "" } else { "~" },
-                    self.next_tag
+                GqlScalar::String(
+                    format!(
+                        "{}01GNYFZP30ED0EZ1579TH0D55P§0:{}",
+                        if persistent { "" } else { "~" },
+                        self.next_tag
+                    )
+                    .into(),
                 )
                 .into(),
             );
-            obj.add_field("ident", ident.into());
-            obj.add_field("kind", kind.into());
+            obj.add_field("ident", GqlScalar::String(ident.into()).into());
+            obj.add_field("kind", GqlScalar::String(kind.into()).into());
 
             self.next_tag += 1;
             self.list.push(juniper::Value::Object(obj));
@@ -512,7 +519,7 @@ async fn test_ontology_stix(ds: &str) {
                 .field("defs")
                 .element(0)
                 .field("propId")
-                .as_scalar_value()
+                .as_scalar()
                 .unwrap()
                 .to_string()
         };
@@ -600,7 +607,7 @@ async fn test_ontology_stix(ds: &str) {
             .element(0)
             .field("address")
             .scalar()
-            .as_string()
+            .try_as_str()
             .unwrap();
 
         info!("filter by address");
